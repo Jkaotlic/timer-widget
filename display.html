@@ -44,44 +44,111 @@
             padding: 40px;
         }
 
-        /* Верхняя панель с часами */
-        .top-info {
-            position: fixed;
-            top: 30px;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: center;
-            gap: 60px;
-            z-index: 10;
-        }
-
+        /* Информационные блоки (текущее время, время мероприятия) */
         .info-block {
+            --info-scale: 1;
+            position: fixed;
             text-align: center;
             opacity: 0;
-            transform: translateY(-20px);
+            transform: scale(calc(0.9 * var(--info-scale)));
             transition: all 0.4s ease;
+            z-index: 100;
+            padding: 15px 25px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .info-block.visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: scale(var(--info-scale));
         }
 
+        /* Позиции с правильными transform-origin */
+        .info-block.top-left { top: 30px; left: 30px; transform-origin: top left; }
+        .info-block.top-center { top: 30px; left: 50%; transform-origin: top center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-center.visible { transform: translateX(-50%) scale(var(--info-scale)); }
+        .info-block.top-right { top: 30px; right: 30px; transform-origin: top right; }
+        .info-block.bottom-left { bottom: 120px; left: 30px; transform-origin: bottom left; }
+        .info-block.bottom-center { bottom: 120px; left: 50%; transform-origin: bottom center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-center.visible { transform: translateX(-50%) scale(var(--info-scale)); }
+        .info-block.bottom-right { bottom: 120px; right: 30px; transform-origin: bottom right; }
+        
+        /* Дополнительные позиции для линейных пресетов */
+        .info-block.top-left-third { top: 30px; left: 15%; transform-origin: top left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-left-third.visible { transform: translateX(-50%) scale(var(--info-scale)); }
+        .info-block.top-right-third { top: 30px; right: 15%; transform-origin: top right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-right-third.visible { transform: translateX(50%) scale(var(--info-scale)); }
+        .info-block.bottom-left-third { bottom: 120px; left: 15%; transform-origin: bottom left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-left-third.visible { transform: translateX(-50%) scale(var(--info-scale)); }
+        .info-block.bottom-right-third { bottom: 120px; right: 15%; transform-origin: bottom right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-right-third.visible { transform: translateX(50%) scale(var(--info-scale)); }
+
         .info-label {
-            font-size: 0.85em;
+            font-size: 0.75em;
             text-transform: uppercase;
             letter-spacing: 2px;
             color: rgba(255, 255, 255, 0.5);
             margin-bottom: 8px;
+            transition: all 0.3s ease;
         }
 
         .info-value {
-            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-size: 2rem;
             font-weight: 600;
             font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
             color: rgba(255, 255, 255, 0.9);
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            white-space: nowrap;
+            transition: all 0.3s ease;
+        }
+
+        /* ===== Стили информационных блоков для разных режимов ===== */
+        
+        /* Стиль: Цифровой LED */
+        body.style-digital .info-block {
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 2px solid #333;
+            box-shadow: 
+                inset 0 0 30px rgba(0, 0, 0, 0.8),
+                0 0 20px rgba(0, 0, 0, 0.5),
+                0 0 40px rgba(0, 255, 136, 0.1);
+        }
+
+        body.style-digital .info-label {
+            color: rgba(0, 255, 136, 0.5);
+            text-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+        }
+
+        body.style-digital .info-value {
+            font-family: 'Courier New', 'Consolas', monospace;
+            color: #00ff88;
+            text-shadow: 
+                0 0 10px #00ff88,
+                0 0 20px #00ff88,
+                0 0 40px rgba(0, 255, 136, 0.4);
+        }
+
+        /* Стиль: Перекидные часы */
+        body.style-flip .info-block {
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        body.style-flip .info-label {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        body.style-flip .info-value {
+            font-family: 'Arial Black', 'Helvetica', sans-serif;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
         }
 
         /* Круговой таймер */
@@ -201,9 +268,13 @@
             50% { transform: scale(1.02); }
         }
 
-        /* Статус */
+        /* Статус - фиксированный внизу */
         .status-container {
-            margin-top: 30px;
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
         }
 
         .status-pill {
@@ -270,23 +341,315 @@
             0%, 100% { filter: brightness(1); }
             50% { filter: brightness(1.5); }
         }
+
+        /* ===== Стили статус-пилюли для разных режимов ===== */
+        
+        /* Стиль: Цифровой LED */
+        body.style-digital .status-pill {
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 2px solid #333;
+            border-radius: 10px;
+            color: #00ff88;
+            text-shadow: 0 0 10px #00ff88;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+        }
+
+        body.style-digital .status-pill.running {
+            color: #00ff88;
+            text-shadow: 0 0 15px #00ff88;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 136, 0.2);
+        }
+
+        body.style-digital .status-pill.paused {
+            color: #ffcc00;
+            text-shadow: 0 0 10px #ffcc00;
+        }
+
+        body.style-digital .status-pill.finished {
+            color: #ff3333;
+            text-shadow: 0 0 15px #ff3333;
+        }
+
+        body.style-digital .status-dot {
+            box-shadow: 0 0 8px currentColor;
+        }
+
+        /* Стиль: Перекидные часы */
+        body.style-flip .status-pill {
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        /* ============================================
+           СТИЛЬ: ЦИФРОВОЙ LED (Digital)
+           ============================================ */
+        .timer-digital {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .timer-digital.active {
+            display: flex;
+        }
+
+        .digital-display {
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+            border-radius: 20px;
+            padding: 40px 60px;
+            border: 3px solid #333;
+            box-shadow: 
+                inset 0 0 60px rgba(0, 0, 0, 0.8),
+                0 0 40px rgba(0, 0, 0, 0.5),
+                0 0 100px rgba(102, 126, 234, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .digital-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .digital-time {
+            font-family: 'Courier New', 'Consolas', monospace;
+            font-size: clamp(4rem, 15vw, 12rem);
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 
+                0 0 20px #00ff88,
+                0 0 40px #00ff88,
+                0 0 80px #00ff8866;
+            letter-spacing: 8px;
+            position: relative;
+        }
+
+        .digital-time.warning {
+            color: #ffcc00;
+            text-shadow: 
+                0 0 20px #ffcc00,
+                0 0 40px #ffcc00,
+                0 0 80px #ffcc0066;
+        }
+
+        .digital-time.danger {
+            color: #ff3333;
+            text-shadow: 
+                0 0 20px #ff3333,
+                0 0 40px #ff3333,
+                0 0 80px #ff333366;
+            animation: led-blink 0.5s infinite;
+        }
+
+        @keyframes led-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .digital-dots {
+            display: inline-block;
+            animation: dots-blink 1s infinite;
+        }
+
+        @keyframes dots-blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        /* ============================================
+           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip Clock)
+           ============================================ */
+        .timer-flip {
+            display: none;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 40px;
+        }
+
+        .timer-flip.active {
+            display: flex;
+        }
+
+        .flip-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .flip-separator {
+            font-size: clamp(3rem, 10vw, 8rem);
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .flip-card {
+            position: relative;
+            width: clamp(60px, 12vw, 140px);
+            height: clamp(80px, 16vw, 180px);
+            perspective: 1000px;
+        }
+
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 49.9%, #0a0a0a 50%, #1a1a1a 100%);
+            border-radius: 12px;
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .flip-card-inner::before {
+            content: '';
+            position: absolute;
+            top: 49.5%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #000;
+            z-index: 10;
+        }
+
+        .flip-card-inner::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .flip-digit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Arial Black', 'Helvetica', sans-serif;
+            font-size: clamp(2.5rem, 8vw, 6rem);
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .flip-card.warning .flip-digit {
+            color: #ffc107;
+        }
+
+        .flip-card.danger .flip-digit {
+            color: #ff4444;
+        }
+
+        .flip-label {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Анимация перекидывания */
+        .flip-card.flipping .flip-card-inner {
+            animation: flip-animation 0.3s ease-in-out;
+        }
+
+        @keyframes flip-animation {
+            0% { transform: rotateX(0); }
+            50% { transform: rotateX(-10deg); }
+            100% { transform: rotateX(0); }
+        }
+
+        /* Скрытие неактивных стилей - все скрыты по умолчанию */
+        .timer-ring,
+        .timer-digital,
+        .timer-flip {
+            display: none !important;
+        }
+
+        /* Показываем только активный */
+        .timer-ring.active {
+            display: block !important;
+        }
+        
+        .timer-digital.active {
+            display: flex !important;
+        }
+        
+        .timer-flip.active {
+            display: flex !important;
+        }
+        /* Кнопка закрытия */
+        .close-btn {
+            position: fixed;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 18px;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 68, 68, 0.4);
+            color: white;
+            transform: translateY(-50%) scale(1.15);
+        }
+
+        body:hover .close-btn {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
-    <!-- Верхняя информационная панель -->
-    <div class="top-info">
-        <div class="info-block" id="currentTimeBlock">
-            <div class="info-label">Текущее время</div>
-            <div class="info-value" id="currentTime">00:00:00</div>
-        </div>
-        <div class="info-block" id="eventTimeBlock">
-            <div class="info-label">Начало мероприятия</div>
-            <div class="info-value" id="eventTime">10:00</div>
-        </div>
+    <!-- Кнопка закрытия -->
+    <button class="close-btn" id="closeBtn" title="Закрыть">✕</button>
+
+    <!-- Информационные блоки (независимое позиционирование) -->
+    <div class="info-block top-left" id="currentTimeBlock">
+        <div class="info-label">Текущее время</div>
+        <div class="info-value" id="currentTime">00:00:00</div>
+    </div>
+    <div class="info-block top-right" id="eventTimeBlock">
+        <div class="info-label">Начало</div>
+        <div class="info-value" id="eventTime">10:00</div>
+    </div>
+    <div class="info-block bottom-center" id="endTimeBlock">
+        <div class="info-label">Окончание</div>
+        <div class="info-value" id="endTime">12:00</div>
     </div>
 
     <div class="display-container">
-        <div class="timer-ring" id="timerRing">
+        <div class="timer-ring active" id="timerRing">
             <svg class="timer-svg" viewBox="0 0 400 400">
                 <defs>
                     <!-- Основной градиент -->
@@ -341,12 +704,56 @@
             </div>
         </div>
 
-        <!-- Статус -->
-        <div class="status-container">
-            <div class="status-pill" id="statusPill">
-                <span class="status-dot"></span>
-                <span id="statusText">Готов к запуску</span>
+        <!-- Стиль: Цифровой LED -->
+        <div class="timer-digital" id="timerDigital">
+            <div class="digital-display">
+                <div class="digital-time" id="digitalTime">
+                    <span id="digitalMinutes">00</span><span class="digital-dots">:</span><span id="digitalSeconds">00</span>
+                </div>
             </div>
+        </div>
+
+        <!-- Стиль: Перекидные часы -->
+        <div class="timer-flip" id="timerFlip">
+            <div class="flip-unit">
+                <div class="flip-group" id="flipMinutes">
+                    <div class="flip-card" id="flipMin1">
+                        <div class="flip-card-inner">
+                            <span class="flip-digit">0</span>
+                        </div>
+                    </div>
+                    <div class="flip-card" id="flipMin2">
+                        <div class="flip-card-inner">
+                            <span class="flip-digit">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-label">минуты</div>
+            </div>
+            <div class="flip-separator">:</div>
+            <div class="flip-unit">
+                <div class="flip-group" id="flipSeconds">
+                    <div class="flip-card" id="flipSec1">
+                        <div class="flip-card-inner">
+                            <span class="flip-digit">0</span>
+                        </div>
+                    </div>
+                    <div class="flip-card" id="flipSec2">
+                        <div class="flip-card-inner">
+                            <span class="flip-digit">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-label">секунды</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статус (фиксированный внизу) -->
+    <div class="status-container">
+        <div class="status-pill" id="statusPill">
+            <span class="status-dot"></span>
+            <span id="statusText">Готов к запуску</span>
         </div>
     </div>
 

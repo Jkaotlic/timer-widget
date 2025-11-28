@@ -95,10 +95,10 @@ function startTimer() {
 
 function createControlWindow() {
     controlWindow = new BrowserWindow({
-        width: 650,
-        height: 900,
-        minWidth: 550,
-        minHeight: 700,
+        width: 420,
+        height: 500,
+        minWidth: 350,
+        minHeight: 300,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
@@ -146,11 +146,21 @@ function createWidgetWindow() {
     });
 }
 
-function createDisplayWindow() {
+function createDisplayWindow(displayIndex) {
     const displays = screen.getAllDisplays();
-    const externalDisplay = displays.find(display => display.bounds.x !== 0 || display.bounds.y !== 0);
+    let targetDisplay;
     
-    let displayBounds = externalDisplay ? externalDisplay.bounds : screen.getPrimaryDisplay().bounds;
+    if (displayIndex === 'auto' || displayIndex === undefined) {
+        // Авто: предпочитаем внешний монитор
+        targetDisplay = displays.find(display => display.bounds.x !== 0 || display.bounds.y !== 0) 
+            || screen.getPrimaryDisplay();
+    } else {
+        // Выбранный монитор по индексу
+        const idx = parseInt(displayIndex);
+        targetDisplay = displays[idx] || screen.getPrimaryDisplay();
+    }
+    
+    const displayBounds = targetDisplay.bounds;
 
     displayWindow = new BrowserWindow({
         width: displayBounds.width,
@@ -256,6 +266,26 @@ ipcMain.on('get-timer-state', (event) => {
     event.reply('timer-state', timerState);
 });
 
+// Изменение размера окна управления
+ipcMain.on('resize-control-window', (event, size) => {
+    if (controlWindow) {
+        const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+        const targetWidth = Math.min(size.width || 420, screenWidth - 50);
+        const targetHeight = Math.min(size.height || 400, screenHeight - 50);
+        
+        // Получаем текущую позицию окна
+        const [x, y] = controlWindow.getPosition();
+        
+        // Устанавливаем размер
+        controlWindow.setSize(targetWidth, targetHeight);
+        
+        // Проверяем, не выходит ли окно за экран
+        if (y + targetHeight > screenHeight) {
+            controlWindow.setPosition(x, Math.max(0, screenHeight - targetHeight - 20));
+        }
+    }
+});
+
 // Рассылка обновления цветов всем окнам
 ipcMain.on('colors-update', (event, colors) => {
     if (widgetWindow) {
@@ -298,9 +328,15 @@ ipcMain.on('close-widget', () => {
     }
 });
 
-ipcMain.on('open-display', () => {
+// Получение списка мониторов
+ipcMain.on('get-displays', (event) => {
+    const displays = screen.getAllDisplays();
+    event.sender.send('displays-list', displays);
+});
+
+ipcMain.on('open-display', (event, options = {}) => {
     if (!displayWindow) {
-        createDisplayWindow();
+        createDisplayWindow(options.displayIndex);
         if (displayWindow) {
             displayWindow.webContents.on('did-finish-load', () => {
                 displayWindow.webContents.send('timer-state', timerState);

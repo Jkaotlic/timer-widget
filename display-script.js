@@ -16,14 +16,25 @@ class DisplayTimer {
         this.showCurrentTime = false;
         this.showEventTime = false;
         this.eventTime = '10:00';
+        this.showEndTime = false;
+        this.endTime = '12:00';
         this.timerScale = 100;
+        this.timerStyle = 'circle';
+        this.lastFlipValues = { min1: '', min2: '', sec1: '', sec2: '' };
 
         this.initElements();
         this.initProgress();
         this.loadColors();
+        this.initDefaultStyle();
         this.detectElectronAndSetup();
         this.startColorSync();
         this.startCurrentTimeClock();
+    }
+    
+    initDefaultStyle() {
+        // По умолчанию показываем круговой стиль
+        if (this.timerRing) this.timerRing.classList.add('active');
+        document.body.classList.add('style-circle');
     }
 
     initElements() {
@@ -34,8 +45,35 @@ class DisplayTimer {
         this.timerRing = document.getElementById('timerRing');
         this.currentTimeBlock = document.getElementById('currentTimeBlock');
         this.eventTimeBlock = document.getElementById('eventTimeBlock');
+        this.endTimeBlock = document.getElementById('endTimeBlock');
         this.currentTimeEl = document.getElementById('currentTime');
         this.eventTimeEl = document.getElementById('eventTime');
+        this.endTimeEl = document.getElementById('endTime');
+        this.closeBtn = document.getElementById('closeBtn');
+        
+        // Элементы для разных стилей
+        this.timerDigital = document.getElementById('timerDigital');
+        this.timerFlip = document.getElementById('timerFlip');
+        this.digitalTime = document.getElementById('digitalTime');
+        this.digitalMinutes = document.getElementById('digitalMinutes');
+        this.digitalSeconds = document.getElementById('digitalSeconds');
+        
+        // Flip карточки
+        this.flipMin1 = document.getElementById('flipMin1');
+        this.flipMin2 = document.getElementById('flipMin2');
+        this.flipSec1 = document.getElementById('flipSec1');
+        this.flipSec2 = document.getElementById('flipSec2');
+        
+        // Обработчик кнопки закрытия
+        if (this.closeBtn) {
+            this.closeBtn.addEventListener('click', () => {
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('close-display');
+                } else {
+                    window.close();
+                }
+            });
+        }
     }
 
     initProgress() {
@@ -94,6 +132,7 @@ class DisplayTimer {
         });
 
         this.ipcRenderer.on('display-settings-update', (event, settings) => {
+            console.log('Display received settings:', settings);
             if (settings.bgMode || settings.bgSolid || settings.bgGrad1) {
                 this.applyBackground(settings);
             }
@@ -102,34 +141,129 @@ class DisplayTimer {
     }
     
     applyDisplaySettings(settings) {
-        // Показ/скрытие текущего времени
-        if (settings.showCurrentTime !== undefined) {
-            this.showCurrentTime = settings.showCurrentTime;
-            if (this.currentTimeBlock) {
-                this.currentTimeBlock.classList.toggle('visible', this.showCurrentTime);
-            }
+        // Стиль таймера
+        if (settings.timerStyle) {
+            this.setTimerStyle(settings.timerStyle);
         }
         
-        // Показ/скрытие времени мероприятия
-        if (settings.showEventTime !== undefined) {
-            this.showEventTime = settings.showEventTime;
-            if (this.eventTimeBlock) {
-                this.eventTimeBlock.classList.toggle('visible', this.showEventTime);
+        // Пресет расположения блоков времени
+        const showBlocks = settings.showTimeBlocks !== undefined ? settings.showTimeBlocks : false;
+        const preset = settings.timeLayoutPreset || 'frame';
+        
+        // Определяем позиции по пресету
+        const presetPositions = {
+            'frame': { 
+                current: 'top-center', 
+                start: 'bottom-left', 
+                end: 'bottom-right' 
+            },
+            'top-line': { 
+                current: 'top-center', 
+                start: 'top-left-third', 
+                end: 'top-right-third' 
+            },
+            'bottom-line': { 
+                current: 'bottom-center', 
+                start: 'bottom-left-third', 
+                end: 'bottom-right-third' 
+            },
+            'corners': { 
+                current: 'top-left', 
+                start: 'top-right', 
+                end: 'bottom-right' 
             }
+        };
+        
+        const positions = presetPositions[preset] || presetPositions['frame'];
+        
+        // Показ/скрытие всех блоков времени
+        if (this.currentTimeBlock) {
+            this.currentTimeBlock.classList.toggle('visible', showBlocks);
+            this.applyPosition(this.currentTimeBlock, positions.current);
+        }
+        if (this.eventTimeBlock) {
+            this.eventTimeBlock.classList.toggle('visible', showBlocks);
+            this.applyPosition(this.eventTimeBlock, positions.start);
+        }
+        if (this.endTimeBlock) {
+            this.endTimeBlock.classList.toggle('visible', showBlocks);
+            this.applyPosition(this.endTimeBlock, positions.end);
         }
         
-        // Время мероприятия
+        // Время начала
         if (settings.eventTime && this.eventTimeEl) {
             this.eventTime = settings.eventTime;
             this.eventTimeEl.textContent = settings.eventTime;
         }
         
+        // Время окончания
+        if (settings.endTime && this.endTimeEl) {
+            this.endTime = settings.endTime;
+            this.endTimeEl.textContent = settings.endTime;
+        }
+        
         // Масштаб таймера
-        if (settings.timerScale !== undefined && this.timerRing) {
+        if (settings.timerScale !== undefined) {
             this.timerScale = settings.timerScale;
             const scale = settings.timerScale / 100;
-            this.timerRing.style.transform = `scale(${scale})`;
+            // Применяем масштаб к активному стилю
+            if (this.timerRing) this.timerRing.style.transform = `scale(${scale})`;
+            if (this.timerDigital) this.timerDigital.style.transform = `scale(${scale})`;
+            if (this.timerFlip) this.timerFlip.style.transform = `scale(${scale})`;
         }
+        
+        // Масштаб блоков времени (общий)
+        if (settings.timeBlocksScale !== undefined) {
+            const scale = settings.timeBlocksScale / 100;
+            if (this.currentTimeBlock) this.currentTimeBlock.style.setProperty('--info-scale', scale);
+            if (this.eventTimeBlock) this.eventTimeBlock.style.setProperty('--info-scale', scale);
+            if (this.endTimeBlock) this.endTimeBlock.style.setProperty('--info-scale', scale);
+        }
+    }
+    
+    setTimerStyle(style) {
+        this.timerStyle = style;
+        
+        // Удаляем все классы стилей с body
+        document.body.classList.remove('style-circle', 'style-digital', 'style-flip');
+        
+        // Скрываем все стили таймера
+        if (this.timerRing) this.timerRing.classList.remove('active');
+        if (this.timerDigital) this.timerDigital.classList.remove('active');
+        if (this.timerFlip) this.timerFlip.classList.remove('active');
+        
+        // Показываем выбранный и добавляем класс на body
+        switch (style) {
+            case 'circle':
+                if (this.timerRing) this.timerRing.classList.add('active');
+                document.body.classList.add('style-circle');
+                break;
+            case 'digital':
+                if (this.timerDigital) this.timerDigital.classList.add('active');
+                document.body.classList.add('style-digital');
+                break;
+            case 'flip':
+                if (this.timerFlip) this.timerFlip.classList.add('active');
+                document.body.classList.add('style-flip');
+                break;
+        }
+        
+        // Обновляем отображение
+        this.updateDisplay();
+    }
+    
+    applyPosition(element, position) {
+        console.log('Applying position:', position, 'to', element.id);
+        // Удаляем все классы позиции
+        element.classList.remove(
+            'top-left', 'top-center', 'top-right',
+            'bottom-left', 'bottom-center', 'bottom-right',
+            'top-left-third', 'top-right-third',
+            'bottom-left-third', 'bottom-right-third'
+        );
+        // Добавляем новый класс позиции
+        element.classList.add(position);
+        console.log('Element classes now:', element.className);
     }
 
     startLocalStorageSync() {
@@ -321,12 +455,18 @@ class DisplayTimer {
         const secs = Math.floor(this.remainingSeconds);
         const formatted = this.formatTime(secs);
         
-        // Обновляем время
+        // Обновляем время для кругового стиля
         this.timeDisplay.textContent = formatted;
         
         // Добавляем класс compact для длинного времени (минус или часы)
         const isCompact = secs < 0 || Math.abs(secs) >= 3600 || formatted.length > 5;
         this.timeDisplay.classList.toggle('compact', isCompact);
+
+        // Обновляем цифровой стиль
+        this.updateDigitalDisplay(secs, formatted);
+        
+        // Обновляем перекидные часы
+        this.updateFlipDisplay(secs);
 
         // Обновляем прогресс
         this.updateProgress();
@@ -337,6 +477,79 @@ class DisplayTimer {
         // Эффект завершения
         if (this.finished && !this.flashInterval) {
             this.triggerFinishEffect();
+        }
+    }
+    
+    updateDigitalDisplay(secs, formatted) {
+        if (!this.digitalMinutes || !this.digitalSeconds) return;
+        
+        const absSecs = Math.abs(secs);
+        const mins = Math.floor(absSecs / 60);
+        const seconds = absSecs % 60;
+        
+        const prefix = secs < 0 ? '-' : '';
+        this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
+        this.digitalSeconds.textContent = String(seconds).padStart(2, '0');
+        
+        // Классы предупреждения
+        this.digitalTime.classList.remove('warning', 'danger');
+        if (this.totalSeconds > 0) {
+            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+            if (percentLeft <= 10 && percentLeft > 0) {
+                this.digitalTime.classList.add('danger');
+            } else if (percentLeft <= 25) {
+                this.digitalTime.classList.add('warning');
+            }
+        }
+    }
+    
+    updateFlipDisplay(secs) {
+        if (!this.flipMin1 || !this.flipMin2 || !this.flipSec1 || !this.flipSec2) return;
+        
+        const absSecs = Math.abs(secs);
+        const mins = Math.floor(absSecs / 60);
+        const seconds = absSecs % 60;
+        
+        const min1 = String(Math.floor(mins / 10) % 10);
+        const min2 = String(mins % 10);
+        const sec1 = String(Math.floor(seconds / 10));
+        const sec2 = String(seconds % 10);
+        
+        // Анимация перекидывания при изменении
+        this.updateFlipCard(this.flipMin1, min1, 'min1');
+        this.updateFlipCard(this.flipMin2, min2, 'min2');
+        this.updateFlipCard(this.flipSec1, sec1, 'sec1');
+        this.updateFlipCard(this.flipSec2, sec2, 'sec2');
+        
+        // Классы предупреждения
+        const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2];
+        flipCards.forEach(card => {
+            card.classList.remove('warning', 'danger');
+        });
+        
+        if (this.totalSeconds > 0) {
+            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+            flipCards.forEach(card => {
+                if (percentLeft <= 10 && percentLeft > 0) {
+                    card.classList.add('danger');
+                } else if (percentLeft <= 25) {
+                    card.classList.add('warning');
+                }
+            });
+        }
+    }
+    
+    updateFlipCard(card, value, key) {
+        const digit = card.querySelector('.flip-digit');
+        if (digit.textContent !== value) {
+            // Запускаем анимацию
+            card.classList.add('flipping');
+            digit.textContent = value;
+            this.lastFlipValues[key] = value;
+            
+            setTimeout(() => {
+                card.classList.remove('flipping');
+            }, 300);
         }
     }
 
