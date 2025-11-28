@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление Таймером</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Новый современный UI */
+        .control-window {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            padding: 0;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+            max-width: 480px;
+            width: 100%;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        /* Верхняя секция с таймером */
+        .timer-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 32px 24px;
+            text-align: center;
+            position: relative;
+        }
+
+        .timer-header h1 {
+            color: white;
+            font-size: 1.2em;
+            font-weight: 500;
+            margin: 0 0 16px 0;
+            opacity: 0.9;
+            letter-spacing: 1px;
+        }
+
+        .timer-display-main {
+            font-size: 4.5em;
+            font-weight: 700;
+            color: white;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        .timer-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            color: white;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-dot.running {
+            background: #38ef7d;
+            box-shadow: 0 0 8px #38ef7d;
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        .status-dot.paused {
+            background: #ffd700;
+        }
+
+        .status-dot.finished {
+            background: #ff4757;
+            animation: pulse-dot 0.5s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+
+        /* Главные кнопки управления */
+        .main-controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 20px 24px;
+            background: #f8f9ff;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .main-btn {
+            width: 64px;
+            height: 64px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .main-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .main-btn:active:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .main-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .main-btn.start {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .main-btn.pause {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .main-btn.reset {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* Секция контента */
+        .content-section {
+            padding: 20px 24px;
+        }
+
+        /* Табы */
+        .tabs {
+            display: flex;
+            background: #f0f2ff;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: none;
+            background: transparent;
+            color: #666;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tab-btn span.icon {
+            font-size: 1.3em;
+        }
+
+        .tab-btn:hover {
+            color: #667eea;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Пресеты времени */
+        .time-presets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .preset-btn {
+            padding: 16px 8px;
+            font-size: 1em;
+            border: 2px solid #e8ecff;
+            border-radius: 12px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+            transform: translateY(-2px);
+        }
+
+        .preset-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Ввод времени */
+        .time-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #f8f9ff;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .time-input {
+            flex: 1;
+            padding: 14px;
+            font-size: 1.2em;
+            text-align: center;
+            border: 2px solid #e8ecff;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            transition: border-color 0.2s;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .time-separator {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .set-time-btn {
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .set-time-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Корректировка времени */
+        .adjust-section {
+            background: #f8f9ff;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .adjust-title {
+            font-size: 0.8em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .adjust-btns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .adjust-btn {
+            flex: 1;
+            min-width: 70px;
+            padding: 10px 8px;
+            font-size: 0.9em;
+            border: none;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .adjust-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .adjust-btn.minus {
+            color: #f5576c;
+        }
+
+        .adjust-btn.minus:hover {
+            background: #f5576c;
+            color: white;
+        }
+
+        /* Кнопки открытия окон */
+        .window-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .window-btn {
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .window-btn .icon {
+            font-size: 1.8em;
+        }
+
+        .window-btn.widget {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .window-btn.display {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .window-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        /* Настройки - секции */
+        .settings-group {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .settings-group-title {
+            font-size: 0.85em;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-group-title .icon {
+            font-size: 1.1em;
+        }
+
+        /* Цвета */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .color-item {
+            text-align: center;
+        }
+
+        .color-item label {
+            display: block;
+            font-size: 0.75em;
+            color: #666;
+            margin-bottom: 6px;
+        }
+
+        .color-picker {
+            width: 100%;
+            height: 48px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        /* Темы */
+        .themes-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .theme-btn {
+            aspect-ratio: 1;
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .theme-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-btn.active {
+            border-color: #333;
+        }
+
+        .theme-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--t1) 0%, var(--t2) 100%);
+        }
+
+        /* Звуки */
+        .sound-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .sound-row:last-child {
+            border-bottom: none;
+        }
+
+        .sound-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 110px;
+        }
+
+        .sound-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+
+        .sound-select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.85em;
+            min-width: 0;
+        }
+
+        .sound-preview {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .sound-preview:hover {
+            background: #5568d3;
+            transform: scale(1.1);
+        }
+
+        /* Кастомные звуки */
+        .custom-sounds-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px dashed rgba(102, 126, 234, 0.2);
+        }
+
+        .custom-sound-list {
+            max-height: 120px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .custom-sound-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #f0f2ff;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 0.85em;
+        }
+
+        .custom-sound-item .name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #333;
+        }
+
+        .custom-sound-item .btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .custom-sound-item .play-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .custom-sound-item .delete-btn {
+            background: rgba(245, 87, 108, 0.15);
+            color: #f5576c;
+        }
+
+        .custom-sound-item .btn:hover {
+            transform: scale(1.1);
+        }
+
+        .add-sound-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .add-sound-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: 2px dashed #ccc;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .add-sound-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .hidden-file-input {
+            display: none;
+        }
+
+        /* Переключатели */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .toggle-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .toggle-label {
+            font-size: 0.9em;
+            color: #333;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 28px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Фон */
+        .bg-mode-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .bg-mode-btn {
+            flex: 1;
+            padding: 8px 4px;
+            border: 2px solid #e8ecff;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .bg-mode-btn.active {
+            border-color: #667eea;
+            background: #f0f2ff;
+            color: #667eea;
+        }
+
+        .bg-controls {
+            display: none;
+        }
+
+        .bg-controls.active {
+            display: block;
+        }
+
+        .gradient-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e8ecff;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        /* Загрузка локального фона */
+        .local-bg-section {
+            margin-top: 12px;
+        }
+
+        .local-bg-preview {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            border-radius: 12px;
+            background: #f0f2ff;
+            border: 2px dashed #ccc;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .local-bg-preview:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .local-bg-preview.has-image {
+            border-style: solid;
+            border-color: #667eea;
+        }
+
+        .local-bg-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .local-bg-placeholder {
+            text-align: center;
+            color: #999;
+        }
+
+        .local-bg-placeholder .icon {
+            font-size: 2em;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .local-bg-placeholder .text {
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .local-bg-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .local-bg-preview:hover .local-bg-actions {
+            opacity: 1;
+        }
+
+        .local-bg-action-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .local-bg-action-btn.change {
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+        }
+
+        .local-bg-action-btn.delete {
+            background: rgba(245, 87, 108, 0.9);
+            color: white;
+        }
+
+        .local-bg-action-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .bg-fit-options {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .bg-fit-btn {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #e8ecff;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .bg-fit-btn.active {
+            border-color: #667eea;
+            background: #f0f2ff;
+            color: #667eea;
+        }
+
+        .bg-overlay-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .bg-overlay-row label {
+            font-size: 0.8em;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .bg-overlay-row input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: #e8ecff;
+            border-radius: 3px;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .bg-overlay-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        .bg-overlay-value {
+            font-size: 0.8em;
+            color: #667eea;
+            font-weight: 600;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        /* Кнопка сброса */
+        .reset-btn {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e8ecff;
+            background: white;
+            border-radius: 10px;
+            color: #666;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .reset-btn:hover {
+            border-color: #f5576c;
+            color: #f5576c;
+        }
+
+        /* Скролл в окне */
+        .control-window {
+            overflow-y: auto;
+        }
+
+        .control-window::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .control-window::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .control-window::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 500px) {
+            .timer-display-main {
+                font-size: 3.5em;
+            }
+            
+            .time-presets {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .themes-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body class="control-window">
+    <div class="control-panel">
+        <!-- Заголовок с таймером -->
+        <div class="timer-header">
+            <h1>⏱️ ТАЙМЕР</h1>
+            <div class="timer-display-main" id="controlTime">00:00</div>
+            <div class="timer-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Готов</span>
+            </div>
+        </div>
+
+        <!-- Главные кнопки управления -->
+        <div class="main-controls">
+            <button class="main-btn start" id="startBtn" title="Старт">▶</button>
+            <button class="main-btn pause" id="pauseBtn" title="Пауза" disabled>⏸</button>
+            <button class="main-btn reset" id="resetBtn" title="Сброс">↺</button>
+        </div>
+
+        <!-- Контент с табами -->
+        <div class="content-section">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="time">
+                    <span class="icon">⏰</span>
+                    <span>Время</span>
+                </button>
+                <button class="tab-btn" data-tab="windows">
+                    <span class="icon">🖥️</span>
+                    <span>Окна</span>
+                </button>
+                <button class="tab-btn" data-tab="style">
+                    <span class="icon">🎨</span>
+                    <span>Стиль</span>
+                </button>
+                <button class="tab-btn" data-tab="sound">
+                    <span class="icon">🔊</span>
+                    <span>Звук</span>
+                </button>
+            </div>
+
+            <!-- Таб: Время -->
+            <div class="tab-content active" id="tab-time">
+                <div class="time-presets">
+                    <button class="preset-btn" data-minutes="5">5 мин</button>
+                    <button class="preset-btn" data-minutes="10">10 мин</button>
+                    <button class="preset-btn" data-minutes="15">15 мин</button>
+                    <button class="preset-btn" data-minutes="30">30 мин</button>
+                    <button class="preset-btn" data-minutes="45">45 мин</button>
+                    <button class="preset-btn" data-minutes="60">60 мин</button>
+                </div>
+
+                <div class="time-input-group">
+                    <input type="number" class="time-input" id="customMinutes" min="0" max="999" placeholder="00" value="">
+                    <span class="time-separator">:</span>
+                    <input type="number" class="time-input" id="customSeconds" min="0" max="59" placeholder="00" value="">
+                    <button class="set-time-btn" id="setCustomTime">✓</button>
+                </div>
+
+                <div class="adjust-section">
+                    <div class="adjust-title">Корректировка</div>
+                    <div class="adjust-btns">
+                        <button class="adjust-btn" data-seconds="30">+30с</button>
+                        <button class="adjust-btn" data-seconds="60">+1м</button>
+                        <button class="adjust-btn" data-seconds="300">+5м</button>
+                        <button class="adjust-btn minus" data-seconds="-30">−30с</button>
+                        <button class="adjust-btn minus" data-seconds="-60">−1м</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таб: Окна -->
+            <div class="tab-content" id="tab-windows">
+                <div class="window-btns">
+                    <button class="window-btn widget" id="openWidgetBtn">
+                        <span class="icon">🖥️</span>
+                        <span>Виджет</span>
+                    </button>
+                    <button class="window-btn display" id="openDisplayBtn">
+                        <span class="icon">📺</span>
+                        <span>Полный экран</span>
+                    </button>
+                </div>
+
+                <div class="settings-group" style="margin-top: 20px;">
+                    <div class="settings-group-title">
+                        <span class="icon">⚙️</span>
+                        Дополнительно
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label">Продолжать отсчёт ниже 0</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="allowNegative">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row" id="overrunRow" style="display: none;">
+                        <span class="toggle-label">Лимит перерасхода</span>
+                        <input type="text" id="overrunLimit" placeholder="мм:сс" value="05:00" 
+                               style="width: 80px; padding: 8px; text-align: center; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Таб: Стиль -->
+            <div class="tab-content" id="tab-style">
+                <div class="settings-group">
+                    <div class="settings-group-title">
+                        <span class="icon">🎨</span>
+                        Цвета
+                    </div>
+                    <div class="color-grid">
+                        <div class="color-item">
+                            <label>Таймер</label>
+                            <input type="color" class="color-picker" id="timerColorPicker" value="#667eea">
+                        </div>
+                        <div class="color-item">
+                            <label>Прогресс</label>
+                            <input type="color" class="color-picker" id="progressColorPicker" value="#764ba2">
+                        </div>
+                        <div class="color-item">
+                            <label>Фон</label>
+                            <input type="color" class="color-picker" id="bgColorPicker" value="#0f0c29">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-title">
+                        <span class="icon">✨</span>
+                        Темы
+                    </div>
+                    <div class="themes-grid" id="themesGrid">
+                        <!-- Генерируется JS -->
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-title">
+                        <span class="icon">🖼️</span>
+                        Фон дисплея
+                    </div>
+                    <div class="bg-mode-tabs">
+                        <button class="bg-mode-btn active" data-mode="solid">Цвет</button>
+                        <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
+                        <button class="bg-mode-btn" data-mode="image">URL</button>
+                        <button class="bg-mode-btn" data-mode="local">Файл</button>
+                    </div>
+                    <div class="bg-controls active" id="bgSolidControls">
+                        <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;">
+                    </div>
+                    <div class="bg-controls" id="bgGradientControls">
+                        <div class="gradient-row">
+                            <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29">
+                            <input type="color" class="color-picker" id="bgGrad2" value="#302b63">
+                        </div>
+                    </div>
+                    <div class="bg-controls" id="bgImageControls">
+                        <input type="url" class="url-input" id="bgImageUrl" placeholder="https://example.com/image.jpg">
+                    </div>
+                    <div class="bg-controls" id="bgLocalControls">
+                        <div class="local-bg-section">
+                            <div class="local-bg-preview" id="localBgPreview">
+                                <div class="local-bg-placeholder" id="localBgPlaceholder">
+                                    <span class="icon">📁</span>
+                                    <span class="text">Нажмите для выбора изображения</span>
+                                </div>
+                                <img id="localBgImage" style="display: none;">
+                                <div class="local-bg-actions">
+                                    <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить">🔄</button>
+                                    <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить">✕</button>
+                                </div>
+                            </div>
+                            <input type="file" class="hidden-file-input" id="bgFileInput" 
+                                   accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp">
+                            
+                            <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
+                                <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
+                                <button class="bg-fit-btn" data-fit="contain">Вписать</button>
+                                <button class="bg-fit-btn" data-fit="tile">Плитка</button>
+                            </div>
+                            
+                            <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
+                                <label>Затемнение:</label>
+                                <input type="range" id="bgOverlaySlider" min="0" max="80" value="30">
+                                <span class="bg-overlay-value" id="bgOverlayValue">30%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="reset-btn" id="resetStyleBtn">Сбросить стиль</button>
+                </div>
+            </div>
+
+            <!-- Таб: Звук -->
+            <div class="tab-content" id="tab-sound">
+                <div class="settings-group">
+                    <div class="toggle-row">
+                        <span class="toggle-label" style="font-weight: 600;">🔊 Звуки включены</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="soundMasterEnabled" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-group" id="soundSettings">
+                    <div class="sound-row">
+                        <div class="sound-toggle">
+                            <input type="checkbox" id="soundStartEnabled">
+                            <label for="soundStartEnabled">Старт</label>
+                        </div>
+                        <select class="sound-select" id="soundStartPreset">
+                            <option value="none">— без звука —</option>
+                            <optgroup label="Стандартные">
+                                <option value="beep-short">Короткий бип</option>
+                                <option value="beep-long">Длинный бип</option>
+                                <option value="triple">Тройной сигнал</option>
+                                <option value="chirp">Чирп</option>
+                                <option value="bell">Колокольчик</option>
+                                <option value="ding">Динь</option>
+                                <option value="whoosh">Свист</option>
+                                <option value="click">Клик</option>
+                            </optgroup>
+                            <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
+                        </select>
+                        <button class="sound-preview" id="soundStartPreview">▶</button>
+                    </div>
+
+                    <div class="sound-row">
+                        <div class="sound-toggle">
+                            <input type="checkbox" id="soundEndEnabled" checked>
+                            <label for="soundEndEnabled">Финиш</label>
+                        </div>
+                        <select class="sound-select" id="soundEndPreset">
+                            <option value="none">— без звука —</option>
+                            <optgroup label="Стандартные">
+                                <option value="beep-short">Короткий бип</option>
+                                <option value="beep-long">Длинный бип</option>
+                                <option value="triple">Тройной сигнал</option>
+                                <option value="chirp">Чирп</option>
+                                <option value="bell">Колокольчик</option>
+                                <option value="ding">Динь</option>
+                                <option value="alarm">Будильник</option>
+                                <option value="fanfare">Фанфары</option>
+                                <option value="gong">Гонг</option>
+                            </optgroup>
+                            <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
+                        </select>
+                        <button class="sound-preview" id="soundEndPreview">▶</button>
+                    </div>
+
+                    <div class="sound-row">
+                        <div class="sound-toggle">
+                            <input type="checkbox" id="soundMinuteEnabled">
+                            <label for="soundMinuteEnabled">1 мин</label>
+                        </div>
+                        <select class="sound-select" id="soundMinutePreset">
+                            <option value="none">— без звука —</option>
+                            <optgroup label="Стандартные">
+                                <option value="beep-short">Короткий бип</option>
+                                <option value="beep-long">Длинный бип</option>
+                                <option value="triple">Тройной сигнал</option>
+                                <option value="chirp">Чирп</option>
+                                <option value="bell">Колокольчик</option>
+                                <option value="ding">Динь</option>
+                                <option value="tick">Тик</option>
+                                <option value="soft-alert">Мягкий сигнал</option>
+                            </optgroup>
+                            <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
+                        </select>
+                        <button class="sound-preview" id="soundMinutePreview">▶</button>
+                    </div>
+
+                    <!-- Пользовательские звуки -->
+                    <div class="custom-sounds-section">
+                        <div class="settings-group-title">
+                            <span class="icon">🎵</span>
+                            Ваши звуки
+                        </div>
+                        <div class="custom-sound-list" id="customSoundList">
+                            <!-- Список загруженных звуков -->
+                        </div>
+                        <div class="add-sound-row">
+                            <button class="add-sound-btn" id="addSoundBtn">
+                                <span>➕</span>
+                                <span>Добавить звук (MP3, WAV)</span>
+                            </button>
+                            <input type="file" class="hidden-file-input" id="soundFileInput" 
+                                   accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,.mp3,.wav,.ogg">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        const debounce = (fn, delay = 120) => {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn(...args), delay);
+            };
+        };
+
+        class TimerController {
+            constructor() {
+                this.totalSeconds = 0;
+                this.remainingSeconds = 0;
+                this.isRunning = false;
+                this.isPaused = false;
+                this.lastTimestamp = 0;
+                this.wasFinished = false;
+                this.currentBgMode = 'solid';
+
+                this.initElements();
+                this.initTabs();
+                this.initThemes();
+                this.attachEvents();
+                this.loadSettings();
+                this.setupIPC();
+            }
+
+            initElements() {
+                this.controlTimeEl = document.getElementById('controlTime');
+                this.statusDot = document.getElementById('statusDot');
+                this.statusText = document.getElementById('statusText');
+                this.startBtn = document.getElementById('startBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.customMinutes = document.getElementById('customMinutes');
+                this.customSeconds = document.getElementById('customSeconds');
+                
+                // Настройки
+                this.allowNegativeEl = document.getElementById('allowNegative');
+                this.soundMasterEl = document.getElementById('soundMasterEnabled');
+                this.soundStartEl = document.getElementById('soundStartEnabled');
+                this.soundEndEl = document.getElementById('soundEndEnabled');
+                this.soundMinuteEl = document.getElementById('soundMinuteEnabled');
+            }
+
+            initTabs() {
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        btn.classList.add('active');
+                        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                    });
+                });
+
+                // Режим фона
+                document.querySelectorAll('.bg-mode-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.bg-mode-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.currentBgMode = btn.dataset.mode;
+                        document.getElementById(`bg${this.capitalize(btn.dataset.mode)}Controls`).classList.add('active');
+                        this.pushDisplaySettings();
+                    });
+                });
+            }
+
+            initThemes() {
+                const themes = [
+                    { name: 'Синий', t1: '#667eea', t2: '#764ba2', bg: '#0f0c29' },
+                    { name: 'Неон', t1: '#39ff14', t2: '#00ffa3', bg: '#0b2b1d' },
+                    { name: 'Закат', t1: '#ff9966', t2: '#ff5e62', bg: '#1a0a1a' },
+                    { name: 'Океан', t1: '#36d1dc', t2: '#5b86e5', bg: '#0f2027' },
+                    { name: 'Мята', t1: '#3cd3ad', t2: '#4cb8c4', bg: '#134e5e' },
+                    { name: 'Лаванда', t1: '#b993d6', t2: '#8ca6db', bg: '#190a33' },
+                    { name: 'Солнце', t1: '#f6d365', t2: '#fda085', bg: '#3b1d0f' },
+                    { name: 'Норд', t1: '#88c0d0', t2: '#81a1c1', bg: '#2e3440' }
+                ];
+
+                const grid = document.getElementById('themesGrid');
+                themes.forEach((theme, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'theme-btn';
+                    btn.title = theme.name;
+                    btn.style.setProperty('--t1', theme.t1);
+                    btn.style.setProperty('--t2', theme.t2);
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        document.getElementById('timerColorPicker').value = theme.t1;
+                        document.getElementById('progressColorPicker').value = theme.t2;
+                        document.getElementById('bgColorPicker').value = theme.bg;
+                        document.getElementById('bgSolidColor').value = theme.bg;
+                        document.getElementById('bgGrad1').value = theme.bg;
+                        this.saveColors();
+                        this.pushDisplaySettings();
+                    });
+                    grid.appendChild(btn);
+                });
+            }
+
+            attachEvents() {
+                // Пресеты времени
+                document.querySelectorAll('.preset-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const minutes = parseInt(btn.dataset.minutes);
+                        this.setTime(minutes * 60);
+                    });
+                });
+
+                // Установка времени вручную
+                document.getElementById('setCustomTime').addEventListener('click', () => {
+                    const m = Math.max(0, parseInt(this.customMinutes.value) || 0);
+                    const s = Math.max(0, Math.min(59, parseInt(this.customSeconds.value) || 0));
+                    this.setTime(m * 60 + s);
+                });
+
+                // Enter для установки времени
+                [this.customMinutes, this.customSeconds].forEach(el => {
+                    el.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            document.getElementById('setCustomTime').click();
+                        }
+                    });
+                });
+
+                // Корректировка времени
+                document.querySelectorAll('.adjust-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.adjustTime(parseInt(btn.dataset.seconds));
+                    });
+                });
+
+                // Главные кнопки
+                this.startBtn.addEventListener('click', () => this.start());
+                this.pauseBtn.addEventListener('click', () => this.pause());
+                this.resetBtn.addEventListener('click', () => this.reset());
+
+                // Окна
+                document.getElementById('openWidgetBtn').addEventListener('click', () => {
+                    ipcRenderer.send('open-widget');
+                });
+                document.getElementById('openDisplayBtn').addEventListener('click', () => {
+                    ipcRenderer.send('open-display');
+                });
+
+                // Настройки перерасхода
+                this.allowNegativeEl.addEventListener('change', () => {
+                    document.getElementById('overrunRow').style.display = 
+                        this.allowNegativeEl.checked ? 'flex' : 'none';
+                    this.saveExtSettings();
+                });
+
+                // Цвета
+                const colorInputs = ['timerColorPicker', 'progressColorPicker', 'bgColorPicker'];
+                colorInputs.forEach(id => {
+                    document.getElementById(id).addEventListener('input', debounce(() => this.saveColors()));
+                });
+
+                // Фон дисплея
+                ['bgSolidColor', 'bgGrad1', 'bgGrad2'].forEach(id => {
+                    document.getElementById(id).addEventListener('input', debounce(() => this.pushDisplaySettings()));
+                });
+                document.getElementById('bgImageUrl').addEventListener('change', () => this.pushDisplaySettings());
+
+                // Сброс стиля
+                document.getElementById('resetStyleBtn').addEventListener('click', () => {
+                    document.getElementById('timerColorPicker').value = '#667eea';
+                    document.getElementById('progressColorPicker').value = '#764ba2';
+                    document.getElementById('bgColorPicker').value = '#0f0c29';
+                    document.getElementById('bgSolidColor').value = '#0f0c29';
+                    document.getElementById('bgGrad1').value = '#0f0c29';
+                    document.getElementById('bgGrad2').value = '#302b63';
+                    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                    this.saveColors();
+                    this.pushDisplaySettings();
+                });
+
+                // Звуки
+                this.soundMasterEl.addEventListener('change', () => {
+                    document.getElementById('soundSettings').style.opacity = 
+                        this.soundMasterEl.checked ? '1' : '0.5';
+                    this.saveExtSettings();
+                });
+
+                [this.soundStartEl, this.soundEndEl, this.soundMinuteEl].forEach(el => {
+                    el.addEventListener('change', () => this.saveExtSettings());
+                });
+
+                ['soundStartPreset', 'soundEndPreset', 'soundMinutePreset'].forEach(id => {
+                    document.getElementById(id).addEventListener('change', () => this.saveExtSettings());
+                });
+
+                // Превью звуков
+                document.getElementById('soundStartPreview').addEventListener('click', () => this.previewSound('start'));
+                document.getElementById('soundEndPreview').addEventListener('click', () => this.previewSound('end'));
+                document.getElementById('soundMinutePreview').addEventListener('click', () => this.previewSound('minute'));
+
+                // Лимит перерасхода
+                document.getElementById('overrunLimit').addEventListener('change', () => this.saveExtSettings());
+
+                // Загрузка пользовательских звуков
+                document.getElementById('addSoundBtn').addEventListener('click', () => {
+                    document.getElementById('soundFileInput').click();
+                });
+
+                document.getElementById('soundFileInput').addEventListener('change', (e) => {
+                    this.handleSoundFileUpload(e);
+                });
+
+                // Загружаем список пользовательских звуков
+                this.loadCustomSounds();
+
+                // Локальный фон
+                this.setupLocalBackground();
+            }
+
+            setupLocalBackground() {
+                const preview = document.getElementById('localBgPreview');
+                const placeholder = document.getElementById('localBgPlaceholder');
+                const image = document.getElementById('localBgImage');
+                const fileInput = document.getElementById('bgFileInput');
+                const changeBtn = document.getElementById('changeBgBtn');
+                const deleteBtn = document.getElementById('deleteBgBtn');
+                const fitOptions = document.getElementById('bgFitOptions');
+                const overlayRow = document.getElementById('bgOverlayRow');
+                const overlaySlider = document.getElementById('bgOverlaySlider');
+                const overlayValue = document.getElementById('bgOverlayValue');
+
+                // Клик по превью - открыть диалог выбора файла
+                preview.addEventListener('click', (e) => {
+                    if (e.target === changeBtn || e.target === deleteBtn) return;
+                    fileInput.click();
+                });
+
+                // Кнопка изменить
+                changeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fileInput.click();
+                });
+
+                // Кнопка удалить
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.deleteLocalBackground();
+                });
+
+                // Выбор файла
+                fileInput.addEventListener('change', (e) => {
+                    this.handleLocalBgUpload(e);
+                });
+
+                // Режим заполнения
+                document.querySelectorAll('.bg-fit-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.bg-fit-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.saveLocalBgSettings();
+                        this.pushDisplaySettings();
+                    });
+                });
+
+                // Затемнение
+                overlaySlider.addEventListener('input', () => {
+                    overlayValue.textContent = overlaySlider.value + '%';
+                    this.saveLocalBgSettings();
+                    this.pushDisplaySettings();
+                });
+
+                // Загружаем сохранённый фон
+                this.loadLocalBackground();
+            }
+
+            handleLocalBgUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // Проверяем размер (макс 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('Файл слишком большой. Максимум 10 МБ.');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result;
+                    
+                    // Сохраняем в localStorage
+                    localStorage.setItem('localBgImage', base64);
+                    
+                    // Обновляем UI
+                    this.showLocalBgPreview(base64);
+                    
+                    // Применяем настройки
+                    this.pushDisplaySettings();
+                };
+                
+                reader.readAsDataURL(file);
+                event.target.value = ''; // Сбрасываем input
+            }
+
+            showLocalBgPreview(base64) {
+                const preview = document.getElementById('localBgPreview');
+                const placeholder = document.getElementById('localBgPlaceholder');
+                const image = document.getElementById('localBgImage');
+                const fitOptions = document.getElementById('bgFitOptions');
+                const overlayRow = document.getElementById('bgOverlayRow');
+
+                image.src = base64;
+                image.style.display = 'block';
+                placeholder.style.display = 'none';
+                preview.classList.add('has-image');
+                fitOptions.style.display = 'flex';
+                overlayRow.style.display = 'flex';
+            }
+
+            hideLocalBgPreview() {
+                const preview = document.getElementById('localBgPreview');
+                const placeholder = document.getElementById('localBgPlaceholder');
+                const image = document.getElementById('localBgImage');
+                const fitOptions = document.getElementById('bgFitOptions');
+                const overlayRow = document.getElementById('bgOverlayRow');
+
+                image.src = '';
+                image.style.display = 'none';
+                placeholder.style.display = 'block';
+                preview.classList.remove('has-image');
+                fitOptions.style.display = 'none';
+                overlayRow.style.display = 'none';
+            }
+
+            loadLocalBackground() {
+                const savedBg = localStorage.getItem('localBgImage');
+                const savedSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                
+                if (savedBg) {
+                    this.showLocalBgPreview(savedBg);
+                    
+                    // Применяем настройки
+                    if (savedSettings.fit) {
+                        document.querySelectorAll('.bg-fit-btn').forEach(b => {
+                            b.classList.toggle('active', b.dataset.fit === savedSettings.fit);
+                        });
+                    }
+                    if (savedSettings.overlay !== undefined) {
+                        document.getElementById('bgOverlaySlider').value = savedSettings.overlay;
+                        document.getElementById('bgOverlayValue').textContent = savedSettings.overlay + '%';
+                    }
+                }
+            }
+
+            deleteLocalBackground() {
+                localStorage.removeItem('localBgImage');
+                localStorage.removeItem('localBgSettings');
+                this.hideLocalBgPreview();
+                
+                // Если был выбран режим local, переключаемся на solid
+                if (this.currentBgMode === 'local') {
+                    document.querySelectorAll('.bg-mode-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelector('.bg-mode-btn[data-mode="solid"]').classList.add('active');
+                    document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
+                    document.getElementById('bgSolidControls').classList.add('active');
+                    this.currentBgMode = 'solid';
+                }
+                
+                this.pushDisplaySettings();
+            }
+
+            saveLocalBgSettings() {
+                const activeBtn = document.querySelector('.bg-fit-btn.active');
+                const overlay = document.getElementById('bgOverlaySlider').value;
+                
+                localStorage.setItem('localBgSettings', JSON.stringify({
+                    fit: activeBtn ? activeBtn.dataset.fit : 'cover',
+                    overlay: parseInt(overlay)
+                }));
+            }
+
+            loadSettings() {
+                // Загрузка цветов
+                const savedColors = localStorage.getItem('timerColors');
+                if (savedColors) {
+                    const c = JSON.parse(savedColors);
+                    document.getElementById('timerColorPicker').value = c.timer || '#667eea';
+                    document.getElementById('progressColorPicker').value = c.progress || '#764ba2';
+                    document.getElementById('bgColorPicker').value = c.bg || '#0f0c29';
+                }
+
+                // Загрузка расширенных настроек
+                const ext = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+                
+                this.allowNegativeEl.checked = !!ext.allowNegative;
+                document.getElementById('overrunRow').style.display = ext.allowNegative ? 'flex' : 'none';
+                
+                if (ext.overrunLimitSeconds != null) {
+                    const mm = String(Math.floor(ext.overrunLimitSeconds / 60)).padStart(2, '0');
+                    const ss = String(ext.overrunLimitSeconds % 60).padStart(2, '0');
+                    document.getElementById('overrunLimit').value = `${mm}:${ss}`;
+                }
+
+                this.soundMasterEl.checked = ext.soundMasterEnabled !== false;
+                this.soundStartEl.checked = !!ext.soundStartEnabled;
+                this.soundEndEl.checked = ext.soundEndEnabled !== false;
+                this.soundMinuteEl.checked = !!ext.soundMinuteEnabled;
+
+                document.getElementById('soundStartPreset').value = ext.soundStartPreset || 'none';
+                document.getElementById('soundEndPreset').value = ext.soundEndPreset || 'none';
+                document.getElementById('soundMinutePreset').value = ext.soundMinutePreset || 'none';
+
+                document.getElementById('bgSolidColor').value = ext.bgSolid || '#0f0c29';
+                document.getElementById('bgGrad1').value = ext.bgGrad1 || '#0f0c29';
+                document.getElementById('bgGrad2').value = ext.bgGrad2 || '#302b63';
+                document.getElementById('bgImageUrl').value = ext.bgImageUrl || '';
+
+                // Режим фона
+                const bgMode = ext.bgMode || 'solid';
+                this.currentBgMode = bgMode;
+                document.querySelectorAll('.bg-mode-btn').forEach(b => {
+                    b.classList.toggle('active', b.dataset.mode === bgMode);
+                });
+                document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
+                document.getElementById(`bg${this.capitalize(bgMode)}Controls`).classList.add('active');
+            }
+
+            saveColors() {
+                const colors = {
+                    timer: document.getElementById('timerColorPicker').value,
+                    progress: document.getElementById('progressColorPicker').value,
+                    bg: document.getElementById('bgColorPicker').value
+                };
+                localStorage.setItem('timerColors', JSON.stringify(colors));
+                ipcRenderer.send('colors-update', colors);
+            }
+
+            saveExtSettings() {
+                const overrunVal = document.getElementById('overrunLimit').value.trim();
+                const [mm = '0', ss = '0'] = overrunVal.split(':');
+                const overrunSecs = Math.max(0, parseInt(mm) || 0) * 60 + Math.max(0, Math.min(59, parseInt(ss) || 0));
+
+                const settings = {
+                    allowNegative: this.allowNegativeEl.checked,
+                    overrunLimitSeconds: overrunSecs,
+                    soundMasterEnabled: this.soundMasterEl.checked,
+                    soundStartEnabled: this.soundStartEl.checked,
+                    soundEndEnabled: this.soundEndEl.checked,
+                    soundMinuteEnabled: this.soundMinuteEl.checked,
+                    soundStartPreset: document.getElementById('soundStartPreset').value,
+                    soundEndPreset: document.getElementById('soundEndPreset').value,
+                    soundMinutePreset: document.getElementById('soundMinutePreset').value,
+                    bgMode: this.currentBgMode,
+                    bgSolid: document.getElementById('bgSolidColor').value,
+                    bgGrad1: document.getElementById('bgGrad1').value,
+                    bgGrad2: document.getElementById('bgGrad2').value,
+                    bgImageUrl: document.getElementById('bgImageUrl').value
+                };
+
+                const prev = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+                localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
+            }
+
+            pushDisplaySettings() {
+                this.saveExtSettings();
+                
+                // Получаем локальный фон и его настройки
+                const localBgImage = localStorage.getItem('localBgImage') || '';
+                const localBgSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                
+                const settings = {
+                    clockStyle: 'circle',
+                    bgMode: this.currentBgMode,
+                    bgSolid: document.getElementById('bgSolidColor').value,
+                    bgGrad1: document.getElementById('bgGrad1').value,
+                    bgGrad2: document.getElementById('bgGrad2').value,
+                    bgImageUrl: document.getElementById('bgImageUrl').value,
+                    // Локальный фон
+                    bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
+                    bgLocalFit: localBgSettings.fit || 'cover',
+                    bgLocalOverlay: localBgSettings.overlay || 30
+                };
+                ipcRenderer.send('display-settings-update', settings);
+            }
+
+            setupIPC() {
+                ipcRenderer.send('get-timer-state');
+
+                ipcRenderer.on('timer-state', (event, state) => {
+                    if (state.timestamp && state.timestamp <= this.lastTimestamp) return;
+                    this.lastTimestamp = state.timestamp || Date.now();
+
+                    const wasFinishedBefore = this.wasFinished;
+                    this.totalSeconds = state.totalSeconds;
+                    this.remainingSeconds = state.remainingSeconds;
+                    this.isRunning = state.isRunning;
+                    this.isPaused = state.isPaused;
+                    this.wasFinished = !!state.finished;
+
+                    this.updateDisplay();
+                    this.updateControls();
+
+                    if (state.finished && !wasFinishedBefore && this.soundEndEl.checked) {
+                        this.playSound('end');
+                    }
+                });
+
+                ipcRenderer.on('timer-minute', () => {
+                    if (this.soundMinuteEl.checked) {
+                        this.playSound('minute');
+                    }
+                });
+            }
+
+            // Команды таймера
+            getConfig() {
+                const overrunVal = document.getElementById('overrunLimit').value.trim();
+                const [mm = '0', ss = '0'] = overrunVal.split(':');
+                return {
+                    allowNegative: this.allowNegativeEl.checked,
+                    overrunLimitSeconds: Math.max(0, parseInt(mm) || 0) * 60 + Math.max(0, parseInt(ss) || 0)
+                };
+            }
+
+            sendCommand(type, extra = {}) {
+                const cfg = this.getConfig();
+                ipcRenderer.send('timer-command', { type, ...cfg, ...extra });
+            }
+
+            setTime(seconds) {
+                if (this.isRunning) return;
+                this.sendCommand('set', { seconds: Math.max(0, seconds) });
+            }
+
+            adjustTime(seconds) {
+                this.sendCommand('adjust', { deltaSeconds: seconds });
+            }
+
+            start() {
+                if (this.remainingSeconds <= 0 && !this.getConfig().allowNegative) {
+                    // Небольшая анимация ошибки
+                    this.controlTimeEl.style.animation = 'shake 0.3s';
+                    setTimeout(() => this.controlTimeEl.style.animation = '', 300);
+                    return;
+                }
+                this.sendCommand('start');
+                if (this.soundStartEl.checked) this.playSound('start');
+            }
+
+            pause() {
+                this.sendCommand('pause');
+            }
+
+            reset() {
+                this.sendCommand('reset');
+            }
+
+            // Отображение
+            updateDisplay() {
+                this.controlTimeEl.textContent = this.formatTime(this.remainingSeconds);
+                
+                this.statusDot.className = 'status-dot';
+                if (this.wasFinished || (this.remainingSeconds <= 0 && this.totalSeconds > 0 && !this.isRunning)) {
+                    this.statusDot.classList.add('finished');
+                    this.statusText.textContent = 'Завершено';
+                } else if (this.isRunning) {
+                    this.statusDot.classList.add('running');
+                    this.statusText.textContent = this.remainingSeconds < 0 ? 'Перерасход' : 'Активен';
+                } else if (this.isPaused) {
+                    this.statusDot.classList.add('paused');
+                    this.statusText.textContent = 'Пауза';
+                } else {
+                    this.statusText.textContent = 'Готов';
+                }
+            }
+
+            updateControls() {
+                this.startBtn.disabled = this.isRunning;
+                this.pauseBtn.disabled = !this.isRunning;
+            }
+
+            formatTime(seconds) {
+                const neg = seconds < 0;
+                const abs = Math.abs(seconds);
+                const h = Math.floor(abs / 3600);
+                const m = Math.floor((abs % 3600) / 60);
+                const s = abs % 60;
+                
+                if (h > 0) {
+                    return `${neg ? '-' : ''}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                }
+                return `${neg ? '-' : ''}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            }
+
+            // Звуки
+            playSound(type) {
+                if (!this.soundMasterEl.checked) return;
+                
+                const presetId = `sound${this.capitalize(type)}Preset`;
+                const preset = document.getElementById(presetId)?.value || 'none';
+                
+                if (preset === 'none') {
+                    this.beep(880, 0.15);
+                    return;
+                }
+                
+                this.playPreset(preset);
+            }
+
+            previewSound(type) {
+                const presetId = `sound${this.capitalize(type)}Preset`;
+                const preset = document.getElementById(presetId)?.value || 'none';
+                
+                if (preset === 'none') {
+                    this.beep(880, 0.15);
+                } else {
+                    this.playPreset(preset);
+                }
+            }
+
+            playPreset(name) {
+                // Проверяем, пользовательский ли это звук
+                if (name.startsWith('custom:')) {
+                    this.playCustomSound(name.replace('custom:', ''));
+                    return;
+                }
+
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const g = ctx.createGain();
+                g.connect(ctx.destination);
+                g.gain.value = 0.0001;
+                const now = ctx.currentTime;
+
+                const beep = (freq, start, dur, type = 'sine') => {
+                    const o = ctx.createOscillator();
+                    o.type = type;
+                    o.frequency.value = freq;
+                    o.connect(g);
+                    g.gain.setValueAtTime(0.0001, start);
+                    g.gain.exponentialRampToValueAtTime(0.25, start + 0.01);
+                    o.start(start);
+                    g.gain.exponentialRampToValueAtTime(0.0001, start + dur - 0.01);
+                    o.stop(start + dur);
+                };
+
+                const multiBeep = (freq, count, interval, dur) => {
+                    for (let i = 0; i < count; i++) {
+                        beep(freq, now + i * interval, dur);
+                    }
+                };
+
+                switch (name) {
+                    case 'beep-short': 
+                        beep(880, now, 0.15); 
+                        break;
+                    case 'beep-long': 
+                        beep(660, now, 0.4); 
+                        break;
+                    case 'triple': 
+                        beep(880, now, 0.12);
+                        beep(980, now + 0.16, 0.12);
+                        beep(1100, now + 0.32, 0.18);
+                        break;
+                    case 'chirp': {
+                        const o = ctx.createOscillator();
+                        o.type = 'sawtooth';
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.0001, now);
+                        g.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+                        o.frequency.setValueAtTime(400, now);
+                        o.frequency.exponentialRampToValueAtTime(1200, now + 0.25);
+                        o.start(now);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.27);
+                        o.stop(now + 0.28);
+                        break;
+                    }
+                    case 'bell': {
+                        // Колокольчик
+                        [1975, 2637, 3520].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            o.frequency.value = freq;
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            env.gain.setValueAtTime(0.0001, now);
+                            env.gain.exponentialRampToValueAtTime(0.15 / (i + 1), now + 0.01);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+                            o.start(now);
+                            o.stop(now + 0.85);
+                        });
+                        break;
+                    }
+                    case 'ding': {
+                        // Динь
+                        const o = ctx.createOscillator();
+                        o.type = 'sine';
+                        o.frequency.value = 2093;
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.0001, now);
+                        g.gain.exponentialRampToValueAtTime(0.3, now + 0.005);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+                        o.start(now);
+                        o.stop(now + 0.65);
+                        break;
+                    }
+                    case 'whoosh': {
+                        // Свист
+                        const o = ctx.createOscillator();
+                        o.type = 'sawtooth';
+                        const filter = ctx.createBiquadFilter();
+                        filter.type = 'bandpass';
+                        filter.Q.value = 2;
+                        o.connect(filter);
+                        filter.connect(g);
+                        g.gain.setValueAtTime(0.0001, now);
+                        g.gain.exponentialRampToValueAtTime(0.15, now + 0.05);
+                        o.frequency.setValueAtTime(200, now);
+                        o.frequency.exponentialRampToValueAtTime(2000, now + 0.3);
+                        filter.frequency.setValueAtTime(500, now);
+                        filter.frequency.exponentialRampToValueAtTime(3000, now + 0.3);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+                        o.start(now);
+                        o.stop(now + 0.4);
+                        break;
+                    }
+                    case 'click': {
+                        // Клик
+                        const o = ctx.createOscillator();
+                        o.type = 'square';
+                        o.frequency.value = 1000;
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.3, now);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+                        o.start(now);
+                        o.stop(now + 0.04);
+                        break;
+                    }
+                    case 'alarm': {
+                        // Будильник
+                        for (let i = 0; i < 4; i++) {
+                            beep(880, now + i * 0.25, 0.12);
+                            beep(660, now + i * 0.25 + 0.12, 0.12);
+                        }
+                        break;
+                    }
+                    case 'fanfare': {
+                        // Фанфары
+                        const notes = [523, 659, 784, 1047, 784, 1047];
+                        notes.forEach((freq, i) => {
+                            beep(freq, now + i * 0.15, 0.14);
+                        });
+                        break;
+                    }
+                    case 'gong': {
+                        // Гонг
+                        const o1 = ctx.createOscillator();
+                        const o2 = ctx.createOscillator();
+                        o1.type = 'sine';
+                        o2.type = 'sine';
+                        o1.frequency.value = 110;
+                        o2.frequency.value = 165;
+                        const gongGain = ctx.createGain();
+                        o1.connect(gongGain);
+                        o2.connect(gongGain);
+                        gongGain.connect(ctx.destination);
+                        gongGain.gain.setValueAtTime(0.0001, now);
+                        gongGain.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+                        gongGain.gain.exponentialRampToValueAtTime(0.0001, now + 2);
+                        o1.start(now);
+                        o2.start(now);
+                        o1.stop(now + 2.1);
+                        o2.stop(now + 2.1);
+                        break;
+                    }
+                    case 'tick': {
+                        // Тик
+                        const o = ctx.createOscillator();
+                        o.type = 'square';
+                        o.frequency.value = 800;
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.2, now);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+                        o.start(now);
+                        o.stop(now + 0.06);
+                        break;
+                    }
+                    case 'soft-alert': {
+                        // Мягкий сигнал
+                        [440, 554, 659].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            o.frequency.value = freq;
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            env.gain.setValueAtTime(0.0001, now + i * 0.1);
+                            env.gain.exponentialRampToValueAtTime(0.1, now + i * 0.1 + 0.02);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.1 + 0.3);
+                            o.start(now + i * 0.1);
+                            o.stop(now + i * 0.1 + 0.35);
+                        });
+                        break;
+                    }
+                    default:
+                        beep(880, now, 0.15);
+                }
+            }
+
+            // Пользовательские звуки
+            handleSoundFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const base64 = e.target.result;
+                    const name = file.name.replace(/\.[^.]+$/, ''); // Убираем расширение
+                    
+                    // Сохраняем в localStorage
+                    const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                    
+                    // Проверяем, не существует ли уже такой звук
+                    const exists = customSounds.find(s => s.name === name);
+                    if (exists) {
+                        exists.data = base64;
+                    } else {
+                        customSounds.push({ name, data: base64 });
+                    }
+                    
+                    localStorage.setItem('customSounds', JSON.stringify(customSounds));
+                    this.loadCustomSounds();
+                };
+                
+                reader.readAsDataURL(file);
+                event.target.value = ''; // Сбрасываем input
+            }
+
+            loadCustomSounds() {
+                const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                const listEl = document.getElementById('customSoundList');
+                
+                // Очищаем список
+                listEl.innerHTML = '';
+                
+                // Обновляем списки в select'ах
+                ['Start', 'End', 'Minute'].forEach(type => {
+                    const group = document.getElementById(`customSoundsGroup${type}`);
+                    group.innerHTML = '';
+                    customSounds.forEach(sound => {
+                        const opt = document.createElement('option');
+                        opt.value = `custom:${sound.name}`;
+                        opt.textContent = sound.name;
+                        group.appendChild(opt);
+                    });
+                });
+
+                // Отображаем список звуков
+                if (customSounds.length === 0) {
+                    listEl.innerHTML = '<div style="color: #999; font-size: 0.85em; padding: 8px; text-align: center;">Нет добавленных звуков</div>';
+                    return;
+                }
+
+                customSounds.forEach(sound => {
+                    const item = document.createElement('div');
+                    item.className = 'custom-sound-item';
+                    item.innerHTML = `
+                        <span class="name">🎵 ${sound.name}</span>
+                        <button class="btn play-btn" data-name="${sound.name}" title="Воспроизвести">▶</button>
+                        <button class="btn delete-btn" data-name="${sound.name}" title="Удалить">✕</button>
+                    `;
+                    listEl.appendChild(item);
+                });
+
+                // Обработчики
+                listEl.querySelectorAll('.play-btn').forEach(btn => {
+                    btn.addEventListener('click', () => this.playCustomSound(btn.dataset.name));
+                });
+
+                listEl.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', () => this.deleteCustomSound(btn.dataset.name));
+                });
+            }
+
+            playCustomSound(name) {
+                const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                const sound = customSounds.find(s => s.name === name);
+                if (!sound) return;
+
+                const audio = new Audio(sound.data);
+                audio.volume = 0.5;
+                audio.play().catch(() => {});
+            }
+
+            deleteCustomSound(name) {
+                const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                const filtered = customSounds.filter(s => s.name !== name);
+                localStorage.setItem('customSounds', JSON.stringify(filtered));
+                this.loadCustomSounds();
+            }
+
+            beep(freq, dur) {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.connect(g);
+                g.connect(ctx.destination);
+                o.frequency.value = freq;
+                g.gain.setValueAtTime(0.2, ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+                o.start();
+                o.stop(ctx.currentTime + dur);
+            }
+
+            capitalize(str) {
+                return str.charAt(0).toUpperCase() + str.slice(1);
+            }
+        }
+
+        // CSS для анимации ошибки
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-10px); }
+                75% { transform: translateX(10px); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        new TimerController();
+    </script>
+</body>
+</html>

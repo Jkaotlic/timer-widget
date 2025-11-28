@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таймер - Полноэкранное отображение</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+            background: var(--bg, linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%));
+            transition: background 0.5s ease;
+        }
+
+        /* Декоративные блики */
+        body::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06), transparent 35%),
+                radial-gradient(circle at 80% 10%, rgba(255,255,255,0.04), transparent 40%),
+                radial-gradient(circle at 50% 80%, rgba(255,255,255,0.05), transparent 45%);
+            pointer-events: none;
+        }
+
+        .display-container {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 1200px;
+            padding: 40px;
+        }
+
+        /* Круговой таймер */
+        .timer-ring {
+            position: relative;
+            width: min(65vw, 65vh);
+            height: min(65vw, 65vh);
+            max-width: 600px;
+            max-height: 600px;
+            margin: 0 auto;
+        }
+
+        .timer-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+            filter: drop-shadow(0 10px 40px rgba(0, 0, 0, 0.3));
+        }
+
+        /* Фоновый круг */
+        .ring-bg {
+            fill: rgba(255, 255, 255, 0.03);
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 2;
+        }
+
+        /* Трек прогресса */
+        .ring-track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 12;
+        }
+
+        /* Прогресс */
+        .ring-progress {
+            fill: none;
+            stroke: url(#mainGradient);
+            stroke-width: 12;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease-out;
+            filter: drop-shadow(0 0 15px var(--glow-color, rgba(102, 126, 234, 0.5)));
+        }
+
+        .ring-progress.warning {
+            stroke: url(#warningGradient);
+            filter: drop-shadow(0 0 15px rgba(255, 193, 7, 0.6));
+        }
+
+        .ring-progress.danger {
+            stroke: url(#dangerGradient);
+            filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.7));
+            animation: danger-pulse 1s infinite;
+        }
+
+        @keyframes danger-pulse {
+            0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.7)); }
+            50% { filter: drop-shadow(0 0 35px rgba(255, 68, 68, 0.9)); }
+        }
+
+        /* Деления по кругу */
+        .tick-line {
+            stroke: rgba(255, 255, 255, 0.15);
+            stroke-width: 1.5;
+        }
+
+        .tick-line.major {
+            stroke: rgba(255, 255, 255, 0.35);
+            stroke-width: 2.5;
+        }
+
+        /* Центральное время */
+        .center-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 90%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-text {
+            font-size: clamp(3rem, 10vw, 8rem);
+            font-weight: 700;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            color: white;
+            letter-spacing: 2px;
+            text-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.4),
+                0 0 60px var(--text-glow, rgba(102, 126, 234, 0.5));
+            transition: color 0.4s, text-shadow 0.4s, font-size 0.3s;
+            white-space: nowrap;
+        }
+
+        /* Уменьшение шрифта при длинном времени (HH:MM:SS или минус) */
+        .time-text.compact {
+            font-size: clamp(2.5rem, 8vw, 6rem);
+            letter-spacing: 1px;
+        }
+
+        .time-text.warning {
+            color: #ffc107;
+            --text-glow: rgba(255, 193, 7, 0.6);
+        }
+
+        .time-text.danger {
+            color: #ff4444;
+            --text-glow: rgba(255, 68, 68, 0.7);
+            animation: time-pulse 0.5s infinite;
+        }
+
+        @keyframes time-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        /* Статус */
+        .status-container {
+            margin-top: 30px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 28px;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.2em;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            transition: all 0.3s;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: dot-pulse 2s infinite;
+        }
+
+        @keyframes dot-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .status-pill.running {
+            background: rgba(56, 239, 125, 0.15);
+            color: #38ef7d;
+            box-shadow: 0 0 25px rgba(56, 239, 125, 0.2);
+        }
+
+        .status-pill.paused {
+            background: rgba(245, 87, 108, 0.15);
+            color: #f5576c;
+        }
+
+        .status-pill.paused .status-dot {
+            animation: none;
+        }
+
+        .status-pill.finished {
+            background: rgba(254, 225, 64, 0.2);
+            color: #fee140;
+            animation: finished-pulse 0.5s infinite;
+        }
+
+        @keyframes finished-pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(254, 225, 64, 0.3); }
+            50% { opacity: 0.7; box-shadow: 0 0 40px rgba(254, 225, 64, 0.5); }
+        }
+
+        /* Режим вспышки при завершении */
+        body.flash-mode {
+            animation: flash-bg 0.3s;
+        }
+
+        @keyframes flash-bg {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.5); }
+        }
+    </style>
+</head>
+<body>
+    <div class="display-container">
+        <div class="timer-ring">
+            <svg class="timer-svg" viewBox="0 0 400 400">
+                <defs>
+                    <!-- Основной градиент -->
+                    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#667eea" class="grad-stop-1" />
+                        <stop offset="100%" stop-color="#764ba2" class="grad-stop-2" />
+                    </linearGradient>
+                    <!-- Предупреждение -->
+                    <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ffc107" />
+                        <stop offset="100%" stop-color="#ff9800" />
+                    </linearGradient>
+                    <!-- Опасность -->
+                    <linearGradient id="dangerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ff4444" />
+                        <stop offset="100%" stop-color="#cc0000" />
+                    </linearGradient>
+                </defs>
+
+                <!-- Фоновый круг -->
+                <circle class="ring-bg" cx="200" cy="200" r="185" />
+
+                <!-- Деления -->
+                <g class="tick-marks">
+                    <!-- 12 делений (каждые 30 градусов) -->
+                    <line class="tick-line major" x1="200" y1="25" x2="200" y2="45" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(30, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(60, 200, 200)" />
+                    <line class="tick-line major" x1="200" y1="25" x2="200" y2="45" transform="rotate(90, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(120, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(150, 200, 200)" />
+                    <line class="tick-line major" x1="200" y1="25" x2="200" y2="45" transform="rotate(180, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(210, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(240, 200, 200)" />
+                    <line class="tick-line major" x1="200" y1="25" x2="200" y2="45" transform="rotate(270, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(300, 200, 200)" />
+                    <line class="tick-line" x1="200" y1="25" x2="200" y2="40" transform="rotate(330, 200, 200)" />
+                </g>
+
+                <!-- Трек прогресса -->
+                <circle class="ring-track" cx="200" cy="200" r="160" />
+                
+                <!-- Прогресс -->
+                <circle class="ring-progress" id="progressRing" cx="200" cy="200" r="160" 
+                        stroke-dasharray="1005.31" 
+                        stroke-dashoffset="1005.31" />
+            </svg>
+
+            <!-- Центральное отображение времени -->
+            <div class="center-display">
+                <div class="time-text" id="timeDisplay">00:00</div>
+            </div>
+        </div>
+
+        <!-- Статус -->
+        <div class="status-container">
+            <div class="status-pill" id="statusPill">
+                <span class="status-dot"></span>
+                <span id="statusText">Готов к запуску</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="display-script.js"></script>
+</body>
+</html>
