@@ -44,11 +44,29 @@
             border-color: rgba(255, 255, 255, 0.3);
         }
 
+        /* Рамка окна при наведении */
+        .widget-border {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid transparent;
+            pointer-events: none;
+            z-index: 9998;
+            transition: border-color 0.3s ease;
+            border-radius: 4px;
+        }
+
+        html:hover .widget-border {
+            border-color: rgba(102, 126, 234, 0.6);
+        }
+
         /* Индикаторы углов для ресайза */
         .resize-handle {
             position: fixed;
-            width: 12px;
-            height: 12px;
+            width: 20px;
+            height: 20px;
             opacity: 0;
             transition: opacity 0.3s ease;
             pointer-events: none;
@@ -62,95 +80,97 @@
         .resize-handle::before {
             content: '';
             position: absolute;
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(102, 126, 234, 0.9);
+            border-radius: 1px;
+            box-shadow: 0 0 4px rgba(102, 126, 234, 0.5);
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            background: rgba(102, 126, 234, 0.9);
+            border-radius: 1px;
+            box-shadow: 0 0 4px rgba(102, 126, 234, 0.5);
         }
 
         .resize-handle.corner-se {
-            bottom: 2px;
-            right: 2px;
+            bottom: 0;
+            right: 0;
+            cursor: se-resize;
         }
 
         .resize-handle.corner-se::before {
-            width: 12px;
-            height: 2px;
-            bottom: 0;
-            right: 0;
+            width: 16px;
+            height: 3px;
+            bottom: 2px;
+            right: 2px;
         }
 
         .resize-handle.corner-se::after {
-            content: '';
-            position: absolute;
-            width: 2px;
-            height: 12px;
-            bottom: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.5);
+            width: 3px;
+            height: 16px;
+            bottom: 2px;
+            right: 2px;
         }
 
         .resize-handle.corner-nw {
+            top: 0;
+            left: 0;
+            cursor: nw-resize;
+        }
+
+        .resize-handle.corner-nw::before {
+            width: 16px;
+            height: 3px;
             top: 2px;
             left: 2px;
         }
 
-        .resize-handle.corner-nw::before {
-            width: 12px;
-            height: 2px;
-            top: 0;
-            left: 0;
-        }
-
         .resize-handle.corner-nw::after {
-            content: '';
-            position: absolute;
-            width: 2px;
-            height: 12px;
-            top: 0;
-            left: 0;
-            background: rgba(255, 255, 255, 0.5);
+            width: 3px;
+            height: 16px;
+            top: 2px;
+            left: 2px;
         }
 
         .resize-handle.corner-ne {
+            top: 0;
+            right: 0;
+            cursor: ne-resize;
+        }
+
+        .resize-handle.corner-ne::before {
+            width: 16px;
+            height: 3px;
             top: 2px;
             right: 2px;
         }
 
-        .resize-handle.corner-ne::before {
-            width: 12px;
-            height: 2px;
-            top: 0;
-            right: 0;
-        }
-
         .resize-handle.corner-ne::after {
-            content: '';
-            position: absolute;
-            width: 2px;
-            height: 12px;
-            top: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.5);
+            width: 3px;
+            height: 16px;
+            top: 2px;
+            right: 2px;
         }
 
         .resize-handle.corner-sw {
+            bottom: 0;
+            left: 0;
+            cursor: sw-resize;
+        }
+
+        .resize-handle.corner-sw::before {
+            width: 16px;
+            height: 3px;
             bottom: 2px;
             left: 2px;
         }
 
-        .resize-handle.corner-sw::before {
-            width: 12px;
-            height: 2px;
-            bottom: 0;
-            left: 0;
-        }
-
         .resize-handle.corner-sw::after {
-            content: '';
-            position: absolute;
-            width: 2px;
-            height: 12px;
-            bottom: 0;
-            left: 0;
-            background: rgba(255, 255, 255, 0.5);
+            width: 3px;
+            height: 16px;
+            bottom: 2px;
+            left: 2px;
         }
 
         .widget-container {
@@ -347,29 +367,20 @@
 
         /* Кнопки управления */
         .controls-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: min(90%, 90vh);
-            height: min(90%, 90vw);
-            max-width: 90%;
-            max-height: 90%;
-            aspect-ratio: 1 / 1;
+            position: fixed;
+            top: 5%;
+            right: 5%;
             display: flex;
-            justify-content: flex-end;
-            align-items: flex-start;
-            padding: 5%;
-            gap: 4%;
+            gap: 8px;
             opacity: 0;
             transition: all 0.25s ease;
             -webkit-app-region: no-drag;
-            z-index: 100;
+            z-index: 1000;
             pointer-events: none;
-            box-sizing: border-box;
         }
 
-        .widget-container:hover .controls-overlay {
+        .widget-container:hover .controls-overlay,
+        html:hover .controls-overlay {
             opacity: 1;
         }
 
@@ -520,67 +531,172 @@
             color: rgba(255, 255, 255, 0.5);
         }
 
-        /* Quick actions внизу виджета */
-        .quick-actions {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 8px;
-            opacity: 0;
-            transition: opacity 0.25s;
-            -webkit-app-region: no-drag;
-        }
-
-        .widget-container:hover .quick-actions {
-            opacity: 1;
-        }
-
-        .action-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: none;
-            background: rgba(255, 255, 255, 0.12);
-            backdrop-filter: blur(10px);
-            color: white;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
+        /* ============================================
+           СТИЛЬ: ЦИФРОВОЙ LED (Digital) - Виджет
+           ============================================ */
+        .widget-digital {
+            display: none;
+            width: 100%;
+            height: 100%;
             align-items: center;
             justify-content: center;
+            padding: 10%;
         }
 
-        .action-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
+        .widget-digital.active {
+            display: flex;
         }
 
-        .action-btn.play {
-            background: rgba(56, 239, 125, 0.3);
+        .widget-digital-display {
+            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+            border-radius: 15px;
+            padding: 15% 20%;
+            border: 2px solid #333;
+            box-shadow: 
+                inset 0 0 30px rgba(0, 0, 0, 0.8),
+                0 0 20px rgba(0, 0, 0, 0.5),
+                0 0 50px rgba(102, 126, 234, 0.15);
+            position: relative;
         }
 
-        .action-btn.play:hover {
-            background: rgba(56, 239, 125, 0.5);
+        .widget-digital-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            pointer-events: none;
+            border-radius: 15px 15px 0 0;
         }
 
-        .action-btn.pause {
-            background: rgba(245, 87, 108, 0.3);
+        .widget-digital-time {
+            font-family: 'Courier New', 'Consolas', monospace;
+            font-size: clamp(1.5rem, min(15vw, 15vh), 4rem);
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 
+                0 0 10px #00ff88,
+                0 0 20px #00ff88,
+                0 0 40px #00ff8866;
+            letter-spacing: 4px;
+            white-space: nowrap;
         }
 
-        .action-btn.pause:hover {
-            background: rgba(245, 87, 108, 0.5);
+        .widget-digital-time.warning {
+            color: #ffcc00;
+            text-shadow: 
+                0 0 10px #ffcc00,
+                0 0 20px #ffcc00,
+                0 0 40px #ffcc0066;
         }
 
-        /* Скрытие при запущенном таймере */
-        .widget-container.timer-running .quick-actions {
-            opacity: 0.5;
+        .widget-digital-time.danger {
+            color: #ff3333;
+            text-shadow: 
+                0 0 10px #ff3333,
+                0 0 20px #ff3333,
+                0 0 40px #ff333366;
+            animation: widget-led-blink 0.5s infinite;
         }
+
+        @keyframes widget-led-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ============================================
+           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip) - Виджет
+           ============================================ */
+        .widget-flip {
+            display: none;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            gap: 3%;
+            padding: 8%;
+            box-sizing: border-box;
+        }
+
+        .widget-flip.active {
+            display: flex;
+        }
+
+        .widget-flip-group {
+            display: flex;
+            gap: 2px;
+        }
+
+        .widget-flip-separator {
+            font-size: clamp(0.8rem, min(8vw, 10vh), 2rem);
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            align-items: center;
+            margin: 0 2px;
+        }
+
+        .widget-flip-card {
+            position: relative;
+            width: clamp(18px, 10vw, 45px);
+            height: clamp(24px, 14vw, 60px);
+        }
+
+        .widget-flip-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 49.9%, #0a0a0a 50%, #1a1a1a 100%);
+            border-radius: clamp(3px, 0.5vw, 6px);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .widget-flip-inner::before {
+            content: '';
+            position: absolute;
+            top: 49%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #000;
+            z-index: 10;
+        }
+
+        .widget-flip-digit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Arial Black', sans-serif;
+            font-size: clamp(0.7rem, min(6vw, 8vh), 1.8rem);
+            font-weight: 900;
+            color: white;
+            line-height: 1;
+        }
+
+        .widget-flip-card.warning .widget-flip-digit { color: #ffc107; }
+        .widget-flip-card.danger .widget-flip-digit { color: #ff4444; }
+
+        /* Скрытие неактивных стилей - все скрыты по умолчанию */
+        .circular-widget,
+        .widget-digital,
+        .widget-flip {
+            display: none !important;
+        }
+        
+        /* Показываем только активный */
+        .circular-widget.active { display: flex !important; }
+        .widget-digital.active { display: flex !important; }
+        .widget-flip.active { display: flex !important; }
     </style>
 </head>
 <body>
+    <!-- Рамка окна при наведении -->
+    <div class="widget-border"></div>
+    
     <!-- Индикаторы углов для ресайза -->
     <div class="resize-handle corner-nw"></div>
     <div class="resize-handle corner-ne"></div>
@@ -620,7 +736,7 @@
         </div>
 
         <!-- Круговой виджет -->
-        <div class="circular-widget">
+        <div class="circular-widget active">
             <svg class="widget-svg" viewBox="0 0 200 200">
                 <defs>
                     <!-- Основной градиент -->
@@ -688,11 +804,40 @@
             </div>
         </div>
 
-        <!-- Быстрые действия -->
-        <div class="quick-actions">
-            <button class="action-btn play" id="playBtn" title="Старт">▶</button>
-            <button class="action-btn pause" id="pauseBtn" title="Пауза">⏸</button>
-            <button class="action-btn" id="resetBtn" title="Сброс">↺</button>
+        <!-- Стиль: Цифровой LED -->
+        <div class="widget-digital" id="widgetDigital">
+            <div class="widget-digital-display">
+                <div class="widget-digital-time" id="widgetDigitalTime">00:00</div>
+            </div>
+        </div>
+
+        <!-- Стиль: Перекидные часы -->
+        <div class="widget-flip" id="widgetFlip">
+            <div class="widget-flip-group">
+                <div class="widget-flip-card" id="wFlipMin1">
+                    <div class="widget-flip-inner">
+                        <span class="widget-flip-digit">0</span>
+                    </div>
+                </div>
+                <div class="widget-flip-card" id="wFlipMin2">
+                    <div class="widget-flip-inner">
+                        <span class="widget-flip-digit">0</span>
+                    </div>
+                </div>
+            </div>
+            <div class="widget-flip-separator">:</div>
+            <div class="widget-flip-group">
+                <div class="widget-flip-card" id="wFlipSec1">
+                    <div class="widget-flip-inner">
+                        <span class="widget-flip-digit">0</span>
+                    </div>
+                </div>
+                <div class="widget-flip-card" id="wFlipSec2">
+                    <div class="widget-flip-inner">
+                        <span class="widget-flip-digit">0</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -730,11 +875,26 @@
                 this.settingsPanel = document.getElementById('settingsPanel');
                 this.settingsBtn = document.getElementById('settingsBtn');
                 this.closeBtn = document.getElementById('closeBtn');
-                this.playBtn = document.getElementById('playBtn');
-                this.pauseBtn = document.getElementById('pauseBtn');
-                this.resetBtn = document.getElementById('resetBtn');
                 this.opacityRange = document.getElementById('opacityRange');
                 this.opacityValue = document.getElementById('opacityValue');
+                
+                // Элементы для разных стилей
+                this.circularWidget = document.querySelector('.circular-widget');
+                this.widgetDigital = document.getElementById('widgetDigital');
+                this.widgetFlip = document.getElementById('widgetFlip');
+                this.widgetDigitalTime = document.getElementById('widgetDigitalTime');
+                
+                // Flip карточки
+                this.wFlipMin1 = document.getElementById('wFlipMin1');
+                this.wFlipMin2 = document.getElementById('wFlipMin2');
+                this.wFlipSec1 = document.getElementById('wFlipSec1');
+                this.wFlipSec2 = document.getElementById('wFlipSec2');
+                
+                // Текущий стиль
+                this.timerStyle = 'circle';
+                
+                // Устанавливаем стиль по умолчанию
+                if (this.circularWidget) this.circularWidget.classList.add('active');
             }
 
             initProgress() {
@@ -767,19 +927,6 @@
                     if (e.key === 'Escape') {
                         this.closeSettings();
                     }
-                });
-
-                // Быстрые действия
-                this.playBtn.addEventListener('click', () => {
-                    ipcRenderer.send('timer-control', 'start');
-                });
-
-                this.pauseBtn.addEventListener('click', () => {
-                    ipcRenderer.send('timer-control', 'pause');
-                });
-
-                this.resetBtn.addEventListener('click', () => {
-                    ipcRenderer.send('timer-control', 'reset');
                 });
 
                 // Масштабирование колесиком (Ctrl + scroll)
@@ -979,6 +1126,11 @@
                         }
                         
                         this.applyBackground(settings);
+                        
+                        // Применяем стиль таймера
+                        if (settings.timerStyle) {
+                            this.setTimerStyle(settings.timerStyle);
+                        }
                     } catch (_) {}
                 }
             }
@@ -1006,16 +1158,52 @@
 
                 ipcRenderer.on('display-settings-update', (event, settings) => {
                     this.applyBackground(settings);
+                    if (settings.timerStyle) {
+                        this.setTimerStyle(settings.timerStyle);
+                    }
                 });
+            }
+            
+            setTimerStyle(style) {
+                this.timerStyle = style;
+                
+                // Скрываем все стили
+                if (this.circularWidget) this.circularWidget.classList.remove('active');
+                if (this.widgetDigital) this.widgetDigital.classList.remove('active');
+                if (this.widgetFlip) this.widgetFlip.classList.remove('active');
+                
+                // Показываем выбранный
+                switch (style) {
+                    case 'circle':
+                        if (this.circularWidget) this.circularWidget.classList.add('active');
+                        break;
+                    case 'digital':
+                        if (this.widgetDigital) this.widgetDigital.classList.add('active');
+                        break;
+                    case 'flip':
+                        if (this.widgetFlip) this.widgetFlip.classList.add('active');
+                        break;
+                }
+                
+                this.updateDisplay();
             }
 
             updateDisplay() {
                 const secs = Math.floor(this.remainingSeconds);
+                const formatted = this.formatTime(secs);
                 
-                // Обновляем время
-                this.timeDisplay.textContent = this.formatTime(secs);
+                // Обновляем время для кругового стиля
+                this.timeDisplay.textContent = formatted;
+                
+                // Обновляем цифровой стиль
+                if (this.widgetDigitalTime) {
+                    this.widgetDigitalTime.textContent = formatted;
+                }
+                
+                // Обновляем перекидные часы
+                this.updateFlipDisplay(secs);
 
-                // Обновляем прогресс
+                // Обновляем прогресс (для кругового)
                 if (this.totalSeconds > 0) {
                     const ratio = Math.max(0, Math.min(1, this.remainingSeconds / this.totalSeconds));
                     const offset = this.circumference - (ratio * this.circumference);
@@ -1026,13 +1214,18 @@
                     
                     this.progressBar.classList.remove('warning', 'danger');
                     this.timeDisplay.classList.remove('warning', 'danger');
+                    if (this.widgetDigitalTime) {
+                        this.widgetDigitalTime.classList.remove('warning', 'danger');
+                    }
 
                     if (percentLeft <= 10 && percentLeft > 0) {
                         this.progressBar.classList.add('danger');
                         this.timeDisplay.classList.add('danger');
+                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('danger');
                     } else if (percentLeft <= 25) {
                         this.progressBar.classList.add('warning');
                         this.timeDisplay.classList.add('warning');
+                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('warning');
                     }
                 } else {
                     this.progressBar.style.strokeDashoffset = this.circumference;
@@ -1043,6 +1236,40 @@
 
                 // Класс для контейнера
                 this.container.classList.toggle('timer-running', this.isRunning);
+            }
+            
+            updateFlipDisplay(secs) {
+                if (!this.wFlipMin1 || !this.wFlipMin2 || !this.wFlipSec1 || !this.wFlipSec2) return;
+                
+                const absSecs = Math.abs(secs);
+                const mins = Math.floor(absSecs / 60);
+                const seconds = absSecs % 60;
+                
+                const min1 = String(Math.floor(mins / 10) % 10);
+                const min2 = String(mins % 10);
+                const sec1 = String(Math.floor(seconds / 10));
+                const sec2 = String(seconds % 10);
+                
+                // Обновляем цифры
+                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = min1;
+                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = min2;
+                this.wFlipSec1.querySelector('.widget-flip-digit').textContent = sec1;
+                this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
+                
+                // Классы предупреждения
+                const flipCards = [this.wFlipMin1, this.wFlipMin2, this.wFlipSec1, this.wFlipSec2];
+                flipCards.forEach(card => card.classList.remove('warning', 'danger'));
+                
+                if (this.totalSeconds > 0) {
+                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+                    flipCards.forEach(card => {
+                        if (percentLeft <= 10 && percentLeft > 0) {
+                            card.classList.add('danger');
+                        } else if (percentLeft <= 25) {
+                            card.classList.add('warning');
+                        }
+                    });
+                }
             }
 
             updateStatus(secs) {
