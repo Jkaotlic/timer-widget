@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            -webkit-app-region: drag;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        /* Рамка для ресайза - видна при наведении на окно */
+        html::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px dashed transparent;
+            border-radius: 8px;
+            pointer-events: none;
+            transition: border-color 0.3s ease;
+            z-index: 9999;
+        }
+
+        html:hover::before {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Индикаторы углов для ресайза */
+        .resize-handle {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        html:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-handle::before {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .resize-handle.corner-se {
+            bottom: 2px;
+            right: 2px;
+        }
+
+        .resize-handle.corner-se::before {
+            width: 12px;
+            height: 2px;
+            bottom: 0;
+            right: 0;
+        }
+
+        .resize-handle.corner-se::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            bottom: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .resize-handle.corner-nw {
+            top: 2px;
+            left: 2px;
+        }
+
+        .resize-handle.corner-nw::before {
+            width: 12px;
+            height: 2px;
+            top: 0;
+            left: 0;
+        }
+
+        .resize-handle.corner-nw::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            top: 0;
+            left: 0;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .resize-handle.corner-ne {
+            top: 2px;
+            right: 2px;
+        }
+
+        .resize-handle.corner-ne::before {
+            width: 12px;
+            height: 2px;
+            top: 0;
+            right: 0;
+        }
+
+        .resize-handle.corner-ne::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            top: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .resize-handle.corner-sw {
+            bottom: 2px;
+            left: 2px;
+        }
+
+        .resize-handle.corner-sw::before {
+            width: 12px;
+            height: 2px;
+            bottom: 0;
+            left: 0;
+        }
+
+        .resize-handle.corner-sw::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            bottom: 0;
+            left: 0;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .widget-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            -webkit-app-region: drag;
+        }
+
+        /* Круговой виджет */
+        .circular-widget {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .widget-svg {
+            width: min(100%, 100vh);
+            height: min(100%, 100vw);
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 1 / 1;
+            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
+        }
+
+        /* Фоновый круг с градиентом */
+        .bg-circle {
+            fill: var(--widget-bg-fill, rgba(15, 15, 25, 0.85));
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 2;
+        }
+
+        /* Фоновое изображение (для режима local/image) */
+        .widget-bg-image {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 92%;
+            height: 92%;
+            border-radius: 50%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .widget-bg-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .widget-bg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+        }
+
+        /* Декоративный внутренний круг */
+        .inner-glow {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.03);
+            stroke-width: 1;
+        }
+
+        /* Трек прогресса (фон) */
+        .progress-track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 8;
+        }
+
+        /* Прогресс-бар */
+        .progress-bar {
+            fill: none;
+            stroke: url(#widgetGradient);
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.3s ease-out;
+            filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.5));
+        }
+
+        .progress-bar.warning {
+            stroke: url(#warningGradient);
+            filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.5));
+        }
+
+        .progress-bar.danger {
+            stroke: url(#dangerGradient);
+            filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
+            animation: pulse-glow 1s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6)); }
+            50% { filter: drop-shadow(0 0 16px rgba(255, 68, 68, 0.9)); }
+        }
+
+        /* Шкала с делениями */
+        .tick-marks {
+            stroke: rgba(255, 255, 255, 0.15);
+            stroke-width: 1;
+        }
+
+        .tick-marks-major {
+            stroke: rgba(255, 255, 255, 0.3);
+            stroke-width: 2;
+        }
+
+        /* Центральный контент */
+        .center-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .time-display {
+            font-size: clamp(1rem, min(12vw, 12vh), 4rem);
+            font-weight: 700;
+            color: white;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            letter-spacing: 2px;
+            text-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.5),
+                0 0 30px var(--glow-color, rgba(102, 126, 234, 0.6));
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+
+        .time-display.warning {
+            color: #ffc107;
+            --glow-color: rgba(255, 193, 7, 0.6);
+        }
+
+        .time-display.danger {
+            color: #ff4444;
+            --glow-color: rgba(255, 68, 68, 0.8);
+            animation: time-pulse 1s infinite;
+        }
+
+        @keyframes time-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        .status-badge {
+            margin-top: clamp(4px, 2vh, 10px);
+            padding: clamp(2px, 1vh, 6px) clamp(6px, 3vw, 14px);
+            border-radius: 20px;
+            font-size: clamp(0.4rem, min(2.5vw, 2.5vh), 0.75rem);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s;
+        }
+
+        .status-badge.running {
+            background: rgba(56, 239, 125, 0.2);
+            color: #38ef7d;
+            box-shadow: 0 0 10px rgba(56, 239, 125, 0.3);
+        }
+
+        .status-badge.paused {
+            background: rgba(245, 87, 108, 0.2);
+            color: #f5576c;
+        }
+
+        .status-badge.finished {
+            background: rgba(254, 225, 64, 0.2);
+            color: #fee140;
+            animation: badge-pulse 0.5s infinite;
+        }
+
+        @keyframes badge-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Кнопки управления */
+        .controls-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(90%, 90vh);
+            height: min(90%, 90vw);
+            max-width: 90%;
+            max-height: 90%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
+            padding: 5%;
+            gap: 4%;
+            opacity: 0;
+            transition: all 0.25s ease;
+            -webkit-app-region: no-drag;
+            z-index: 100;
+            pointer-events: none;
+            box-sizing: border-box;
+        }
+
+        .widget-container:hover .controls-overlay {
+            opacity: 1;
+        }
+
+        .ctrl-btn {
+            width: min(28px, 15%);
+            height: min(28px, 15%);
+            min-width: 20px;
+            min-height: 20px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            color: white;
+            pointer-events: auto;
+            -webkit-app-region: no-drag;
+            font-size: clamp(8px, min(3vw, 3vh), 14px);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.1);
+        }
+
+        .ctrl-btn.close:hover {
+            background: rgba(255, 68, 68, 0.6);
+        }
+
+        /* Панель настроек */
+        .settings-panel {
+            position: absolute;
+            top: 15%;
+            right: 10%;
+            background: rgba(20, 20, 35, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: clamp(10px, 4%, 20px);
+            min-width: min(180px, 70%);
+            max-width: 90%;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px) scale(0.95);
+            transition: all 0.25s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+            -webkit-app-region: no-drag;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .settings-panel.visible {
+            opacity: 1;
+            pointer-events: auto !important;
+            transform: translateY(0) scale(1);
+        }
+
+        .settings-title {
+            color: white;
+            font-size: 0.75em;
+            margin-bottom: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            opacity: 0.7;
+        }
+
+        .size-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .size-btn {
+            padding: 10px 6px;
+            font-size: 0.7em;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .size-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .size-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+        }
+
+        .setting-row {
+            margin-bottom: 12px;
+        }
+
+        .setting-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.7em;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .slider-container {
+            position: relative;
+            height: 24px;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .slider-value {
+            position: absolute;
+            right: 0;
+            top: -16px;
+            font-size: 0.65em;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Quick actions внизу виджета */
+        .quick-actions {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.25s;
+            -webkit-app-region: no-drag;
+        }
+
+        .widget-container:hover .quick-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(10px);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.1);
+        }
+
+        .action-btn.play {
+            background: rgba(56, 239, 125, 0.3);
+        }
+
+        .action-btn.play:hover {
+            background: rgba(56, 239, 125, 0.5);
+        }
+
+        .action-btn.pause {
+            background: rgba(245, 87, 108, 0.3);
+        }
+
+        .action-btn.pause:hover {
+            background: rgba(245, 87, 108, 0.5);
+        }
+
+        /* Скрытие при запущенном таймере */
+        .widget-container.timer-running .quick-actions {
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <!-- Индикаторы углов для ресайза -->
+    <div class="resize-handle corner-nw"></div>
+    <div class="resize-handle corner-ne"></div>
+    <div class="resize-handle corner-sw"></div>
+    <div class="resize-handle corner-se"></div>
+
+    <div class="widget-container" id="widgetContainer">
+        <!-- Фоновое изображение (для режима local/image) -->
+        <div class="widget-bg-image" id="widgetBgImage" style="display: none;">
+            <img id="widgetBgImg" src="" alt="">
+            <div class="widget-bg-overlay" id="widgetBgOverlay"></div>
+        </div>
+
+        <!-- Верхние контролы -->
+        <div class="controls-overlay">
+            <button class="ctrl-btn" id="settingsBtn" title="Настройки">⚙</button>
+            <button class="ctrl-btn close" id="closeBtn" title="Закрыть">✕</button>
+        </div>
+
+        <!-- Панель настроек -->
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-title">Размер виджета</div>
+            <div class="size-grid">
+                <button class="size-btn" data-size="tiny">XS</button>
+                <button class="size-btn" data-size="small">S</button>
+                <button class="size-btn active" data-size="medium">M</button>
+                <button class="size-btn" data-size="large">L</button>
+            </div>
+
+            <div class="setting-row">
+                <label class="setting-label">Прозрачность</label>
+                <div class="slider-container">
+                    <span class="slider-value" id="opacityValue">100%</span>
+                    <input type="range" id="opacityRange" min="40" max="100" value="100">
+                </div>
+            </div>
+        </div>
+
+        <!-- Круговой виджет -->
+        <div class="circular-widget">
+            <svg class="widget-svg" viewBox="0 0 200 200">
+                <defs>
+                    <!-- Основной градиент -->
+                    <linearGradient id="widgetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#667eea" />
+                        <stop offset="100%" stop-color="#764ba2" />
+                    </linearGradient>
+                    <!-- Предупреждение -->
+                    <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ffc107" />
+                        <stop offset="100%" stop-color="#ff9800" />
+                    </linearGradient>
+                    <!-- Опасность -->
+                    <linearGradient id="dangerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ff4444" />
+                        <stop offset="100%" stop-color="#cc0000" />
+                    </linearGradient>
+                    <!-- Свечение -->
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                <!-- Фоновый круг -->
+                <circle class="bg-circle" cx="100" cy="100" r="95" />
+                
+                <!-- Внутреннее свечение -->
+                <circle class="inner-glow" cx="100" cy="100" r="70" />
+
+                <!-- Деления (12 шт) -->
+                <g class="tick-marks" transform="rotate(-90, 100, 100)">
+                    <line x1="100" y1="15" x2="100" y2="22" class="tick-marks-major" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(30, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(60, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="22" transform="rotate(90, 100, 100)" class="tick-marks-major" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(120, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(150, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="22" transform="rotate(180, 100, 100)" class="tick-marks-major" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(210, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(240, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="22" transform="rotate(270, 100, 100)" class="tick-marks-major" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(300, 100, 100)" />
+                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(330, 100, 100)" />
+                </g>
+
+                <!-- Трек прогресса -->
+                <circle class="progress-track" cx="100" cy="100" r="82" 
+                        transform="rotate(-90, 100, 100)" />
+                
+                <!-- Прогресс-бар -->
+                <circle class="progress-bar" id="progressBar" cx="100" cy="100" r="82" 
+                        transform="rotate(-90, 100, 100)" 
+                        stroke-dasharray="515.22" 
+                        stroke-dashoffset="515.22" />
+            </svg>
+
+            <!-- Центральный контент -->
+            <div class="center-content">
+                <div class="time-display" id="timeDisplay">00:00</div>
+                <div class="status-badge" id="statusBadge">Готов</div>
+            </div>
+        </div>
+
+        <!-- Быстрые действия -->
+        <div class="quick-actions">
+            <button class="action-btn play" id="playBtn" title="Старт">▶</button>
+            <button class="action-btn pause" id="pauseBtn" title="Пауза">⏸</button>
+            <button class="action-btn" id="resetBtn" title="Сброс">↺</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        class WidgetTimer {
+            constructor() {
+                this.radius = 82;
+                this.circumference = 2 * Math.PI * this.radius;
+                this.totalSeconds = 0;
+                this.remainingSeconds = 0;
+                this.isRunning = false;
+                this.isPaused = false;
+                this.lastTimestamp = 0;
+
+                this.initElements();
+                this.initProgress();
+                this.loadSettings();
+                this.applyColors();
+                this.loadBackgroundSettings();
+                this.setupIPC();
+                this.setupEventListeners();
+                this.setupSettings();
+                
+                // Проверка изменений цветов
+                setInterval(() => this.checkColorChanges(), 1000);
+            }
+
+            initElements() {
+                this.container = document.getElementById('widgetContainer');
+                this.timeDisplay = document.getElementById('timeDisplay');
+                this.statusBadge = document.getElementById('statusBadge');
+                this.progressBar = document.getElementById('progressBar');
+                this.settingsPanel = document.getElementById('settingsPanel');
+                this.settingsBtn = document.getElementById('settingsBtn');
+                this.closeBtn = document.getElementById('closeBtn');
+                this.playBtn = document.getElementById('playBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.opacityRange = document.getElementById('opacityRange');
+                this.opacityValue = document.getElementById('opacityValue');
+            }
+
+            initProgress() {
+                this.progressBar.style.strokeDasharray = `${this.circumference}`;
+                this.progressBar.style.strokeDashoffset = this.circumference;
+            }
+
+            setupEventListeners() {
+                // Закрыть виджет
+                this.closeBtn.addEventListener('click', () => {
+                    ipcRenderer.send('close-widget');
+                });
+
+                // Настройки
+                this.settingsBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleSettings();
+                });
+
+                // Закрытие панели настроек
+                document.addEventListener('click', (e) => {
+                    if (this.settingsPanel.classList.contains('visible') &&
+                        !this.settingsPanel.contains(e.target) &&
+                        e.target !== this.settingsBtn) {
+                        this.closeSettings();
+                    }
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closeSettings();
+                    }
+                });
+
+                // Быстрые действия
+                this.playBtn.addEventListener('click', () => {
+                    ipcRenderer.send('timer-control', 'start');
+                });
+
+                this.pauseBtn.addEventListener('click', () => {
+                    ipcRenderer.send('timer-control', 'pause');
+                });
+
+                this.resetBtn.addEventListener('click', () => {
+                    ipcRenderer.send('timer-control', 'reset');
+                });
+
+                // Масштабирование колесиком (Ctrl + scroll)
+                document.addEventListener('wheel', (e) => {
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                        let scale = parseFloat(localStorage.getItem('widgetScale') || '1');
+                        scale = Math.max(0.5, Math.min(2.5, scale + delta));
+                        localStorage.setItem('widgetScale', scale.toString());
+                        this.container.style.transform = `scale(${scale})`;
+                    }
+                }, { passive: false });
+
+                // Загружаем сохраненный масштаб
+                const savedScale = localStorage.getItem('widgetScale');
+                if (savedScale) {
+                    this.container.style.transform = `scale(${savedScale})`;
+                }
+            }
+
+            setupSettings() {
+                // Размеры
+                document.querySelectorAll('.size-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.setSize(btn.dataset.size);
+                    });
+                });
+
+                // Прозрачность
+                this.opacityRange.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    this.opacityValue.textContent = value + '%';
+                    this.container.style.opacity = value / 100;
+                    this.saveSettings();
+                });
+            }
+
+            setSize(size) {
+                const sizes = {
+                    tiny: { width: 150, height: 150 },
+                    small: { width: 180, height: 180 },
+                    medium: { width: 220, height: 220 },
+                    large: { width: 280, height: 280 }
+                };
+
+                const s = sizes[size];
+                if (s) {
+                    ipcRenderer.send('widget-resize', s);
+                    localStorage.setItem('widgetSize', size);
+                }
+            }
+
+            toggleSettings() {
+                this.settingsPanel.classList.toggle('visible');
+            }
+
+            closeSettings() {
+                this.settingsPanel.classList.remove('visible');
+            }
+
+            loadSettings() {
+                // Настройки виджета
+                const settings = localStorage.getItem('widgetSettings');
+                if (settings) {
+                    const s = JSON.parse(settings);
+                    if (s.opacity) {
+                        this.container.style.opacity = s.opacity;
+                        this.opacityRange.value = s.opacity * 100;
+                        this.opacityValue.textContent = Math.round(s.opacity * 100) + '%';
+                    }
+                }
+
+                // Размер
+                const savedSize = localStorage.getItem('widgetSize') || 'medium';
+                document.querySelectorAll('.size-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.size === savedSize);
+                });
+                // Устанавливаем размер при загрузке
+                this.setSize(savedSize);
+            }
+
+            saveSettings() {
+                const settings = {
+                    opacity: parseFloat(this.container.style.opacity) || 1
+                };
+                localStorage.setItem('widgetSettings', JSON.stringify(settings));
+            }
+
+            checkColorChanges() {
+                const savedColors = localStorage.getItem('timerColors');
+                if (savedColors) {
+                    this.applyColors(JSON.parse(savedColors));
+                }
+            }
+
+            applyColors(colors = null) {
+                if (!colors) {
+                    const saved = localStorage.getItem('timerColors');
+                    colors = saved ? JSON.parse(saved) : {
+                        timer: '#667eea',
+                        progress: '#764ba2'
+                    };
+                }
+
+                // Обновляем градиент
+                const gradient = document.getElementById('widgetGradient');
+                if (gradient) {
+                    const stops = gradient.querySelectorAll('stop');
+                    if (stops[0]) stops[0].setAttribute('stop-color', colors.timer);
+                    if (stops[1]) stops[1].setAttribute('stop-color', colors.progress);
+                }
+
+                // Обновляем свечение текста
+                this.timeDisplay.style.setProperty('--glow-color', `${colors.timer}80`);
+            }
+
+            applyBackground(settings) {
+                const bgCircle = document.querySelector('.bg-circle');
+                const bgImageContainer = document.getElementById('widgetBgImage');
+                const bgImg = document.getElementById('widgetBgImg');
+                const bgOverlay = document.getElementById('widgetBgOverlay');
+
+                if (!bgCircle) return;
+
+                // Сбрасываем фоновое изображение
+                bgImageContainer.style.display = 'none';
+
+                switch (settings.bgMode) {
+                    case 'solid':
+                        bgCircle.style.fill = settings.bgSolid || '#1a1a2e';
+                        break;
+
+                    case 'gradient':
+                        // Создаем или обновляем градиент для фона
+                        let bgGradient = document.getElementById('widgetBgGradient');
+                        if (!bgGradient) {
+                            const defs = document.querySelector('.widget-svg defs');
+                            bgGradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+                            bgGradient.setAttribute('id', 'widgetBgGradient');
+                            bgGradient.setAttribute('x1', '0%');
+                            bgGradient.setAttribute('y1', '0%');
+                            bgGradient.setAttribute('x2', '100%');
+                            bgGradient.setAttribute('y2', '100%');
+                            bgGradient.innerHTML = '<stop offset="0%" /><stop offset="100%" />';
+                            defs.appendChild(bgGradient);
+                        }
+                        const stops = bgGradient.querySelectorAll('stop');
+                        stops[0].setAttribute('stop-color', settings.bgGrad1 || '#1a1a2e');
+                        stops[1].setAttribute('stop-color', settings.bgGrad2 || '#16213e');
+                        bgCircle.style.fill = 'url(#widgetBgGradient)';
+                        break;
+
+                    case 'image':
+                        if (settings.bgImageUrl) {
+                            bgImageContainer.style.display = 'block';
+                            bgImg.src = settings.bgImageUrl;
+                            bgOverlay.style.background = 'rgba(0, 0, 0, 0.3)';
+                            bgCircle.style.fill = 'rgba(0, 0, 0, 0.1)';
+                        }
+                        break;
+
+                    case 'local':
+                        if (settings.bgLocalImage) {
+                            bgImageContainer.style.display = 'block';
+                            bgImg.src = settings.bgLocalImage;
+                            bgImg.style.objectFit = settings.bgLocalFit || 'cover';
+                            const overlayOpacity = (settings.bgLocalOverlay || 30) / 100;
+                            bgOverlay.style.background = `rgba(0, 0, 0, ${overlayOpacity})`;
+                            bgCircle.style.fill = 'rgba(0, 0, 0, 0.1)';
+                        }
+                        break;
+
+                    default:
+                        bgCircle.style.fill = 'rgba(15, 15, 25, 0.85)';
+                }
+            }
+
+            loadBackgroundSettings() {
+                const bgSettings = localStorage.getItem('displayExtSettings');
+                if (bgSettings) {
+                    try {
+                        const settings = JSON.parse(bgSettings);
+                        
+                        // Для локального фона загружаем изображение
+                        if (settings.bgMode === 'local') {
+                            const localBgImage = localStorage.getItem('localBgImage');
+                            const localBgSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                            if (localBgImage) {
+                                settings.bgLocalImage = localBgImage;
+                                settings.bgLocalFit = localBgSettings.fit || 'cover';
+                                settings.bgLocalOverlay = localBgSettings.overlay || 30;
+                            }
+                        }
+                        
+                        this.applyBackground(settings);
+                    } catch (_) {}
+                }
+            }
+
+            setupIPC() {
+                ipcRenderer.send('get-timer-state');
+
+                ipcRenderer.on('timer-state', (event, state) => {
+                    // Фильтр устаревших пакетов
+                    const ts = state.timestamp || Date.now();
+                    if (ts <= this.lastTimestamp) return;
+                    this.lastTimestamp = ts;
+
+                    this.totalSeconds = Number(state.totalSeconds) || 0;
+                    this.remainingSeconds = Number(state.remainingSeconds) || 0;
+                    this.isRunning = !!state.isRunning;
+                    this.isPaused = !!state.isPaused;
+                    
+                    this.updateDisplay();
+                });
+
+                ipcRenderer.on('colors-update', (event, colors) => {
+                    this.applyColors(colors);
+                });
+
+                ipcRenderer.on('display-settings-update', (event, settings) => {
+                    this.applyBackground(settings);
+                });
+            }
+
+            updateDisplay() {
+                const secs = Math.floor(this.remainingSeconds);
+                
+                // Обновляем время
+                this.timeDisplay.textContent = this.formatTime(secs);
+
+                // Обновляем прогресс
+                if (this.totalSeconds > 0) {
+                    const ratio = Math.max(0, Math.min(1, this.remainingSeconds / this.totalSeconds));
+                    const offset = this.circumference - (ratio * this.circumference);
+                    this.progressBar.style.strokeDashoffset = offset;
+
+                    // Цветовые классы
+                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+                    
+                    this.progressBar.classList.remove('warning', 'danger');
+                    this.timeDisplay.classList.remove('warning', 'danger');
+
+                    if (percentLeft <= 10 && percentLeft > 0) {
+                        this.progressBar.classList.add('danger');
+                        this.timeDisplay.classList.add('danger');
+                    } else if (percentLeft <= 25) {
+                        this.progressBar.classList.add('warning');
+                        this.timeDisplay.classList.add('warning');
+                    }
+                } else {
+                    this.progressBar.style.strokeDashoffset = this.circumference;
+                }
+
+                // Обновляем статус
+                this.updateStatus(secs);
+
+                // Класс для контейнера
+                this.container.classList.toggle('timer-running', this.isRunning);
+            }
+
+            updateStatus(secs) {
+                this.statusBadge.classList.remove('running', 'paused', 'finished');
+
+                if (secs <= 0 && this.totalSeconds > 0 && !this.isRunning) {
+                    this.statusBadge.textContent = 'Завершён';
+                    this.statusBadge.classList.add('finished');
+                } else if (this.isRunning) {
+                    this.statusBadge.textContent = secs < 0 ? 'Перерасход' : 'Активен';
+                    this.statusBadge.classList.add('running');
+                } else if (this.isPaused) {
+                    this.statusBadge.textContent = 'Пауза';
+                    this.statusBadge.classList.add('paused');
+                } else {
+                    this.statusBadge.textContent = 'Готов';
+                }
+            }
+
+            formatTime(seconds) {
+                const neg = seconds < 0;
+                const abs = Math.abs(seconds);
+                
+                if (abs >= 3600) {
+                    const hrs = Math.floor(abs / 3600);
+                    const mins = Math.floor((abs % 3600) / 60);
+                    const secs = abs % 60;
+                    return `${neg ? '-' : ''}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                }
+                
+                const mins = Math.floor(abs / 60);
+                const secs = abs % 60;
+                return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+        }
+
+        new WidgetTimer();
+    </script>
+</body>
+</html>

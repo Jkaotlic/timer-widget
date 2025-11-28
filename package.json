@@ -1,0 +1,43 @@
+{
+  "name": "timer-widget",
+  "version": "1.0.0",
+  "description": "Прозрачный таймер-виджет для рабочего стола",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": ["timer", "widget", "overlay", "transparent"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.timer.widget",
+    "productName": "TimerWidget",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": ["portable"],
+      "icon": "icon.ico",
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "${productName}.exe"
+    },
+    "files": [
+      "electron-main.js",
+      "electron-widget.html",
+      "electron-control.html",
+      "styles.css",
+      "display.html",
+      "display-script.js"
+    ]
+  }
+}
