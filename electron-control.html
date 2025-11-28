@@ -7,19 +7,28 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         /* Новый современный UI */
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
         .control-window {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 12px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .control-panel {
             background: rgba(255, 255, 255, 0.98);
-            border-radius: 24px;
+            border-radius: 20px;
             padding: 0;
             box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
-            max-width: 480px;
+            max-width: 100%;
             width: 100%;
             margin: 0 auto;
             overflow: hidden;
@@ -28,39 +37,39 @@
         /* Верхняя секция с таймером */
         .timer-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 32px 24px;
+            padding: 20px 16px;
             text-align: center;
             position: relative;
         }
 
         .timer-header h1 {
             color: white;
-            font-size: 1.2em;
+            font-size: 1em;
             font-weight: 500;
-            margin: 0 0 16px 0;
+            margin: 0 0 10px 0;
             opacity: 0.9;
             letter-spacing: 1px;
         }
 
         .timer-display-main {
-            font-size: 4.5em;
+            font-size: 3.5em;
             font-weight: 700;
             color: white;
             font-family: 'Courier New', monospace;
             text-shadow: 0 4px 20px rgba(0,0,0,0.3);
             letter-spacing: 2px;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
 
         .timer-status {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             background: rgba(255,255,255,0.2);
             border-radius: 20px;
             color: white;
-            font-size: 0.85em;
+            font-size: 0.8em;
             font-weight: 500;
         }
 
@@ -95,19 +104,19 @@
         .main-controls {
             display: flex;
             justify-content: center;
-            gap: 12px;
-            padding: 20px 24px;
+            gap: 10px;
+            padding: 14px 16px;
             background: #f8f9ff;
             border-bottom: 1px solid rgba(102, 126, 234, 0.1);
         }
 
         .main-btn {
-            width: 64px;
-            height: 64px;
+            width: 52px;
+            height: 52px;
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 24px;
+            font-size: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -146,37 +155,37 @@
 
         /* Секция контента */
         .content-section {
-            padding: 20px 24px;
+            padding: 12px 16px;
         }
 
         /* Табы */
         .tabs {
             display: flex;
             background: #f0f2ff;
-            border-radius: 12px;
-            padding: 4px;
-            margin-bottom: 20px;
+            border-radius: 10px;
+            padding: 3px;
+            margin-bottom: 14px;
         }
 
         .tab-btn {
             flex: 1;
-            padding: 12px 8px;
+            padding: 8px 4px;
             border: none;
             background: transparent;
             color: #666;
-            font-size: 0.85em;
+            font-size: 0.75em;
             font-weight: 600;
             cursor: pointer;
-            border-radius: 8px;
+            border-radius: 7px;
             transition: all 0.2s;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
 
         .tab-btn span.icon {
-            font-size: 1.3em;
+            font-size: 1.2em;
         }
 
         .tab-btn:hover {
@@ -198,6 +207,33 @@
             animation: fadeIn 0.3s ease;
         }
 
+        /* Кнопки позиционирования */
+        .pos-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: inherit;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pos-btn:hover {
+            background: rgba(102, 126, 234, 0.3);
+            border-color: #667eea;
+        }
+
+        .pos-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -207,15 +243,15 @@
         .time-presets {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
+            gap: 8px;
+            margin-bottom: 12px;
         }
 
         .preset-btn {
-            padding: 16px 8px;
-            font-size: 1em;
+            padding: 12px 6px;
+            font-size: 0.9em;
             border: 2px solid #e8ecff;
-            border-radius: 12px;
+            border-radius: 10px;
             background: white;
             color: #333;
             cursor: pointer;
@@ -236,21 +272,21 @@
         /* Ввод времени */
         .time-input-group {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             align-items: center;
             background: #f8f9ff;
-            padding: 12px;
-            border-radius: 12px;
-            margin-bottom: 16px;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 12px;
         }
 
         .time-input {
             flex: 1;
-            padding: 14px;
-            font-size: 1.2em;
+            padding: 10px;
+            font-size: 1.1em;
             text-align: center;
             border: 2px solid #e8ecff;
-            border-radius: 10px;
+            border-radius: 8px;
             font-family: 'Courier New', monospace;
             font-weight: 600;
             transition: border-color 0.2s;
@@ -262,17 +298,17 @@
         }
 
         .time-separator {
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: 700;
             color: #667eea;
         }
 
         .set-time-btn {
-            padding: 14px 24px;
+            padding: 10px 18px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -286,16 +322,16 @@
         /* Корректировка времени */
         .adjust-section {
             background: #f8f9ff;
-            padding: 16px;
-            border-radius: 12px;
+            padding: 12px;
+            border-radius: 10px;
         }
 
         .adjust-title {
-            font-size: 0.8em;
+            font-size: 0.75em;
             color: #666;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             font-weight: 600;
         }
 
@@ -339,26 +375,25 @@
         .window-btns {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 16px;
+            gap: 10px;
         }
 
         .window-btn {
-            padding: 16px;
+            padding: 12px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 0.9em;
+            font-size: 0.85em;
             transition: all 0.2s;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .window-btn .icon {
-            font-size: 1.8em;
+            font-size: 1.5em;
         }
 
         .window-btn.widget {
@@ -379,30 +414,30 @@
         /* Настройки - секции */
         .settings-group {
             background: #f8f9ff;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
         }
 
         .settings-group-title {
-            font-size: 0.85em;
+            font-size: 0.8em;
             font-weight: 700;
             color: #333;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .settings-group-title .icon {
-            font-size: 1.1em;
+            font-size: 1em;
         }
 
         /* Цвета */
         .color-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
+            gap: 10px;
         }
 
         .color-item {
@@ -411,16 +446,16 @@
 
         .color-item label {
             display: block;
-            font-size: 0.75em;
+            font-size: 0.7em;
             color: #666;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .color-picker {
             width: 100%;
-            height: 48px;
+            height: 40px;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             padding: 0;
         }
@@ -428,14 +463,14 @@
         /* Темы */
         .themes-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
         }
 
         .theme-btn {
             aspect-ratio: 1;
-            border: 3px solid transparent;
-            border-radius: 10px;
+            border: 2px solid transparent;
+            border-radius: 6px;
             cursor: pointer;
             position: relative;
             overflow: hidden;
@@ -606,7 +641,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 12px 0;
+            padding: 8px 0;
             border-bottom: 1px solid rgba(0,0,0,0.05);
         }
 
@@ -616,14 +651,14 @@
         }
 
         .toggle-label {
-            font-size: 0.9em;
+            font-size: 0.8em;
             color: #333;
         }
 
         .toggle-switch {
             position: relative;
-            width: 50px;
-            height: 28px;
+            width: 44px;
+            height: 24px;
         }
 
         .toggle-switch input {
@@ -638,14 +673,14 @@
             inset: 0;
             background-color: #ccc;
             transition: .3s;
-            border-radius: 28px;
+            border-radius: 24px;
         }
 
         .toggle-slider:before {
             position: absolute;
             content: "";
-            height: 22px;
-            width: 22px;
+            height: 18px;
+            width: 18px;
             left: 3px;
             bottom: 3px;
             background-color: white;
@@ -659,14 +694,14 @@
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(22px);
+            transform: translateX(20px);
         }
 
         /* Фон */
         .bg-mode-tabs {
             display: flex;
             gap: 6px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .bg-mode-btn {
@@ -925,6 +960,121 @@
                 grid-template-columns: repeat(3, 1fr);
             }
         }
+
+        /* Компактный режим */
+        .compact-section {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .quick-presets {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .quick-preset {
+            padding: 8px 14px;
+            border: 2px solid #e8ecff;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-preset:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .quick-preset.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .quick-windows {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .quick-window-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .quick-window-btn.widget {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .quick-window-btn.display {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .quick-window-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        /* Кнопка настроек */
+        .settings-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            background: #f8f9ff;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.85em;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .settings-toggle:hover {
+            background: #f0f2ff;
+            color: #667eea;
+        }
+
+        .settings-toggle .arrow {
+            transition: transform 0.3s;
+        }
+
+        .settings-toggle.open .arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Расширенные настройки */
+        .advanced-settings {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .advanced-settings.open {
+            max-height: 2000px;
+            transition: max-height 0.5s ease-in;
+        }
+
+        .advanced-settings .content-section {
+            padding: 0 16px 16px;
+        }
     </style>
 </head>
 <body class="control-window">
@@ -946,317 +1096,337 @@
             <button class="main-btn reset" id="resetBtn" title="Сброс">↺</button>
         </div>
 
-        <!-- Контент с табами -->
-        <div class="content-section">
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="time">
-                    <span class="icon">⏰</span>
-                    <span>Время</span>
-                </button>
-                <button class="tab-btn" data-tab="windows">
-                    <span class="icon">🖥️</span>
-                    <span>Окна</span>
-                </button>
-                <button class="tab-btn" data-tab="style">
-                    <span class="icon">🎨</span>
-                    <span>Стиль</span>
-                </button>
-                <button class="tab-btn" data-tab="sound">
-                    <span class="icon">🔊</span>
-                    <span>Звук</span>
-                </button>
+        <!-- Быстрые пресеты -->
+        <div class="compact-section">
+            <div class="quick-presets">
+                <button class="quick-preset" data-minutes="5">5м</button>
+                <button class="quick-preset" data-minutes="10">10м</button>
+                <button class="quick-preset" data-minutes="15">15м</button>
+                <button class="quick-preset" data-minutes="30">30м</button>
+                <button class="quick-preset" data-minutes="45">45м</button>
+                <button class="quick-preset" data-minutes="60">60м</button>
             </div>
+        </div>
 
-            <!-- Таб: Время -->
-            <div class="tab-content active" id="tab-time">
-                <div class="time-presets">
-                    <button class="preset-btn" data-minutes="5">5 мин</button>
-                    <button class="preset-btn" data-minutes="10">10 мин</button>
-                    <button class="preset-btn" data-minutes="15">15 мин</button>
-                    <button class="preset-btn" data-minutes="30">30 мин</button>
-                    <button class="preset-btn" data-minutes="45">45 мин</button>
-                    <button class="preset-btn" data-minutes="60">60 мин</button>
-                </div>
-
-                <div class="time-input-group">
-                    <input type="number" class="time-input" id="customMinutes" min="0" max="999" placeholder="00" value="">
-                    <span class="time-separator">:</span>
-                    <input type="number" class="time-input" id="customSeconds" min="0" max="59" placeholder="00" value="">
-                    <button class="set-time-btn" id="setCustomTime">✓</button>
-                </div>
-
-                <div class="adjust-section">
-                    <div class="adjust-title">Корректировка</div>
-                    <div class="adjust-btns">
-                        <button class="adjust-btn" data-seconds="30">+30с</button>
-                        <button class="adjust-btn" data-seconds="60">+1м</button>
-                        <button class="adjust-btn" data-seconds="300">+5м</button>
-                        <button class="adjust-btn minus" data-seconds="-30">−30с</button>
-                        <button class="adjust-btn minus" data-seconds="-60">−1м</button>
-                    </div>
-                </div>
+        <!-- Быстрые окна -->
+        <div class="compact-section">
+            <div class="quick-windows">
+                <button class="quick-window-btn widget" id="openWidgetBtn">🖥️ Виджет</button>
+                <button class="quick-window-btn display" id="openDisplayBtn">📺 Экран</button>
             </div>
+        </div>
 
-            <!-- Таб: Окна -->
-            <div class="tab-content" id="tab-windows">
-                <div class="window-btns">
-                    <button class="window-btn widget" id="openWidgetBtn">
+        <!-- Кнопка расширенных настроек -->
+        <button class="settings-toggle" id="settingsToggle">
+            <span>⚙️ Настройки</span>
+            <span class="arrow">▼</span>
+        </button>
+
+        <!-- Расширенные настройки (скрыты по умолчанию) -->
+        <div class="advanced-settings" id="advancedSettings">
+            <div class="content-section">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="time">
+                        <span class="icon">⏰</span>
+                        <span>Время</span>
+                    </button>
+                    <button class="tab-btn" data-tab="windows">
                         <span class="icon">🖥️</span>
-                        <span>Виджет</span>
+                        <span>Окна</span>
                     </button>
-                    <button class="window-btn display" id="openDisplayBtn">
-                        <span class="icon">📺</span>
-                        <span>Полный экран</span>
-                    </button>
-                </div>
-
-                <div class="settings-group" style="margin-top: 20px;">
-                    <div class="settings-group-title">
-                        <span class="icon">📺</span>
-                        Полноэкранный режим
-                    </div>
-                    
-                    <div class="toggle-row">
-                        <span class="toggle-label">Показывать текущее время</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="showCurrentTime">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    
-                    <div class="toggle-row">
-                        <span class="toggle-label">Показывать время старта</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="showEventTime">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    
-                    <div class="toggle-row" id="eventTimeRow" style="display: none;">
-                        <span class="toggle-label">Время мероприятия</span>
-                        <input type="time" id="eventTimeInput" value="10:00" 
-                               style="width: 100px; padding: 8px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit;">
-                    </div>
-
-                    <div class="toggle-row">
-                        <span class="toggle-label">Размер таймера</span>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="range" id="timerScale" min="50" max="150" value="100" 
-                                   style="width: 100px;">
-                            <span id="timerScaleValue" style="min-width: 40px;">100%</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="settings-group" style="margin-top: 20px;">
-                    <div class="settings-group-title">
-                        <span class="icon">⚙️</span>
-                        Дополнительно
-                    </div>
-                    <div class="toggle-row">
-                        <span class="toggle-label">Продолжать отсчёт ниже 0</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="allowNegative">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-row" id="overrunRow" style="display: none;">
-                        <span class="toggle-label">Лимит перерасхода</span>
-                        <input type="text" id="overrunLimit" placeholder="мм:сс" value="05:00" 
-                               style="width: 80px; padding: 8px; text-align: center; border: 1px solid #ddd; border-radius: 6px;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Таб: Стиль -->
-            <div class="tab-content" id="tab-style">
-                <div class="settings-group">
-                    <div class="settings-group-title">
+                    <button class="tab-btn" data-tab="style">
                         <span class="icon">🎨</span>
-                        Цвета
+                        <span>Стиль</span>
+                    </button>
+                    <button class="tab-btn" data-tab="sound">
+                        <span class="icon">🔊</span>
+                        <span>Звук</span>
+                    </button>
+                </div>
+
+                <!-- Таб: Время -->
+                <div class="tab-content active" id="tab-time">
+                    <div class="time-input-group">
+                        <input type="number" class="time-input" id="customMinutes" min="0" max="999" placeholder="00" value="">
+                        <span class="time-separator">:</span>
+                        <input type="number" class="time-input" id="customSeconds" min="0" max="59" placeholder="00" value="">
+                        <button class="set-time-btn" id="setCustomTime">✓</button>
                     </div>
-                    <div class="color-grid">
-                        <div class="color-item">
-                            <label>Таймер</label>
-                            <input type="color" class="color-picker" id="timerColorPicker" value="#667eea">
+
+                    <div class="adjust-section">
+                        <div class="adjust-title">Корректировка</div>
+                        <div class="adjust-btns">
+                            <button class="adjust-btn" data-seconds="30">+30с</button>
+                            <button class="adjust-btn" data-seconds="60">+1м</button>
+                            <button class="adjust-btn" data-seconds="300">+5м</button>
+                            <button class="adjust-btn minus" data-seconds="-30">−30с</button>
+                            <button class="adjust-btn minus" data-seconds="-60">−1м</button>
                         </div>
-                        <div class="color-item">
-                            <label>Прогресс</label>
-                            <input type="color" class="color-picker" id="progressColorPicker" value="#764ba2">
+                    </div>
+
+                    <div class="settings-group" style="margin-top: 12px;">
+                        <div class="toggle-row">
+                            <span class="toggle-label">⏱️ Продолжать ниже 0</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="allowNegative">
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
-                        <div class="color-item">
-                            <label>Фон</label>
-                            <input type="color" class="color-picker" id="bgColorPicker" value="#0f0c29">
+                        <div class="toggle-row" id="overrunRow" style="display: none;">
+                            <span class="toggle-label">Лимит перерасхода</span>
+                            <input type="text" id="overrunLimit" placeholder="мм:сс" value="05:00" 
+                                   style="width: 70px; padding: 6px 8px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.1); color: white; font-size: 0.9em;">
                         </div>
                     </div>
                 </div>
 
-                <div class="settings-group">
-                    <div class="settings-group-title">
-                        <span class="icon">✨</span>
-                        Темы
-                    </div>
-                    <div class="themes-grid" id="themesGrid">
-                        <!-- Генерируется JS -->
-                    </div>
-                </div>
-
-                <div class="settings-group">
-                    <div class="settings-group-title">
-                        <span class="icon">🖼️</span>
-                        Фон дисплея
-                    </div>
-                    <div class="bg-mode-tabs">
-                        <button class="bg-mode-btn active" data-mode="solid">Цвет</button>
-                        <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
-                        <button class="bg-mode-btn" data-mode="image">URL</button>
-                        <button class="bg-mode-btn" data-mode="local">Файл</button>
-                    </div>
-                    <div class="bg-controls active" id="bgSolidControls">
-                        <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;">
-                    </div>
-                    <div class="bg-controls" id="bgGradientControls">
-                        <div class="gradient-row">
-                            <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29">
-                            <input type="color" class="color-picker" id="bgGrad2" value="#302b63">
-                        </div>
-                    </div>
-                    <div class="bg-controls" id="bgImageControls">
-                        <input type="url" class="url-input" id="bgImageUrl" placeholder="https://example.com/image.jpg">
-                    </div>
-                    <div class="bg-controls" id="bgLocalControls">
-                        <div class="local-bg-section">
-                            <div class="local-bg-preview" id="localBgPreview">
-                                <div class="local-bg-placeholder" id="localBgPlaceholder">
-                                    <span class="icon">📁</span>
-                                    <span class="text">Нажмите для выбора изображения</span>
-                                </div>
-                                <img id="localBgImage" style="display: none;">
-                                <div class="local-bg-actions">
-                                    <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить">🔄</button>
-                                    <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить">✕</button>
-                                </div>
-                            </div>
-                            <input type="file" class="hidden-file-input" id="bgFileInput" 
-                                   accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp">
-                            
-                            <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
-                                <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
-                                <button class="bg-fit-btn" data-fit="contain">Вписать</button>
-                                <button class="bg-fit-btn" data-fit="tile">Плитка</button>
-                            </div>
-                            
-                            <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
-                                <label>Затемнение:</label>
-                                <input type="range" id="bgOverlaySlider" min="0" max="80" value="30">
-                                <span class="bg-overlay-value" id="bgOverlayValue">30%</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="reset-btn" id="resetStyleBtn">Сбросить стиль</button>
-                </div>
-            </div>
-
-            <!-- Таб: Звук -->
-            <div class="tab-content" id="tab-sound">
-                <div class="settings-group">
-                    <div class="toggle-row">
-                        <span class="toggle-label" style="font-weight: 600;">🔊 Звуки включены</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="soundMasterEnabled" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="settings-group" id="soundSettings">
-                    <div class="sound-row">
-                        <div class="sound-toggle">
-                            <input type="checkbox" id="soundStartEnabled">
-                            <label for="soundStartEnabled">Старт</label>
-                        </div>
-                        <select class="sound-select" id="soundStartPreset">
-                            <option value="none">— без звука —</option>
-                            <optgroup label="Стандартные">
-                                <option value="beep-short">Короткий бип</option>
-                                <option value="beep-long">Длинный бип</option>
-                                <option value="triple">Тройной сигнал</option>
-                                <option value="chirp">Чирп</option>
-                                <option value="bell">Колокольчик</option>
-                                <option value="ding">Динь</option>
-                                <option value="whoosh">Свист</option>
-                                <option value="click">Клик</option>
-                            </optgroup>
-                            <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
-                        </select>
-                        <button class="sound-preview" id="soundStartPreview">▶</button>
-                    </div>
-
-                    <div class="sound-row">
-                        <div class="sound-toggle">
-                            <input type="checkbox" id="soundEndEnabled" checked>
-                            <label for="soundEndEnabled">Финиш</label>
-                        </div>
-                        <select class="sound-select" id="soundEndPreset">
-                            <option value="none">— без звука —</option>
-                            <optgroup label="Стандартные">
-                                <option value="beep-short">Короткий бип</option>
-                                <option value="beep-long">Длинный бип</option>
-                                <option value="triple">Тройной сигнал</option>
-                                <option value="chirp">Чирп</option>
-                                <option value="bell">Колокольчик</option>
-                                <option value="ding">Динь</option>
-                                <option value="alarm">Будильник</option>
-                                <option value="fanfare">Фанфары</option>
-                                <option value="gong">Гонг</option>
-                            </optgroup>
-                            <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
-                        </select>
-                        <button class="sound-preview" id="soundEndPreview">▶</button>
-                    </div>
-
-                    <div class="sound-row">
-                        <div class="sound-toggle">
-                            <input type="checkbox" id="soundMinuteEnabled">
-                            <label for="soundMinuteEnabled">1 мин</label>
-                        </div>
-                        <select class="sound-select" id="soundMinutePreset">
-                            <option value="none">— без звука —</option>
-                            <optgroup label="Стандартные">
-                                <option value="beep-short">Короткий бип</option>
-                                <option value="beep-long">Длинный бип</option>
-                                <option value="triple">Тройной сигнал</option>
-                                <option value="chirp">Чирп</option>
-                                <option value="bell">Колокольчик</option>
-                                <option value="ding">Динь</option>
-                                <option value="tick">Тик</option>
-                                <option value="soft-alert">Мягкий сигнал</option>
-                            </optgroup>
-                            <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
-                        </select>
-                        <button class="sound-preview" id="soundMinutePreview">▶</button>
-                    </div>
-
-                    <!-- Пользовательские звуки -->
-                    <div class="custom-sounds-section">
+                <!-- Таб: Окна -->
+                <div class="tab-content" id="tab-windows">
+                    <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🎵</span>
-                            Ваши звуки
+                            <span class="icon">📺</span>
+                            Полноэкранный режим
                         </div>
-                        <div class="custom-sound-list" id="customSoundList">
-                            <!-- Список загруженных звуков -->
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Монитор</span>
+                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em; max-width: 140px;">
+                                <option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>
+                            </select>
                         </div>
-                        <div class="add-sound-row">
-                            <button class="add-sound-btn" id="addSoundBtn">
-                                <span>➕</span>
-                                <span>Добавить звук (MP3, WAV)</span>
-                            </button>
-                            <input type="file" class="hidden-file-input" id="soundFileInput" 
-                                   accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,.mp3,.wav,.ogg">
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Стиль таймера</span>
+                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em;">
+                                <option value="circle" style="background: #1a1a2e;">⭕ Круговой</option>
+                                <option value="digital" style="background: #1a1a2e;">🔢 Цифровой LED</option>
+                                <option value="flip" style="background: #1a1a2e;">🔄 Перекидные часы</option>
+                            </select>
+                        </div>
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Размер таймера</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="range" id="timerScale" min="50" max="150" value="100" style="width: 80px;">
+                                <span id="timerScaleValue" style="min-width: 35px; font-size: 0.85em;">100%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">🕐</span>
+                            Информация о времени
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <span class="toggle-label">Показывать блоки времени</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="showTimeBlocks">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="timeBlocksSettings" style="display: none;">
+                            <div class="toggle-row">
+                                <span class="toggle-label">Расположение</span>
+                                <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
+                                    <option value="frame">Рамка (Текущее ↑, Начало/Конец ↓)</option>
+                                    <option value="top-line">Линия сверху (все в ряд)</option>
+                                    <option value="bottom-line">Линия снизу (все в ряд)</option>
+                                    <option value="corners">По углам</option>
+                                </select>
+                            </div>
+                            
+                            <div class="toggle-row">
+                                <span class="toggle-label">Время начала</span>
+                                <input type="time" id="eventTimeInput" value="10:00" 
+                                       style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
+                            </div>
+                            
+                            <div class="toggle-row">
+                                <span class="toggle-label">Время окончания</span>
+                                <input type="time" id="endTimeInput" value="12:00" 
+                                       style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
+                            </div>
+                            
+                            <div class="toggle-row">
+                                <span class="toggle-label">Размер блоков</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="timeBlocksScale" min="50" max="200" value="100" style="width: 80px;">
+                                    <span id="timeBlocksScaleValue" style="min-width: 40px;">100%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Таб: Стиль -->
+                <div class="tab-content" id="tab-style">
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">✨</span>
+                            Темы
+                        </div>
+                        <div class="themes-grid" id="themesGrid"></div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">🖼️</span>
+                            Фон дисплея
+                        </div>
+                        <div class="bg-mode-tabs">
+                            <button class="bg-mode-btn active" data-mode="solid">Цвет</button>
+                            <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
+                            <button class="bg-mode-btn" data-mode="image">URL</button>
+                            <button class="bg-mode-btn" data-mode="local">Файл</button>
+                        </div>
+                        <div class="bg-controls active" id="bgSolidControls">
+                            <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;">
+                        </div>
+                        <div class="bg-controls" id="bgGradientControls">
+                            <div class="gradient-row">
+                                <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29">
+                                <input type="color" class="color-picker" id="bgGrad2" value="#302b63">
+                            </div>
+                        </div>
+                        <div class="bg-controls" id="bgImageControls">
+                            <input type="url" class="url-input" id="bgImageUrl" placeholder="https://example.com/image.jpg">
+                        </div>
+                        <div class="bg-controls" id="bgLocalControls">
+                            <div class="local-bg-section">
+                                <div class="local-bg-preview" id="localBgPreview">
+                                    <div class="local-bg-placeholder" id="localBgPlaceholder">
+                                        <span class="icon">📁</span>
+                                        <span class="text">Нажмите для выбора</span>
+                                    </div>
+                                    <img id="localBgImage" style="display: none;">
+                                    <div class="local-bg-actions">
+                                        <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить">🔄</button>
+                                        <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить">✕</button>
+                                    </div>
+                                </div>
+                                <input type="file" class="hidden-file-input" id="bgFileInput" 
+                                       accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp">
+                                
+                                <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
+                                    <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
+                                    <button class="bg-fit-btn" data-fit="contain">Вписать</button>
+                                    <button class="bg-fit-btn" data-fit="tile">Плитка</button>
+                                </div>
+                                
+                                <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
+                                    <label>Затемнение:</label>
+                                    <input type="range" id="bgOverlaySlider" min="0" max="80" value="30">
+                                    <span class="bg-overlay-value" id="bgOverlayValue">30%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="reset-btn" id="resetStyleBtn">Сбросить стиль</button>
+                    </div>
+                </div>
+
+                <!-- Таб: Звук -->
+                <div class="tab-content" id="tab-sound">
+                    <div class="settings-group">
+                        <div class="toggle-row">
+                            <span class="toggle-label" style="font-weight: 600;">🔊 Звуки включены</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="soundMasterEnabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-group" id="soundSettings">
+                        <div class="sound-row">
+                            <div class="sound-toggle">
+                                <input type="checkbox" id="soundStartEnabled">
+                                <label for="soundStartEnabled">Старт</label>
+                            </div>
+                            <select class="sound-select" id="soundStartPreset">
+                                <option value="none">— без звука —</option>
+                                <optgroup label="Стандартные">
+                                    <option value="beep-short">Короткий бип</option>
+                                    <option value="beep-long">Длинный бип</option>
+                                    <option value="triple">Тройной сигнал</option>
+                                    <option value="chirp">Чирп</option>
+                                    <option value="bell">Колокольчик</option>
+                                    <option value="ding">Динь</option>
+                                    <option value="whoosh">Свист</option>
+                                    <option value="click">Клик</option>
+                                </optgroup>
+                                <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
+                            </select>
+                            <button class="sound-preview" id="soundStartPreview">▶</button>
+                        </div>
+
+                        <div class="sound-row">
+                            <div class="sound-toggle">
+                                <input type="checkbox" id="soundEndEnabled" checked>
+                                <label for="soundEndEnabled">Финиш</label>
+                            </div>
+                            <select class="sound-select" id="soundEndPreset">
+                                <option value="none">— без звука —</option>
+                                <optgroup label="Стандартные">
+                                    <option value="beep-short">Короткий бип</option>
+                                    <option value="beep-long">Длинный бип</option>
+                                    <option value="triple">Тройной сигнал</option>
+                                    <option value="chirp">Чирп</option>
+                                    <option value="bell">Колокольчик</option>
+                                    <option value="ding">Динь</option>
+                                    <option value="alarm">Будильник</option>
+                                    <option value="fanfare">Фанфары</option>
+                                    <option value="gong">Гонг</option>
+                                </optgroup>
+                                <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
+                            </select>
+                            <button class="sound-preview" id="soundEndPreview">▶</button>
+                        </div>
+
+                        <div class="sound-row">
+                            <div class="sound-toggle">
+                                <input type="checkbox" id="soundMinuteEnabled">
+                                <label for="soundMinuteEnabled">1 мин</label>
+                            </div>
+                            <select class="sound-select" id="soundMinutePreset">
+                                <option value="none">— без звука —</option>
+                                <optgroup label="Стандартные">
+                                    <option value="beep-short">Короткий бип</option>
+                                    <option value="beep-long">Длинный бип</option>
+                                    <option value="triple">Тройной сигнал</option>
+                                    <option value="chirp">Чирп</option>
+                                    <option value="bell">Колокольчик</option>
+                                    <option value="ding">Динь</option>
+                                    <option value="tick">Тик</option>
+                                    <option value="soft-alert">Мягкий сигнал</option>
+                                </optgroup>
+                                <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
+                            </select>
+                            <button class="sound-preview" id="soundMinutePreview">▶</button>
+                        </div>
+
+                        <div class="custom-sounds-section">
+                            <div class="settings-group-title">
+                                <span class="icon">🎵</span>
+                                Ваши звуки
+                            </div>
+                            <div class="custom-sound-list" id="customSoundList"></div>
+                            <div class="add-sound-row">
+                                <button class="add-sound-btn" id="addSoundBtn">
+                                    <span>➕</span>
+                                    <span>Добавить звук</span>
+                                </button>
+                                <input type="file" class="hidden-file-input" id="soundFileInput" 
+                                       accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,.mp3,.wav,.ogg">
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
         </div>
     </div>
 
@@ -1280,6 +1450,13 @@
                 this.lastTimestamp = 0;
                 this.wasFinished = false;
                 this.currentBgMode = 'solid';
+                
+                // Текущие цвета (по умолчанию - первая тема)
+                this.currentColors = {
+                    timer: '#667eea',
+                    progress: '#764ba2',
+                    bg: '#0f0c29'
+                };
 
                 this.initElements();
                 this.initTabs();
@@ -1287,6 +1464,9 @@
                 this.attachEvents();
                 this.loadSettings();
                 this.setupIPC();
+                
+                // Авто-размер при загрузке
+                setTimeout(() => this.autoResizeWindow(), 100);
             }
 
             initElements() {
@@ -1307,20 +1487,57 @@
                 this.soundMinuteEl = document.getElementById('soundMinuteEnabled');
                 
                 // Настройки полноэкранного режима
-                this.showCurrentTimeEl = document.getElementById('showCurrentTime');
-                this.showEventTimeEl = document.getElementById('showEventTime');
+                this.displaySelectEl = document.getElementById('displaySelect');
+                this.showTimeBlocksEl = document.getElementById('showTimeBlocks');
+                this.timeLayoutPresetEl = document.getElementById('timeLayoutPreset');
                 this.eventTimeInputEl = document.getElementById('eventTimeInput');
+                this.endTimeInputEl = document.getElementById('endTimeInput');
+                this.timeBlocksScaleEl = document.getElementById('timeBlocksScale');
+                this.timeBlocksScaleValueEl = document.getElementById('timeBlocksScaleValue');
+                this.timerStyleEl = document.getElementById('timerStyle');
                 this.timerScaleEl = document.getElementById('timerScale');
                 this.timerScaleValueEl = document.getElementById('timerScaleValue');
+                
+                // Пресет расположения по умолчанию - "Рамка"
+                this.timeLayoutPreset = 'frame';
             }
 
             initTabs() {
+                // Кнопка настроек
+                const settingsToggle = document.getElementById('settingsToggle');
+                const advancedSettings = document.getElementById('advancedSettings');
+                
+                settingsToggle.addEventListener('click', () => {
+                    settingsToggle.classList.toggle('open');
+                    advancedSettings.classList.toggle('open');
+                    
+                    // Изменяем размер окна после анимации
+                    setTimeout(() => {
+                        this.autoResizeWindow();
+                    }, 400);
+                });
+
+                // Табы внутри настроек
                 document.querySelectorAll('.tab-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
                         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                         btn.classList.add('active');
-                        document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                        const tabContent = document.getElementById(`tab-${btn.dataset.tab}`);
+                        tabContent.classList.add('active');
+                        
+                        // Авто-ресайз при смене таба
+                        setTimeout(() => this.autoResizeWindow(), 50);
+                    });
+                });
+
+                // Быстрые пресеты
+                document.querySelectorAll('.quick-preset').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.quick-preset').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        const minutes = parseInt(btn.dataset.minutes);
+                        this.sendCommand('set', { seconds: minutes * 60 });
                     });
                 });
 
@@ -1359,9 +1576,13 @@
                     btn.addEventListener('click', () => {
                         document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
-                        document.getElementById('timerColorPicker').value = theme.t1;
-                        document.getElementById('progressColorPicker').value = theme.t2;
-                        document.getElementById('bgColorPicker').value = theme.bg;
+                        // Сохраняем цвета темы
+                        this.currentColors = {
+                            timer: theme.t1,
+                            progress: theme.t2,
+                            bg: theme.bg
+                        };
+                        // Обновляем фон
                         document.getElementById('bgSolidColor').value = theme.bg;
                         document.getElementById('bgGrad1').value = theme.bg;
                         this.saveColors();
@@ -1413,7 +1634,13 @@
                     ipcRenderer.send('open-widget');
                 });
                 document.getElementById('openDisplayBtn').addEventListener('click', () => {
-                    ipcRenderer.send('open-display');
+                    const displayIndex = this.displaySelectEl.value;
+                    ipcRenderer.send('open-display', { displayIndex });
+                });
+                
+                // Сохранение выбора монитора
+                this.displaySelectEl.addEventListener('change', () => {
+                    localStorage.setItem('selectedDisplay', this.displaySelectEl.value);
                 });
 
                 // Настройки перерасхода
@@ -1423,43 +1650,53 @@
                     this.saveExtSettings();
                 });
 
-                // Настройки полноэкранного режима
-                this.showCurrentTimeEl.addEventListener('change', () => this.pushDisplaySettings());
-                this.showEventTimeEl.addEventListener('change', () => {
-                    document.getElementById('eventTimeRow').style.display = 
-                        this.showEventTimeEl.checked ? 'flex' : 'none';
+                // Настройки блоков времени
+                this.showTimeBlocksEl.addEventListener('change', () => {
+                    const show = this.showTimeBlocksEl.checked;
+                    document.getElementById('timeBlocksSettings').style.display = show ? 'block' : 'none';
                     this.pushDisplaySettings();
                 });
+                
+                this.timeLayoutPresetEl.addEventListener('change', () => {
+                    this.timeLayoutPreset = this.timeLayoutPresetEl.value;
+                    this.pushDisplaySettings();
+                });
+                
                 this.eventTimeInputEl.addEventListener('change', () => this.pushDisplaySettings());
+                this.endTimeInputEl.addEventListener('change', () => this.pushDisplaySettings());
+                
+                this.timeBlocksScaleEl.addEventListener('input', () => {
+                    this.timeBlocksScaleValueEl.textContent = this.timeBlocksScaleEl.value + '%';
+                    this.pushDisplaySettings();
+                });
+                
+                this.timerStyleEl.addEventListener('change', () => this.pushDisplaySettings());
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
                     this.pushDisplaySettings();
                 });
 
-                // Цвета
-                const colorInputs = ['timerColorPicker', 'progressColorPicker', 'bgColorPicker'];
-                colorInputs.forEach(id => {
-                    document.getElementById(id).addEventListener('input', debounce(() => this.saveColors()));
-                });
-
                 // Фон дисплея
                 ['bgSolidColor', 'bgGrad1', 'bgGrad2'].forEach(id => {
-                    document.getElementById(id).addEventListener('input', debounce(() => this.pushDisplaySettings()));
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener('input', debounce(() => this.pushDisplaySettings()));
                 });
-                document.getElementById('bgImageUrl').addEventListener('change', () => this.pushDisplaySettings());
+                const bgImageUrl = document.getElementById('bgImageUrl');
+                if (bgImageUrl) bgImageUrl.addEventListener('change', () => this.pushDisplaySettings());
 
                 // Сброс стиля
-                document.getElementById('resetStyleBtn').addEventListener('click', () => {
-                    document.getElementById('timerColorPicker').value = '#667eea';
-                    document.getElementById('progressColorPicker').value = '#764ba2';
-                    document.getElementById('bgColorPicker').value = '#0f0c29';
-                    document.getElementById('bgSolidColor').value = '#0f0c29';
-                    document.getElementById('bgGrad1').value = '#0f0c29';
-                    document.getElementById('bgGrad2').value = '#302b63';
-                    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-                    this.saveColors();
-                    this.pushDisplaySettings();
-                });
+                const resetStyleBtn = document.getElementById('resetStyleBtn');
+                if (resetStyleBtn) {
+                    resetStyleBtn.addEventListener('click', () => {
+                        document.getElementById('bgSolidColor').value = '#0f0c29';
+                        document.getElementById('bgGrad1').value = '#0f0c29';
+                        document.getElementById('bgGrad2').value = '#302b63';
+                        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                        // Применить первую тему по умолчанию
+                        const firstTheme = document.querySelector('.theme-btn');
+                        if (firstTheme) firstTheme.click();
+                    });
+                }
 
                 // Звуки
                 this.soundMasterEl.addEventListener('change', () => {
@@ -1666,9 +1903,11 @@
                 const savedColors = localStorage.getItem('timerColors');
                 if (savedColors) {
                     const c = JSON.parse(savedColors);
-                    document.getElementById('timerColorPicker').value = c.timer || '#667eea';
-                    document.getElementById('progressColorPicker').value = c.progress || '#764ba2';
-                    document.getElementById('bgColorPicker').value = c.bg || '#0f0c29';
+                    this.currentColors = {
+                        timer: c.timer || '#667eea',
+                        progress: c.progress || '#764ba2',
+                        bg: c.bg || '#0f0c29'
+                    };
                 }
 
                 // Загрузка расширенных настроек
@@ -1706,23 +1945,24 @@
                 document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
                 document.getElementById(`bg${this.capitalize(bgMode)}Controls`).classList.add('active');
                 
-                // Настройки полноэкранного режима
-                this.showCurrentTimeEl.checked = !!ext.showCurrentTime;
-                this.showEventTimeEl.checked = !!ext.showEventTime;
-                document.getElementById('eventTimeRow').style.display = ext.showEventTime ? 'flex' : 'none';
+                // Настройки блоков времени
+                this.showTimeBlocksEl.checked = !!ext.showTimeBlocks;
+                document.getElementById('timeBlocksSettings').style.display = ext.showTimeBlocks ? 'block' : 'none';
+                this.timeLayoutPreset = ext.timeLayoutPreset || 'frame';
+                this.timeLayoutPresetEl.value = this.timeLayoutPreset;
                 this.eventTimeInputEl.value = ext.eventTime || '10:00';
+                this.endTimeInputEl.value = ext.endTime || '12:00';
+                this.timeBlocksScaleEl.value = ext.timeBlocksScale || 100;
+                this.timeBlocksScaleValueEl.textContent = (ext.timeBlocksScale || 100) + '%';
+                
+                this.timerStyleEl.value = ext.timerStyle || 'circle';
                 this.timerScaleEl.value = ext.timerScale || 100;
                 this.timerScaleValueEl.textContent = (ext.timerScale || 100) + '%';
             }
 
             saveColors() {
-                const colors = {
-                    timer: document.getElementById('timerColorPicker').value,
-                    progress: document.getElementById('progressColorPicker').value,
-                    bg: document.getElementById('bgColorPicker').value
-                };
-                localStorage.setItem('timerColors', JSON.stringify(colors));
-                ipcRenderer.send('colors-update', colors);
+                localStorage.setItem('timerColors', JSON.stringify(this.currentColors));
+                ipcRenderer.send('colors-update', this.currentColors);
             }
 
             saveExtSettings() {
@@ -1745,10 +1985,13 @@
                     bgGrad1: document.getElementById('bgGrad1').value,
                     bgGrad2: document.getElementById('bgGrad2').value,
                     bgImageUrl: document.getElementById('bgImageUrl').value,
-                    // Настройки отображения
-                    showCurrentTime: this.showCurrentTimeEl.checked,
-                    showEventTime: this.showEventTimeEl.checked,
+                    // Настройки блоков времени
+                    showTimeBlocks: this.showTimeBlocksEl.checked,
+                    timeLayoutPreset: this.timeLayoutPreset,
                     eventTime: this.eventTimeInputEl.value,
+                    endTime: this.endTimeInputEl.value,
+                    timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
+                    timerStyle: this.timerStyleEl.value,
                     timerScale: parseInt(this.timerScaleEl.value)
                 };
 
@@ -1774,10 +2017,13 @@
                     bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
                     bgLocalFit: localBgSettings.fit || 'cover',
                     bgLocalOverlay: localBgSettings.overlay || 30,
-                    // Настройки отображения
-                    showCurrentTime: this.showCurrentTimeEl.checked,
-                    showEventTime: this.showEventTimeEl.checked,
+                    // Настройки блоков времени
+                    showTimeBlocks: this.showTimeBlocksEl.checked,
+                    timeLayoutPreset: this.timeLayoutPreset,
                     eventTime: this.eventTimeInputEl.value,
+                    endTime: this.endTimeInputEl.value,
+                    timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
+                    timerStyle: this.timerStyleEl.value,
                     timerScale: parseInt(this.timerScaleEl.value)
                 };
                 ipcRenderer.send('display-settings-update', settings);
@@ -1785,6 +2031,11 @@
 
             setupIPC() {
                 ipcRenderer.send('get-timer-state');
+                ipcRenderer.send('get-displays');
+
+                ipcRenderer.on('displays-list', (event, displays) => {
+                    this.updateDisplaysList(displays);
+                });
 
                 ipcRenderer.on('timer-state', (event, state) => {
                     if (state.timestamp && state.timestamp <= this.lastTimestamp) return;
@@ -1800,8 +2051,12 @@
                     this.updateDisplay();
                     this.updateControls();
 
-                    if (state.finished && !wasFinishedBefore && this.soundEndEl.checked) {
-                        this.playSound('end');
+                    // Звук окончания таймера
+                    if (state.finished && !wasFinishedBefore) {
+                        console.log('Timer finished! Sound enabled:', this.soundEndEl.checked, 'Master:', this.soundMasterEl.checked);
+                        if (this.soundEndEl.checked) {
+                            this.playSound('end');
+                        }
                     }
                 });
 
@@ -1879,6 +2134,48 @@
                 this.pauseBtn.disabled = !this.isRunning;
             }
 
+            updateDisplaysList(displays) {
+                const select = this.displaySelectEl;
+                const savedDisplay = localStorage.getItem('selectedDisplay') || 'auto';
+                
+                // Очищаем и добавляем опцию "Авто"
+                select.innerHTML = '<option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>';
+                
+                displays.forEach((display, index) => {
+                    const option = document.createElement('option');
+                    option.value = index.toString();
+                    option.style.background = '#1a1a2e';
+                    
+                    const isPrimary = display.bounds.x === 0 && display.bounds.y === 0;
+                    const label = isPrimary ? '🖥️ Основной' : `🖥️ Монитор ${index + 1}`;
+                    const size = `${display.bounds.width}×${display.bounds.height}`;
+                    
+                    option.textContent = `${label} (${size})`;
+                    select.appendChild(option);
+                });
+                
+                // Восстанавливаем выбор
+                if (savedDisplay && select.querySelector(`option[value="${savedDisplay}"]`)) {
+                    select.value = savedDisplay;
+                }
+            }
+
+            autoResizeWindow() {
+                // Измеряем реальную высоту всего контента
+                const panel = document.querySelector('.control-panel');
+                
+                // Получаем реальную высоту панели + отступы + заголовок окна
+                const panelHeight = panel.getBoundingClientRect().height;
+                const extra = 75; // отступы + заголовок окна Windows + запас
+                
+                const neededHeight = Math.ceil(panelHeight + extra);
+                
+                ipcRenderer.send('resize-control-window', { 
+                    width: 420, 
+                    height: neededHeight
+                });
+            }
+
             formatTime(seconds) {
                 const neg = seconds < 0;
                 const abs = Math.abs(seconds);
@@ -1899,6 +2196,8 @@
                 const presetId = `sound${this.capitalize(type)}Preset`;
                 const preset = document.getElementById(presetId)?.value || 'none';
                 
+                console.log('Playing sound:', type, 'Preset:', preset);
+                
                 if (preset === 'none') {
                     this.beep(880, 0.15);
                     return;
@@ -1918,7 +2217,7 @@
                 }
             }
 
-            playPreset(name) {
+            async playPreset(name) {
                 // Проверяем, пользовательский ли это звук
                 if (name.startsWith('custom:')) {
                     this.playCustomSound(name.replace('custom:', ''));
@@ -1926,6 +2225,10 @@
                 }
 
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Возобновляем AudioContext если он приостановлен
+                if (ctx.state === 'suspended') {
+                    await ctx.resume();
+                }
                 const g = ctx.createGain();
                 g.connect(ctx.destination);
                 g.gain.value = 0.0001;
@@ -2185,11 +2488,20 @@
             playCustomSound(name) {
                 const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
                 const sound = customSounds.find(s => s.name === name);
-                if (!sound) return;
+                if (!sound) {
+                    console.warn('Custom sound not found:', name);
+                    // Проиграем стандартный beep если кастомный звук не найден
+                    this.beep(880, 0.15);
+                    return;
+                }
 
                 const audio = new Audio(sound.data);
                 audio.volume = 0.5;
-                audio.play().catch(() => {});
+                audio.play().catch(err => {
+                    console.error('Error playing custom sound:', err);
+                    // Проиграем стандартный beep если кастомный звук не сработал
+                    this.beep(880, 0.15);
+                });
             }
 
             deleteCustomSound(name) {
@@ -2199,8 +2511,12 @@
                 this.loadCustomSounds();
             }
 
-            beep(freq, dur) {
+            async beep(freq, dur) {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Возобновляем AudioContext если он приостановлен
+                if (ctx.state === 'suspended') {
+                    await ctx.resume();
+                }
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 o.connect(g);
