@@ -11,12 +11,19 @@ class DisplayTimer {
         this.lastTimestamp = 0;
         this.flashCount = 0;
         this.flashInterval = null;
+        
+        // Настройки отображения
+        this.showCurrentTime = false;
+        this.showEventTime = false;
+        this.eventTime = '10:00';
+        this.timerScale = 100;
 
         this.initElements();
         this.initProgress();
         this.loadColors();
         this.detectElectronAndSetup();
         this.startColorSync();
+        this.startCurrentTimeClock();
     }
 
     initElements() {
@@ -24,11 +31,30 @@ class DisplayTimer {
         this.progressRing = document.getElementById('progressRing');
         this.statusPill = document.getElementById('statusPill');
         this.statusText = document.getElementById('statusText');
+        this.timerRing = document.getElementById('timerRing');
+        this.currentTimeBlock = document.getElementById('currentTimeBlock');
+        this.eventTimeBlock = document.getElementById('eventTimeBlock');
+        this.currentTimeEl = document.getElementById('currentTime');
+        this.eventTimeEl = document.getElementById('eventTime');
     }
 
     initProgress() {
         this.progressRing.style.strokeDasharray = `${this.circumference}`;
         this.progressRing.style.strokeDashoffset = this.circumference;
+    }
+    
+    startCurrentTimeClock() {
+        const updateClock = () => {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const secs = String(now.getSeconds()).padStart(2, '0');
+            if (this.currentTimeEl) {
+                this.currentTimeEl.textContent = `${hours}:${mins}:${secs}`;
+            }
+        };
+        updateClock();
+        setInterval(updateClock, 1000);
     }
 
     detectElectronAndSetup() {
@@ -71,7 +97,39 @@ class DisplayTimer {
             if (settings.bgMode || settings.bgSolid || settings.bgGrad1) {
                 this.applyBackground(settings);
             }
+            this.applyDisplaySettings(settings);
         });
+    }
+    
+    applyDisplaySettings(settings) {
+        // Показ/скрытие текущего времени
+        if (settings.showCurrentTime !== undefined) {
+            this.showCurrentTime = settings.showCurrentTime;
+            if (this.currentTimeBlock) {
+                this.currentTimeBlock.classList.toggle('visible', this.showCurrentTime);
+            }
+        }
+        
+        // Показ/скрытие времени мероприятия
+        if (settings.showEventTime !== undefined) {
+            this.showEventTime = settings.showEventTime;
+            if (this.eventTimeBlock) {
+                this.eventTimeBlock.classList.toggle('visible', this.showEventTime);
+            }
+        }
+        
+        // Время мероприятия
+        if (settings.eventTime && this.eventTimeEl) {
+            this.eventTime = settings.eventTime;
+            this.eventTimeEl.textContent = settings.eventTime;
+        }
+        
+        // Масштаб таймера
+        if (settings.timerScale !== undefined && this.timerRing) {
+            this.timerScale = settings.timerScale;
+            const scale = settings.timerScale / 100;
+            this.timerRing.style.transform = `scale(${scale})`;
+        }
     }
 
     startLocalStorageSync() {
@@ -149,6 +207,7 @@ class DisplayTimer {
                 }
                 
                 this.applyBackground(settings);
+                this.applyDisplaySettings(settings);
             } catch (_) {}
         }
     }
