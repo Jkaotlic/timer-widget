@@ -171,7 +171,7 @@ MIT © 2024
 
 <br>
 
-[![GitHub stars](https://img.shields.io/github/stars/YOUR_USERNAME/timer-widget?style=social)](../../stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/YOUR_USERNAME/timer-widget?style=social)](../../network/members)
+[![GitHub stars](https://img.shields.io/github/stars/Jkaotlic/timer-widget?style=social)](../../stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Jkaotlic/timer-widget?style=social)](../../network/members)
 
 </div>
