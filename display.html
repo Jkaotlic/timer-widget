@@ -44,6 +44,46 @@
             padding: 40px;
         }
 
+        /* Верхняя панель с часами */
+        .top-info {
+            position: fixed;
+            top: 30px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            z-index: 10;
+        }
+
+        .info-block {
+            text-align: center;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.4s ease;
+        }
+
+        .info-block.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .info-label {
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+        }
+
+        .info-value {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 600;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
         /* Круговой таймер */
         .timer-ring {
             position: relative;
@@ -233,8 +273,20 @@
     </style>
 </head>
 <body>
+    <!-- Верхняя информационная панель -->
+    <div class="top-info">
+        <div class="info-block" id="currentTimeBlock">
+            <div class="info-label">Текущее время</div>
+            <div class="info-value" id="currentTime">00:00:00</div>
+        </div>
+        <div class="info-block" id="eventTimeBlock">
+            <div class="info-label">Начало мероприятия</div>
+            <div class="info-value" id="eventTime">10:00</div>
+        </div>
+    </div>
+
     <div class="display-container">
-        <div class="timer-ring">
+        <div class="timer-ring" id="timerRing">
             <svg class="timer-svg" viewBox="0 0 400 400">
                 <defs>
                     <!-- Основной градиент -->

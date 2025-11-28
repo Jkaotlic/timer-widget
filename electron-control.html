@@ -1012,6 +1012,44 @@
 
                 <div class="settings-group" style="margin-top: 20px;">
                     <div class="settings-group-title">
+                        <span class="icon">📺</span>
+                        Полноэкранный режим
+                    </div>
+                    
+                    <div class="toggle-row">
+                        <span class="toggle-label">Показывать текущее время</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="showCurrentTime">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="toggle-row">
+                        <span class="toggle-label">Показывать время старта</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="showEventTime">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="toggle-row" id="eventTimeRow" style="display: none;">
+                        <span class="toggle-label">Время мероприятия</span>
+                        <input type="time" id="eventTimeInput" value="10:00" 
+                               style="width: 100px; padding: 8px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit;">
+                    </div>
+
+                    <div class="toggle-row">
+                        <span class="toggle-label">Размер таймера</span>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="range" id="timerScale" min="50" max="150" value="100" 
+                                   style="width: 100px;">
+                            <span id="timerScaleValue" style="min-width: 40px;">100%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-group" style="margin-top: 20px;">
+                    <div class="settings-group-title">
                         <span class="icon">⚙️</span>
                         Дополнительно
                     </div>
@@ -1267,6 +1305,13 @@
                 this.soundStartEl = document.getElementById('soundStartEnabled');
                 this.soundEndEl = document.getElementById('soundEndEnabled');
                 this.soundMinuteEl = document.getElementById('soundMinuteEnabled');
+                
+                // Настройки полноэкранного режима
+                this.showCurrentTimeEl = document.getElementById('showCurrentTime');
+                this.showEventTimeEl = document.getElementById('showEventTime');
+                this.eventTimeInputEl = document.getElementById('eventTimeInput');
+                this.timerScaleEl = document.getElementById('timerScale');
+                this.timerScaleValueEl = document.getElementById('timerScaleValue');
             }
 
             initTabs() {
@@ -1376,6 +1421,19 @@
                     document.getElementById('overrunRow').style.display = 
                         this.allowNegativeEl.checked ? 'flex' : 'none';
                     this.saveExtSettings();
+                });
+
+                // Настройки полноэкранного режима
+                this.showCurrentTimeEl.addEventListener('change', () => this.pushDisplaySettings());
+                this.showEventTimeEl.addEventListener('change', () => {
+                    document.getElementById('eventTimeRow').style.display = 
+                        this.showEventTimeEl.checked ? 'flex' : 'none';
+                    this.pushDisplaySettings();
+                });
+                this.eventTimeInputEl.addEventListener('change', () => this.pushDisplaySettings());
+                this.timerScaleEl.addEventListener('input', () => {
+                    this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
+                    this.pushDisplaySettings();
                 });
 
                 // Цвета
@@ -1647,6 +1705,14 @@
                 });
                 document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
                 document.getElementById(`bg${this.capitalize(bgMode)}Controls`).classList.add('active');
+                
+                // Настройки полноэкранного режима
+                this.showCurrentTimeEl.checked = !!ext.showCurrentTime;
+                this.showEventTimeEl.checked = !!ext.showEventTime;
+                document.getElementById('eventTimeRow').style.display = ext.showEventTime ? 'flex' : 'none';
+                this.eventTimeInputEl.value = ext.eventTime || '10:00';
+                this.timerScaleEl.value = ext.timerScale || 100;
+                this.timerScaleValueEl.textContent = (ext.timerScale || 100) + '%';
             }
 
             saveColors() {
@@ -1678,7 +1744,12 @@
                     bgSolid: document.getElementById('bgSolidColor').value,
                     bgGrad1: document.getElementById('bgGrad1').value,
                     bgGrad2: document.getElementById('bgGrad2').value,
-                    bgImageUrl: document.getElementById('bgImageUrl').value
+                    bgImageUrl: document.getElementById('bgImageUrl').value,
+                    // Настройки отображения
+                    showCurrentTime: this.showCurrentTimeEl.checked,
+                    showEventTime: this.showEventTimeEl.checked,
+                    eventTime: this.eventTimeInputEl.value,
+                    timerScale: parseInt(this.timerScaleEl.value)
                 };
 
                 const prev = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
@@ -1702,7 +1773,12 @@
                     // Локальный фон
                     bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
                     bgLocalFit: localBgSettings.fit || 'cover',
-                    bgLocalOverlay: localBgSettings.overlay || 30
+                    bgLocalOverlay: localBgSettings.overlay || 30,
+                    // Настройки отображения
+                    showCurrentTime: this.showCurrentTimeEl.checked,
+                    showEventTime: this.showEventTimeEl.checked,
+                    eventTime: this.eventTimeInputEl.value,
+                    timerScale: parseInt(this.timerScaleEl.value)
                 };
                 ipcRenderer.send('display-settings-update', settings);
             }
