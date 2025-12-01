@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timer Widget</title>
+    <title>Clock Widget</title>
     <style>
         * {
             margin: 0;
@@ -40,7 +40,7 @@
         }
 
         body.mouse-active .widget-border {
-            border-color: rgba(102, 126, 234, 0.4);
+            border-color: rgba(56, 239, 125, 0.4);
         }
 
         /* Индикаторы углов для ресайза - скрыты по умолчанию */
@@ -61,17 +61,17 @@
         .resize-handle::before {
             content: '';
             position: absolute;
-            background: rgba(102, 126, 234, 0.9);
+            background: rgba(56, 239, 125, 0.9);
             border-radius: 1px;
-            box-shadow: 0 0 4px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 0 4px rgba(56, 239, 125, 0.5);
         }
 
         .resize-handle::after {
             content: '';
             position: absolute;
-            background: rgba(102, 126, 234, 0.9);
+            background: rgba(56, 239, 125, 0.9);
             border-radius: 1px;
-            box-shadow: 0 0 4px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 0 4px rgba(56, 239, 125, 0.5);
         }
 
         .resize-handle.corner-se {
@@ -189,39 +189,9 @@
 
         /* Фоновый круг с градиентом */
         .bg-circle {
-            fill: var(--widget-bg-fill, rgba(15, 15, 25, 0.85));
+            fill: rgba(15, 15, 25, 0.85);
             stroke: rgba(255, 255, 255, 0.08);
             stroke-width: 2;
-        }
-
-        /* Фоновое изображение (для режима local/image) */
-        .widget-bg-image {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 92%;
-            height: 92%;
-            border-radius: 50%;
-            overflow: hidden;
-            pointer-events: none;
-            z-index: -1;
-        }
-
-        .widget-bg-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .widget-bg-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 50%;
         }
 
         /* Декоративный внутренний круг */
@@ -231,37 +201,21 @@
             stroke-width: 1;
         }
 
-        /* Трек прогресса (фон) */
-        .progress-track {
+        /* Трек секундной стрелки (фон) */
+        .seconds-track {
             fill: none;
             stroke: rgba(255, 255, 255, 0.08);
-            stroke-width: 8;
+            stroke-width: 6;
         }
 
-        /* Прогресс-бар */
-        .progress-bar {
+        /* Прогресс секунд */
+        .seconds-bar {
             fill: none;
-            stroke: url(#widgetGradient);
-            stroke-width: 8;
+            stroke: url(#clockGradient);
+            stroke-width: 6;
             stroke-linecap: round;
-            transition: stroke-dashoffset 0.3s ease-out;
-            filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.5));
-        }
-
-        .progress-bar.warning {
-            stroke: url(#warningGradient);
-            filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.5));
-        }
-
-        .progress-bar.danger {
-            stroke: url(#dangerGradient);
-            filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
-            animation: pulse-glow 1s infinite;
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6)); }
-            50% { filter: drop-shadow(0 0 16px rgba(255, 68, 68, 0.9)); }
+            transition: stroke-dashoffset 0.2s linear;
+            filter: drop-shadow(0 0 8px rgba(56, 239, 125, 0.5));
         }
 
         /* Шкала с делениями */
@@ -286,35 +240,19 @@
         }
 
         .time-display {
-            font-size: clamp(1.5rem, min(18vw, 18vh), 8rem);
+            font-size: clamp(1.2rem, min(14vw, 14vh), 5rem);
             font-weight: 700;
             color: white;
             font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.02em;
             text-shadow: 
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 30px var(--glow-color, rgba(102, 126, 234, 0.6));
+                0 0 30px rgba(56, 239, 125, 0.6);
             transition: color 0.3s, text-shadow 0.3s;
             white-space: nowrap;
         }
 
-        .time-display.warning {
-            color: #ffc107;
-            --glow-color: rgba(255, 193, 7, 0.6);
-        }
-
-        .time-display.danger {
-            color: #ff4444;
-            --glow-color: rgba(255, 68, 68, 0.8);
-            animation: time-pulse 1s infinite;
-        }
-
-        @keyframes time-pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-        }
-
-        .status-badge {
+        .date-badge {
             margin-top: clamp(4px, 2vh, 16px);
             padding: clamp(4px, 1.5vh, 10px) clamp(10px, 4vw, 24px);
             border-radius: 20px;
@@ -328,26 +266,64 @@
             transition: all 0.3s;
         }
 
-        .status-badge.running {
-            background: rgba(56, 239, 125, 0.2);
-            color: #38ef7d;
-            box-shadow: 0 0 10px rgba(56, 239, 125, 0.3);
+        /* Стили date-badge для Digital режима */
+        body.style-digital .date-badge {
+            background: linear-gradient(180deg, #0a0a0a 0%, #151515 100%);
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #00ff88;
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
         }
 
-        .status-badge.paused {
-            background: rgba(245, 87, 108, 0.2);
-            color: #f5576c;
+        /* Стили date-badge для Flip режима */
+        body.style-flip .date-badge {
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 6px;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: 'Arial Black', 'Helvetica', sans-serif;
+            font-weight: 900;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
         }
 
-        .status-badge.finished {
-            background: rgba(254, 225, 64, 0.2);
-            color: #fee140;
-            animation: badge-pulse 0.5s infinite;
+        /* Часовой пояс */
+        .timezone-badge {
+            margin-top: clamp(2px, 1vh, 8px);
+            padding: clamp(2px, 0.8vh, 6px) clamp(6px, 2vw, 14px);
+            border-radius: 12px;
+            font-size: clamp(0.4rem, min(2.5vw, 2.5vh), 0.9rem);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s;
+            display: none;
         }
 
-        @keyframes badge-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+        .timezone-badge.visible {
+            display: inline-block;
+        }
+
+        /* Стили timezone для Digital режима */
+        body.style-digital .timezone-badge {
+            background: linear-gradient(180deg, #0a0a0a 0%, #101010 100%);
+            border: 1px solid #222;
+            border-radius: 6px;
+            color: #00cc66;
+            text-shadow: 0 0 6px rgba(0, 204, 102, 0.4);
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Стили timezone для Flip режима */
+        body.style-flip .timezone-badge {
+            background: linear-gradient(180deg, #222 0%, #1a1a1a 100%);
+            border-radius: 4px;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Arial', sans-serif;
+            font-weight: 600;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
         }
 
         /* Кнопки управления */
@@ -461,9 +437,9 @@
         }
 
         .size-btn.active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #38ef7d, #11998e);
             color: white;
-            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 2px 10px rgba(56, 239, 125, 0.4);
         }
 
         .setting-row {
@@ -475,6 +451,62 @@
             font-size: 0.7em;
             margin-bottom: 6px;
             display: block;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .toggle-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.7em;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 36px;
+            height: 20px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.2);
+            transition: 0.3s;
+            border-radius: 20px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #38ef7d, #11998e);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(16px);
         }
 
         .slider-container {
@@ -498,7 +530,7 @@
             -webkit-appearance: none;
             width: 16px;
             height: 16px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #38ef7d, #11998e);
             cursor: pointer;
             border-radius: 50%;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -543,10 +575,12 @@
                 0 4px 20px rgba(0, 0, 0, 0.6),
                 0 0 40px rgba(0, 255, 136, 0.1);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             width: 100%;
             height: 100%;
+            gap: 4px;
             padding: 10%;
             position: relative;
         }
@@ -577,26 +611,19 @@
             line-height: 1;
         }
 
-        .widget-digital-time.warning {
-            color: #ffcc00;
-            text-shadow: 
-                0 0 10px #ffcc00,
-                0 0 20px #ffcc00,
-                0 0 40px #ffcc0066;
+        /* Дата и timezone пропорционально размеру времени в digital */
+        .widget-digital-display .date-badge {
+            margin-top: 0;
+            padding: calc(var(--digital-font-size, 24px) * 0.1) calc(var(--digital-font-size, 24px) * 0.3);
+            font-size: calc(var(--digital-font-size, 24px) * 0.18);
+            border-radius: calc(var(--digital-font-size, 24px) * 0.1);
         }
 
-        .widget-digital-time.danger {
-            color: #ff3333;
-            text-shadow: 
-                0 0 10px #ff3333,
-                0 0 20px #ff3333,
-                0 0 40px #ff333366;
-            animation: widget-led-blink 0.5s infinite;
-        }
-
-        @keyframes widget-led-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+        .widget-digital-display .timezone-badge {
+            margin-top: 0;
+            padding: calc(var(--digital-font-size, 24px) * 0.06) calc(var(--digital-font-size, 24px) * 0.2);
+            font-size: calc(var(--digital-font-size, 24px) * 0.14);
+            border-radius: calc(var(--digital-font-size, 24px) * 0.08);
         }
 
         /* ============================================
@@ -606,6 +633,7 @@
             display: none;
             width: 100%;
             height: 100%;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             padding: 5%;
@@ -619,11 +647,42 @@
 
         .widget-flip-content {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 8px;
             transform-origin: center;
             transform: scale(var(--flip-scale, 1));
+        }
+
+        .widget-flip-cards {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .widget-flip-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            margin-top: 6px;
+        }
+
+        /* Уменьшенные стили для даты и timezone в flip */
+        .widget-flip-info .date-badge {
+            margin-top: 0;
+            padding: 3px 10px;
+            font-size: 10px;
+            border-radius: 4px;
+        }
+
+        .widget-flip-info .timezone-badge {
+            margin-top: 0;
+            padding: 2px 8px;
+            font-size: 8px;
+            border-radius: 3px;
         }
 
         .widget-flip-group {
@@ -653,7 +712,6 @@
             background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 49.9%, #0a0a0a 50%, #1a1a1a 100%);
             border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
         }
 
         .widget-flip-inner::before {
@@ -679,20 +737,17 @@
             line-height: 1;
         }
 
-        .widget-flip-card.warning .widget-flip-digit { color: #ffc107; }
-        .widget-flip-card.danger .widget-flip-digit { color: #ff4444; }
-        
-        /* Адаптивные размеры для flip-карточек когда есть часы (6 цифр) */
-        .widget-flip.has-hours .widget-flip-card {
+        /* Адаптивные размеры для 6 цифр (ЧЧ:ММ:СС) */
+        .widget-flip.has-seconds .widget-flip-card {
             width: 40px;
             height: 56px;
         }
         
-        .widget-flip.has-hours .widget-flip-separator {
+        .widget-flip.has-seconds .widget-flip-separator {
             font-size: 36px;
         }
         
-        .widget-flip.has-hours .widget-flip-digit {
+        .widget-flip.has-seconds .widget-flip-digit {
             font-size: 32px;
         }
 
@@ -720,12 +775,6 @@
     <div class="resize-handle corner-se"></div>
 
     <div class="widget-container" id="widgetContainer">
-        <!-- Фоновое изображение (для режима local/image) -->
-        <div class="widget-bg-image" id="widgetBgImage" style="display: none;">
-            <img id="widgetBgImg" src="" alt="">
-            <div class="widget-bg-overlay" id="widgetBgOverlay"></div>
-        </div>
-
         <!-- Верхние контролы -->
         <div class="controls-overlay">
             <button class="ctrl-btn" id="settingsBtn" title="Настройки">⚙</button>
@@ -734,7 +783,7 @@
 
         <!-- Панель настроек -->
         <div class="settings-panel" id="settingsPanel">
-            <div class="settings-title">Размер виджета</div>
+            <div class="settings-title">Размер</div>
             <div class="size-grid">
                 <button class="size-btn" data-size="tiny">XS</button>
                 <button class="size-btn" data-size="small">S</button>
@@ -742,6 +791,30 @@
                 <button class="size-btn" data-size="large">L</button>
                 <button class="size-btn" data-size="xlarge">XL</button>
                 <button class="size-btn" data-size="xxlarge">2XL</button>
+            </div>
+
+            <div class="toggle-row">
+                <span class="toggle-label">Показать секунды</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showSeconds" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <span class="toggle-label">24-часовой формат</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="format24h" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <span class="toggle-label">Показать дату</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showDate">
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
 
             <div class="setting-row">
@@ -757,20 +830,10 @@
         <div class="circular-widget active">
             <svg class="widget-svg" viewBox="0 0 200 200">
                 <defs>
-                    <!-- Основной градиент -->
-                    <linearGradient id="widgetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#667eea" />
-                        <stop offset="100%" stop-color="#764ba2" />
-                    </linearGradient>
-                    <!-- Предупреждение -->
-                    <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ffc107" />
-                        <stop offset="100%" stop-color="#ff9800" />
-                    </linearGradient>
-                    <!-- Опасность -->
-                    <linearGradient id="dangerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ff4444" />
-                        <stop offset="100%" stop-color="#cc0000" />
+                    <!-- Градиент для часов -->
+                    <linearGradient id="clockGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38ef7d" />
+                        <stop offset="100%" stop-color="#11998e" />
                     </linearGradient>
                     <!-- Свечение -->
                     <filter id="glow">
@@ -804,12 +867,12 @@
                     <line x1="100" y1="15" x2="100" y2="20" transform="rotate(330, 100, 100)" />
                 </g>
 
-                <!-- Трек прогресса -->
-                <circle class="progress-track" cx="100" cy="100" r="82" 
+                <!-- Трек секунд -->
+                <circle class="seconds-track" cx="100" cy="100" r="82" 
                         transform="rotate(-90, 100, 100)" />
                 
-                <!-- Прогресс-бар -->
-                <circle class="progress-bar" id="progressBar" cx="100" cy="100" r="82" 
+                <!-- Прогресс секунд -->
+                <circle class="seconds-bar" id="secondsBar" cx="100" cy="100" r="82" 
                         transform="rotate(-90, 100, 100)" 
                         stroke-dasharray="515.22" 
                         stroke-dashoffset="515.22" />
@@ -818,7 +881,8 @@
             <!-- Центральный контент -->
             <div class="center-content">
                 <div class="time-display" id="timeDisplay">00:00</div>
-                <div class="status-badge" id="statusBadge">Готов</div>
+                <div class="date-badge" id="dateBadge" style="display: none;"></div>
+                <div class="timezone-badge" id="timezoneBadge"></div>
             </div>
         </div>
 
@@ -826,52 +890,62 @@
         <div class="widget-digital" id="widgetDigital">
             <div class="widget-digital-display">
                 <div class="widget-digital-time" id="widgetDigitalTime">00:00</div>
+                <div class="date-badge" id="digitalDateBadge" style="display: none;"></div>
+                <div class="timezone-badge" id="digitalTimezoneBadge"></div>
             </div>
         </div>
 
         <!-- Стиль: Перекидные часы -->
         <div class="widget-flip" id="widgetFlip">
             <div class="widget-flip-content" id="widgetFlipContent">
-                <!-- Группа часов (скрыта по умолчанию) -->
-                <div class="widget-flip-group widget-flip-hours" id="wFlipHoursGroup" style="display: none;">
-                    <div class="widget-flip-card" id="wFlipHr1">
-                        <div class="widget-flip-inner">
-                            <span class="widget-flip-digit">0</span>
+                <!-- Карточки времени -->
+                <div class="widget-flip-cards">
+                    <!-- Группа часов -->
+                    <div class="widget-flip-group">
+                        <div class="widget-flip-card" id="wFlipHr1">
+                            <div class="widget-flip-inner">
+                                <span class="widget-flip-digit">0</span>
+                            </div>
+                        </div>
+                        <div class="widget-flip-card" id="wFlipHr2">
+                            <div class="widget-flip-inner">
+                                <span class="widget-flip-digit">0</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="widget-flip-card" id="wFlipHr2">
-                        <div class="widget-flip-inner">
-                            <span class="widget-flip-digit">0</span>
+                    <div class="widget-flip-separator">:</div>
+                    <!-- Группа минут -->
+                    <div class="widget-flip-group">
+                        <div class="widget-flip-card" id="wFlipMin1">
+                            <div class="widget-flip-inner">
+                                <span class="widget-flip-digit">0</span>
+                            </div>
+                        </div>
+                        <div class="widget-flip-card" id="wFlipMin2">
+                            <div class="widget-flip-inner">
+                                <span class="widget-flip-digit">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Группа секунд (скрываемая) -->
+                    <div class="widget-flip-separator widget-flip-seconds-sep" id="wFlipSecSep">:</div>
+                    <div class="widget-flip-group widget-flip-seconds-group" id="wFlipSecGroup">
+                        <div class="widget-flip-card" id="wFlipSec1">
+                            <div class="widget-flip-inner">
+                                <span class="widget-flip-digit">0</span>
+                            </div>
+                        </div>
+                        <div class="widget-flip-card" id="wFlipSec2">
+                            <div class="widget-flip-inner">
+                                <span class="widget-flip-digit">0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="widget-flip-separator widget-flip-hours-sep" id="wFlipHoursSep" style="display: none;">:</div>
-                <!-- Группа минут -->
-                <div class="widget-flip-group">
-                    <div class="widget-flip-card" id="wFlipMin1">
-                        <div class="widget-flip-inner">
-                            <span class="widget-flip-digit">0</span>
-                        </div>
-                    </div>
-                    <div class="widget-flip-card" id="wFlipMin2">
-                        <div class="widget-flip-inner">
-                            <span class="widget-flip-digit">0</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="widget-flip-separator">:</div>
-                <!-- Группа секунд -->
-                <div class="widget-flip-group">
-                    <div class="widget-flip-card" id="wFlipSec1">
-                        <div class="widget-flip-inner">
-                            <span class="widget-flip-digit">0</span>
-                        </div>
-                    </div>
-                    <div class="widget-flip-card" id="wFlipSec2">
-                        <div class="widget-flip-inner">
-                            <span class="widget-flip-digit">0</span>
-                        </div>
-                    </div>
+                <!-- Дата и часовой пояс -->
+                <div class="widget-flip-info" id="widgetFlipInfo">
+                    <div class="date-badge" id="flipDateBadge" style="display: none;"></div>
+                    <div class="timezone-badge" id="flipTimezoneBadge"></div>
                 </div>
             </div>
         </div>
@@ -880,39 +954,47 @@
     <script>
         const { ipcRenderer } = require('electron');
 
-        class WidgetTimer {
+        class ClockWidget {
             constructor() {
                 this.radius = 82;
                 this.circumference = 2 * Math.PI * this.radius;
-                this.totalSeconds = 0;
-                this.remainingSeconds = 0;
-                this.isRunning = false;
-                this.isPaused = false;
-                this.lastTimestamp = 0;
+                
+                // Настройки
+                this.showSeconds = true;
+                this.format24h = true;
+                this.showDate = false;
+                this.showTimezone = false;
+                this.clockStyle = 'circle';
 
                 this.initElements();
                 this.initProgress();
                 this.loadSettings();
-                this.applyColors();
-                this.loadBackgroundSettings();
-                this.setupIPC();
                 this.setupEventListeners();
                 this.setupSettings();
-                
-                // Проверка изменений цветов
-                setInterval(() => this.checkColorChanges(), 1000);
+                this.setupIPC();
+                this.startClock();
             }
 
             initElements() {
                 this.container = document.getElementById('widgetContainer');
                 this.timeDisplay = document.getElementById('timeDisplay');
-                this.statusBadge = document.getElementById('statusBadge');
-                this.progressBar = document.getElementById('progressBar');
+                this.dateBadge = document.getElementById('dateBadge');
+                this.timezoneBadge = document.getElementById('timezoneBadge');
+                this.secondsBar = document.getElementById('secondsBar');
                 this.settingsPanel = document.getElementById('settingsPanel');
                 this.settingsBtn = document.getElementById('settingsBtn');
                 this.closeBtn = document.getElementById('closeBtn');
                 this.opacityRange = document.getElementById('opacityRange');
                 this.opacityValue = document.getElementById('opacityValue');
+                this.showSecondsEl = document.getElementById('showSeconds');
+                this.format24hEl = document.getElementById('format24h');
+                this.showDateEl = document.getElementById('showDate');
+                
+                // Дополнительные элементы для стилей
+                this.digitalDateBadge = document.getElementById('digitalDateBadge');
+                this.digitalTimezoneBadge = document.getElementById('digitalTimezoneBadge');
+                this.flipDateBadge = document.getElementById('flipDateBadge');
+                this.flipTimezoneBadge = document.getElementById('flipTimezoneBadge');
                 
                 // Элементы для разных стилей
                 this.circularWidget = document.querySelector('.circular-widget');
@@ -924,18 +1006,16 @@
                 // Flip карточки
                 this.wFlipHr1 = document.getElementById('wFlipHr1');
                 this.wFlipHr2 = document.getElementById('wFlipHr2');
-                this.wFlipHoursGroup = document.getElementById('wFlipHoursGroup');
-                this.wFlipHoursSep = document.getElementById('wFlipHoursSep');
                 this.wFlipMin1 = document.getElementById('wFlipMin1');
                 this.wFlipMin2 = document.getElementById('wFlipMin2');
                 this.wFlipSec1 = document.getElementById('wFlipSec1');
                 this.wFlipSec2 = document.getElementById('wFlipSec2');
-                
-                // Текущий стиль
-                this.timerStyle = 'circle';
+                this.wFlipSecGroup = document.getElementById('wFlipSecGroup');
+                this.wFlipSecSep = document.getElementById('wFlipSecSep');
                 
                 // Устанавливаем стиль по умолчанию
                 if (this.circularWidget) this.circularWidget.classList.add('active');
+                document.body.classList.add('style-circle');
                 
                 // Настраиваем масштабирование для digital и flip
                 this.setupScaling();
@@ -952,18 +1032,20 @@
                 const containerHeight = this.container.offsetHeight;
                 
                 // Размер шрифта для digital - подбираем чтобы текст вместился
-                // Для таймера формат MM:SS или HH:MM:SS
-                const hasHours = this.wFlipHoursGroup && this.wFlipHoursGroup.style.display !== 'none';
-                const charCount = hasHours ? 8 : 5;
+                // Для времени HH:MM:SS нужно ~8 символов, для HH:MM - ~5
+                const showSeconds = this.showSecondsEl && this.showSecondsEl.checked;
+                const charCount = showSeconds ? 8 : 5;
                 // Ширина символа примерно 0.6 от размера шрифта для моноширинного
                 const maxFontByWidth = (containerWidth * 0.85) / (charCount * 0.6);
                 const maxFontByHeight = containerHeight * 0.7;
                 const digitalFontSize = Math.min(maxFontByWidth, maxFontByHeight);
                 this.container.style.setProperty('--digital-font-size', digitalFontSize + 'px');
                 
-                // Масштаб для flip (базовая ширина ~280px для 4 карточек MM:SS)
-                const baseFlipWidth = hasHours ? 380 : 280;
-                const baseFlipHeight = 100;
+                // Масштаб для flip (базовая ширина для 6 карточек HH:MM:SS)
+                // Учитываем небольшую высоту с датой и timezone (они теперь маленькие)
+                const baseFlipWidth = showSeconds ? 380 : 280;
+                const hasExtraInfo = this.showDate || this.showTimezone;
+                const baseFlipHeight = hasExtraInfo ? 115 : 100;
                 
                 const scaleX = (containerWidth * 0.9) / baseFlipWidth;
                 const scaleY = (containerHeight * 0.9) / baseFlipHeight;
@@ -973,8 +1055,8 @@
             }
 
             initProgress() {
-                this.progressBar.style.strokeDasharray = `${this.circumference}`;
-                this.progressBar.style.strokeDashoffset = this.circumference;
+                this.secondsBar.style.strokeDasharray = `${this.circumference}`;
+                this.secondsBar.style.strokeDashoffset = this.circumference;
             }
 
             setupEventListeners() {
@@ -993,7 +1075,7 @@
                 
                 // Закрыть виджет
                 this.closeBtn.addEventListener('click', () => {
-                    ipcRenderer.send('close-widget');
+                    ipcRenderer.send('close-clock-widget');
                 });
 
                 // Настройки
@@ -1022,7 +1104,7 @@
                     if (e.ctrlKey) {
                         e.preventDefault();
                         const delta = e.deltaY > 0 ? -20 : 20;
-                        ipcRenderer.send('widget-scale', delta);
+                        ipcRenderer.send('clock-widget-scale', delta);
                     }
                 }, { passive: false });
             }
@@ -1045,6 +1127,28 @@
                     this.container.style.opacity = value / 100;
                     this.saveSettings();
                 });
+
+                // Показать секунды
+                this.showSecondsEl.addEventListener('change', () => {
+                    this.showSeconds = this.showSecondsEl.checked;
+                    this.updateSecondsVisibility();
+                    this.saveSettings();
+                });
+
+                // 24-часовой формат
+                this.format24hEl.addEventListener('change', () => {
+                    this.format24h = this.format24hEl.checked;
+                    this.saveSettings();
+                    this.updateDisplay();
+                });
+
+                // Показать дату
+                this.showDateEl.addEventListener('change', () => {
+                    this.showDate = this.showDateEl.checked;
+                    this.dateBadge.style.display = this.showDate ? 'block' : 'none';
+                    this.saveSettings();
+                    this.updateDisplay();
+                });
             }
 
             setSize(size) {
@@ -1059,194 +1163,17 @@
 
                 const s = sizes[size];
                 if (s) {
-                    ipcRenderer.send('widget-resize', s);
-                    localStorage.setItem('widgetSize', size);
+                    ipcRenderer.send('clock-widget-resize', s);
+                    localStorage.setItem('clockWidgetSize', size);
                 }
             }
 
-            toggleSettings() {
-                this.settingsPanel.classList.toggle('visible');
-            }
-
-            closeSettings() {
-                this.settingsPanel.classList.remove('visible');
-            }
-
-            loadSettings() {
-                // Настройки виджета
-                const settings = localStorage.getItem('widgetSettings');
-                if (settings) {
-                    const s = JSON.parse(settings);
-                    if (s.opacity) {
-                        this.container.style.opacity = s.opacity;
-                        this.opacityRange.value = s.opacity * 100;
-                        this.opacityValue.textContent = Math.round(s.opacity * 100) + '%';
-                    }
-                }
-
-                // Размер
-                const savedSize = localStorage.getItem('widgetSize') || 'medium';
-                document.querySelectorAll('.size-btn').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.size === savedSize);
-                });
-                // Устанавливаем размер при загрузке
-                this.setSize(savedSize);
-            }
-
-            saveSettings() {
-                const settings = {
-                    opacity: parseFloat(this.container.style.opacity) || 1
-                };
-                localStorage.setItem('widgetSettings', JSON.stringify(settings));
-            }
-
-            checkColorChanges() {
-                const savedColors = localStorage.getItem('timerColors');
-                if (savedColors) {
-                    this.applyColors(JSON.parse(savedColors));
-                }
-            }
-
-            applyColors(colors = null) {
-                if (!colors) {
-                    const saved = localStorage.getItem('timerColors');
-                    colors = saved ? JSON.parse(saved) : {
-                        timer: '#667eea',
-                        progress: '#764ba2'
-                    };
-                }
-
-                // Обновляем градиент
-                const gradient = document.getElementById('widgetGradient');
-                if (gradient) {
-                    const stops = gradient.querySelectorAll('stop');
-                    if (stops[0]) stops[0].setAttribute('stop-color', colors.timer);
-                    if (stops[1]) stops[1].setAttribute('stop-color', colors.progress);
-                }
-
-                // Обновляем свечение текста
-                this.timeDisplay.style.setProperty('--glow-color', `${colors.timer}80`);
-            }
-
-            applyBackground(settings) {
-                const bgCircle = document.querySelector('.bg-circle');
-                const bgImageContainer = document.getElementById('widgetBgImage');
-                const bgImg = document.getElementById('widgetBgImg');
-                const bgOverlay = document.getElementById('widgetBgOverlay');
-
-                if (!bgCircle) return;
-
-                // Сбрасываем фоновое изображение
-                bgImageContainer.style.display = 'none';
-
-                switch (settings.bgMode) {
-                    case 'solid':
-                        bgCircle.style.fill = settings.bgSolid || '#1a1a2e';
-                        break;
-
-                    case 'gradient':
-                        // Создаем или обновляем градиент для фона
-                        let bgGradient = document.getElementById('widgetBgGradient');
-                        if (!bgGradient) {
-                            const defs = document.querySelector('.widget-svg defs');
-                            bgGradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-                            bgGradient.setAttribute('id', 'widgetBgGradient');
-                            bgGradient.setAttribute('x1', '0%');
-                            bgGradient.setAttribute('y1', '0%');
-                            bgGradient.setAttribute('x2', '100%');
-                            bgGradient.setAttribute('y2', '100%');
-                            bgGradient.innerHTML = '<stop offset="0%" /><stop offset="100%" />';
-                            defs.appendChild(bgGradient);
-                        }
-                        const stops = bgGradient.querySelectorAll('stop');
-                        stops[0].setAttribute('stop-color', settings.bgGrad1 || '#1a1a2e');
-                        stops[1].setAttribute('stop-color', settings.bgGrad2 || '#16213e');
-                        bgCircle.style.fill = 'url(#widgetBgGradient)';
-                        break;
-
-                    case 'image':
-                        if (settings.bgImageUrl) {
-                            bgImageContainer.style.display = 'block';
-                            bgImg.src = settings.bgImageUrl;
-                            bgOverlay.style.background = 'rgba(0, 0, 0, 0.3)';
-                            bgCircle.style.fill = 'rgba(0, 0, 0, 0.1)';
-                        }
-                        break;
-
-                    case 'local':
-                        if (settings.bgLocalImage) {
-                            bgImageContainer.style.display = 'block';
-                            bgImg.src = settings.bgLocalImage;
-                            bgImg.style.objectFit = settings.bgLocalFit || 'cover';
-                            const overlayOpacity = (settings.bgLocalOverlay || 30) / 100;
-                            bgOverlay.style.background = `rgba(0, 0, 0, ${overlayOpacity})`;
-                            bgCircle.style.fill = 'rgba(0, 0, 0, 0.1)';
-                        }
-                        break;
-
-                    default:
-                        bgCircle.style.fill = 'rgba(15, 15, 25, 0.85)';
-                }
-            }
-
-            loadBackgroundSettings() {
-                const bgSettings = localStorage.getItem('displayExtSettings');
-                if (bgSettings) {
-                    try {
-                        const settings = JSON.parse(bgSettings);
-                        
-                        // Для локального фона загружаем изображение
-                        if (settings.bgMode === 'local') {
-                            const localBgImage = localStorage.getItem('localBgImage');
-                            const localBgSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
-                            if (localBgImage) {
-                                settings.bgLocalImage = localBgImage;
-                                settings.bgLocalFit = localBgSettings.fit || 'cover';
-                                settings.bgLocalOverlay = localBgSettings.overlay || 30;
-                            }
-                        }
-                        
-                        this.applyBackground(settings);
-                        
-                        // Применяем стиль таймера
-                        if (settings.timerStyle) {
-                            this.setTimerStyle(settings.timerStyle);
-                        }
-                    } catch (_) {}
-                }
-            }
-
-            setupIPC() {
-                ipcRenderer.send('get-timer-state');
-
-                ipcRenderer.on('timer-state', (event, state) => {
-                    // Фильтр устаревших пакетов
-                    const ts = state.timestamp || Date.now();
-                    if (ts <= this.lastTimestamp) return;
-                    this.lastTimestamp = ts;
-
-                    this.totalSeconds = Number(state.totalSeconds) || 0;
-                    this.remainingSeconds = Number(state.remainingSeconds) || 0;
-                    this.isRunning = !!state.isRunning;
-                    this.isPaused = !!state.isPaused;
-                    
-                    this.updateDisplay();
-                });
-
-                ipcRenderer.on('colors-update', (event, colors) => {
-                    this.applyColors(colors);
-                });
-
-                ipcRenderer.on('display-settings-update', (event, settings) => {
-                    this.applyBackground(settings);
-                    if (settings.timerStyle) {
-                        this.setTimerStyle(settings.timerStyle);
-                    }
-                });
-            }
-            
-            setTimerStyle(style) {
-                this.timerStyle = style;
+            setClockStyle(style) {
+                this.clockStyle = style;
+                
+                // Применяем класс стиля к body
+                document.body.classList.remove('style-circle', 'style-digital', 'style-flip');
+                document.body.classList.add('style-' + style);
                 
                 // Скрываем все стили
                 if (this.circularWidget) this.circularWidget.classList.remove('active');
@@ -1269,160 +1196,235 @@
                 // Обновляем масштабирование после смены стиля
                 setTimeout(() => this.updateScaling(), 50);
                 
+                this.saveSettings();
                 this.updateDisplay();
             }
 
+            updateSecondsVisibility() {
+                // Для flip-часов
+                if (this.wFlipSecGroup && this.wFlipSecSep) {
+                    this.wFlipSecGroup.style.display = this.showSeconds ? 'flex' : 'none';
+                    this.wFlipSecSep.style.display = this.showSeconds ? 'flex' : 'none';
+                    this.widgetFlip.classList.toggle('has-seconds', this.showSeconds);
+                }
+                
+                // Обновляем масштаб при изменении количества цифр
+                setTimeout(() => this.updateScaling(), 50);
+            }
+
+            toggleSettings() {
+                this.settingsPanel.classList.toggle('visible');
+            }
+
+            closeSettings() {
+                this.settingsPanel.classList.remove('visible');
+            }
+
+            loadSettings() {
+                const settings = localStorage.getItem('clockWidgetSettings');
+                if (settings) {
+                    const s = JSON.parse(settings);
+                    if (s.opacity !== undefined) {
+                        this.container.style.opacity = s.opacity;
+                        this.opacityRange.value = s.opacity * 100;
+                        this.opacityValue.textContent = Math.round(s.opacity * 100) + '%';
+                    }
+                    if (s.showSeconds !== undefined) {
+                        this.showSeconds = s.showSeconds;
+                        this.showSecondsEl.checked = s.showSeconds;
+                    }
+                    if (s.format24h !== undefined) {
+                        this.format24h = s.format24h;
+                        this.format24hEl.checked = s.format24h;
+                    }
+                    if (s.showDate !== undefined) {
+                        this.showDate = s.showDate;
+                        this.showDateEl.checked = s.showDate;
+                    }
+                    if (s.showTimezone !== undefined) {
+                        this.showTimezone = s.showTimezone;
+                    }
+                    if (s.clockStyle) {
+                        this.clockStyle = s.clockStyle;
+                        document.querySelectorAll('.style-btn').forEach(btn => {
+                            btn.classList.toggle('active', btn.dataset.style === s.clockStyle);
+                        });
+                        this.setClockStyle(s.clockStyle);
+                    }
+                }
+
+                // Размер
+                const savedSize = localStorage.getItem('clockWidgetSize') || 'medium';
+                document.querySelectorAll('.size-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.size === savedSize);
+                });
+                this.setSize(savedSize);
+                
+                // Обновляем видимость элементов
+                this.updateSecondsVisibility();
+                this.updateDateVisibility();
+                this.updateTimezoneVisibility();
+            }
+
+            saveSettings() {
+                const settings = {
+                    opacity: parseFloat(this.container.style.opacity) || 1,
+                    showSeconds: this.showSeconds,
+                    format24h: this.format24h,
+                    showDate: this.showDate,
+                    showTimezone: this.showTimezone,
+                    clockStyle: this.clockStyle
+                };
+                localStorage.setItem('clockWidgetSettings', JSON.stringify(settings));
+            }
+
+            setupIPC() {
+                // Получаем стиль от панели управления
+                ipcRenderer.on('set-clock-style', (event, style) => {
+                    this.setClockStyle(style);
+                    // Обновляем UI кнопок стиля
+                    document.querySelectorAll('.style-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.style === style);
+                    });
+                });
+                
+                // Получаем настройки часов от панели управления
+                ipcRenderer.on('clock-settings', (event, settings) => {
+                    if (settings.showDate !== undefined) {
+                        this.showDate = settings.showDate;
+                        this.showDateEl.checked = settings.showDate;
+                    }
+                    if (settings.showTimezone !== undefined) {
+                        this.showTimezone = settings.showTimezone;
+                    }
+                    if (settings.showSeconds !== undefined) {
+                        this.showSeconds = settings.showSeconds;
+                        this.showSecondsEl.checked = settings.showSeconds;
+                        this.updateSecondsVisibility();
+                    }
+                    if (settings.format24h !== undefined) {
+                        this.format24h = settings.format24h;
+                        this.format24hEl.checked = settings.format24h;
+                    }
+                    this.updateTimezoneVisibility();
+                    this.updateDateVisibility();
+                    this.saveSettings();
+                    this.updateDisplay();
+                });
+            }
+
+            updateTimezoneVisibility() {
+                const visible = this.showTimezone;
+                
+                // Получаем часовой пояс
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const offset = new Date().getTimezoneOffset();
+                const sign = offset <= 0 ? '+' : '-';
+                const absOffset = Math.abs(offset);
+                const hours = Math.floor(absOffset / 60);
+                const mins = absOffset % 60;
+                const tzString = `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace('_', ' ')}`;
+                
+                // Обновляем все timezone badges
+                [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge].forEach(el => {
+                    if (el) {
+                        el.textContent = tzString;
+                        el.classList.toggle('visible', visible);
+                    }
+                });
+                
+                // Пересчитываем масштаб
+                this.updateScaling();
+            }
+
+            updateDateVisibility() {
+                const visible = this.showDate;
+                
+                [this.dateBadge, this.digitalDateBadge, this.flipDateBadge].forEach(el => {
+                    if (el) {
+                        el.style.display = visible ? 'block' : 'none';
+                    }
+                });
+                
+                // Пересчитываем масштаб
+                this.updateScaling();
+            }
+
+            startClock() {
+                this.updateDisplay();
+                // Обновляем каждую секунду
+                setInterval(() => this.updateDisplay(), 1000);
+            }
+
             updateDisplay() {
-                const secs = Math.floor(this.remainingSeconds);
-                const formatted = this.formatTime(secs);
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+
+                // Форматируем время
+                let displayHours = hours;
+                let ampm = '';
                 
-                // Обновляем время для кругового стиля
-                this.timeDisplay.textContent = formatted;
-                
+                if (!this.format24h) {
+                    ampm = hours >= 12 ? ' PM' : ' AM';
+                    displayHours = hours % 12 || 12;
+                }
+
+                const timeStr = this.showSeconds 
+                    ? `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}${ampm}`
+                    : `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}${ampm}`;
+
+                // Обновляем круговой стиль
+                this.timeDisplay.textContent = timeStr;
+
+                // Обновляем прогресс секунд
+                const ratio = seconds / 60;
+                const offset = this.circumference - (ratio * this.circumference);
+                this.secondsBar.style.strokeDashoffset = offset;
+
                 // Обновляем цифровой стиль
                 if (this.widgetDigitalTime) {
-                    this.widgetDigitalTime.textContent = formatted;
+                    this.widgetDigitalTime.textContent = timeStr;
                 }
-                
+
                 // Обновляем перекидные часы
-                this.updateFlipDisplay(secs);
+                this.updateFlipDisplay(displayHours, minutes, seconds);
 
-                // Обновляем прогресс (для кругового)
-                if (this.totalSeconds > 0) {
-                    const ratio = Math.max(0, Math.min(1, this.remainingSeconds / this.totalSeconds));
-                    const offset = this.circumference - (ratio * this.circumference);
-                    this.progressBar.style.strokeDashoffset = offset;
-
-                    // Цветовые классы
-                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    const isOvertime = secs < 0;
-                    
-                    this.progressBar.classList.remove('warning', 'danger', 'overtime');
-                    this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
-                    if (this.widgetDigitalTime) {
-                        this.widgetDigitalTime.classList.remove('warning', 'danger', 'overtime');
-                    }
-
-                    if (isOvertime) {
-                        this.progressBar.classList.add('danger', 'overtime');
-                        this.timeDisplay.classList.add('danger', 'overtime');
-                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('danger', 'overtime');
-                    } else if (percentLeft <= 10 && percentLeft > 0) {
-                        this.progressBar.classList.add('danger');
-                        this.timeDisplay.classList.add('danger');
-                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('danger');
-                    } else if (percentLeft <= 25) {
-                        this.progressBar.classList.add('warning');
-                        this.timeDisplay.classList.add('warning');
-                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('warning');
-                    }
-                } else {
-                    this.progressBar.style.strokeDashoffset = this.circumference;
-                }
-
-                // Обновляем статус
-                this.updateStatus(secs);
-
-                // Класс для контейнера
-                this.container.classList.toggle('timer-running', this.isRunning);
-            }
-            
-            updateFlipDisplay(secs) {
-                if (!this.wFlipMin1 || !this.wFlipMin2 || !this.wFlipSec1 || !this.wFlipSec2) return;
-                
-                const absSecs = Math.abs(secs);
-                const hours = Math.floor(absSecs / 3600);
-                const mins = Math.floor((absSecs % 3600) / 60);
-                const seconds = absSecs % 60;
-                
-                // Показываем/скрываем часы в зависимости от общего времени
-                const showHours = this.totalSeconds >= 3600 || hours > 0;
-                
-                // Добавляем/удаляем класс для адаптивных размеров
-                if (this.widgetFlip) {
-                    this.widgetFlip.classList.toggle('has-hours', showHours);
-                }
-                
-                if (this.wFlipHoursGroup && this.wFlipHoursSep) {
-                    this.wFlipHoursGroup.style.display = showHours ? 'flex' : 'none';
-                    this.wFlipHoursSep.style.display = showHours ? 'flex' : 'none';
-                    
-                    if (showHours && this.wFlipHr1 && this.wFlipHr2) {
-                        const hr1 = String(Math.floor(hours / 10) % 10);
-                        const hr2 = String(hours % 10);
-                        this.wFlipHr1.querySelector('.widget-flip-digit').textContent = hr1;
-                        this.wFlipHr2.querySelector('.widget-flip-digit').textContent = hr2;
-                    }
-                }
-                
-                const min1 = String(Math.floor(mins / 10) % 10);
-                const min2 = String(mins % 10);
-                const sec1 = String(Math.floor(seconds / 10));
-                const sec2 = String(seconds % 10);
-                
-                // Обновляем цифры
-                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = min1;
-                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = min2;
-                this.wFlipSec1.querySelector('.widget-flip-digit').textContent = sec1;
-                this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
-                
-                // Классы предупреждения
-                const flipCards = [this.wFlipMin1, this.wFlipMin2, this.wFlipSec1, this.wFlipSec2];
-                if (showHours && this.wFlipHr1 && this.wFlipHr2) {
-                    flipCards.push(this.wFlipHr1, this.wFlipHr2);
-                }
-                flipCards.forEach(card => card.classList.remove('warning', 'danger', 'overtime'));
-                
-                const isOvertime = secs < 0;
-                if (isOvertime) {
-                    flipCards.forEach(card => card.classList.add('danger', 'overtime'));
-                } else if (this.totalSeconds > 0) {
-                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    flipCards.forEach(card => {
-                        if (percentLeft <= 10 && percentLeft > 0) {
-                            card.classList.add('danger');
-                        } else if (percentLeft <= 25) {
-                            card.classList.add('warning');
-                        }
+                // Обновляем дату во всех стилях
+                if (this.showDate) {
+                    const options = { weekday: 'short', day: 'numeric', month: 'short' };
+                    const dateStr = now.toLocaleDateString('ru-RU', options);
+                    [this.dateBadge, this.digitalDateBadge, this.flipDateBadge].forEach(el => {
+                        if (el) el.textContent = dateStr;
                     });
                 }
             }
 
-            updateStatus(secs) {
-                this.statusBadge.classList.remove('running', 'paused', 'finished');
+            updateFlipDisplay(hours, minutes, seconds) {
+                if (!this.wFlipHr1 || !this.wFlipMin1) return;
 
-                if (secs <= 0 && this.totalSeconds > 0 && !this.isRunning) {
-                    this.statusBadge.textContent = 'Завершён';
-                    this.statusBadge.classList.add('finished');
-                } else if (this.isRunning) {
-                    this.statusBadge.textContent = secs < 0 ? 'Перерасход' : 'Активен';
-                    this.statusBadge.classList.add('running');
-                } else if (this.isPaused) {
-                    this.statusBadge.textContent = 'Пауза';
-                    this.statusBadge.classList.add('paused');
-                } else {
-                    this.statusBadge.textContent = 'Готов';
-                }
-            }
+                const hr1 = String(Math.floor(hours / 10) % 10);
+                const hr2 = String(hours % 10);
+                const min1 = String(Math.floor(minutes / 10));
+                const min2 = String(minutes % 10);
+                const sec1 = String(Math.floor(seconds / 10));
+                const sec2 = String(seconds % 10);
 
-            formatTime(seconds) {
-                const neg = seconds < 0;
-                const abs = Math.abs(seconds);
+                // Обновляем цифры
+                this.wFlipHr1.querySelector('.widget-flip-digit').textContent = hr1;
+                this.wFlipHr2.querySelector('.widget-flip-digit').textContent = hr2;
+                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = min1;
+                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = min2;
                 
-                if (abs >= 3600) {
-                    const hrs = Math.floor(abs / 3600);
-                    const mins = Math.floor((abs % 3600) / 60);
-                    const secs = abs % 60;
-                    return `${neg ? '-' : ''}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                if (this.showSeconds && this.wFlipSec1 && this.wFlipSec2) {
+                    this.wFlipSec1.querySelector('.widget-flip-digit').textContent = sec1;
+                    this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
                 }
-                
-                const mins = Math.floor(abs / 60);
-                const secs = abs % 60;
-                return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
             }
         }
 
-        new WidgetTimer();
+        new ClockWidget();
     </script>
 </body>
 </html>
