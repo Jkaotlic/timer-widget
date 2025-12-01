@@ -59,6 +59,17 @@
             text-shadow: 0 4px 20px rgba(0,0,0,0.3);
             letter-spacing: 2px;
             margin-bottom: 12px;
+            transition: color 0.3s;
+        }
+
+        .timer-display-main.danger {
+            color: #ff4444;
+            text-shadow: 0 4px 20px rgba(255, 68, 68, 0.5);
+        }
+
+        .timer-display-main.warning {
+            color: #ffc107;
+            text-shadow: 0 4px 20px rgba(255, 193, 7, 0.5);
         }
 
         .timer-status {
@@ -463,14 +474,15 @@
         /* Темы */
         .themes-grid {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 4px;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 3px;
         }
 
         .theme-btn {
-            aspect-ratio: 1;
-            border: 2px solid transparent;
-            border-radius: 6px;
+            width: 20px;
+            height: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
             cursor: pointer;
             position: relative;
             overflow: hidden;
@@ -478,11 +490,13 @@
         }
 
         .theme-btn:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
+            border-color: rgba(0,0,0,0.3);
         }
 
         .theme-btn.active {
             border-color: #333;
+            box-shadow: 0 0 0 1px #333;
         }
 
         .theme-btn::after {
@@ -957,7 +971,7 @@
             }
             
             .themes-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(6, 1fr);
             }
         }
 
@@ -1021,6 +1035,11 @@
             color: white;
         }
 
+        .quick-window-btn.clock {
+            background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
+            color: white;
+        }
+
         .quick-window-btn.display {
             background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
             color: white;
@@ -1075,12 +1094,310 @@
         .advanced-settings .content-section {
             padding: 0 16px 16px;
         }
+
+        /* FAQ кнопка */
+        .faq-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            -webkit-app-region: no-drag;
+        }
+
+        .faq-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+            transform: scale(1.1);
+        }
+
+        /* FAQ модальное окно */
+        .faq-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .faq-modal.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .faq-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            width: 95%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+            transform: translateY(20px) scale(0.95);
+            transition: transform 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .faq-modal.show .faq-content {
+            transform: translateY(0) scale(1);
+        }
+
+        .faq-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-header h2 {
+            margin: 0;
+            color: white;
+            font-size: 1.1em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .faq-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .faq-close:hover {
+            background: rgba(255, 68, 68, 0.6);
+            transform: scale(1.1);
+        }
+
+        .faq-body {
+            padding: 16px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .faq-section {
+            margin-bottom: 16px;
+        }
+
+        .faq-section-title {
+            color: #667eea;
+            font-size: 0.85em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .faq-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .faq-question {
+            padding: 12px 14px;
+            color: white;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .faq-question:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .faq-question .arrow {
+            font-size: 0.8em;
+            transition: transform 0.3s;
+            opacity: 0.6;
+        }
+
+        .faq-item.open .faq-question .arrow {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            padding: 0 14px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.8em;
+            line-height: 1.6;
+        }
+
+        .faq-item.open .faq-answer {
+            max-height: 500px;
+            padding: 0 14px 14px;
+        }
+
+        .faq-answer ul {
+            margin: 8px 0;
+            padding-left: 20px;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .faq-answer ul li {
+            margin-bottom: 6px;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .faq-answer p {
+            margin: 8px 0;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .faq-answer strong {
+            color: #fff;
+        }
+
+        .faq-answer-content {
+            padding: 0 14px 14px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8em;
+            line-height: 1.6;
+        }
+
+        .faq-answer-content ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .faq-answer-content li {
+            margin-bottom: 4px;
+        }
+
+        .faq-answer-content code {
+            background: rgba(102, 126, 234, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.95em;
+        }
+
+        .faq-shortcut {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            margin: 2px;
+        }
+
+        .faq-shortcuts {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .shortcut {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .key {
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .shortcut-desc {
+            color: rgba(255, 255, 255, 0.7);
+            margin-left: 8px;
+        }
+
+        .faq-answer ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .faq-answer ul li {
+            margin-bottom: 6px;
+            line-height: 1.5;
+        }
+
+        .faq-answer p {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+
+        .faq-footer {
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.2);
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75em;
+        }
+
+        .faq-footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .faq-footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body class="control-window">
     <div class="control-panel">
         <!-- Заголовок с таймером -->
         <div class="timer-header">
+            <button class="faq-btn" id="faqBtn" title="Справка">?</button>
             <h1>⏱️ ТАЙМЕР</h1>
             <div class="timer-display-main" id="controlTime">00:00</div>
             <div class="timer-status">
@@ -1111,8 +1428,9 @@
         <!-- Быстрые окна -->
         <div class="compact-section">
             <div class="quick-windows">
-                <button class="quick-window-btn widget" id="openWidgetBtn">🖥️ Виджет</button>
-                <button class="quick-window-btn display" id="openDisplayBtn">📺 Экран</button>
+                <button class="quick-window-btn widget" id="openWidgetBtn">⏱️ Таймер</button>
+                <button class="quick-window-btn clock" id="openClockBtn">🕐 Часы</button>
+                <button class="quick-window-btn display" id="openDisplayBtn">📺 На экран</button>
             </div>
         </div>
 
@@ -1207,8 +1525,8 @@
                         <div class="toggle-row">
                             <span class="toggle-label">Размер таймера</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="timerScale" min="50" max="150" value="100" style="width: 80px;">
-                                <span id="timerScaleValue" style="min-width: 35px; font-size: 0.85em;">100%</span>
+                                <input type="range" id="timerScale" min="50" max="300" value="100" style="width: 80px;">
+                                <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em;">100%</span>
                             </div>
                         </div>
                     </div>
@@ -1216,7 +1534,46 @@
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🕐</span>
-                            Информация о времени
+                            Виджет часов
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <span class="toggle-label">Показывать дату</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockShowDate">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <span class="toggle-label">Показывать часовой пояс</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockShowTimezone">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <span class="toggle-label">Показывать секунды</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockShowSeconds" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <span class="toggle-label">24-часовой формат</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockFormat24h" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">📺</span>
+                            Информация о времени (Дисплей)
                         </div>
                         
                         <div class="toggle-row">
@@ -1253,8 +1610,8 @@
                             <div class="toggle-row">
                                 <span class="toggle-label">Размер блоков</span>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="range" id="timeBlocksScale" min="50" max="200" value="100" style="width: 80px;">
-                                    <span id="timeBlocksScaleValue" style="min-width: 40px;">100%</span>
+                                    <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
+                                    <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
                                 </div>
                             </div>
                         </div>
@@ -1430,6 +1787,233 @@
         </div>
     </div>
 
+    <!-- FAQ Modal -->
+    <div class="faq-modal" id="faqModal">
+        <div class="faq-content">
+            <div class="faq-header">
+                <h2>📖 Справка по Timer App</h2>
+                <button class="faq-close" id="faqClose">&times;</button>
+            </div>
+            <div class="faq-body">
+                <!-- Основное управление -->
+                <div class="faq-section">
+                    <div class="faq-section-title">⏱️ Основное управление</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Как установить время?</div>
+                        <div class="faq-answer">
+                            <p>Используйте слайдеры <strong>Часы</strong>, <strong>Минуты</strong> и <strong>Секунды</strong> для установки времени таймера.</p>
+                            <p>Также можно использовать готовые пресеты (например, 15, 30, 60 минут) для быстрой настройки.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Управление таймером</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li><strong>▶ Start</strong> — запустить таймер</li>
+                                <li><strong>⏸ Pause</strong> — приостановить (время сохраняется)</li>
+                                <li><strong>■ Stop</strong> — остановить и сбросить таймер</li>
+                                <li><strong>+1 мин</strong> — добавить одну минуту к текущему времени</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Продолжать ниже 0</div>
+                        <div class="faq-answer">
+                            <p>Когда эта опция включена, таймер не останавливается при достижении нуля, а продолжает считать в минус.</p>
+                            <ul>
+                                <li>Время отображается со знаком минус (например, -00:15)</li>
+                                <li>Полезно для отслеживания переработки времени</li>
+                                <li>Звуковое уведомление всё равно воспроизводится при достижении 0</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Окна -->
+                <div class="faq-section">
+                    <div class="faq-section-title">🖥️ Окна приложения</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Timer Widget (виджет таймера)</div>
+                        <div class="faq-answer">
+                            <p>Компактный прозрачный виджет, который можно разместить поверх любого окна.</p>
+                            <ul>
+                                <li>Перетаскивается за любую область</li>
+                                <li>Кнопки управления появляются при наведении мыши</li>
+                                <li>Масштабируется с помощью Ctrl+колесо мыши</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Clock Widget (виджет часов)</div>
+                        <div class="faq-answer">
+                            <p>Отображает текущее время в выбранном стиле.</p>
+                            <ul>
+                                <li>Три стиля: круговой, цифровой LED, флип-часы</li>
+                                <li>Опционально: дата, часовой пояс, секунды, 24ч формат</li>
+                                <li>Масштабируется с помощью Ctrl+колесо мыши</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Display (полноэкранный дисплей)</div>
+                        <div class="faq-answer">
+                            <p>Полноэкранное отображение таймера для презентаций.</p>
+                            <ul>
+                                <li>Нажмите <strong>Esc</strong> для закрытия</li>
+                                <li>Стиль соответствует выбранному в настройках</li>
+                                <li>Размер шрифта настраивается в панели управления</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Стили отображения -->
+                <div class="faq-section">
+                    <div class="faq-section-title">🎨 Стили отображения</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Доступные стили</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li><strong>Circle (Круговой)</strong> — классический круговой индикатор с прогрессом</li>
+                                <li><strong>Digital (Цифровой)</strong> — LED-дисплей в стиле ретро</li>
+                                <li><strong>Flip (Флип)</strong> — механические перекидные часы</li>
+                            </ul>
+                            <p>Стиль выбирается в секции "Настройки отображения".</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Размер и масштаб</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li><strong>Размер шрифта</strong> — для Digital и Flip стилей на Display</li>
+                                <li><strong>Масштаб виджета</strong> — для виджета таймера (также Ctrl+колесо)</li>
+                                <li><strong>Масштаб часов</strong> — для виджета часов (также Ctrl+колесо)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Настройки дисплея -->
+                <div class="faq-section">
+                    <div class="faq-section-title">📺 Настройки дисплея</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Информация о времени</div>
+                        <div class="faq-answer">
+                            <p>Дополнительная информация, отображаемая на дисплее:</p>
+                            <ul>
+                                <li><strong>Показывать блоки времени</strong> — отображение блоков с текущим временем, датой и часовым поясом</li>
+                                <li>Блоки автоматически подстраиваются под выбранный стиль</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Расположение и размер</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li><strong>Расположение</strong> — выбор позиции таймера на экране (центр, верх, низ и т.д.)</li>
+                                <li><strong>Размер блоков</strong> — настройка размера информационных блоков времени</li>
+                                <li>Оптимально для разных сценариев: презентации, стримы, мероприятия</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Фон дисплея</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li><strong>Цвет фона</strong> — выбор сплошного цвета фона</li>
+                                <li><strong>Своя подложка</strong> — загрузка собственного изображения в качестве фона</li>
+                                <li>Поддерживаются форматы: JPG, PNG, GIF, WebP</li>
+                                <li>Изображение автоматически масштабируется под размер экрана</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Настройки часов -->
+                <div class="faq-section">
+                    <div class="faq-section-title">🕐 Настройки часов</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Опции отображения</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li><strong>Показывать дату</strong> — отображение текущей даты</li>
+                                <li><strong>Показывать часовой пояс</strong> — отображение временной зоны</li>
+                                <li><strong>Показывать секунды</strong> — секунды в цифровом стиле</li>
+                                <li><strong>24-часовой формат</strong> — переключение между 12/24ч форматом</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Звуки -->
+                <div class="faq-section">
+                    <div class="faq-section-title">🔔 Звуковые уведомления</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Настройка звуков</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li>Выберите звук уведомления из списка встроенных звуков</li>
+                                <li>Нажмите <strong>▶ Тест</strong> для предпрослушивания</li>
+                                <li>Настройте громкость с помощью слайдера</li>
+                                <li>Звук воспроизводится при завершении таймера</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Загрузка своего звука</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li>Нажмите кнопку <strong>📁 Загрузить</strong> рядом с выбором звука</li>
+                                <li>Выберите аудиофайл с компьютера (MP3, WAV, OGG)</li>
+                                <li>Загруженный звук появится в списке как "Custom Sound"</li>
+                                <li>Можно загрузить любую мелодию или звуковой эффект</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Горячие клавиши -->
+                <div class="faq-section">
+                    <div class="faq-section-title">⌨️ Горячие клавиши</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Виджеты</div>
+                        <div class="faq-answer">
+                            <div class="faq-shortcuts">
+                                <div class="shortcut"><span class="key">Ctrl</span> + <span class="key">Колесо</span> <span class="shortcut-desc">Масштабирование</span></div>
+                                <div class="shortcut"><span class="key">Перетаскивание</span> <span class="shortcut-desc">Перемещение окна</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">Полноэкранный дисплей</div>
+                        <div class="faq-answer">
+                            <div class="faq-shortcuts">
+                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть дисплей</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Советы -->
+                <div class="faq-section">
+                    <div class="faq-section-title">💡 Полезные советы</div>
+                    <div class="faq-item">
+                        <div class="faq-question">Рекомендации по использованию</div>
+                        <div class="faq-answer">
+                            <ul>
+                                <li>Используйте виджет для постоянного отслеживания времени поверх других окон</li>
+                                <li>Display идеален для презентаций и трансляций</li>
+                                <li>Кнопка <strong>+1 мин</strong> работает даже во время работы таймера</li>
+                                <li>Настройки сохраняются автоматически</li>
+                                <li>Все окна синхронизированы — изменения применяются везде</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const { ipcRenderer } = require('electron');
         
@@ -1463,10 +2047,17 @@
                 this.initThemes();
                 this.attachEvents();
                 this.loadSettings();
+                this.loadClockSettings();
                 this.setupIPC();
                 
                 // Авто-размер при загрузке
                 setTimeout(() => this.autoResizeWindow(), 100);
+                
+                // Отправляем текущие настройки для синхронизации
+                setTimeout(() => {
+                    this.pushDisplaySettings();
+                    this.pushClockSettings();
+                }, 200);
             }
 
             initElements() {
@@ -1497,6 +2088,12 @@
                 this.timerStyleEl = document.getElementById('timerStyle');
                 this.timerScaleEl = document.getElementById('timerScale');
                 this.timerScaleValueEl = document.getElementById('timerScaleValue');
+                
+                // Настройки виджета часов
+                this.clockShowDateEl = document.getElementById('clockShowDate');
+                this.clockShowTimezoneEl = document.getElementById('clockShowTimezone');
+                this.clockShowSecondsEl = document.getElementById('clockShowSeconds');
+                this.clockFormat24hEl = document.getElementById('clockFormat24h');
                 
                 // Пресет расположения по умолчанию - "Рамка"
                 this.timeLayoutPreset = 'frame';
@@ -1633,6 +2230,11 @@
                 document.getElementById('openWidgetBtn').addEventListener('click', () => {
                     ipcRenderer.send('open-widget');
                 });
+                document.getElementById('openClockBtn').addEventListener('click', () => {
+                    ipcRenderer.send('open-clock-widget');
+                    // Синхронизируем настройки часов при открытии
+                    setTimeout(() => this.pushClockSettings(), 500);
+                });
                 document.getElementById('openDisplayBtn').addEventListener('click', () => {
                     const displayIndex = this.displaySelectEl.value;
                     ipcRenderer.send('open-display', { displayIndex });
@@ -1670,11 +2272,21 @@
                     this.pushDisplaySettings();
                 });
                 
-                this.timerStyleEl.addEventListener('change', () => this.pushDisplaySettings());
+                this.timerStyleEl.addEventListener('change', () => {
+                    this.pushDisplaySettings();
+                    // Синхронизируем стиль с виджетом часов
+                    ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
+                });
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
                     this.pushDisplaySettings();
                 });
+
+                // Настройки виджета часов
+                this.clockShowDateEl.addEventListener('change', () => this.pushClockSettings());
+                this.clockShowTimezoneEl.addEventListener('change', () => this.pushClockSettings());
+                this.clockShowSecondsEl.addEventListener('change', () => this.pushClockSettings());
+                this.clockFormat24hEl.addEventListener('change', () => this.pushClockSettings());
 
                 // Фон дисплея
                 ['bgSolidColor', 'bgGrad1', 'bgGrad2'].forEach(id => {
@@ -2029,6 +2641,30 @@
                 ipcRenderer.send('display-settings-update', settings);
             }
 
+            pushClockSettings() {
+                const settings = {
+                    showDate: this.clockShowDateEl.checked,
+                    showTimezone: this.clockShowTimezoneEl.checked,
+                    showSeconds: this.clockShowSecondsEl.checked,
+                    format24h: this.clockFormat24hEl.checked
+                };
+                
+                // Сохраняем в localStorage
+                localStorage.setItem('clockWidgetSettings', JSON.stringify(settings));
+                
+                // Отправляем в виджет часов
+                ipcRenderer.send('clock-widget-settings', settings);
+            }
+
+            loadClockSettings() {
+                const settings = JSON.parse(localStorage.getItem('clockWidgetSettings') || '{}');
+                
+                this.clockShowDateEl.checked = !!settings.showDate;
+                this.clockShowTimezoneEl.checked = !!settings.showTimezone;
+                this.clockShowSecondsEl.checked = settings.showSeconds !== false;
+                this.clockFormat24hEl.checked = settings.format24h !== false;
+            }
+
             setupIPC() {
                 ipcRenderer.send('get-timer-state');
                 ipcRenderer.send('get-displays');
@@ -2113,6 +2749,20 @@
             // Отображение
             updateDisplay() {
                 this.controlTimeEl.textContent = this.formatTime(this.remainingSeconds);
+                
+                // Цветовые классы для времени
+                this.controlTimeEl.classList.remove('warning', 'danger');
+                const isOvertime = this.remainingSeconds < 0;
+                if (isOvertime) {
+                    this.controlTimeEl.classList.add('danger');
+                } else if (this.totalSeconds > 0) {
+                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+                    if (percentLeft <= 10 && percentLeft > 0) {
+                        this.controlTimeEl.classList.add('danger');
+                    } else if (percentLeft <= 25) {
+                        this.controlTimeEl.classList.add('warning');
+                    }
+                }
                 
                 this.statusDot.className = 'status-dot';
                 if (this.wasFinished || (this.remainingSeconds <= 0 && this.totalSeconds > 0 && !this.isRunning)) {
@@ -2545,6 +3195,53 @@
         document.head.appendChild(style);
 
         new TimerController();
+
+        // FAQ Modal Logic
+        const faqBtn = document.getElementById('faqBtn');
+        const faqModal = document.getElementById('faqModal');
+        const faqClose = document.getElementById('faqClose');
+        const faqQuestions = document.querySelectorAll('.faq-question');
+
+        // Open FAQ modal
+        faqBtn.addEventListener('click', () => {
+            faqModal.classList.add('show');
+        });
+
+        // Close FAQ modal
+        faqClose.addEventListener('click', () => {
+            faqModal.classList.remove('show');
+        });
+
+        // Close on backdrop click
+        faqModal.addEventListener('click', (e) => {
+            if (e.target === faqModal) {
+                faqModal.classList.remove('show');
+            }
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && faqModal.classList.contains('show')) {
+                faqModal.classList.remove('show');
+            }
+        });
+
+        // Toggle FAQ items (accordion)
+        faqQuestions.forEach(question => {
+            question.addEventListener('click', () => {
+                const item = question.parentElement;
+                const wasOpen = item.classList.contains('open');
+                
+                // Close all items in the same section
+                const section = item.closest('.faq-section');
+                section.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+                
+                // Toggle clicked item
+                if (!wasOpen) {
+                    item.classList.add('open');
+                }
+            });
+        });
     </script>
 </body>
 </html>

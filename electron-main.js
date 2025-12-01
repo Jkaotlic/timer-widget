@@ -4,6 +4,7 @@ const path = require('path');
 let controlWindow = null;
 let widgetWindow = null;
 let displayWindow = null;
+let clockWidgetWindow = null;
 
 // Состояние таймера
 let timerState = {
@@ -19,6 +20,9 @@ let timerConfig = {
     overrunLimitSeconds: 0
 };
 let timerInterval = null;
+
+// Сохраняем последние настройки дисплея для синхронизации
+let lastDisplaySettings = null;
 
 function clearTimerInterval() {
     if (timerInterval) {
@@ -139,10 +143,38 @@ function createWidgetWindow() {
     });
 
     widgetWindow.loadFile('electron-widget.html');
-    widgetWindow.setIgnoreMouseEvents(false);
 
     widgetWindow.on('closed', () => {
         widgetWindow = null;
+    });
+}
+
+function createClockWidgetWindow() {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    
+    clockWidgetWindow = new BrowserWindow({
+        width: 220,
+        height: 220,
+        minWidth: 120,
+        minHeight: 120,
+        x: width - 240,
+        y: height - 260,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: true,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        },
+        hasShadow: false
+    });
+
+    clockWidgetWindow.loadFile('electron-clock-widget.html');
+
+    clockWidgetWindow.on('closed', () => {
+        clockWidgetWindow = null;
     });
 }
 
@@ -301,6 +333,9 @@ ipcMain.on('colors-update', (event, colors) => {
 
 // Рассылка настроек отображения fullscreen и widget (clockStyle/background)
 ipcMain.on('display-settings-update', (event, settings) => {
+    // Сохраняем настройки для синхронизации при открытии новых окон
+    lastDisplaySettings = settings;
+    
     if (displayWindow) {
         displayWindow.webContents.send('display-settings-update', settings);
     }
@@ -315,6 +350,10 @@ ipcMain.on('open-widget', () => {
         if (widgetWindow) {
             widgetWindow.webContents.on('did-finish-load', () => {
                 widgetWindow.webContents.send('timer-state', timerState);
+                // Отправляем сохранённые настройки дисплея (включая стиль)
+                if (lastDisplaySettings) {
+                    widgetWindow.webContents.send('display-settings-update', lastDisplaySettings);
+                }
             });
         }
     } else {
@@ -325,6 +364,50 @@ ipcMain.on('open-widget', () => {
 ipcMain.on('close-widget', () => {
     if (widgetWindow) {
         widgetWindow.close();
+    }
+});
+
+// Виджет часов
+ipcMain.on('open-clock-widget', () => {
+    if (!clockWidgetWindow) {
+        createClockWidgetWindow();
+    } else {
+        clockWidgetWindow.focus();
+    }
+});
+
+ipcMain.on('close-clock-widget', () => {
+    if (clockWidgetWindow) {
+        clockWidgetWindow.close();
+    }
+});
+
+ipcMain.on('clock-widget-resize', (event, { width, height }) => {
+    if (clockWidgetWindow) {
+        clockWidgetWindow.setSize(width, height, true);
+    }
+});
+
+// Масштабирование окна часов через Ctrl+колесико
+ipcMain.on('clock-widget-scale', (event, delta) => {
+    if (clockWidgetWindow) {
+        const [currentWidth, currentHeight] = clockWidgetWindow.getSize();
+        const newWidth = Math.max(100, Math.min(800, currentWidth + delta));
+        const newHeight = Math.max(100, Math.min(800, currentHeight + delta));
+        clockWidgetWindow.setSize(newWidth, newHeight, true);
+    }
+});
+
+ipcMain.on('clock-widget-set-style', (event, style) => {
+    if (clockWidgetWindow) {
+        clockWidgetWindow.webContents.send('set-clock-style', style);
+    }
+});
+
+// Настройки виджета часов (дата, часовой пояс и т.д.)
+ipcMain.on('clock-widget-settings', (event, settings) => {
+    if (clockWidgetWindow) {
+        clockWidgetWindow.webContents.send('clock-settings', settings);
     }
 });
 
@@ -340,6 +423,10 @@ ipcMain.on('open-display', (event, options = {}) => {
         if (displayWindow) {
             displayWindow.webContents.on('did-finish-load', () => {
                 displayWindow.webContents.send('timer-state', timerState);
+                // Отправляем сохранённые настройки дисплея (включая стиль)
+                if (lastDisplaySettings) {
+                    displayWindow.webContents.send('display-settings-update', lastDisplaySettings);
+                }
             });
         }
     } else {
@@ -366,15 +453,19 @@ ipcMain.on('widget-set-position', (event, { x, y }) => {
     }
 });
 
-ipcMain.on('widget-toggle-mouse-events', (event, ignore) => {
-    if (widgetWindow) {
-        widgetWindow.setIgnoreMouseEvents(ignore, { forward: true });
-    }
-});
-
 ipcMain.on('widget-resize', (event, { width, height }) => {
     if (widgetWindow) {
         widgetWindow.setSize(width, height, true);
+    }
+});
+
+// Масштабирование окна таймера через Ctrl+колесико
+ipcMain.on('widget-scale', (event, delta) => {
+    if (widgetWindow) {
+        const [currentWidth, currentHeight] = widgetWindow.getSize();
+        const newWidth = Math.max(100, Math.min(800, currentWidth + delta));
+        const newHeight = Math.max(100, Math.min(800, currentHeight + delta));
+        widgetWindow.setSize(newWidth, newHeight, true);
     }
 });
 
