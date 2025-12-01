@@ -49,7 +49,6 @@ class DisplayTimer {
         this.currentTimeEl = document.getElementById('currentTime');
         this.eventTimeEl = document.getElementById('eventTime');
         this.endTimeEl = document.getElementById('endTime');
-        this.closeBtn = document.getElementById('closeBtn');
         
         // Элементы для разных стилей
         this.timerDigital = document.getElementById('timerDigital');
@@ -63,17 +62,6 @@ class DisplayTimer {
         this.flipMin2 = document.getElementById('flipMin2');
         this.flipSec1 = document.getElementById('flipSec1');
         this.flipSec2 = document.getElementById('flipSec2');
-        
-        // Обработчик кнопки закрытия
-        if (this.closeBtn) {
-            this.closeBtn.addEventListener('click', () => {
-                if (this.ipcRenderer) {
-                    this.ipcRenderer.send('close-display');
-                } else {
-                    window.close();
-                }
-            });
-        }
     }
 
     initProgress() {
@@ -492,8 +480,11 @@ class DisplayTimer {
         this.digitalSeconds.textContent = String(seconds).padStart(2, '0');
         
         // Классы предупреждения
-        this.digitalTime.classList.remove('warning', 'danger');
-        if (this.totalSeconds > 0) {
+        this.digitalTime.classList.remove('warning', 'danger', 'overtime');
+        const isOvertime = secs < 0;
+        if (isOvertime) {
+            this.digitalTime.classList.add('danger', 'overtime');
+        } else if (this.totalSeconds > 0) {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             if (percentLeft <= 10 && percentLeft > 0) {
                 this.digitalTime.classList.add('danger');
@@ -524,10 +515,13 @@ class DisplayTimer {
         // Классы предупреждения
         const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2];
         flipCards.forEach(card => {
-            card.classList.remove('warning', 'danger');
+            card.classList.remove('warning', 'danger', 'overtime');
         });
         
-        if (this.totalSeconds > 0) {
+        const isOvertime = secs < 0;
+        if (isOvertime) {
+            flipCards.forEach(card => card.classList.add('danger', 'overtime'));
+        } else if (this.totalSeconds > 0) {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             flipCards.forEach(card => {
                 if (percentLeft <= 10 && percentLeft > 0) {
@@ -561,11 +555,15 @@ class DisplayTimer {
 
             // Цветовые предупреждения
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+            const isOvertime = this.remainingSeconds < 0;
             
-            this.progressRing.classList.remove('warning', 'danger');
-            this.timeDisplay.classList.remove('warning', 'danger');
+            this.progressRing.classList.remove('warning', 'danger', 'overtime');
+            this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
 
-            if (percentLeft <= 10 && percentLeft > 0) {
+            if (isOvertime) {
+                this.progressRing.classList.add('danger', 'overtime');
+                this.timeDisplay.classList.add('danger', 'overtime');
+            } else if (percentLeft <= 10 && percentLeft > 0) {
                 this.progressRing.classList.add('danger');
                 this.timeDisplay.classList.add('danger');
             } else if (percentLeft <= 25) {

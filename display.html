@@ -11,16 +11,22 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: 'SF Pro Display', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
             position: relative;
             background: var(--bg, linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%));
             transition: background 0.5s ease;
+            background-size: cover;
+            background-attachment: fixed;
         }
 
         /* Декоративные блики */
@@ -42,22 +48,29 @@
             width: 100%;
             max-width: 1200px;
             padding: 40px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Информационные блоки (текущее время, время мероприятия) */
         .info-block {
-            --info-scale: 1;
+            --info-scale: 1.2;
             position: fixed;
             text-align: center;
             opacity: 0;
             transform: scale(calc(0.9 * var(--info-scale)));
             transition: all 0.4s ease;
             z-index: 100;
-            padding: 15px 25px;
+            padding: 16px 28px;
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
-            border-radius: 12px;
+            border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            /* Ограничиваем размер чтобы не выходить за края */
+            max-width: calc(33vw - 40px);
         }
 
         .info-block.visible {
@@ -66,36 +79,36 @@
         }
 
         /* Позиции с правильными transform-origin */
-        .info-block.top-left { top: 30px; left: 30px; transform-origin: top left; }
-        .info-block.top-center { top: 30px; left: 50%; transform-origin: top center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-left { top: 20px; left: 20px; transform-origin: top left; }
+        .info-block.top-center { top: 20px; left: 50%; transform-origin: top center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.top-center.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.top-right { top: 30px; right: 30px; transform-origin: top right; }
-        .info-block.bottom-left { bottom: 120px; left: 30px; transform-origin: bottom left; }
-        .info-block.bottom-center { bottom: 120px; left: 50%; transform-origin: bottom center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-right { top: 20px; right: 20px; transform-origin: top right; }
+        .info-block.bottom-left { bottom: 100px; left: 20px; transform-origin: bottom left; }
+        .info-block.bottom-center { bottom: 100px; left: 50%; transform-origin: bottom center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.bottom-center.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.bottom-right { bottom: 120px; right: 30px; transform-origin: bottom right; }
+        .info-block.bottom-right { bottom: 100px; right: 20px; transform-origin: bottom right; }
         
         /* Дополнительные позиции для линейных пресетов */
-        .info-block.top-left-third { top: 30px; left: 15%; transform-origin: top left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-left-third { top: 20px; left: 20%; transform-origin: top left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.top-left-third.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.top-right-third { top: 30px; right: 15%; transform-origin: top right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-right-third { top: 20px; right: 20%; transform-origin: top right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.top-right-third.visible { transform: translateX(50%) scale(var(--info-scale)); }
-        .info-block.bottom-left-third { bottom: 120px; left: 15%; transform-origin: bottom left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-left-third { bottom: 100px; left: 20%; transform-origin: bottom left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.bottom-left-third.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.bottom-right-third { bottom: 120px; right: 15%; transform-origin: bottom right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-right-third { bottom: 100px; right: 20%; transform-origin: bottom right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.bottom-right-third.visible { transform: translateX(50%) scale(var(--info-scale)); }
 
         .info-label {
-            font-size: 0.75em;
+            font-size: 0.9em;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             transition: all 0.3s ease;
         }
 
         .info-value {
-            font-size: 2rem;
+            font-size: clamp(1.2rem, 2.5vw, 2.2rem);
             font-weight: 600;
             font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
             color: rgba(255, 255, 255, 0.9);
@@ -108,12 +121,9 @@
         
         /* Стиль: Цифровой LED */
         body.style-digital .info-block {
-            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
-            border: 2px solid #333;
-            box-shadow: 
-                inset 0 0 30px rgba(0, 0, 0, 0.8),
-                0 0 20px rgba(0, 0, 0, 0.5),
-                0 0 40px rgba(0, 255, 136, 0.1);
+            background: transparent;
+            border: none;
+            box-shadow: none;
         }
 
         body.style-digital .info-label {
@@ -154,10 +164,10 @@
         /* Круговой таймер */
         .timer-ring {
             position: relative;
-            width: min(65vw, 65vh);
-            height: min(65vw, 65vh);
-            max-width: 600px;
-            max-height: 600px;
+            width: min(60vw, 55vh);
+            height: min(60vw, 55vh);
+            max-width: 800px;
+            max-height: 800px;
             margin: 0 auto;
         }
 
@@ -234,7 +244,7 @@
         }
 
         .time-text {
-            font-size: clamp(3rem, 10vw, 8rem);
+            font-size: clamp(4rem, 14vw, 14rem);
             font-weight: 700;
             font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
             color: white;
@@ -248,7 +258,7 @@
 
         /* Уменьшение шрифта при длинном времени (HH:MM:SS или минус) */
         .time-text.compact {
-            font-size: clamp(2.5rem, 8vw, 6rem);
+            font-size: clamp(3rem, 10vw, 10rem);
             letter-spacing: 1px;
         }
 
@@ -272,8 +282,10 @@
         .status-container {
             position: fixed;
             bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
             z-index: 20;
         }
 
@@ -346,18 +358,18 @@
         
         /* Стиль: Цифровой LED */
         body.style-digital .status-pill {
-            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
-            border: 2px solid #333;
+            background: transparent;
+            border: none;
             border-radius: 10px;
             color: #00ff88;
             text-shadow: 0 0 10px #00ff88;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+            box-shadow: none;
         }
 
         body.style-digital .status-pill.running {
             color: #00ff88;
             text-shadow: 0 0 15px #00ff88;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 136, 0.2);
+            box-shadow: none;
         }
 
         body.style-digital .status-pill.paused {
@@ -398,14 +410,14 @@
         }
 
         .digital-display {
-            background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+            background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
+            border: 3px solid #333;
             border-radius: 20px;
             padding: 40px 60px;
-            border: 3px solid #333;
             box-shadow: 
-                inset 0 0 60px rgba(0, 0, 0, 0.8),
-                0 0 40px rgba(0, 0, 0, 0.5),
-                0 0 100px rgba(102, 126, 234, 0.2);
+                inset 0 0 50px rgba(0, 0, 0, 0.8),
+                0 8px 40px rgba(0, 0, 0, 0.6),
+                0 0 60px rgba(0, 255, 136, 0.15);
             position: relative;
             overflow: hidden;
         }
@@ -419,11 +431,12 @@
             height: 50%;
             background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
             pointer-events: none;
+            border-radius: 17px 17px 0 0;
         }
 
         .digital-time {
             font-family: 'Courier New', 'Consolas', monospace;
-            font-size: clamp(4rem, 15vw, 12rem);
+            font-size: clamp(4rem, 12vw, 12rem);
             font-weight: bold;
             color: #00ff88;
             text-shadow: 
@@ -498,8 +511,8 @@
 
         .flip-card {
             position: relative;
-            width: clamp(60px, 12vw, 140px);
-            height: clamp(80px, 16vw, 180px);
+            width: clamp(60px, 12vw, 160px);
+            height: clamp(80px, 16vw, 200px);
             perspective: 1000px;
         }
 
@@ -544,7 +557,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-family: 'Arial Black', 'Helvetica', sans-serif;
-            font-size: clamp(2.5rem, 8vw, 6rem);
+            font-size: clamp(2.5rem, 9vw, 7rem);
             font-weight: 900;
             color: white;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
@@ -597,43 +610,9 @@
         .timer-flip.active {
             display: flex !important;
         }
-        /* Кнопка закрытия */
-        .close-btn {
-            position: fixed;
-            top: 50%;
-            right: 15px;
-            transform: translateY(-50%);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border: none;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 18px;
-            cursor: pointer;
-            opacity: 0;
-            transition: all 0.3s ease;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .close-btn:hover {
-            background: rgba(255, 68, 68, 0.4);
-            color: white;
-            transform: translateY(-50%) scale(1.15);
-        }
-
-        body:hover .close-btn {
-            opacity: 1;
-        }
     </style>
 </head>
 <body>
-    <!-- Кнопка закрытия -->
-    <button class="close-btn" id="closeBtn" title="Закрыть">✕</button>
-
     <!-- Информационные блоки (независимое позиционирование) -->
     <div class="info-block top-left" id="currentTimeBlock">
         <div class="info-label">Текущее время</div>
