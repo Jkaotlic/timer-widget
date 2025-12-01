@@ -8,10 +8,12 @@
     "dev": "electron . --dev",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:all": "electron-builder --win --mac",
     "pack": "electron-builder --dir"
   },
   "keywords": ["timer", "widget", "overlay", "transparent"],
-  "author": "",
+  "author": "Jkaotlic",
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
@@ -24,20 +26,34 @@
       "output": "dist"
     },
     "win": {
-      "target": ["portable"],
-      "icon": "icon.ico",
+      "target": ["nsis", "portable"],
       "signAndEditExecutable": false
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
     "portable": {
-      "artifactName": "${productName}.exe"
+      "artifactName": "${productName}-Portable.exe"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.utilities",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "dmg": {
+      "title": "${productName}"
     },
     "files": [
       "electron-main.js",
       "electron-widget.html",
       "electron-control.html",
+      "electron-clock-widget.html",
       "styles.css",
       "display.html",
-      "display-script.js"
+      "display-script.js",
+      "sounds/**/*"
     ]
   }
 }
