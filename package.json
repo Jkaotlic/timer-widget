@@ -23,11 +23,13 @@
     "appId": "com.timer.widget",
     "productName": "TimerWidget",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "win": {
       "target": ["nsis", "portable"],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -40,7 +42,8 @@
     "mac": {
       "target": ["dmg", "zip"],
       "category": "public.app-category.utilities",
-      "artifactName": "${productName}-${version}.${ext}"
+      "artifactName": "${productName}-${version}.${ext}",
+      "icon": "build/icon.png"
     },
     "dmg": {
       "title": "${productName}"
