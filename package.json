@@ -48,6 +48,7 @@
     "dmg": {
       "title": "${productName}"
     },
+    "publish": null,
     "files": [
       "electron-main.js",
       "electron-widget.html",
