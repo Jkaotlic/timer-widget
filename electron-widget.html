@@ -640,6 +640,33 @@
             margin: 0 2px;
         }
 
+        .widget-flip-minus {
+            position: relative;
+            width: 25px;
+            height: 45px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            margin-right: 4px;
+        }
+
+        .widget-flip-minus-sign {
+            font-family: 'Arial Black', sans-serif;
+            font-size: 32px;
+            font-weight: 900;
+            color: #ff3333;
+            text-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.5),
+                0 0 10px rgba(255, 51, 51, 0.5);
+        }
+
+        .widget-flip-minus.visible {
+            display: flex;
+        }
+
         .widget-flip-card {
             position: relative;
             width: 50px;
@@ -699,7 +726,8 @@
         /* Скрытие неактивных стилей - все скрыты по умолчанию */
         .circular-widget,
         .widget-digital,
-        .widget-flip {
+        .widget-flip,
+        .widget-analog {
             display: none !important;
         }
         
@@ -707,6 +735,172 @@
         .circular-widget.active { display: flex !important; }
         .widget-digital.active { display: flex !important; }
         .widget-flip.active { display: flex !important; }
+        .widget-analog.active { display: flex !important; }
+
+        /* ============================================
+           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog) - для виджета
+           ============================================ */
+        .widget-analog {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            padding: 5%;
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        .widget-analog-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center;
+            transform: scale(var(--analog-scale, 1));
+        }
+
+        .widget-analog-clock {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.9) 100%);
+            box-shadow: 
+                0 0 0 3px rgba(102, 126, 234, 0.3),
+                inset 0 0 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Деления на циферблате виджета */
+        .widget-clock-tick {
+            position: absolute;
+            width: 2px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.3);
+            left: 50%;
+            top: 8%;
+            transform-origin: 50% 63px;
+            border-radius: 1px;
+        }
+
+        .widget-clock-tick.major {
+            width: 2px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.6);
+            top: 6%;
+        }
+
+        .widget-clock-tick.quarter {
+            width: 3px;
+            height: 14px;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            top: 4%;
+        }
+
+        /* Стрелки виджета */
+        .widget-clock-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            border-radius: 2px;
+        }
+
+        .widget-hand-minute {
+            width: 3px;
+            height: 48px;
+            background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+            margin-left: -1.5px;
+            z-index: 3;
+        }
+
+        .widget-hand-second {
+            width: 2px;
+            height: 57px;
+            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+            margin-left: -1px;
+            z-index: 4;
+        }
+
+        .widget-clock-center {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        /* Цифровое время под циферблатом */
+        .widget-analog-digital {
+            position: absolute;
+            bottom: 20%;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Цифры на циферблате */
+        .widget-clock-numbers {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+        .widget-clock-numbers.visible {
+            display: block;
+        }
+
+        .widget-clock-number {
+            position: absolute;
+            font-family: 'Georgia', serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+            transform: translate(-50%, -50%);
+        }
+
+        .widget-clock-number.n12 { top: 15%; left: 50%; }
+        .widget-clock-number.n3 { top: 50%; left: 88%; }
+        .widget-clock-number.n6 { top: 85%; left: 50%; }
+        .widget-clock-number.n9 { top: 50%; left: 12%; }
+
+        /* Предупреждения для стрелок виджета */
+        .widget-hand-minute.warning,
+        .widget-hand-second.warning {
+            filter: hue-rotate(-30deg) saturate(1.5);
+        }
+
+        .widget-hand-minute.danger,
+        .widget-hand-second.danger {
+            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%) !important;
+            animation: widget-hand-pulse 0.5s infinite;
+        }
+
+        .widget-clock-center.danger {
+            background: linear-gradient(145deg, #ff4444, #cc0000);
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
+        }
+
+        .widget-analog-digital.danger {
+            color: #ff4444;
+            text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+        }
+
+        @keyframes widget-hand-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body>
@@ -832,6 +1026,7 @@
         <!-- Стиль: Перекидные часы -->
         <div class="widget-flip" id="widgetFlip">
             <div class="widget-flip-content" id="widgetFlipContent">
+                <div class="widget-flip-minus" id="wFlipMinus"><span class="widget-flip-minus-sign">−</span></div>
                 <!-- Группа часов (скрыта по умолчанию) -->
                 <div class="widget-flip-group widget-flip-hours" id="wFlipHoursGroup" style="display: none;">
                     <div class="widget-flip-card" id="wFlipHr1">
@@ -872,6 +1067,45 @@
                             <span class="widget-flip-digit">0</span>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Стиль: Аналоговые часы -->
+        <div class="widget-analog" id="widgetAnalog">
+            <div class="widget-analog-content">
+                <div class="widget-analog-clock">
+                    <!-- Деления -->
+                    <div class="widget-clock-tick" style="transform: rotate(0deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(30deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(60deg);"></div>
+                    <div class="widget-clock-tick quarter" style="transform: rotate(90deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(120deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(150deg);"></div>
+                    <div class="widget-clock-tick major" style="transform: rotate(180deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(210deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(240deg);"></div>
+                    <div class="widget-clock-tick quarter" style="transform: rotate(270deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(300deg);"></div>
+                    <div class="widget-clock-tick" style="transform: rotate(330deg);"></div>
+                    
+                    <!-- Цифры (скрыты по умолчанию) -->
+                    <div class="widget-clock-numbers" id="widgetClockNumbers">
+                        <span class="widget-clock-number n12">12</span>
+                        <span class="widget-clock-number n3">3</span>
+                        <span class="widget-clock-number n6">6</span>
+                        <span class="widget-clock-number n9">9</span>
+                    </div>
+                    
+                    <!-- Цифровое время -->
+                    <div class="widget-analog-digital" id="widgetAnalogDigital">00:00</div>
+                    
+                    <!-- Стрелки -->
+                    <div class="widget-clock-hand widget-hand-minute" id="widgetHandMinute"></div>
+                    <div class="widget-clock-hand widget-hand-second" id="widgetHandSecond"></div>
+                    
+                    <!-- Центр -->
+                    <div class="widget-clock-center" id="widgetClockCenter"></div>
                 </div>
             </div>
         </div>
@@ -918,14 +1152,23 @@
                 this.circularWidget = document.querySelector('.circular-widget');
                 this.widgetDigital = document.getElementById('widgetDigital');
                 this.widgetFlip = document.getElementById('widgetFlip');
+                this.widgetAnalog = document.getElementById('widgetAnalog');
                 this.widgetDigitalTime = document.getElementById('widgetDigitalTime');
                 this.widgetFlipContent = document.getElementById('widgetFlipContent');
+                
+                // Аналоговые элементы
+                this.widgetHandMinute = document.getElementById('widgetHandMinute');
+                this.widgetHandSecond = document.getElementById('widgetHandSecond');
+                this.widgetClockCenter = document.getElementById('widgetClockCenter');
+                this.widgetAnalogDigital = document.getElementById('widgetAnalogDigital');
+                this.widgetClockNumbers = document.getElementById('widgetClockNumbers');
                 
                 // Flip карточки
                 this.wFlipHr1 = document.getElementById('wFlipHr1');
                 this.wFlipHr2 = document.getElementById('wFlipHr2');
                 this.wFlipHoursGroup = document.getElementById('wFlipHoursGroup');
                 this.wFlipHoursSep = document.getElementById('wFlipHoursSep');
+                this.wFlipMinus = document.getElementById('wFlipMinus');
                 this.wFlipMin1 = document.getElementById('wFlipMin1');
                 this.wFlipMin2 = document.getElementById('wFlipMin2');
                 this.wFlipSec1 = document.getElementById('wFlipSec1');
@@ -952,9 +1195,10 @@
                 const containerHeight = this.container.offsetHeight;
                 
                 // Размер шрифта для digital - подбираем чтобы текст вместился
-                // Для таймера формат MM:SS или HH:MM:SS
+                // Для таймера формат MM:SS или HH:MM:SS, +1 символ для возможного минуса при перерасходе
                 const hasHours = this.wFlipHoursGroup && this.wFlipHoursGroup.style.display !== 'none';
-                const charCount = hasHours ? 8 : 5;
+                const baseCharCount = hasHours ? 8 : 5;
+                const charCount = baseCharCount + 1; // +1 для знака минуса при перерасходе
                 // Ширина символа примерно 0.6 от размера шрифта для моноширинного
                 const maxFontByWidth = (containerWidth * 0.85) / (charCount * 0.6);
                 const maxFontByHeight = containerHeight * 0.7;
@@ -970,6 +1214,14 @@
                 const flipScale = Math.min(scaleX, scaleY);
                 
                 this.container.style.setProperty('--flip-scale', flipScale);
+                
+                // Масштаб для аналоговых часов (базовый размер 150px)
+                const baseAnalogSize = 150;
+                const analogScaleX = (containerWidth * 0.85) / baseAnalogSize;
+                const analogScaleY = (containerHeight * 0.85) / baseAnalogSize;
+                const analogScale = Math.min(analogScaleX, analogScaleY);
+                
+                this.container.style.setProperty('--analog-scale', analogScale);
             }
 
             initProgress() {
@@ -1242,6 +1494,10 @@
                     if (settings.timerStyle) {
                         this.setTimerStyle(settings.timerStyle);
                     }
+                    // Показ цифр на аналоговом циферблате
+                    if (settings.showAnalogNumbers !== undefined && this.widgetClockNumbers) {
+                        this.widgetClockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
+                    }
                 });
             }
             
@@ -1252,6 +1508,7 @@
                 if (this.circularWidget) this.circularWidget.classList.remove('active');
                 if (this.widgetDigital) this.widgetDigital.classList.remove('active');
                 if (this.widgetFlip) this.widgetFlip.classList.remove('active');
+                if (this.widgetAnalog) this.widgetAnalog.classList.remove('active');
                 
                 // Показываем выбранный
                 switch (style) {
@@ -1263,6 +1520,9 @@
                         break;
                     case 'flip':
                         if (this.widgetFlip) this.widgetFlip.classList.add('active');
+                        break;
+                    case 'analog':
+                        if (this.widgetAnalog) this.widgetAnalog.classList.add('active');
                         break;
                 }
                 
@@ -1286,6 +1546,9 @@
                 
                 // Обновляем перекидные часы
                 this.updateFlipDisplay(secs);
+                
+                // Обновляем аналоговые часы
+                this.updateAnalogDisplay(secs);
 
                 // Обновляем прогресс (для кругового)
                 if (this.totalSeconds > 0) {
@@ -1330,10 +1593,16 @@
             updateFlipDisplay(secs) {
                 if (!this.wFlipMin1 || !this.wFlipMin2 || !this.wFlipSec1 || !this.wFlipSec2) return;
                 
+                const isNegative = secs < 0;
                 const absSecs = Math.abs(secs);
                 const hours = Math.floor(absSecs / 3600);
                 const mins = Math.floor((absSecs % 3600) / 60);
                 const seconds = absSecs % 60;
+                
+                // Показываем/скрываем знак минуса
+                if (this.wFlipMinus) {
+                    this.wFlipMinus.classList.toggle('visible', isNegative);
+                }
                 
                 // Показываем/скрываем часы в зависимости от общего времени
                 const showHours = this.totalSeconds >= 3600 || hours > 0;
@@ -1385,6 +1654,54 @@
                             card.classList.add('warning');
                         }
                     });
+                }
+            }
+
+            updateAnalogDisplay(secs) {
+                if (!this.widgetHandMinute || !this.widgetHandSecond) return;
+
+                const absSecs = Math.abs(secs);
+                const totalMins = absSecs / 60;
+                const seconds = absSecs % 60;
+
+                // Минутная стрелка - полный оборот за 60 минут
+                const minuteDeg = (totalMins / 60) * 360;
+                this.widgetHandMinute.style.transform = `rotate(${minuteDeg}deg)`;
+
+                // Секундная стрелка - полный оборот за 60 секунд
+                const secondDeg = (seconds / 60) * 360;
+                this.widgetHandSecond.style.transform = `rotate(${secondDeg}deg)`;
+
+                // Обновляем цифровое время
+                if (this.widgetAnalogDigital) {
+                    const mins = Math.floor(absSecs / 60);
+                    const prefix = secs < 0 ? '-' : '';
+                    this.widgetAnalogDigital.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }
+
+                // Классы предупреждения
+                const analogElements = [this.widgetHandMinute, this.widgetHandSecond, this.widgetClockCenter, this.widgetAnalogDigital];
+                
+                analogElements.forEach(el => {
+                    if (el) el.classList.remove('warning', 'danger', 'overtime');
+                });
+
+                const isOvertime = secs < 0;
+                if (isOvertime) {
+                    analogElements.forEach(el => {
+                        if (el) el.classList.add('danger', 'overtime');
+                    });
+                } else if (this.totalSeconds > 0) {
+                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+                    if (percentLeft <= 10 && percentLeft > 0) {
+                        analogElements.forEach(el => {
+                            if (el) el.classList.add('danger');
+                        });
+                    } else if (percentLeft <= 25) {
+                        analogElements.forEach(el => {
+                            if (el) el.classList.add('warning');
+                        });
+                    }
                 }
             }
 

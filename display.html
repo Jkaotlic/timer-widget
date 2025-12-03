@@ -121,9 +121,13 @@
         
         /* Стиль: Цифровой LED */
         body.style-digital .info-block {
-            background: transparent;
-            border: none;
-            box-shadow: none;
+            background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
+            border: 2px solid #333;
+            border-radius: 12px;
+            box-shadow: 
+                inset 0 0 20px rgba(0, 0, 0, 0.8),
+                0 4px 20px rgba(0, 0, 0, 0.5),
+                0 0 30px rgba(0, 255, 136, 0.1);
         }
 
         body.style-digital .info-label {
@@ -161,11 +165,173 @@
             z-index: 1;
         }
 
+        /* Стиль: Аналоговые часы */
+        body.style-analog .info-block {
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
+            border-radius: 50%;
+            border: 2px solid rgba(100, 120, 180, 0.4);
+            box-shadow: 
+                inset 0 0 30px rgba(0, 0, 0, 0.6),
+                0 4px 20px rgba(0, 0, 0, 0.5);
+            padding: 0;
+            width: 100px;
+            height: 100px;
+            min-width: 100px;
+            min-height: 100px;
+            max-width: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Переопределение позиций для аналогового стиля (круглые блоки) */
+        /* transform-origin выставляется так, чтобы при масштабировании блок рос от угла/края */
+        body.style-analog .info-block.top-left { 
+            top: 20px; left: 20px; 
+            transform-origin: top left;
+        }
+        body.style-analog .info-block.top-center { 
+            top: 20px; left: 50%; margin-left: -50px; 
+            transform-origin: top center;
+        }
+        body.style-analog .info-block.top-right { 
+            top: 20px; right: 20px; 
+            transform-origin: top right;
+        }
+        body.style-analog .info-block.bottom-left { 
+            bottom: 100px; left: 20px; 
+            transform-origin: bottom left;
+        }
+        body.style-analog .info-block.bottom-center { 
+            bottom: 100px; left: 50%; margin-left: -50px; 
+            transform-origin: bottom center;
+        }
+        body.style-analog .info-block.bottom-right { 
+            bottom: 100px; right: 20px; 
+            transform-origin: bottom right;
+        }
+        body.style-analog .info-block.top-left-third { 
+            top: 20px; left: 20%; margin-left: -50px; 
+            transform-origin: top center;
+        }
+        body.style-analog .info-block.top-right-third { 
+            top: 20px; right: 20%; margin-right: -50px; 
+            transform-origin: top center;
+        }
+        body.style-analog .info-block.bottom-left-third { 
+            bottom: 100px; left: 20%; margin-left: -50px; 
+            transform-origin: bottom center;
+        }
+        body.style-analog .info-block.bottom-right-third { 
+            bottom: 100px; right: 20%; margin-right: -50px; 
+            transform-origin: bottom center;
+        }
+
+        body.style-analog .info-label {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: absolute;
+            top: 15%;
+            z-index: 10;
+        }
+
+        body.style-analog .info-value {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 11px;
+            position: absolute;
+            bottom: 15%;
+            z-index: 10;
+        }
+
+        /* Переопределение transform для аналогового режима */
+        body.style-analog .info-block {
+            transform-origin: center center;
+        }
+        body.style-analog .info-block.visible {
+            opacity: 1;
+            transform: scale(var(--info-scale));
+        }
+
+        /* Мини-циферблат внутри info-block */
+        body.style-analog .info-block .mini-clock {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: block;
+        }
+
+        body.style-analog .info-block .mini-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: center bottom;
+            border-radius: 2px;
+        }
+
+        body.style-analog .info-block .mini-hand-hour {
+            width: 3px;
+            height: 18px;
+            background: linear-gradient(180deg, #fff 0%, #bbb 100%);
+            transform: translateX(-50%) rotate(0deg);
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+            z-index: 2;
+        }
+
+        body.style-analog .info-block .mini-hand-minute {
+            width: 2px;
+            height: 26px;
+            background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+            transform: translateX(-50%) rotate(0deg);
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+            z-index: 3;
+        }
+
+        body.style-analog .info-block .mini-center {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: linear-gradient(145deg, #7c5cbf, #5a4a99);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Деления мини-часов */
+        body.style-analog .info-block .mini-tick {
+            position: absolute;
+            width: 1px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.25);
+            left: 50%;
+            top: 4px;
+            transform-origin: center 46px;
+        }
+
+        body.style-analog .info-block .mini-tick.quarter {
+            width: 2px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.5);
+            top: 3px;
+            transform-origin: center 47px;
+        }
+
         /* Круговой таймер */
         .timer-ring {
+            --ring-size: min(60vw, 55vh, 800px);
             position: relative;
-            width: min(60vw, 55vh);
-            height: min(60vw, 55vh);
+            width: var(--ring-size);
+            height: var(--ring-size);
             max-width: 800px;
             max-height: 800px;
             margin: 0 auto;
@@ -236,7 +402,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             text-align: center;
-            width: 90%;
+            width: 75%;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -244,22 +410,25 @@
         }
 
         .time-text {
-            font-size: clamp(4rem, 14vw, 14rem);
+            /* Размер шрифта = 22% от размера круга */
+            font-size: calc(var(--ring-size, 400px) * 0.22);
             font-weight: 700;
             font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
             color: white;
-            letter-spacing: 2px;
+            letter-spacing: 0.02em;
             text-shadow: 
                 0 4px 8px rgba(0, 0, 0, 0.4),
                 0 0 60px var(--text-glow, rgba(102, 126, 234, 0.5));
             transition: color 0.4s, text-shadow 0.4s, font-size 0.3s;
             white-space: nowrap;
+            line-height: 1;
         }
 
         /* Уменьшение шрифта при длинном времени (HH:MM:SS или минус) */
         .time-text.compact {
-            font-size: clamp(3rem, 10vw, 10rem);
-            letter-spacing: 1px;
+            /* Размер шрифта = 16% от размера круга для длинного времени */
+            font-size: calc(var(--ring-size, 400px) * 0.16);
+            letter-spacing: 0.01em;
         }
 
         .time-text.warning {
@@ -324,6 +493,18 @@
             box-shadow: 0 0 25px rgba(56, 239, 125, 0.2);
         }
 
+        .status-pill.overtime {
+            background: rgba(255, 51, 51, 0.2);
+            color: #ff3333;
+            box-shadow: 0 0 25px rgba(255, 51, 51, 0.3);
+            animation: overtime-pulse 0.8s infinite;
+        }
+
+        @keyframes overtime-pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 51, 51, 0.3); }
+            50% { opacity: 0.85; box-shadow: 0 0 40px rgba(255, 51, 51, 0.5); }
+        }
+
         .status-pill.paused {
             background: rgba(245, 87, 108, 0.15);
             color: #f5576c;
@@ -380,6 +561,17 @@
         body.style-digital .status-pill.finished {
             color: #ff3333;
             text-shadow: 0 0 15px #ff3333;
+        }
+
+        body.style-digital .status-pill.overtime {
+            color: #ff3333;
+            text-shadow: 0 0 15px #ff3333;
+            animation: led-overtime-pulse 1s infinite;
+        }
+
+        @keyframes led-overtime-pulse {
+            0%, 100% { text-shadow: 0 0 15px #ff3333; }
+            50% { text-shadow: 0 0 30px #ff3333, 0 0 50px #ff3333; }
         }
 
         body.style-digital .status-dot {
@@ -509,6 +701,35 @@
             padding: 0 10px;
         }
 
+        .flip-minus {
+            position: relative;
+            width: clamp(35px, 6vw, 80px);
+            height: clamp(50px, 10vw, 120px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border-radius: 10px;
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            margin-right: 10px;
+        }
+
+        .flip-minus-sign {
+            font-family: 'Arial Black', 'Helvetica', sans-serif;
+            font-size: clamp(2rem, 7vw, 5rem);
+            font-weight: 900;
+            color: #ff3333;
+            text-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(255, 51, 51, 0.5);
+        }
+
+        .flip-minus.visible {
+            display: flex;
+        }
+
         .flip-card {
             position: relative;
             width: clamp(60px, 12vw, 160px);
@@ -594,7 +815,8 @@
         /* Скрытие неактивных стилей - все скрыты по умолчанию */
         .timer-ring,
         .timer-digital,
-        .timer-flip {
+        .timer-flip,
+        .timer-analog {
             display: none !important;
         }
 
@@ -610,20 +832,379 @@
         .timer-flip.active {
             display: flex !important;
         }
+
+        .timer-analog.active {
+            display: flex !important;
+        }
+
+        /* ============================================
+           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
+           ============================================ */
+        .timer-analog {
+            --analog-size: min(55vw, 50vh, 700px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .analog-clock {
+            position: relative;
+            width: var(--analog-size);
+            height: var(--analog-size);
+            border-radius: 50%;
+            background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1a 100%);
+            box-shadow: 
+                0 0 0 8px rgba(102, 126, 234, 0.3),
+                0 0 0 12px rgba(102, 126, 234, 0.1),
+                inset 0 0 60px rgba(0, 0, 0, 0.5),
+                0 20px 60px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .analog-clock::before {
+            content: '';
+            position: absolute;
+            inset: 15px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.05), transparent 60%);
+            pointer-events: none;
+        }
+
+        /* Циферблат */
+        .clock-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Деления на циферблате */
+        .clock-tick {
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.3);
+            left: 50%;
+            top: 8%;
+            transform-origin: 50% calc(var(--analog-size) * 0.42);
+            border-radius: 1px;
+        }
+
+        .clock-tick.major {
+            width: 3px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.6);
+            top: 6%;
+        }
+
+        .clock-tick.quarter {
+            width: 4px;
+            height: 28px;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            top: 4%;
+            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+        }
+
+        /* Цифры на циферблате */
+        .clock-numbers {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+        .clock-numbers.visible {
+            display: block;
+        }
+
+        .clock-number {
+            position: absolute;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: calc(var(--analog-size) * 0.08);
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            transform: translate(-50%, -50%);
+        }
+
+        .clock-number.n12 { top: 12%; left: 50%; }
+        .clock-number.n1 { top: 17%; left: 74%; }
+        .clock-number.n2 { top: 30%; left: 87%; }
+        .clock-number.n3 { top: 50%; left: 92%; }
+        .clock-number.n4 { top: 70%; left: 87%; }
+        .clock-number.n5 { top: 83%; left: 74%; }
+        .clock-number.n6 { top: 88%; left: 50%; }
+        .clock-number.n7 { top: 83%; left: 26%; }
+        .clock-number.n8 { top: 70%; left: 13%; }
+        .clock-number.n9 { top: 50%; left: 8%; }
+        .clock-number.n10 { top: 30%; left: 13%; }
+        .clock-number.n11 { top: 17%; left: 26%; }
+
+        /* Стрелки */
+        .clock-hands {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .clock-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            border-radius: 4px;
+        }
+
+        /* Часовая стрелка (для часов) / Минутная (для таймера) */
+        .hand-hour {
+            width: 6px;
+            height: calc(var(--analog-size) * 0.22);
+            background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+            margin-left: -3px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            z-index: 2;
+        }
+
+        /* Минутная стрелка (для часов) / Секундная (для таймера) */
+        .hand-minute {
+            width: 4px;
+            height: calc(var(--analog-size) * 0.32);
+            background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+            margin-left: -2px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            z-index: 3;
+        }
+
+        /* Секундная стрелка */
+        .hand-second {
+            width: 2px;
+            height: calc(var(--analog-size) * 0.38);
+            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+            margin-left: -1px;
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
+            z-index: 4;
+        }
+
+        .hand-second::after {
+            content: '';
+            position: absolute;
+            bottom: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: calc(var(--analog-size) * 0.08);
+            background: #ff4444;
+            border-radius: 2px;
+        }
+
+        /* Центральная точка */
+        .clock-center {
+            position: absolute;
+            width: calc(var(--analog-size) * 0.04);
+            height: calc(var(--analog-size) * 0.04);
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: 
+                0 0 15px rgba(102, 126, 234, 0.6),
+                inset 0 2px 4px rgba(255, 255, 255, 0.3);
+        }
+
+        .clock-center::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40%;
+            height: 40%;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        /* Цифровое время под циферблатом */
+        .analog-digital-time {
+            position: absolute;
+            bottom: 22%;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: calc(var(--analog-size) * 0.1);
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .analog-digital-time.warning {
+            color: #ffc107;
+        }
+
+        .analog-digital-time.danger {
+            color: #ff4444;
+            animation: time-pulse 0.5s infinite;
+        }
+
+        /* Декоративное кольцо */
+        .analog-ring {
+            position: absolute;
+            inset: 3%;
+            border-radius: 50%;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            pointer-events: none;
+        }
+
+        /* Название бренда */
+        .clock-brand {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Georgia', serif;
+            font-size: calc(var(--analog-size) * 0.04);
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* Стили для аналогового в режиме таймера */
+        body.style-analog .status-pill {
+            background: rgba(26, 26, 46, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        /* Кнопка закрытия */
+        .close-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 1000;
+            opacity: 0;
+        }
+        .close-btn:hover {
+            background: rgba(255, 68, 68, 0.8);
+            color: white;
+            opacity: 1;
+        }
+        body:hover .close-btn {
+            opacity: 1;
+        }
+
+        /* Предупреждения для стрелок */
+        .hand-minute.warning,
+        .hand-second.warning {
+            filter: hue-rotate(-30deg) saturate(1.5);
+        }
+
+        .clock-center.warning {
+            background: linear-gradient(145deg, #ffc107, #ff9800);
+        }
+
+        .hand-minute.danger,
+        .hand-second.danger {
+            animation: hand-pulse 0.5s infinite;
+        }
+
+        .clock-center.danger {
+            background: linear-gradient(145deg, #ff4444, #cc0000);
+            animation: center-pulse 0.5s infinite;
+        }
+
+        @keyframes hand-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes center-pulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 68, 68, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(255, 68, 68, 0.9); }
+        }
     </style>
 </head>
 <body>
+    <!-- Кнопка закрытия -->
+    <button class="close-btn" id="closeBtn" title="Закрыть">✕</button>
+    
     <!-- Информационные блоки (независимое позиционирование) -->
     <div class="info-block top-left" id="currentTimeBlock">
         <div class="info-label">Текущее время</div>
+        <div class="mini-clock">
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(30deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(60deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(90deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(120deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(150deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(180deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(210deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(240deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(270deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(300deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(330deg);"></div>
+            <div class="mini-hand mini-hand-hour"></div>
+            <div class="mini-hand mini-hand-minute"></div>
+            <div class="mini-center"></div>
+        </div>
         <div class="info-value" id="currentTime">00:00:00</div>
     </div>
     <div class="info-block top-right" id="eventTimeBlock">
         <div class="info-label">Начало</div>
+        <div class="mini-clock">
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(30deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(60deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(90deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(120deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(150deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(180deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(210deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(240deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(270deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(300deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(330deg);"></div>
+            <div class="mini-hand mini-hand-hour"></div>
+            <div class="mini-hand mini-hand-minute"></div>
+            <div class="mini-center"></div>
+        </div>
         <div class="info-value" id="eventTime">10:00</div>
     </div>
     <div class="info-block bottom-center" id="endTimeBlock">
         <div class="info-label">Окончание</div>
+        <div class="mini-clock">
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(30deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(60deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(90deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(120deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(150deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(180deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(210deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(240deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(270deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(300deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(330deg);"></div>
+            <div class="mini-hand mini-hand-hour"></div>
+            <div class="mini-hand mini-hand-minute"></div>
+            <div class="mini-center"></div>
+        </div>
         <div class="info-value" id="endTime">12:00</div>
     </div>
 
@@ -694,6 +1275,7 @@
 
         <!-- Стиль: Перекидные часы -->
         <div class="timer-flip" id="timerFlip">
+            <div class="flip-minus" id="flipMinus"><span class="flip-minus-sign">−</span></div>
             <div class="flip-unit">
                 <div class="flip-group" id="flipMinutes">
                     <div class="flip-card" id="flipMin1">
@@ -724,6 +1306,111 @@
                     </div>
                 </div>
                 <div class="flip-label">секунды</div>
+            </div>
+        </div>
+
+        <!-- Стиль: Аналоговые часы -->
+        <div class="timer-analog" id="timerAnalog">
+            <div class="analog-clock">
+                <div class="analog-ring"></div>
+                
+                <!-- Деления на циферблате -->
+                <div class="clock-face">
+                    <!-- 60 мелких делений -->
+                    <div class="clock-tick" style="transform: rotate(0deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(6deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(12deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(18deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(24deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(30deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(36deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(42deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(48deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(54deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(60deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(66deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(72deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(78deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(84deg);"></div>
+                    <div class="clock-tick quarter" style="transform: rotate(90deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(96deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(102deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(108deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(114deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(120deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(126deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(132deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(138deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(144deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(150deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(156deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(162deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(168deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(174deg);"></div>
+                    <div class="clock-tick quarter" style="transform: rotate(180deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(186deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(192deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(198deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(204deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(210deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(216deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(222deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(228deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(234deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(240deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(246deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(252deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(258deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(264deg);"></div>
+                    <div class="clock-tick quarter" style="transform: rotate(270deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(276deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(282deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(288deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(294deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(300deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(306deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(312deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(318deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(324deg);"></div>
+                    <div class="clock-tick major" style="transform: rotate(330deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(336deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(342deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(348deg);"></div>
+                    <div class="clock-tick" style="transform: rotate(354deg);"></div>
+                    <div class="clock-tick quarter" style="transform: rotate(360deg);"></div>
+                </div>
+
+                <!-- Цифры на циферблате (опционально) -->
+                <div class="clock-numbers" id="clockNumbers">
+                    <span class="clock-number n12">12</span>
+                    <span class="clock-number n1">1</span>
+                    <span class="clock-number n2">2</span>
+                    <span class="clock-number n3">3</span>
+                    <span class="clock-number n4">4</span>
+                    <span class="clock-number n5">5</span>
+                    <span class="clock-number n6">6</span>
+                    <span class="clock-number n7">7</span>
+                    <span class="clock-number n8">8</span>
+                    <span class="clock-number n9">9</span>
+                    <span class="clock-number n10">10</span>
+                    <span class="clock-number n11">11</span>
+                </div>
+
+                <!-- Бренд -->
+                <div class="clock-brand">Timer</div>
+
+                <!-- Цифровое время -->
+                <div class="analog-digital-time" id="analogDigitalTime">00:00</div>
+
+                <!-- Стрелки -->
+                <div class="clock-hands">
+                    <div class="clock-hand hand-hour" id="analogHandHour"></div>
+                    <div class="clock-hand hand-minute" id="analogHandMinute"></div>
+                    <div class="clock-hand hand-second" id="analogHandSecond"></div>
+                </div>
+
+                <!-- Центральная точка -->
+                <div class="clock-center"></div>
             </div>
         </div>
     </div>

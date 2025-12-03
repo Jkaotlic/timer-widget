@@ -29,6 +29,24 @@ class DisplayTimer {
         this.detectElectronAndSetup();
         this.startColorSync();
         this.startCurrentTimeClock();
+        this.setupResizeHandler();
+    }
+    
+    setupResizeHandler() {
+        // Пересчитываем размеры при изменении окна
+        window.addEventListener('resize', () => {
+            this.updateRingSize();
+        });
+        // Начальный расчёт
+        this.updateRingSize();
+    }
+    
+    updateRingSize() {
+        if (this.timerRing) {
+            const scale = this.timerScale / 100;
+            // Используем transform для масштабирования всего таймера (круг + текст)
+            this.timerRing.style.transform = `scale(${scale})`;
+        }
     }
     
     initDefaultStyle() {
@@ -49,6 +67,7 @@ class DisplayTimer {
         this.currentTimeEl = document.getElementById('currentTime');
         this.eventTimeEl = document.getElementById('eventTime');
         this.endTimeEl = document.getElementById('endTime');
+        this.closeBtn = document.getElementById('closeBtn');
         
         // Элементы для разных стилей
         this.timerDigital = document.getElementById('timerDigital');
@@ -58,10 +77,19 @@ class DisplayTimer {
         this.digitalSeconds = document.getElementById('digitalSeconds');
         
         // Flip карточки
+        this.flipMinus = document.getElementById('flipMinus');
         this.flipMin1 = document.getElementById('flipMin1');
         this.flipMin2 = document.getElementById('flipMin2');
         this.flipSec1 = document.getElementById('flipSec1');
         this.flipSec2 = document.getElementById('flipSec2');
+        
+        // Аналоговые часы
+        this.timerAnalog = document.getElementById('timerAnalog');
+        this.analogHandHour = document.getElementById('analogHandHour');
+        this.analogHandMinute = document.getElementById('analogHandMinute');
+        this.analogHandSecond = document.getElementById('analogHandSecond');
+        this.analogDigitalTime = document.getElementById('analogDigitalTime');
+        this.clockNumbers = document.getElementById('clockNumbers');
     }
 
     initProgress() {
@@ -78,9 +106,44 @@ class DisplayTimer {
             if (this.currentTimeEl) {
                 this.currentTimeEl.textContent = `${hours}:${mins}:${secs}`;
             }
+            // Обновляем стрелки мини-часов для текущего времени
+            this.updateMiniClockHands(this.currentTimeBlock, now.getHours(), now.getMinutes(), now.getSeconds());
         };
         updateClock();
         setInterval(updateClock, 1000);
+    }
+    
+    updateMiniClockHands(block, hours, minutes, seconds = 0) {
+        if (!block) return;
+        const hourHand = block.querySelector('.mini-hand-hour');
+        const minuteHand = block.querySelector('.mini-hand-minute');
+        const secondHand = block.querySelector('.mini-hand-second');
+        
+        if (hourHand) {
+            // Часовая стрелка: 360/12 = 30 градусов на час + смещение от минут
+            const hourDeg = (hours % 12) * 30 + minutes * 0.5;
+            hourHand.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
+        }
+        if (minuteHand) {
+            // Минутная стрелка: 360/60 = 6 градусов на минуту
+            const minuteDeg = minutes * 6 + seconds * 0.1;
+            minuteHand.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
+        }
+        if (secondHand) {
+            // Секундная стрелка: 6 градусов на секунду
+            const secondDeg = seconds * 6;
+            secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
+        }
+    }
+    
+    updateStaticMiniClock(block, timeString) {
+        if (!block || !timeString) return;
+        const parts = timeString.split(':');
+        if (parts.length >= 2) {
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            this.updateMiniClockHands(block, hours, minutes);
+        }
     }
 
     detectElectronAndSetup() {
@@ -97,6 +160,13 @@ class DisplayTimer {
     }
 
     setupIPC() {
+        // Кнопка закрытия
+        if (this.closeBtn) {
+            this.closeBtn.addEventListener('click', () => {
+                this.ipcRenderer.send('close-display');
+            });
+        }
+        
         // Запрашиваем текущее состояние
         this.ipcRenderer.send('get-timer-state');
 
@@ -182,22 +252,33 @@ class DisplayTimer {
         if (settings.eventTime && this.eventTimeEl) {
             this.eventTime = settings.eventTime;
             this.eventTimeEl.textContent = settings.eventTime;
+            this.updateStaticMiniClock(this.eventTimeBlock, settings.eventTime);
         }
         
         // Время окончания
         if (settings.endTime && this.endTimeEl) {
             this.endTime = settings.endTime;
             this.endTimeEl.textContent = settings.endTime;
+            this.updateStaticMiniClock(this.endTimeBlock, settings.endTime);
         }
         
         // Масштаб таймера
         if (settings.timerScale !== undefined) {
             this.timerScale = settings.timerScale;
             const scale = settings.timerScale / 100;
-            // Применяем масштаб к активному стилю
-            if (this.timerRing) this.timerRing.style.transform = `scale(${scale})`;
+            
+            // Для кругового стиля - обновляем размер динамически
+            this.updateRingSize();
+            
+            // Для других стилей - transform
             if (this.timerDigital) this.timerDigital.style.transform = `scale(${scale})`;
             if (this.timerFlip) this.timerFlip.style.transform = `scale(${scale})`;
+            if (this.timerAnalog) this.timerAnalog.style.transform = `scale(${scale})`;
+        }
+        
+        // Показ цифр на аналоговом циферблате
+        if (settings.showAnalogNumbers !== undefined && this.clockNumbers) {
+            this.clockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
         }
         
         // Масштаб блоков времени (общий)
@@ -213,12 +294,13 @@ class DisplayTimer {
         this.timerStyle = style;
         
         // Удаляем все классы стилей с body
-        document.body.classList.remove('style-circle', 'style-digital', 'style-flip');
+        document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
         
         // Скрываем все стили таймера
         if (this.timerRing) this.timerRing.classList.remove('active');
         if (this.timerDigital) this.timerDigital.classList.remove('active');
         if (this.timerFlip) this.timerFlip.classList.remove('active');
+        if (this.timerAnalog) this.timerAnalog.classList.remove('active');
         
         // Показываем выбранный и добавляем класс на body
         switch (style) {
@@ -233,6 +315,10 @@ class DisplayTimer {
             case 'flip':
                 if (this.timerFlip) this.timerFlip.classList.add('active');
                 document.body.classList.add('style-flip');
+                break;
+            case 'analog':
+                if (this.timerAnalog) this.timerAnalog.classList.add('active');
+                document.body.classList.add('style-analog');
                 break;
         }
         
@@ -456,6 +542,9 @@ class DisplayTimer {
         // Обновляем перекидные часы
         this.updateFlipDisplay(secs);
 
+        // Обновляем аналоговые часы
+        this.updateAnalogDisplay(secs);
+
         // Обновляем прогресс
         this.updateProgress();
 
@@ -497,9 +586,15 @@ class DisplayTimer {
     updateFlipDisplay(secs) {
         if (!this.flipMin1 || !this.flipMin2 || !this.flipSec1 || !this.flipSec2) return;
         
+        const isNegative = secs < 0;
         const absSecs = Math.abs(secs);
         const mins = Math.floor(absSecs / 60);
         const seconds = absSecs % 60;
+        
+        // Показываем/скрываем знак минуса
+        if (this.flipMinus) {
+            this.flipMinus.classList.toggle('visible', isNegative);
+        }
         
         const min1 = String(Math.floor(mins / 10) % 10);
         const min2 = String(mins % 10);
@@ -547,6 +642,68 @@ class DisplayTimer {
         }
     }
 
+    updateAnalogDisplay(secs) {
+        if (!this.analogHandMinute || !this.analogHandSecond) return;
+
+        const absSecs = Math.abs(secs);
+        const totalMins = absSecs / 60;
+        const seconds = absSecs % 60;
+
+        // Минутная стрелка - полный оборот за 60 минут
+        // Плавное движение с учетом секунд
+        const minuteDeg = (totalMins / 60) * 360;
+        this.analogHandMinute.style.transform = `rotate(${minuteDeg}deg)`;
+
+        // Секундная стрелка - полный оборот за 60 секунд
+        const secondDeg = (seconds / 60) * 360;
+        this.analogHandSecond.style.transform = `rotate(${secondDeg}deg)`;
+
+        // Обновляем цифровое время под циферблатом
+        if (this.analogDigitalTime) {
+            const mins = Math.floor(absSecs / 60);
+            const prefix = secs < 0 ? '-' : '';
+            this.analogDigitalTime.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Классы предупреждения для центра и стрелок
+        const clockCenter = this.timerAnalog ? this.timerAnalog.querySelector('.clock-center') : null;
+        const analogElements = [this.analogHandMinute, this.analogHandSecond, clockCenter];
+        
+        analogElements.forEach(el => {
+            if (el) el.classList.remove('warning', 'danger', 'overtime');
+        });
+        if (this.analogDigitalTime) {
+            this.analogDigitalTime.classList.remove('warning', 'danger', 'overtime');
+        }
+
+        const isOvertime = secs < 0;
+        if (isOvertime) {
+            analogElements.forEach(el => {
+                if (el) el.classList.add('danger', 'overtime');
+            });
+            if (this.analogDigitalTime) {
+                this.analogDigitalTime.classList.add('danger', 'overtime');
+            }
+        } else if (this.totalSeconds > 0) {
+            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+            if (percentLeft <= 10 && percentLeft > 0) {
+                analogElements.forEach(el => {
+                    if (el) el.classList.add('danger');
+                });
+                if (this.analogDigitalTime) {
+                    this.analogDigitalTime.classList.add('danger');
+                }
+            } else if (percentLeft <= 25) {
+                analogElements.forEach(el => {
+                    if (el) el.classList.add('warning');
+                });
+                if (this.analogDigitalTime) {
+                    this.analogDigitalTime.classList.add('warning');
+                }
+            }
+        }
+    }
+
     updateProgress() {
         if (this.totalSeconds > 0) {
             const ratio = Math.max(0, Math.min(1, this.remainingSeconds / this.totalSeconds));
@@ -576,14 +733,19 @@ class DisplayTimer {
     }
 
     updateStatus(secs) {
-        this.statusPill.classList.remove('running', 'paused', 'finished');
+        this.statusPill.classList.remove('running', 'paused', 'finished', 'overtime');
 
         if (this.finished || (secs <= 0 && this.totalSeconds > 0 && !this.isRunning)) {
             this.statusText.textContent = 'Время вышло!';
             this.statusPill.classList.add('finished');
         } else if (this.isRunning) {
-            this.statusText.textContent = secs < 0 ? 'Перерасход времени' : 'Таймер активен';
-            this.statusPill.classList.add('running');
+            if (secs < 0) {
+                this.statusText.textContent = 'Перерасход времени';
+                this.statusPill.classList.add('overtime');
+            } else {
+                this.statusText.textContent = 'Таймер активен';
+                this.statusPill.classList.add('running');
+            }
         } else if (this.isPaused) {
             this.statusText.textContent = 'На паузе';
             this.statusPill.classList.add('paused');
