@@ -19,6 +19,7 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             padding: 12px;
+            padding-bottom: 40px;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -31,7 +32,7 @@
             max-width: 100%;
             width: 100%;
             margin: 0 auto;
-            overflow: hidden;
+            overflow: visible;
         }
 
         /* Верхняя секция с таймером */
@@ -180,11 +181,11 @@
 
         .tab-btn {
             flex: 1;
-            padding: 8px 4px;
+            padding: 8px 2px;
             border: none;
             background: transparent;
             color: #666;
-            font-size: 0.75em;
+            font-size: 0.7em;
             font-weight: 600;
             cursor: pointer;
             border-radius: 7px;
@@ -192,11 +193,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 3px;
+            gap: 2px;
+            min-width: 0;
         }
 
         .tab-btn span.icon {
-            font-size: 1.2em;
+            font-size: 1.1em;
         }
 
         .tab-btn:hover {
@@ -216,6 +218,27 @@
         .tab-content.active {
             display: block;
             animation: fadeIn 0.3s ease;
+            overflow: visible;
+            padding-right: 4px;
+        }
+
+        /* Стилизация скроллбара для вкладок */
+        .tab-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .tab-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .tab-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .tab-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
 
         /* Кнопки позиционирования */
@@ -1081,18 +1104,30 @@
 
         /* Расширенные настройки */
         .advanced-settings {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
+            display: none;
+            overflow: visible;
         }
 
         .advanced-settings.open {
-            max-height: 2000px;
-            transition: max-height 0.5s ease-in;
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .advanced-settings .content-section {
-            padding: 0 16px 16px;
+            padding: 0 16px 20px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 0 0 20px 20px;
         }
 
         /* FAQ кнопка */
@@ -1428,9 +1463,9 @@
         <!-- Быстрые окна -->
         <div class="compact-section">
             <div class="quick-windows">
-                <button class="quick-window-btn widget" id="openWidgetBtn">⏱️ Таймер</button>
-                <button class="quick-window-btn clock" id="openClockBtn">🕐 Часы</button>
-                <button class="quick-window-btn display" id="openDisplayBtn">📺 На экран</button>
+                <button class="quick-window-btn widget" id="openWidgetBtn">⏱️ Виджет таймера</button>
+                <button class="quick-window-btn clock" id="openClockBtn">🕐 Виджет часов</button>
+                <button class="quick-window-btn display" id="openDisplayBtn">🖥️ Полноэкранный режим</button>
             </div>
         </div>
 
@@ -1448,13 +1483,17 @@
                         <span class="icon">⏰</span>
                         <span>Время</span>
                     </button>
-                    <button class="tab-btn" data-tab="windows">
+                    <button class="tab-btn" data-tab="display">
                         <span class="icon">🖥️</span>
-                        <span>Окна</span>
+                        <span>Экран</span>
+                    </button>
+                    <button class="tab-btn" data-tab="clock">
+                        <span class="icon">🕐</span>
+                        <span>Виджет</span>
                     </button>
                     <button class="tab-btn" data-tab="style">
                         <span class="icon">🎨</span>
-                        <span>Стиль</span>
+                        <span>Фон</span>
                     </button>
                     <button class="tab-btn" data-tab="sound">
                         <span class="icon">🔊</span>
@@ -1493,37 +1532,38 @@
                         <div class="toggle-row" id="overrunRow" style="display: none;">
                             <span class="toggle-label">Лимит перерасхода</span>
                             <input type="text" id="overrunLimit" placeholder="мм:сс" value="05:00" 
-                                   style="width: 70px; padding: 6px 8px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.1); color: white; font-size: 0.9em;">
+                                   style="width: 70px; padding: 6px 8px; text-align: center; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; background: rgba(30,30,50,0.8); color: white; font-size: 0.9em; font-family: 'Courier New', monospace;">
                         </div>
                     </div>
                 </div>
 
-                <!-- Таб: Окна -->
-                <div class="tab-content" id="tab-windows">
+                <!-- Таб: Полноэкранный режим -->
+                <div class="tab-content" id="tab-display">
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">📺</span>
-                            Полноэкранный режим
+                            <span class="icon">🖥️</span>
+                            Настройки
                         </div>
 
                         <div class="toggle-row">
-                            <span class="toggle-label">Монитор</span>
+                            <span class="toggle-label">Монитор вывода</span>
                             <select id="displaySelect" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em; max-width: 140px;">
                                 <option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>
                             </select>
                         </div>
 
                         <div class="toggle-row">
-                            <span class="toggle-label">Стиль таймера</span>
-                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em;">
-                                <option value="circle" style="background: #1a1a2e;">⭕ Круговой</option>
-                                <option value="digital" style="background: #1a1a2e;">🔢 Цифровой LED</option>
-                                <option value="flip" style="background: #1a1a2e;">🔄 Перекидные часы</option>
+                            <span class="toggle-label">Стиль</span>
+                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 6px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; font-size: 0.85em; min-width: 160px;">
+                                <option value="circle" style="background: #1a1a2e; color: white;">⭕ Круговой</option>
+                                <option value="digital" style="background: #1a1a2e; color: white;">🔢 Цифровой LED</option>
+                                <option value="flip" style="background: #1a1a2e; color: white;">🔄 Перекидные</option>
+                                <option value="analog" style="background: #1a1a2e; color: white;">🕐 Аналоговые</option>
                             </select>
                         </div>
 
                         <div class="toggle-row">
-                            <span class="toggle-label">Размер таймера</span>
+                            <span class="toggle-label">Размер</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <input type="range" id="timerScale" min="50" max="300" value="100" style="width: 80px;">
                                 <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em;">100%</span>
@@ -1533,12 +1573,95 @@
 
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🕐</span>
-                            Виджет часов
+                            <span class="icon">📋</span>
+                            Блоки времени
                         </div>
                         
                         <div class="toggle-row">
-                            <span class="toggle-label">Показывать дату</span>
+                            <span class="toggle-label">Показывать</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="showTimeBlocks">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="timeBlocksSettings" style="display: none;">
+                            <div class="toggle-row">
+                                <span class="toggle-label">Расположение</span>
+                                <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
+                                    <option value="frame">Рамка</option>
+                                    <option value="top-line">Сверху</option>
+                                    <option value="bottom-line">Снизу</option>
+                                    <option value="corners">По углам</option>
+                                </select>
+                            </div>
+                            
+                            <div class="toggle-row">
+                                <span class="toggle-label">Начало</span>
+                                <input type="time" id="eventTimeInput" value="10:00" 
+                                       style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
+                            </div>
+                            
+                            <div class="toggle-row">
+                                <span class="toggle-label">Конец</span>
+                                <input type="time" id="endTimeInput" value="12:00" 
+                                       style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
+                            </div>
+                            
+                            <div class="toggle-row">
+                                <span class="toggle-label">Размер</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
+                                    <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Таб: Виджет часов -->
+                <div class="tab-content" id="tab-clock">
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">🕐</span>
+                            Стиль часов
+                        </div>
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Как у таймера</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="syncClockStyle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="toggle-row" id="clockStyleRow" style="display: none;">
+                            <span class="toggle-label">Стиль</span>
+                            <select id="clockStyle" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em;">
+                                <option value="circle" style="background: #1a1a2e;">⭕ Круговой</option>
+                                <option value="digital" style="background: #1a1a2e;">🔢 Цифровой LED</option>
+                                <option value="flip" style="background: #1a1a2e;">🔄 Перекидные часы</option>
+                                <option value="analog" style="background: #1a1a2e;">🕐 Аналоговые</option>
+                            </select>
+                        </div>
+
+                        <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
+                            <span class="toggle-label">Цифры на циферблате</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockShowAnalogNumbers">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">⚙️</span>
+                            Отображение
+                        </div>
+                        
+                        <div class="toggle-row">
+                            <span class="toggle-label">Дата</span>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="clockShowDate">
                                 <span class="toggle-slider"></span>
@@ -1546,7 +1669,7 @@
                         </div>
                         
                         <div class="toggle-row">
-                            <span class="toggle-label">Показывать часовой пояс</span>
+                            <span class="toggle-label">Часовой пояс</span>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="clockShowTimezone">
                                 <span class="toggle-slider"></span>
@@ -1554,7 +1677,7 @@
                         </div>
                         
                         <div class="toggle-row">
-                            <span class="toggle-label">Показывать секунды</span>
+                            <span class="toggle-label">Секунды</span>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="clockShowSeconds" checked>
                                 <span class="toggle-slider"></span>
@@ -1569,61 +1692,14 @@
                             </label>
                         </div>
                     </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">📺</span>
-                            Информация о времени (Дисплей)
-                        </div>
-                        
-                        <div class="toggle-row">
-                            <span class="toggle-label">Показывать блоки времени</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="showTimeBlocks">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        
-                        <div id="timeBlocksSettings" style="display: none;">
-                            <div class="toggle-row">
-                                <span class="toggle-label">Расположение</span>
-                                <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
-                                    <option value="frame">Рамка (Текущее ↑, Начало/Конец ↓)</option>
-                                    <option value="top-line">Линия сверху (все в ряд)</option>
-                                    <option value="bottom-line">Линия снизу (все в ряд)</option>
-                                    <option value="corners">По углам</option>
-                                </select>
-                            </div>
-                            
-                            <div class="toggle-row">
-                                <span class="toggle-label">Время начала</span>
-                                <input type="time" id="eventTimeInput" value="10:00" 
-                                       style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
-                            </div>
-                            
-                            <div class="toggle-row">
-                                <span class="toggle-label">Время окончания</span>
-                                <input type="time" id="endTimeInput" value="12:00" 
-                                       style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
-                            </div>
-                            
-                            <div class="toggle-row">
-                                <span class="toggle-label">Размер блоков</span>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
-                                    <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- Таб: Стиль -->
+                <!-- Таб: Фон -->
                 <div class="tab-content" id="tab-style">
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">✨</span>
-                            Темы
+                            Цветовые темы
                         </div>
                         <div class="themes-grid" id="themesGrid"></div>
                     </div>
@@ -1631,7 +1707,7 @@
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🖼️</span>
-                            Фон дисплея
+                            Фоновое изображение
                         </div>
                         <div class="bg-mode-tabs">
                             <button class="bg-mode-btn active" data-mode="solid">Цвет</button>
@@ -2090,10 +2166,18 @@
                 this.timerScaleValueEl = document.getElementById('timerScaleValue');
                 
                 // Настройки виджета часов
+                this.syncClockStyleEl = document.getElementById('syncClockStyle');
+                this.clockStyleEl = document.getElementById('clockStyle');
+                this.clockStyleRowEl = document.getElementById('clockStyleRow');
+                this.clockAnalogNumbersRowEl = document.getElementById('clockAnalogNumbersRow');
+                this.clockShowAnalogNumbersEl = document.getElementById('clockShowAnalogNumbers');
                 this.clockShowDateEl = document.getElementById('clockShowDate');
                 this.clockShowTimezoneEl = document.getElementById('clockShowTimezone');
                 this.clockShowSecondsEl = document.getElementById('clockShowSeconds');
                 this.clockFormat24hEl = document.getElementById('clockFormat24h');
+                
+                // Синхронизация стилей (по умолчанию включена)
+                this.syncClockStyle = true;
                 
                 // Пресет расположения по умолчанию - "Рамка"
                 this.timeLayoutPreset = 'frame';
@@ -2274,12 +2358,45 @@
                 
                 this.timerStyleEl.addEventListener('change', () => {
                     this.pushDisplaySettings();
-                    // Синхронизируем стиль с виджетом часов
-                    ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
+                    // Синхронизируем стиль с виджетом часов если включена синхронизация
+                    if (this.syncClockStyle) {
+                        this.clockStyleEl.value = this.timerStyleEl.value;
+                        this.updateClockAnalogNumbersVisibility();
+                        ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
+                    }
                 });
+                
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
                     this.pushDisplaySettings();
+                });
+
+                // Синхронизация стиля часов
+                this.syncClockStyleEl.addEventListener('change', () => {
+                    this.syncClockStyle = this.syncClockStyleEl.checked;
+                    this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
+                    
+                    if (this.syncClockStyle) {
+                        // При включении синхронизации - применяем стиль таймера к часам
+                        this.clockStyleEl.value = this.timerStyleEl.value;
+                        ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
+                    }
+                    this.updateClockAnalogNumbersVisibility();
+                    this.saveExtSettings();
+                });
+
+                // Отдельный стиль часов
+                this.clockStyleEl.addEventListener('change', () => {
+                    if (!this.syncClockStyle) {
+                        ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
+                    }
+                    this.updateClockAnalogNumbersVisibility();
+                    this.saveExtSettings();
+                });
+
+                // Цифры на циферблате для часов
+                this.clockShowAnalogNumbersEl.addEventListener('change', () => {
+                    this.pushClockSettings();
                 });
 
                 // Настройки виджета часов
@@ -2570,6 +2687,21 @@
                 this.timerStyleEl.value = ext.timerStyle || 'circle';
                 this.timerScaleEl.value = ext.timerScale || 100;
                 this.timerScaleValueEl.textContent = (ext.timerScale || 100) + '%';
+                
+                // Синхронизация стиля часов
+                this.syncClockStyle = ext.syncClockStyle !== false; // по умолчанию true
+                this.syncClockStyleEl.checked = this.syncClockStyle;
+                this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
+                this.clockStyleEl.value = ext.clockStyle || ext.timerStyle || 'circle';
+                
+                // Обновляем видимость опции цифр для часов
+                this.updateClockAnalogNumbersVisibility();
+                
+                // Отправляем стиль часам при загрузке
+                const clockStyleToSend = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
+                setTimeout(() => {
+                    ipcRenderer.send('clock-widget-set-style', clockStyleToSend);
+                }, 500);
             }
 
             saveColors() {
@@ -2604,7 +2736,10 @@
                     endTime: this.endTimeInputEl.value,
                     timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
                     timerStyle: this.timerStyleEl.value,
-                    timerScale: parseInt(this.timerScaleEl.value)
+                    timerScale: parseInt(this.timerScaleEl.value),
+                    // Настройки стиля часов
+                    syncClockStyle: this.syncClockStyle,
+                    clockStyle: this.clockStyleEl.value
                 };
 
                 const prev = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
@@ -2641,12 +2776,22 @@
                 ipcRenderer.send('display-settings-update', settings);
             }
 
+            updateClockAnalogNumbersVisibility() {
+                // Определяем текущий стиль часов
+                const clockStyle = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
+                // Показываем опцию цифр только для аналогового стиля
+                if (this.clockAnalogNumbersRowEl) {
+                    this.clockAnalogNumbersRowEl.style.display = clockStyle === 'analog' ? 'flex' : 'none';
+                }
+            }
+
             pushClockSettings() {
                 const settings = {
                     showDate: this.clockShowDateEl.checked,
                     showTimezone: this.clockShowTimezoneEl.checked,
                     showSeconds: this.clockShowSecondsEl.checked,
-                    format24h: this.clockFormat24hEl.checked
+                    format24h: this.clockFormat24hEl.checked,
+                    showNumbers: this.clockShowAnalogNumbersEl.checked
                 };
                 
                 // Сохраняем в localStorage
@@ -2663,6 +2808,10 @@
                 this.clockShowTimezoneEl.checked = !!settings.showTimezone;
                 this.clockShowSecondsEl.checked = settings.showSeconds !== false;
                 this.clockFormat24hEl.checked = settings.format24h !== false;
+                this.clockShowAnalogNumbersEl.checked = !!settings.showNumbers;
+                
+                // Обновляем видимость опции цифр
+                this.updateClockAnalogNumbersVisibility();
             }
 
             setupIPC() {
