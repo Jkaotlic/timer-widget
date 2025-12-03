@@ -442,6 +442,33 @@
             box-shadow: 0 2px 10px rgba(56, 239, 125, 0.4);
         }
 
+        .style-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .style-btn {
+            padding: 10px 6px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .style-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+
+        .style-btn.active {
+            background: linear-gradient(135deg, #38ef7d, #11998e);
+            box-shadow: 0 2px 10px rgba(56, 239, 125, 0.4);
+        }
+
         .setting-row {
             margin-bottom: 12px;
         }
@@ -754,7 +781,8 @@
         /* Скрытие неактивных стилей - все скрыты по умолчанию */
         .circular-widget,
         .widget-digital,
-        .widget-flip {
+        .widget-flip,
+        .widget-analog {
             display: none !important;
         }
         
@@ -762,6 +790,224 @@
         .circular-widget.active { display: flex !important; }
         .widget-digital.active { display: flex !important; }
         .widget-flip.active { display: flex !important; }
+        .widget-analog.active { display: flex !important; }
+
+        /* ============================================
+           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog) - для виджета часов
+           ============================================ */
+        .widget-analog {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            padding: 5%;
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        .widget-analog-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center;
+            transform: scale(var(--analog-scale, 1));
+        }
+
+        .widget-analog-clock {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
+            box-shadow: 
+                0 0 0 4px rgba(56, 239, 125, 0.3),
+                0 0 0 8px rgba(56, 239, 125, 0.1),
+                inset 0 0 30px rgba(0, 0, 0, 0.5),
+                0 10px 30px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .widget-analog-clock::before {
+            content: '';
+            position: absolute;
+            inset: 5%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.03), transparent 60%);
+            pointer-events: none;
+        }
+
+        /* Деления на циферблате */
+        .widget-analog-tick {
+            position: absolute;
+            width: 2px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.25);
+            left: 50%;
+            top: 12px;
+            transform-origin: 50% 88px;
+            border-radius: 1px;
+            margin-left: -1px;
+        }
+
+        .widget-analog-tick.major {
+            width: 3px;
+            height: 14px;
+            background: rgba(255, 255, 255, 0.5);
+            top: 10px;
+            margin-left: -1.5px;
+        }
+
+        .widget-analog-tick.quarter {
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #38ef7d 0%, #11998e 100%);
+            top: 6px;
+            box-shadow: 0 0 8px rgba(56, 239, 125, 0.4);
+            margin-left: -2px;
+        }
+
+        /* Цифры на циферблате */
+        .widget-analog-numbers {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+        .widget-analog-numbers.visible {
+            display: block;
+        }
+
+        .widget-analog-number {
+            position: absolute;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.75);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            transform: translate(-50%, -50%);
+        }
+
+        .widget-analog-number.n12 { top: 12%; left: 50%; }
+        .widget-analog-number.n1 { top: 17%; left: 73%; }
+        .widget-analog-number.n2 { top: 30%; left: 86%; }
+        .widget-analog-number.n3 { top: 50%; left: 90%; }
+        .widget-analog-number.n4 { top: 70%; left: 86%; }
+        .widget-analog-number.n5 { top: 83%; left: 73%; }
+        .widget-analog-number.n6 { top: 88%; left: 50%; }
+        .widget-analog-number.n7 { top: 83%; left: 27%; }
+        .widget-analog-number.n8 { top: 70%; left: 14%; }
+        .widget-analog-number.n9 { top: 50%; left: 10%; }
+        .widget-analog-number.n10 { top: 30%; left: 14%; }
+        .widget-analog-number.n11 { top: 17%; left: 27%; }
+
+        /* Стрелки */
+        .widget-analog-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            border-radius: 3px;
+        }
+
+        /* Часовая стрелка */
+        .widget-analog-hour {
+            width: 5px;
+            height: 44px;
+            background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+            margin-left: -2.5px;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+            z-index: 2;
+        }
+
+        /* Минутная стрелка */
+        .widget-analog-minute {
+            width: 3px;
+            height: 64px;
+            background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+            margin-left: -1.5px;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+            z-index: 3;
+        }
+
+        /* Секундная стрелка */
+        .widget-analog-second {
+            width: 2px;
+            height: 76px;
+            background: linear-gradient(180deg, #38ef7d 0%, #11998e 100%);
+            margin-left: -1px;
+            box-shadow: 0 0 12px rgba(56, 239, 125, 0.5);
+            z-index: 4;
+            transition: transform 0.1s cubic-bezier(0.4, 2.3, 0.3, 1);
+        }
+
+        .widget-analog-second::after {
+            content: '';
+            position: absolute;
+            bottom: -15%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 12px;
+            background: linear-gradient(180deg, #11998e, #38ef7d);
+            border-radius: 1px;
+        }
+
+        /* Центральная точка */
+        .widget-analog-center {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: linear-gradient(145deg, #38ef7d, #11998e);
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 12px rgba(56, 239, 125, 0.6);
+        }
+
+        .widget-analog-center::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 20%;
+            width: 30%;
+            height: 30%;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+        }
+
+        /* Дата и зона под циферблатом */
+        .widget-analog-info {
+            margin-top: 10px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .widget-analog-info .date-badge {
+            display: none;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: rgba(56, 239, 125, 0.1);
+            border: 1px solid rgba(56, 239, 125, 0.3);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .widget-analog-info .timezone-badge {
+            display: none;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            background: rgba(56, 239, 125, 0.08);
+            border: 1px solid rgba(56, 239, 125, 0.2);
+            color: rgba(255, 255, 255, 0.6);
+        }
     </style>
 </head>
 <body>
@@ -783,6 +1029,14 @@
 
         <!-- Панель настроек -->
         <div class="settings-panel" id="settingsPanel">
+            <div class="settings-title">Стиль</div>
+            <div class="style-grid">
+                <button class="style-btn active" data-style="circle" title="Круговой">⭕</button>
+                <button class="style-btn" data-style="digital" title="Цифровой">🔢</button>
+                <button class="style-btn" data-style="flip" title="Перекидные">🔄</button>
+                <button class="style-btn" data-style="analog" title="Аналоговые">🕐</button>
+            </div>
+
             <div class="settings-title">Размер</div>
             <div class="size-grid">
                 <button class="size-btn" data-size="tiny">XS</button>
@@ -813,6 +1067,22 @@
                 <span class="toggle-label">Показать дату</span>
                 <label class="toggle-switch">
                     <input type="checkbox" id="showDate">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row">
+                <span class="toggle-label">Часовой пояс</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showTimezone">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-row" id="showNumbersRow" style="display: none;">
+                <span class="toggle-label">Цифры на циферблате</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showNumbers">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
@@ -949,6 +1219,57 @@
                 </div>
             </div>
         </div>
+
+        <!-- Стиль: Аналоговые часы -->
+        <div class="widget-analog" id="widgetAnalog">
+            <div class="widget-analog-content">
+                <div class="widget-analog-clock">
+                    <!-- Деления -->
+                    <div class="widget-analog-tick quarter" style="transform: rotate(0deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(30deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(60deg);"></div>
+                <div class="widget-analog-tick quarter" style="transform: rotate(90deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(120deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(150deg);"></div>
+                <div class="widget-analog-tick quarter" style="transform: rotate(180deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(210deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(240deg);"></div>
+                <div class="widget-analog-tick quarter" style="transform: rotate(270deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(300deg);"></div>
+                <div class="widget-analog-tick" style="transform: rotate(330deg);"></div>
+                
+                <!-- Цифры (скрыты по умолчанию) -->
+                <div class="widget-analog-numbers" id="clockAnalogNumbers">
+                    <span class="widget-analog-number n12">12</span>
+                    <span class="widget-analog-number n1">1</span>
+                    <span class="widget-analog-number n2">2</span>
+                    <span class="widget-analog-number n3">3</span>
+                    <span class="widget-analog-number n4">4</span>
+                    <span class="widget-analog-number n5">5</span>
+                    <span class="widget-analog-number n6">6</span>
+                    <span class="widget-analog-number n7">7</span>
+                    <span class="widget-analog-number n8">8</span>
+                    <span class="widget-analog-number n9">9</span>
+                    <span class="widget-analog-number n10">10</span>
+                    <span class="widget-analog-number n11">11</span>
+                </div>
+                
+                <!-- Стрелки -->
+                <div class="widget-analog-hand widget-analog-hour" id="clockAnalogHour"></div>
+                <div class="widget-analog-hand widget-analog-minute" id="clockAnalogMinute"></div>
+                <div class="widget-analog-hand widget-analog-second" id="clockAnalogSecond"></div>
+                
+                <!-- Центр -->
+                <div class="widget-analog-center"></div>
+            </div>
+            
+            <!-- Дата и часовой пояс -->
+            <div class="widget-analog-info" id="widgetAnalogInfo">
+                <div class="date-badge" id="analogDateBadge"></div>
+                <div class="timezone-badge" id="analogTimezoneBadge"></div>
+            </div>
+            </div><!-- закрытие widget-analog-content -->
+        </div>
     </div>
 
     <script>
@@ -964,6 +1285,7 @@
                 this.format24h = true;
                 this.showDate = false;
                 this.showTimezone = false;
+                this.showNumbers = false;
                 this.clockStyle = 'circle';
 
                 this.initElements();
@@ -989,6 +1311,9 @@
                 this.showSecondsEl = document.getElementById('showSeconds');
                 this.format24hEl = document.getElementById('format24h');
                 this.showDateEl = document.getElementById('showDate');
+                this.showTimezoneEl = document.getElementById('showTimezone');
+                this.showNumbersEl = document.getElementById('showNumbers');
+                this.showNumbersRow = document.getElementById('showNumbersRow');
                 
                 // Дополнительные элементы для стилей
                 this.digitalDateBadge = document.getElementById('digitalDateBadge');
@@ -1012,6 +1337,15 @@
                 this.wFlipSec2 = document.getElementById('wFlipSec2');
                 this.wFlipSecGroup = document.getElementById('wFlipSecGroup');
                 this.wFlipSecSep = document.getElementById('wFlipSecSep');
+                
+                // Аналоговые часы
+                this.widgetAnalog = document.getElementById('widgetAnalog');
+                this.clockAnalogHour = document.getElementById('clockAnalogHour');
+                this.clockAnalogMinute = document.getElementById('clockAnalogMinute');
+                this.clockAnalogSecond = document.getElementById('clockAnalogSecond');
+                this.clockAnalogNumbers = document.getElementById('clockAnalogNumbers');
+                this.analogDateBadge = document.getElementById('analogDateBadge');
+                this.analogTimezoneBadge = document.getElementById('analogTimezoneBadge');
                 
                 // Устанавливаем стиль по умолчанию
                 if (this.circularWidget) this.circularWidget.classList.add('active');
@@ -1052,6 +1386,17 @@
                 const flipScale = Math.min(scaleX, scaleY);
                 
                 this.container.style.setProperty('--flip-scale', flipScale);
+                
+                // Масштаб для аналоговых часов (базовый размер 200px + ~50px для info)
+                const hasAnalogInfo = this.showDate || this.showTimezone;
+                const baseAnalogWidth = 200;
+                const baseAnalogHeight = hasAnalogInfo ? 250 : 200;
+                
+                const analogScaleX = (containerWidth * 0.8) / baseAnalogWidth;
+                const analogScaleY = (containerHeight * 0.8) / baseAnalogHeight;
+                const analogScale = Math.min(analogScaleX, analogScaleY);
+                
+                this.container.style.setProperty('--analog-scale', analogScale);
             }
 
             initProgress() {
@@ -1110,6 +1455,16 @@
             }
 
             setupSettings() {
+                // Стили
+                document.querySelectorAll('.style-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.setClockStyle(btn.dataset.style);
+                    });
+                });
+
                 // Размеры
                 document.querySelectorAll('.size-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
@@ -1145,9 +1500,26 @@
                 // Показать дату
                 this.showDateEl.addEventListener('change', () => {
                     this.showDate = this.showDateEl.checked;
-                    this.dateBadge.style.display = this.showDate ? 'block' : 'none';
+                    this.updateDateTimezoneVisibility();
                     this.saveSettings();
                     this.updateDisplay();
+                });
+
+                // Показать часовой пояс
+                this.showTimezoneEl.addEventListener('change', () => {
+                    this.showTimezone = this.showTimezoneEl.checked;
+                    this.updateDateTimezoneVisibility();
+                    this.saveSettings();
+                    this.updateDisplay();
+                });
+
+                // Показать цифры на циферблате (для аналогового стиля)
+                this.showNumbersEl.addEventListener('change', () => {
+                    this.showNumbers = this.showNumbersEl.checked;
+                    if (this.clockAnalogNumbers) {
+                        this.clockAnalogNumbers.classList.toggle('visible', this.showNumbers);
+                    }
+                    this.saveSettings();
                 });
             }
 
@@ -1172,13 +1544,14 @@
                 this.clockStyle = style;
                 
                 // Применяем класс стиля к body
-                document.body.classList.remove('style-circle', 'style-digital', 'style-flip');
+                document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
                 document.body.classList.add('style-' + style);
                 
                 // Скрываем все стили
                 if (this.circularWidget) this.circularWidget.classList.remove('active');
                 if (this.widgetDigital) this.widgetDigital.classList.remove('active');
                 if (this.widgetFlip) this.widgetFlip.classList.remove('active');
+                if (this.widgetAnalog) this.widgetAnalog.classList.remove('active');
                 
                 // Показываем выбранный
                 switch (style) {
@@ -1191,6 +1564,14 @@
                     case 'flip':
                         if (this.widgetFlip) this.widgetFlip.classList.add('active');
                         break;
+                    case 'analog':
+                        if (this.widgetAnalog) this.widgetAnalog.classList.add('active');
+                        break;
+                }
+                
+                // Показываем/скрываем опцию "Цифры на циферблате" только для analog
+                if (this.showNumbersRow) {
+                    this.showNumbersRow.style.display = (style === 'analog') ? 'flex' : 'none';
                 }
                 
                 // Обновляем масштабирование после смены стиля
@@ -1198,6 +1579,34 @@
                 
                 this.saveSettings();
                 this.updateDisplay();
+            }
+
+            updateDateTimezoneVisibility() {
+                // Обновляем видимость даты во всех стилях
+                [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
+                    if (el) {
+                        el.style.display = this.showDate ? 'block' : 'none';
+                    }
+                });
+                
+                // Обновляем видимость часового пояса во всех стилях
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const offset = new Date().getTimezoneOffset();
+                const sign = offset <= 0 ? '+' : '-';
+                const absOffset = Math.abs(offset);
+                const hours = Math.floor(absOffset / 60);
+                const mins = absOffset % 60;
+                const tzString = `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace('_', ' ')}`;
+                
+                [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
+                    if (el) {
+                        el.textContent = tzString;
+                        el.style.display = this.showTimezone ? 'block' : 'none';
+                    }
+                });
+                
+                // Пересчитываем масштаб
+                this.updateScaling();
             }
 
             updateSecondsVisibility() {
@@ -1243,6 +1652,14 @@
                     }
                     if (s.showTimezone !== undefined) {
                         this.showTimezone = s.showTimezone;
+                        this.showTimezoneEl.checked = s.showTimezone;
+                    }
+                    if (s.showNumbers !== undefined) {
+                        this.showNumbers = s.showNumbers;
+                        this.showNumbersEl.checked = s.showNumbers;
+                        if (this.clockAnalogNumbers) {
+                            this.clockAnalogNumbers.classList.toggle('visible', s.showNumbers);
+                        }
                     }
                     if (s.clockStyle) {
                         this.clockStyle = s.clockStyle;
@@ -1262,8 +1679,8 @@
                 
                 // Обновляем видимость элементов
                 this.updateSecondsVisibility();
-                this.updateDateVisibility();
-                this.updateTimezoneVisibility();
+                this.updateDateTimezoneVisibility();
+                this.updateScaling();
             }
 
             saveSettings() {
@@ -1273,6 +1690,7 @@
                     format24h: this.format24h,
                     showDate: this.showDate,
                     showTimezone: this.showTimezone,
+                    showNumbers: this.showNumbers,
                     clockStyle: this.clockStyle
                 };
                 localStorage.setItem('clockWidgetSettings', JSON.stringify(settings));
@@ -1288,6 +1706,16 @@
                     });
                 });
                 
+                // Получаем настройки дисплея (showAnalogNumbers)
+                ipcRenderer.on('display-settings-update', (event, settings) => {
+                    if (settings.showAnalogNumbers !== undefined && this.clockAnalogNumbers) {
+                        this.clockAnalogNumbers.classList.toggle('visible', settings.showAnalogNumbers);
+                    }
+                    if (settings.timerStyle) {
+                        this.setClockStyle(settings.timerStyle);
+                    }
+                });
+                
                 // Получаем настройки часов от панели управления
                 ipcRenderer.on('clock-settings', (event, settings) => {
                     if (settings.showDate !== undefined) {
@@ -1296,6 +1724,7 @@
                     }
                     if (settings.showTimezone !== undefined) {
                         this.showTimezone = settings.showTimezone;
+                        this.showTimezoneEl.checked = settings.showTimezone;
                     }
                     if (settings.showSeconds !== undefined) {
                         this.showSeconds = settings.showSeconds;
@@ -1306,8 +1735,14 @@
                         this.format24h = settings.format24h;
                         this.format24hEl.checked = settings.format24h;
                     }
-                    this.updateTimezoneVisibility();
-                    this.updateDateVisibility();
+                    if (settings.showNumbers !== undefined) {
+                        this.showNumbers = settings.showNumbers;
+                        this.showNumbersEl.checked = settings.showNumbers;
+                        if (this.clockAnalogNumbers) {
+                            this.clockAnalogNumbers.classList.toggle('visible', settings.showNumbers);
+                        }
+                    }
+                    this.updateDateTimezoneVisibility();
                     this.saveSettings();
                     this.updateDisplay();
                 });
@@ -1340,9 +1775,10 @@
             updateDateVisibility() {
                 const visible = this.showDate;
                 
-                [this.dateBadge, this.digitalDateBadge, this.flipDateBadge].forEach(el => {
+                [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
                     if (el) {
                         el.style.display = visible ? 'block' : 'none';
+                        el.classList.toggle('visible', visible);
                     }
                 });
                 
@@ -1391,13 +1827,47 @@
                 // Обновляем перекидные часы
                 this.updateFlipDisplay(displayHours, minutes, seconds);
 
+                // Обновляем аналоговые часы
+                this.updateAnalogClock(hours, minutes, seconds);
+
                 // Обновляем дату во всех стилях
                 if (this.showDate) {
                     const options = { weekday: 'short', day: 'numeric', month: 'short' };
                     const dateStr = now.toLocaleDateString('ru-RU', options);
-                    [this.dateBadge, this.digitalDateBadge, this.flipDateBadge].forEach(el => {
+                    [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
                         if (el) el.textContent = dateStr;
                     });
+                }
+                
+                // Обновляем часовой пояс во всех стилях
+                if (this.showTimezone) {
+                    const tzStr = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
+                        if (el) el.textContent = tzStr;
+                    });
+                }
+            }
+
+            updateAnalogClock(hours, minutes, seconds) {
+                if (!this.clockAnalogHour || !this.clockAnalogMinute || !this.clockAnalogSecond) return;
+
+                // Часовая стрелка - полный оборот за 12 часов
+                // Плавное движение с учетом минут
+                const hourDeg = ((hours % 12) / 12) * 360 + (minutes / 60) * 30;
+                this.clockAnalogHour.style.transform = `rotate(${hourDeg}deg)`;
+
+                // Минутная стрелка - полный оборот за 60 минут
+                // Плавное движение с учетом секунд
+                const minuteDeg = (minutes / 60) * 360 + (seconds / 60) * 6;
+                this.clockAnalogMinute.style.transform = `rotate(${minuteDeg}deg)`;
+
+                // Секундная стрелка - полный оборот за 60 секунд
+                const secondDeg = (seconds / 60) * 360;
+                this.clockAnalogSecond.style.transform = `rotate(${secondDeg}deg)`;
+                
+                // Скрываем/показываем секундную стрелку
+                if (this.clockAnalogSecond) {
+                    this.clockAnalogSecond.style.display = this.showSeconds ? 'block' : 'none';
                 }
             }
 

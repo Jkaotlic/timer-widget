@@ -342,6 +342,9 @@ ipcMain.on('display-settings-update', (event, settings) => {
     if (widgetWindow) {
         widgetWindow.webContents.send('display-settings-update', settings);
     }
+    if (clockWidgetWindow) {
+        clockWidgetWindow.webContents.send('display-settings-update', settings);
+    }
 });
 
 ipcMain.on('open-widget', () => {
