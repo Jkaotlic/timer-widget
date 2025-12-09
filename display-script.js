@@ -9,9 +9,27 @@ class DisplayTimer {
         this.isPaused = false;
         this.finished = false;
         this.lastTimestamp = 0;
+        this.lastUpdateCounter = -1;  // FIX BUG-012: Монотонный счетчик вместо timestamp
         this.flashCount = 0;
         this.flashInterval = null;
-        
+
+        // Массив для хранения ID всех интервалов
+        this.intervals = [];
+
+        // Обработчики IPC для cleanup
+        this.ipcHandlers = {};
+
+        // Кэш для оптимизации re-renders (FIX BUG-007)
+        this.cache = {
+            lastSeconds: null,
+            lastFormatted: null,
+            lastStatus: null,
+            lastProgress: null,
+            lastDigitalUpdate: null,
+            lastFlipUpdate: null,
+            lastAnalogUpdate: null
+        };
+
         // Настройки отображения
         this.showCurrentTime = false;
         this.showEventTime = false;
@@ -33,10 +51,14 @@ class DisplayTimer {
     }
     
     setupResizeHandler() {
-        // Пересчитываем размеры при изменении окна
-        window.addEventListener('resize', () => {
-            this.updateRingSize();
-        });
+        // Пересчитываем размеры при изменении окна с debounce
+        const debouncedResize = window.UtilityFunctions
+            ? window.UtilityFunctions.debounce(() => {
+                this.updateRingSize();
+            }, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
+            : () => this.updateRingSize();
+
+        window.addEventListener('resize', debouncedResize);
         // Начальный расчёт
         this.updateRingSize();
     }
@@ -110,7 +132,8 @@ class DisplayTimer {
             this.updateMiniClockHands(this.currentTimeBlock, now.getHours(), now.getMinutes(), now.getSeconds());
         };
         updateClock();
-        setInterval(updateClock, 1000);
+        const intervalId = setInterval(updateClock, 1000);
+        this.intervals.push(intervalId);
     }
     
     updateMiniClockHands(block, hours, minutes, seconds = 0) {
@@ -166,15 +189,20 @@ class DisplayTimer {
                 this.ipcRenderer.send('close-display');
             });
         }
-        
+
         // Запрашиваем текущее состояние
         this.ipcRenderer.send('get-timer-state');
 
-        this.ipcRenderer.on('timer-state', (event, state) => {
-            // Фильтруем устаревшие пакеты
-            const ts = state.timestamp || Date.now();
-            if (ts <= this.lastTimestamp) return;
-            this.lastTimestamp = ts;
+        // Сохраняем ссылки на обработчики для cleanup
+        this.ipcHandlers.timerState = (event, state) => {
+            // FIX BUG-012: Используем монотонный счетчик вместо timestamp
+            // Это предотвращает проблемы при изменении системного времени
+            const updateCounter = state.updateCounter || 0;
+            if (updateCounter <= this.lastUpdateCounter) return;
+            this.lastUpdateCounter = updateCounter;
+
+            // Сохраняем timestamp для совместимости
+            this.lastTimestamp = state.timestamp || Date.now();
 
             this.totalSeconds = Number(state.totalSeconds) || 0;
             this.remainingSeconds = Number(state.remainingSeconds) || 0;
@@ -183,19 +211,24 @@ class DisplayTimer {
             this.finished = !!state.finished;
 
             this.updateDisplay();
-        });
+        };
 
-        this.ipcRenderer.on('colors-update', (event, colors) => {
+        this.ipcHandlers.colorsUpdate = (event, colors) => {
             this.applyColors(colors);
-        });
+        };
 
-        this.ipcRenderer.on('display-settings-update', (event, settings) => {
+        this.ipcHandlers.displaySettingsUpdate = (event, settings) => {
             console.log('Display received settings:', settings);
             if (settings.bgMode || settings.bgSolid || settings.bgGrad1) {
                 this.applyBackground(settings);
             }
             this.applyDisplaySettings(settings);
-        });
+        };
+
+        // Регистрируем обработчики
+        this.ipcRenderer.on('timer-state', this.ipcHandlers.timerState);
+        this.ipcRenderer.on('colors-update', this.ipcHandlers.colorsUpdate);
+        this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
     }
     
     applyDisplaySettings(settings) {
@@ -342,36 +375,50 @@ class DisplayTimer {
 
     startLocalStorageSync() {
         // Синхронизация каждые 100мс через localStorage
-        setInterval(() => {
+        const syncIntervalId = setInterval(() => {
             const stateStr = localStorage.getItem('timerState');
             if (!stateStr) return;
 
-            try {
-                const state = JSON.parse(stateStr);
-                this.totalSeconds = Number(state.totalSeconds) || 0;
-                this.remainingSeconds = Number(state.remainingSeconds) || 0;
-                this.isRunning = !!state.isRunning;
-                this.isPaused = !!state.isPaused;
-                this.finished = !!state.finished;
-                this.updateDisplay();
-            } catch (_) {}
+            // Безопасный парсинг с fallback (FIX BUG-014: JSON parse error handling)
+            const defaultState = {
+                totalSeconds: 0,
+                remainingSeconds: 0,
+                isRunning: false,
+                isPaused: false,
+                finished: false
+            };
+            const state = window.SecurityUtils
+                ? window.SecurityUtils.safeJSONParse(stateStr, defaultState)
+                : JSON.parse(stateStr);
+
+            this.totalSeconds = Number(state.totalSeconds) || 0;
+            this.remainingSeconds = Number(state.remainingSeconds) || 0;
+            this.isRunning = !!state.isRunning;
+            this.isPaused = !!state.isPaused;
+            this.finished = !!state.finished;
+            this.updateDisplay();
         }, 100);
+        this.intervals.push(syncIntervalId);
 
         // Слушаем изменения цветов
         window.addEventListener('storage', (e) => {
             if (e.key === 'timerColors' && e.newValue) {
-                try {
-                    this.applyColors(JSON.parse(e.newValue));
-                } catch (_) {}
+                const colors = window.SecurityUtils
+                    ? window.SecurityUtils.safeJSONParse(e.newValue, {})
+                    : JSON.parse(e.newValue);
+                if (colors) {
+                    this.applyColors(colors);
+                }
             }
         });
     }
 
     startColorSync() {
         // Периодическая проверка цветов (только цвета, не фон - фон управляется через IPC)
-        setInterval(() => {
+        const colorSyncIntervalId = setInterval(() => {
             this.syncColors();
         }, 2000);
+        this.intervals.push(colorSyncIntervalId);
     }
 
     syncColors() {
@@ -488,8 +535,19 @@ class DisplayTimer {
             bgPosition = 'top left';
         }
 
-        // Применяем фон
-        document.body.style.backgroundImage = `url('${imageData}')`;
+        // Безопасная установка фона с валидацией (FIX BUG-004: XSS prevention)
+        if (window.SecurityUtils) {
+            const success = window.SecurityUtils.safeSetBackgroundImage(document.body, imageData);
+            if (!success) {
+                console.error('Failed to set background image: invalid or unsafe URL');
+                return;
+            }
+        } else {
+            // Fallback если security.js не загружен (не должно случиться)
+            console.warn('SecurityUtils not loaded, using unsafe method');
+            document.body.style.backgroundImage = `url('${imageData}')`;
+        }
+
         document.body.style.backgroundSize = bgSize;
         document.body.style.backgroundRepeat = bgRepeat;
         document.body.style.backgroundPosition = bgPosition;
@@ -509,7 +567,10 @@ class DisplayTimer {
             `;
             document.body.insertBefore(overlayEl, document.body.firstChild);
         }
-        overlayEl.style.background = `rgba(0, 0, 0, ${overlay / 100})`;
+
+        // Валидация overlay значения
+        const safeOverlay = Math.max(0, Math.min(100, parseFloat(overlay) || 0));
+        overlayEl.style.background = `rgba(0, 0, 0, ${safeOverlay / 100})`;
     }
 
     removeLocalBackgroundOverlay() {
@@ -527,34 +588,81 @@ class DisplayTimer {
 
     updateDisplay() {
         const secs = Math.floor(this.remainingSeconds);
+
+        // ОПТИМИЗАЦИЯ (FIX BUG-007): Проверка изменений перед обновлением
+        // Если секунды не изменились, нечего обновлять
+        if (this.cache.lastSeconds === secs && !this.finished) {
+            return;
+        }
+
         const formatted = this.formatTime(secs);
-        
-        // Обновляем время для кругового стиля
-        this.timeDisplay.textContent = formatted;
-        
-        // Добавляем класс compact для длинного времени (минус или часы)
-        const isCompact = secs < 0 || Math.abs(secs) >= 3600 || formatted.length > 5;
-        this.timeDisplay.classList.toggle('compact', isCompact);
+        const hasFormattedChanged = this.cache.lastFormatted !== formatted;
 
-        // Обновляем цифровой стиль
-        this.updateDigitalDisplay(secs, formatted);
-        
-        // Обновляем перекидные часы
-        this.updateFlipDisplay(secs);
+        // Обновляем время для кругового стиля (только если изменилось)
+        if (hasFormattedChanged) {
+            this.timeDisplay.textContent = formatted;
 
-        // Обновляем аналоговые часы
-        this.updateAnalogDisplay(secs);
+            // Добавляем класс compact для длинного времени (минус или часы)
+            const isCompact = secs < 0 || Math.abs(secs) >= 3600 || formatted.length > 5;
+            this.timeDisplay.classList.toggle('compact', isCompact);
 
-        // Обновляем прогресс
-        this.updateProgress();
+            this.cache.lastFormatted = formatted;
+        }
 
-        // Обновляем статус
-        this.updateStatus(secs);
+        // Обновляем цифровой стиль (только если изменилось)
+        if (hasFormattedChanged || this.cache.lastDigitalUpdate !== secs) {
+            this.updateDigitalDisplay(secs, formatted);
+            this.cache.lastDigitalUpdate = secs;
+        }
+
+        // Обновляем перекидные часы (только если изменилось)
+        if (hasFormattedChanged || this.cache.lastFlipUpdate !== secs) {
+            this.updateFlipDisplay(secs);
+            this.cache.lastFlipUpdate = secs;
+        }
+
+        // Обновляем аналоговые часы (только если изменилось)
+        if (hasFormattedChanged || this.cache.lastAnalogUpdate !== secs) {
+            this.updateAnalogDisplay(secs);
+            this.cache.lastAnalogUpdate = secs;
+        }
+
+        // Прогресс обновляется только если процент изменился
+        const progress = this.calculateProgressValue();
+        if (this.cache.lastProgress !== progress) {
+            this.updateProgress();
+            this.cache.lastProgress = progress;
+        }
+
+        // Статус меняется редко (normal → warning → danger → overtime)
+        const status = this.getTimerStatusValue(secs);
+        if (this.cache.lastStatus !== status) {
+            this.updateStatus(secs);
+            this.cache.lastStatus = status;
+        }
+
+        // Сохраняем последнее значение секунд
+        this.cache.lastSeconds = secs;
 
         // Эффект завершения
         if (this.finished && !this.flashInterval) {
             this.triggerFinishEffect();
         }
+    }
+
+    // Вспомогательная функция для вычисления прогресса (для кэширования)
+    calculateProgressValue() {
+        if (this.totalSeconds === 0) return 0;
+        if (this.remainingSeconds < 0) return 0;
+        return Math.round((this.remainingSeconds / this.totalSeconds) * 1000) / 1000;
+    }
+
+    // Вспомогательная функция для определения статуса (для кэширования)
+    getTimerStatusValue(secs) {
+        if (secs < 0) return 'overtime';
+        if (secs === 0 && this.totalSeconds > 0) return 'danger';
+        if (secs <= 60 && secs > 0) return 'warning';
+        return 'normal';
     }
     
     updateDigitalDisplay(secs, formatted) {
@@ -785,9 +893,42 @@ class DisplayTimer {
         const secs = abs % 60;
         return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     }
+
+    cleanup() {
+        // Очищаем все интервалы
+        this.intervals.forEach(intervalId => clearInterval(intervalId));
+        this.intervals = [];
+
+        // Очищаем flashInterval если он активен
+        if (this.flashInterval) {
+            clearInterval(this.flashInterval);
+            this.flashInterval = null;
+        }
+
+        // Удаляем IPC listeners если они есть
+        if (this.ipcRenderer) {
+            if (this.ipcHandlers.timerState) {
+                this.ipcRenderer.removeListener('timer-state', this.ipcHandlers.timerState);
+            }
+            if (this.ipcHandlers.colorsUpdate) {
+                this.ipcRenderer.removeListener('colors-update', this.ipcHandlers.colorsUpdate);
+            }
+            if (this.ipcHandlers.displaySettingsUpdate) {
+                this.ipcRenderer.removeListener('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
+            }
+        }
+    }
 }
 
 // Инициализация
+let displayTimer;
 document.addEventListener('DOMContentLoaded', () => {
-    new DisplayTimer();
+    displayTimer = new DisplayTimer();
+});
+
+// Cleanup при закрытии окна
+window.addEventListener('beforeunload', () => {
+    if (displayTimer) {
+        displayTimer.cleanup();
+    }
 });
