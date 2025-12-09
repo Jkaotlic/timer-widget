@@ -1471,7 +1471,8 @@
             setupIPC() {
                 ipcRenderer.send('get-timer-state');
 
-                ipcRenderer.on('timer-state', (event, state) => {
+                // Сохраняем ссылки на обработчики для последующей очистки
+                this.timerStateHandler = (event, state) => {
                     // Фильтр устаревших пакетов
                     const ts = state.timestamp || Date.now();
                     if (ts <= this.lastTimestamp) return;
@@ -1481,15 +1482,15 @@
                     this.remainingSeconds = Number(state.remainingSeconds) || 0;
                     this.isRunning = !!state.isRunning;
                     this.isPaused = !!state.isPaused;
-                    
+
                     this.updateDisplay();
-                });
+                };
 
-                ipcRenderer.on('colors-update', (event, colors) => {
+                this.colorsUpdateHandler = (event, colors) => {
                     this.applyColors(colors);
-                });
+                };
 
-                ipcRenderer.on('display-settings-update', (event, settings) => {
+                this.displaySettingsUpdateHandler = (event, settings) => {
                     this.applyBackground(settings);
                     if (settings.timerStyle) {
                         this.setTimerStyle(settings.timerStyle);
@@ -1498,7 +1499,31 @@
                     if (settings.showAnalogNumbers !== undefined && this.widgetClockNumbers) {
                         this.widgetClockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
                     }
-                });
+                };
+
+                // Регистрируем обработчики
+                ipcRenderer.on('timer-state', this.timerStateHandler);
+                ipcRenderer.on('colors-update', this.colorsUpdateHandler);
+                ipcRenderer.on('display-settings-update', this.displaySettingsUpdateHandler);
+            }
+
+            cleanup() {
+                // Удаляем IPC listeners
+                if (this.timerStateHandler) {
+                    ipcRenderer.removeListener('timer-state', this.timerStateHandler);
+                }
+                if (this.colorsUpdateHandler) {
+                    ipcRenderer.removeListener('colors-update', this.colorsUpdateHandler);
+                }
+                if (this.displaySettingsUpdateHandler) {
+                    ipcRenderer.removeListener('display-settings-update', this.displaySettingsUpdateHandler);
+                }
+
+                // Очищаем интервал обновления
+                if (this.updateInterval) {
+                    clearInterval(this.updateInterval);
+                    this.updateInterval = null;
+                }
             }
             
             setTimerStyle(style) {
@@ -1739,7 +1764,12 @@
             }
         }
 
-        new WidgetTimer();
+        const widgetTimer = new WidgetTimer();
+
+        // Cleanup при закрытии окна
+        window.addEventListener('beforeunload', () => {
+            widgetTimer.cleanup();
+        });
     </script>
 </body>
 </html>

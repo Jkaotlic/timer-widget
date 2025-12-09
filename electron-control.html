@@ -1426,6 +1426,30 @@
         .faq-footer a:hover {
             text-decoration: underline;
         }
+
+        /* FIX BUG-011: Стили для валидации ввода */
+        .input-error {
+            border-color: #ff4444 !important;
+            background-color: rgba(255, 68, 68, 0.1) !important;
+            animation: shake 0.3s;
+        }
+
+        .error-message {
+            color: #ff4444;
+            font-size: 0.75rem;
+            margin-top: 4px;
+            display: none;
+            padding: 4px 8px;
+            background: rgba(255, 68, 68, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #ff4444;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
     </style>
 </head>
 <body class="control-window">
@@ -2284,9 +2308,42 @@
 
                 // Установка времени вручную
                 document.getElementById('setCustomTime').addEventListener('click', () => {
-                    const m = Math.max(0, parseInt(this.customMinutes.value) || 0);
-                    const s = Math.max(0, Math.min(59, parseInt(this.customSeconds.value) || 0));
-                    this.setTime(m * 60 + s);
+                    // FIX BUG-011: Валидация пользовательского ввода
+                    const minutesValue = this.customMinutes.value.trim();
+                    const secondsValue = this.customSeconds.value.trim();
+
+                    // Валидация минут
+                    const minutes = parseInt(minutesValue);
+                    if (isNaN(minutes) || minutes < 0) {
+                        this.showInputError(this.customMinutes, 'Введите корректное число минут (≥ 0)');
+                        return;
+                    }
+                    if (minutes > 999) {
+                        this.showInputError(this.customMinutes, 'Максимум 999 минут');
+                        return;
+                    }
+                    this.clearInputError(this.customMinutes);
+
+                    // Валидация секунд
+                    const seconds = parseInt(secondsValue);
+                    if (isNaN(seconds) || seconds < 0) {
+                        this.showInputError(this.customSeconds, 'Введите корректное число секунд (0-59)');
+                        return;
+                    }
+                    if (seconds > 59) {
+                        this.showInputError(this.customSeconds, 'Секунды должны быть от 0 до 59');
+                        return;
+                    }
+                    this.clearInputError(this.customSeconds);
+
+                    // Проверка что установлено хоть что-то
+                    const totalSeconds = minutes * 60 + seconds;
+                    if (totalSeconds === 0) {
+                        this.showInputError(this.customMinutes, 'Установите время больше 0');
+                        return;
+                    }
+
+                    this.setTime(totalSeconds);
                 });
 
                 // Enter для установки времени
@@ -2893,6 +2950,38 @@
 
             reset() {
                 this.sendCommand('reset');
+            }
+
+            // FIX BUG-011: Методы для показа ошибок валидации
+            showInputError(inputElement, message) {
+                if (!inputElement) return;
+
+                // Добавляем класс ошибки к input
+                inputElement.classList.add('input-error');
+
+                // Создаем или обновляем сообщение об ошибке
+                let errorDiv = inputElement.nextElementSibling;
+                if (!errorDiv || !errorDiv.classList.contains('error-message')) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    inputElement.parentNode.insertBefore(errorDiv, inputElement.nextSibling);
+                }
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+
+                // Небольшая анимация shake
+                inputElement.style.animation = 'shake 0.3s';
+                setTimeout(() => inputElement.style.animation = '', 300);
+            }
+
+            clearInputError(inputElement) {
+                if (!inputElement) return;
+
+                inputElement.classList.remove('input-error');
+                const errorDiv = inputElement.nextElementSibling;
+                if (errorDiv && errorDiv.classList.contains('error-message')) {
+                    errorDiv.style.display = 'none';
+                }
             }
 
             // Отображение
