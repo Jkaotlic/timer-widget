@@ -1114,6 +1114,16 @@
     <script>
         const { ipcRenderer } = require('electron');
 
+        // FIX BUG-014: Safe JSON.parse helper function
+        function safeJSONParse(jsonString, defaultValue = null) {
+            try {
+                return JSON.parse(jsonString);
+            } catch (error) {
+                console.error('JSON parse error:', error.message);
+                return defaultValue;
+            }
+        }
+
         class WidgetTimer {
             constructor() {
                 this.radius = 82;
@@ -1328,8 +1338,8 @@
                 // Настройки виджета
                 const settings = localStorage.getItem('widgetSettings');
                 if (settings) {
-                    const s = JSON.parse(settings);
-                    if (s.opacity) {
+                    const s = safeJSONParse(settings, {});
+                    if (s && s.opacity) {
                         this.container.style.opacity = s.opacity;
                         this.opacityRange.value = s.opacity * 100;
                         this.opacityValue.textContent = Math.round(s.opacity * 100) + '%';
@@ -1355,14 +1365,20 @@
             checkColorChanges() {
                 const savedColors = localStorage.getItem('timerColors');
                 if (savedColors) {
-                    this.applyColors(JSON.parse(savedColors));
+                    const colors = safeJSONParse(savedColors, null);
+                    if (colors) {
+                        this.applyColors(colors);
+                    }
                 }
             }
 
             applyColors(colors = null) {
                 if (!colors) {
                     const saved = localStorage.getItem('timerColors');
-                    colors = saved ? JSON.parse(saved) : {
+                    colors = saved ? safeJSONParse(saved, {
+                        timer: '#667eea',
+                        progress: '#764ba2'
+                    }) : {
                         timer: '#667eea',
                         progress: '#764ba2'
                     };
@@ -1372,8 +1388,11 @@
                 const gradient = document.getElementById('widgetGradient');
                 if (gradient) {
                     const stops = gradient.querySelectorAll('stop');
-                    if (stops[0]) stops[0].setAttribute('stop-color', colors.timer);
-                    if (stops[1]) stops[1].setAttribute('stop-color', colors.progress);
+                    // FIX BUG-015: Check array length before accessing elements
+                    if (stops.length >= 2) {
+                        stops[0].setAttribute('stop-color', colors.timer);
+                        stops[1].setAttribute('stop-color', colors.progress);
+                    }
                 }
 
                 // Обновляем свечение текста
@@ -1444,27 +1463,29 @@
             loadBackgroundSettings() {
                 const bgSettings = localStorage.getItem('displayExtSettings');
                 if (bgSettings) {
-                    try {
-                        const settings = JSON.parse(bgSettings);
-                        
+                    const settings = safeJSONParse(bgSettings, {});
+
+                    if (settings && Object.keys(settings).length > 0) {
                         // Для локального фона загружаем изображение
                         if (settings.bgMode === 'local') {
                             const localBgImage = localStorage.getItem('localBgImage');
-                            const localBgSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                            const localBgSettingsStr = localStorage.getItem('localBgSettings') || '{}';
+                            const localBgSettings = safeJSONParse(localBgSettingsStr, {});
+
                             if (localBgImage) {
                                 settings.bgLocalImage = localBgImage;
                                 settings.bgLocalFit = localBgSettings.fit || 'cover';
                                 settings.bgLocalOverlay = localBgSettings.overlay || 30;
                             }
                         }
-                        
+
                         this.applyBackground(settings);
                         
                         // Применяем стиль таймера
                         if (settings.timerStyle) {
                             this.setTimerStyle(settings.timerStyle);
                         }
-                    } catch (_) {}
+                    }
                 }
             }
 

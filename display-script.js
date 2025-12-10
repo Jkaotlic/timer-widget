@@ -425,9 +425,12 @@ class DisplayTimer {
         // Только цвета таймера, БЕЗ фона
         const saved = localStorage.getItem('timerColors');
         if (saved) {
-            try {
-                this.applyColors(JSON.parse(saved));
-            } catch (_) {}
+            const colors = window.SecurityUtils
+                ? window.SecurityUtils.safeJSONParse(saved, null)
+                : null;
+            if (colors) {
+                this.applyColors(colors);
+            }
         }
     }
 
@@ -435,9 +438,12 @@ class DisplayTimer {
         // При первой загрузке - применяем всё
         const saved = localStorage.getItem('timerColors');
         if (saved) {
-            try {
-                this.applyColors(JSON.parse(saved));
-            } catch (_) {}
+            const colors = window.SecurityUtils
+                ? window.SecurityUtils.safeJSONParse(saved, null)
+                : null;
+            if (colors) {
+                this.applyColors(colors);
+            }
         }
 
         // Фон - загружаем один раз и из правильного источника
@@ -447,23 +453,29 @@ class DisplayTimer {
     loadBackgroundSettings() {
         const bgSettings = localStorage.getItem('displayExtSettings');
         if (bgSettings) {
-            try {
-                const settings = JSON.parse(bgSettings);
-                
+            const settings = window.SecurityUtils
+                ? window.SecurityUtils.safeJSONParse(bgSettings, {})
+                : {};
+
+            if (settings && Object.keys(settings).length > 0) {
                 // Для локального фона нужно дополнительно загрузить изображение
                 if (settings.bgMode === 'local') {
                     const localBgImage = localStorage.getItem('localBgImage');
-                    const localBgSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                    const localBgSettingsStr = localStorage.getItem('localBgSettings') || '{}';
+                    const localBgSettings = window.SecurityUtils
+                        ? window.SecurityUtils.safeJSONParse(localBgSettingsStr, {})
+                        : {};
+
                     if (localBgImage) {
                         settings.bgLocalImage = localBgImage;
                         settings.bgLocalFit = localBgSettings.fit || 'cover';
                         settings.bgLocalOverlay = localBgSettings.overlay || 30;
                     }
                 }
-                
+
                 this.applyBackground(settings);
                 this.applyDisplaySettings(settings);
-            } catch (_) {}
+            }
         }
     }
 
@@ -653,7 +665,16 @@ class DisplayTimer {
     // Вспомогательная функция для вычисления прогресса (для кэширования)
     calculateProgressValue() {
         if (this.totalSeconds === 0) return 0;
-        if (this.remainingSeconds < 0) return 0;
+
+        // FIX BUG-016: Handle overtime progress correctly
+        if (this.remainingSeconds < 0) {
+            // В overtime режиме показываем прогресс от 0 до -1
+            // Это позволит визуализировать "обратный" прогресс
+            const overrunLimit = 300; // TODO: Get from timerConfig
+            const overtimeRatio = Math.abs(this.remainingSeconds) / overrunLimit;
+            return -Math.min(1, overtimeRatio); // Отрицательное значение
+        }
+
         return Math.round((this.remainingSeconds / this.totalSeconds) * 1000) / 1000;
     }
 
@@ -814,14 +835,18 @@ class DisplayTimer {
 
     updateProgress() {
         if (this.totalSeconds > 0) {
-            const ratio = Math.max(0, Math.min(1, this.remainingSeconds / this.totalSeconds));
+            // FIX BUG-016: Use calculateProgressValue() for correct overtime handling
+            const progress = this.calculateProgressValue();
+
+            // Для overtime (отрицательный прогресс) показываем обратное заполнение
+            const ratio = progress < 0 ? 0 : Math.max(0, Math.min(1, progress));
             const offset = this.circumference - (ratio * this.circumference);
             this.progressRing.style.strokeDashoffset = offset;
 
             // Цветовые предупреждения
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             const isOvertime = this.remainingSeconds < 0;
-            
+
             this.progressRing.classList.remove('warning', 'danger', 'overtime');
             this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
 
