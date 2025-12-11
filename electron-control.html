@@ -1507,47 +1507,59 @@
 
         /* Info banners for better UX */
         .info-banner {
-            background: rgba(103, 126, 234, 0.1);
+            background: rgba(103, 126, 234, 0.15);
             border-left: 3px solid #667eea;
             padding: 10px 12px;
             border-radius: 6px;
             margin-bottom: 12px;
             font-size: 0.85em;
             line-height: 1.5;
-            color: rgba(255, 255, 255, 0.8);
+            color: #e0e0e0;
         }
 
         .info-banner.tip {
-            background: rgba(74, 175, 80, 0.1);
+            background: rgba(74, 175, 80, 0.15);
             border-left-color: #4CAF50;
+            color: #e8f5e9;
         }
 
         .info-banner.warning {
-            background: rgba(255, 152, 0, 0.1);
+            background: rgba(255, 152, 0, 0.15);
             border-left-color: #FF9800;
+            color: #fff3e0;
         }
 
         .info-banner strong {
             color: #fff;
+            font-weight: 600;
         }
 
         .info-banner code {
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.4);
             padding: 2px 6px;
             border-radius: 3px;
             font-family: 'Courier New', monospace;
             font-size: 0.9em;
+            color: #ffeb3b;
         }
 
         /* Responsive design improvements */
         .advanced-settings .content-section {
             max-height: calc(100vh - 280px);
             overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .tab-content {
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .tab-content.active {
-            max-height: calc(100vh - 380px);
+            display: block;
+            max-height: calc(100vh - 360px);
             overflow-y: auto;
+            padding-right: 8px;
         }
 
         /* Media queries for small screens */
