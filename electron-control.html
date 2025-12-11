@@ -3077,38 +3077,38 @@
                 return `${neg ? '-' : ''}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             }
 
-            // Звуки
-            playSound(type) {
+            // FIX BUG-020: Add async/await for async operations
+            async playSound(type) {
                 if (!this.soundMasterEl.checked) return;
-                
+
                 const presetId = `sound${this.capitalize(type)}Preset`;
                 const preset = document.getElementById(presetId)?.value || 'none';
-                
+
                 console.log('Playing sound:', type, 'Preset:', preset);
-                
+
                 if (preset === 'none') {
-                    this.beep(880, 0.15);
+                    await this.beep(880, 0.15);
                     return;
                 }
-                
-                this.playPreset(preset);
+
+                await this.playPreset(preset);
             }
 
-            previewSound(type) {
+            async previewSound(type) {
                 const presetId = `sound${this.capitalize(type)}Preset`;
                 const preset = document.getElementById(presetId)?.value || 'none';
-                
+
                 if (preset === 'none') {
-                    this.beep(880, 0.15);
+                    await this.beep(880, 0.15);
                 } else {
-                    this.playPreset(preset);
+                    await this.playPreset(preset);
                 }
             }
 
             async playPreset(name) {
                 // Проверяем, пользовательский ли это звук
                 if (name.startsWith('custom:')) {
-                    this.playCustomSound(name.replace('custom:', ''));
+                    await this.playCustomSound(name.replace('custom:', ''));
                     return;
                 }
 
@@ -3373,23 +3373,25 @@
                 });
             }
 
-            playCustomSound(name) {
+            async playCustomSound(name) {
                 const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
                 const sound = customSounds.find(s => s.name === name);
                 if (!sound) {
                     console.warn('Custom sound not found:', name);
                     // Проиграем стандартный beep если кастомный звук не найден
-                    this.beep(880, 0.15);
+                    await this.beep(880, 0.15);
                     return;
                 }
 
                 const audio = new Audio(sound.data);
                 audio.volume = 0.5;
-                audio.play().catch(err => {
+                try {
+                    await audio.play();
+                } catch (err) {
                     console.error('Error playing custom sound:', err);
                     // Проиграем стандартный beep если кастомный звук не сработал
-                    this.beep(880, 0.15);
-                });
+                    await this.beep(880, 0.15);
+                }
             }
 
             deleteCustomSound(name) {
