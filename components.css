@@ -1,0 +1,386 @@
+/**
+ * Timer Widget - Shared Components Styles
+ * Common styles for timer displays across all windows
+ * FIX BUG-010: Extracted from duplicated inline styles
+ */
+
+/* ============================================
+   Digital Display Component
+   ============================================ */
+
+.digital-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Orbitron', 'Courier New', monospace;
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.digital-time {
+    font-size: 8rem;
+    font-weight: 700;
+    color: #00ff00;
+    text-shadow:
+        0 0 10px currentColor,
+        0 0 20px currentColor,
+        0 0 30px currentColor,
+        0 0 40px currentColor;
+    letter-spacing: 0.1em;
+    transition: all 0.3s ease;
+}
+
+.digital-time.warning {
+    color: #ffaa00;
+}
+
+.digital-time.danger {
+    color: #ff4444;
+}
+
+.digital-time.overtime {
+    color: #ff6600;
+}
+
+.digital-dots {
+    opacity: 1;
+    transition: opacity 0.5s;
+}
+
+/* ============================================
+   Flip Card Component
+   ============================================ */
+
+.flip-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+}
+
+.flip-separator {
+    font-size: 4rem;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 300;
+    margin: 0 8px;
+}
+
+.flip-minus {
+    font-size: 5rem;
+    color: #ff6600;
+    font-weight: 700;
+    margin-right: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.flip-minus-sign {
+    text-shadow:
+        0 0 10px #ff6600,
+        0 0 20px #ff6600;
+}
+
+.flip-minus.visible {
+    opacity: 1;
+}
+
+.flip-card {
+    perspective: 1000px;
+    display: inline-block;
+    width: 100px;
+    height: 140px;
+    position: relative;
+}
+
+.flip-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+    background: linear-gradient(180deg, #2a2a3e 0%, #1a1a2e 50%, #0f0f1e 100%);
+    border-radius: 8px;
+    box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+.flip-card-inner::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10;
+}
+
+.flip-card-inner::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 50%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+    border-radius: 8px 8px 0 0;
+    pointer-events: none;
+}
+
+.flip-digit {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 5rem;
+    font-weight: 700;
+    color: #00ff00;
+    text-shadow:
+        0 0 10px currentColor,
+        0 0 20px currentColor;
+    font-family: 'Orbitron', monospace;
+}
+
+.flip-card.warning .flip-digit {
+    color: #ffaa00;
+}
+
+.flip-card.danger .flip-digit {
+    color: #ff4444;
+}
+
+.flip-card.overtime .flip-digit {
+    color: #ff6600;
+}
+
+.flip-label {
+    position: absolute;
+    bottom: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.flip-card.flipping .flip-card-inner {
+    animation: flipAnimation 0.6s ease-in-out;
+}
+
+@keyframes flipAnimation {
+    0% { transform: rotateX(0deg); }
+    50% { transform: rotateX(90deg); }
+    100% { transform: rotateX(0deg); }
+}
+
+/* ============================================
+   Analog Clock Component
+   ============================================ */
+
+.analog-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.analog-clock {
+    position: relative;
+    width: 300px;
+    height: 300px;
+}
+
+.analog-clock svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.analog-clock-face {
+    fill: rgba(30, 30, 50, 0.8);
+    stroke: rgba(255, 255, 255, 0.3);
+    stroke-width: 2;
+}
+
+.analog-progress-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 20;
+}
+
+.analog-progress {
+    fill: none;
+    stroke: #00ff00;
+    stroke-width: 20;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
+}
+
+.analog-progress.warning {
+    stroke: #ffaa00;
+}
+
+.analog-progress.danger {
+    stroke: #ff4444;
+}
+
+.analog-progress.overtime {
+    stroke: #ff6600;
+}
+
+.analog-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.analog-time {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #00ff00;
+    text-shadow:
+        0 0 10px currentColor,
+        0 0 20px currentColor;
+    font-family: 'Orbitron', monospace;
+    margin-bottom: 8px;
+}
+
+.analog-time.warning {
+    color: #ffaa00;
+}
+
+.analog-time.danger {
+    color: #ff4444;
+}
+
+.analog-time.overtime {
+    color: #ff6600;
+}
+
+.analog-label {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ============================================
+   Circle/Ring Component
+   ============================================ */
+
+.circle-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.circle-container {
+    position: relative;
+    width: 250px;
+    height: 250px;
+}
+
+.circle-ring {
+    width: 100%;
+    height: 100%;
+}
+
+.circle-ring svg {
+    transform: rotate(-90deg);
+}
+
+.circle-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.1);
+    stroke-width: 15;
+}
+
+.circle-progress {
+    fill: none;
+    stroke: #00ff00;
+    stroke-width: 15;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease, stroke 0.3s ease;
+}
+
+.circle-progress.warning {
+    stroke: #ffaa00;
+}
+
+.circle-progress.danger {
+    stroke: #ff4444;
+}
+
+.circle-progress.overtime {
+    stroke: #ff6600;
+}
+
+.circle-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.circle-time {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: white;
+    font-family: 'Orbitron', monospace;
+    margin-bottom: 8px;
+}
+
+.circle-label {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ============================================
+   Common Utilities
+   ============================================ */
+
+.timer-status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timer-status-badge.running {
+    background: rgba(0, 255, 0, 0.2);
+    color: #00ff00;
+}
+
+.timer-status-badge.paused {
+    background: rgba(255, 170, 0, 0.2);
+    color: #ffaa00;
+}
+
+.timer-status-badge.stopped {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.timer-status-badge.overtime {
+    background: rgba(255, 102, 0, 0.2);
+    color: #ff6600;
+}
