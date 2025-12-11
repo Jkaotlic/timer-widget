@@ -2134,7 +2134,10 @@
                 this.lastTimestamp = 0;
                 this.wasFinished = false;
                 this.currentBgMode = 'solid';
-                
+
+                // FIX BUG-023: Track active theme button to avoid querySelectorAll
+                this.activeThemeButton = null;
+
                 // Текущие цвета (по умолчанию - первая тема)
                 this.currentColors = {
                     timer: '#667eea',
@@ -2279,8 +2282,13 @@
                     btn.style.setProperty('--t1', theme.t1);
                     btn.style.setProperty('--t2', theme.t2);
                     btn.addEventListener('click', () => {
-                        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                        // FIX BUG-023: Optimize - remove active from previous button only
+                        if (this.activeThemeButton) {
+                            this.activeThemeButton.classList.remove('active');
+                        }
                         btn.classList.add('active');
+                        this.activeThemeButton = btn;
+
                         // Сохраняем цвета темы
                         this.currentColors = {
                             timer: theme.t1,
@@ -2477,7 +2485,11 @@
                         document.getElementById('bgSolidColor').value = '#0f0c29';
                         document.getElementById('bgGrad1').value = '#0f0c29';
                         document.getElementById('bgGrad2').value = '#302b63';
-                        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+                        // FIX BUG-023: Optimize - clear active button reference
+                        if (this.activeThemeButton) {
+                            this.activeThemeButton.classList.remove('active');
+                            this.activeThemeButton = null;
+                        }
                         // Применить первую тему по умолчанию
                         const firstTheme = document.querySelector('.theme-btn');
                         if (firstTheme) firstTheme.click();

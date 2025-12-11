@@ -1151,9 +1151,9 @@
                 this.setupIPC();
                 this.setupEventListeners();
                 this.setupSettings();
-                
-                // Проверка изменений цветов
-                setInterval(() => this.checkColorChanges(), 1000);
+
+                // FIX BUG-020: Removed dead code - checkColorChanges interval
+                // Colors are updated via IPC 'colors-update' event in setupIPC()
             }
 
             initElements() {
@@ -1371,15 +1371,8 @@
                 localStorage.setItem('widgetSettings', JSON.stringify(settings));
             }
 
-            checkColorChanges() {
-                const savedColors = localStorage.getItem('timerColors');
-                if (savedColors) {
-                    const colors = safeJSONParse(savedColors, null);
-                    if (colors) {
-                        this.applyColors(colors);
-                    }
-                }
-            }
+            // FIX BUG-020: Removed checkColorChanges() - dead code
+            // Colors are updated via IPC 'colors-update' event, no need for polling
 
             applyColors(colors = null) {
                 if (!colors) {
