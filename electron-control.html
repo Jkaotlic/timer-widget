@@ -1538,6 +1538,119 @@
             font-family: 'Courier New', monospace;
             font-size: 0.9em;
         }
+
+        /* Responsive design improvements */
+        .advanced-settings .content-section {
+            max-height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+
+        .tab-content.active {
+            max-height: calc(100vh - 380px);
+            overflow-y: auto;
+        }
+
+        /* Media queries for small screens */
+        @media (max-height: 600px) {
+            .timer-header {
+                padding: 12px 16px;
+            }
+
+            .timer-display-main {
+                font-size: 2rem !important;
+                margin: 4px 0 !important;
+            }
+
+            .main-controls {
+                padding: 8px;
+                gap: 8px;
+            }
+
+            .main-btn {
+                width: 50px !important;
+                height: 50px !important;
+                font-size: 1.3em !important;
+            }
+
+            .quick-presets {
+                padding: 8px;
+            }
+
+            .quick-preset {
+                padding: 6px 10px;
+                font-size: 0.75em;
+            }
+
+            .tab-content.active {
+                max-height: calc(100vh - 300px);
+            }
+
+            .advanced-settings .content-section {
+                max-height: calc(100vh - 220px);
+            }
+
+            .info-banner {
+                padding: 6px 8px;
+                font-size: 0.75em;
+                margin-bottom: 8px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .control-window {
+                padding: 8px;
+            }
+
+            .timer-header h1 {
+                font-size: 0.9em;
+            }
+
+            .quick-preset {
+                padding: 4px 8px;
+                font-size: 0.7em;
+            }
+
+            .quick-window-btn {
+                font-size: 0.75em;
+                padding: 8px;
+            }
+
+            .tab-btn {
+                font-size: 0.75em;
+                padding: 8px;
+            }
+
+            .tab-btn .icon {
+                font-size: 1em;
+            }
+
+            .settings-group {
+                padding: 8px;
+            }
+        }
+
+        /* Scrollbar for content section */
+        .advanced-settings .content-section::-webkit-scrollbar,
+        .tab-content.active::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .advanced-settings .content-section::-webkit-scrollbar-track,
+        .tab-content.active::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .advanced-settings .content-section::-webkit-scrollbar-thumb,
+        .tab-content.active::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .advanced-settings .content-section::-webkit-scrollbar-thumb:hover,
+        .tab-content.active::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body class="control-window">

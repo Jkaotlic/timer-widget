@@ -133,11 +133,20 @@ function startTimer() {
 }
 
 function createControlWindow() {
+    // Get screen dimensions for adaptive sizing
+    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+
+    // Calculate optimal window size (adapt to screen size)
+    const windowWidth = Math.min(420, Math.max(320, screenWidth - 100));
+    const windowHeight = Math.min(650, Math.max(400, screenHeight - 100));
+
     controlWindow = new BrowserWindow({
-        width: 420,
-        height: 500,
-        minWidth: 350,
-        minHeight: 300,
+        width: windowWidth,
+        height: windowHeight,
+        minWidth: 320,  // Smaller min width for small screens
+        minHeight: 400, // Reasonable minimum height
+        maxWidth: 500,  // Prevent too wide on large screens
+        maxHeight: 800, // Prevent too tall
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -145,7 +154,8 @@ function createControlWindow() {
             sandbox: false  // Нужен для доступа к localStorage
         },
         title: 'Управление Таймером',
-        icon: path.join(__dirname, 'icon.ico')
+        icon: path.join(__dirname, 'icon.ico'),
+        resizable: true // Allow user to resize if needed
     });
 
     controlWindow.loadFile('electron-control.html');
