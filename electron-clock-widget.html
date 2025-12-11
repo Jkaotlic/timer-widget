@@ -1272,8 +1272,11 @@
         </div>
     </div>
 
+    <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
+    <script src="ipc-compat.js"></script>
+
     <script>
-        const { ipcRenderer } = require('electron');
+        // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
         class ClockWidget {
             constructor() {
