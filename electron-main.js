@@ -28,6 +28,35 @@ let timerInterval = null;
 // Сохраняем последние настройки дисплея для синхронизации
 let lastDisplaySettings = null;
 
+// Enable Ctrl+Wheel to resize window
+function enableWindowResizeOnScroll(window) {
+    if (!window || !window.webContents) return;
+
+    window.webContents.on('before-input-event', (event, input) => {
+        // Prevent default zoom behavior
+        if (input.control && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '0')) {
+            event.preventDefault();
+        }
+    });
+
+    // Handle mouse wheel with Ctrl for window resizing
+    window.webContents.on('zoom-changed', (event, zoomDirection) => {
+        const [currentWidth, currentHeight] = window.getSize();
+        const increment = 20; // Pixels to grow/shrink
+
+        if (zoomDirection === 'in') {
+            // Increase window size
+            window.setSize(currentWidth + increment, currentHeight + increment);
+        } else {
+            // Decrease window size (respect minimum)
+            const [minWidth, minHeight] = window.getMinimumSize();
+            const newWidth = Math.max(currentWidth - increment, minWidth);
+            const newHeight = Math.max(currentHeight - increment, minHeight);
+            window.setSize(newWidth, newHeight);
+        }
+    });
+}
+
 function clearTimerInterval() {
     if (timerInterval) {
         clearInterval(timerInterval);
@@ -160,6 +189,11 @@ function createControlWindow() {
 
     controlWindow.loadFile('electron-control.html');
 
+    // Enable Ctrl+Wheel window resizing
+    controlWindow.webContents.once('did-finish-load', () => {
+        enableWindowResizeOnScroll(controlWindow);
+    });
+
     controlWindow.on('closed', () => {
         controlWindow = null;
     });
@@ -193,6 +227,11 @@ function createWidgetWindow() {
 
     widgetWindow.loadFile('electron-widget.html');
 
+    // Enable Ctrl+Wheel window resizing
+    widgetWindow.webContents.once('did-finish-load', () => {
+        enableWindowResizeOnScroll(widgetWindow);
+    });
+
     widgetWindow.on('closed', () => {
         widgetWindow = null;
     });
@@ -223,6 +262,11 @@ function createClockWidgetWindow() {
     });
 
     clockWidgetWindow.loadFile('electron-clock-widget.html');
+
+    // Enable Ctrl+Wheel window resizing
+    clockWidgetWindow.webContents.once('did-finish-load', () => {
+        enableWindowResizeOnScroll(clockWidgetWindow);
+    });
 
     clockWidgetWindow.on('closed', () => {
         clockWidgetWindow = null;
@@ -259,6 +303,11 @@ function createDisplayWindow(displayIndex) {
     });
 
     displayWindow.loadFile('display.html');
+
+    // Enable Ctrl+Wheel window resizing
+    displayWindow.webContents.once('did-finish-load', () => {
+        enableWindowResizeOnScroll(displayWindow);
+    });
 
     displayWindow.on('closed', () => {
         displayWindow = null;
