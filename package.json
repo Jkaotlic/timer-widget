@@ -51,10 +51,16 @@
     "publish": null,
     "files": [
       "electron-main.js",
+      "preload.js",
+      "ipc-compat.js",
+      "security.js",
+      "utils.js",
+      "constants.js",
       "electron-widget.html",
       "electron-control.html",
       "electron-clock-widget.html",
       "styles.css",
+      "components.css",
       "display.html",
       "display-script.js",
       "sounds/**/*"
