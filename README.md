@@ -123,15 +123,41 @@ npm run build:win
 ## 📁 Структура проекта
 
 ```
-timer-app/
+timer-widget/
 ├── 📄 electron-main.js      # Главный процесс Electron
 ├── 📄 electron-control.html # Панель управления
 ├── 📄 electron-widget.html  # Мини-виджет
 ├── 📄 display.html          # Полноэкранный таймер
 ├── 📄 display-script.js     # Логика полноэкранного режима
+├── 📄 security.js           # Утилиты безопасности
+├── 📄 utils.js              # Общие утилиты
+├── 📄 constants.js          # Константы проекта
 ├── 📄 styles.css            # Общие стили
-└── 📄 package.json          # Конфигурация проекта
+├── 📄 package.json          # Конфигурация проекта
+└── 📂 docs/                 # Документация
+    ├── 📂 bugs/             # Баги и исправления
+    │   ├── STATUS.md        # 📊 Текущий статус багов
+    │   ├── BUGS_LIST.md     # Полный список багов
+    │   └── FIXES_APPLIED.md # Детали исправлений
+    ├── 📂 planning/         # Планирование
+    │   ├── ARCHITECTURE.md  # Архитектура проекта
+    │   └── ROADMAP.md       # План развития
+    └── 📂 changelog/        # История изменений
+        └── CHANGELOG.md     # Changelog
 ```
+
+### 📚 Документация
+
+**Хотите узнать о статусе исправления багов?**
+👉 Смотрите [docs/bugs/STATUS.md](docs/bugs/STATUS.md)
+
+**Вся документация:**
+- 📊 [Статус багов](docs/bugs/STATUS.md) - текущий прогресс исправлений
+- 🐛 [Список багов](docs/bugs/BUGS_LIST.md) - все найденные баги с описанием
+- 🔧 [Применённые исправления](docs/bugs/FIXES_APPLIED.md) - детали исправлений
+- 🏗️ [Архитектура](docs/planning/ARCHITECTURE.md) - структура и гайды
+- 🗺️ [Roadmap](docs/planning/ROADMAP.md) - план развития
+- 📝 [Changelog](docs/changelog/CHANGELOG.md) - история изменений
 
 ### 📜 Скрипты
 
