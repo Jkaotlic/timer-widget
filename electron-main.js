@@ -270,11 +270,21 @@ app.on('window-all-closed', () => {
 ipcMain.on('timer-command', (_event, payload = {}) => {
     const { type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds } = payload;
 
+    // FIX BUG-017: Track if config changed to sync immediately
+    let configChanged = false;
+
     if (typeof allowNegative === 'boolean') {
-        timerConfig.allowNegative = allowNegative;
+        if (timerConfig.allowNegative !== allowNegative) {
+            timerConfig.allowNegative = allowNegative;
+            configChanged = true;
+        }
     }
     if (overrunLimitSeconds != null) {
-        timerConfig.overrunLimitSeconds = Math.max(0, Number(overrunLimitSeconds) || 0);
+        const newLimit = Math.max(0, Number(overrunLimitSeconds) || 0);
+        if (timerConfig.overrunLimitSeconds !== newLimit) {
+            timerConfig.overrunLimitSeconds = newLimit;
+            configChanged = true;
+        }
     }
 
     switch (type) {
@@ -326,6 +336,11 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
         }
         default:
             break;
+    }
+
+    // FIX BUG-017: If config changed, broadcast state immediately
+    if (configChanged) {
+        emitTimerState({});
     }
 });
 

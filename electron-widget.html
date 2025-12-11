@@ -248,12 +248,14 @@
             filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.5));
         }
 
-        .progress-bar.warning {
+        /* FIX BUG-018: Use data attributes for status */
+        .progress-bar[data-status="warning"] {
             stroke: url(#warningGradient);
             filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.5));
         }
 
-        .progress-bar.danger {
+        .progress-bar[data-status="danger"],
+        .progress-bar[data-status="overtime"] {
             stroke: url(#dangerGradient);
             filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
             animation: pulse-glow 1s infinite;
@@ -298,12 +300,13 @@
             white-space: nowrap;
         }
 
-        .time-display.warning {
+        .time-display[data-status="warning"] {
             color: #ffc107;
             --glow-color: rgba(255, 193, 7, 0.6);
         }
 
-        .time-display.danger {
+        .time-display[data-status="danger"],
+        .time-display[data-status="overtime"] {
             color: #ff4444;
             --glow-color: rgba(255, 68, 68, 0.8);
             animation: time-pulse 1s infinite;
@@ -577,17 +580,18 @@
             line-height: 1;
         }
 
-        .widget-digital-time.warning {
+        .widget-digital-time[data-status="warning"] {
             color: #ffcc00;
-            text-shadow: 
+            text-shadow:
                 0 0 10px #ffcc00,
                 0 0 20px #ffcc00,
                 0 0 40px #ffcc0066;
         }
 
-        .widget-digital-time.danger {
+        .widget-digital-time[data-status="danger"],
+        .widget-digital-time[data-status="overtime"] {
             color: #ff3333;
-            text-shadow: 
+            text-shadow:
                 0 0 10px #ff3333,
                 0 0 20px #ff3333,
                 0 0 40px #ff333366;
@@ -706,8 +710,9 @@
             line-height: 1;
         }
 
-        .widget-flip-card.warning .widget-flip-digit { color: #ffc107; }
-        .widget-flip-card.danger .widget-flip-digit { color: #ff4444; }
+        .widget-flip-card[data-status="warning"] .widget-flip-digit { color: #ffc107; }
+        .widget-flip-card[data-status="danger"] .widget-flip-digit,
+        .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: #ff4444; }
         
         /* Адаптивные размеры для flip-карточек когда есть часы (6 цифр) */
         .widget-flip.has-hours .widget-flip-card {
@@ -876,23 +881,27 @@
         .widget-clock-number.n9 { top: 50%; left: 12%; }
 
         /* Предупреждения для стрелок виджета */
-        .widget-hand-minute.warning,
-        .widget-hand-second.warning {
+        .widget-hand-minute[data-status="warning"],
+        .widget-hand-second[data-status="warning"] {
             filter: hue-rotate(-30deg) saturate(1.5);
         }
 
-        .widget-hand-minute.danger,
-        .widget-hand-second.danger {
+        .widget-hand-minute[data-status="danger"],
+        .widget-hand-second[data-status="danger"],
+        .widget-hand-minute[data-status="overtime"],
+        .widget-hand-second[data-status="overtime"] {
             background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%) !important;
             animation: widget-hand-pulse 0.5s infinite;
         }
 
-        .widget-clock-center.danger {
+        .widget-clock-center[data-status="danger"],
+        .widget-clock-center[data-status="overtime"] {
             background: linear-gradient(145deg, #ff4444, #cc0000);
             box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
         }
 
-        .widget-analog-digital.danger {
+        .widget-analog-digital[data-status="danger"],
+        .widget-analog-digital[data-status="overtime"] {
             color: #ff4444;
             text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
         }
@@ -1602,28 +1611,24 @@
                     const offset = this.circumference - (ratio * this.circumference);
                     this.progressBar.style.strokeDashoffset = offset;
 
-                    // Цветовые классы
+                    // FIX BUG-018: Use data attributes instead of classList manipulations
                     const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
                     const isOvertime = secs < 0;
-                    
-                    this.progressBar.classList.remove('warning', 'danger', 'overtime');
-                    this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
-                    if (this.widgetDigitalTime) {
-                        this.widgetDigitalTime.classList.remove('warning', 'danger', 'overtime');
+
+                    let status = 'normal';
+                    if (isOvertime) {
+                        status = 'overtime';
+                    } else if (percentLeft <= 10 && percentLeft > 0) {
+                        status = 'danger';
+                    } else if (percentLeft <= 25) {
+                        status = 'warning';
                     }
 
-                    if (isOvertime) {
-                        this.progressBar.classList.add('danger', 'overtime');
-                        this.timeDisplay.classList.add('danger', 'overtime');
-                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('danger', 'overtime');
-                    } else if (percentLeft <= 10 && percentLeft > 0) {
-                        this.progressBar.classList.add('danger');
-                        this.timeDisplay.classList.add('danger');
-                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('danger');
-                    } else if (percentLeft <= 25) {
-                        this.progressBar.classList.add('warning');
-                        this.timeDisplay.classList.add('warning');
-                        if (this.widgetDigitalTime) this.widgetDigitalTime.classList.add('warning');
+                    // Set data attribute once instead of multiple classList operations
+                    this.progressBar.dataset.status = status;
+                    this.timeDisplay.dataset.status = status;
+                    if (this.widgetDigitalTime) {
+                        this.widgetDigitalTime.dataset.status = status;
                     }
                 } else {
                     this.progressBar.style.strokeDashoffset = this.circumference;
@@ -1682,25 +1687,26 @@
                 this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
                 
                 // Классы предупреждения
+                // FIX BUG-018: Use data attributes instead of classList
                 const flipCards = [this.wFlipMin1, this.wFlipMin2, this.wFlipSec1, this.wFlipSec2];
                 if (showHours && this.wFlipHr1 && this.wFlipHr2) {
                     flipCards.push(this.wFlipHr1, this.wFlipHr2);
                 }
-                flipCards.forEach(card => card.classList.remove('warning', 'danger', 'overtime'));
-                
+
                 const isOvertime = secs < 0;
+                let status = 'normal';
                 if (isOvertime) {
-                    flipCards.forEach(card => card.classList.add('danger', 'overtime'));
+                    status = 'overtime';
                 } else if (this.totalSeconds > 0) {
                     const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    flipCards.forEach(card => {
-                        if (percentLeft <= 10 && percentLeft > 0) {
-                            card.classList.add('danger');
-                        } else if (percentLeft <= 25) {
-                            card.classList.add('warning');
-                        }
-                    });
+                    if (percentLeft <= 10 && percentLeft > 0) {
+                        status = 'danger';
+                    } else if (percentLeft <= 25) {
+                        status = 'warning';
+                    }
                 }
+
+                flipCards.forEach(card => card.dataset.status = status);
             }
 
             updateAnalogDisplay(secs) {
@@ -1725,30 +1731,25 @@
                     this.widgetAnalogDigital.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                 }
 
-                // Классы предупреждения
+                // FIX BUG-018: Use data attributes instead of classList
                 const analogElements = [this.widgetHandMinute, this.widgetHandSecond, this.widgetClockCenter, this.widgetAnalogDigital];
-                
-                analogElements.forEach(el => {
-                    if (el) el.classList.remove('warning', 'danger', 'overtime');
-                });
 
                 const isOvertime = secs < 0;
+                let status = 'normal';
                 if (isOvertime) {
-                    analogElements.forEach(el => {
-                        if (el) el.classList.add('danger', 'overtime');
-                    });
+                    status = 'overtime';
                 } else if (this.totalSeconds > 0) {
                     const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
                     if (percentLeft <= 10 && percentLeft > 0) {
-                        analogElements.forEach(el => {
-                            if (el) el.classList.add('danger');
-                        });
+                        status = 'danger';
                     } else if (percentLeft <= 25) {
-                        analogElements.forEach(el => {
-                            if (el) el.classList.add('warning');
-                        });
+                        status = 'warning';
                     }
                 }
+
+                analogElements.forEach(el => {
+                    if (el) el.dataset.status = status;
+                });
             }
 
             updateStatus(secs) {
