@@ -2591,30 +2591,86 @@
                 this.loadLocalBackground();
             }
 
-            handleLocalBgUpload(event) {
+            // FIX BUG-025, BUG-026: Validate file upload with MIME and magic bytes
+            async validateImageFile(file) {
+                // Проверка размера
+                const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+                if (file.size > MAX_SIZE) {
+                    return { valid: false, error: 'Файл слишком большой (максимум 10 МБ)' };
+                }
+
+                // Проверка MIME type
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+                if (!allowedTypes.includes(file.type)) {
+                    return { valid: false, error: 'Неподдерживаемый тип файла. Используйте JPG, PNG, GIF, WebP или BMP' };
+                }
+
+                // Проверка magic bytes (первые байты файла)
+                try {
+                    const buffer = await file.slice(0, 12).arrayBuffer();
+                    const bytes = new Uint8Array(buffer);
+
+                    // Сигнатуры форматов изображений
+                    const signatures = {
+                        jpeg: [[0xFF, 0xD8, 0xFF]],
+                        png: [[0x89, 0x50, 0x4E, 0x47]],
+                        gif: [[0x47, 0x49, 0x46, 0x38]],
+                        webp: [[0x52, 0x49, 0x46, 0x46]], // RIFF
+                        bmp: [[0x42, 0x4D]] // BM
+                    };
+
+                    let isValid = false;
+                    for (const sigs of Object.values(signatures)) {
+                        for (const sig of sigs) {
+                            if (sig.every((byte, i) => bytes[i] === byte)) {
+                                isValid = true;
+                                break;
+                            }
+                        }
+                        if (isValid) break;
+                    }
+
+                    if (!isValid) {
+                        return { valid: false, error: 'Файл поврежден или не является изображением' };
+                    }
+                } catch (error) {
+                    return { valid: false, error: 'Ошибка при проверке файла' };
+                }
+
+                return { valid: true };
+            }
+
+            async handleLocalBgUpload(event) {
                 const file = event.target.files[0];
                 if (!file) return;
 
-                // Проверяем размер (макс 10MB)
-                if (file.size > 10 * 1024 * 1024) {
-                    alert('Файл слишком большой. Максимум 10 МБ.');
+                // FIX BUG-025, BUG-026: Validate file before upload
+                const validation = await this.validateImageFile(file);
+                if (!validation.valid) {
+                    alert(validation.error);
+                    event.target.value = ''; // Сбрасываем input
                     return;
                 }
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const base64 = e.target.result;
-                    
+
                     // Сохраняем в localStorage
                     localStorage.setItem('localBgImage', base64);
-                    
+
                     // Обновляем UI
                     this.showLocalBgPreview(base64);
-                    
+
                     // Применяем настройки
                     this.pushDisplaySettings();
                 };
-                
+
+                reader.onerror = () => {
+                    alert('Ошибка при чтении файла');
+                    event.target.value = '';
+                };
+
                 reader.readAsDataURL(file);
                 event.target.value = ''; // Сбрасываем input
             }
