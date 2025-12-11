@@ -139,8 +139,10 @@ function createControlWindow() {
         minWidth: 350,
         minHeight: 300,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
+            sandbox: false  // Нужен для доступа к localStorage
         },
         title: 'Управление Таймером',
         icon: path.join(__dirname, 'icon.ico')
@@ -171,8 +173,10 @@ function createWidgetWindow() {
         skipTaskbar: true,
         resizable: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
+            sandbox: false  // Нужен для доступа к localStorage
         },
         hasShadow: false
     });
@@ -200,8 +204,10 @@ function createClockWidgetWindow() {
         skipTaskbar: true,
         resizable: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
+            sandbox: false  // Нужен для доступа к localStorage
         },
         hasShadow: false
     });

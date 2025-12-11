@@ -1450,6 +1450,60 @@
             25% { transform: translateX(-5px); }
             75% { transform: translateX(5px); }
         }
+
+        /* FIX BUG-028: Loading indicator styles */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-text {
+            color: white;
+            margin-top: 15px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Inline loading indicator (small) */
+        .inline-loader {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(74, 175, 80, 0.3);
+            border-top: 2px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .loading-button {
+            opacity: 0.6;
+            pointer-events: none;
+            position: relative;
+        }
     </style>
 </head>
 <body class="control-window">
@@ -2114,15 +2168,100 @@
         </div>
     </div>
 
+    <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
+    <script src="ipc-compat.js"></script>
+
     <script>
-        const { ipcRenderer } = require('electron');
-        
+        // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
+
         const debounce = (fn, delay = 120) => {
             let t;
             return (...args) => {
                 clearTimeout(t);
                 t = setTimeout(() => fn(...args), delay);
             };
+        };
+
+        // FIX BUG-028: Loading indicator utilities
+        const LoadingIndicator = {
+            /**
+             * Show fullscreen loading overlay
+             * @param {string} message - Loading message to display
+             * @returns {HTMLElement} - Overlay element (to remove later)
+             */
+            show(message = 'Загрузка...') {
+                const overlay = document.createElement('div');
+                overlay.className = 'loading-overlay';
+                overlay.innerHTML = `
+                    <div style="text-align: center;">
+                        <div class="loading-spinner"></div>
+                        <div class="loading-text">${message}</div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                return overlay;
+            },
+
+            /**
+             * Hide loading overlay
+             * @param {HTMLElement} overlay - Overlay element to remove
+             */
+            hide(overlay) {
+                if (overlay && overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            },
+
+            /**
+             * Show inline loading indicator in a button
+             * @param {HTMLElement} button - Button element
+             * @returns {HTMLElement} - Loader element
+             */
+            showInline(button) {
+                if (!button) return null;
+
+                button.disabled = true;
+                button.classList.add('loading-button');
+
+                const loader = document.createElement('span');
+                loader.className = 'inline-loader';
+                button.appendChild(loader);
+
+                return loader;
+            },
+
+            /**
+             * Hide inline loading indicator
+             * @param {HTMLElement} button - Button element
+             * @param {HTMLElement} loader - Loader element to remove
+             */
+            hideInline(button, loader) {
+                if (!button) return;
+
+                button.disabled = false;
+                button.classList.remove('loading-button');
+
+                if (loader && loader.parentNode) {
+                    loader.parentNode.removeChild(loader);
+                }
+            },
+
+            /**
+             * Wrap async function with loading indicator
+             * @param {Function} asyncFn - Async function to wrap
+             * @param {string} message - Loading message
+             * @returns {Function} - Wrapped function
+             */
+            wrap(asyncFn, message = 'Загрузка...') {
+                return async (...args) => {
+                    const overlay = this.show(message);
+                    try {
+                        return await asyncFn(...args);
+                    } finally {
+                        this.hide(overlay);
+                    }
+                };
+            }
         };
 
         class TimerController {
@@ -2644,35 +2783,49 @@
                 const file = event.target.files[0];
                 if (!file) return;
 
-                // FIX BUG-025, BUG-026: Validate file before upload
-                const validation = await this.validateImageFile(file);
-                if (!validation.valid) {
-                    alert(validation.error);
+                // FIX BUG-028: Show loading indicator during file processing
+                const loadingOverlay = LoadingIndicator.show('Загрузка изображения...');
+
+                try {
+                    // FIX BUG-025, BUG-026: Validate file before upload
+                    const validation = await this.validateImageFile(file);
+                    if (!validation.valid) {
+                        alert(validation.error);
+                        event.target.value = ''; // Сбрасываем input
+                        LoadingIndicator.hide(loadingOverlay);
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const base64 = e.target.result;
+
+                        // Сохраняем в localStorage
+                        localStorage.setItem('localBgImage', base64);
+
+                        // Обновляем UI
+                        this.showLocalBgPreview(base64);
+
+                        // Применяем настройки
+                        this.pushDisplaySettings();
+
+                        // Hide loading indicator
+                        LoadingIndicator.hide(loadingOverlay);
+                    };
+
+                    reader.onerror = () => {
+                        alert('Ошибка при чтении файла');
+                        event.target.value = '';
+                        LoadingIndicator.hide(loadingOverlay);
+                    };
+
+                    reader.readAsDataURL(file);
                     event.target.value = ''; // Сбрасываем input
-                    return;
-                }
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const base64 = e.target.result;
-
-                    // Сохраняем в localStorage
-                    localStorage.setItem('localBgImage', base64);
-
-                    // Обновляем UI
-                    this.showLocalBgPreview(base64);
-
-                    // Применяем настройки
-                    this.pushDisplaySettings();
-                };
-
-                reader.onerror = () => {
-                    alert('Ошибка при чтении файла');
+                } catch (error) {
+                    alert('Произошла ошибка при обработке файла');
+                    LoadingIndicator.hide(loadingOverlay);
                     event.target.value = '';
-                };
-
-                reader.readAsDataURL(file);
-                event.target.value = ''; // Сбрасываем input
+                }
             }
 
             showLocalBgPreview(base64) {
@@ -3539,17 +3692,129 @@
             question.addEventListener('click', () => {
                 const item = question.parentElement;
                 const wasOpen = item.classList.contains('open');
-                
+
                 // Close all items in the same section
                 const section = item.closest('.faq-section');
                 section.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
-                
+
                 // Toggle clicked item
                 if (!wasOpen) {
                     item.classList.add('open');
                 }
             });
         });
+
+        // FIX BUG-027: Keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            // Ignore if user is typing in an input field
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Space: Start/Pause timer
+            if (event.code === 'Space') {
+                event.preventDefault();
+                if (window.timerController && window.timerController.state) {
+                    if (window.timerController.state.isRunning) {
+                        window.timerController.pauseTimer();
+                    } else {
+                        window.timerController.startTimer();
+                    }
+                }
+            }
+
+            // R: Reset timer
+            else if (event.code === 'KeyR' && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                if (window.timerController) {
+                    window.timerController.resetTimer();
+                }
+            }
+
+            // S: Stop timer
+            else if (event.code === 'KeyS' && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                if (window.timerController) {
+                    window.timerController.stopTimer();
+                }
+            }
+
+            // W: Open widget
+            else if (event.code === 'KeyW' && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                ipcRenderer.send('open-widget');
+            }
+
+            // D: Open display (fullscreen)
+            else if (event.code === 'KeyD' && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                if (window.timerController) {
+                    window.timerController.openDisplayWindow();
+                }
+            }
+
+            // 1-5: Quick timer presets
+            else if (event.code >= 'Digit1' && event.code <= 'Digit5' && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
+                const presets = [60, 300, 600, 900, 1800]; // 1, 5, 10, 15, 30 minutes
+                if (window.timerController) {
+                    window.timerController.setTimer(presets[presetIndex]);
+                }
+            }
+
+            // Escape: Close widget/display
+            else if (event.code === 'Escape') {
+                event.preventDefault();
+                ipcRenderer.send('close-widget');
+                ipcRenderer.send('close-display');
+            }
+
+            // F1: Show help/shortcuts
+            else if (event.code === 'F1') {
+                event.preventDefault();
+                showKeyboardShortcuts();
+            }
+        });
+
+        // Show keyboard shortcuts help
+        function showKeyboardShortcuts() {
+            const shortcuts = `
+                <div style="background: white; padding: 20px; border-radius: 10px; max-width: 400px;">
+                    <h3 style="margin-top: 0; color: #333;">⌨️ Горячие клавиши</h3>
+                    <div style="color: #666; line-height: 1.8;">
+                        <b>Space</b> - Старт/Пауза таймера<br>
+                        <b>R</b> - Сброс таймера<br>
+                        <b>S</b> - Остановить таймер<br>
+                        <b>W</b> - Открыть виджет<br>
+                        <b>D</b> - Открыть полноэкранный дисплей<br>
+                        <b>1-5</b> - Быстрые пресеты (1, 5, 10, 15, 30 мин)<br>
+                        <b>Esc</b> - Закрыть виджет/дисплей<br>
+                        <b>F1</b> - Показать эту справку<br>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()"
+                            style="margin-top: 15px; padding: 8px 20px; background: #4CAF50;
+                                   color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Закрыть
+                    </button>
+                </div>
+            `;
+
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.7); display: flex; align-items: center;
+                justify-content: center; z-index: 10000;
+            `;
+            overlay.innerHTML = shortcuts;
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+            document.body.appendChild(overlay);
+        }
+
+        // Log keyboard shortcuts on startup (can be removed later)
+        console.log('⌨️ Keyboard shortcuts enabled. Press F1 for help.');
     </script>
 </body>
 </html>
