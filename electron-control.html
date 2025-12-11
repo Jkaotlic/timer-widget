@@ -1663,6 +1663,32 @@
         .tab-content.active::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+
+        /* Media queries for large screens */
+        @media (min-height: 900px) {
+            .tab-content.active {
+                max-height: calc(100vh - 340px);
+            }
+
+            .advanced-settings .content-section {
+                max-height: calc(100vh - 260px);
+            }
+        }
+
+        @media (min-width: 500px) {
+            .control-window {
+                padding: 20px;
+            }
+
+            .timer-display-main {
+                font-size: 2.8rem;
+            }
+
+            .main-btn {
+                width: 70px;
+                height: 70px;
+            }
+        }
     </style>
 </head>
 <body class="control-window">
