@@ -44,6 +44,7 @@ jobs:
 
       - name: Set version
         id: set_version
+        shell: bash
         run: |
           # Compute a clean version string (strip leading 'v' if present)
           ver="${GITHUB_REF_NAME:-${GITHUB_RUN_ID}}"
@@ -78,6 +79,7 @@ jobs:
 
       - name: Set release version
         id: set_release_version
+        shell: bash
         run: |
           ver="${GITHUB_REF_NAME:-${GITHUB_RUN_ID}}"
           ver="${ver#v}"
