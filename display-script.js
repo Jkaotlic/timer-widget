@@ -170,16 +170,14 @@ class DisplayTimer {
     }
 
     detectElectronAndSetup() {
-        try {
-            const { ipcRenderer } = require('electron');
-            if (ipcRenderer) {
-                this.ipcRenderer = ipcRenderer;
-                this.setupIPC();
-            }
-        } catch (_) {
-            // Браузерный режим - синхронизация через localStorage
-            this.startLocalStorageSync();
+        if (window.ipcRenderer) {
+            this.ipcRenderer = window.ipcRenderer;
+            this.setupIPC();
+            return;
         }
+
+        // Браузерный режим - синхронизация через localStorage
+        this.startLocalStorageSync();
     }
 
     setupIPC() {

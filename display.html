@@ -2,8 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Таймер - Полноэкранное отображение</title>
+    <link rel="stylesheet" href="components.css">
     <style>
         * {
             margin: 0;
@@ -1423,6 +1425,7 @@
         </div>
     </div>
 
+    <script src="ipc-compat.js"></script>
     <script src="security.js"></script>
     <script src="utils.js"></script>
     <script src="display-script.js"></script>

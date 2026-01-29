@@ -1,7 +1,7 @@
 # Timer Widget - Техническая документация
 
-> Версия: 1.1.0
-> Дата обновления: 2025-12-09
+> Версия: 1.2.2
+> Дата обновления: 2026-01-20
 
 ## Оглавление
 
@@ -23,7 +23,7 @@
 
 ### Ключевые характеристики
 
-- **Платформа:** Electron v28.0.0
+- **Платформа:** Electron v33.2.0
 - **Язык:** Vanilla JavaScript (без фреймворков)
 - **Поддерживаемые ОС:** Windows, macOS
 - **Архитектура:** Multi-window Electron app с IPC синхронизацией
@@ -31,8 +31,8 @@
 ### Основные технологии
 
 ```
-Electron 28.0.0          - Core framework
-Electron Builder 24.9.1  - Build and packaging
+Electron 33.2.0          - Core framework
+Electron Builder 25.1.8  - Build and packaging
 HTML5/CSS3              - UI rendering
 Node.js                 - Main process runtime
 ```
@@ -798,8 +798,8 @@ npm run pack           # Упаковка без создания инсталл
 }
 
 // Выходные файлы:
-- TimerWidget-Setup-1.1.0.exe     (NSIS installer)
-- TimerWidget-Portable-1.1.0.exe  (Portable)
+- TimerWidget-Setup-1.2.2.exe     (NSIS installer)
+- TimerWidget-Portable-1.2.2.exe  (Portable)
 ```
 
 #### macOS
@@ -811,8 +811,8 @@ npm run pack           # Упаковка без создания инсталл
 }
 
 // Выходные файлы:
-- TimerWidget-1.1.0.dmg           (DMG package)
-- TimerWidget-1.1.0-mac.zip       (ZIP archive)
+- TimerWidget-1.2.2.dmg           (DMG package)
+- TimerWidget-1.2.2-mac.zip       (ZIP archive)
 ```
 
 ### CI/CD
@@ -979,13 +979,15 @@ localStorage:
 ```javascript
 // webPreferences
 {
-  nodeIntegration: true,        // Включена интеграция Node.js
-  contextIsolation: false       // Отключена изоляция контекста
+  nodeIntegration: false,       // Отключена интеграция Node.js
+  contextIsolation: true,       // Включена изоляция контекста
+  preload: path.join(__dirname, 'preload.js'),
+  sandbox: true
 }
 
 // Примечание:
-// Это небезопасная конфигурация для приложений с web-контентом,
-// но приемлемо для локального desktop-приложения
+// Это безопасная конфигурация для локального desktop-приложения.
+// Inline-скрипты допускаются CSP (см. ограничение ниже).
 ```
 
 ### Оптимизация производительности
@@ -1037,14 +1039,12 @@ window.addEventListener('beforeunload', () => {
 
 ## Дорожная карта
 
-### Текущая версия: 1.1.0
+### Текущая версия: 1.2.2
 
 **Добавлено:**
-- Аналоговые мини-часы в информационных блоках дисплея
-- Стиль аналоговых часов для полноэкранного режима
-- Улучшения LED-стиля для цифр
-- Кнопка закрытия в виджетах
-- Индикатор статуса переработки (overtime)
+- Безопасная конфигурация окон (contextIsolation + sandbox)
+- CSP во всех HTML окнах
+- Унифицированный IPC allowlist
 
 ### История версий
 
@@ -1059,6 +1059,11 @@ window.addEventListener('beforeunload', () => {
 - Мини-аналоговые часы
 - Виджет часов (clock widget)
 - Улучшения дизайна
+
+**v1.2.2** - Security & stability
+- Безопасная конфигурация окон (contextIsolation + sandbox)
+- CSP во всех HTML окнах
+- Унифицированный IPC allowlist
 
 ---
 
@@ -1112,7 +1117,7 @@ console.log('[RENDERER]', message);
 
 ## Известные ограничения
 
-1. **Безопасность:** nodeIntegration включена (не рекомендуется для web-контента)
+1. **Безопасность:** CSP использует `unsafe-inline` из-за inline-скриптов
 2. **LocalStorage:** Ограничение размера ~10MB (для звуков и фонов)
 3. **Производительность:** Flip-анимации могут быть тяжелыми на слабых системах
 4. **Платформы:** Только Windows и macOS (Linux не поддерживается официально)

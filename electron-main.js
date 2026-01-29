@@ -180,7 +180,7 @@ function createControlWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: false  // Нужен для доступа к localStorage
+            sandbox: true
         },
         title: 'Управление Таймером',
         icon: path.join(__dirname, 'icon.ico'),
@@ -220,7 +220,7 @@ function createWidgetWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: false  // Нужен для доступа к localStorage
+            sandbox: true
         },
         hasShadow: false
     });
@@ -256,7 +256,7 @@ function createClockWidgetWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: false  // Нужен для доступа к localStorage
+            sandbox: true
         },
         hasShadow: false
     });
@@ -297,8 +297,10 @@ function createDisplayWindow(displayIndex) {
         fullscreen: true,
         frame: false,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
+            sandbox: true
         }
     });
 
