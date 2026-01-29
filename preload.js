@@ -11,6 +11,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 const ALLOWED_CHANNELS = {
     // Timer commands
     send: [
+        'get-timer-state',
+        'get-displays',
         'timer-command',
         'timer-control',
         'colors-update',
@@ -22,6 +24,17 @@ const ALLOWED_CHANNELS = {
         'close-display',
         'open-clock-widget',
         'close-clock-widget',
+        'clock-widget-resize',
+        'clock-widget-scale',
+        'clock-widget-set-style',
+        'clock-widget-settings',
+        'resize-control-window',
+        'widget-set-opacity',
+        'widget-set-position',
+        'widget-resize',
+        'widget-scale',
+        'widget-move',
+        'widget-get-size',
         'minimize-window',
         'maximize-window',
         'close-window',
@@ -34,7 +47,10 @@ const ALLOWED_CHANNELS = {
         'timer-minute',
         'timer-finished',
         'display-settings-update',
-        'config-update'
+        'config-update',
+        'displays-list',
+        'set-clock-style',
+        'clock-settings'
     ]
 };
 
