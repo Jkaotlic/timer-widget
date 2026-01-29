@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3)'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -46,9 +51,15 @@ jobs:
         id: set_version
         shell: bash
         run: |
-          # Compute a clean version string (strip leading 'v' if present)
-          ver="${GITHUB_REF_NAME:-${GITHUB_RUN_ID}}"
-          ver="${ver#v}"
+          # Use input version if provided, otherwise read from package.json, fallback to ref/run_id
+          if [ -n "${{ inputs.version }}" ]; then
+            ver="${{ inputs.version }}"
+          elif [ -f "package.json" ]; then
+            ver=$(node -p "require('./package.json').version")
+          else
+            ver="${GITHUB_REF_NAME:-${GITHUB_RUN_ID}}"
+            ver="${ver#v}"
+          fi
           echo "version=$ver" >> $GITHUB_OUTPUT
 
       - name: Upload artifacts
@@ -75,8 +86,13 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
-
+          # Use input version if provided, otherwise extract from tag
+          if [ -n "${{ inputs.version }}" ]; then
+            ver="${{ inputs.version }}"
+          else
+            ver="${GITHUB_REF_NAME:-${GITHUB_RUN_ID}}"
+            ver="${ver#v}"
+          fi
       - name: Set release version
         id: set_release_version
         shell: bash
