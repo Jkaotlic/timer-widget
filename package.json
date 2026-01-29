@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -13,7 +13,12 @@
     "build:all": "electron-builder --win --mac",
     "pack": "electron-builder --dir"
   },
-  "keywords": ["timer", "widget", "overlay", "transparent"],
+  "keywords": [
+    "timer",
+    "widget",
+    "overlay",
+    "transparent"
+  ],
   "author": "Jkaotlic",
   "license": "MIT",
   "devDependencies": {
@@ -28,7 +33,10 @@
       "buildResources": "build"
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "signAndEditExecutable": false,
       "icon": "build/icon.png"
     },
@@ -41,7 +49,10 @@
       "artifactName": "${productName}-Portable.exe"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.utilities",
       "artifactName": "${productName}-${version}.${ext}",
       "icon": "build/icon.png"
