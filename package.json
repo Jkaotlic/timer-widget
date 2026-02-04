@@ -54,7 +54,7 @@
         "zip"
       ],
       "category": "public.app-category.utilities",
-      "artifactName": "${productName}-${version}.${ext}",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "build/icon.png"
     },
     "dmg": {
