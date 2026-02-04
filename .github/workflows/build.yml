@@ -19,7 +19,7 @@ jobs:
         include:
           - os: windows-latest
             platform: win
-          - os: macos-13
+          - os: macos-15-intel
             platform: mac
             arch: x64
 
