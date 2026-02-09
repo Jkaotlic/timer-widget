@@ -2371,7 +2371,7 @@
                                 <div class="shortcut"><span class="key">Space</span> <span class="shortcut-desc">Старт/Пауза таймера</span></div>
                                 <div class="shortcut"><span class="key">R</span> <span class="shortcut-desc">Сброс таймера (возврат к установленному времени)</span></div>
                                 <div class="shortcut"><span class="key">S</span> <span class="shortcut-desc">Остановить таймер</span></div>
-                                <div class="shortcut"><span class="key">1-5</span> <span class="shortcut-desc">Быстрые пресеты (5, 10, 15, 30, 45 мин)</span></div>
+                                <div class="shortcut"><span class="key">1-5</span> <span class="shortcut-desc">Быстрые пресеты (1, 5, 10, 15, 30 мин)</span></div>
                             </div>
                         </div>
                     </div>
@@ -2410,7 +2410,7 @@
                                 <li>🖱️ <strong>Ctrl+Колесо мыши</strong> - самый быстрый способ изменить размер любого окна</li>
                                 <li>⏱️ Используйте виджет для постоянного отслеживания времени поверх других окон</li>
                                 <li>🎥 Display идеален для презентаций, трансляций и мероприятий</li>
-                                <li>⌨️ Горячие клавиши 1-5 быстро устанавливают популярные интервалы (5, 10, 15, 30, 45 мин)</li>
+                                <li>⌨️ Горячие клавиши 1-5 быстро устанавливают популярные интервалы (1, 5, 10, 15, 30 мин)</li>
                                 <li>💾 Все настройки сохраняются автоматически</li>
                                 <li>🔄 Все окна синхронизированы — изменения применяются везде мгновенно</li>
                                 <li>📁 Поддерживается загрузка собственных звуков и фоновых изображений</li>
@@ -2442,12 +2442,19 @@
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
         const debounce = (fn, delay = 120) => {
-            let t;
+            let timeoutId;
             return (...args) => {
-                clearTimeout(t);
-                t = setTimeout(() => fn(...args), delay);
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => fn(...args), delay);
             };
         };
+
+        // FIX BUG-014: Safe JSON.parse helper (fallback if SecurityUtils not loaded)
+        function safeJSONParse(jsonString, defaultValue = null) {
+            if (!jsonString || typeof jsonString !== 'string') return defaultValue;
+            try { return JSON.parse(jsonString); }
+            catch (e) { console.error('JSON parse error:', e.message); return defaultValue; }
+        }
 
         // FIX BUG-028: Loading indicator utilities
         const LoadingIndicator = {
@@ -2459,10 +2466,14 @@
             show(message = 'Загрузка...') {
                 const overlay = document.createElement('div');
                 overlay.className = 'loading-overlay';
+                // Используем escapeHTML для защиты от XSS
+                const safeMessage = window.SecurityUtils && window.SecurityUtils.escapeHTML 
+                    ? window.SecurityUtils.escapeHTML(message) 
+                    : message.replace(/[&<>"'/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'})[c]);
                 overlay.innerHTML = `
                     <div style="text-align: center;">
                         <div class="loading-spinner"></div>
-                        <div class="loading-text">${message}</div>
+                        <div class="loading-text">${safeMessage}</div>
                     </div>
                 `;
                 document.body.appendChild(overlay);
@@ -2538,6 +2549,7 @@
                 this.isRunning = false;
                 this.isPaused = false;
                 this.lastTimestamp = 0;
+                this.lastUpdateCounter = -1;
                 this.wasFinished = false;
                 this.currentBgMode = 'solid';
 
@@ -2712,14 +2724,6 @@
             }
 
             attachEvents() {
-                // Пресеты времени
-                document.querySelectorAll('.preset-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const minutes = parseInt(btn.dataset.minutes);
-                        this.setTime(minutes * 60);
-                    });
-                });
-
                 // Установка времени вручную
                 document.getElementById('setCustomTime').addEventListener('click', () => {
                     // FIX BUG-011: Валидация пользовательского ввода
@@ -2904,8 +2908,9 @@
 
                 // Звуки
                 this.soundMasterEl.addEventListener('change', () => {
-                    document.getElementById('soundSettings').style.opacity = 
-                        this.soundMasterEl.checked ? '1' : '0.5';
+                    const soundSettings = document.getElementById('soundSettings');
+                    soundSettings.style.opacity = this.soundMasterEl.checked ? '1' : '0.5';
+                    soundSettings.style.pointerEvents = this.soundMasterEl.checked ? 'auto' : 'none';
                     this.saveExtSettings();
                 });
 
@@ -3127,7 +3132,9 @@
 
             loadLocalBackground() {
                 const savedBg = localStorage.getItem('localBgImage');
-                const savedSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                const savedSettings = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {})
+                    : safeJSONParse(localStorage.getItem('localBgSettings'), {});
                 
                 if (savedBg) {
                     this.showLocalBgPreview(savedBg);
@@ -3176,7 +3183,9 @@
                 // Загрузка цветов
                 const savedColors = localStorage.getItem('timerColors');
                 if (savedColors) {
-                    const c = JSON.parse(savedColors);
+                    const c = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                        ? window.SecurityUtils.safeJSONParse(savedColors, {})
+                        : safeJSONParse(savedColors, {});
                     this.currentColors = {
                         timer: c.timer || '#667eea',
                         progress: c.progress || '#764ba2',
@@ -3185,7 +3194,9 @@
                 }
 
                 // Загрузка расширенных настроек
-                const ext = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+                const ext = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
+                    : safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 
                 this.allowNegativeEl.checked = !!ext.allowNegative;
                 document.getElementById('overrunRow').style.display = ext.allowNegative ? 'flex' : 'none';
@@ -3197,6 +3208,11 @@
                 }
 
                 this.soundMasterEl.checked = ext.soundMasterEnabled !== false;
+                // FIX: Apply initial visual state for sound master toggle
+                const soundSettings = document.getElementById('soundSettings');
+                soundSettings.style.opacity = this.soundMasterEl.checked ? '1' : '0.5';
+                soundSettings.style.pointerEvents = this.soundMasterEl.checked ? 'auto' : 'none';
+
                 this.soundStartEl.checked = !!ext.soundStartEnabled;
                 this.soundEndEl.checked = ext.soundEndEnabled !== false;
                 this.soundMinuteEl.checked = !!ext.soundMinuteEnabled;
@@ -3287,7 +3303,9 @@
                     clockStyle: this.clockStyleEl.value
                 };
 
-                const prev = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+                const prev = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
+                    : safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
             }
 
@@ -3296,10 +3314,12 @@
                 
                 // Получаем локальный фон и его настройки
                 const localBgImage = localStorage.getItem('localBgImage') || '';
-                const localBgSettings = JSON.parse(localStorage.getItem('localBgSettings') || '{}');
+                const localBgSettings = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {})
+                    : safeJSONParse(localStorage.getItem('localBgSettings'), {});
                 
                 const settings = {
-                    clockStyle: 'circle',
+                    clockStyle: this.syncClockStyle ? this.timerStyleEl.value : (this.clockStyleEl ? this.clockStyleEl.value : 'circle'),
                     bgMode: this.currentBgMode,
                     bgSolid: document.getElementById('bgSolidColor').value,
                     bgGrad1: document.getElementById('bgGrad1').value,
@@ -3347,7 +3367,9 @@
             }
 
             loadClockSettings() {
-                const settings = JSON.parse(localStorage.getItem('clockWidgetSettings') || '{}');
+                const settings = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
+                    : safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
                 
                 this.clockShowDateEl.checked = !!settings.showDate;
                 this.clockShowTimezoneEl.checked = !!settings.showTimezone;
@@ -3368,7 +3390,10 @@
                 });
 
                 ipcRenderer.on('timer-state', (event, state) => {
-                    if (state.timestamp && state.timestamp <= this.lastTimestamp) return;
+                    // FIX: Use monotonic updateCounter instead of timestamp for dedup
+                    const updateCounter = state.updateCounter || 0;
+                    if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) return;
+                    this.lastUpdateCounter = updateCounter;
                     this.lastTimestamp = state.timestamp || Date.now();
 
                     const wasFinishedBefore = this.wasFinished;
@@ -3447,12 +3472,13 @@
                 // Добавляем класс ошибки к input
                 inputElement.classList.add('input-error');
 
-                // Создаем или обновляем сообщение об ошибке
-                let errorDiv = inputElement.nextElementSibling;
-                if (!errorDiv || !errorDiv.classList.contains('error-message')) {
+                // FIX: Insert error outside the flex container to avoid breaking layout
+                const container = inputElement.closest('.time-input-group') || inputElement.parentNode;
+                let errorDiv = container.querySelector('.error-message');
+                if (!errorDiv) {
                     errorDiv = document.createElement('div');
                     errorDiv.className = 'error-message';
-                    inputElement.parentNode.insertBefore(errorDiv, inputElement.nextSibling);
+                    container.parentNode.insertBefore(errorDiv, container.nextSibling);
                 }
                 errorDiv.textContent = message;
                 errorDiv.style.display = 'block';
@@ -3466,8 +3492,9 @@
                 if (!inputElement) return;
 
                 inputElement.classList.remove('input-error');
-                const errorDiv = inputElement.nextElementSibling;
-                if (errorDiv && errorDiv.classList.contains('error-message')) {
+                const container = inputElement.closest('.time-input-group') || inputElement.parentNode;
+                const errorDiv = container.parentNode.querySelector('.error-message');
+                if (errorDiv) {
                     errorDiv.style.display = 'none';
                 }
             }
@@ -3553,6 +3580,11 @@
             }
 
             formatTime(seconds) {
+                // Используем централизованную функцию из utils.js
+                if (typeof formatTimeShort !== 'undefined') {
+                    return formatTimeShort(seconds);
+                }
+                // Fallback если utils.js не загружен
                 const neg = seconds < 0;
                 const abs = Math.abs(seconds);
                 const h = Math.floor(abs / 3600);
@@ -3600,7 +3632,11 @@
                     return;
                 }
 
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // FIX: Reuse shared AudioContext to prevent leak (browsers limit ~6 concurrent)
+                if (!this._audioCtx || this._audioCtx.state === 'closed') {
+                    this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const ctx = this._audioCtx;
                 // Возобновляем AudioContext если он приостановлен
                 if (ctx.state === 'suspended') {
                     await ctx.resume();
@@ -3791,13 +3827,29 @@
                 const file = event.target.files[0];
                 if (!file) return;
 
+                // FIX BUG-025: Validation for sound file uploads
+                const MAX_SOUND_SIZE = 5 * 1024 * 1024; // 5 MB (matches UI text)
+                if (file.size > MAX_SOUND_SIZE) {
+                    alert('Файл слишком большой (максимум 10 MB)');
+                    event.target.value = '';
+                    return;
+                }
+                const allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'];
+                if (file.type && !allowedAudioTypes.includes(file.type)) {
+                    alert('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC');
+                    event.target.value = '';
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const base64 = e.target.result;
                     const name = file.name.replace(/\.[^.]+$/, ''); // Убираем расширение
                     
                     // Сохраняем в localStorage
-                    const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                    const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                        ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
+                        : safeJSONParse(localStorage.getItem('customSounds'), []);
                     
                     // Проверяем, не существует ли уже такой звук
                     const exists = customSounds.find(s => s.name === name);
@@ -3816,14 +3868,18 @@
             }
 
             loadCustomSounds() {
-                const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
+                    : safeJSONParse(localStorage.getItem('customSounds'), []);
                 const listEl = document.getElementById('customSoundList');
                 
                 // Очищаем список
                 listEl.innerHTML = '';
                 
-                // Обновляем списки в select'ах
+                // Обновляем списки в select'ах (сохраняя текущий выбор)
                 ['Start', 'End', 'Minute'].forEach(type => {
+                    const select = document.getElementById(`sound${type}Preset`);
+                    const savedValue = select.value;
                     const group = document.getElementById(`customSoundsGroup${type}`);
                     group.innerHTML = '';
                     customSounds.forEach(sound => {
@@ -3832,6 +3888,10 @@
                         opt.textContent = sound.name;
                         group.appendChild(opt);
                     });
+                    // Restore selection if it still exists
+                    if (savedValue && select.querySelector(`option[value="${CSS.escape(savedValue)}"]`)) {
+                        select.value = savedValue;
+                    }
                 });
 
                 // Отображаем список звуков
@@ -3843,10 +3903,14 @@
                 customSounds.forEach(sound => {
                     const item = document.createElement('div');
                     item.className = 'custom-sound-item';
+                    // Используем escapeHTML для защиты от XSS
+                    const safeName = window.SecurityUtils && window.SecurityUtils.escapeHTML 
+                        ? window.SecurityUtils.escapeHTML(sound.name) 
+                        : sound.name.replace(/[&<>"'/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'})[c]);
                     item.innerHTML = `
-                        <span class="name">🎵 ${sound.name}</span>
-                        <button class="btn play-btn" data-name="${sound.name}" title="Воспроизвести">▶</button>
-                        <button class="btn delete-btn" data-name="${sound.name}" title="Удалить">✕</button>
+                        <span class="name">🎵 ${safeName}</span>
+                        <button class="btn play-btn" data-name="${safeName}" title="Воспроизвести">▶</button>
+                        <button class="btn delete-btn" data-name="${safeName}" title="Удалить">✕</button>
                     `;
                     listEl.appendChild(item);
                 });
@@ -3862,7 +3926,9 @@
             }
 
             async playCustomSound(name) {
-                const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
+                    : safeJSONParse(localStorage.getItem('customSounds'), []);
                 const sound = customSounds.find(s => s.name === name);
                 if (!sound) {
                     console.warn('Custom sound not found:', name);
@@ -3883,7 +3949,9 @@
             }
 
             deleteCustomSound(name) {
-                const customSounds = JSON.parse(localStorage.getItem('customSounds') || '[]');
+                const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
+                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
+                    : safeJSONParse(localStorage.getItem('customSounds'), []);
                 const filtered = customSounds.filter(s => s.name !== name);
                 localStorage.setItem('customSounds', JSON.stringify(filtered));
                 this.loadCustomSounds();
@@ -3922,7 +3990,7 @@
         `;
         document.head.appendChild(style);
 
-        new TimerController();
+        window.timerController = new TimerController();
 
         // FAQ Modal Logic
         const faqBtn = document.getElementById('faqBtn');
@@ -3981,11 +4049,11 @@
             // Space: Start/Pause timer
             if (event.code === 'Space') {
                 event.preventDefault();
-                if (window.timerController && window.timerController.state) {
-                    if (window.timerController.state.isRunning) {
-                        window.timerController.pauseTimer();
+                if (window.timerController) {
+                    if (window.timerController.isRunning) {
+                        window.timerController.pause();
                     } else {
-                        window.timerController.startTimer();
+                        window.timerController.start();
                     }
                 }
             }
@@ -3994,15 +4062,15 @@
             else if (event.code === 'KeyR' && !event.ctrlKey && !event.metaKey) {
                 event.preventDefault();
                 if (window.timerController) {
-                    window.timerController.resetTimer();
+                    window.timerController.reset();
                 }
             }
 
-            // S: Stop timer
+            // S: Stop timer (pause)
             else if (event.code === 'KeyS' && !event.ctrlKey && !event.metaKey) {
                 event.preventDefault();
                 if (window.timerController) {
-                    window.timerController.stopTimer();
+                    window.timerController.pause();
                 }
             }
 
@@ -4015,9 +4083,8 @@
             // D: Open display (fullscreen)
             else if (event.code === 'KeyD' && !event.ctrlKey && !event.metaKey) {
                 event.preventDefault();
-                if (window.timerController) {
-                    window.timerController.openDisplayWindow();
-                }
+                const displayIndex = document.getElementById('displaySelect')?.value || 'auto';
+                ipcRenderer.send('open-display', { displayIndex });
             }
 
             // 1-5: Quick timer presets
@@ -4026,15 +4093,16 @@
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
                 const presets = [60, 300, 600, 900, 1800]; // 1, 5, 10, 15, 30 minutes
                 if (window.timerController) {
-                    window.timerController.setTimer(presets[presetIndex]);
+                    window.timerController.setTime(presets[presetIndex]);
                 }
             }
 
-            // Escape: Close widget/display
+            // Escape: Close widget/display/clock-widget
             else if (event.code === 'Escape') {
                 event.preventDefault();
                 ipcRenderer.send('close-widget');
                 ipcRenderer.send('close-display');
+                ipcRenderer.send('close-clock-widget');
             }
 
             // F1: Show help/shortcuts
@@ -4046,6 +4114,10 @@
 
         // Show keyboard shortcuts help
         function showKeyboardShortcuts() {
+            // Prevent stacking multiple overlays
+            const existing = document.getElementById('keyboard-shortcuts-overlay');
+            if (existing) { existing.remove(); return; }
+
             const shortcuts = `
                 <div style="background: white; padding: 20px; border-radius: 10px; max-width: 400px;">
                     <h3 style="margin-top: 0; color: #333;">⌨️ Горячие клавиши</h3>
@@ -4068,6 +4140,7 @@
             `;
 
             const overlay = document.createElement('div');
+            overlay.id = 'keyboard-shortcuts-overlay';
             overlay.style.cssText = `
                 position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                 background: rgba(0,0,0,0.7); display: flex; align-items: center;

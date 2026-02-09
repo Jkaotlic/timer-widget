@@ -7,6 +7,8 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test",
+    "lint": "eslint . --ext .js",
+    "ci": "npm run lint && npm test",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
@@ -23,7 +25,8 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "eslint": "^8.48.0"
   },
   "build": {
     "appId": "com.timer.widget",
