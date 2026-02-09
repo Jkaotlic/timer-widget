@@ -208,14 +208,30 @@ function parseRGBA(rgba) {
 function hexToRGB(hex) {
     if (!hex || typeof hex !== 'string') return null;
 
-    const match = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-    if (!match) return null;
+    // Support both short (#RGB) and full (#RRGGBB) hex formats
+    const fullMatch = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+    if (fullMatch) {
+        return {
+            r: parseInt(fullMatch[1], 16),
+            g: parseInt(fullMatch[2], 16),
+            b: parseInt(fullMatch[3], 16)
+        };
+    }
 
-    return {
-        r: parseInt(match[1], 16),
-        g: parseInt(match[2], 16),
-        b: parseInt(match[3], 16)
-    };
+    const shortMatch = hex.match(/^#?([a-f\d])([a-f\d])([a-f\d])$/i);
+    if (shortMatch) {
+        // Expand shorthand form to full
+        const r = shortMatch[1] + shortMatch[1];
+        const g = shortMatch[2] + shortMatch[2];
+        const b = shortMatch[3] + shortMatch[3];
+        return {
+            r: parseInt(r, 16),
+            g: parseInt(g, 16),
+            b: parseInt(b, 16)
+        };
+    }
+
+    return null;
 }
 
 /**
@@ -238,6 +254,8 @@ function rgbToHex(r, g, b) {
  * @returns {string} - '#000000' или '#ffffff'
  */
 function getContrastColor(bgColor) {
+    if (!bgColor || typeof bgColor !== 'string') return '#ffffff';
+
     let rgb;
     if (bgColor.startsWith('#')) {
         rgb = hexToRGB(bgColor);

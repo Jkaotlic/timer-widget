@@ -1637,7 +1637,9 @@
             loadSettings() {
                 const settings = localStorage.getItem('clockWidgetSettings');
                 if (settings) {
-                    const s = JSON.parse(settings);
+                    let s = {};
+                    try { s = JSON.parse(settings) || {}; }
+                    catch (e) { console.error('JSON parse error:', e.message); s = {}; }
                     if (s.opacity !== undefined) {
                         this.container.style.opacity = s.opacity;
                         this.opacityRange.value = s.opacity * 100;
@@ -1794,7 +1796,7 @@
             startClock() {
                 this.updateDisplay();
                 // Обновляем каждую секунду
-                setInterval(() => this.updateDisplay(), 1000);
+                this.clockInterval = setInterval(() => this.updateDisplay(), 1000);
             }
 
             updateDisplay() {
@@ -1899,7 +1901,14 @@
             }
         }
 
-        new ClockWidget();
+        const clockWidget = new ClockWidget();
+
+        // Cleanup при закрытии окна
+        window.addEventListener('beforeunload', () => {
+            if (clockWidget.clockInterval) {
+                clearInterval(clockWidget.clockInterval);
+            }
+        });
     </script>
 </body>
 </html>

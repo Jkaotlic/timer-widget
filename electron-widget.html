@@ -1146,6 +1146,7 @@
                 this.isRunning = false;
                 this.isPaused = false;
                 this.lastTimestamp = 0;
+                this.lastUpdateCounter = -1;
 
                 this.initElements();
                 this.initProgress();
@@ -1500,10 +1501,11 @@
 
                 // Сохраняем ссылки на обработчики для последующей очистки
                 this.timerStateHandler = (event, state) => {
-                    // Фильтр устаревших пакетов
-                    const ts = state.timestamp || Date.now();
-                    if (ts <= this.lastTimestamp) return;
-                    this.lastTimestamp = ts;
+                    // FIX: Use monotonic updateCounter instead of timestamp for dedup
+                    const updateCounter = state.updateCounter || 0;
+                    if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) return;
+                    this.lastUpdateCounter = updateCounter;
+                    this.lastTimestamp = state.timestamp || Date.now();
 
                     this.totalSeconds = Number(state.totalSeconds) || 0;
                     this.remainingSeconds = Number(state.remainingSeconds) || 0;

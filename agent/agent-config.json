@@ -1,0 +1,9 @@
+{
+  "agent": {
+    "id": "local-agent",
+    "displayName": "Local premium agent",
+    "model": "opus-4.5",
+    "provider": "user-configurable",
+    "description": "Configuration placeholder for an agent intended to use a premium model. Ensure your provider supports 'opus-4.5' and configure credentials separately."
+  }
+}
