@@ -1,0 +1,150 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-intel:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build macOS Intel
+        run: npx electron-builder --mac --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-intel
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          retention-days: 5
+
+  build-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build macOS ARM
+        run: npx electron-builder --mac --arm64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          retention-days: 5
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Windows
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.exe
+          retention-days: 5
+
+  release:
+    needs: [build-macos-intel, build-macos-arm, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | head -50
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "TimerWidget v${{ github.ref_name }}"
+          body: |
+            ## TimerWidget ${{ github.ref_name }}
+
+            ### Что нового
+            - Глубокий аудит #2: исправлено 12 новых багов
+            - Исправлен хардкод clockStyle в pushDisplaySettings
+            - Исправлена утечка AudioContext
+            - Escape теперь закрывает все виджеты включая часы
+            - Улучшена дедупликация состояния (updateCounter)
+            - Sound master toggle полностью блокирует настройки звука
+            - Исправлен сброс выбора звука при перезагрузке списка
+            - FAQ приведён в соответствие с реальными пресетами
+            - Множество мелких UX-фиксов
+
+            ### Скачать
+            | Платформа | Файл |
+            |-----------|------|
+            | 🍎 macOS Intel | `TimerWidget-*-x64.dmg` |
+            | 🍎 macOS Apple Silicon | `TimerWidget-*-arm64.dmg` |
+            | 🪟 Windows (установщик) | `TimerWidget-Setup-*.exe` |
+            | 🪟 Windows (портативная) | `TimerWidget-Portable.exe` |
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
