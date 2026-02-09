@@ -27,7 +27,8 @@ class DisplayTimer {
             lastProgress: null,
             lastDigitalUpdate: null,
             lastFlipUpdate: null,
-            lastAnalogUpdate: null
+            lastAnalogUpdate: null,
+            lastRunning: null  // FIX BUG-C: track running state
         };
 
         // Настройки отображения
@@ -48,6 +49,7 @@ class DisplayTimer {
         this.startColorSync();
         this.startCurrentTimeClock();
         this.setupResizeHandler();
+        this.setupKeyboardShortcuts();
     }
     
     setupResizeHandler() {
@@ -62,8 +64,41 @@ class DisplayTimer {
         // Начальный расчёт
         this.updateRingSize();
     }
-    
-    updateRingSize() {
+        setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            switch (e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        if (this.isRunning) {
+                            this.ipcRenderer.send('timer-control', 'pause');
+                        } else {
+                            this.ipcRenderer.send('timer-control', 'start');
+                        }
+                    }
+                    break;
+                case 'KeyR':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send('timer-control', 'reset');
+                    }
+                    break;
+                case 'KeyS':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send('timer-control', 'pause');
+                    }
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send('close-display');
+                    }
+                    break;
+            }
+        });
+    }
+        updateRingSize() {
         if (this.timerRing) {
             const scale = this.timerScale / 100;
             // Используем transform для масштабирования всего таймера (круг + текст)
@@ -372,22 +407,21 @@ class DisplayTimer {
     }
 
     startLocalStorageSync() {
-        // Синхронизация каждые 100мс через localStorage
-        const syncIntervalId = setInterval(() => {
-            const stateStr = localStorage.getItem('timerState');
-            if (!stateStr) return;
+        // FIX BUG-021: Используем storage event вместо polling для синхронизации состояния
+        const defaultState = {
+            totalSeconds: 0,
+            remainingSeconds: 0,
+            isRunning: false,
+            isPaused: false,
+            finished: false
+        };
 
-            // Безопасный парсинг с fallback (FIX BUG-014: JSON parse error handling)
-            const defaultState = {
-                totalSeconds: 0,
-                remainingSeconds: 0,
-                isRunning: false,
-                isPaused: false,
-                finished: false
-            };
-            const state = window.SecurityUtils
-                ? window.SecurityUtils.safeJSONParse(stateStr, defaultState)
-                : JSON.parse(stateStr);
+        // Обработчик обновления состояния из localStorage
+        const applyState = (stateStr) => {
+            if (!stateStr) return;
+            let state;
+            try { state = JSON.parse(stateStr); }
+            catch (e) { console.error('JSON parse error:', e.message); state = defaultState; }
 
             this.totalSeconds = Number(state.totalSeconds) || 0;
             this.remainingSeconds = Number(state.remainingSeconds) || 0;
@@ -395,20 +429,32 @@ class DisplayTimer {
             this.isPaused = !!state.isPaused;
             this.finished = !!state.finished;
             this.updateDisplay();
-        }, 100);
-        this.intervals.push(syncIntervalId);
+        };
 
-        // Слушаем изменения цветов
+        // Начальное чтение
+        applyState(localStorage.getItem('timerState'));
+
+        // Слушаем изменения через storage event (вместо 100ms polling)
         window.addEventListener('storage', (e) => {
+            if (e.key === 'timerState' && e.newValue) {
+                applyState(e.newValue);
+            }
             if (e.key === 'timerColors' && e.newValue) {
-                const colors = window.SecurityUtils
-                    ? window.SecurityUtils.safeJSONParse(e.newValue, {})
-                    : JSON.parse(e.newValue);
+                let colors;
+                try { colors = JSON.parse(e.newValue); }
+                catch (err) { console.error('JSON parse error:', err.message); colors = {}; }
                 if (colors) {
                     this.applyColors(colors);
                 }
             }
         });
+
+        // Fallback: редкий polling для случаев когда storage event не срабатывает
+        // (происходит в рамках того же окна)
+        const syncIntervalId = setInterval(() => {
+            applyState(localStorage.getItem('timerState'));
+        }, 1000); // 1с вместо 100мс
+        this.intervals.push(syncIntervalId);
     }
 
     startColorSync() {
@@ -602,6 +648,13 @@ class DisplayTimer {
         // ОПТИМИЗАЦИЯ (FIX BUG-007): Проверка изменений перед обновлением
         // Если секунды не изменились, нечего обновлять
         if (this.cache.lastSeconds === secs && !this.finished) {
+            // FIX BUG-C: BUT статус проверяем ВСЕГДА (не зависит от кэша секунд)
+            const status = this.getTimerStatusValue(secs);
+            if (this.cache.lastStatus !== status || this.cache.lastRunning !== this.isRunning) {
+                this.updateStatus(secs);
+                this.cache.lastStatus = status;
+                this.cache.lastRunning = this.isRunning;
+            }
             return;
         }
 
