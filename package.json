@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
