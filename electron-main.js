@@ -1,5 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
+const { safelySendToWindow } = require('./utils');
+const CONFIG = require('./constants');
 
 let controlWindow = null;
 let widgetWindow = null;
@@ -42,7 +44,7 @@ function enableWindowResizeOnScroll(window) {
     // Handle mouse wheel with Ctrl for window resizing
     window.webContents.on('zoom-changed', (event, zoomDirection) => {
         const [currentWidth, currentHeight] = window.getSize();
-        const increment = 20; // Pixels to grow/shrink
+        const increment = CONFIG.SCALE_STEP || 20; // Pixels to grow/shrink
 
         if (zoomDirection === 'in') {
             // Increase window size
@@ -64,25 +66,6 @@ function clearTimerInterval() {
     }
 }
 
-// FIX BUG-013: Безопасная отправка IPC сообщений
-function safelySendToWindow(window, channel, ...args) {
-    if (!window || window.isDestroyed()) {
-        return false;
-    }
-
-    try {
-        // Проверить что webContents существует и не уничтожен
-        if (window.webContents && !window.webContents.isDestroyed()) {
-            window.webContents.send(channel, ...args);
-            return true;
-        }
-    } catch (error) {
-        console.error(`Failed to send IPC message to ${channel}:`, error.message);
-    }
-
-    return false;
-}
-
 function emitTimerState(partial = {}) {
     // FIX BUG-012: Увеличиваем монотонный счетчик при каждом обновлении
     timerUpdateCounter++;
@@ -90,6 +73,8 @@ function emitTimerState(partial = {}) {
     timerState = {
         ...timerState,
         ...partial,
+        overrunLimitSeconds: timerConfig.overrunLimitSeconds,
+        allowNegative: timerConfig.allowNegative,
         timestamp: Date.now(),
         updateCounter: timerUpdateCounter  // Монотонный счетчик
     };
@@ -155,7 +140,7 @@ function startTimer() {
                 remainingSeconds: nextRemaining,
                 finished: false
             });
-        }, 1000);
+        }, CONFIG.TIMER_TICK_INTERVAL || 1000);
     } finally {
         timerLock = false;
     }

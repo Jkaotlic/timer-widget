@@ -1369,29 +1369,7 @@
             color: #fff;
         }
 
-        .faq-answer-content {
-            padding: 0 14px 14px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8em;
-            line-height: 1.6;
-        }
 
-        .faq-answer-content ul {
-            margin: 8px 0;
-            padding-left: 20px;
-        }
-
-        .faq-answer-content li {
-            margin-bottom: 4px;
-        }
-
-        .faq-answer-content code {
-            background: rgba(102, 126, 234, 0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Consolas', monospace;
-            font-size: 0.95em;
-        }
 
         .faq-shortcut {
             display: inline-flex;
@@ -1580,15 +1558,6 @@
             font-size: 0.9em;
             color: #4a3ba2;
             font-weight: 600;
-        }
-
-        /* Responsive design improvements */
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
         }
 
         /* Media queries for small screens */
@@ -2042,7 +2011,7 @@
                                     </div>
                                 </div>
                                 <input type="file" class="hidden-file-input" id="bgFileInput" 
-                                       accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp">
+                                       accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,.jpg,.jpeg,.png,.gif,.webp,.bmp">
                                 
                                 <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
                                     <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
@@ -2157,7 +2126,7 @@
                                     <span>Добавить звук</span>
                                 </button>
                                 <input type="file" class="hidden-file-input" id="soundFileInput" 
-                                       accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,.mp3,.wav,.ogg">
+                                       accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
                             </div>
                         </div>
                     </div>
@@ -2437,17 +2406,22 @@
 
     <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
     <script src="ipc-compat.js"></script>
+    <script src="constants.js"></script>
+    <script src="security.js"></script>
+    <script src="utils.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
-        const debounce = (fn, delay = 120) => {
-            let timeoutId;
-            return (...args) => {
-                clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => fn(...args), delay);
+        const debounce = (window.TimeUtils && window.TimeUtils.debounce)
+            ? window.TimeUtils.debounce
+            : (fn, delay = (window.CONFIG && CONFIG.DEBOUNCE_DELAY) || 120) => {
+                let timeoutId;
+                return (...args) => {
+                    clearTimeout(timeoutId);
+                    timeoutId = setTimeout(() => fn(...args), delay);
+                };
             };
-        };
 
         // FIX BUG-014: Safe JSON.parse helper (fallback if SecurityUtils not loaded)
         function safeJSONParse(jsonString, defaultValue = null) {
@@ -3005,13 +2979,13 @@
             // FIX BUG-025, BUG-026: Validate file upload with MIME and magic bytes
             async validateImageFile(file) {
                 // Проверка размера
-                const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+                const MAX_SIZE = (window.CONFIG && CONFIG.MAX_IMAGE_FILE_SIZE) || 10 * 1024 * 1024;
                 if (file.size > MAX_SIZE) {
                     return { valid: false, error: 'Файл слишком большой (максимум 10 МБ)' };
                 }
 
                 // Проверка MIME type
-                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+                const allowedTypes = (window.CONFIG && CONFIG.ALLOWED_IMAGE_TYPES) || ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
                 if (!allowedTypes.includes(file.type)) {
                     return { valid: false, error: 'Неподдерживаемый тип файла. Используйте JPG, PNG, GIF, WebP или BMP' };
                 }
@@ -3385,11 +3359,12 @@
                 ipcRenderer.send('get-timer-state');
                 ipcRenderer.send('get-displays');
 
-                ipcRenderer.on('displays-list', (event, displays) => {
+                this._onDisplaysList = (event, displays) => {
                     this.updateDisplaysList(displays);
-                });
+                };
+                ipcRenderer.on('displays-list', this._onDisplaysList);
 
-                ipcRenderer.on('timer-state', (event, state) => {
+                this._onTimerState = (event, state) => {
                     // FIX: Use monotonic updateCounter instead of timestamp for dedup
                     const updateCounter = state.updateCounter || 0;
                     if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) return;
@@ -3408,18 +3383,29 @@
 
                     // Звук окончания таймера
                     if (state.finished && !wasFinishedBefore) {
-                        console.log('Timer finished! Sound enabled:', this.soundEndEl.checked, 'Master:', this.soundMasterEl.checked);
                         if (this.soundEndEl.checked) {
                             this.playSound('end');
                         }
                     }
-                });
+                };
+                ipcRenderer.on('timer-state', this._onTimerState);
 
-                ipcRenderer.on('timer-minute', () => {
+                this._onTimerMinute = () => {
                     if (this.soundMinuteEl.checked) {
                         this.playSound('minute');
                     }
-                });
+                };
+                ipcRenderer.on('timer-minute', this._onTimerMinute);
+            }
+
+            cleanup() {
+                if (this._onDisplaysList) ipcRenderer.removeListener('displays-list', this._onDisplaysList);
+                if (this._onTimerState) ipcRenderer.removeListener('timer-state', this._onTimerState);
+                if (this._onTimerMinute) ipcRenderer.removeListener('timer-minute', this._onTimerMinute);
+                if (this._audioCtx) {
+                    this._audioCtx.close().catch(() => {});
+                    this._audioCtx = null;
+                }
             }
 
             // Команды таймера
@@ -3510,9 +3496,11 @@
                     this.controlTimeEl.classList.add('danger');
                 } else if (this.totalSeconds > 0) {
                     const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    if (percentLeft <= 10 && percentLeft > 0) {
+                    const dangerPct = (window.CONFIG && CONFIG.DANGER_PERCENTAGE) || 10;
+                    const warningPct = (window.CONFIG && CONFIG.WARNING_PERCENTAGE) || 25;
+                    if (percentLeft <= dangerPct && percentLeft > 0) {
                         this.controlTimeEl.classList.add('danger');
-                    } else if (percentLeft <= 25) {
+                    } else if (percentLeft <= warningPct) {
                         this.controlTimeEl.classList.add('warning');
                     }
                 }
@@ -3574,7 +3562,7 @@
                 const neededHeight = Math.ceil(panelHeight + extra);
                 
                 ipcRenderer.send('resize-control-window', { 
-                    width: 420, 
+                    width: (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 420, 
                     height: neededHeight
                 });
             }
@@ -3603,8 +3591,6 @@
 
                 const presetId = `sound${this.capitalize(type)}Preset`;
                 const preset = document.getElementById(presetId)?.value || 'none';
-
-                console.log('Playing sound:', type, 'Preset:', preset);
 
                 if (preset === 'none') {
                     await this.beep(880, 0.15);
@@ -3656,12 +3642,6 @@
                     o.start(start);
                     g.gain.exponentialRampToValueAtTime(0.0001, start + dur - 0.01);
                     o.stop(start + dur);
-                };
-
-                const multiBeep = (freq, count, interval, dur) => {
-                    for (let i = 0; i < count; i++) {
-                        beep(freq, now + i * interval, dur);
-                    }
                 };
 
                 switch (name) {
@@ -3828,13 +3808,13 @@
                 if (!file) return;
 
                 // FIX BUG-025: Validation for sound file uploads
-                const MAX_SOUND_SIZE = 5 * 1024 * 1024; // 5 MB (matches UI text)
+                const MAX_SOUND_SIZE = (window.CONFIG && window.CONFIG.MAX_SOUND_FILE_SIZE) || 5 * 1024 * 1024;
                 if (file.size > MAX_SOUND_SIZE) {
-                    alert('Файл слишком большой (максимум 10 MB)');
+                    alert('Файл слишком большой (максимум 5 MB)');
                     event.target.value = '';
                     return;
                 }
-                const allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'];
+                const allowedAudioTypes = (window.CONFIG && window.CONFIG.ALLOWED_AUDIO_TYPES) || ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'];
                 if (file.type && !allowedAudioTypes.includes(file.type)) {
                     alert('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC');
                     event.target.value = '';
@@ -3862,7 +3842,10 @@
                     localStorage.setItem('customSounds', JSON.stringify(customSounds));
                     this.loadCustomSounds();
                 };
-                
+                reader.onerror = () => {
+                    alert('Ошибка чтения звукового файла');
+                    event.target.value = '';
+                };
                 reader.readAsDataURL(file);
                 event.target.value = ''; // Сбрасываем input
             }
@@ -3903,25 +3886,29 @@
                 customSounds.forEach(sound => {
                     const item = document.createElement('div');
                     item.className = 'custom-sound-item';
-                    // Используем escapeHTML для защиты от XSS
-                    const safeName = window.SecurityUtils && window.SecurityUtils.escapeHTML 
-                        ? window.SecurityUtils.escapeHTML(sound.name) 
-                        : sound.name.replace(/[&<>"'/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'})[c]);
-                    item.innerHTML = `
-                        <span class="name">🎵 ${safeName}</span>
-                        <button class="btn play-btn" data-name="${safeName}" title="Воспроизвести">▶</button>
-                        <button class="btn delete-btn" data-name="${safeName}" title="Удалить">✕</button>
-                    `;
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'name';
+                    nameSpan.textContent = '🎵 ' + sound.name;
+                    
+                    const playBtn = document.createElement('button');
+                    playBtn.className = 'btn play-btn';
+                    playBtn.title = 'Воспроизвести';
+                    playBtn.textContent = '▶';
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn delete-btn';
+                    deleteBtn.title = 'Удалить';
+                    deleteBtn.textContent = '✕';
+                    
+                    item.appendChild(nameSpan);
+                    item.appendChild(playBtn);
+                    item.appendChild(deleteBtn);
                     listEl.appendChild(item);
-                });
-
-                // Обработчики
-                listEl.querySelectorAll('.play-btn').forEach(btn => {
-                    btn.addEventListener('click', () => this.playCustomSound(btn.dataset.name));
-                });
-
-                listEl.querySelectorAll('.delete-btn').forEach(btn => {
-                    btn.addEventListener('click', () => this.deleteCustomSound(btn.dataset.name));
+                    
+                    // Обработчики с оригинальным именем
+                    playBtn.addEventListener('click', () => this.playCustomSound(sound.name));
+                    deleteBtn.addEventListener('click', () => this.deleteCustomSound(sound.name));
                 });
             }
 
@@ -3958,7 +3945,11 @@
             }
 
             async beep(freq, dur) {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                // Переиспользуем AudioContext вместо создания нового каждый раз
+                if (!this._audioCtx) {
+                    this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const ctx = this._audioCtx;
                 // Возобновляем AudioContext если он приостановлен
                 if (ctx.state === 'suspended') {
                     await ctx.resume();
@@ -3979,18 +3970,12 @@
             }
         }
 
-        // CSS для анимации ошибки
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                25% { transform: translateX(-10px); }
-                75% { transform: translateX(10px); }
-            }
-        `;
-        document.head.appendChild(style);
-
         window.timerController = new TimerController();
+
+        // Cleanup при закрытии окна
+        window.addEventListener('beforeunload', () => {
+            window.timerController.cleanup();
+        });
 
         // FAQ Modal Logic
         const faqBtn = document.getElementById('faqBtn');
@@ -4153,8 +4138,6 @@
             document.body.appendChild(overlay);
         }
 
-        // Log keyboard shortcuts on startup (can be removed later)
-        console.log('⌨️ Keyboard shortcuts enabled. Press F1 for help.');
     </script>
 </body>
 </html>

@@ -1123,18 +1123,20 @@
 
     <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
     <script src="ipc-compat.js"></script>
+    <script src="constants.js"></script>
+    <script src="security.js"></script>
+    <script src="utils.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
-        // FIX BUG-014: Safe JSON.parse helper function
+        // Используем safeJSONParse из SecurityUtils
         function safeJSONParse(jsonString, defaultValue = null) {
-            try {
-                return JSON.parse(jsonString);
-            } catch (error) {
-                console.error('JSON parse error:', error.message);
-                return defaultValue;
+            if (window.SecurityUtils && window.SecurityUtils.safeJSONParse) {
+                return window.SecurityUtils.safeJSONParse(jsonString, defaultValue);
             }
+            try { return JSON.parse(jsonString); }
+            catch (e) { return defaultValue; }
         }
 
         class WidgetTimer {
@@ -1769,16 +1771,19 @@
             }
 
             formatTime(seconds) {
+                // Используем централизованную функцию из utils.js
+                if (typeof formatTimeShort !== 'undefined') {
+                    return formatTimeShort(seconds);
+                }
+                // Fallback
                 const neg = seconds < 0;
                 const abs = Math.abs(seconds);
-                
                 if (abs >= 3600) {
                     const hrs = Math.floor(abs / 3600);
                     const mins = Math.floor((abs % 3600) / 60);
                     const secs = abs % 60;
                     return `${neg ? '-' : ''}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                 }
-                
                 const mins = Math.floor(abs / 60);
                 const secs = abs % 60;
                 return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;

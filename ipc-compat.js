@@ -122,6 +122,4 @@
 
     // Freeze the ipcRenderer object to prevent modifications
     Object.freeze(window.ipcRenderer);
-
-    console.log('IPC compatibility layer initialized');
 })();
