@@ -70,16 +70,6 @@ function parseTime(timeString) {
 }
 
 /**
- * Добавляет ноль к числу если оно < size
- * @param {number} num - число
- * @param {number} size - размер (по умолчанию 2)
- * @returns {string}
- */
-function padZero(num, size = 2) {
-    return String(num).padStart(size, '0');
-}
-
-/**
  * Debounce функция
  * Откладывает выполнение функции до тех пор, пока не пройдет delay мс с последнего вызова
  * @param {Function} func - функция для debounce
@@ -94,23 +84,6 @@ function debounce(func, delay = 120) {
     };
 }
 
-/**
- * Throttle функция
- * Ограничивает частоту вызова функции до одного раза в период delay
- * @param {Function} func - функция для throttle
- * @param {number} delay - задержка в миллисекундах
- * @returns {Function} - throttled функция
- */
-function throttle(func, delay = 120) {
-    let lastCall = 0;
-    return function(...args) {
-        const now = Date.now();
-        if (now - lastCall >= delay) {
-            lastCall = now;
-            return func.apply(this, args);
-        }
-    };
-}
 
 /**
  * Получает статус таймера на основе оставшегося времени
@@ -234,107 +207,20 @@ function hexToRGB(hex) {
     return null;
 }
 
-/**
- * Конвертирует rgb в hex
- * @param {number} r - красный (0-255)
- * @param {number} g - зелёный (0-255)
- * @param {number} b - синий (0-255)
- * @returns {string} - hex цвет #RRGGBB
- */
-function rgbToHex(r, g, b) {
-    return '#' + [r, g, b].map(x => {
-        const hex = x.toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-    }).join('');
-}
-
-/**
- * Получает контрастный цвет (чёрный или белый) для фона
- * @param {string} bgColor - цвет фона (hex или rgb)
- * @returns {string} - '#000000' или '#ffffff'
- */
-function getContrastColor(bgColor) {
-    if (!bgColor || typeof bgColor !== 'string') return '#ffffff';
-
-    let rgb;
-    if (bgColor.startsWith('#')) {
-        rgb = hexToRGB(bgColor);
-    } else if (bgColor.startsWith('rgb')) {
-        rgb = parseRGBA(bgColor);
-    } else {
-        return '#ffffff'; // Default белый
-    }
-
-    if (!rgb) return '#ffffff';
-
-    // Вычисляем яркость по формуле YIQ
-    const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-    return brightness > 128 ? '#000000' : '#ffffff';
-}
-
-/**
- * Форматирует размер файла в читаемый вид
- * @param {number} bytes - размер в байтах
- * @returns {string} - форматированный размер
- */
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-/**
- * Глубокое клонирование объекта
- * @param {Object} obj - объект для клонирования
- * @returns {Object} - клон объекта
- */
-function deepClone(obj) {
-    if (obj === null || typeof obj !== 'object') return obj;
-    if (obj instanceof Date) return new Date(obj.getTime());
-    if (obj instanceof Array) return obj.map(item => deepClone(item));
-    if (obj instanceof Object) {
-        const clonedObj = {};
-        for (const key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                clonedObj[key] = deepClone(obj[key]);
-            }
-        }
-        return clonedObj;
-    }
-}
-
-/**
- * Ожидание заданное количество миллисекунд
- * @param {number} ms - миллисекунды
- * @returns {Promise} - промис который резолвится через ms
- */
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 // Экспорт для Node.js (main process)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         formatTime,
         formatTimeShort,
         parseTime,
-        padZero,
         debounce,
-        throttle,
         getTimerStatus,
         calculateProgress,
         safelySendToWindow,
         isValidNumber,
         clamp,
         parseRGBA,
-        hexToRGB,
-        rgbToHex,
-        getContrastColor,
-        formatFileSize,
-        deepClone,
-        sleep
+        hexToRGB
     };
 }
 
@@ -344,19 +230,12 @@ if (typeof window !== 'undefined') {
         formatTime,
         formatTimeShort,
         parseTime,
-        padZero,
         getTimerStatus,
         calculateProgress,
         isValidNumber,
         clamp,
         parseRGBA,
         hexToRGB,
-        rgbToHex,
-        getContrastColor,
-        formatFileSize,
-        deepClone,
-        sleep,
-        debounce,
-        throttle
+        debounce
     };
 }
