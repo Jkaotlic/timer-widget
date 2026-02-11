@@ -1,45 +1,4 @@
-/* === ПЕРЕНОС из styles.css: .controls и .control-btn (унификация компонентных стилей) === */
-.controls {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-}
-.control-btn {
-    padding: 20px;
-    font-size: 1.2em;
-    border: none;
-    border-radius: 10px;
-    color: white;
-    cursor: pointer;
-    font-weight: 600;
-    transition: transform 0.2s, opacity 0.3s;
-}
-.control-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-.control-btn:not(:disabled):hover {
-    transform: translateY(-2px);
-}
-.control-btn.start {
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-}
-.control-btn.pause {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-.control-btn.reset {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-/* === ПЕРЕНОС из styles.css: .adjust-btn и .adjust-controls (унификация компонентных стилей) === */
-.adjust-controls {
-    margin-bottom: 20px;
-}
-.adjust-controls h3 {
-    color: #333;
-    margin-bottom: 10px;
-    text-align: center;
-}
+/* === Adjust Button (унификация компонентных стилей) === */
 .adjust-btn {
     padding: 12px 20px;
     margin: 5px;
@@ -47,7 +6,7 @@
     border: none;
     border-radius: 8px;
     background: #f0f0f0;
-    color: #333;
+    color: var(--color-text-dark);
     cursor: pointer;
     font-weight: 600;
     transition: background 0.3s, transform 0.2s;
@@ -56,112 +15,13 @@
     background: #e0e0e0;
     transform: translateY(-2px);
 }
-/* === ПЕРЕНОС из styles.css: .display-btn и .display-controls (унификация компонентных стилей) === */
-.display-controls {
-    text-align: center;
-    margin-top: 30px;
-}
-.display-btn {
-    padding: 15px 30px;
-    font-size: 1.1em;
-    border: none;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-    color: white;
-    cursor: pointer;
-    font-weight: 600;
-    transition: transform 0.2s;
-}
-.display-btn:hover {
-    transform: scale(1.05);
-}
-/* === ПЕРЕНОС из styles.css: .display-window (layout-компонент) === */
-.display-window {
-    --display-bg: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-    background: var(--display-bg);
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    position: relative;
-}
-.display-window::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: 
-        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06), transparent 35%),
-        radial-gradient(circle at 80% 10%, rgba(255,255,255,0.04), transparent 40%),
-        radial-gradient(circle at 50% 80%, rgba(255,255,255,0.05), transparent 45%);
-    pointer-events: none;
-}
-/* === ПЕРЕНОС из styles.css: .timer-circle (унификация компонентных стилей) === */
-.timer-circle {
-    position: relative;
-    width: min(65vw, 600px);
-    height: min(65vw, 600px);
-    margin: 0 auto;
-}
-/* === ПЕРЕНОС из styles.css: .display-container (унификация контейнерных стилей) === */
+/* === Display Container (унификация контейнерных стилей) === */
 .display-container {
     text-align: center;
     position: relative;
     max-width: 1200px;
     width: 100%;
     padding: 40px;
-}
-/* === ПЕРЕНОС из styles.css: .progress-ring и .progress-ring__circle (унификация компонентных стилей) === */
-.progress-ring {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-}
-.progress-ring__background {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.1);
-    stroke-width: 10;
-}
-.progress-ring__circle {
-    fill: none;
-    stroke: url(#gradient);
-    stroke-width: 10;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.5s ease-out;
-}
-/* === ПЕРЕНОС из styles.css: .status-indicator (унификация компонентных стилей) === */
-.status-indicator {
-    margin-top: 30px;
-    font-size: 1.3em;
-    color: rgba(255, 255, 255, 0.7);
-    text-transform: uppercase;
-    letter-spacing: 3px;
-}
-.status-indicator.running {
-    color: #38ef7d;
-}
-.status-indicator.paused {
-    color: #f5576c;
-}
-.status-indicator.finished {
-    color: #fee140;
-    animation: pulse 0.5s infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-/* === ПЕРЕНОС из styles.css: .timer-display (унификация компонентных стилей) === */
-.timer-display {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: clamp(4rem, 12vw, 10rem);
-    font-weight: 700;
-    color: white;
-    font-family: 'SF Mono', 'Consolas', monospace;
-    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
 }
 /**
  * Timer Widget - Shared Components Styles
@@ -201,7 +61,7 @@
 }
 
 .digital-time.danger {
-    color: #ff4444;
+    color: var(--color-danger);
 }
 
 .digital-time.overtime {
@@ -226,7 +86,7 @@
 
 .flip-separator {
     font-size: 4rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-muted);
     font-weight: 300;
     margin: 0 8px;
 }
@@ -264,7 +124,7 @@
     height: 100%;
     transition: transform 0.6s;
     transform-style: preserve-3d;
-    background: linear-gradient(180deg, #2a2a3e 0%, #1a1a2e 50%, #0f0f1e 100%);
+    background: linear-gradient(180deg, #2a2a3e 0%, var(--color-bg-dark-blue) 50%, #0f0f1e 100%);
     border-radius: 8px;
     box-shadow:
         0 4px 8px rgba(0, 0, 0, 0.3),
@@ -278,7 +138,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--color-overlay);
     z-index: 10;
 }
 
@@ -313,7 +173,7 @@
 }
 
 .flip-card.danger .flip-digit {
-    color: #ff4444;
+    color: var(--color-danger);
 }
 
 .flip-card.overtime .flip-digit {
@@ -326,7 +186,7 @@
     left: 50%;
     transform: translateX(-50%);
     font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -339,213 +199,4 @@
     0% { transform: rotateX(0deg); }
     50% { transform: rotateX(90deg); }
     100% { transform: rotateX(0deg); }
-}
-
-/* ============================================
-   Analog Clock Component
-   ============================================ */
-
-.analog-display {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
-.analog-clock {
-    position: relative;
-    width: 300px;
-    height: 300px;
-}
-
-.analog-clock svg {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-}
-
-.analog-clock-face {
-    fill: rgba(30, 30, 50, 0.8);
-    stroke: rgba(255, 255, 255, 0.3);
-    stroke-width: 2;
-}
-
-.analog-progress-bg {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.1);
-    stroke-width: 20;
-}
-
-.analog-progress {
-    fill: none;
-    stroke: #00ff00;
-    stroke-width: 20;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
-}
-
-.analog-progress.warning {
-    stroke: #ffaa00;
-}
-
-.analog-progress.danger {
-    stroke: #ff4444;
-}
-
-.analog-progress.overtime {
-    stroke: #ff6600;
-}
-
-.analog-center {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.analog-time {
-    font-size: 3rem;
-    font-weight: 700;
-    color: #00ff00;
-    text-shadow:
-        0 0 10px currentColor,
-        0 0 20px currentColor;
-    font-family: 'Orbitron', monospace;
-    margin-bottom: 8px;
-}
-
-.analog-time.warning {
-    color: #ffaa00;
-}
-
-.analog-time.danger {
-    color: #ff4444;
-}
-
-.analog-time.overtime {
-    color: #ff6600;
-}
-
-.analog-label {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.5);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-/* ============================================
-   Circle/Ring Component
-   ============================================ */
-
-.circle-display {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
-.circle-container {
-    position: relative;
-    width: 250px;
-    height: 250px;
-}
-
-.circle-ring {
-    width: 100%;
-    height: 100%;
-}
-
-.circle-ring svg {
-    transform: rotate(-90deg);
-}
-
-.circle-bg {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.1);
-    stroke-width: 15;
-}
-
-.circle-progress {
-    fill: none;
-    stroke: #00ff00;
-    stroke-width: 15;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 1s ease, stroke 0.3s ease;
-}
-
-.circle-progress.warning {
-    stroke: #ffaa00;
-}
-
-.circle-progress.danger {
-    stroke: #ff4444;
-}
-
-.circle-progress.overtime {
-    stroke: #ff6600;
-}
-
-.circle-center {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-}
-
-.circle-time {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: white;
-    font-family: 'Orbitron', monospace;
-    margin-bottom: 8px;
-}
-
-.circle-label {
-    font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.5);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-/* ============================================
-   Common Utilities
-   ============================================ */
-
-.timer-status-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.timer-status-badge.running {
-    background: rgba(0, 255, 0, 0.2);
-    color: #00ff00;
-}
-
-.timer-status-badge.paused {
-    background: rgba(255, 170, 0, 0.2);
-    color: #ffaa00;
-}
-
-.timer-status-badge.stopped {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.6);
-}
-
-.timer-status-badge.overtime {
-    background: rgba(255, 102, 0, 0.2);
-    color: #ff6600;
 }

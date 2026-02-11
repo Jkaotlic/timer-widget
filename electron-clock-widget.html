@@ -1276,6 +1276,9 @@
 
     <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
     <script src="ipc-compat.js"></script>
+    <script src="constants.js"></script>
+    <script src="security.js"></script>
+    <script src="utils.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1411,11 +1414,11 @@
 
             setupEventListeners() {
                 // Отслеживание мыши для показа границ
-                let mouseTimeout = null;
+                this.mouseTimeout = null;
                 const showBorder = () => {
                     document.body.classList.add('mouse-active');
-                    if (mouseTimeout) clearTimeout(mouseTimeout);
-                    mouseTimeout = setTimeout(() => {
+                    if (this.mouseTimeout) clearTimeout(this.mouseTimeout);
+                    this.mouseTimeout = setTimeout(() => {
                         document.body.classList.remove('mouse-active');
                     }, 2000); // Скрываем через 2 секунды неактивности
                 };
@@ -1586,6 +1589,16 @@
                 this.updateDisplay();
             }
 
+            formatTimezoneString() {
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const offset = new Date().getTimezoneOffset();
+                const sign = offset <= 0 ? '+' : '-';
+                const absOffset = Math.abs(offset);
+                const hours = Math.floor(absOffset / 60);
+                const mins = absOffset % 60;
+                return `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace('_', ' ')}`;
+            }
+
             updateDateTimezoneVisibility() {
                 // Обновляем видимость даты во всех стилях
                 [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
@@ -1595,13 +1608,7 @@
                 });
                 
                 // Обновляем видимость часового пояса во всех стилях
-                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                const offset = new Date().getTimezoneOffset();
-                const sign = offset <= 0 ? '+' : '-';
-                const absOffset = Math.abs(offset);
-                const hours = Math.floor(absOffset / 60);
-                const mins = absOffset % 60;
-                const tzString = `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace('_', ' ')}`;
+                const tzString = this.formatTimezoneString();
                 
                 [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
                     if (el) {
@@ -1705,26 +1712,28 @@
 
             setupIPC() {
                 // Получаем стиль от панели управления
-                ipcRenderer.on('set-clock-style', (event, style) => {
+                this._onSetClockStyle = (event, style) => {
                     this.setClockStyle(style);
                     // Обновляем UI кнопок стиля
                     document.querySelectorAll('.style-btn').forEach(btn => {
                         btn.classList.toggle('active', btn.dataset.style === style);
                     });
-                });
+                };
+                ipcRenderer.on('set-clock-style', this._onSetClockStyle);
                 
                 // Получаем настройки дисплея (showAnalogNumbers)
-                ipcRenderer.on('display-settings-update', (event, settings) => {
+                this._onDisplaySettingsUpdate = (event, settings) => {
                     if (settings.showAnalogNumbers !== undefined && this.clockAnalogNumbers) {
                         this.clockAnalogNumbers.classList.toggle('visible', settings.showAnalogNumbers);
                     }
                     if (settings.timerStyle) {
                         this.setClockStyle(settings.timerStyle);
                     }
-                });
+                };
+                ipcRenderer.on('display-settings-update', this._onDisplaySettingsUpdate);
                 
                 // Получаем настройки часов от панели управления
-                ipcRenderer.on('clock-settings', (event, settings) => {
+                this._onClockSettings = (event, settings) => {
                     if (settings.showDate !== undefined) {
                         this.showDate = settings.showDate;
                         this.showDateEl.checked = settings.showDate;
@@ -1752,48 +1761,29 @@
                     this.updateDateTimezoneVisibility();
                     this.saveSettings();
                     this.updateDisplay();
-                });
+                };
+                ipcRenderer.on('clock-settings', this._onClockSettings);
             }
 
-            updateTimezoneVisibility() {
-                const visible = this.showTimezone;
-                
-                // Получаем часовой пояс
-                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                const offset = new Date().getTimezoneOffset();
-                const sign = offset <= 0 ? '+' : '-';
-                const absOffset = Math.abs(offset);
-                const hours = Math.floor(absOffset / 60);
-                const mins = absOffset % 60;
-                const tzString = `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace('_', ' ')}`;
-                
-                // Обновляем все timezone badges
-                [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge].forEach(el => {
-                    if (el) {
-                        el.textContent = tzString;
-                        el.classList.toggle('visible', visible);
-                    }
-                });
-                
-                // Пересчитываем масштаб
-                this.updateScaling();
-            }
-
-            updateDateVisibility() {
-                const visible = this.showDate;
-                
-                [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
-                    if (el) {
-                        el.style.display = visible ? 'block' : 'none';
-                        el.classList.toggle('visible', visible);
-                    }
-                });
-                
-                // Пересчитываем масштаб
-                this.updateScaling();
+            cleanup() {
+                if (this.clockInterval) {
+                    clearInterval(this.clockInterval);
+                    this.clockInterval = null;
+                }
+                if (this.mouseTimeout) {
+                    clearTimeout(this.mouseTimeout);
+                    this.mouseTimeout = null;
+                }
+                if (this._onSetClockStyle) ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);
+                if (this._onDisplaySettingsUpdate) ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);
+                if (this._onClockSettings) ipcRenderer.removeListener('clock-settings', this._onClockSettings);
             }
 
             startClock() {
+                // Очищаем предыдущий интервал если был
+                if (this.clockInterval) {
+                    clearInterval(this.clockInterval);
+                }
                 this.updateDisplay();
                 // Обновляем каждую секунду
                 this.clockInterval = setInterval(() => this.updateDisplay(), 1000);
@@ -1848,7 +1838,7 @@
                 
                 // Обновляем часовой пояс во всех стилях
                 if (this.showTimezone) {
-                    const tzStr = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    const tzStr = this.formatTimezoneString();
                     [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
                         if (el) el.textContent = tzStr;
                     });
@@ -1905,9 +1895,7 @@
 
         // Cleanup при закрытии окна
         window.addEventListener('beforeunload', () => {
-            if (clockWidget.clockInterval) {
-                clearInterval(clockWidget.clockInterval);
-            }
+            clockWidget.cleanup();
         });
     </script>
 </body>

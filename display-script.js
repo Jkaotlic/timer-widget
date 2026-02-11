@@ -8,6 +8,7 @@ class DisplayTimer {
         this.isRunning = false;
         this.isPaused = false;
         this.finished = false;
+        this.overrunLimitSeconds = 0;
         this.lastTimestamp = 0;
         this.lastUpdateCounter = -1;  // FIX BUG-012: Монотонный счетчик вместо timestamp
         this.flashCount = 0;
@@ -54,8 +55,8 @@ class DisplayTimer {
     
     setupResizeHandler() {
         // Пересчитываем размеры при изменении окна с debounce
-        const debouncedResize = window.UtilityFunctions
-            ? window.UtilityFunctions.debounce(() => {
+        const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
+            ? window.TimeUtils.debounce(() => {
                 this.updateRingSize();
             }, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
             : () => this.updateRingSize();
@@ -242,6 +243,7 @@ class DisplayTimer {
             this.isRunning = !!state.isRunning;
             this.isPaused = !!state.isPaused;
             this.finished = !!state.finished;
+            this.overrunLimitSeconds = Number(state.overrunLimitSeconds) || 0;
 
             this.updateDisplay();
         };
@@ -251,7 +253,6 @@ class DisplayTimer {
         };
 
         this.ipcHandlers.displaySettingsUpdate = (event, settings) => {
-            console.log('Display received settings:', settings);
             if (settings.bgMode || settings.bgSolid || settings.bgGrad1) {
                 this.applyBackground(settings);
             }
@@ -393,7 +394,6 @@ class DisplayTimer {
     }
     
     applyPosition(element, position) {
-        console.log('Applying position:', position, 'to', element.id);
         // Удаляем все классы позиции
         element.classList.remove(
             'top-left', 'top-center', 'top-right',
@@ -403,7 +403,6 @@ class DisplayTimer {
         );
         // Добавляем новый класс позиции
         element.classList.add(position);
-        console.log('Element classes now:', element.className);
     }
 
     startLocalStorageSync() {
@@ -721,7 +720,7 @@ class DisplayTimer {
         if (this.remainingSeconds < 0) {
             // В overtime режиме показываем прогресс от 0 до -1
             // Это позволит визуализировать "обратный" прогресс
-            const overrunLimit = 300; // TODO: Get from timerConfig
+            const overrunLimit = this.overrunLimitSeconds || 300;
             const overtimeRatio = Math.abs(this.remainingSeconds) / overrunLimit;
             return -Math.min(1, overtimeRatio); // Отрицательное значение
         }
@@ -955,16 +954,19 @@ class DisplayTimer {
     }
 
     formatTime(seconds) {
+        // Используем централизованную функцию из utils.js
+        if (typeof formatTimeShort !== 'undefined') {
+            return formatTimeShort(seconds);
+        }
+        // Fallback
         const neg = seconds < 0;
         const abs = Math.abs(seconds);
-
         if (abs >= 3600) {
             const hrs = Math.floor(abs / 3600);
             const mins = Math.floor((abs % 3600) / 60);
             const secs = abs % 60;
             return `${neg ? '-' : ''}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         }
-
         const mins = Math.floor(abs / 60);
         const secs = abs % 60;
         return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
