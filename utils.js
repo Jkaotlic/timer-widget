@@ -48,7 +48,7 @@ function formatTimeShort(totalSeconds) {
  * @returns {number} - количество секунд
  */
 function parseTime(timeString) {
-    if (!timeString || typeof timeString !== 'string') return 0;
+    if (!timeString || typeof timeString !== 'string') {return 0;}
 
     const isNegative = timeString.startsWith('-');
     const cleaned = timeString.replace('-', '').trim();
@@ -92,9 +92,9 @@ function debounce(func, delay = 120) {
  * @returns {string} - 'normal' | 'warning' | 'danger' | 'overtime'
  */
 function getTimerStatus(remainingSeconds, totalSeconds = 0) {
-    if (remainingSeconds < 0) return 'overtime';
-    if (remainingSeconds === 0 && totalSeconds > 0) return 'danger';
-    if (remainingSeconds <= 60 && remainingSeconds > 0) return 'warning';
+    if (remainingSeconds < 0) {return 'overtime';}
+    if (remainingSeconds === 0 && totalSeconds > 0) {return 'danger';}
+    if (remainingSeconds <= 60 && remainingSeconds > 0) {return 'warning';}
     return 'normal';
 }
 
@@ -105,8 +105,8 @@ function getTimerStatus(remainingSeconds, totalSeconds = 0) {
  * @returns {number} - прогресс от 0 до 1
  */
 function calculateProgress(remainingSeconds, totalSeconds) {
-    if (totalSeconds === 0) return 0;
-    if (remainingSeconds < 0) return 0; // Overtime - прогресс 0
+    if (totalSeconds === 0) {return 0;}
+    if (remainingSeconds < 0) {return 0;} // Overtime - прогресс 0
     return Math.max(0, Math.min(1, remainingSeconds / totalSeconds));
 }
 
@@ -160,10 +160,10 @@ function clamp(value, min, max) {
  * @returns {Object|null} - { r, g, b, a } или null
  */
 function parseRGBA(rgba) {
-    if (!rgba || typeof rgba !== 'string') return null;
+    if (!rgba || typeof rgba !== 'string') {return null;}
 
     const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (!match) return null;
+    if (!match) {return null;}
 
     return {
         r: parseInt(match[1]),
@@ -179,7 +179,7 @@ function parseRGBA(rgba) {
  * @returns {Object|null} - { r, g, b } или null
  */
 function hexToRGB(hex) {
-    if (!hex || typeof hex !== 'string') return null;
+    if (!hex || typeof hex !== 'string') {return null;}
 
     // Support both short (#RGB) and full (#RRGGBB) hex formats
     const fullMatch = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);

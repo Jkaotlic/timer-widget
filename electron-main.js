@@ -32,7 +32,7 @@ let lastDisplaySettings = null;
 
 // Enable Ctrl+Wheel to resize window
 function enableWindowResizeOnScroll(window) {
-    if (!window || !window.webContents) return;
+    if (!window || !window.webContents) {return;}
 
     window.webContents.on('before-input-event', (event, input) => {
         // Prevent default zoom behavior
@@ -100,7 +100,7 @@ let timerLock = false;
 
 function startTimer() {
     // Атомарная проверка с lock для предотвращения race condition
-    if (timerLock || timerState.isRunning) return;
+    if (timerLock || timerState.isRunning) {return;}
     timerLock = true;
 
     try {
@@ -185,7 +185,7 @@ function createControlWindow() {
 }
 
 function createWidgetWindow() {
-    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    const { width } = screen.getPrimaryDisplay().workAreaSize;
     
     widgetWindow = new BrowserWindow({
         width: 250,
@@ -331,7 +331,7 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
             configChanged = true;
         }
     }
-    if (overrunLimitSeconds != null) {
+    if (overrunLimitSeconds !== null && overrunLimitSeconds !== undefined) {
         const newLimit = Math.max(0, Number(overrunLimitSeconds) || 0);
         if (timerConfig.overrunLimitSeconds !== newLimit) {
             timerConfig.overrunLimitSeconds = newLimit;
@@ -341,7 +341,7 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
 
     switch (type) {
         case 'set': {
-            if (timerState.isRunning) break;
+            if (timerState.isRunning) {break;}
             const next = Math.max(0, Number(seconds) || 0);
             emitTimerState({
                 totalSeconds: next,
