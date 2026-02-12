@@ -5,7 +5,7 @@
  * Проверяет что строка является корректным data URL изображения
  */
 function isValidDataURL(str) {
-    if (!str || typeof str !== 'string') return false;
+    if (!str || typeof str !== 'string') {return false;}
 
     // Проверка формата data URL для изображений
     const dataURLPattern = /^data:image\/(png|jpeg|jpg|gif|webp|bmp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
@@ -17,7 +17,7 @@ function isValidDataURL(str) {
  * Проверяет что строка является валидным HTTP(S) URL
  */
 function isValidURL(str) {
-    if (!str || typeof str !== 'string') return false;
+    if (!str || typeof str !== 'string') {return false;}
 
     try {
         const url = new URL(str);
@@ -149,14 +149,14 @@ async function validateAudioFile(file) {
         };
 
         let isValid = false;
-        for (const [format, sigs] of Object.entries(signatures)) {
+        for (const [_format, sigs] of Object.entries(signatures)) {
             for (const sig of sigs) {
                 if (sig.every((byte, i) => bytes[i] === byte)) {
                     isValid = true;
                     break;
                 }
             }
-            if (isValid) break;
+            if (isValid) {break;}
         }
 
         if (!isValid) {
@@ -218,7 +218,7 @@ async function validateImageFile(file) {
                     break;
                 }
             }
-            if (isValid) break;
+            if (isValid) {break;}
         }
 
         if (!isValid) {
@@ -255,7 +255,7 @@ function safeJSONParse(jsonString, defaultValue = null) {
  * Предотвращает XSS при вставке пользовательского текста в HTML
  */
 function escapeHTML(str) {
-    if (!str || typeof str !== 'string') return '';
+    if (!str || typeof str !== 'string') {return '';}
 
     const htmlEscapeMap = {
         '&': '&amp;',
@@ -274,7 +274,7 @@ function escapeHTML(str) {
  * Удаляет потенциально опасные конструкции из CSS значений
  */
 function sanitizeCSS(value) {
-    if (!value || typeof value !== 'string') return '';
+    if (!value || typeof value !== 'string') {return '';}
 
     // Удаляем expression, url с javascript:, и другие опасные конструкции
     const dangerous = [
