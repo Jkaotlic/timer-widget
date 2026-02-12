@@ -109,7 +109,7 @@ class DisplayTimer {
     
     initDefaultStyle() {
         // По умолчанию показываем круговой стиль
-        if (this.timerRing) this.timerRing.classList.add('active');
+        if (this.timerRing) {this.timerRing.classList.add('active');}
         document.body.classList.add('style-circle');
     }
 
@@ -173,7 +173,7 @@ class DisplayTimer {
     }
     
     updateMiniClockHands(block, hours, minutes, seconds = 0) {
-        if (!block) return;
+        if (!block) {return;}
         const hourHand = block.querySelector('.mini-hand-hour');
         const minuteHand = block.querySelector('.mini-hand-minute');
         const secondHand = block.querySelector('.mini-hand-second');
@@ -196,7 +196,7 @@ class DisplayTimer {
     }
     
     updateStaticMiniClock(block, timeString) {
-        if (!block || !timeString) return;
+        if (!block || !timeString) {return;}
         const parts = timeString.split(':');
         if (parts.length >= 2) {
             const hours = parseInt(parts[0], 10);
@@ -232,7 +232,7 @@ class DisplayTimer {
             // FIX BUG-012: Используем монотонный счетчик вместо timestamp
             // Это предотвращает проблемы при изменении системного времени
             const updateCounter = state.updateCounter || 0;
-            if (updateCounter <= this.lastUpdateCounter) return;
+            if (updateCounter <= this.lastUpdateCounter) {return;}
             this.lastUpdateCounter = updateCounter;
 
             // Сохраняем timestamp для совместимости
@@ -338,9 +338,9 @@ class DisplayTimer {
             this.updateRingSize();
             
             // Для других стилей - transform
-            if (this.timerDigital) this.timerDigital.style.transform = `scale(${scale})`;
-            if (this.timerFlip) this.timerFlip.style.transform = `scale(${scale})`;
-            if (this.timerAnalog) this.timerAnalog.style.transform = `scale(${scale})`;
+            if (this.timerDigital) {this.timerDigital.style.transform = `scale(${scale})`;}
+            if (this.timerFlip) {this.timerFlip.style.transform = `scale(${scale})`;}
+            if (this.timerAnalog) {this.timerAnalog.style.transform = `scale(${scale})`;}
         }
         
         // Показ цифр на аналоговом циферблате
@@ -351,9 +351,9 @@ class DisplayTimer {
         // Масштаб блоков времени (общий)
         if (settings.timeBlocksScale !== undefined) {
             const scale = settings.timeBlocksScale / 100;
-            if (this.currentTimeBlock) this.currentTimeBlock.style.setProperty('--info-scale', scale);
-            if (this.eventTimeBlock) this.eventTimeBlock.style.setProperty('--info-scale', scale);
-            if (this.endTimeBlock) this.endTimeBlock.style.setProperty('--info-scale', scale);
+            if (this.currentTimeBlock) {this.currentTimeBlock.style.setProperty('--info-scale', scale);}
+            if (this.eventTimeBlock) {this.eventTimeBlock.style.setProperty('--info-scale', scale);}
+            if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', scale);}
         }
     }
     
@@ -364,27 +364,27 @@ class DisplayTimer {
         document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
         
         // Скрываем все стили таймера
-        if (this.timerRing) this.timerRing.classList.remove('active');
-        if (this.timerDigital) this.timerDigital.classList.remove('active');
-        if (this.timerFlip) this.timerFlip.classList.remove('active');
-        if (this.timerAnalog) this.timerAnalog.classList.remove('active');
+        if (this.timerRing) {this.timerRing.classList.remove('active');}
+        if (this.timerDigital) {this.timerDigital.classList.remove('active');}
+        if (this.timerFlip) {this.timerFlip.classList.remove('active');}
+        if (this.timerAnalog) {this.timerAnalog.classList.remove('active');}
         
         // Показываем выбранный и добавляем класс на body
         switch (style) {
             case 'circle':
-                if (this.timerRing) this.timerRing.classList.add('active');
+                if (this.timerRing) {this.timerRing.classList.add('active');}
                 document.body.classList.add('style-circle');
                 break;
             case 'digital':
-                if (this.timerDigital) this.timerDigital.classList.add('active');
+                if (this.timerDigital) {this.timerDigital.classList.add('active');}
                 document.body.classList.add('style-digital');
                 break;
             case 'flip':
-                if (this.timerFlip) this.timerFlip.classList.add('active');
+                if (this.timerFlip) {this.timerFlip.classList.add('active');}
                 document.body.classList.add('style-flip');
                 break;
             case 'analog':
-                if (this.timerAnalog) this.timerAnalog.classList.add('active');
+                if (this.timerAnalog) {this.timerAnalog.classList.add('active');}
                 document.body.classList.add('style-analog');
                 break;
         }
@@ -417,7 +417,7 @@ class DisplayTimer {
 
         // Обработчик обновления состояния из localStorage
         const applyState = (stateStr) => {
-            if (!stateStr) return;
+            if (!stateStr) {return;}
             let state;
             try { state = JSON.parse(stateStr); }
             catch (e) { console.error('JSON parse error:', e.message); state = defaultState; }
@@ -714,7 +714,7 @@ class DisplayTimer {
 
     // Вспомогательная функция для вычисления прогресса (для кэширования)
     calculateProgressValue() {
-        if (this.totalSeconds === 0) return 0;
+        if (this.totalSeconds === 0) {return 0;}
 
         // FIX BUG-016: Handle overtime progress correctly
         if (this.remainingSeconds < 0) {
@@ -730,14 +730,14 @@ class DisplayTimer {
 
     // Вспомогательная функция для определения статуса (для кэширования)
     getTimerStatusValue(secs) {
-        if (secs < 0) return 'overtime';
-        if (secs === 0 && this.totalSeconds > 0) return 'danger';
-        if (secs <= 60 && secs > 0) return 'warning';
+        if (secs < 0) {return 'overtime';}
+        if (secs === 0 && this.totalSeconds > 0) {return 'danger';}
+        if (secs <= 60 && secs > 0) {return 'warning';}
         return 'normal';
     }
     
-    updateDigitalDisplay(secs, formatted) {
-        if (!this.digitalMinutes || !this.digitalSeconds) return;
+    updateDigitalDisplay(secs, _formatted) {
+        if (!this.digitalMinutes || !this.digitalSeconds) {return;}
         
         const absSecs = Math.abs(secs);
         const mins = Math.floor(absSecs / 60);
@@ -763,7 +763,7 @@ class DisplayTimer {
     }
     
     updateFlipDisplay(secs) {
-        if (!this.flipMin1 || !this.flipMin2 || !this.flipSec1 || !this.flipSec2) return;
+        if (!this.flipMin1 || !this.flipMin2 || !this.flipSec1 || !this.flipSec2) {return;}
         
         const isNegative = secs < 0;
         const absSecs = Math.abs(secs);
@@ -822,7 +822,7 @@ class DisplayTimer {
     }
 
     updateAnalogDisplay(secs) {
-        if (!this.analogHandMinute || !this.analogHandSecond) return;
+        if (!this.analogHandMinute || !this.analogHandSecond) {return;}
 
         const absSecs = Math.abs(secs);
         const totalMins = absSecs / 60;
@@ -849,7 +849,7 @@ class DisplayTimer {
         const analogElements = [this.analogHandMinute, this.analogHandSecond, clockCenter];
         
         analogElements.forEach(el => {
-            if (el) el.classList.remove('warning', 'danger', 'overtime');
+            if (el) {el.classList.remove('warning', 'danger', 'overtime');}
         });
         if (this.analogDigitalTime) {
             this.analogDigitalTime.classList.remove('warning', 'danger', 'overtime');
@@ -858,7 +858,7 @@ class DisplayTimer {
         const isOvertime = secs < 0;
         if (isOvertime) {
             analogElements.forEach(el => {
-                if (el) el.classList.add('danger', 'overtime');
+                if (el) {el.classList.add('danger', 'overtime');}
             });
             if (this.analogDigitalTime) {
                 this.analogDigitalTime.classList.add('danger', 'overtime');
@@ -867,14 +867,14 @@ class DisplayTimer {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             if (percentLeft <= 10 && percentLeft > 0) {
                 analogElements.forEach(el => {
-                    if (el) el.classList.add('danger');
+                    if (el) {el.classList.add('danger');}
                 });
                 if (this.analogDigitalTime) {
                     this.analogDigitalTime.classList.add('danger');
                 }
             } else if (percentLeft <= 25) {
                 analogElements.forEach(el => {
-                    if (el) el.classList.add('warning');
+                    if (el) {el.classList.add('warning');}
                 });
                 if (this.analogDigitalTime) {
                     this.analogDigitalTime.classList.add('warning');
@@ -955,8 +955,8 @@ class DisplayTimer {
 
     formatTime(seconds) {
         // Используем централизованную функцию из utils.js
-        if (typeof formatTimeShort !== 'undefined') {
-            return formatTimeShort(seconds);
+        if (typeof window.formatTimeShort !== 'undefined') {
+            return window.formatTimeShort(seconds);
         }
         // Fallback
         const neg = seconds < 0;
