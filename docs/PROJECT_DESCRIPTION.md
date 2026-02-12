@@ -1,9 +1,9 @@
 # Полное описание проекта Timer Widget
 
-**Проект:** Timer Widget v1.2.2  
-**Тип:** кроссплатформенное desktop‑приложение на Electron  
+**Проект:** Timer Widget v1.2.4  
+**Тип:** кроссплатформенное desktop-приложение на Electron  
 **Платформы:** Windows, macOS  
-**Стек:** Electron, HTML/CSS, Vanilla JavaScript, Node.js  
+**Стек:** Electron 33.2.0, HTML/CSS, Vanilla JavaScript, Node.js  
 
 ---
 
