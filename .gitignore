@@ -11,3 +11,4 @@ _electron/.cache/
 
 # VSCode
 .vscode/
+.playwright-mcp/

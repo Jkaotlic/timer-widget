@@ -151,16 +151,16 @@ function createControlWindow() {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
     // Calculate optimal window size (adapt to screen size)
-    const windowWidth = Math.min(420, Math.max(340, screenWidth - 100));
-    const windowHeight = Math.min(700, Math.max(550, screenHeight - 100));
+    const windowWidth = Math.min(440, Math.max(360, screenWidth - 100));
+    const windowHeight = Math.min(720, Math.max(560, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        minWidth: 340,  // Increased for better layout
-        minHeight: 550, // Increased to fit all content
-        maxWidth: 500,  // Prevent too wide on large screens
-        maxHeight: 900, // Increased for larger screens
+        minWidth: 360,  // Wider for better layout
+        minHeight: 560, // Increased to fit all content
+        maxWidth: 520,  // Prevent too wide on large screens
+        maxHeight: 920, // Increased for larger screens
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
