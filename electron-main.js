@@ -32,30 +32,38 @@ let timerInterval = null;
 let lastDisplaySettings = null;
 
 // Enable Ctrl+Wheel to resize window
-function enableWindowResizeOnScroll(window) {
-    if (!window || !window.webContents) {return;}
+function enableWindowResizeOnScroll(win) {
+    if (!win || !win.webContents) {return;}
 
-    window.webContents.on('before-input-event', (event, input) => {
+    const onBeforeInput = (event, input) => {
         // Prevent default zoom behavior
         if (input.control && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '0')) {
             event.preventDefault();
         }
-    });
+    };
 
-    // Handle mouse wheel with Ctrl for window resizing
-    window.webContents.on('zoom-changed', (event, zoomDirection) => {
-        const [currentWidth, currentHeight] = window.getSize();
-        const increment = CONFIG.SCALE_STEP || 20; // Pixels to grow/shrink
+    const onZoomChanged = (_event, zoomDirection) => {
+        const [currentWidth, currentHeight] = win.getSize();
+        const increment = CONFIG.SCALE_STEP || 20;
 
         if (zoomDirection === 'in') {
-            // Increase window size
-            window.setSize(currentWidth + increment, currentHeight + increment);
+            win.setSize(currentWidth + increment, currentHeight + increment);
         } else {
-            // Decrease window size (respect minimum)
-            const [minWidth, minHeight] = window.getMinimumSize();
+            const [minWidth, minHeight] = win.getMinimumSize();
             const newWidth = Math.max(currentWidth - increment, minWidth);
             const newHeight = Math.max(currentHeight - increment, minHeight);
-            window.setSize(newWidth, newHeight);
+            win.setSize(newWidth, newHeight);
+        }
+    };
+
+    win.webContents.on('before-input-event', onBeforeInput);
+    win.webContents.on('zoom-changed', onZoomChanged);
+
+    // Cleanup listeners on window close to prevent memory leaks
+    win.on('closed', () => {
+        if (win.webContents && !win.webContents.isDestroyed()) {
+            win.webContents.removeListener('before-input-event', onBeforeInput);
+            win.webContents.removeListener('zoom-changed', onZoomChanged);
         }
     });
 }
@@ -511,12 +519,12 @@ ipcMain.on('close-widget', () => {
 // Управление окном панели управления
 ipcMain.on('minimize-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (win) win.minimize();
+    if (win) { win.minimize(); }
 });
 
 ipcMain.on('close-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (win) win.close();
+    if (win) { win.close(); }
 });
 
 // Виджет часов
@@ -640,14 +648,6 @@ ipcMain.on('widget-scale', (event, delta) => {
         const newHeight = Math.max(100, Math.min(800, currentHeight + delta));
         widgetWindow.setSize(newWidth, newHeight, true);
     }
-});
-
-// Provide current widget size to renderer for relative scaling logic
-ipcMain.handle('widget-get-size', () => {
-    if (widgetWindow) {
-        return widgetWindow.getSize();
-    }
-    return [0, 0];
 });
 
 ipcMain.on('widget-move', (event, { deltaX, deltaY }) => {

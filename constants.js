@@ -266,7 +266,6 @@ const CONFIG = {
         WIDGET_RESIZE: 'widget-resize',
         WIDGET_SCALE: 'widget-scale',
         WIDGET_MOVE: 'widget-move',
-        WIDGET_GET_SIZE: 'widget-get-size',
 
         // Display controls
         GET_DISPLAYS: 'get-displays',
