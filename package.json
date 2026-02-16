@@ -4,16 +4,16 @@
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
+    "start": "npx electron .",
+    "dev": "npx electron . --dev",
     "test": "node --test",
-    "lint": "eslint . --ext .js",
+    "lint": "npx eslint . --ext .js",
     "ci": "npm run lint && npm test",
-    "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:all": "electron-builder --win --mac",
-    "pack": "electron-builder --dir"
+    "build": "npx --yes electron-builder",
+    "build:win": "npx --yes electron-builder --win",
+    "build:mac": "npx --yes electron-builder --mac",
+    "build:all": "npx --yes electron-builder --win --mac",
+    "pack": "npx --yes electron-builder --dir"
   },
   "keywords": [
     "timer",
@@ -24,8 +24,8 @@
   "author": "Jkaotlic",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^33.4.11",
+    "electron-builder": "^26.7.0",
     "eslint": "^8.48.0"
   },
   "build": {
@@ -58,7 +58,10 @@
       ],
       "category": "public.app-category.utilities",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
     },
     "dmg": {
       "title": "${productName}"

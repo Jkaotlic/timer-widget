@@ -1726,7 +1726,9 @@
                     if (settings.showAnalogNumbers !== undefined && this.clockAnalogNumbers) {
                         this.clockAnalogNumbers.classList.toggle('visible', settings.showAnalogNumbers);
                     }
-                    if (settings.timerStyle) {
+                    if (settings.clockStyle) {
+                        this.setClockStyle(settings.clockStyle);
+                    } else if (settings.timerStyle) {
                         this.setClockStyle(settings.timerStyle);
                     }
                 };

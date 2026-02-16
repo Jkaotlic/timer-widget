@@ -23,7 +23,8 @@ let timerState = {
 };
 let timerConfig = {
     allowNegative: false,
-    overrunLimitSeconds: 0
+    overrunLimitSeconds: 0,
+    overrunIntervalMinutes: 1
 };
 let timerInterval = null;
 
@@ -96,54 +97,82 @@ function finishTimer() {
     });
 }
 
-let timerLock = false;
-
 function startTimer() {
-    // Атомарная проверка с lock для предотвращения race condition
-    if (timerLock || timerState.isRunning) {return;}
-    timerLock = true;
+    // Защита от повторного запуска: проверяем и state, и наличие интервала
+    if (timerState.isRunning || timerInterval) {return;}
 
-    try {
-        // Убедиться что предыдущий интервал полностью очищен
-        clearTimerInterval();
+    // Убедиться что предыдущий интервал полностью очищен
+    clearTimerInterval();
 
-        emitTimerState({ isRunning: true, isPaused: false, finished: false });
+    emitTimerState({ isRunning: true, isPaused: false, finished: false });
 
-        timerInterval = setInterval(() => {
-            const prevRemaining = timerState.remainingSeconds;
-            let nextRemaining = prevRemaining - 1;
-            let shouldFinish = false;
+    timerInterval = setInterval(() => {
+        const prevRemaining = timerState.remainingSeconds;
+        let nextRemaining = prevRemaining - 1;
+        let shouldFinish = false;
 
-            if (!timerConfig.allowNegative && nextRemaining <= 0) {
-                nextRemaining = 0;
-                shouldFinish = true;
+        if (!timerConfig.allowNegative && nextRemaining <= 0) {
+            nextRemaining = 0;
+            shouldFinish = true;
+        }
+        if (timerConfig.allowNegative && timerConfig.overrunLimitSeconds > 0 && nextRemaining <= -timerConfig.overrunLimitSeconds) {
+            shouldFinish = true;
+        }
+
+        // Событие "осталась минута"
+        if (prevRemaining > 60 && nextRemaining <= 60 && nextRemaining >= 0) {
+            safelySendToWindow(controlWindow, 'timer-minute');
+            safelySendToWindow(widgetWindow, 'timer-minute');
+            safelySendToWindow(displayWindow, 'timer-minute');
+        }
+
+        // Событие "перерасход - напоминание"
+        if (nextRemaining < 0 && timerConfig.allowNegative) {
+            const intervalSec = (timerConfig.overrunIntervalMinutes || 1) * 60;
+            const absNext = Math.abs(nextRemaining);
+            const absPrev = Math.abs(prevRemaining);
+            if (Math.floor(absNext / intervalSec) > Math.floor(absPrev / intervalSec)) {
+                safelySendToWindow(controlWindow, 'timer-overrun-minute');
+                safelySendToWindow(widgetWindow, 'timer-overrun-minute');
+                safelySendToWindow(displayWindow, 'timer-overrun-minute');
             }
-            // ИСПРАВЛЕНО: изменено <= на < для корректной работы overtime limit
-            if (timerConfig.allowNegative && timerConfig.overrunLimitSeconds > 0 && nextRemaining < -timerConfig.overrunLimitSeconds) {
-                shouldFinish = true;
-            }
+        }
 
-            // Событие "осталась минута"
-            if (prevRemaining > 60 && nextRemaining <= 60 && nextRemaining >= 0) {
-                safelySendToWindow(controlWindow, 'timer-minute');
-                safelySendToWindow(widgetWindow, 'timer-minute');
-                safelySendToWindow(displayWindow, 'timer-minute');
-            }
+        if (shouldFinish) {
+            emitTimerState({ remainingSeconds: nextRemaining });
+            finishTimer();
+            return;
+        }
 
-            if (shouldFinish) {
-                emitTimerState({ remainingSeconds: nextRemaining });
-                finishTimer();
-                return;
-            }
+        emitTimerState({
+            remainingSeconds: nextRemaining,
+            finished: false
+        });
+    }, CONFIG.TIMER_TICK_INTERVAL || 1000);
+}
 
-            emitTimerState({
-                remainingSeconds: nextRemaining,
-                finished: false
-            });
-        }, CONFIG.TIMER_TICK_INTERVAL || 1000);
-    } finally {
-        timerLock = false;
+// Единые функции управления таймером (используются из timer-command и timer-control)
+function handleTimerStart() {
+    if (timerState.remainingSeconds <= 0 && !timerConfig.allowNegative) {
+        finishTimer();
+        return;
     }
+    startTimer();
+}
+
+function handleTimerPause() {
+    clearTimerInterval();
+    emitTimerState({ isRunning: false, isPaused: true, finished: false });
+}
+
+function handleTimerReset() {
+    clearTimerInterval();
+    emitTimerState({
+        remainingSeconds: timerState.totalSeconds,
+        isRunning: false,
+        isPaused: false,
+        finished: false
+    });
 }
 
 function createControlWindow() {
@@ -165,10 +194,12 @@ function createControlWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: true
+            sandbox: true,
+            devTools: false
         },
         title: 'Управление Таймером',
         icon: path.join(__dirname, 'icon.ico'),
+        frame: false,
         resizable: true // Allow user to resize if needed
     });
 
@@ -205,7 +236,8 @@ function createWidgetWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: true
+            sandbox: true,
+            devTools: false
         },
         hasShadow: false
     });
@@ -219,6 +251,8 @@ function createWidgetWindow() {
 
     widgetWindow.on('closed', () => {
         widgetWindow = null;
+        // Уведомляем окно управления что виджет закрыт
+        safelySendToWindow(controlWindow, 'widget-window-state', { isOpen: false });
     });
 }
 
@@ -241,7 +275,8 @@ function createClockWidgetWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: true
+            sandbox: true,
+            devTools: false
         },
         hasShadow: false
     });
@@ -255,6 +290,8 @@ function createClockWidgetWindow() {
 
     clockWidgetWindow.on('closed', () => {
         clockWidgetWindow = null;
+        // Уведомляем окно управления что виджет часов закрыт
+        safelySendToWindow(controlWindow, 'clock-window-state', { isOpen: false });
     });
 }
 
@@ -267,9 +304,11 @@ function createDisplayWindow(displayIndex) {
         targetDisplay = displays.find(display => display.bounds.x !== 0 || display.bounds.y !== 0) 
             || screen.getPrimaryDisplay();
     } else {
-        // Выбранный монитор по индексу
-        const idx = parseInt(displayIndex);
-        targetDisplay = displays[idx] || screen.getPrimaryDisplay();
+        // Выбранный монитор по индексу (с валидацией)
+        const idx = parseInt(displayIndex, 10);
+        targetDisplay = (!isNaN(idx) && idx >= 0 && idx < displays.length)
+            ? displays[idx]
+            : screen.getPrimaryDisplay();
     }
     
     const displayBounds = targetDisplay.bounds;
@@ -285,19 +324,17 @@ function createDisplayWindow(displayIndex) {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            sandbox: true
+            sandbox: true,
+            devTools: false
         }
     });
 
     displayWindow.loadFile('display.html');
 
-    // Enable Ctrl+Wheel window resizing
-    displayWindow.webContents.once('did-finish-load', () => {
-        enableWindowResizeOnScroll(displayWindow);
-    });
-
     displayWindow.on('closed', () => {
         displayWindow = null;
+        // Уведомляем окно управления что дисплей закрыт
+        safelySendToWindow(controlWindow, 'display-window-state', { isOpen: false });
     });
 }
 
@@ -320,9 +357,9 @@ app.on('window-all-closed', () => {
 
 // IPC обработчики для синхронизации
 ipcMain.on('timer-command', (_event, payload = {}) => {
-    const { type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds } = payload;
+    const { type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes } = payload;
 
-    // FIX BUG-017: Track if config changed to sync immediately
+    // Обновляем конфиг до выполнения команды
     let configChanged = false;
 
     if (typeof allowNegative === 'boolean') {
@@ -338,6 +375,16 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
             configChanged = true;
         }
     }
+    if (overrunIntervalMinutes !== null && overrunIntervalMinutes !== undefined) {
+        const newVal = Math.max(1, Number(overrunIntervalMinutes) || 1);
+        if (timerConfig.overrunIntervalMinutes !== newVal) {
+            timerConfig.overrunIntervalMinutes = newVal;
+            configChanged = true;
+        }
+    }
+
+    // Отслеживаем, сделал ли switch emit (чтобы не дублировать)
+    let emittedByCommand = false;
 
     switch (type) {
         case 'set': {
@@ -350,6 +397,7 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
                 isPaused: false,
                 finished: false
             });
+            emittedByCommand = true;
             break;
         }
         case 'adjust': {
@@ -361,37 +409,30 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
                 remainingSeconds: nextRemaining,
                 finished: false
             });
+            emittedByCommand = true;
             break;
         }
         case 'start': {
-            if (timerState.remainingSeconds <= 0 && !timerConfig.allowNegative) {
-                finishTimer();
-                break;
-            }
-            startTimer();
+            handleTimerStart();
+            emittedByCommand = true;
             break;
         }
         case 'pause': {
-            clearTimerInterval();
-            emitTimerState({ isRunning: false, isPaused: true, finished: false });
+            handleTimerPause();
+            emittedByCommand = true;
             break;
         }
         case 'reset': {
-            clearTimerInterval();
-            emitTimerState({
-                remainingSeconds: timerState.totalSeconds,
-                isRunning: false,
-                isPaused: false,
-                finished: false
-            });
+            handleTimerReset();
+            emittedByCommand = true;
             break;
         }
         default:
             break;
     }
 
-    // FIX BUG-017: If config changed, broadcast state immediately
-    if (configChanged) {
+    // Broadcast при изменении конфига, только если команда сама не сделала emit
+    if (configChanged && !emittedByCommand) {
         emitTimerState({});
     }
 });
@@ -452,6 +493,8 @@ ipcMain.on('open-widget', () => {
                     safelySendToWindow(widgetWindow, 'display-settings-update', lastDisplaySettings);
                 }
             });
+            // Уведомляем окно управления что виджет открыт
+            safelySendToWindow(controlWindow, 'widget-window-state', { isOpen: true });
         }
     } else {
         widgetWindow.focus();
@@ -461,13 +504,35 @@ ipcMain.on('open-widget', () => {
 ipcMain.on('close-widget', () => {
     if (widgetWindow) {
         widgetWindow.close();
+        // Уведомление отправится в обработчике 'closed' события окна
     }
+});
+
+// Управление окном панели управления
+ipcMain.on('minimize-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.minimize();
+});
+
+ipcMain.on('close-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.close();
 });
 
 // Виджет часов
 ipcMain.on('open-clock-widget', () => {
     if (!clockWidgetWindow) {
         createClockWidgetWindow();
+        if (clockWidgetWindow) {
+            clockWidgetWindow.webContents.on('did-finish-load', () => {
+                // Отправляем сохранённые настройки дисплея (включая стиль часов)
+                if (lastDisplaySettings) {
+                    safelySendToWindow(clockWidgetWindow, 'display-settings-update', lastDisplaySettings);
+                }
+            });
+            // Уведомляем окно управления что виджет часов открыт
+            safelySendToWindow(controlWindow, 'clock-window-state', { isOpen: true });
+        }
     } else {
         clockWidgetWindow.focus();
     }
@@ -476,6 +541,7 @@ ipcMain.on('open-clock-widget', () => {
 ipcMain.on('close-clock-widget', () => {
     if (clockWidgetWindow) {
         clockWidgetWindow.close();
+        // Уведомление отправится в обработчике 'closed' события окна
     }
 });
 
@@ -511,25 +577,39 @@ ipcMain.on('get-displays', (event) => {
 });
 
 ipcMain.on('open-display', (event, options = {}) => {
-    if (!displayWindow) {
-        createDisplayWindow(options.displayIndex);
-        if (displayWindow) {
-            displayWindow.webContents.on('did-finish-load', () => {
-                safelySendToWindow(displayWindow, 'timer-state', timerState);
-                // Отправляем сохранённые настройки дисплея (включая стиль)
-                if (lastDisplaySettings) {
-                    safelySendToWindow(displayWindow, 'display-settings-update', lastDisplaySettings);
-                }
-            });
-        }
-    } else {
+    // Если дисплей уже открыт и запрос на тот же монитор - просто фокус
+    if (displayWindow && options.displayIndex === displayWindow._displayIndex) {
         displayWindow.focus();
+        return;
+    }
+
+    // Закрываем старое окно если оно открыто (переключение монитора)
+    if (displayWindow) {
+        displayWindow.close();
+        displayWindow = null;
+    }
+
+    createDisplayWindow(options.displayIndex);
+    if (displayWindow) {
+        // Сохраняем индекс монитора для проверки
+        displayWindow._displayIndex = options.displayIndex;
+
+        displayWindow.webContents.on('did-finish-load', () => {
+            safelySendToWindow(displayWindow, 'timer-state', timerState);
+            // Отправляем сохранённые настройки дисплея (включая стиль)
+            if (lastDisplaySettings) {
+                safelySendToWindow(displayWindow, 'display-settings-update', lastDisplaySettings);
+            }
+        });
+        // Уведомляем окно управления что дисплей открыт
+        safelySendToWindow(controlWindow, 'display-window-state', { isOpen: true });
     }
 });
 
 ipcMain.on('close-display', () => {
     if (displayWindow) {
         displayWindow.close();
+        // Уведомление отправится в обработчике 'closed' события окна
     }
 });
 
@@ -577,28 +657,11 @@ ipcMain.on('widget-move', (event, { deltaX, deltaY }) => {
     }
 });
 
-// Управление таймером через виджет
-ipcMain.on('timer-control', (event, action) => {
+// Управление таймером через виджет (делегирует в единые функции)
+ipcMain.on('timer-control', (_event, action) => {
     switch (action) {
-        case 'start':
-            if (timerState.remainingSeconds <= 0 && !timerConfig.allowNegative) {
-                finishTimer();
-                break;
-            }
-            startTimer();
-            break;
-        case 'pause':
-            clearTimerInterval();
-            emitTimerState({ isRunning: false, isPaused: true, finished: false });
-            break;
-        case 'reset':
-            clearTimerInterval();
-            emitTimerState({
-                remainingSeconds: timerState.totalSeconds,
-                isRunning: false,
-                isPaused: false,
-                finished: false
-            });
-            break;
+        case 'start': handleTimerStart(); break;
+        case 'pause': handleTimerPause(); break;
+        case 'reset': handleTimerReset(); break;
     }
 });
