@@ -12,3 +12,7 @@ _electron/.cache/
 # VSCode
 .vscode/
 .playwright-mcp/
+
+# Test screenshots
+titlebar-test.png
+docs/bugs/*.png

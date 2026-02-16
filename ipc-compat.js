@@ -45,9 +45,6 @@
             const cleanup = window.electronAPI.on(channel, wrappedCallback);
 
             // Store reference for removeListener
-            if (!this._listeners) {
-                this._listeners = new Map();
-            }
             if (!this._listeners.has(channel)) {
                 this._listeners.set(channel, []);
             }

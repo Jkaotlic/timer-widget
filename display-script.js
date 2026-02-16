@@ -42,12 +42,18 @@ class DisplayTimer {
         this.timerStyle = 'circle';
         this.lastFlipValues = { min1: '', min2: '', sec1: '', sec2: '' };
 
+        this.isElectron = !!window.ipcRenderer;
+
         this.initElements();
         this.initProgress();
         this.loadColors();
         this.initDefaultStyle();
         this.detectElectronAndSetup();
-        this.startColorSync();
+        // Polling синхронизация цветов только в браузерном режиме;
+        // в Electron цвета приходят через IPC
+        if (!this.isElectron) {
+            this.startColorSync();
+        }
         this.startCurrentTimeClock();
         this.setupResizeHandler();
         this.setupKeyboardShortcuts();
@@ -598,9 +604,8 @@ class DisplayTimer {
                 return;
             }
         } else {
-            // Fallback если security.js не загружен (не должно случиться)
-            console.warn('SecurityUtils not loaded, using unsafe method');
-            document.body.style.backgroundImage = `url('${imageData}')`;
+            console.error('SecurityUtils not loaded, background image rejected for security');
+            return;
         }
 
         document.body.style.backgroundSize = bgSize;
@@ -955,8 +960,8 @@ class DisplayTimer {
 
     formatTime(seconds) {
         // Используем централизованную функцию из utils.js
-        if (typeof window.formatTimeShort !== 'undefined') {
-            return window.formatTimeShort(seconds);
+        if (window.TimeUtils && window.TimeUtils.formatTimeShort) {
+            return window.TimeUtils.formatTimeShort(seconds);
         }
         // Fallback
         const neg = seconds < 0;

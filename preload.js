@@ -16,7 +16,6 @@ const ALLOWED_CHANNELS = {
         'timer-command',
         'timer-control',
         'colors-update',
-        'timer-config-update',
         'display-settings-update',
         'open-widget',
         'close-widget',
@@ -36,21 +35,21 @@ const ALLOWED_CHANNELS = {
         'widget-move',
         'widget-get-size',
         'minimize-window',
-        'maximize-window',
-        'close-window',
-        'play-sound'
+        'close-window'
     ],
     // Event listeners
     receive: [
         'timer-state',
         'colors-update',
         'timer-minute',
-        'timer-finished',
+        'timer-overrun-minute',
         'display-settings-update',
-        'config-update',
         'displays-list',
         'set-clock-style',
-        'clock-settings'
+        'clock-settings',
+        'display-window-state',
+        'widget-window-state',
+        'clock-window-state'
     ]
 };
 
@@ -138,7 +137,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
 });
 
-// Log successful preload initialization (dev mode only)
-if (process.env.NODE_ENV === 'development') {
-    console.log('Preload script initialized with secure contextBridge');
-}
