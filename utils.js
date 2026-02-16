@@ -154,59 +154,6 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-/**
- * Конвертирует rgba строку в объект
- * @param {string} rgba - строка вида "rgba(255, 0, 0, 0.5)"
- * @returns {Object|null} - { r, g, b, a } или null
- */
-function parseRGBA(rgba) {
-    if (!rgba || typeof rgba !== 'string') {return null;}
-
-    const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-    if (!match) {return null;}
-
-    return {
-        r: parseInt(match[1]),
-        g: parseInt(match[2]),
-        b: parseInt(match[3]),
-        a: match[4] ? parseFloat(match[4]) : 1
-    };
-}
-
-/**
- * Конвертирует hex цвет в rgb
- * @param {string} hex - цвет в формате #RRGGBB
- * @returns {Object|null} - { r, g, b } или null
- */
-function hexToRGB(hex) {
-    if (!hex || typeof hex !== 'string') {return null;}
-
-    // Support both short (#RGB) and full (#RRGGBB) hex formats
-    const fullMatch = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-    if (fullMatch) {
-        return {
-            r: parseInt(fullMatch[1], 16),
-            g: parseInt(fullMatch[2], 16),
-            b: parseInt(fullMatch[3], 16)
-        };
-    }
-
-    const shortMatch = hex.match(/^#?([a-f\d])([a-f\d])([a-f\d])$/i);
-    if (shortMatch) {
-        // Expand shorthand form to full
-        const r = shortMatch[1] + shortMatch[1];
-        const g = shortMatch[2] + shortMatch[2];
-        const b = shortMatch[3] + shortMatch[3];
-        return {
-            r: parseInt(r, 16),
-            g: parseInt(g, 16),
-            b: parseInt(b, 16)
-        };
-    }
-
-    return null;
-}
-
 // Экспорт для Node.js (main process)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -218,9 +165,7 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateProgress,
         safelySendToWindow,
         isValidNumber,
-        clamp,
-        parseRGBA,
-        hexToRGB
+        clamp
     };
 }
 
@@ -234,8 +179,6 @@ if (typeof window !== 'undefined') {
         calculateProgress,
         isValidNumber,
         clamp,
-        parseRGBA,
-        hexToRGB,
         debounce
     };
 }
