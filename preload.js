@@ -33,7 +33,6 @@ const ALLOWED_CHANNELS = {
         'widget-resize',
         'widget-scale',
         'widget-move',
-        'widget-get-size',
         'minimize-window',
         'close-window'
     ],
