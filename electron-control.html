@@ -64,6 +64,53 @@
             background: rgba(102, 126, 234, 0.5);
         }
 
+        /* Кастомная панель заголовка (вместо системной) */
+        .custom-titlebar {
+            -webkit-app-region: drag;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 8px 6px 14px;
+            background: linear-gradient(135deg, #556ad0 0%, #6a3f9a 100%);
+            border-radius: 20px 20px 0 0;
+            flex-shrink: 0;
+            min-height: 32px;
+        }
+        .custom-titlebar .title-text {
+            color: rgba(255,255,255,0.85);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+        }
+        .custom-titlebar .window-controls {
+            display: flex;
+            gap: 6px;
+            -webkit-app-region: no-drag;
+        }
+        .custom-titlebar .win-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            line-height: 1;
+        }
+        .custom-titlebar .win-btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        .custom-titlebar .win-btn.close-btn:hover {
+            background: #e74c3c;
+            color: white;
+        }
+
         /* Верхняя секция с таймером */
         .timer-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1107,6 +1154,15 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
 
+        .quick-window-btn.active {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), 0 4px 12px rgba(0,0,0,0.3);
+            transform: scale(1.05);
+        }
+
+        .quick-window-btn.active:hover {
+            transform: scale(1.05) translateY(-2px);
+        }
+
         /* Кнопка настроек */
         .settings-toggle {
             display: flex;
@@ -1547,6 +1603,47 @@
             color: #7a4d00;
         }
 
+        /* Toast notifications (replacement for alert dialogs) */
+        .toast-container {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            background: #333;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: auto;
+            max-width: 340px;
+            text-align: center;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.error {
+            background: linear-gradient(135deg, #d32f2f, #b71c1c);
+        }
+        .toast.warning {
+            background: linear-gradient(135deg, #f57c00, #e65100);
+        }
+        .toast.success {
+            background: linear-gradient(135deg, #388e3c, #2e7d32);
+        }
+
         .info-banner strong {
             color: #1a1a1a;
             font-weight: 700;
@@ -1686,6 +1783,15 @@
 </head>
 <body class="control-window">
     <div class="control-panel">
+        <!-- Кастомная панель заголовка -->
+        <div class="custom-titlebar">
+            <span class="title-text">⏱️ Управление таймером</span>
+            <div class="window-controls">
+                <button class="win-btn" id="minimizeBtn" title="Свернуть">—</button>
+                <button class="win-btn close-btn" id="closeAppBtn" title="Закрыть">✕</button>
+            </div>
+        </div>
+
         <!-- Заголовок с таймером -->
         <div class="timer-header">
             <button class="faq-btn" id="faqBtn" title="Справка">?</button>
@@ -1720,7 +1826,7 @@
         <div class="compact-section">
             <div class="quick-windows">
                 <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный виджет поверх окон (W)">⏱️ Виджет</button>
-                <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени">🕐 Часы</button>
+                <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)">🕐 Часы</button>
                 <button class="quick-window-btn display" id="openDisplayBtn" title="На весь экран для презентаций (D)">🖥️ Дисплей</button>
             </div>
         </div>
@@ -1739,13 +1845,9 @@
                         <span class="icon">⏰</span>
                         <span>Время</span>
                     </button>
-                    <button class="tab-btn" data-tab="display" title="Настройки полноэкранного дисплея">
-                        <span class="icon">🖥️</span>
-                        <span>Дисплей</span>
-                    </button>
-                    <button class="tab-btn" data-tab="clock" title="Виджет часов и его стиль">
-                        <span class="icon">🕐</span>
-                        <span>Часы</span>
+                    <button class="tab-btn" data-tab="windows" title="Настройки виджета, дисплея и часов">
+                        <span class="icon">📱</span>
+                        <span>Окна</span>
                     </button>
                     <button class="tab-btn" data-tab="style" title="Фон и цветовая тема">
                         <span class="icon">🎨</span>
@@ -1797,23 +1899,17 @@
                     </div>
                 </div>
 
-                <!-- Таб: Полноэкранный режим -->
-                <div class="tab-content" id="tab-display">
+                <!-- Таб: Окна (Виджет, Дисплей, Часы) -->
+                <div class="tab-content" id="tab-windows">
                     <div class="info-banner">
-                        ⌨️ <code>D</code> — открыть/закрыть дисплей &bull; <code>Esc</code> — закрыть &bull; <code>Ctrl+Колесо</code> — масштаб
+                        ⌨️ <code>W</code> — виджет &bull; <code>D</code> — дисплей &bull; <code>Esc</code> — закрыть &bull; <code>Ctrl+Колесо</code> — масштаб
                     </div>
 
+                    <!-- Виджет таймера -->
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🖥️</span>
-                            Основные настройки
-                        </div>
-
-                        <div class="toggle-row">
-                            <span class="toggle-label">Монитор</span>
-                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em; max-width: 140px;">
-                                <option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>
-                            </select>
+                            <span class="icon">⏱️</span>
+                            Виджет таймера
                         </div>
 
                         <div class="toggle-row">
@@ -1835,12 +1931,28 @@
                         </div>
                     </div>
 
+                    <!-- Полноэкранный дисплей -->
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">🖥️</span>
+                            Полноэкранный дисплей
+                        </div>
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Монитор</span>
+                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em; max-width: 140px;">
+                                <option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Блоки времени на дисплее -->
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">📋</span>
                             Блоки времени на дисплее
                         </div>
-                        
+
                         <div class="toggle-row">
                             <span class="toggle-label">Показывать блоки</span>
                             <label class="toggle-switch">
@@ -1848,7 +1960,7 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                        
+
                         <div id="timeBlocksSettings" style="display: none;">
                             <div class="toggle-row">
                                 <span class="toggle-label">Расположение блоков</span>
@@ -1859,19 +1971,19 @@
                                     <option value="corners">По углам</option>
                                 </select>
                             </div>
-                            
+
                             <div class="toggle-row">
                                 <span class="toggle-label">Время начала</span>
-                                <input type="time" id="eventTimeInput" value="10:00" title="Время начала мероприятия" 
+                                <input type="time" id="eventTimeInput" value="10:00" title="Время начала мероприятия"
                                        style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
                             </div>
-                            
+
                             <div class="toggle-row">
                                 <span class="toggle-label">Время окончания</span>
-                                <input type="time" id="endTimeInput" value="12:00" title="Время окончания мероприятия" 
+                                <input type="time" id="endTimeInput" value="12:00" title="Время окончания мероприятия"
                                        style="width: 90px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9em;">
                             </div>
-                            
+
                             <div class="toggle-row">
                                 <span class="toggle-label">Размер блоков</span>
                                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -1881,18 +1993,12 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Таб: Виджет часов -->
-                <div class="tab-content" id="tab-clock">
-                    <div class="info-banner tip">
-                        💡 <code>Ctrl+Колесо</code> — масштаб виджета &bull; Перетаскивайте в любое место экрана
-                    </div>
-
+                    <!-- Виджет часов -->
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🕐</span>
-                            Стиль часов
+                            Виджет часов
                         </div>
 
                         <div class="toggle-row">
@@ -1920,14 +2026,7 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                    </div>
 
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">⚙️</span>
-                            Элементы виджета
-                        </div>
-                        
                         <div class="toggle-row">
                             <span class="toggle-label">Показывать дату</span>
                             <label class="toggle-switch">
@@ -1935,7 +2034,7 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                        
+
                         <div class="toggle-row">
                             <span class="toggle-label">Показывать часовой пояс</span>
                             <label class="toggle-switch">
@@ -1943,7 +2042,7 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                        
+
                         <div class="toggle-row">
                             <span class="toggle-label">Показывать секунды</span>
                             <label class="toggle-switch">
@@ -1951,7 +2050,7 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                        
+
                         <div class="toggle-row">
                             <span class="toggle-label">24-часовой формат</span>
                             <label class="toggle-switch">
@@ -2116,6 +2215,39 @@
                             <button class="sound-preview" id="soundMinutePreview" title="Прослушать">▶</button>
                         </div>
 
+                        <div class="sound-row" style="border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; margin-top: 6px;">
+                            <div class="sound-toggle">
+                                <input type="checkbox" id="soundOverrunEnabled">
+                                <label for="soundOverrunEnabled">При перерасходе</label>
+                            </div>
+                            <select class="sound-select" id="soundOverrunPreset">
+                                <option value="none">— без звука —</option>
+                                <optgroup label="Стандартные">
+                                    <option value="beep-short">Короткий бип</option>
+                                    <option value="beep-long">Длинный бип</option>
+                                    <option value="triple" selected>Тройной сигнал</option>
+                                    <option value="chirp">Чирп</option>
+                                    <option value="bell">Колокольчик</option>
+                                    <option value="ding">Динь</option>
+                                    <option value="alarm">Будильник</option>
+                                    <option value="soft-alert">Мягкий сигнал</option>
+                                </optgroup>
+                                <optgroup label="Ваши звуки" id="customSoundsGroupOverrun"></optgroup>
+                            </select>
+                            <button class="sound-preview" id="soundOverrunPreview" title="Прослушать">▶</button>
+                        </div>
+
+                        <div class="sound-row" style="padding-left: 24px;">
+                            <label style="font-size: 0.85em; color: #666; white-space: nowrap;">Напоминать каждые</label>
+                            <select class="sound-select" id="overrunIntervalMinutes" style="max-width: 130px;">
+                                <option value="1">1 минуту</option>
+                                <option value="2">2 минуты</option>
+                                <option value="3">3 минуты</option>
+                                <option value="5">5 минут</option>
+                                <option value="10">10 минут</option>
+                            </select>
+                        </div>
+
                         <div class="custom-sounds-section">
                             <div class="settings-group-title">
                                 <span class="icon">🎵</span>
@@ -2194,7 +2326,7 @@
                                 <li>Перетаскивается мышкой в любое место</li>
                                 <li>Кнопки управления появляются при наведении</li>
                                 <li><strong>Ctrl+Колесо</strong> — изменить размер</li>
-                                <li>Горячая клавиша: <strong>W</strong></li>
+                                <li>Горячая клавиша: <strong>W</strong> (открыть / закрыть)</li>
                             </ul>
                         </div>
                     </div>
@@ -2207,6 +2339,7 @@
                                 <li>Опционально: дата, часовой пояс, секунды, 12/24ч формат</li>
                                 <li><strong>Ctrl+Колесо</strong> — изменить размер</li>
                                 <li>Прозрачный, всегда поверх других окон</li>
+                                <li>Горячая клавиша: <strong>C</strong> (открыть / закрыть)</li>
                             </ul>
                         </div>
                     </div>
@@ -2219,7 +2352,7 @@
                                 <li>4 стиля таймера + настройка масштаба</li>
                                 <li>Блоки времени: текущее время начала/окончания мероприятия</li>
                                 <li>Настраиваемый фон: заливка, градиент, изображение (URL или файл)</li>
-                                <li>Горячая клавиша: <strong>D</strong> (открыть), <strong>Esc</strong> (закрыть)</li>
+                                <li>Горячая клавиша: <strong>D</strong> (открыть / закрыть), <strong>Esc</strong> (закрыть все)</li>
                             </ul>
                         </div>
                     </div>
@@ -2300,9 +2433,10 @@
                         <div class="faq-question">Окна</div>
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
-                                <div class="shortcut"><span class="key">W</span> <span class="shortcut-desc">Виджет таймера</span></div>
-                                <div class="shortcut"><span class="key">D</span> <span class="shortcut-desc">Полноэкранный дисплей</span></div>
-                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть виджеты</span></div>
+                                <div class="shortcut"><span class="key">W</span> <span class="shortcut-desc">Виджет таймера (открыть / закрыть)</span></div>
+                                <div class="shortcut"><span class="key">C</span> <span class="shortcut-desc">Виджет часов (открыть / закрыть)</span></div>
+                                <div class="shortcut"><span class="key">D</span> <span class="shortcut-desc">Полноэкранный дисплей (открыть / закрыть)</span></div>
+                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть все виджеты</span></div>
                                 <div class="shortcut"><span class="key">F1</span> <span class="shortcut-desc">Подсказка по клавишам</span></div>
                             </div>
                         </div>
@@ -2457,6 +2591,31 @@
             }
         };
 
+        // Toast notification system (replaces alert dialogs)
+        const Toast = {
+            _container: null,
+            _getContainer() {
+                if (!this._container) {
+                    this._container = document.createElement('div');
+                    this._container.className = 'toast-container';
+                    document.body.appendChild(this._container);
+                }
+                return this._container;
+            },
+            show(message, type = 'error', duration = 3500) {
+                const container = this._getContainer();
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                container.appendChild(toast);
+                requestAnimationFrame(() => toast.classList.add('show'));
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, duration);
+            }
+        };
+
         class TimerController {
             constructor() {
                 this.totalSeconds = 0;
@@ -2512,6 +2671,8 @@
                 this.soundStartEl = document.getElementById('soundStartEnabled');
                 this.soundEndEl = document.getElementById('soundEndEnabled');
                 this.soundMinuteEl = document.getElementById('soundMinuteEnabled');
+                this.soundOverrunEl = document.getElementById('soundOverrunEnabled');
+                this.overrunIntervalEl = document.getElementById('overrunIntervalMinutes');
                 
                 // Настройки полноэкранного режима
                 this.displaySelectEl = document.getElementById('displaySelect');
@@ -2700,18 +2861,34 @@
                 this.pauseBtn.addEventListener('click', () => this.pause());
                 this.resetBtn.addEventListener('click', () => this.reset());
 
-                // Окна
+                // Окна (переключение открыть/закрыть)
                 document.getElementById('openWidgetBtn').addEventListener('click', () => {
-                    ipcRenderer.send('open-widget');
+                    if (isWidgetOpen) {
+                        ipcRenderer.send('close-widget');
+                    } else {
+                        ipcRenderer.send('open-widget');
+                    }
                 });
                 document.getElementById('openClockBtn').addEventListener('click', () => {
-                    ipcRenderer.send('open-clock-widget');
-                    // Синхронизируем настройки часов при открытии
-                    setTimeout(() => this.pushClockSettings(), 500);
+                    if (isClockOpen) {
+                        ipcRenderer.send('close-clock-widget');
+                    } else {
+                        ipcRenderer.send('open-clock-widget');
+                        // Синхронизируем настройки и стиль часов при открытии
+                        setTimeout(() => {
+                            this.pushClockSettings();
+                            const clockStyle = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
+                            ipcRenderer.send('clock-widget-set-style', clockStyle);
+                        }, 500);
+                    }
                 });
                 document.getElementById('openDisplayBtn').addEventListener('click', () => {
-                    const displayIndex = this.displaySelectEl.value;
-                    ipcRenderer.send('open-display', { displayIndex });
+                    if (isDisplayOpen) {
+                        ipcRenderer.send('close-display');
+                    } else {
+                        const displayIndex = this.displaySelectEl.value;
+                        ipcRenderer.send('open-display', { displayIndex });
+                    }
                 });
                 
                 // Сохранение выбора монитора
@@ -2841,6 +3018,14 @@
                 document.getElementById('soundStartPreview').addEventListener('click', () => this.previewSound('start'));
                 document.getElementById('soundEndPreview').addEventListener('click', () => this.previewSound('end'));
                 document.getElementById('soundMinutePreview').addEventListener('click', () => this.previewSound('minute'));
+                document.getElementById('soundOverrunPreview').addEventListener('click', () => this.previewSound('overrun'));
+
+                // Настройки перерасхода звука
+                this.soundOverrunEl.addEventListener('change', () => this.saveExtSettings());
+                this.overrunIntervalEl.addEventListener('change', () => {
+                    this.saveExtSettings();
+                    this.pushOverrunInterval();
+                });
 
                 // Лимит перерасхода
                 document.getElementById('overrunLimit').addEventListener('change', () => this.saveExtSettings());
@@ -2977,7 +3162,7 @@
                     // FIX BUG-025, BUG-026: Validate file before upload
                     const validation = await this.validateImageFile(file);
                     if (!validation.valid) {
-                        alert(validation.error);
+                        Toast.show(validation.error, 'error');
                         event.target.value = ''; // Сбрасываем input
                         LoadingIndicator.hide(loadingOverlay);
                         return;
@@ -3001,7 +3186,7 @@
                     };
 
                     reader.onerror = () => {
-                        alert('Ошибка при чтении файла');
+                        Toast.show('Ошибка при чтении файла', 'error');
                         event.target.value = '';
                         LoadingIndicator.hide(loadingOverlay);
                     };
@@ -3009,7 +3194,7 @@
                     reader.readAsDataURL(file);
                     event.target.value = ''; // Сбрасываем input
                 } catch (error) {
-                    alert('Произошла ошибка при обработке файла');
+                    Toast.show('Произошла ошибка при обработке файла', 'error');
                     LoadingIndicator.hide(loadingOverlay);
                     event.target.value = '';
                 }
@@ -3131,10 +3316,15 @@
                 this.soundStartEl.checked = !!ext.soundStartEnabled;
                 this.soundEndEl.checked = ext.soundEndEnabled !== false;
                 this.soundMinuteEl.checked = !!ext.soundMinuteEnabled;
+                this.soundOverrunEl.checked = !!ext.soundOverrunEnabled;
+                if (ext.overrunIntervalMinutes) {
+                    this.overrunIntervalEl.value = ext.overrunIntervalMinutes;
+                }
 
                 document.getElementById('soundStartPreset').value = ext.soundStartPreset || 'none';
                 document.getElementById('soundEndPreset').value = ext.soundEndPreset || 'none';
                 document.getElementById('soundMinutePreset').value = ext.soundMinutePreset || 'none';
+                document.getElementById('soundOverrunPreset').value = ext.soundOverrunPreset || 'triple';
 
                 document.getElementById('bgSolidColor').value = ext.bgSolid || '#0f0c29';
                 document.getElementById('bgGrad1').value = ext.bgGrad1 || '#0f0c29';
@@ -3178,6 +3368,9 @@
                 setTimeout(() => {
                     ipcRenderer.send('clock-widget-set-style', clockStyleToSend);
                 }, 500);
+
+                // Отправляем интервал перерасхода при загрузке
+                this.pushOverrunInterval();
             }
 
             saveColors() {
@@ -3200,6 +3393,9 @@
                     soundStartPreset: document.getElementById('soundStartPreset').value,
                     soundEndPreset: document.getElementById('soundEndPreset').value,
                     soundMinutePreset: document.getElementById('soundMinutePreset').value,
+                    soundOverrunEnabled: this.soundOverrunEl.checked,
+                    soundOverrunPreset: document.getElementById('soundOverrunPreset').value,
+                    overrunIntervalMinutes: parseInt(this.overrunIntervalEl.value) || 1,
                     bgMode: this.currentBgMode,
                     bgSolid: document.getElementById('bgSolidColor').value,
                     bgGrad1: document.getElementById('bgGrad1').value,
@@ -3222,6 +3418,14 @@
                     ? window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
                     : safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
+            }
+
+            pushOverrunInterval() {
+                const interval = parseInt(this.overrunIntervalEl.value) || 1;
+                ipcRenderer.send('timer-command', {
+                    type: 'set-overrun-interval',
+                    overrunIntervalMinutes: interval
+                });
             }
 
             pushDisplaySettings() {
@@ -3337,12 +3541,20 @@
                     }
                 };
                 ipcRenderer.on('timer-minute', this._onTimerMinute);
+
+                this._onTimerOverrun = () => {
+                    if (this.soundOverrunEl.checked) {
+                        this.playSound('overrun');
+                    }
+                };
+                ipcRenderer.on('timer-overrun-minute', this._onTimerOverrun);
             }
 
             cleanup() {
                 if (this._onDisplaysList) ipcRenderer.removeListener('displays-list', this._onDisplaysList);
                 if (this._onTimerState) ipcRenderer.removeListener('timer-state', this._onTimerState);
                 if (this._onTimerMinute) ipcRenderer.removeListener('timer-minute', this._onTimerMinute);
+                if (this._onTimerOverrun) ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);
                 if (this._audioCtx) {
                     this._audioCtx.close().catch(() => {});
                     this._audioCtx = null;
@@ -3751,13 +3963,13 @@
                 // FIX BUG-025: Validation for sound file uploads
                 const MAX_SOUND_SIZE = (window.CONFIG && window.CONFIG.MAX_SOUND_FILE_SIZE) || 5 * 1024 * 1024;
                 if (file.size > MAX_SOUND_SIZE) {
-                    alert('Файл слишком большой (максимум 5 MB)');
+                    Toast.show('Файл слишком большой (максимум 5 MB)', 'error');
                     event.target.value = '';
                     return;
                 }
                 const allowedAudioTypes = (window.CONFIG && window.CONFIG.ALLOWED_AUDIO_TYPES) || ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'];
                 if (file.type && !allowedAudioTypes.includes(file.type)) {
-                    alert('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC');
+                    Toast.show('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC', 'warning');
                     event.target.value = '';
                     return;
                 }
@@ -3784,7 +3996,7 @@
                     this.loadCustomSounds();
                 };
                 reader.onerror = () => {
-                    alert('Ошибка чтения звукового файла');
+                    Toast.show('Ошибка чтения звукового файла', 'error');
                     event.target.value = '';
                 };
                 reader.readAsDataURL(file);
@@ -3801,7 +4013,7 @@
                 listEl.innerHTML = '';
                 
                 // Обновляем списки в select'ах (сохраняя текущий выбор)
-                ['Start', 'End', 'Minute'].forEach(type => {
+                ['Start', 'End', 'Minute', 'Overrun'].forEach(type => {
                     const select = document.getElementById(`sound${type}Preset`);
                     const savedValue = select.value;
                     const group = document.getElementById(`customSoundsGroup${type}`);
@@ -3913,6 +4125,60 @@
 
         window.timerController = new TimerController();
 
+        // Отслеживание состояния окон
+        let isDisplayOpen = false;
+        let isWidgetOpen = false;
+        let isClockOpen = false;
+
+        // Функция обновления визуала кнопок
+        function updateWindowButton(buttonId, isOpen, baseText) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+
+            if (isOpen) {
+                button.classList.add('active');
+                button.textContent = baseText + ' ✓';
+                button.title = button.title.replace(/открыть|Компактный|Часы в реальном|На весь экран/i, 'Закрыть');
+            } else {
+                button.classList.remove('active');
+                button.textContent = baseText;
+                // Восстанавливаем оригинальные подсказки
+                if (buttonId === 'openWidgetBtn') {
+                    button.title = 'Компактный виджет поверх окон (W)';
+                } else if (buttonId === 'openClockBtn') {
+                    button.title = 'Часы в реальном времени (C)';
+                } else if (buttonId === 'openDisplayBtn') {
+                    button.title = 'На весь экран для презентаций (D)';
+                }
+            }
+        }
+
+        // Слушатели для обновления состояния окон
+        if (window.ipcRenderer) {
+            window.ipcRenderer.on('display-window-state', (event, data) => {
+                isDisplayOpen = data.isOpen;
+                updateWindowButton('openDisplayBtn', isDisplayOpen, '🖥️ Дисплей');
+            });
+
+            window.ipcRenderer.on('widget-window-state', (event, data) => {
+                isWidgetOpen = data.isOpen;
+                updateWindowButton('openWidgetBtn', isWidgetOpen, '⏱️ Виджет');
+            });
+
+            window.ipcRenderer.on('clock-window-state', (event, data) => {
+                isClockOpen = data.isOpen;
+                updateWindowButton('openClockBtn', isClockOpen, '🕐 Часы');
+            });
+        }
+
+        // Кнопки кастомной панели заголовка
+        document.getElementById('minimizeBtn').addEventListener('click', () => {
+            if (window.ipcRenderer) window.ipcRenderer.send('minimize-window');
+        });
+        document.getElementById('closeAppBtn').addEventListener('click', () => {
+            if (window.ipcRenderer) window.ipcRenderer.send('close-window');
+        });
+
         // Cleanup при закрытии окна
         window.addEventListener('beforeunload', () => {
             window.timerController.cleanup();
@@ -4000,17 +4266,49 @@
                 }
             }
 
-            // W: Open widget
+            // W: Toggle widget (open/close)
             else if (event.code === 'KeyW' && !event.ctrlKey && !event.metaKey) {
                 event.preventDefault();
-                ipcRenderer.send('open-widget');
+                if (window.ipcRenderer) {
+                    if (isWidgetOpen) {
+                        window.ipcRenderer.send('close-widget');
+                    } else {
+                        window.ipcRenderer.send('open-widget');
+                    }
+                }
             }
 
-            // D: Open display (fullscreen)
+            // C: Toggle clock widget (open/close)
+            else if (event.code === 'KeyC' && !event.ctrlKey && !event.metaKey) {
+                event.preventDefault();
+                if (window.ipcRenderer) {
+                    if (isClockOpen) {
+                        window.ipcRenderer.send('close-clock-widget');
+                    } else {
+                        window.ipcRenderer.send('open-clock-widget');
+                        if (window.timerController) {
+                            setTimeout(() => {
+                                window.timerController.pushClockSettings();
+                                const tc = window.timerController;
+                                const clockStyle = tc.syncClockStyle ? tc.timerStyleEl.value : tc.clockStyleEl.value;
+                                window.ipcRenderer.send('clock-widget-set-style', clockStyle);
+                            }, 500);
+                        }
+                    }
+                }
+            }
+
+            // D: Toggle display (open/close fullscreen)
             else if (event.code === 'KeyD' && !event.ctrlKey && !event.metaKey) {
                 event.preventDefault();
-                const displayIndex = document.getElementById('displaySelect')?.value || 'auto';
-                ipcRenderer.send('open-display', { displayIndex });
+                if (window.ipcRenderer) {
+                    if (isDisplayOpen) {
+                        window.ipcRenderer.send('close-display');
+                    } else {
+                        const displayIndex = document.getElementById('displaySelect')?.value || 'auto';
+                        window.ipcRenderer.send('open-display', { displayIndex });
+                    }
+                }
             }
 
             // 1-5: Quick timer presets
@@ -4023,12 +4321,14 @@
                 }
             }
 
-            // Escape: Close widget/display/clock-widget
+            // Escape: Close display first, then widget, then clock (sequential)
             else if (event.code === 'Escape') {
                 event.preventDefault();
-                ipcRenderer.send('close-widget');
-                ipcRenderer.send('close-display');
-                ipcRenderer.send('close-clock-widget');
+                if (window.ipcRenderer) {
+                    window.ipcRenderer.send('close-display');
+                    window.ipcRenderer.send('close-widget');
+                    window.ipcRenderer.send('close-clock-widget');
+                }
             }
 
             // F1: Show help/shortcuts
@@ -4051,10 +4351,11 @@
                         <b>Space</b> - Старт/Пауза таймера<br>
                         <b>R</b> - Сброс таймера<br>
                         <b>S</b> - Остановить таймер<br>
-                        <b>W</b> - Открыть виджет<br>
-                        <b>D</b> - Открыть полноэкранный дисплей<br>
+                        <b>W</b> - Виджет таймера (открыть/закрыть)<br>
+                        <b>C</b> - Виджет часов (открыть/закрыть)<br>
+                        <b>D</b> - Полноэкранный дисплей (открыть/закрыть)<br>
                         <b>1-5</b> - Быстрые пресеты (1, 5, 10, 15, 30 мин)<br>
-                        <b>Esc</b> - Закрыть виджет/дисплей<br>
+                        <b>Esc</b> - Закрыть все виджеты<br>
                         <b>F1</b> - Показать эту справку<br>
                     </div>
                     <button onclick="this.parentElement.parentElement.remove()"
