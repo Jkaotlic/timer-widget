@@ -3722,8 +3722,8 @@
 
             formatTime(seconds) {
                 // Используем централизованную функцию из utils.js
-                if (typeof formatTimeShort !== 'undefined') {
-                    return formatTimeShort(seconds);
+                if (window.TimeUtils && window.TimeUtils.formatTimeShort) {
+                    return window.TimeUtils.formatTimeShort(seconds);
                 }
                 // Fallback если utils.js не загружен
                 const neg = seconds < 0;
