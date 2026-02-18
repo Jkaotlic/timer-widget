@@ -58,14 +58,6 @@ function enableWindowResizeOnScroll(win) {
 
     win.webContents.on('before-input-event', onBeforeInput);
     win.webContents.on('zoom-changed', onZoomChanged);
-
-    // Cleanup listeners on window close to prevent memory leaks
-    win.on('closed', () => {
-        if (win.webContents && !win.webContents.isDestroyed()) {
-            win.webContents.removeListener('before-input-event', onBeforeInput);
-            win.webContents.removeListener('zoom-changed', onZoomChanged);
-        }
-    });
 }
 
 function clearTimerInterval() {
