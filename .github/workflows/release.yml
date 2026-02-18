@@ -125,15 +125,14 @@ jobs:
             ## TimerWidget ${{ github.ref_name }}
 
             ### Что нового
-            - Исправлена ссылка на `formatTimeShort` в панели управления и виджете таймера — функция вызывалась как глобальная, но экспортируется через `window.TimeUtils`
-            - Панель управления и виджет теперь корректно используют `window.TimeUtils.formatTimeShort` для отображения времени
+            - Исправлен краш `TypeError: Object has been destroyed` при открытии/закрытии окон виджета, часов и дисплея
 
             ### Скачать
             | Платформа | Файл |
             |-----------|------|
-            | 🍎 macOS Apple Silicon | `TimerWidget-1.2.7-arm64.dmg` |
-            | 🍎 macOS Intel | `TimerWidget-1.2.7-x64.dmg` |
-            | 🪟 Windows (установщик) | `TimerWidget-Setup-1.2.7.exe` |
+            | 🍎 macOS Apple Silicon | `TimerWidget-1.2.8-arm64.dmg` |
+            | 🍎 macOS Intel | `TimerWidget-1.2.8-x64.dmg` |
+            | 🪟 Windows (установщик) | `TimerWidget-Setup-1.2.8.exe` |
             | 🪟 Windows (портативная) | `TimerWidget-Portable.exe` |
           draft: false
           prerelease: false
