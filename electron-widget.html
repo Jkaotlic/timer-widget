@@ -1475,21 +1475,13 @@
                     const settings = safeJSONParse(bgSettings, {});
 
                     if (settings && Object.keys(settings).length > 0) {
-                        // Для локального фона загружаем изображение
-                        if (settings.bgMode === 'local') {
-                            const localBgImage = localStorage.getItem('localBgImage');
-                            const localBgSettingsStr = localStorage.getItem('localBgSettings') || '{}';
-                            const localBgSettings = safeJSONParse(localBgSettingsStr, {});
-
-                            if (localBgImage) {
-                                settings.bgLocalImage = localBgImage;
-                                settings.bgLocalFit = localBgSettings.fit || 'cover';
-                                settings.bgLocalOverlay = localBgSettings.overlay || 30;
-                            }
+                        // Виджет всегда прозрачный — картинки только на полноэкранном дисплее
+                        if (settings.bgMode === 'image' || settings.bgMode === 'local') {
+                            settings.bgMode = 'default';
                         }
 
                         this.applyBackground(settings);
-                        
+
                         // Применяем стиль таймера
                         if (settings.timerStyle) {
                             this.setTimerStyle(settings.timerStyle);
@@ -1522,7 +1514,12 @@
                 };
 
                 this.displaySettingsUpdateHandler = (event, settings) => {
-                    this.applyBackground(settings);
+                    // Виджет всегда прозрачный — фоновые картинки только на полноэкранном дисплее
+                    const widgetSettings = { ...settings };
+                    if (widgetSettings.bgMode === 'image' || widgetSettings.bgMode === 'local') {
+                        widgetSettings.bgMode = 'default';
+                    }
+                    this.applyBackground(widgetSettings);
                     if (settings.timerStyle) {
                         this.setTimerStyle(settings.timerStyle);
                     }
