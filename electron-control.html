@@ -1255,6 +1255,89 @@
             transform: scale(1.1);
         }
 
+        /* Диалог подтверждения выхода */
+        .exit-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .exit-modal.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .exit-dialog {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 16px;
+            padding: 28px 32px;
+            min-width: 280px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+            transform: translateY(20px) scale(0.95);
+            transition: transform 0.3s;
+            text-align: center;
+        }
+
+        .exit-modal.show .exit-dialog {
+            transform: translateY(0) scale(1);
+        }
+
+        .exit-dialog h3 {
+            margin: 0 0 8px;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .exit-dialog p {
+            margin: 0 0 20px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .exit-dialog-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .exit-dialog-buttons button {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .exit-btn-cancel {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .exit-btn-cancel:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .exit-btn-confirm {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: #fff;
+        }
+
+        .exit-btn-confirm:hover {
+            background: linear-gradient(135deg, #ff6b6b, #e74c3c);
+        }
+
         /* FAQ модальное окно */
         .faq-modal {
             position: fixed;
@@ -2272,6 +2355,18 @@
     </div>
 
     <!-- FAQ Modal -->
+    <!-- Диалог подтверждения выхода -->
+    <div class="exit-modal" id="exitModal">
+        <div class="exit-dialog">
+            <h3>Закрыть приложение?</h3>
+            <p>Все окна (виджет, часы, дисплей) будут закрыты</p>
+            <div class="exit-dialog-buttons">
+                <button class="exit-btn-cancel" id="exitCancel">Отмена</button>
+                <button class="exit-btn-confirm" id="exitConfirm">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <div class="faq-modal" id="faqModal">
         <div class="faq-content">
             <div class="faq-header">
@@ -4175,8 +4270,19 @@
         document.getElementById('minimizeBtn').addEventListener('click', () => {
             if (window.ipcRenderer) window.ipcRenderer.send('minimize-window');
         });
+        // Диалог подтверждения выхода
+        const exitModal = document.getElementById('exitModal');
         document.getElementById('closeAppBtn').addEventListener('click', () => {
-            if (window.ipcRenderer) window.ipcRenderer.send('close-window');
+            exitModal.classList.add('show');
+        });
+        document.getElementById('exitCancel').addEventListener('click', () => {
+            exitModal.classList.remove('show');
+        });
+        document.getElementById('exitConfirm').addEventListener('click', () => {
+            if (window.ipcRenderer) window.ipcRenderer.send('quit-app');
+        });
+        exitModal.addEventListener('click', (e) => {
+            if (e.target === exitModal) exitModal.classList.remove('show');
         });
 
         // Cleanup при закрытии окна
@@ -4209,8 +4315,9 @@
 
         // Close on Escape key
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && faqModal.classList.contains('show')) {
-                faqModal.classList.remove('show');
+            if (e.key === 'Escape') {
+                if (exitModal.classList.contains('show')) exitModal.classList.remove('show');
+                if (faqModal.classList.contains('show')) faqModal.classList.remove('show');
             }
         });
 

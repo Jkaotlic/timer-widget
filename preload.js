@@ -34,7 +34,8 @@ const ALLOWED_CHANNELS = {
         'widget-scale',
         'widget-move',
         'minimize-window',
-        'close-window'
+        'close-window',
+        'quit-app'
     ],
     // Event listeners
     receive: [

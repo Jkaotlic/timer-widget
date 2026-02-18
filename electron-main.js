@@ -519,6 +519,11 @@ ipcMain.on('close-window', (event) => {
     if (win) { win.close(); }
 });
 
+ipcMain.on('quit-app', () => {
+    clearTimerInterval();
+    app.quit();
+});
+
 // Виджет часов
 ipcMain.on('open-clock-widget', () => {
     if (!clockWidgetWindow) {
