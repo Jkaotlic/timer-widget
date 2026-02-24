@@ -125,15 +125,14 @@ jobs:
             ## TimerWidget ${{ github.ref_name }}
 
             ### Что нового
-            - Исправлен краш `TypeError: Object has been destroyed` при открытии/закрытии окон виджета, часов и дисплея
-            - Добавлен диалог подтверждения при закрытии — кнопка ✕ теперь спрашивает «Закрыть приложение?» и при подтверждении закрывает все окна
+            - Исправлен звук финиша в режиме перерасхода: теперь звук воспроизводится при достижении 00:00, а не только при достижении лимита перерасхода
 
             ### Скачать
             | Платформа | Файл |
             |-----------|------|
-            | 🍎 macOS Apple Silicon | `TimerWidget-1.2.8-arm64.dmg` |
-            | 🍎 macOS Intel | `TimerWidget-1.2.8-x64.dmg` |
-            | 🪟 Windows (установщик) | `TimerWidget-Setup-1.2.8.exe` |
+            | 🍎 macOS Apple Silicon | `TimerWidget-1.2.9-arm64.dmg` |
+            | 🍎 macOS Intel | `TimerWidget-1.2.9-x64.dmg` |
+            | 🪟 Windows (установщик) | `TimerWidget-Setup-1.2.9.exe` |
             | 🪟 Windows (портативная) | `TimerWidget-Portable.exe` |
           draft: false
           prerelease: false
