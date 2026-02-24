@@ -3637,6 +3637,13 @@
                 };
                 ipcRenderer.on('timer-minute', this._onTimerMinute);
 
+                this._onTimerReachedZero = () => {
+                    if (this.soundEndEl.checked) {
+                        this.playSound('end');
+                    }
+                };
+                ipcRenderer.on('timer-reached-zero', this._onTimerReachedZero);
+
                 this._onTimerOverrun = () => {
                     if (this.soundOverrunEl.checked) {
                         this.playSound('overrun');
@@ -3649,6 +3656,7 @@
                 if (this._onDisplaysList) ipcRenderer.removeListener('displays-list', this._onDisplaysList);
                 if (this._onTimerState) ipcRenderer.removeListener('timer-state', this._onTimerState);
                 if (this._onTimerMinute) ipcRenderer.removeListener('timer-minute', this._onTimerMinute);
+                if (this._onTimerReachedZero) ipcRenderer.removeListener('timer-reached-zero', this._onTimerReachedZero);
                 if (this._onTimerOverrun) ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);
                 if (this._audioCtx) {
                     this._audioCtx.close().catch(() => {});

@@ -119,6 +119,13 @@ function startTimer() {
             shouldFinish = true;
         }
 
+        // Событие "таймер достиг нуля" (для звука финиша в режиме перерасхода)
+        if (prevRemaining > 0 && nextRemaining <= 0 && timerConfig.allowNegative) {
+            safelySendToWindow(controlWindow, 'timer-reached-zero');
+            safelySendToWindow(widgetWindow, 'timer-reached-zero');
+            safelySendToWindow(displayWindow, 'timer-reached-zero');
+        }
+
         // Событие "осталась минута"
         if (prevRemaining > 60 && nextRemaining <= 60 && nextRemaining >= 0) {
             safelySendToWindow(controlWindow, 'timer-minute');
