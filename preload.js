@@ -42,6 +42,7 @@ const ALLOWED_CHANNELS = {
         'timer-state',
         'colors-update',
         'timer-minute',
+        'timer-reached-zero',
         'timer-overrun-minute',
         'display-settings-update',
         'displays-list',
