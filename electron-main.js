@@ -36,6 +36,7 @@ function enableWindowResizeOnScroll(win) {
     if (!win || !win.webContents) {return;}
 
     const onBeforeInput = (event, input) => {
+        if (win.isDestroyed()) {return;}
         // Prevent default zoom behavior
         if (input.control && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '0')) {
             event.preventDefault();
@@ -43,6 +44,7 @@ function enableWindowResizeOnScroll(win) {
     };
 
     const onZoomChanged = (_event, zoomDirection) => {
+        if (win.isDestroyed()) {return;}
         const [currentWidth, currentHeight] = win.getSize();
         const increment = CONFIG.SCALE_STEP || 20;
 
