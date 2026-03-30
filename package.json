@@ -7,7 +7,7 @@
     "start": "npx electron .",
     "dev": "npx electron . --dev",
     "test": "node --test",
-    "lint": "npx eslint . --ext .js",
+    "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
     "build": "npx --yes electron-builder",
     "build:win": "npx --yes electron-builder --win",
@@ -24,9 +24,10 @@
   "author": "Jkaotlic",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^26.7.0",
-    "eslint": "^8.48.0"
+    "electron": "^41.1.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9.39.4",
+    "globals": "^17.4.0"
   },
   "build": {
     "appId": "com.timer.widget",
@@ -46,7 +47,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "useZip": true
     },
     "portable": {
       "artifactName": "${productName}-Portable.exe"

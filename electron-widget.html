@@ -185,6 +185,8 @@
             height: 100%;
             max-width: 100%;
             max-height: 100%;
+            pointer-events: none;
+            -webkit-app-region: drag;
             filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
         }
 
@@ -930,32 +932,7 @@
             <div class="widget-bg-overlay" id="widgetBgOverlay"></div>
         </div>
 
-        <!-- Верхние контролы -->
-        <div class="controls-overlay">
-            <button class="ctrl-btn" id="settingsBtn" title="Настройки">⚙</button>
-            <button class="ctrl-btn close" id="closeBtn" title="Закрыть">✕</button>
-        </div>
-
-        <!-- Панель настроек -->
-        <div class="settings-panel" id="settingsPanel">
-            <div class="settings-title">Размер виджета</div>
-            <div class="size-grid">
-                <button class="size-btn" data-size="tiny">XS</button>
-                <button class="size-btn" data-size="small">S</button>
-                <button class="size-btn active" data-size="medium">M</button>
-                <button class="size-btn" data-size="large">L</button>
-                <button class="size-btn" data-size="xlarge">XL</button>
-                <button class="size-btn" data-size="xxlarge">2XL</button>
-            </div>
-
-            <div class="setting-row">
-                <label class="setting-label">Прозрачность</label>
-                <div class="slider-container">
-                    <span class="slider-value" id="opacityValue">100%</span>
-                    <input type="range" id="opacityRange" min="40" max="100" value="100">
-                </div>
-            </div>
-        </div>
+        <!-- Контролы и настройки убраны — управление из главного окна -->
 
         <!-- Круговой виджет -->
         <div class="circular-widget active">
@@ -1168,11 +1145,7 @@
                 this.timeDisplay = document.getElementById('timeDisplay');
                 this.statusBadge = document.getElementById('statusBadge');
                 this.progressBar = document.getElementById('progressBar');
-                this.settingsPanel = document.getElementById('settingsPanel');
-                this.settingsBtn = document.getElementById('settingsBtn');
-                this.closeBtn = document.getElementById('closeBtn');
-                this.opacityRange = document.getElementById('opacityRange');
-                this.opacityValue = document.getElementById('opacityValue');
+                // Контролы убраны — управление из главного окна
                 
                 // Элементы для разных стилей
                 this.circularWidget = document.querySelector('.circular-widget');
@@ -1257,43 +1230,19 @@
 
             setupEventListeners() {
                 // Отслеживание мыши для показа границ
-                let mouseTimeout = null;
+                this.mouseTimeout = null;
                 const showBorder = () => {
                     document.body.classList.add('mouse-active');
-                    if (mouseTimeout) clearTimeout(mouseTimeout);
-                    mouseTimeout = setTimeout(() => {
+                    if (this.mouseTimeout) { clearTimeout(this.mouseTimeout); }
+                    this.mouseTimeout = setTimeout(() => {
                         document.body.classList.remove('mouse-active');
-                    }, 2000); // Скрываем через 2 секунды неактивности
+                    }, 2000);
                 };
                 document.addEventListener('mousemove', showBorder);
                 document.addEventListener('mousedown', showBorder);
                 document.addEventListener('wheel', showBorder);
                 
-                // Закрыть виджет
-                this.closeBtn.addEventListener('click', () => {
-                    ipcRenderer.send('close-widget');
-                });
-
-                // Настройки
-                this.settingsBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleSettings();
-                });
-
-                // Закрытие панели настроек
-                document.addEventListener('click', (e) => {
-                    if (this.settingsPanel.classList.contains('visible') &&
-                        !this.settingsPanel.contains(e.target) &&
-                        e.target !== this.settingsBtn) {
-                        this.closeSettings();
-                    }
-                });
-
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        this.closeSettings();
-                    }
-                });
+                // Контролы убраны — закрытие и настройки из главного окна
 
                 // Масштабирование колесиком (Ctrl + scroll) - изменяем размер окна
                 document.addEventListener('wheel', (e) => {
@@ -1306,33 +1255,16 @@
             }
 
             setupSettings() {
-                // Размеры
-                document.querySelectorAll('.size-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                        this.setSize(btn.dataset.size);
-                    });
-                });
-
-                // Прозрачность
-                this.opacityRange.addEventListener('input', (e) => {
-                    const value = e.target.value;
-                    this.opacityValue.textContent = value + '%';
-                    this.container.style.opacity = value / 100;
-                    this.saveSettings();
-                });
+                // Настройки управляются из главного окна
+                // Ctrl+Wheel resize сохранён в setupEventListeners
             }
 
             setSize(size) {
                 const sizes = {
-                    tiny: { width: 150, height: 150 },
                     small: { width: 180, height: 180 },
-                    medium: { width: 220, height: 220 },
-                    large: { width: 280, height: 280 },
-                    xlarge: { width: 400, height: 400 },
-                    xxlarge: { width: 550, height: 550 }
+                    medium: { width: 250, height: 250 },
+                    large: { width: 350, height: 350 },
+                    xlarge: { width: 500, height: 500 }
                 };
 
                 const s = sizes[size];
@@ -1342,14 +1274,6 @@
                 }
             }
 
-            toggleSettings() {
-                this.settingsPanel.classList.toggle('visible');
-            }
-
-            closeSettings() {
-                this.settingsPanel.classList.remove('visible');
-            }
-
             loadSettings() {
                 // Настройки виджета
                 const settings = localStorage.getItem('widgetSettings');
@@ -1357,17 +1281,11 @@
                     const s = safeJSONParse(settings, {});
                     if (s && s.opacity) {
                         this.container.style.opacity = s.opacity;
-                        this.opacityRange.value = s.opacity * 100;
-                        this.opacityValue.textContent = Math.round(s.opacity * 100) + '%';
                     }
                 }
 
                 // Размер
                 const savedSize = localStorage.getItem('widgetSize') || 'medium';
-                document.querySelectorAll('.size-btn').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.size === savedSize);
-                });
-                // Устанавливаем размер при загрузке
                 this.setSize(savedSize);
             }
 
@@ -1552,6 +1470,16 @@
                     clearInterval(this.updateInterval);
                     this.updateInterval = null;
                 }
+
+                // Очищаем mouseTimeout
+                if (this.mouseTimeout) {
+                    clearTimeout(this.mouseTimeout);
+                    this.mouseTimeout = null;
+                }
+                if (this._scalingTimer) {
+                    clearTimeout(this._scalingTimer);
+                    this._scalingTimer = null;
+                }
             }
             
             setTimerStyle(style) {
@@ -1580,8 +1508,12 @@
                 }
                 
                 // Обновляем масштабирование после смены стиля
-                setTimeout(() => this.updateScaling(), 50);
-                
+                if (this._scalingTimer) { clearTimeout(this._scalingTimer); }
+                this._scalingTimer = setTimeout(() => {
+                    this._scalingTimer = null;
+                    this.updateScaling();
+                }, 50);
+
                 this.updateDisplay();
             }
 

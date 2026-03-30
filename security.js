@@ -8,7 +8,8 @@ function isValidDataURL(str) {
     if (!str || typeof str !== 'string') {return false;}
 
     // Проверка формата data URL для изображений
-    const dataURLPattern = /^data:image\/(png|jpeg|jpg|gif|webp|bmp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
+    // SVG исключён — может содержать встроенный JavaScript
+    const dataURLPattern = /^data:image\/(png|jpeg|jpg|gif|webp|bmp);base64,[A-Za-z0-9+/]+=*$/;
     return dataURLPattern.test(str);
 }
 

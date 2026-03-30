@@ -599,7 +599,7 @@
             background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
             border: 2px solid #333;
             border-radius: 12px;
-            box-shadow: 
+            box-shadow:
                 inset 0 0 30px rgba(0, 0, 0, 0.8),
                 0 4px 20px rgba(0, 0, 0, 0.6),
                 0 0 40px rgba(0, 255, 136, 0.1);
@@ -608,9 +608,9 @@
             align-items: center;
             justify-content: center;
             width: 100%;
-            height: 100%;
+            max-height: 60%;
             gap: 4px;
-            padding: 10%;
+            padding: 5% 8%;
             position: relative;
         }
 
@@ -823,11 +823,11 @@
             height: 200px;
             border-radius: 50%;
             background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
-            box-shadow: 
+            box-shadow:
                 0 0 0 4px rgba(56, 239, 125, 0.3),
                 0 0 0 8px rgba(56, 239, 125, 0.1),
-                inset 0 0 30px rgba(0, 0, 0, 0.5),
-                0 10px 30px rgba(0, 0, 0, 0.4);
+                inset 0 0 30px rgba(0, 0, 0, 0.5);
+            filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4));
             display: flex;
             align-items: center;
             justify-content: center;
@@ -870,6 +870,11 @@
             top: 6px;
             box-shadow: 0 0 8px rgba(56, 239, 125, 0.4);
             margin-left: -2px;
+        }
+
+        /* Скрываем деления когда цифры включены */
+        .widget-analog-clock:has(.widget-analog-numbers.visible) .widget-analog-tick {
+            display: none;
         }
 
         /* Цифры на циферблате */
@@ -1023,80 +1028,7 @@
     <div class="resize-handle corner-se"></div>
 
     <div class="widget-container" id="widgetContainer">
-        <!-- Верхние контролы -->
-        <div class="controls-overlay">
-            <button class="ctrl-btn" id="settingsBtn" title="Настройки">⚙</button>
-            <button class="ctrl-btn close" id="closeBtn" title="Закрыть">✕</button>
-        </div>
-
-        <!-- Панель настроек -->
-        <div class="settings-panel" id="settingsPanel">
-            <div class="settings-title">Стиль</div>
-            <div class="style-grid">
-                <button class="style-btn active" data-style="circle" title="Круговой">⭕</button>
-                <button class="style-btn" data-style="digital" title="Цифровой">🔢</button>
-                <button class="style-btn" data-style="flip" title="Перекидные">🔄</button>
-                <button class="style-btn" data-style="analog" title="Аналоговые">🕐</button>
-            </div>
-
-            <div class="settings-title">Размер</div>
-            <div class="size-grid">
-                <button class="size-btn" data-size="tiny">XS</button>
-                <button class="size-btn" data-size="small">S</button>
-                <button class="size-btn active" data-size="medium">M</button>
-                <button class="size-btn" data-size="large">L</button>
-                <button class="size-btn" data-size="xlarge">XL</button>
-                <button class="size-btn" data-size="xxlarge">2XL</button>
-            </div>
-
-            <div class="toggle-row">
-                <span class="toggle-label">Показать секунды</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="showSeconds" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <div class="toggle-row">
-                <span class="toggle-label">24-часовой формат</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="format24h" checked>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <div class="toggle-row">
-                <span class="toggle-label">Показать дату</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="showDate">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <div class="toggle-row">
-                <span class="toggle-label">Часовой пояс</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="showTimezone">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <div class="toggle-row" id="showNumbersRow" style="display: none;">
-                <span class="toggle-label">Цифры на циферблате</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="showNumbers">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <div class="setting-row">
-                <label class="setting-label">Прозрачность</label>
-                <div class="slider-container">
-                    <span class="slider-value" id="opacityValue">100%</span>
-                    <input type="range" id="opacityRange" min="40" max="100" value="100">
-                </div>
-            </div>
-        </div>
+        <!-- Контролы и настройки убраны — управление из главного окна -->
 
         <!-- Круговой виджет -->
         <div class="circular-widget active">
@@ -1292,7 +1224,7 @@
                 this.showSeconds = true;
                 this.format24h = true;
                 this.showDate = false;
-                this.showTimezone = false;
+                this.showTimezone = false;  // Убрано из UI — всегда выключено
                 this.showNumbers = false;
                 this.clockStyle = 'circle';
 
@@ -1311,17 +1243,14 @@
                 this.dateBadge = document.getElementById('dateBadge');
                 this.timezoneBadge = document.getElementById('timezoneBadge');
                 this.secondsBar = document.getElementById('secondsBar');
-                this.settingsPanel = document.getElementById('settingsPanel');
-                this.settingsBtn = document.getElementById('settingsBtn');
-                this.closeBtn = document.getElementById('closeBtn');
-                this.opacityRange = document.getElementById('opacityRange');
-                this.opacityValue = document.getElementById('opacityValue');
-                this.showSecondsEl = document.getElementById('showSeconds');
-                this.format24hEl = document.getElementById('format24h');
-                this.showDateEl = document.getElementById('showDate');
-                this.showTimezoneEl = document.getElementById('showTimezone');
-                this.showNumbersEl = document.getElementById('showNumbers');
-                this.showNumbersRow = document.getElementById('showNumbersRow');
+                // Контролы убраны — управление из главного окна через IPC
+                // Элементы удалены из HTML, ставим null чтобы избежать крэшей
+                this.showSecondsEl = null;
+                this.format24hEl = null;
+                this.showDateEl = null;
+                this.showTimezoneEl = null;
+                this.showNumbersEl = null;
+                this.showNumbersRow = null;
                 
                 // Дополнительные элементы для стилей
                 this.digitalDateBadge = document.getElementById('digitalDateBadge');
@@ -1375,7 +1304,7 @@
                 
                 // Размер шрифта для digital - подбираем чтобы текст вместился
                 // Для времени HH:MM:SS нужно ~8 символов, для HH:MM - ~5
-                const showSeconds = this.showSecondsEl && this.showSecondsEl.checked;
+                const showSeconds = this.showSeconds;
                 const charCount = showSeconds ? 8 : 5;
                 // Ширина символа примерно 0.6 от размера шрифта для моноширинного
                 const maxFontByWidth = (containerWidth * 0.85) / (charCount * 0.6);
@@ -1426,31 +1355,9 @@
                 document.addEventListener('mousedown', showBorder);
                 document.addEventListener('wheel', showBorder);
                 
-                // Закрыть виджет
-                this.closeBtn.addEventListener('click', () => {
-                    ipcRenderer.send('close-clock-widget');
-                });
+                // Контролы убраны — закрытие и настройки из главного окна
 
-                // Настройки
-                this.settingsBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.toggleSettings();
-                });
-
-                // Закрытие панели настроек
-                document.addEventListener('click', (e) => {
-                    if (this.settingsPanel.classList.contains('visible') &&
-                        !this.settingsPanel.contains(e.target) &&
-                        e.target !== this.settingsBtn) {
-                        this.closeSettings();
-                    }
-                });
-
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        this.closeSettings();
-                    }
-                });
+                // Обработчик Escape убран — нет панели настроек
 
                 // Масштабирование колесиком (Ctrl + scroll) - изменяем размер окна
                 document.addEventListener('wheel', (e) => {
@@ -1463,82 +1370,16 @@
             }
 
             setupSettings() {
-                // Стили
-                document.querySelectorAll('.style-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                        this.setClockStyle(btn.dataset.style);
-                    });
-                });
-
-                // Размеры
-                document.querySelectorAll('.size-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                        this.setSize(btn.dataset.size);
-                    });
-                });
-
-                // Прозрачность
-                this.opacityRange.addEventListener('input', (e) => {
-                    const value = e.target.value;
-                    this.opacityValue.textContent = value + '%';
-                    this.container.style.opacity = value / 100;
-                    this.saveSettings();
-                });
-
-                // Показать секунды
-                this.showSecondsEl.addEventListener('change', () => {
-                    this.showSeconds = this.showSecondsEl.checked;
-                    this.updateSecondsVisibility();
-                    this.saveSettings();
-                });
-
-                // 24-часовой формат
-                this.format24hEl.addEventListener('change', () => {
-                    this.format24h = this.format24hEl.checked;
-                    this.saveSettings();
-                    this.updateDisplay();
-                });
-
-                // Показать дату
-                this.showDateEl.addEventListener('change', () => {
-                    this.showDate = this.showDateEl.checked;
-                    this.updateDateTimezoneVisibility();
-                    this.saveSettings();
-                    this.updateDisplay();
-                });
-
-                // Показать часовой пояс
-                this.showTimezoneEl.addEventListener('change', () => {
-                    this.showTimezone = this.showTimezoneEl.checked;
-                    this.updateDateTimezoneVisibility();
-                    this.saveSettings();
-                    this.updateDisplay();
-                });
-
-                // Показать цифры на циферблате (для аналогового стиля)
-                this.showNumbersEl.addEventListener('change', () => {
-                    this.showNumbers = this.showNumbersEl.checked;
-                    if (this.clockAnalogNumbers) {
-                        this.clockAnalogNumbers.classList.toggle('visible', this.showNumbers);
-                    }
-                    this.saveSettings();
-                });
+                // Все настройки управляются из главного окна через IPC
+                // Ctrl+Wheel resize сохранён в setupEventListeners
             }
 
             setSize(size) {
                 const sizes = {
-                    tiny: { width: 150, height: 150 },
                     small: { width: 180, height: 180 },
-                    medium: { width: 220, height: 220 },
-                    large: { width: 280, height: 280 },
-                    xlarge: { width: 400, height: 400 },
-                    xxlarge: { width: 550, height: 550 }
+                    medium: { width: 250, height: 250 },
+                    large: { width: 350, height: 350 },
+                    xlarge: { width: 500, height: 500 }
                 };
 
                 const s = sizes[size];
@@ -1581,10 +1422,25 @@
                 if (this.showNumbersRow) {
                     this.showNumbersRow.style.display = (style === 'analog') ? 'flex' : 'none';
                 }
-                
+
+                // Принудительные форматы по стилю:
+                // Круговой/Аналоговый: секунды всегда включены
+                // Цифровой/Перекидные: 24ч формат, секунды выключены
+                if (style === 'circle' || style === 'analog') {
+                    this.showSeconds = true;
+                } else {
+                    this.showSeconds = false;
+                    this.format24h = true;
+                }
+                this.updateSecondsVisibility();
+
                 // Обновляем масштабирование после смены стиля
-                setTimeout(() => this.updateScaling(), 50);
-                
+                if (this._scalingTimer) { clearTimeout(this._scalingTimer); }
+                this._scalingTimer = setTimeout(() => {
+                    this._scalingTimer = null;
+                    this.updateScaling();
+                }, 50);
+
                 this.saveSettings();
                 this.updateDisplay();
             }
@@ -1630,16 +1486,14 @@
                 }
                 
                 // Обновляем масштаб при изменении количества цифр
-                setTimeout(() => this.updateScaling(), 50);
+                if (this._scalingTimer) { clearTimeout(this._scalingTimer); }
+                this._scalingTimer = setTimeout(() => {
+                    this._scalingTimer = null;
+                    this.updateScaling();
+                }, 50);
             }
 
-            toggleSettings() {
-                this.settingsPanel.classList.toggle('visible');
-            }
-
-            closeSettings() {
-                this.settingsPanel.classList.remove('visible');
-            }
+            // toggleSettings и closeSettings убраны — управление из главного окна
 
             loadSettings() {
                 const settings = localStorage.getItem('clockWidgetSettings');
@@ -1649,46 +1503,33 @@
                     catch (e) { console.error('JSON parse error:', e.message); s = {}; }
                     if (s.opacity !== undefined) {
                         this.container.style.opacity = s.opacity;
-                        this.opacityRange.value = s.opacity * 100;
-                        this.opacityValue.textContent = Math.round(s.opacity * 100) + '%';
                     }
                     if (s.showSeconds !== undefined) {
                         this.showSeconds = s.showSeconds;
-                        this.showSecondsEl.checked = s.showSeconds;
                     }
                     if (s.format24h !== undefined) {
                         this.format24h = s.format24h;
-                        this.format24hEl.checked = s.format24h;
                     }
                     if (s.showDate !== undefined) {
                         this.showDate = s.showDate;
-                        this.showDateEl.checked = s.showDate;
                     }
                     if (s.showTimezone !== undefined) {
                         this.showTimezone = s.showTimezone;
-                        this.showTimezoneEl.checked = s.showTimezone;
                     }
                     if (s.showNumbers !== undefined) {
                         this.showNumbers = s.showNumbers;
-                        this.showNumbersEl.checked = s.showNumbers;
                         if (this.clockAnalogNumbers) {
                             this.clockAnalogNumbers.classList.toggle('visible', s.showNumbers);
                         }
                     }
                     if (s.clockStyle) {
                         this.clockStyle = s.clockStyle;
-                        document.querySelectorAll('.style-btn').forEach(btn => {
-                            btn.classList.toggle('active', btn.dataset.style === s.clockStyle);
-                        });
                         this.setClockStyle(s.clockStyle);
                     }
                 }
 
                 // Размер
                 const savedSize = localStorage.getItem('clockWidgetSize') || 'medium';
-                document.querySelectorAll('.size-btn').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.size === savedSize);
-                });
                 this.setSize(savedSize);
                 
                 // Обновляем видимость элементов
@@ -1738,24 +1579,24 @@
                 this._onClockSettings = (event, settings) => {
                     if (settings.showDate !== undefined) {
                         this.showDate = settings.showDate;
-                        this.showDateEl.checked = settings.showDate;
+                        if (this.showDateEl) { this.showDateEl.checked = settings.showDate; }
                     }
                     if (settings.showTimezone !== undefined) {
                         this.showTimezone = settings.showTimezone;
-                        this.showTimezoneEl.checked = settings.showTimezone;
+                        if (this.showTimezoneEl) { this.showTimezoneEl.checked = settings.showTimezone; }
                     }
                     if (settings.showSeconds !== undefined) {
                         this.showSeconds = settings.showSeconds;
-                        this.showSecondsEl.checked = settings.showSeconds;
+                        if (this.showSecondsEl) { this.showSecondsEl.checked = settings.showSeconds; }
                         this.updateSecondsVisibility();
                     }
                     if (settings.format24h !== undefined) {
                         this.format24h = settings.format24h;
-                        this.format24hEl.checked = settings.format24h;
+                        if (this.format24hEl) { this.format24hEl.checked = settings.format24h; }
                     }
                     if (settings.showNumbers !== undefined) {
                         this.showNumbers = settings.showNumbers;
-                        this.showNumbersEl.checked = settings.showNumbers;
+                        if (this.showNumbersEl) { this.showNumbersEl.checked = settings.showNumbers; }
                         if (this.clockAnalogNumbers) {
                             this.clockAnalogNumbers.classList.toggle('visible', settings.showNumbers);
                         }
@@ -1768,13 +1609,17 @@
             }
 
             cleanup() {
-                if (this.clockInterval) {
-                    clearInterval(this.clockInterval);
-                    this.clockInterval = null;
+                if (this.clockTimeout) {
+                    clearTimeout(this.clockTimeout);
+                    this.clockTimeout = null;
                 }
                 if (this.mouseTimeout) {
                     clearTimeout(this.mouseTimeout);
                     this.mouseTimeout = null;
+                }
+                if (this._scalingTimer) {
+                    clearTimeout(this._scalingTimer);
+                    this._scalingTimer = null;
                 }
                 if (this._onSetClockStyle) ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);
                 if (this._onDisplaySettingsUpdate) ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);
@@ -1782,13 +1627,23 @@
             }
 
             startClock() {
-                // Очищаем предыдущий интервал если был
-                if (this.clockInterval) {
-                    clearInterval(this.clockInterval);
+                // Очищаем предыдущий таймер если был
+                if (this.clockTimeout) {
+                    clearTimeout(this.clockTimeout);
+                    this.clockTimeout = null;
                 }
                 this.updateDisplay();
-                // Обновляем каждую секунду
-                this.clockInterval = setInterval(() => this.updateDisplay(), 1000);
+                // Самокорректирующийся таймер, синхронизированный с системными часами
+                this._scheduleNextTick();
+            }
+
+            _scheduleNextTick() {
+                const now = Date.now();
+                const msToNextSecond = 1000 - (now % 1000);
+                this.clockTimeout = setTimeout(() => {
+                    this.updateDisplay();
+                    this._scheduleNextTick();
+                }, msToNextSecond);
             }
 
             updateDisplay() {
@@ -1862,6 +1717,12 @@
 
                 // Секундная стрелка - полный оборот за 60 секунд
                 const secondDeg = (seconds / 60) * 360;
+                // Отключаем transition при переходе 59→0 чтобы не было обратного оборота
+                if (seconds === 0) {
+                    this.clockAnalogSecond.style.transition = 'none';
+                } else if (this.clockAnalogSecond.style.transition === 'none') {
+                    this.clockAnalogSecond.style.transition = '';
+                }
                 this.clockAnalogSecond.style.transform = `rotate(${secondDeg}deg)`;
                 
                 // Скрываем/показываем секундную стрелку
