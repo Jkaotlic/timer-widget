@@ -9,10 +9,10 @@ Thumbs.db
 .cache/
 _electron/.cache/
 
-# VSCode
+# IDE / tools
 .vscode/
 .playwright-mcp/
+.claude/
 
-# Test screenshots
+# Test artifacts
 titlebar-test.png
-docs/bugs/*.png
