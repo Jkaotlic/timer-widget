@@ -555,7 +555,7 @@ class DisplayTimer {
         try {
             const url = new URL(value);
             return url.protocol === 'https:' || url.protocol === 'http:';
-        } catch (_e) {
+        } catch {
             return false;
         }
     }
