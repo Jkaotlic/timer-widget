@@ -311,6 +311,9 @@ Object.freeze(CONFIG.BACKGROUND_FIT);
 Object.freeze(CONFIG.IPC_CHANNELS);
 Object.freeze(CONFIG.Z_INDEX);
 Object.freeze(CONFIG.THEMES);
+if (CONFIG.BUILTIN_SOUNDS) { Object.freeze(CONFIG.BUILTIN_SOUNDS); }
+if (CONFIG.ALLOWED_AUDIO_TYPES) { Object.freeze(CONFIG.ALLOWED_AUDIO_TYPES); }
+if (CONFIG.ALLOWED_IMAGE_TYPES) { Object.freeze(CONFIG.ALLOWED_IMAGE_TYPES); }
 
 // Экспорт для Node.js (main process)
 if (typeof module !== 'undefined' && module.exports) {

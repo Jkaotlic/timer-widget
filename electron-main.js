@@ -15,6 +15,7 @@ let timerUpdateCounter = 0;
 let timerState = {
     totalSeconds: 0,
     remainingSeconds: 0,
+    presetSeconds: 0,  // Оригинальное время пресета (для корректного сброса)
     isRunning: false,
     isPaused: false,
     finished: false,
@@ -62,6 +63,16 @@ function enableWindowResizeOnScroll(win) {
     win.webContents.on('zoom-changed', onZoomChanged);
 }
 
+// Защита от навигации и открытия новых окон
+function hardenWindow(win) {
+    win.webContents.on('will-navigate', (event, url) => {
+        if (!url.startsWith('file://')) {
+            event.preventDefault();
+        }
+    });
+    win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+}
+
 function clearTimerInterval() {
     if (timerInterval) {
         clearInterval(timerInterval);
@@ -88,9 +99,11 @@ function emitTimerState(partial = {}) {
     safelySendToWindow(controlWindow, 'timer-state', timerState);
 }
 
-function finishTimer() {
+function finishTimer(finalRemaining) {
     clearTimerInterval();
-    const remaining = timerConfig.allowNegative ? timerState.remainingSeconds : Math.max(0, timerState.remainingSeconds);
+    const remaining = finalRemaining !== undefined
+        ? finalRemaining
+        : (timerConfig.allowNegative ? timerState.remainingSeconds : Math.max(0, timerState.remainingSeconds));
     emitTimerState({
         isRunning: false,
         isPaused: false,
@@ -117,9 +130,8 @@ function startTimer() {
             nextRemaining = 0;
             shouldFinish = true;
         }
-        if (timerConfig.allowNegative && timerConfig.overrunLimitSeconds > 0 && nextRemaining <= -timerConfig.overrunLimitSeconds) {
-            shouldFinish = true;
-        }
+        // Перерасход без ограничений — таймер продолжает считать в минус
+        // (лимит перерасхода убран по запросу пользователя)
 
         // Событие "таймер достиг нуля" (для звука финиша в режиме перерасхода)
         if (prevRemaining > 0 && nextRemaining <= 0 && timerConfig.allowNegative) {
@@ -148,8 +160,7 @@ function startTimer() {
         }
 
         if (shouldFinish) {
-            emitTimerState({ remainingSeconds: nextRemaining });
-            finishTimer();
+            finishTimer(nextRemaining);
             return;
         }
 
@@ -176,8 +187,10 @@ function handleTimerPause() {
 
 function handleTimerReset() {
     clearTimerInterval();
+    const resetTo = timerState.presetSeconds || timerState.totalSeconds;
     emitTimerState({
-        remainingSeconds: timerState.totalSeconds,
+        totalSeconds: resetTo,
+        remainingSeconds: resetTo,
         isRunning: false,
         isPaused: false,
         finished: false
@@ -213,6 +226,7 @@ function createControlWindow() {
     });
 
     controlWindow.loadFile('electron-control.html');
+    hardenWindow(controlWindow);
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
@@ -252,6 +266,7 @@ function createWidgetWindow() {
     });
 
     widgetWindow.loadFile('electron-widget.html');
+    hardenWindow(widgetWindow);
 
     // Enable Ctrl+Wheel window resizing
     widgetWindow.webContents.once('did-finish-load', () => {
@@ -291,6 +306,7 @@ function createClockWidgetWindow() {
     });
 
     clockWidgetWindow.loadFile('electron-clock-widget.html');
+    hardenWindow(clockWidgetWindow);
 
     // Enable Ctrl+Wheel window resizing
     clockWidgetWindow.webContents.once('did-finish-load', () => {
@@ -339,10 +355,14 @@ function createDisplayWindow(displayIndex) {
     });
 
     displayWindow.loadFile('display.html');
+    hardenWindow(displayWindow);
 
+    const thisWindow = displayWindow;
     displayWindow.on('closed', () => {
-        displayWindow = null;
-        // Уведомляем окно управления что дисплей закрыт
+        // Защита от race condition: не обнуляем если уже создано новое окно
+        if (displayWindow === thisWindow) {
+            displayWindow = null;
+        }
         safelySendToWindow(controlWindow, 'display-window-state', { isOpen: false });
     });
 }
@@ -402,6 +422,7 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
             emitTimerState({
                 totalSeconds: next,
                 remainingSeconds: next,
+                presetSeconds: next,  // Сохраняем оригинальное время пресета
                 isRunning: false,
                 isPaused: false,
                 finished: false
@@ -561,17 +582,18 @@ ipcMain.on('close-clock-widget', () => {
 
 ipcMain.on('clock-widget-resize', (event, { width, height }) => {
     if (clockWidgetWindow) {
-        clockWidgetWindow.setSize(width, height, true);
+        const w = Math.max(120, Math.min(800, Number(width) || 220));
+        const h = Math.max(120, Math.min(800, Number(height) || 220));
+        clockWidgetWindow.setSize(w, h, true);
     }
 });
 
 // Масштабирование окна часов через Ctrl+колесико
 ipcMain.on('clock-widget-scale', (event, delta) => {
     if (clockWidgetWindow) {
-        const [currentWidth, currentHeight] = clockWidgetWindow.getSize();
-        const newWidth = Math.max(100, Math.min(800, currentWidth + delta));
-        const newHeight = Math.max(100, Math.min(800, currentHeight + delta));
-        clockWidgetWindow.setSize(newWidth, newHeight, true);
+        const [currentWidth] = clockWidgetWindow.getSize();
+        const newSize = Math.max(150, Math.min(600, currentWidth + delta));
+        clockWidgetWindow.setSize(newSize, newSize, true);
     }
 });
 
@@ -629,37 +651,38 @@ ipcMain.on('close-display', () => {
 
 // Управление виджетом
 ipcMain.on('widget-set-opacity', (event, opacity) => {
-    if (widgetWindow) {
+    if (widgetWindow && typeof opacity === 'number' && opacity >= 0 && opacity <= 1) {
         widgetWindow.setOpacity(opacity);
     }
 });
 
 ipcMain.on('widget-set-position', (event, { x, y }) => {
-    if (widgetWindow) {
-        widgetWindow.setPosition(x, y);
+    if (widgetWindow && Number.isFinite(x) && Number.isFinite(y)) {
+        widgetWindow.setPosition(Math.round(x), Math.round(y));
     }
 });
 
 ipcMain.on('widget-resize', (event, { width, height }) => {
     if (widgetWindow) {
-        widgetWindow.setSize(width, height, true);
+        const w = Math.max(120, Math.min(1920, Number(width) || 220));
+        const h = Math.max(120, Math.min(1080, Number(height) || 220));
+        widgetWindow.setSize(w, h, true);
     }
 });
 
 // Масштабирование окна таймера через Ctrl+колесико
 ipcMain.on('widget-scale', (event, delta) => {
-    if (widgetWindow) {
-        const [currentWidth, currentHeight] = widgetWindow.getSize();
-        const newWidth = Math.max(100, Math.min(800, currentWidth + delta));
-        const newHeight = Math.max(100, Math.min(800, currentHeight + delta));
-        widgetWindow.setSize(newWidth, newHeight, true);
+    if (widgetWindow && Number.isFinite(delta)) {
+        const [currentWidth] = widgetWindow.getSize();
+        const newSize = Math.max(150, Math.min(600, currentWidth + delta));
+        widgetWindow.setSize(newSize, newSize, true);
     }
 });
 
 ipcMain.on('widget-move', (event, { deltaX, deltaY }) => {
-    if (widgetWindow) {
+    if (widgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
         const [currentX, currentY] = widgetWindow.getPosition();
-        widgetWindow.setPosition(currentX + deltaX, currentY + deltaY, true);
+        widgetWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
     }
 });
 
