@@ -25,7 +25,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 **Main process** (`electron-main.js`) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
-1. **Control Window** (`electron-control.html`) — main management panel with tabs (Timer, Display, Widgets, Style, Sound, Advanced). ~4500 lines, all inline HTML/CSS/JS.
+1. **Control Window** (`electron-control.html`) — main management panel with 3 settings tabs (Таймер, Часы, Дисплей). ~4500 lines, all inline HTML/CSS/JS.
 2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. Draggable and resizable.
 3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. Supports 4 styles: circle, digital, flip, analog. Has a `DisplayTimer` class.
 4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget, analog/digital.
@@ -52,10 +52,22 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 ## Code Style
 
 - 2-space indentation, single quotes, camelCase for variables/functions, UPPER_CASE for constants
-- ESLint enforces `eqeqeq: always` and `curly: always`
+- ESLint 9 with flat config (`eslint.config.js`) enforces `eqeqeq: always` and `curly: always`
 - Unused variables prefixed with `_` are allowed (`argsIgnorePattern: '^_'`)
+
+## Security
+
+- All BrowserWindows: `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`
+- `hardenWindow()` applied to all windows: blocks `will-navigate` to non-file:// URLs, denies `window.open`
+- IPC channel whitelist in `preload.js` with direction validation (send vs receive)
+- All IPC resize/move/opacity handlers validate numeric inputs (bounds, NaN, Infinity)
+- Image validation: size + MIME + magic bytes (WebP checks RIFF+WEBP signature)
+- SVG excluded from data URL whitelist (XSS vector)
+- Audio upload rejects empty `file.type`
+- CSS injection prevented: color values validated with regex, URLs validated with `URL()` constructor
+- Timer state: `presetSeconds` tracks original preset for correct reset after on-the-fly adjustments
 
 ## CI
 
-GitHub Actions (`.github/workflows/nodejs.yml`): Node 18, ubuntu-latest — runs `npm run ci` (lint + test).
-Release workflow builds on macOS (Intel + ARM) and Windows with Node 20.
+GitHub Actions (`.github/workflows/nodejs.yml`): Node 22, ubuntu-latest — runs `npm run ci` (lint + test).
+Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
