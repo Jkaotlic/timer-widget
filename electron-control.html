@@ -2591,12 +2591,8 @@
                 };
         }
 
-        // FIX BUG-014: Safe JSON.parse helper (fallback if SecurityUtils not loaded)
-        function safeJSONParse(jsonString, defaultValue = null) {
-            if (!jsonString || typeof jsonString !== 'string') return defaultValue;
-            try { return JSON.parse(jsonString); }
-            catch (e) { console.error('JSON parse error:', e.message); return defaultValue; }
-        }
+        // safeJSONParse — use SecurityUtils directly (security.js always loaded before this script)
+        const safeJSONParse = window.SecurityUtils.safeJSONParse;
 
         // FIX BUG-028: Loading indicator utilities
         const LoadingIndicator = {
@@ -2664,23 +2660,6 @@
                 if (loader && loader.parentNode) {
                     loader.parentNode.removeChild(loader);
                 }
-            },
-
-            /**
-             * Wrap async function with loading indicator
-             * @param {Function} asyncFn - Async function to wrap
-             * @param {string} message - Loading message
-             * @returns {Function} - Wrapped function
-             */
-            wrap(asyncFn, message = 'Загрузка...') {
-                return async (...args) => {
-                    const overlay = this.show(message);
-                    try {
-                        return await asyncFn(...args);
-                    } finally {
-                        this.hide(overlay);
-                    }
-                };
             }
         };
 
@@ -2716,7 +2695,7 @@
                 this.isRunning = false;
                 this.isPaused = false;
                 this.lastTimestamp = 0;
-                this.soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
+                this.soundEnabled = true; // overwritten by initTabs()
                 this.lastUpdateCounter = -1;
                 this.wasFinished = false;
                 this.currentBgMode = 'solid';
@@ -3367,9 +3346,7 @@
 
             loadLocalBackground() {
                 const savedBg = localStorage.getItem('localBgImage');
-                const savedSettings = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {})
-                    : safeJSONParse(localStorage.getItem('localBgSettings'), {});
+                const savedSettings = safeJSONParse(localStorage.getItem('localBgSettings'), {});
                 
                 if (savedBg) {
                     this.showLocalBgPreview(savedBg);
@@ -3418,9 +3395,7 @@
                 // Загрузка цветов
                 const savedColors = localStorage.getItem('timerColors');
                 if (savedColors) {
-                    const c = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                        ? window.SecurityUtils.safeJSONParse(savedColors, {})
-                        : safeJSONParse(savedColors, {});
+                    const c = safeJSONParse(savedColors, {});
                     this.currentColors = {
                         timer: c.timer || '#667eea',
                         progress: c.progress || '#764ba2',
@@ -3429,9 +3404,7 @@
                 }
 
                 // Загрузка расширенных настроек
-                const ext = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
-                    : safeJSONParse(localStorage.getItem('displayExtSettings'), {});
+                const ext = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 
                 this.allowNegativeEl.checked = !!ext.allowNegative;
                 document.getElementById('overrunRow').style.display = ext.allowNegative ? 'flex' : 'none';
@@ -3549,16 +3522,13 @@
                     clockStyle: this.clockStyleEl.value
                 };
 
-                const prev = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
-                    : safeJSONParse(localStorage.getItem('displayExtSettings'), {});
+                const prev = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
             }
 
             pushOverrunInterval() {
                 const interval = parseInt(this.overrunIntervalEl.value) || 1;
                 ipcRenderer.send('timer-command', {
-                    type: 'set-overrun-interval',
                     overrunIntervalMinutes: interval
                 });
             }
@@ -3568,9 +3538,7 @@
                 
                 // Получаем локальный фон и его настройки
                 const localBgImage = localStorage.getItem('localBgImage') || '';
-                const localBgSettings = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {})
-                    : safeJSONParse(localStorage.getItem('localBgSettings'), {});
+                const localBgSettings = safeJSONParse(localStorage.getItem('localBgSettings'), {});
                 
                 const settings = {
                     clockStyle: this.syncClockStyle ? this.timerStyleEl.value : (this.clockStyleEl ? this.clockStyleEl.value : 'circle'),
@@ -3621,9 +3589,7 @@
             }
 
             loadClockSettings() {
-                const settings = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
-                    : safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
+                const settings = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
                 
                 this.clockShowDateEl.checked = !!settings.showDate;
                 this.clockShowTimezoneEl.checked = !!settings.showTimezone;
@@ -3864,21 +3830,7 @@
             }
 
             formatTime(seconds) {
-                // Используем централизованную функцию из utils.js
-                if (window.TimeUtils && window.TimeUtils.formatTimeShort) {
-                    return window.TimeUtils.formatTimeShort(seconds);
-                }
-                // Fallback если utils.js не загружен
-                const neg = seconds < 0;
-                const abs = Math.abs(seconds);
-                const h = Math.floor(abs / 3600);
-                const m = Math.floor((abs % 3600) / 60);
-                const s = abs % 60;
-                
-                if (h > 0) {
-                    return `${neg ? '-' : ''}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                }
-                return `${neg ? '-' : ''}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                return window.TimeUtils.formatTimeShort(seconds);
             }
 
             // FIX BUG-020: Add async/await for async operations
@@ -4100,7 +4052,7 @@
             }
 
             // Пользовательские звуки
-            handleSoundFileUpload(event) {
+            async handleSoundFileUpload(event) {
                 const file = event.target.files[0];
                 if (!file) return;
 
@@ -4118,25 +4070,41 @@
                     return;
                 }
 
+                // Magic bytes validation
+                const audioBuffer = await file.slice(0, 12).arrayBuffer();
+                const audioBytes = new Uint8Array(audioBuffer);
+                const isMP3 = (audioBytes[0] === 0xFF && (audioBytes[1] & 0xE0) === 0xE0) ||
+                              (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33);
+                const isWAV = audioBytes[0] === 0x52 && audioBytes[1] === 0x49 &&
+                              audioBytes[2] === 0x46 && audioBytes[3] === 0x46;
+                const isOGG = audioBytes[0] === 0x4F && audioBytes[1] === 0x67 &&
+                              audioBytes[2] === 0x67 && audioBytes[3] === 0x53;
+                const isFLAC = audioBytes[0] === 0x66 && audioBytes[1] === 0x4C &&
+                               audioBytes[2] === 0x61 && audioBytes[3] === 0x43;
+                const isWebM = audioBytes[0] === 0x1A && audioBytes[1] === 0x45 &&
+                               audioBytes[2] === 0xDF && audioBytes[3] === 0xA3;
+                const isAAC = audioBytes[0] === 0xFF && (audioBytes[1] & 0xF0) === 0xF0;
+                if (!isMP3 && !isWAV && !isOGG && !isFLAC && !isWebM && !isAAC) {
+                    Toast.show('Файл не прошёл проверку формата', 'error');
+                    event.target.value = '';
+                    return;
+                }
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const base64 = e.target.result;
                     const name = file.name.replace(/\.[^.]+$/, ''); // Убираем расширение
                     
                     // Сохраняем в localStorage
-                    const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                        ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
-                        : safeJSONParse(localStorage.getItem('customSounds'), []);
+                    const customSounds = safeJSONParse(localStorage.getItem('customSounds'), []);
                     
-                    // Проверяем, не существует ли уже такой звук
-                    const exists = customSounds.find(s => s.name === name);
-                    if (exists) {
-                        exists.data = base64;
-                    } else {
-                        customSounds.push({ name, data: base64 });
-                    }
-                    
-                    localStorage.setItem('customSounds', JSON.stringify(customSounds));
+                    // Обновляем иммутабельно
+                    const hasExisting = customSounds.some(s => s.name === name);
+                    const updated = hasExisting
+                        ? customSounds.map(s => s.name === name ? { ...s, data: base64 } : s)
+                        : [...customSounds, { name, data: base64 }];
+
+                    localStorage.setItem('customSounds', JSON.stringify(updated));
                     this.loadCustomSounds();
                 };
                 reader.onerror = () => {
@@ -4148,9 +4116,7 @@
             }
 
             loadCustomSounds() {
-                const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
-                    : safeJSONParse(localStorage.getItem('customSounds'), []);
+                const customSounds = safeJSONParse(localStorage.getItem('customSounds'), []);
                 const listEl = document.getElementById('customSoundList');
                 
                 // Очищаем список
@@ -4210,13 +4176,10 @@
             }
 
             async playCustomSound(name) {
-                const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
-                    : safeJSONParse(localStorage.getItem('customSounds'), []);
+                const customSounds = safeJSONParse(localStorage.getItem('customSounds'), []);
                 const sound = customSounds.find(s => s.name === name);
                 if (!sound) {
-                    console.warn('Custom sound not found:', name);
-                    // Проиграем стандартный beep если кастомный звук не найден
+                    // Кастомный звук не найден — проиграем стандартный beep
                     await this.beep(880, 0.15);
                     return;
                 }
@@ -4233,9 +4196,7 @@
             }
 
             deleteCustomSound(name) {
-                const customSounds = window.SecurityUtils && window.SecurityUtils.safeJSONParse
-                    ? window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), [])
-                    : safeJSONParse(localStorage.getItem('customSounds'), []);
+                const customSounds = safeJSONParse(localStorage.getItem('customSounds'), []);
                 const filtered = customSounds.filter(s => s.name !== name);
                 localStorage.setItem('customSounds', JSON.stringify(filtered));
                 this.loadCustomSounds();

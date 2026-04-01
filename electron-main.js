@@ -393,21 +393,21 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
 
     if (typeof allowNegative === 'boolean') {
         if (timerConfig.allowNegative !== allowNegative) {
-            timerConfig.allowNegative = allowNegative;
+            timerConfig = { ...timerConfig, allowNegative };
             configChanged = true;
         }
     }
     if (overrunLimitSeconds !== null && overrunLimitSeconds !== undefined) {
         const newLimit = Math.max(0, Number(overrunLimitSeconds) || 0);
         if (timerConfig.overrunLimitSeconds !== newLimit) {
-            timerConfig.overrunLimitSeconds = newLimit;
+            timerConfig = { ...timerConfig, overrunLimitSeconds: newLimit };
             configChanged = true;
         }
     }
     if (overrunIntervalMinutes !== null && overrunIntervalMinutes !== undefined) {
         const newVal = Math.max(1, Number(overrunIntervalMinutes) || 1);
         if (timerConfig.overrunIntervalMinutes !== newVal) {
-            timerConfig.overrunIntervalMinutes = newVal;
+            timerConfig = { ...timerConfig, overrunIntervalMinutes: newVal };
             configChanged = true;
         }
     }
@@ -473,10 +473,12 @@ ipcMain.on('get-timer-state', (event) => {
 
 // Изменение размера окна управления
 ipcMain.on('resize-control-window', (event, size) => {
-    if (controlWindow) {
+    if (controlWindow && size && typeof size === 'object') {
         const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
-        const targetWidth = Math.min(size.width || 420, screenWidth - 50);
-        const targetHeight = Math.min(size.height || 400, screenHeight - 50);
+        const w = Number.isFinite(size.width) ? size.width : 420;
+        const h = Number.isFinite(size.height) ? size.height : 400;
+        const targetWidth = Math.max(360, Math.min(w, screenWidth - 50));
+        const targetHeight = Math.max(300, Math.min(h, screenHeight - 50));
         
         // Получаем текущую позицию окна
         const [x, y] = controlWindow.getPosition();
@@ -590,7 +592,7 @@ ipcMain.on('clock-widget-resize', (event, { width, height }) => {
 
 // Масштабирование окна часов через Ctrl+колесико
 ipcMain.on('clock-widget-scale', (event, delta) => {
-    if (clockWidgetWindow) {
+    if (clockWidgetWindow && Number.isFinite(delta)) {
         const [currentWidth] = clockWidgetWindow.getSize();
         const newSize = Math.max(150, Math.min(600, currentWidth + delta));
         clockWidgetWindow.setSize(newSize, newSize, true);
