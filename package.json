@@ -9,6 +9,7 @@
     "test": "node --test",
     "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
+    "test:e2e": "npx playwright test",
     "build": "npx --yes electron-builder",
     "build:win": "npx --yes electron-builder --win",
     "build:mac": "npx --yes electron-builder --mac",
@@ -24,10 +25,12 @@
   "author": "Jkaotlic",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "electron": "^41.1.0",
     "electron-builder": "^26.8.1",
     "eslint": "^9.39.4",
-    "globals": "^17.4.0"
+    "globals": "^17.4.0",
+    "playwright-electron": "^0.5.0"
   },
   "build": {
     "appId": "com.timer.widget",

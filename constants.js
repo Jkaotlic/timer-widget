@@ -6,9 +6,6 @@ const CONFIG = {
     // TIMER INTERVALS
     // ============================================
     TIMER_TICK_INTERVAL: 1000,              // Интервал обновления таймера (1 секунда)
-    CLOCK_UPDATE_INTERVAL: 1000,            // Интервал обновления часов (1 секунда)
-    STORAGE_SYNC_INTERVAL: 100,             // Интервал синхронизации через localStorage
-    COLOR_SYNC_INTERVAL: 2000,              // Интервал синхронизации цветов (2 секунды)
 
     // ============================================
     // UI DELAYS & DEBOUNCE
@@ -76,31 +73,9 @@ const CONFIG = {
     // ============================================
     // DISPLAY SETTINGS
     // ============================================
-    INFO_BLOCK_COUNT: 3,                    // Количество информационных блоков
     MIN_TIMER_SCALE: 50,                    // Минимальный масштаб таймера (50%)
     MAX_TIMER_SCALE: 200,                   // Максимальный масштаб таймера (200%)
     DEFAULT_TIMER_SCALE: 100,               // Масштаб таймера по умолчанию (100%)
-
-    // ============================================
-    // ANALOG CLOCK
-    // ============================================
-    CLOCK_RADIUS: 160,                      // Радиус аналоговых часов
-    MINI_CLOCK_RADIUS: 40,                  // Радиус мини-часов в info блоках
-
-    // ============================================
-    // FLIP CARDS
-    // ============================================
-    FLIP_ANIMATION_DURATION: 600,           // Длительность анимации flip (мс)
-
-    // ============================================
-    // TIMER PRESETS
-    // ============================================
-    PRESET_5_MIN: 5 * 60,                   // 5 минут в секундах
-    PRESET_10_MIN: 10 * 60,                 // 10 минут в секундах
-    PRESET_15_MIN: 15 * 60,                 // 15 минут в секундах
-    PRESET_30_MIN: 30 * 60,                 // 30 минут в секундах
-    PRESET_45_MIN: 45 * 60,                 // 45 минут в секундах
-    PRESET_60_MIN: 60 * 60,                 // 60 минут в секундах
 
     // ============================================
     // INPUT VALIDATION
@@ -142,7 +117,12 @@ const CONFIG = {
         CLOCK_SIZE: 'clockSize',
         CLOCK_WIDGET_SETTINGS: 'clockWidgetSettings',
         TIMER_STATE: 'timerState',
-        TIMER_CONFIG: 'timerConfig'
+        TIMER_CONFIG: 'timerConfig',
+        DISPLAY_EXT_SETTINGS: 'displayExtSettings',
+        LOCAL_BG_IMAGE: 'localBgImage',
+        LOCAL_BG_SETTINGS: 'localBgSettings',
+        CUSTOM_SOUNDS: 'customSounds',
+        SOUND_ENABLED: 'soundEnabled'
     },
 
     // ============================================
@@ -202,34 +182,6 @@ const CONFIG = {
     },
 
     // ============================================
-    // BACKGROUND FIT OPTIONS
-    // ============================================
-    BACKGROUND_FIT: {
-        COVER: 'cover',
-        CONTAIN: 'contain',
-        TILE: 'tile',
-        AUTO: 'auto'
-    },
-
-    // ============================================
-    // SOUND IDS
-    // ============================================
-    BUILTIN_SOUNDS: [
-        'bell',
-        'gong',
-        'chime',
-        'beep',
-        'alarm',
-        'ding',
-        'buzz',
-        'tone',
-        'ping',
-        'ring',
-        'alert',
-        'notification'
-    ],
-
-    // ============================================
     // ALLOWED FILE TYPES
     // ============================================
     ALLOWED_AUDIO_TYPES: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'],
@@ -286,17 +238,6 @@ const CONFIG = {
         RESIZE_HANDLES: 9999
     },
 
-    // ============================================
-    // THEMES
-    // ============================================
-    THEMES: {
-        DEFAULT: 'default',
-        OCEAN: 'ocean',
-        SUNSET: 'sunset',
-        FOREST: 'forest',
-        LAVENDER: 'lavender',
-        MIDNIGHT: 'midnight'
-    }
 };
 
 // Freeze объект чтобы предотвратить изменения
@@ -307,11 +248,8 @@ Object.freeze(CONFIG.TIMER_STYLES);
 Object.freeze(CONFIG.TIMER_STATES);
 Object.freeze(CONFIG.TIMER_STATUS);
 Object.freeze(CONFIG.BACKGROUND_MODES);
-Object.freeze(CONFIG.BACKGROUND_FIT);
 Object.freeze(CONFIG.IPC_CHANNELS);
 Object.freeze(CONFIG.Z_INDEX);
-Object.freeze(CONFIG.THEMES);
-if (CONFIG.BUILTIN_SOUNDS) { Object.freeze(CONFIG.BUILTIN_SOUNDS); }
 if (CONFIG.ALLOWED_AUDIO_TYPES) { Object.freeze(CONFIG.ALLOWED_AUDIO_TYPES); }
 if (CONFIG.ALLOWED_IMAGE_TYPES) { Object.freeze(CONFIG.ALLOWED_IMAGE_TYPES); }
 

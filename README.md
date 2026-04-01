@@ -2,8 +2,8 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-1.2.4-blue?style=for-the-badge)
-![Electron](https://img.shields.io/badge/Electron-33.2.0-47848F?style=for-the-badge&logo=electron&logoColor=white)
+![Version](https://img.shields.io/badge/Version-1.2.9-blue?style=for-the-badge)
+![Electron](https://img.shields.io/badge/Electron-41.1.0-47848F?style=for-the-badge&logo=electron&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-0078D6?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
