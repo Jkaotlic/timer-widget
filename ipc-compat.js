@@ -81,17 +81,16 @@
             }
 
             const listeners = this._listeners.get(channel);
-            const index = listeners.findIndex(l => l.original === callback);
+            const target = listeners.find(l => l.original === callback);
 
-            if (index !== -1) {
-                // Call cleanup function
-                listeners[index].cleanup();
-                // Remove from array
-                listeners.splice(index, 1);
+            if (target) {
+                target.cleanup();
+                const remaining = listeners.filter(l => l.original !== callback);
 
-                // Clean up empty channel
-                if (listeners.length === 0) {
+                if (remaining.length === 0) {
                     this._listeners.delete(channel);
+                } else {
+                    this._listeners.set(channel, remaining);
                 }
             }
         },

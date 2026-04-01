@@ -1289,13 +1289,8 @@
                 document.body.classList.add('style-circle');
                 
                 // Настраиваем масштабирование для digital и flip
-                this.setupScaling();
-                window.addEventListener('resize', () => this.updateScaling());
-            }
-            
-            setupScaling() {
-                // Начальное масштабирование
                 this.updateScaling();
+                window.addEventListener('resize', () => this.updateScaling());
             }
             
             updateScaling() {
@@ -1498,9 +1493,7 @@
             loadSettings() {
                 const settings = localStorage.getItem('clockWidgetSettings');
                 if (settings) {
-                    let s = {};
-                    try { s = JSON.parse(settings) || {}; }
-                    catch (e) { console.error('JSON parse error:', e.message); s = {}; }
+                    const s = window.SecurityUtils.safeJSONParse(settings, {});
                     if (s.opacity !== undefined) {
                         this.container.style.opacity = s.opacity;
                     }

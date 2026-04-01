@@ -71,7 +71,8 @@ class DisplayTimer {
         // Начальный расчёт
         this.updateRingSize();
     }
-        setupKeyboardShortcuts() {
+
+    setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             switch (e.code) {
                 case 'Space':
@@ -105,7 +106,8 @@ class DisplayTimer {
             }
         });
     }
-        updateRingSize() {
+
+    updateRingSize() {
         if (this.timerRing) {
             const scale = this.timerScale / 100;
             // Используем transform для масштабирования всего таймера (круг + текст)
@@ -531,16 +533,16 @@ class DisplayTimer {
     applyColors(colors) {
         const stop1 = document.querySelector('.grad-stop-1');
         const stop2 = document.querySelector('.grad-stop-2');
-        
-        if (stop1 && colors.timer) {
+
+        if (stop1 && colors.timer && this._isSafeColor(colors.timer)) {
             stop1.setAttribute('stop-color', colors.timer);
         }
-        if (stop2 && colors.progress) {
+        if (stop2 && colors.progress && this._isSafeColor(colors.progress)) {
             stop2.setAttribute('stop-color', colors.progress);
         }
 
         // Свечение текста
-        if (colors.timer) {
+        if (colors.timer && this._isSafeColor(colors.timer)) {
             document.documentElement.style.setProperty('--text-glow', `${colors.timer}80`);
             document.documentElement.style.setProperty('--glow-color', `${colors.timer}80`);
         }
@@ -959,7 +961,8 @@ class DisplayTimer {
 
     triggerFinishEffect() {
         this.flashCount = 0;
-        const maxFlashes = 6;
+        const maxFlashes = (window.CONFIG && window.CONFIG.MAX_FLASH_COUNT) || 6;
+        const flashInterval = (window.CONFIG && window.CONFIG.FLASH_INTERVAL) || 250;
 
         this.flashInterval = setInterval(() => {
             document.body.classList.toggle('flash-mode');
@@ -970,26 +973,11 @@ class DisplayTimer {
                 this.flashInterval = null;
                 document.body.classList.remove('flash-mode');
             }
-        }, 250);
+        }, flashInterval);
     }
 
     formatTime(seconds) {
-        // Используем централизованную функцию из utils.js
-        if (window.TimeUtils && window.TimeUtils.formatTimeShort) {
-            return window.TimeUtils.formatTimeShort(seconds);
-        }
-        // Fallback
-        const neg = seconds < 0;
-        const abs = Math.abs(seconds);
-        if (abs >= 3600) {
-            const hrs = Math.floor(abs / 3600);
-            const mins = Math.floor((abs % 3600) / 60);
-            const secs = abs % 60;
-            return `${neg ? '-' : ''}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        }
-        const mins = Math.floor(abs / 60);
-        const secs = abs % 60;
-        return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        return window.TimeUtils.formatTimeShort(seconds);
     }
 
     cleanup() {

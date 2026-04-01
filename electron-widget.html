@@ -1107,14 +1107,8 @@
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
-        // Используем safeJSONParse из SecurityUtils
-        function safeJSONParse(jsonString, defaultValue = null) {
-            if (window.SecurityUtils && window.SecurityUtils.safeJSONParse) {
-                return window.SecurityUtils.safeJSONParse(jsonString, defaultValue);
-            }
-            try { return JSON.parse(jsonString); }
-            catch (e) { return defaultValue; }
-        }
+        // safeJSONParse — use SecurityUtils directly (security.js always loaded before this script)
+        const safeJSONParse = window.SecurityUtils.safeJSONParse;
 
         class WidgetTimer {
             constructor() {
@@ -1180,13 +1174,8 @@
                 if (this.circularWidget) this.circularWidget.classList.add('active');
                 
                 // Настраиваем масштабирование для digital и flip
-                this.setupScaling();
-                window.addEventListener('resize', () => this.updateScaling());
-            }
-            
-            setupScaling() {
-                // Начальное масштабирование
                 this.updateScaling();
+                window.addEventListener('resize', () => this.updateScaling());
             }
             
             updateScaling() {
@@ -1311,19 +1300,24 @@
                     };
                 }
 
+                // Валидация цветов
+                const isSafeColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+
                 // Обновляем градиент
                 const gradient = document.getElementById('widgetGradient');
                 if (gradient) {
                     const stops = gradient.querySelectorAll('stop');
                     // FIX BUG-015: Check array length before accessing elements
                     if (stops.length >= 2) {
-                        stops[0].setAttribute('stop-color', colors.timer);
-                        stops[1].setAttribute('stop-color', colors.progress);
+                        if (isSafeColor(colors.timer)) { stops[0].setAttribute('stop-color', colors.timer); }
+                        if (isSafeColor(colors.progress)) { stops[1].setAttribute('stop-color', colors.progress); }
                     }
                 }
 
                 // Обновляем свечение текста
-                this.timeDisplay.style.setProperty('--glow-color', `${colors.timer}80`);
+                if (isSafeColor(colors.timer)) {
+                    this.timeDisplay.style.setProperty('--glow-color', `${colors.timer}80`);
+                }
             }
 
             applyBackground(settings) {
@@ -1337,9 +1331,11 @@
                 // Сбрасываем фоновое изображение
                 bgImageContainer.style.display = 'none';
 
+                const isSafeBgColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+
                 switch (settings.bgMode) {
                     case 'solid':
-                        bgCircle.style.fill = settings.bgSolid || '#1a1a2e';
+                        bgCircle.style.fill = isSafeBgColor(settings.bgSolid) ? settings.bgSolid : '#1a1a2e';
                         break;
 
                     case 'gradient':
@@ -1357,13 +1353,14 @@
                             defs.appendChild(bgGradient);
                         }
                         const stops = bgGradient.querySelectorAll('stop');
-                        stops[0].setAttribute('stop-color', settings.bgGrad1 || '#1a1a2e');
-                        stops[1].setAttribute('stop-color', settings.bgGrad2 || '#16213e');
+                        stops[0].setAttribute('stop-color', isSafeBgColor(settings.bgGrad1) ? settings.bgGrad1 : '#1a1a2e');
+                        stops[1].setAttribute('stop-color', isSafeBgColor(settings.bgGrad2) ? settings.bgGrad2 : '#16213e');
                         bgCircle.style.fill = 'url(#widgetBgGradient)';
                         break;
 
                     case 'image':
-                        if (settings.bgImageUrl) {
+                        if (settings.bgImageUrl && window.SecurityUtils &&
+                            (window.SecurityUtils.isValidURL(settings.bgImageUrl) || window.SecurityUtils.isValidDataURL(settings.bgImageUrl))) {
                             bgImageContainer.style.display = 'block';
                             bgImg.src = settings.bgImageUrl;
                             bgOverlay.style.background = 'rgba(0, 0, 0, 0.3)';
@@ -1372,7 +1369,8 @@
                         break;
 
                     case 'local':
-                        if (settings.bgLocalImage) {
+                        if (settings.bgLocalImage && window.SecurityUtils &&
+                            window.SecurityUtils.isValidDataURL(settings.bgLocalImage)) {
                             bgImageContainer.style.display = 'block';
                             bgImg.src = settings.bgLocalImage;
                             bgImg.style.objectFit = settings.bgLocalFit || 'cover';
@@ -1700,22 +1698,7 @@
             }
 
             formatTime(seconds) {
-                // Используем централизованную функцию из utils.js
-                if (window.TimeUtils && window.TimeUtils.formatTimeShort) {
-                    return window.TimeUtils.formatTimeShort(seconds);
-                }
-                // Fallback
-                const neg = seconds < 0;
-                const abs = Math.abs(seconds);
-                if (abs >= 3600) {
-                    const hrs = Math.floor(abs / 3600);
-                    const mins = Math.floor((abs % 3600) / 60);
-                    const secs = abs % 60;
-                    return `${neg ? '-' : ''}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                }
-                const mins = Math.floor(abs / 60);
-                const secs = abs % 60;
-                return `${neg ? '-' : ''}${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                return window.TimeUtils.formatTimeShort(seconds);
             }
         }
 

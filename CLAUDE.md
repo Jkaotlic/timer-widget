@@ -67,6 +67,74 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 - CSS injection prevented: color values validated with regex, URLs validated with `URL()` constructor
 - Timer state: `presetSeconds` tracks original preset for correct reset after on-the-fly adjustments
 
+## IPC Channels Reference
+
+Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
+
+### Send (renderer → main)
+
+| Channel | Purpose |
+|---------|---------|
+| `timer-command` | Start/pause/reset/set timer with payload `{ type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes }` |
+| `timer-control` | Keyboard shortcuts from display: `{ action: 'start'/'pause'/'reset' }` |
+| `colors-update` | `{ timer: '#hex', progress: '#hex' }` |
+| `display-settings-update` | Display style, background, clock settings |
+| `get-timer-state` | Request current timer state |
+| `get-displays` | Request list of available displays |
+| `open-widget` / `close-widget` | Toggle widget window |
+| `open-display` / `close-display` | Toggle display window |
+| `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
+| `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
+| `widget-resize` / `widget-scale` / `widget-move` / `widget-set-position` / `widget-set-opacity` | Widget geometry/opacity |
+| `clock-widget-resize` / `clock-widget-scale` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
+| `minimize-window` / `close-window` / `quit-app` | Window management |
+
+### Receive (main → renderer)
+
+| Channel | Payload |
+|---------|---------|
+| `timer-state` | Full `timerState` object (see below) — broadcast every second |
+| `colors-update` | `{ timer, progress }` |
+| `timer-minute` | Fired when 1 minute remains |
+| `timer-reached-zero` | Fired at 00:00 |
+| `timer-overrun-minute` | Fired every N minutes in overrun mode |
+| `display-settings-update` | Display settings object |
+| `displays-list` | Array of available displays |
+| `set-clock-style` / `clock-settings` | Clock widget settings |
+| `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
+
+## Timer State Structure
+
+Broadcast via `timer-state` channel every second:
+
+```js
+{
+    totalSeconds: 300,        // Original preset duration
+    remainingSeconds: 245,    // Current remaining (negative = overrun)
+    presetSeconds: 300,       // Preset for reset (survives on-the-fly adjustments)
+    isRunning: true,          // Timer is actively counting
+    isPaused: false,          // Timer is paused
+    finished: false,          // Timer reached zero (latched until reset)
+    updateCounter: 42         // Monotonic counter for reliable sync
+}
+```
+
+## Testing
+
+67 tests using Node.js built-in test runner (`node --test`). Test files in `tests/`:
+
+| File | Covers |
+|------|--------|
+| `time-utils.test.js` | `formatTime`, `formatTimeShort`, `parseTime` |
+| `security.test.js` | `isValidDataURL`, `isValidURL`, `validateImageSource`, `safeJSONParse`, `escapeHTML` |
+| `security-extended.test.js` | `safeSetBackgroundImage` |
+| `status-progress.test.js` | `getTimerStatus`, `calculateProgress` |
+| `validation-utils.test.js` | `isValidNumber`, `clamp` |
+| `debounce-send.test.js` | `debounce`, `safelySendToWindow` |
+| `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS` |
+| `edge-cases.test.js` | Edge cases for all utils |
+| `constants.test.js` | CONFIG immutability and structure |
+
 ## CI
 
 GitHub Actions (`.github/workflows/nodejs.yml`): Node 22, ubuntu-latest — runs `npm run ci` (lint + test).
