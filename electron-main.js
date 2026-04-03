@@ -217,7 +217,7 @@ function createControlWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: true,
-            devTools: false
+            devTools: true
         },
         title: 'Управление Таймером',
         icon: path.join(__dirname, 'icon.ico'),
