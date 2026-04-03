@@ -201,17 +201,23 @@
         }
 
         .main-btn {
-            width: 52px;
-            height: 52px;
+            width: 48px;
+            height: 48px;
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 20px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s ease;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .main-btn.start {
+            width: 62px;
+            height: 62px;
+            font-size: 24px;
         }
 
         .main-btn:hover:not(:disabled) {
@@ -1202,6 +1208,72 @@
             color: #999;
         }
 
+        /* Presets: equal-width 4-per-row grid */
+        .quick-preset {
+            flex: 1 1 calc(25% - 6px);
+            min-width: 0;
+        }
+
+        /* Visual divider between − and + stepper groups */
+        .adjust-divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.15);
+            align-self: center;
+            margin: 0 6px;
+            flex-shrink: 0;
+        }
+
+        /* − and + sign labels flanking the stepper buttons */
+        .adjust-sign {
+            font-size: 1.1em;
+            font-weight: 700;
+            align-self: center;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        .adjust-sign.minus { color: #f5576c; margin-right: 2px; }
+        .adjust-sign.plus  { color: #667eea; margin-left: 2px; }
+
+        /* Thin vertical divider before Sound button in windows row */
+        .windows-sound-divider {
+            width: 1px;
+            background: rgba(255, 255, 255, 0.35);
+            margin: 4px 2px;
+            align-self: stretch;
+            flex-shrink: 0;
+        }
+
+        /* Settings row: settings-toggle + FAQ small button */
+        .settings-row-bar {
+            display: flex;
+            align-items: stretch;
+            flex-shrink: 0;
+        }
+
+        .settings-row-bar .settings-toggle {
+            flex: 1;
+            width: auto;
+        }
+
+        .faq-small {
+            width: 38px;
+            border: none;
+            background: #f0f2ff;
+            color: #667eea;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border-left: 1px solid rgba(102, 126, 234, 0.15);
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .faq-small:hover {
+            background: #e8ecff;
+        }
+
         .quick-window-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
@@ -1930,7 +2002,6 @@
 
         <!-- Заголовок с таймером -->
         <div class="timer-header">
-            <button class="faq-btn" id="faqBtn" title="Справка">?</button>
             <h1>⏱️ ТАЙМЕР</h1>
             <div class="timer-display-main" id="controlTime">00:00</div>
             <div class="timer-status">
@@ -1941,12 +2012,12 @@
 
         <!-- Главные кнопки управления -->
         <div class="main-controls">
-            <button class="main-btn start" id="startBtn" title="Запустить таймер (Space)">▶</button>
             <button class="main-btn pause" id="pauseBtn" title="Приостановить (Space)" disabled>⏸</button>
+            <button class="main-btn start" id="startBtn" title="Запустить таймер (Space)">▶</button>
             <button class="main-btn reset" id="resetBtn" title="Сбросить к начальному значению (R)">↺</button>
         </div>
 
-        <!-- Быстрые пресеты + ввод времени -->
+        <!-- Быстрые пресеты: 2×4 сетка -->
         <div class="compact-section">
             <div class="quick-presets">
                 <button class="quick-preset" data-minutes="5">5 мин</button>
@@ -1958,34 +2029,42 @@
                 <button class="quick-preset" data-minutes="45">45 мин</button>
                 <button class="quick-preset" data-minutes="60">1 час</button>
             </div>
+        </div>
 
-            <div class="adjust-main-section">
-                <div class="adjust-main-row">
-                    <button class="adjust-main-btn minus" data-adjust="-3600">− 1 час</button>
-                    <button class="adjust-main-btn minus" data-adjust="-300">− 5 мин</button>
-                    <button class="adjust-main-btn minus" data-adjust="-60">− 1 мин</button>
-                    <button class="adjust-main-btn plus" data-adjust="60">+ 1 мин</button>
-                    <button class="adjust-main-btn plus" data-adjust="300">+ 5 мин</button>
-                    <button class="adjust-main-btn plus" data-adjust="3600">+ 1 час</button>
-                </div>
+        <!-- Корректировка: − 1ч 5м 1м | 1м 5м 1ч + -->
+        <div class="compact-section">
+            <div class="adjust-main-row">
+                <span class="adjust-sign minus">−</span>
+                <button class="adjust-main-btn minus" data-adjust="-3600">1 ч</button>
+                <button class="adjust-main-btn minus" data-adjust="-300">5 мин</button>
+                <button class="adjust-main-btn minus" data-adjust="-60">1 мин</button>
+                <div class="adjust-divider"></div>
+                <button class="adjust-main-btn plus" data-adjust="60">1 мин</button>
+                <button class="adjust-main-btn plus" data-adjust="300">5 мин</button>
+                <button class="adjust-main-btn plus" data-adjust="3600">1 ч</button>
+                <span class="adjust-sign plus">+</span>
             </div>
         </div>
 
-        <!-- Открыть окна + звук -->
+        <!-- Открыть окна + звук (в одной строке, разделитель перед звуком) -->
         <div class="compact-section">
             <div class="quick-windows">
-                <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)">⏱️ Таймер</button>
+                <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)">⏱️ Виджет</button>
                 <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)">🕐 Часы</button>
                 <button class="quick-window-btn display" id="openDisplayBtn" title="На весь экран для презентаций (D)">🖥️ Дисплей</button>
+                <div class="windows-sound-divider"></div>
                 <button class="quick-window-btn sound" id="soundToggleBtn" title="Вкл/Выкл звуковые уведомления">🔊 Звук</button>
             </div>
         </div>
 
-        <!-- Кнопка расширенных настроек -->
-        <button class="settings-toggle" id="settingsToggle" title="Развернуть настройки таймера, часов и дисплея">
-            <span>⚙️ Настройки</span>
-            <span class="arrow">▼</span>
-        </button>
+        <!-- Настройки + FAQ -->
+        <div class="settings-row-bar">
+            <button class="settings-toggle" id="settingsToggle" title="Развернуть настройки таймера, часов и дисплея">
+                <span>⚙️ Настройки</span>
+                <span class="arrow">▼</span>
+            </button>
+            <button class="faq-small" id="faqBtn" title="Справка">?</button>
+        </div>
 
         <!-- Расширенные настройки (скрыты по умолчанию) -->
         <div class="advanced-settings" id="advancedSettings">
