@@ -3,10 +3,62 @@
  * Provides secure IPC communication via contextBridge
  *
  * SECURITY: Uses contextIsolation to prevent renderer from accessing Node.js APIs
+ * NOTE: channel-validator is inlined here because sandbox:true restricts require()
+ * to built-in modules only — local file requires are not allowed in sandboxed preloads.
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
-const { isValidChannel } = require('./channel-validator');
+
+// Inlined from channel-validator.js (cannot require local files in sandboxed preload)
+const ALLOWED_CHANNELS = {
+    send: [
+        'get-timer-state',
+        'get-displays',
+        'timer-command',
+        'timer-control',
+        'colors-update',
+        'display-settings-update',
+        'open-widget',
+        'close-widget',
+        'open-display',
+        'close-display',
+        'open-clock-widget',
+        'close-clock-widget',
+        'clock-widget-resize',
+        'clock-widget-scale',
+        'clock-widget-set-style',
+        'clock-widget-settings',
+        'resize-control-window',
+        'widget-set-opacity',
+        'widget-set-position',
+        'widget-resize',
+        'widget-scale',
+        'widget-move',
+        'minimize-window',
+        'close-window',
+        'quit-app'
+    ],
+    receive: [
+        'timer-state',
+        'colors-update',
+        'timer-minute',
+        'timer-reached-zero',
+        'timer-overrun-minute',
+        'display-settings-update',
+        'displays-list',
+        'set-clock-style',
+        'clock-settings',
+        'display-window-state',
+        'widget-window-state',
+        'clock-window-state'
+    ]
+};
+
+function isValidChannel(channel, direction) {
+    if (!channel || typeof channel !== 'string') { return false; }
+    if (!ALLOWED_CHANNELS[direction]) { return false; }
+    return ALLOWED_CHANNELS[direction].includes(channel);
+}
 
 // Expose protected methods to renderer process via contextBridge
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -84,4 +136,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     }
 });
-
