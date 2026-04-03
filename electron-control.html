@@ -9,6 +9,24 @@
     <link rel="stylesheet" href="components.css">
     <style>
         /* Новый современный UI */
+        :root {
+            --color-primary: #667eea;
+            --color-primary-dark: #5568d3;
+            --color-secondary: #764ba2;
+            --color-success: #38ef7d;
+            --color-success-dark: #11998e;
+            --color-danger: #f5576c;
+            --color-warning: #ffc107;
+            --color-bg-light: #f8f9ff;
+            --color-bg-hover: #f0f2ff;
+            --color-border: #e8ecff;
+            --color-text: #333;
+            --color-text-secondary: #666;
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 10px;
+            --radius-xl: 20px;
+        }
         * {
             box-sizing: border-box;
         }
@@ -611,6 +629,118 @@
             position: absolute;
             inset: 0;
             background: linear-gradient(135deg, var(--t1) 0%, var(--t2) 100%);
+        }
+
+        /* Стилизованный select для настроек */
+        .settings-select {
+            padding: 7px 12px;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--color-border);
+            background: white;
+            color: var(--color-text);
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+
+        .settings-select:hover {
+            border-color: var(--color-primary);
+        }
+
+        .settings-select:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+
+        /* Прогресс-бар таймера */
+        .timer-progress {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .timer-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-success), var(--color-primary));
+            transition: width 0.8s ease;
+            border-radius: 0 2px 2px 0;
+            width: 0%;
+        }
+
+        .timer-progress-bar.warning {
+            background: linear-gradient(90deg, var(--color-warning), #ff9800);
+        }
+
+        .timer-progress-bar.danger {
+            background: linear-gradient(90deg, var(--color-danger), #ff4444);
+            animation: pulse-bar 0.8s infinite alternate;
+        }
+
+        @keyframes pulse-bar {
+            from { opacity: 0.7; }
+            to { opacity: 1; }
+        }
+
+        /* Более крупные кнопки тем */
+        .themes-grid-new {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .theme-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 2px solid transparent;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .theme-card:hover {
+            border-color: rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .theme-card.active {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+        }
+
+        .theme-card-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .theme-card-name {
+            font-size: 0.75em;
+            font-weight: 600;
+            color: var(--color-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Разделитель секций в настройках */
+        .settings-divider {
+            height: 1px;
+            background: var(--color-border);
+            margin: 4px 0;
         }
 
         /* Звуки */
@@ -2009,6 +2139,10 @@
                 <span id="statusText">Готов</span>
             </div>
         </div>
+        <!-- Прогресс-бар -->
+        <div class="timer-progress">
+            <div class="timer-progress-bar" id="timerProgressBar"></div>
+        </div>
 
         <!-- Главные кнопки управления -->
         <div class="main-controls">
@@ -2070,13 +2204,17 @@
         <div class="advanced-settings" id="advancedSettings">
             <div class="content-section">
                 <div class="tabs">
-                    <button class="tab-btn active" data-tab="timer" title="Стиль, масштаб, звук и тема таймера">
+                    <button class="tab-btn active" data-tab="timer" title="Стиль, масштаб и настройки таймера">
                         <span class="icon">⏱️</span>
                         <span>Таймер</span>
                     </button>
-                    <button class="tab-btn" data-tab="clock" title="Стиль и настройки часов">
-                        <span class="icon">🕐</span>
-                        <span>Часы</span>
+                    <button class="tab-btn" data-tab="theme" title="Цветовая тема оформления">
+                        <span class="icon">🎨</span>
+                        <span>Тема</span>
+                    </button>
+                    <button class="tab-btn" data-tab="sound" title="Звуковые уведомления">
+                        <span class="icon">🔊</span>
+                        <span>Звук</span>
                     </button>
                     <button class="tab-btn" data-tab="display" title="Монитор, фон и блоки времени">
                         <span class="icon">🖥️</span>
@@ -2094,11 +2232,11 @@
 
                         <div class="toggle-row">
                             <span class="toggle-label">Стиль таймера</span>
-                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 6px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; font-size: 0.85em; min-width: 160px;">
-                                <option value="circle" style="background: #1a1a2e; color: white;">⭕ Круговой</option>
-                                <option value="digital" style="background: #1a1a2e; color: white;">🔢 Цифровой LED</option>
-                                <option value="flip" style="background: #1a1a2e; color: white;">🔄 Перекидные</option>
-                                <option value="analog" style="background: #1a1a2e; color: white;">🕐 Аналоговые</option>
+                            <select id="timerStyle" class="settings-select" style="min-width: 160px;">
+                                <option value="circle">⭕ Круговой</option>
+                                <option value="digital">🔢 Цифровой LED</option>
+                                <option value="flip">🔄 Перекидные</option>
+                                <option value="analog">🕐 Аналоговые</option>
                             </select>
                         </div>
 
@@ -2113,10 +2251,35 @@
 
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">✨</span>
-                            Цветовая тема
+                            <span class="icon">🕐</span>
+                            Виджет часов
                         </div>
-                        <div class="themes-grid" id="themesGrid"></div>
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Стиль часов</span>
+                            <select id="clockStyle" class="settings-select">
+                                <option value="circle">⭕ Круговой</option>
+                                <option value="digital">🔢 Цифровой LED</option>
+                                <option value="flip">🔄 Перекидные часы</option>
+                                <option value="analog">🕐 Аналоговые</option>
+                            </select>
+                        </div>
+
+                        <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
+                            <span class="toggle-label">Цифры на циферблате</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockShowAnalogNumbers">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="toggle-row">
+                            <span class="toggle-label">Показывать дату</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="clockShowDate">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -2128,13 +2291,22 @@
                             </label>
                         </div>
                     </div>
+                </div>
 
+                <!-- Таб: Тема -->
+                <div class="tab-content" id="tab-theme">
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🔊</span>
-                            Звуковые уведомления
+                            <span class="icon">✨</span>
+                            Цветовая тема
                         </div>
+                        <div class="themes-grid-new" id="themesGrid"></div>
+                    </div>
+                </div>
 
+                <!-- Таб: Звук -->
+                <div class="tab-content" id="tab-sound">
+                    <div class="settings-group">
                         <div class="toggle-row">
                             <span class="toggle-label" style="font-weight: 600;">🔊 Включить звук</span>
                             <label class="toggle-switch">
@@ -2145,6 +2317,11 @@
                     </div>
 
                     <div class="settings-group" id="soundSettings">
+                        <div class="settings-group-title">
+                            <span class="icon">🔔</span>
+                            События
+                        </div>
+
                         <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundStartEnabled">
@@ -2212,7 +2389,9 @@
                             <button class="sound-preview" id="soundMinutePreview" title="Прослушать">▶</button>
                         </div>
 
-                        <div class="sound-row" style="border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; margin-top: 6px;">
+                        <div class="settings-divider"></div>
+
+                        <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundOverrunEnabled">
                                 <label for="soundOverrunEnabled">При перерасходе</label>
@@ -2244,66 +2423,30 @@
                                 <option value="10">10 минут</option>
                             </select>
                         </div>
-
-                        <div class="custom-sounds-section">
-                            <div class="settings-group-title">
-                                <span class="icon">🎵</span>
-                                Ваши звуки
-                            </div>
-                            <div class="custom-sound-list" id="customSoundList"></div>
-                            <div class="add-sound-row">
-                                <button class="add-sound-btn" id="addSoundBtn" title="Загрузить аудиофайл с компьютера">
-                                    <span>➕</span>
-                                    <span>Загрузить звук</span>
-                                </button>
-                                <input type="file" class="hidden-file-input" id="soundFileInput"
-                                       accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
-                            </div>
-                        </div>
                     </div>
-                </div>
 
-                <!-- Таб: Часы -->
-                <div class="tab-content" id="tab-clock">
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🎨</span>
-                            Стиль часов
+                            <span class="icon">🎵</span>
+                            Ваши звуки
                         </div>
-
-                        <div class="toggle-row">
-                            <span class="toggle-label">Стиль</span>
-                            <select id="clockStyle" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em;">
-                                <option value="circle" style="background: #1a1a2e;">⭕ Круговой</option>
-                                <option value="digital" style="background: #1a1a2e;">🔢 Цифровой LED</option>
-                                <option value="flip" style="background: #1a1a2e;">🔄 Перекидные часы</option>
-                                <option value="analog" style="background: #1a1a2e;">🕐 Аналоговые</option>
-                            </select>
-                        </div>
-
-                        <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
-                            <span class="toggle-label">Цифры на циферблате</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="clockShowAnalogNumbers">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <div class="toggle-row">
-                            <span class="toggle-label">Показывать дату</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="clockShowDate">
-                                <span class="toggle-slider"></span>
-                            </label>
+                        <div class="custom-sound-list" id="customSoundList"></div>
+                        <div class="add-sound-row">
+                            <button class="add-sound-btn" id="addSoundBtn" title="Загрузить аудиофайл с компьютера">
+                                <span>➕</span>
+                                <span>Загрузить звук</span>
+                            </button>
+                            <input type="file" class="hidden-file-input" id="soundFileInput"
+                                   accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
                         </div>
                     </div>
-
-                    <!-- Hidden elements kept for JS compatibility -->
-                    <input type="checkbox" id="syncClockStyle" style="display:none;">
-                    <input type="checkbox" id="clockShowTimezone" style="display:none;">
-                    <input type="checkbox" id="clockShowSeconds" checked style="display:none;">
-                    <input type="checkbox" id="clockFormat24h" checked style="display:none;">
                 </div>
+
+                <!-- Hidden elements kept for JS compatibility -->
+                <input type="checkbox" id="syncClockStyle" style="display:none;">
+                <input type="checkbox" id="clockShowTimezone" style="display:none;">
+                <input type="checkbox" id="clockShowSeconds" checked style="display:none;">
+                <input type="checkbox" id="clockFormat24h" checked style="display:none;">
 
                 <!-- Таб: Дисплей -->
                 <div class="tab-content" id="tab-display">
@@ -2315,8 +2458,8 @@
 
                         <div class="toggle-row">
                             <span class="toggle-label">Монитор</span>
-                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em; max-width: 140px;">
-                                <option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>
+                            <select id="displaySelect" class="settings-select" style="max-width: 180px;">
+                                <option value="auto">🖥️ Авто</option>
                             </select>
                         </div>
                     </div>
@@ -2338,7 +2481,7 @@
                         <div id="timeBlocksSettings" style="display: none;">
                             <div class="toggle-row">
                                 <span class="toggle-label">Расположение</span>
-                                <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
+                                <select id="timeLayoutPreset" class="settings-select">
                                     <option value="frame">Рамка</option>
                                     <option value="top-line">Сверху</option>
                                     <option value="bottom-line">Снизу</option>
@@ -2947,19 +3090,29 @@
                 ];
 
                 const grid = document.getElementById('themesGrid');
-                themes.forEach((theme, i) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'theme-btn';
-                    btn.title = theme.name;
-                    btn.style.setProperty('--t1', theme.t1);
-                    btn.style.setProperty('--t2', theme.t2);
-                    btn.addEventListener('click', () => {
+                themes.forEach((theme) => {
+                    const card = document.createElement('button');
+                    card.className = 'theme-card';
+                    card.title = theme.name;
+
+                    const swatch = document.createElement('span');
+                    swatch.className = 'theme-card-swatch';
+                    swatch.style.background = `linear-gradient(135deg, ${theme.t1} 0%, ${theme.t2} 100%)`;
+
+                    const name = document.createElement('span');
+                    name.className = 'theme-card-name';
+                    name.textContent = theme.name;
+
+                    card.appendChild(swatch);
+                    card.appendChild(name);
+
+                    card.addEventListener('click', () => {
                         // FIX BUG-023: Optimize - remove active from previous button only
                         if (this.activeThemeButton) {
                             this.activeThemeButton.classList.remove('active');
                         }
-                        btn.classList.add('active');
-                        this.activeThemeButton = btn;
+                        card.classList.add('active');
+                        this.activeThemeButton = card;
 
                         // Сохраняем цвета темы
                         this.currentColors = {
@@ -2973,7 +3126,7 @@
                         this.saveColors();
                         this.pushDisplaySettings();
                     });
-                    grid.appendChild(btn);
+                    grid.appendChild(card);
                 });
             }
 
@@ -3137,11 +3290,11 @@
                     this.saveExtSettings();
                 });
 
-                // Отдельный стиль часов
+                // Отдельный стиль часов — ручное изменение отключает синхронизацию
                 this.clockStyleEl.addEventListener('change', () => {
-                    if (!this.syncClockStyle) {
-                        ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
-                    }
+                    this.syncClockStyle = false;
+                    this.syncClockStyleEl.checked = false;
+                    ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
                     this.updateClockAnalogNumbersVisibility();
                     this.saveExtSettings();
                 });
@@ -3178,7 +3331,7 @@
                             this.activeThemeButton = null;
                         }
                         // Применить первую тему по умолчанию
-                        const firstTheme = document.querySelector('.theme-btn');
+                        const firstTheme = document.querySelector('.theme-card');
                         if (firstTheme) firstTheme.click();
                     });
                 }
@@ -3827,14 +3980,20 @@
             // Отображение
             updateDisplay() {
                 this.controlTimeEl.textContent = this.formatTime(this.remainingSeconds);
-                
+
                 // Цветовые классы для времени
                 this.controlTimeEl.classList.remove('warning', 'danger');
                 const isOvertime = this.remainingSeconds < 0;
+                const progressBar = document.getElementById('timerProgressBar');
                 if (isOvertime) {
                     this.controlTimeEl.classList.add('danger');
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                        progressBar.className = 'timer-progress-bar danger';
+                    }
                 } else if (this.totalSeconds > 0) {
                     const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
+                    const percentUsed = 100 - percentLeft;
                     const dangerPct = (window.CONFIG && CONFIG.DANGER_PERCENTAGE) || 10;
                     const warningPct = (window.CONFIG && CONFIG.WARNING_PERCENTAGE) || 25;
                     if (percentLeft <= dangerPct && percentLeft > 0) {
@@ -3842,6 +4001,14 @@
                     } else if (percentLeft <= warningPct) {
                         this.controlTimeEl.classList.add('warning');
                     }
+                    if (progressBar) {
+                        progressBar.style.width = percentUsed + '%';
+                        progressBar.className = 'timer-progress-bar' +
+                            (percentLeft <= dangerPct ? ' danger' : percentLeft <= warningPct ? ' warning' : '');
+                    }
+                } else if (progressBar) {
+                    progressBar.style.width = '0%';
+                    progressBar.className = 'timer-progress-bar';
                 }
                 
                 this.statusDot.className = 'status-dot';
@@ -3869,12 +4036,11 @@
                 const savedDisplay = localStorage.getItem('selectedDisplay') || 'auto';
                 
                 // Очищаем и добавляем опцию "Авто"
-                select.innerHTML = '<option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>';
-                
+                select.innerHTML = '<option value="auto">🖥️ Авто</option>';
+
                 displays.forEach((display, index) => {
                     const option = document.createElement('option');
                     option.value = index.toString();
-                    option.style.background = '#1a1a2e';
                     
                     const isPrimary = display.bounds.x === 0 && display.bounds.y === 0;
                     const label = isPrimary ? '🖥️ Основной' : `🖥️ Монитор ${index + 1}`;
