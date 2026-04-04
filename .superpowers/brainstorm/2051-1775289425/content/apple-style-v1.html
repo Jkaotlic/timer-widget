@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Timer Widget — Apple Style</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #000;
+    background-image:
+      radial-gradient(ellipse at 30% 20%, rgba(88, 86, 214, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(0, 122, 255, 0.1) 0%, transparent 50%);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .control-panel {
+    width: 400px;
+    background: rgba(28, 28, 30, 0.72);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+    overflow: hidden;
+    box-shadow:
+      0 0 0 0.5px rgba(255,255,255,0.05),
+      0 20px 60px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  /* Titlebar */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .titlebar .title {
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .traffic-lights {
+    display: flex; gap: 8px;
+  }
+  .traffic-light {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+  .traffic-light.close { background: #ff5f57; }
+  .traffic-light.minimize { background: #febc2e; }
+  .traffic-light.maximize { background: #28c840; }
+
+  /* Timer display */
+  .timer-section {
+    padding: 32px 24px 24px;
+    text-align: center;
+  }
+
+  .timer-time {
+    font-size: 64px;
+    font-weight: 200;
+    letter-spacing: -2px;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .timer-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 0 24px 24px;
+  }
+
+  .ctrl-btn {
+    width: 56px; height: 56px;
+    border: none; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: white; cursor: default;
+    transition: all 0.2s;
+  }
+  .ctrl-btn.start {
+    width: 64px; height: 64px;
+    background: #30d158;
+    font-size: 24px;
+    box-shadow: 0 4px 20px rgba(48, 209, 88, 0.3);
+  }
+  .ctrl-btn.pause {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+  }
+  .ctrl-btn.reset {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+  }
+  .ctrl-btn:hover { transform: scale(1.08); }
+
+  /* Presets */
+  .presets {
+    padding: 0 16px 12px;
+  }
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .preset {
+    padding: 10px 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    cursor: default;
+    transition: all 0.2s;
+  }
+  .preset:hover {
+    background: rgba(10, 132, 255, 0.15);
+    border-color: rgba(10, 132, 255, 0.3);
+    color: #0a84ff;
+  }
+
+  /* Adjust */
+  .adjust {
+    padding: 0 16px 12px;
+  }
+  .adjust-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .adj-btn {
+    flex: 1;
+    padding: 8px 4px;
+    border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    cursor: default; text-align: center;
+    background: transparent;
+    transition: all 0.2s;
+  }
+  .adj-btn.minus { color: #ff6b6b; }
+  .adj-btn.minus:hover { background: rgba(255,107,107,0.15); }
+  .adj-btn.plus { color: #0a84ff; }
+  .adj-btn.plus:hover { background: rgba(10,132,255,0.15); }
+  .adj-sep {
+    width: 1px; height: 20px;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+  }
+
+  /* Windows */
+  .windows {
+    padding: 0 16px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .win-btn {
+    padding: 12px 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    text-align: center;
+    cursor: default;
+    transition: all 0.2s;
+  }
+  .win-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.12);
+    transform: translateY(-2px);
+  }
+  .win-btn .ico { font-size: 20px; display: block; margin-bottom: 4px; }
+  .win-btn .name { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.6); }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 0 16px;
+  }
+
+  /* Tabs */
+  .tabs-section {
+    padding: 16px 16px 0;
+  }
+  .tabs {
+    display: flex;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 2px;
+    margin-bottom: 16px;
+  }
+  .tab {
+    flex: 1;
+    padding: 7px 4px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.4);
+    cursor: default;
+    transition: all 0.25s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+  .tab .icon { font-size: 14px; }
+  .tab.active {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  /* Settings groups */
+  .settings-scroll {
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 0 16px 16px;
+  }
+  .settings-scroll::-webkit-scrollbar { width: 4px; }
+  .settings-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .group {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .group-title {
+    padding: 10px 14px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.8);
+  }
+  .row:last-child { border-bottom: none; }
+
+  /* Apple toggle */
+  .apple-toggle {
+    width: 42px; height: 26px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 13px;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .apple-toggle::after {
+    content: '';
+    position: absolute;
+    width: 22px; height: 22px;
+    background: white;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    transition: transform 0.3s;
+  }
+  .apple-toggle.on {
+    background: #30d158;
+  }
+  .apple-toggle.on::after {
+    transform: translateX(16px);
+  }
+
+  /* Apple select */
+  .apple-sel {
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    color: #0a84ff;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Theme dots */
+  .themes {
+    display: flex;
+    gap: 6px;
+    padding: 4px 0;
+    flex-wrap: wrap;
+  }
+  .tdot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(255,255,255,0.08);
+    cursor: default;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    background-clip: padding-box;
+    box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.1);
+  }
+  .tdot:hover { transform: scale(1.15); border-color: rgba(255,255,255,0.25); }
+  .tdot.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.2), inset 0 0 0 0.5px rgba(0,0,0,0.1); }
+
+  /* Sound rows */
+  .snd-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+  }
+  .snd-row:last-child { border-bottom: none; }
+  .snd-check {
+    width: 18px; height: 18px;
+    accent-color: #0a84ff;
+  }
+  .snd-name { min-width: 80px; }
+  .snd-sel {
+    flex: 1;
+    padding: 5px 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+    min-width: 0;
+  }
+  .snd-play {
+    width: 28px; height: 28px;
+    border: none; border-radius: 50%;
+    background: rgba(10, 132, 255, 0.15);
+    color: #0a84ff;
+    font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    cursor: default;
+  }
+  .snd-play:hover { background: rgba(10, 132, 255, 0.3); }
+
+  .upload-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px;
+    background: transparent;
+    border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: 10px;
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: default;
+    margin: 8px 14px 10px;
+    transition: all 0.2s;
+  }
+  .upload-btn:hover {
+    border-color: rgba(10,132,255,0.3);
+    color: #0a84ff;
+  }
+
+  /* BG mode tabs */
+  .bg-tabs {
+    display: flex; gap: 4px; padding: 8px 14px;
+  }
+  .bg-tab {
+    flex: 1;
+    padding: 6px 4px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    cursor: default;
+  }
+  .bg-tab.active {
+    background: rgba(10,132,255,0.15);
+    border-color: rgba(10,132,255,0.2);
+    color: #0a84ff;
+  }
+
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Range slider Apple style */
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    cursor: default;
+  }
+
+  .range-val {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    margin-left: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+
+<div class="control-panel">
+  <!-- Titlebar with traffic lights -->
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <div class="traffic-light close"></div>
+      <div class="traffic-light minimize"></div>
+      <div class="traffic-light maximize"></div>
+    </div>
+    <span class="title">Timer Widget</span>
+    <div style="width:52px;"></div>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-section">
+    <div class="timer-time">05:00</div>
+    <div class="timer-label">Готов к запуску</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="ctrl-btn pause">⏸</div>
+    <div class="ctrl-btn start">▶</div>
+    <div class="ctrl-btn reset">↺</div>
+  </div>
+
+  <!-- Presets -->
+  <div class="presets">
+    <div class="presets-grid">
+      <div class="preset">5 мин</div>
+      <div class="preset">10 мин</div>
+      <div class="preset">15 мин</div>
+      <div class="preset">20 мин</div>
+      <div class="preset">25 мин</div>
+      <div class="preset">30 мин</div>
+      <div class="preset">45 мин</div>
+      <div class="preset">1 час</div>
+    </div>
+  </div>
+
+  <!-- Adjust -->
+  <div class="adjust">
+    <div class="adjust-bar">
+      <div class="adj-btn minus">−1 ч</div>
+      <div class="adj-btn minus">−5 м</div>
+      <div class="adj-btn minus">−1 м</div>
+      <div class="adj-sep"></div>
+      <div class="adj-btn plus">+1 м</div>
+      <div class="adj-btn plus">+5 м</div>
+      <div class="adj-btn plus">+1 ч</div>
+    </div>
+  </div>
+
+  <!-- Overtime toggle -->
+  <div style="padding:0 16px 10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.04); border-radius:10px;">
+      <span style="font-size:13px; color:rgba(255,255,255,0.6); font-weight:400;">⏱ Считать ниже нуля</span>
+      <div class="apple-toggle"></div>
+    </div>
+  </div>
+
+  <!-- Windows -->
+  <div class="windows">
+    <div class="win-btn"><span class="ico">⏱</span><span class="name">Виджет</span></div>
+    <div class="win-btn"><span class="ico">🕐</span><span class="name">Часы</span></div>
+    <div class="win-btn"><span class="ico">🖥</span><span class="name">Полноэкранный</span></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Tabs -->
+  <div class="tabs-section">
+    <div class="tabs" id="mainTabs">
+      <div class="tab active" onclick="switchTab('timer')"><span class="icon">⏱</span>Виджет</div>
+      <div class="tab" onclick="switchTab('clock')"><span class="icon">🕐</span>Часы</div>
+      <div class="tab" onclick="switchTab('display')"><span class="icon">🖥</span>Полноэкранный</div>
+      <div class="tab" onclick="switchTab('sound')"><span class="icon">🔊</span>Звуки</div>
+    </div>
+  </div>
+
+  <div class="settings-scroll">
+    <!-- TAB: Виджет -->
+    <div class="tab-panel active" id="panel-timer">
+      <div class="group">
+        <div class="group-title">Стиль виджета</div>
+        <div class="row">Стиль таймера <span class="apple-sel">Круговой</span></div>
+        <div class="row">Масштаб <span style="display:flex;align-items:center;"><input type="range" value="100"><span class="range-val">100%</span></span></div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">Цвета виджета</div>
+        <div style="padding:6px 14px 10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="tdot active" style="background:linear-gradient(135deg,#667eea,#764ba2)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#30d158,#0a84ff)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#ff6b6b,#ffc93c)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#00b4db,#0083b0)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#f093fb,#f5576c)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#e65c00,#f9d423)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#11998e,#38ef7d)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#c31432,#240b36)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB: Clock -->
+    <div class="tab-panel" id="panel-clock">
+      <div class="group">
+        <div class="group-title">Стиль часов</div>
+        <div class="row">Стиль <span class="apple-sel">Аналоговые</span></div>
+        <div class="row">Цифры на циферблате <div class="apple-toggle"></div></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Цвета часов</div>
+        <div style="padding:6px 14px 10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="tdot active" style="background:linear-gradient(135deg,#667eea,#764ba2)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#30d158,#0a84ff)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#ff6b6b,#ffc93c)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#00b4db,#0083b0)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#f093fb,#f5576c)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#e65c00,#f9d423)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#11998e,#38ef7d)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#c31432,#240b36)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"></div>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-title">Отображение</div>
+        <div class="row">Показывать дату <div class="apple-toggle"></div></div>
+      </div>
+    </div>
+
+    <!-- TAB: Display -->
+    <div class="tab-panel" id="panel-display">
+      <div class="group">
+        <div class="group-title">Стиль таймера</div>
+        <div class="row">Стиль <span class="apple-sel">Круговой</span></div>
+        <div class="row">Масштаб <span style="display:flex;align-items:center;"><input type="range" value="100"><span class="range-val">100%</span></span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Цвета таймера</div>
+        <div style="padding:6px 14px 10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="tdot active" style="background:linear-gradient(135deg,#667eea,#764ba2)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#30d158,#0a84ff)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#ff6b6b,#ffc93c)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#00b4db,#0083b0)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#f093fb,#f5576c)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#e65c00,#f9d423)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#11998e,#38ef7d)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#c31432,#240b36)"></div>
+          <div class="tdot" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"></div>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-title">Монитор</div>
+        <div class="row">Экран <span class="apple-sel">Авто</span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Блоки времени</div>
+        <div class="row">Показывать <div class="apple-toggle"></div></div>
+        <div class="row" style="color:rgba(255,255,255,0.3);">Расположение <span class="apple-sel" style="opacity:0.4;">Рамка</span></div>
+        <div class="row" style="color:rgba(255,255,255,0.3);">Размер <span style="display:flex;align-items:center;opacity:0.4;"><input type="range" value="100"><span class="range-val">100%</span></span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Фон</div>
+        <div class="bg-tabs">
+          <div class="bg-tab active">Заливка</div>
+          <div class="bg-tab">Градиент</div>
+          <div class="bg-tab">URL</div>
+          <div class="bg-tab">Файл</div>
+        </div>
+        <div class="row">
+          Цвет
+          <div style="width:28px;height:28px;border-radius:8px;background:#0f0c29;border:1px solid rgba(255,255,255,0.15);"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Sound -->
+    <div class="tab-panel" id="panel-sound">
+      <div class="group">
+        <div class="group-title">Основное</div>
+        <div class="row">Звуковые уведомления <div class="apple-toggle on"></div></div>
+      </div>
+      <div class="group">
+        <div class="group-title">События</div>
+        <div class="snd-row">
+          <input type="checkbox" class="snd-check"> <span class="snd-name">При старте</span>
+          <select class="snd-sel"><option>Без звука</option></select>
+          <div class="snd-play">▶</div>
+        </div>
+        <div class="snd-row">
+          <input type="checkbox" class="snd-check" checked> <span class="snd-name">При финише</span>
+          <select class="snd-sel"><option>Без звука</option></select>
+          <div class="snd-play">▶</div>
+        </div>
+        <div class="snd-row">
+          <input type="checkbox" class="snd-check"> <span class="snd-name">Каждую мин</span>
+          <select class="snd-sel"><option>Без звука</option></select>
+          <div class="snd-play">▶</div>
+        </div>
+        <div class="snd-row">
+          <input type="checkbox" class="snd-check"> <span class="snd-name">Перерасход</span>
+          <select class="snd-sel"><option>Тройной</option></select>
+          <div class="snd-play">▶</div>
+        </div>
+        <div class="row" style="padding-left:28px;">Интервал напоминания <span class="apple-sel">1 мин</span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Ваши звуки</div>
+        <div class="upload-btn">+ Загрузить звук</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const map = { timer: 0, clock: 1, display: 2, sound: 3 };
+  document.querySelectorAll('.tab')[map[name]].classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+</script>
+
+</body>
+</html>
