@@ -91,6 +91,36 @@
             min-height: 38px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
+        .custom-titlebar .titlebar-right {
+            display: flex;
+            gap: 6px;
+            -webkit-app-region: no-drag;
+            min-width: 52px;
+            justify-content: flex-end;
+        }
+
+        .custom-titlebar .titlebar-help {
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .custom-titlebar .titlebar-help:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
         .custom-titlebar .title-text {
             color: rgba(255, 255, 255, 0.5);
             font-size: 12px;
@@ -1245,19 +1275,30 @@
         }
 
         .quick-window-btn {
-            padding: 7px 11px;
+            padding: 12px 4px;
             border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 8px;
-            font-size: 12px;
+            border-radius: 12px;
+            font-size: 11px;
             font-weight: 500;
             cursor: pointer;
             display: flex;
+            flex-direction: column;
             align-items: center;
             gap: 4px;
             transition: all 0.2s;
             white-space: nowrap;
             background: rgba(255, 255, 255, 0.06);
             color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+        }
+
+        .quick-window-btn .qw-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .quick-window-btn .qw-label {
+            font-size: 11px;
         }
 
         .quick-window-btn.widget {
@@ -2074,22 +2115,24 @@
 </head>
 <body class="control-window">
     <div class="control-panel">
-        <!-- Кастомная панель заголовка -->
+        <!-- Кастомная панель заголовка (macOS style) -->
         <div class="custom-titlebar">
-            <span class="title-text">⏱️ Управление таймером</span>
             <div class="window-controls">
-                <button class="win-btn" id="minimizeBtn" title="Свернуть">—</button>
-                <button class="win-btn close-btn" id="closeAppBtn" title="Закрыть">✕</button>
+                <button class="win-btn close-btn" id="closeAppBtn" title="Закрыть"></button>
+                <button class="win-btn minimize-btn" id="minimizeBtn" title="Свернуть"></button>
+            </div>
+            <span class="title-text">Timer Widget</span>
+            <div class="titlebar-right">
+                <button class="titlebar-help" id="faqBtn" title="Справка (F1)">?</button>
             </div>
         </div>
 
-        <!-- Заголовок с таймером -->
+        <!-- Таймер -->
         <div class="timer-header">
-            <h1>⏱️ ТАЙМЕР</h1>
             <div class="timer-display-main" id="controlTime">00:00</div>
             <div class="timer-status">
                 <span class="status-dot" id="statusDot"></span>
-                <span id="statusText">Готов</span>
+                <span id="statusText">Готов к запуску</span>
             </div>
         </div>
 
@@ -2114,18 +2157,16 @@
             </div>
         </div>
 
-        <!-- Корректировка: − 1ч 5м 1м | 1м 5м 1ч + -->
+        <!-- Корректировка -->
         <div class="compact-section">
             <div class="adjust-main-row">
-                <span class="adjust-sign minus">−</span>
-                <button class="adjust-main-btn minus" data-adjust="-3600">1 ч</button>
-                <button class="adjust-main-btn minus" data-adjust="-300">5 мин</button>
-                <button class="adjust-main-btn minus" data-adjust="-60">1 мин</button>
+                <button class="adjust-main-btn minus" data-adjust="-3600">−1 ч</button>
+                <button class="adjust-main-btn minus" data-adjust="-300">−5 м</button>
+                <button class="adjust-main-btn minus" data-adjust="-60">−1 м</button>
                 <div class="adjust-divider"></div>
-                <button class="adjust-main-btn plus" data-adjust="60">1 мин</button>
-                <button class="adjust-main-btn plus" data-adjust="300">5 мин</button>
-                <button class="adjust-main-btn plus" data-adjust="3600">1 ч</button>
-                <span class="adjust-sign plus">+</span>
+                <button class="adjust-main-btn plus" data-adjust="60">+1 м</button>
+                <button class="adjust-main-btn plus" data-adjust="300">+5 м</button>
+                <button class="adjust-main-btn plus" data-adjust="3600">+1 ч</button>
             </div>
         </div>
 
@@ -2143,21 +2184,20 @@
         <!-- Открыть окна -->
         <div class="compact-section">
             <div class="quick-windows">
-                <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)">⏱️ Виджет</button>
-                <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)">🕐 Часы</button>
-                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)">🖥️ Полноэкранный</button>
+                <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)"><span class="qw-icon">⏱</span><span class="qw-label">Виджет</span></button>
+                <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)"><span class="qw-icon">🕐</span><span class="qw-label">Часы</span></button>
+                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon">🖥</span><span class="qw-label">Полноэкранный</span></button>
             </div>
         </div>
         <!-- Hidden sound toggle for JS compatibility -->
         <button id="soundToggleBtn" style="display:none;"></button>
 
-        <!-- Настройки + FAQ -->
+        <!-- Настройки -->
         <div class="settings-row-bar">
-            <button class="settings-toggle" id="settingsToggle" title="Развернуть настройки таймера, часов и дисплея">
+            <button class="settings-toggle" id="settingsToggle" title="Развернуть настройки">
                 <span>⚙️ Настройки</span>
                 <span class="arrow">▼</span>
             </button>
-            <button class="faq-small" id="faqBtn" title="Справка">?</button>
         </div>
 
         <!-- Расширенные настройки (скрыты по умолчанию) -->
@@ -2965,7 +3005,12 @@
                 this.timerStyleEl = document.getElementById('timerStyle');
                 this.timerScaleEl = document.getElementById('timerScale');
                 this.timerScaleValueEl = document.getElementById('timerScaleValue');
-                
+
+                // Display-specific style/scale (Полноэкранный tab)
+                this.displayTimerStyleEl = document.getElementById('displayTimerStyle');
+                this.displayTimerScaleEl = document.getElementById('displayTimerScale');
+                this.displayTimerScaleValueEl = document.getElementById('displayTimerScaleValue');
+
                 // Настройки виджета часов
                 this.syncClockStyleEl = document.getElementById('syncClockStyle');
                 this.clockStyleEl = document.getElementById('clockStyle');
@@ -3076,35 +3121,52 @@
                     { name: 'Норд', t1: '#88c0d0', t2: '#81a1c1', bg: '#2e3440' }
                 ];
 
-                const grid = document.getElementById('themesGrid');
-                themes.forEach((theme, i) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'theme-btn';
-                    btn.title = theme.name;
-                    btn.style.setProperty('--t1', theme.t1);
-                    btn.style.setProperty('--t2', theme.t2);
-                    btn.addEventListener('click', () => {
-                        // FIX BUG-023: Optimize - remove active from previous button only
-                        if (this.activeThemeButton) {
-                            this.activeThemeButton.classList.remove('active');
-                        }
-                        btn.classList.add('active');
-                        this.activeThemeButton = btn;
+                // Per-window color state
+                this.clockColors = null;
+                this.displayColors = null;
+                this.activeClockThemeButton = null;
+                this.activeDisplayThemeButton = null;
 
-                        // Сохраняем цвета темы
-                        this.currentColors = {
-                            timer: theme.t1,
-                            progress: theme.t2,
-                            bg: theme.bg
-                        };
-                        // Обновляем фон
-                        document.getElementById('bgSolidColor').value = theme.bg;
-                        document.getElementById('bgGrad1').value = theme.bg;
-                        this.saveColors();
-                        this.pushDisplaySettings();
+                const buildThemeGrid = (gridId, target, activeKey) => {
+                    const grid = document.getElementById(gridId);
+                    if (!grid) { return; }
+                    themes.forEach((theme) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'theme-btn';
+                        btn.title = theme.name;
+                        btn.style.setProperty('--t1', theme.t1);
+                        btn.style.setProperty('--t2', theme.t2);
+                        btn.addEventListener('click', () => {
+                            if (this[activeKey]) {
+                                this[activeKey].classList.remove('active');
+                            }
+                            btn.classList.add('active');
+                            this[activeKey] = btn;
+
+                            const colors = { timer: theme.t1, progress: theme.t2, bg: theme.bg };
+                            if (target === 'widget') {
+                                this.currentColors = colors;
+                                document.getElementById('bgSolidColor').value = theme.bg;
+                                document.getElementById('bgGrad1').value = theme.bg;
+                                this.saveColors('widget');
+                                // Also send widget style update
+                                ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value });
+                            } else if (target === 'clock') {
+                                this.clockColors = colors;
+                                this.saveColors('clock');
+                            } else if (target === 'display') {
+                                this.displayColors = colors;
+                                this.saveColors('display');
+                                this.pushDisplaySettings();
+                            }
+                        });
+                        grid.appendChild(btn);
                     });
-                    grid.appendChild(btn);
-                });
+                };
+
+                buildThemeGrid('themesGrid', 'widget', 'activeThemeButton');
+                buildThemeGrid('clockThemesGrid', 'clock', 'activeClockThemeButton');
+                buildThemeGrid('displayThemesGrid', 'display', 'activeDisplayThemeButton');
             }
 
             attachEvents() {
@@ -3239,6 +3301,8 @@
                 });
                 
                 this.timerStyleEl.addEventListener('change', () => {
+                    // Send widget-specific style update
+                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value });
                     this.pushDisplaySettings();
                     // Синхронизируем стиль с виджетом часов если включена синхронизация
                     if (this.syncClockStyle) {
@@ -3250,8 +3314,22 @@
                 
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
+                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: parseInt(this.timerScaleEl.value) });
                     this.pushDisplaySettings();
                 });
+
+                // Display-specific style/scale (Полноэкранный tab)
+                if (this.displayTimerStyleEl) {
+                    this.displayTimerStyleEl.addEventListener('change', () => {
+                        this.pushDisplaySettings();
+                    });
+                }
+                if (this.displayTimerScaleEl) {
+                    this.displayTimerScaleEl.addEventListener('input', () => {
+                        this.displayTimerScaleValueEl.textContent = this.displayTimerScaleEl.value + '%';
+                        this.pushDisplaySettings();
+                    });
+                }
 
                 // Синхронизация стиля часов
                 this.syncClockStyleEl.addEventListener('change', () => {
@@ -3678,6 +3756,15 @@
                 this.timerStyleEl.value = ext.timerStyle || 'circle';
                 this.timerScaleEl.value = ext.timerScale || 100;
                 this.timerScaleValueEl.textContent = (ext.timerScale || 100) + '%';
+
+                // Display-specific style/scale (defaults to same as widget)
+                if (this.displayTimerStyleEl) {
+                    this.displayTimerStyleEl.value = ext.displayTimerStyle || ext.timerStyle || 'circle';
+                }
+                if (this.displayTimerScaleEl) {
+                    this.displayTimerScaleEl.value = ext.displayTimerScale || ext.timerScale || 100;
+                    this.displayTimerScaleValueEl.textContent = (ext.displayTimerScale || ext.timerScale || 100) + '%';
+                }
                 
                 // Синхронизация стиля часов
                 this.syncClockStyle = ext.syncClockStyle !== false; // по умолчанию true
@@ -3696,9 +3783,49 @@
 
                 // Отправляем интервал перерасхода при загрузке
                 this.pushOverrunInterval();
+
+                // Отправляем начальный стиль виджета
+                setTimeout(() => {
+                    ipcRenderer.send('widget-style-update', {
+                        timerStyle: this.timerStyleEl.value,
+                        timerScale: parseInt(this.timerScaleEl.value)
+                    });
+                }, 600);
+
+                // Загружаем per-window цвета
+                const savedWidgetColors = safeJSONParse(localStorage.getItem('widgetColors'), null);
+                const savedClockColors = safeJSONParse(localStorage.getItem('clockColors'), null);
+                const savedDisplayColors = safeJSONParse(localStorage.getItem('displayColors'), null);
+                if (savedWidgetColors) {
+                    this.currentColors = savedWidgetColors;
+                    ipcRenderer.send('widget-colors-update', savedWidgetColors);
+                }
+                if (savedClockColors) {
+                    this.clockColors = savedClockColors;
+                    ipcRenderer.send('clock-colors-update', savedClockColors);
+                }
+                if (savedDisplayColors) {
+                    this.displayColors = savedDisplayColors;
+                    ipcRenderer.send('display-colors-update', savedDisplayColors);
+                }
             }
 
-            saveColors() {
+            saveColors(target = 'all') {
+                if (target === 'all' || target === 'widget') {
+                    localStorage.setItem('widgetColors', JSON.stringify(this.currentColors));
+                    ipcRenderer.send('widget-colors-update', this.currentColors);
+                }
+                if (target === 'all' || target === 'clock') {
+                    const colors = this.clockColors || this.currentColors;
+                    localStorage.setItem('clockColors', JSON.stringify(colors));
+                    ipcRenderer.send('clock-colors-update', colors);
+                }
+                if (target === 'all' || target === 'display') {
+                    const colors = this.displayColors || this.currentColors;
+                    localStorage.setItem('displayColors', JSON.stringify(colors));
+                    ipcRenderer.send('display-colors-update', colors);
+                }
+                // Backward compat
                 localStorage.setItem('timerColors', JSON.stringify(this.currentColors));
                 ipcRenderer.send('colors-update', this.currentColors);
             }
@@ -3732,8 +3859,8 @@
                     eventTime: this.eventTimeInputEl.value,
                     endTime: this.endTimeInputEl.value,
                     timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
-                    timerStyle: this.timerStyleEl.value,
-                    timerScale: parseInt(this.timerScaleEl.value),
+                    timerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
+                    timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
                     // Настройки стиля часов
                     syncClockStyle: this.syncClockStyle,
                     clockStyle: this.clockStyleEl.value
