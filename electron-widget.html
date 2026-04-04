@@ -1436,7 +1436,10 @@
                         widgetSettings.bgMode = 'default';
                     }
                     this.applyBackground(widgetSettings);
-                    // timerStyle из display-settings-update игнорируем — виджет получает стиль через widget-style-update
+                    // Применяем стиль из display-settings только если нет отдельного widget-style
+                    if (settings.timerStyle && !this._hasWidgetStyle) {
+                        this.setTimerStyle(settings.timerStyle);
+                    }
                     // Показ цифр на аналоговом циферблате
                     if (settings.showAnalogNumbers !== undefined && this.widgetClockNumbers) {
                         this.widgetClockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
@@ -1445,6 +1448,7 @@
 
                 this.widgetStyleUpdateHandler = (event, settings) => {
                     if (settings.timerStyle) {
+                        this._hasWidgetStyle = true;
                         this.setTimerStyle(settings.timerStyle);
                     }
                 };
