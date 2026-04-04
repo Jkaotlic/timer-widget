@@ -49,3 +49,26 @@ test('ALLOWED_CHANNELS has expected structure', () => {
     assert.equal(ALLOWED_CHANNELS.send.length, new Set(ALLOWED_CHANNELS.send).size);
     assert.equal(ALLOWED_CHANNELS.receive.length, new Set(ALLOWED_CHANNELS.receive).size);
 });
+
+test('channel-validator.js channels match preload.js inline channels', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const preloadSource = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf-8');
+
+    // Extract send channels from preload.js
+    const sendMatch = preloadSource.match(/send:\s*\[([\s\S]*?)\]/);
+    const receiveMatch = preloadSource.match(/receive:\s*\[([\s\S]*?)\]/);
+    assert.ok(sendMatch, 'preload.js should have send channels');
+    assert.ok(receiveMatch, 'preload.js should have receive channels');
+
+    const extractChannels = (str) =>
+        str.match(/'([^']+)'/g).map(s => s.replace(/'/g, '')).sort();
+
+    const preloadSend = extractChannels(sendMatch[1]);
+    const preloadReceive = extractChannels(receiveMatch[1]);
+    const validatorSend = [...ALLOWED_CHANNELS.send].sort();
+    const validatorReceive = [...ALLOWED_CHANNELS.receive].sort();
+
+    assert.deepEqual(preloadSend, validatorSend, 'Send channels must be identical in preload.js and channel-validator.js');
+    assert.deepEqual(preloadReceive, validatorReceive, 'Receive channels must be identical in preload.js and channel-validator.js');
+});

@@ -5,6 +5,7 @@ const {
     isValidURL,
     validateImageSource,
     safeJSONParse,
+    isSafeColor,
     escapeHTML
 } = require('../security');
 
@@ -86,6 +87,27 @@ test('safeJSONParse returns default on invalid input', () => {
     assert.deepEqual(safeJSONParse('', []), []);
     assert.equal(safeJSONParse('not json', 42), 42);
     assert.equal(safeJSONParse(undefined), null);
+});
+
+// isSafeColor
+test('isSafeColor accepts valid hex and rgba colors', () => {
+    assert.ok(isSafeColor('#fff'));
+    assert.ok(isSafeColor('#FF0000'));
+    assert.ok(isSafeColor('#ff000080'));
+    assert.ok(isSafeColor('rgb(255, 128, 0)'));
+    assert.ok(isSafeColor('rgba(0, 0, 0, 0.5)'));
+    assert.ok(isSafeColor('rgba(255, 255, 255, 1)'));
+});
+
+test('isSafeColor rejects invalid and dangerous values', () => {
+    assert.ok(!isSafeColor(null));
+    assert.ok(!isSafeColor(''));
+    assert.ok(!isSafeColor('red'));
+    assert.ok(!isSafeColor('rgb(999, 0, 0)'));
+    assert.ok(!isSafeColor('rgba(0, 0, 0, 2)'));
+    assert.ok(!isSafeColor('url(javascript:alert(1))'));
+    assert.ok(!isSafeColor('#xyz'));
+    assert.ok(!isSafeColor('expression(alert(1))'));
 });
 
 // escapeHTML

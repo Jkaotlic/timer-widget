@@ -76,7 +76,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | Channel | Purpose |
 |---------|---------|
 | `timer-command` | Start/pause/reset/set timer with payload `{ type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes }` |
-| `timer-control` | Keyboard shortcuts from display: `{ action: 'start'/'pause'/'reset' }` |
+| `timer-control` | Keyboard shortcuts from display: `'start'` / `'pause'` / `'reset'` (plain string) |
 | `colors-update` | `{ timer: '#hex', progress: '#hex' }` |
 | `display-settings-update` | Display style, background, clock settings |
 | `get-timer-state` | Request current timer state |
