@@ -1,0 +1,64 @@
+<h2>Куда вынести звуковые настройки?</h2>
+<p class="subtitle">Звуки — общая настройка, не привязанная к конкретному окну. Два варианта размещения:</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>4-й таб «Звуки»</h3>
+      <p>Добавляем отдельную вкладку рядом с Таймер / Часы / Дисплей</p>
+      <div style="margin-top:12px; background:#1a1a2e; border-radius:8px; padding:16px; font-family:monospace; font-size:13px;">
+        <div style="display:flex; gap:4px; margin-bottom:12px;">
+          <span style="padding:6px 12px; background:#2a2a4a; border-radius:6px; color:#8888aa;">⏱ Таймер</span>
+          <span style="padding:6px 12px; background:#2a2a4a; border-radius:6px; color:#8888aa;">🕐 Часы</span>
+          <span style="padding:6px 12px; background:#2a2a4a; border-radius:6px; color:#8888aa;">🖥 Дисплей</span>
+          <span style="padding:6px 12px; background:#4a90e2; border-radius:6px; color:#fff; font-weight:bold;">🔊 Звуки</span>
+        </div>
+        <div style="background:#12121e; border-radius:6px; padding:12px; color:#aaa; font-size:12px;">
+          <div style="margin-bottom:8px;">🔊 Включить звук &nbsp; [✓]</div>
+          <div style="margin-bottom:4px; padding-left:12px;">▸ При старте</div>
+          <div style="margin-bottom:4px; padding-left:12px;">▸ При финише</div>
+          <div style="margin-bottom:4px; padding-left:12px;">▸ Каждую минуту</div>
+          <div style="margin-bottom:4px; padding-left:12px;">▸ При перерасходе</div>
+          <div style="margin-top:8px; border-top:1px solid #333; padding-top:8px;">🎵 Ваши звуки</div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Плюсы</h4><ul><li>Чистое разделение по сущностям</li><li>Таб «Таймер» разгружается</li><li>Легко найти звуки</li></ul></div>
+        <div class="cons"><h4>Минусы</h4><ul><li>4 таба вместо 3 — чуть теснее</li><li>Один таб на одну функцию</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Секция внизу, вне табов</h3>
+      <p>Звуки всегда видны под любой вкладкой, в с��орачиваемом блоке</p>
+      <div style="margin-top:12px; background:#1a1a2e; border-radius:8px; padding:16px; font-family:monospace; font-size:13px;">
+        <div style="display:flex; gap:4px; margin-bottom:12px;">
+          <span style="padding:6px 12px; background:#4a90e2; border-radius:6px; color:#fff; font-weight:bold;">⏱ Таймер</span>
+          <span style="padding:6px 12px; background:#2a2a4a; border-radius:6px; color:#8888aa;">🕐 Часы</span>
+          <span style="padding:6px 12px; background:#2a2a4a; border-radius:6px; color:#8888aa;">🖥 Дисплей</span>
+        </div>
+        <div style="background:#12121e; border-radius:6px; padding:12px; color:#aaa; font-size:12px; margin-bottom:8px;">
+          <div>[ Контент выбранной вкладки ]</div>
+          <div style="color:#555; margin-top:4px;">Стиль, масштаб, тема...</div>
+        </div>
+        <div style="background:#1e1e30; border:1px solid #333; border-radius:6px; padding:10px; color:#aaa; font-size:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+            <span style="font-weight:bold;">🔊 Звуковые уведомления</span>
+            <span style="color:#666;">▾ развернуть</span>
+          </div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #333; color:#666; font-size:11px;">
+            При старте · При финише · Каждую минуту · При перерасходе · Ваши звуки
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Плюсы</h4><ul><li>Всегда доступны, не надо переключать таб</li><li>3 таба = 3 окна (чистая логика)</li></ul></div>
+        <div class="cons"><h4>Минусы</h4><ul><li>Занимает место внизу всех вкладок</li><li>Сложнее реализация (фиксированная зона)</li><li>Может отобрать пространство у контента табов</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

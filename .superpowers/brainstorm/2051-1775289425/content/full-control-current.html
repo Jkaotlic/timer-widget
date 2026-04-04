@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Timer Widget — Current vs Proposed</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d1a;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 30px;
+    min-height: 100vh;
+  }
+
+  .panel-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .panel-label {
+    color: #888;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .panel-label.current { color: #f5576c; }
+  .panel-label.proposed { color: #38ef7d; }
+
+  /* Realistic control panel */
+  .control-panel {
+    width: 420px;
+    background: rgba(255,255,255,0.98);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+  }
+
+  /* Titlebar */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px 6px 14px;
+    background: linear-gradient(135deg, #556ad0, #6a3f9a);
+    border-radius: 20px 20px 0 0;
+  }
+  .titlebar .title { color: rgba(255,255,255,0.85); font-size: 12px; font-weight: 500; letter-spacing: 0.5px; }
+  .titlebar .btns { display: flex; gap: 6px; }
+  .titlebar .btn { width: 28px; height: 28px; border: none; border-radius: 8px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); font-size: 14px; cursor: default; display: flex; align-items: center; justify-content: center; }
+
+  /* Timer header */
+  .timer-header {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .timer-header h1 { color: white; font-size: 1em; font-weight: 500; margin-bottom: 10px; opacity: 0.9; letter-spacing: 1px; }
+  .timer-display { font-size: 3.5em; font-weight: 700; color: white; font-family: 'Courier New', monospace; text-shadow: 0 4px 20px rgba(0,0,0,0.3); letter-spacing: 2px; margin-bottom: 12px; }
+  .timer-status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(255,255,255,0.2); border-radius: 20px; color: white; font-size: 0.8em; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+
+  /* Main controls */
+  .main-controls {
+    display: flex; justify-content: center; gap: 10px; padding: 14px 16px;
+    background: #f8f9ff; border-bottom: 1px solid rgba(102,126,234,0.1);
+  }
+  .ctrl-btn { width: 48px; height: 48px; border: none; border-radius: 50%; font-size: 18px; display: flex; align-items: center; justify-content: center; color: white; cursor: default; }
+  .ctrl-btn.start { width: 62px; height: 62px; font-size: 24px; background: linear-gradient(135deg, #11998e, #38ef7d); }
+  .ctrl-btn.pause { background: linear-gradient(135deg, #f093fb, #f5576c); }
+  .ctrl-btn.reset { background: linear-gradient(135deg, #667eea, #764ba2); }
+
+  /* Compact sections */
+  .compact-section { padding: 8px 16px; }
+
+  .quick-presets {
+    display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .quick-preset {
+    flex: 1; min-width: 45px; padding: 8px 4px; border: 1.5px solid #e8ecff; border-radius: 8px;
+    background: white; color: #333; font-size: 0.75em; font-weight: 600; cursor: default; text-align: center;
+  }
+
+  .adjust-row {
+    display: flex; align-items: center; gap: 3px; justify-content: center; margin-top: 6px;
+  }
+  .adjust-btn {
+    padding: 6px 8px; border: 1.5px solid #e8ecff; border-radius: 6px; background: white;
+    font-size: 0.7em; font-weight: 600; cursor: default; color: #333;
+  }
+  .adjust-btn.minus { color: #f5576c; }
+  .adjust-btn.plus { color: #667eea; }
+  .adjust-sign { font-weight: 700; font-size: 0.9em; }
+  .adjust-sign.minus { color: #f5576c; }
+  .adjust-sign.plus { color: #667eea; }
+  .adjust-divider { width: 1px; height: 20px; background: #e0e0e0; margin: 0 4px; }
+
+  /* Quick windows */
+  .quick-windows {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+  .qw-btn {
+    flex: 1; padding: 6px 4px; border: none; border-radius: 8px;
+    font-size: 0.7em; font-weight: 600; cursor: default; text-align: center; color: white;
+  }
+  .qw-btn.widget { background: linear-gradient(135deg, #667eea, #764ba2); }
+  .qw-btn.clock { background: linear-gradient(135deg, #f093fb, #f5576c); }
+  .qw-btn.display { background: linear-gradient(135deg, #fa709a, #fee140); }
+  .qw-btn.sound { background: linear-gradient(135deg, #11998e, #38ef7d); }
+  .win-divider { width: 1px; background: #e0e0e0; }
+
+  /* Settings toggle */
+  .settings-bar {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 6px; border-top: 1px solid rgba(0,0,0,0.05);
+  }
+  .settings-toggle-btn {
+    padding: 4px 12px; border: 1px solid #ddd; border-radius: 6px; background: white;
+    font-size: 0.75em; color: #666; cursor: default;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex; background: #f0f2ff; border-radius: 10px; padding: 3px; margin-bottom: 14px;
+  }
+  .tab {
+    flex: 1; padding: 8px 2px; border: none; background: transparent; color: #666;
+    font-size: 0.7em; font-weight: 600; cursor: default; border-radius: 7px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
+  }
+  .tab.active { background: white; color: #667eea; box-shadow: 0 2px 8px rgba(102,126,234,0.2); }
+  .tab .icon { font-size: 1.1em; }
+
+  /* Settings content */
+  .settings-area { padding: 0 16px 16px; }
+  .settings-group {
+    background: #f8f9ff; border-radius: 10px; padding: 12px; margin-bottom: 12px;
+  }
+  .sg-title {
+    font-size: 0.8em; font-weight: 700; color: #333; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sg-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8em; color: #333;
+  }
+  .sg-row:last-child { border-bottom: none; }
+
+  /* Toggle */
+  .toggle { width: 40px; height: 22px; background: #ccc; border-radius: 22px; position: relative; flex-shrink: 0; }
+  .toggle.on { background: linear-gradient(135deg, #667eea, #764ba2); }
+  .toggle::after { content: ''; position: absolute; width: 16px; height: 16px; background: white; border-radius: 50%; top: 3px; left: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+  .toggle.on::after { left: 21px; }
+
+  /* Select mock */
+  .sel { padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.8em; background: white; color: #333; }
+
+  /* Sound rows */
+  .sound-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.8em;
+  }
+  .sound-row:last-child { border-bottom: none; }
+  .sound-check { width: 16px; height: 16px; accent-color: #667eea; }
+  .sound-sel { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.85em; min-width: 0; }
+  .sound-play { width: 32px; height: 32px; border: none; border-radius: 8px; background: #667eea; color: white; font-size: 12px; cursor: default; flex-shrink: 0; }
+
+  /* Themes grid */
+  .themes-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+  .theme-dot { width: 20px; height: 20px; border-radius: 4px; border: 1px solid transparent; }
+
+  /* Custom sounds */
+  .custom-section { margin-top: 12px; padding-top: 12px; border-top: 2px dashed rgba(102,126,234,0.2); }
+  .custom-title { font-size: 0.8em; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .add-btn { width: 100%; padding: 8px; border: 2px dashed #ccc; background: white; border-radius: 8px; font-size: 0.8em; color: #666; cursor: default; text-align: center; }
+
+  /* Highlight problem areas */
+  .problem-highlight {
+    outline: 2px dashed #f5576c;
+    outline-offset: 2px;
+    position: relative;
+  }
+  .problem-label {
+    position: absolute; top: -10px; right: 6px; background: #f5576c; color: white;
+    font-size: 0.6em; padding: 1px 6px; border-radius: 4px; font-weight: 700; z-index: 10;
+  }
+
+  /* Fix highlight */
+  .fix-highlight {
+    outline: 2px solid #38ef7d;
+    outline-offset: 2px;
+    position: relative;
+  }
+  .fix-label {
+    position: absolute; top: -10px; right: 6px; background: #38ef7d; color: #111;
+    font-size: 0.6em; padding: 1px 6px; border-radius: 4px; font-weight: 700; z-index: 10;
+  }
+
+  /* Scrollable inner */
+  .scroll-inner { max-height: 420px; overflow-y: auto; }
+  .scroll-inner::-webkit-scrollbar { width: 6px; }
+  .scroll-inner::-webkit-scrollbar-thumb { background: rgba(102,126,234,0.3); border-radius: 3px; }
+
+  /* Selection support */
+  .panel-wrapper { cursor: pointer; transition: transform 0.2s; }
+  .panel-wrapper:hover { transform: translateY(-4px); }
+  .panel-wrapper.selected .control-panel { outline: 3px solid #38ef7d; }
+
+  .vote-hint {
+    color: #666; font-size: 13px; text-align: center; margin-bottom: 20px;
+    grid-column: 1 / -1;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== CURRENT LAYOUT ===== -->
+<div class="panel-wrapper" onclick="document.querySelectorAll('.panel-wrapper').forEach(p=>p.classList.remove('selected'));this.classList.add('selected');">
+  <div class="panel-label current">СЕЙЧАС</div>
+  <div class="control-panel">
+    <div class="titlebar">
+      <span class="title">Timer Widget</span>
+      <div class="btns"><div class="btn">—</div><div class="btn">✕</div></div>
+    </div>
+
+    <div class="timer-header">
+      <h1>⏱️ ТАЙМЕР</h1>
+      <div class="timer-display">05:00</div>
+      <div class="timer-status"><div class="status-dot"></div> Готов к запуску</div>
+    </div>
+
+    <div class="main-controls">
+      <div class="ctrl-btn pause">⏸</div>
+      <div class="ctrl-btn start">▶</div>
+      <div class="ctrl-btn reset">↺</div>
+    </div>
+
+    <div class="compact-section">
+      <div class="quick-presets">
+        <div class="quick-preset">5 мин</div>
+        <div class="quick-preset">10 мин</div>
+        <div class="quick-preset">15 мин</div>
+        <div class="quick-preset">20 мин</div>
+        <div class="quick-preset">25 мин</div>
+        <div class="quick-preset">30 мин</div>
+        <div class="quick-preset">45 мин</div>
+        <div class="quick-preset">1 час</div>
+      </div>
+      <div class="adjust-row">
+        <span class="adjust-sign minus">−</span>
+        <div class="adjust-btn minus">1 ч</div>
+        <div class="adjust-btn minus">5 мин</div>
+        <div class="adjust-btn minus">1 мин</div>
+        <div class="adjust-divider"></div>
+        <div class="adjust-btn plus">1 мин</div>
+        <div class="adjust-btn plus">5 мин</div>
+        <div class="adjust-btn plus">1 ч</div>
+        <span class="adjust-sign plus">+</span>
+      </div>
+      <div class="quick-windows">
+        <div class="qw-btn widget">⏱ Виджет</div>
+        <div class="qw-btn clock">🕐 Часы</div>
+        <div class="qw-btn display">🖥 Дисплей</div>
+        <div class="win-divider"></div>
+        <div class="qw-btn sound">🔊 Звук</div>
+      </div>
+    </div>
+
+    <div class="settings-bar">
+      <div class="settings-toggle-btn">⚙️ Настройки ▾</div>
+    </div>
+
+    <div class="scroll-inner">
+    <div class="settings-area">
+      <div class="tabs">
+        <div class="tab active"><span class="icon">⏱️</span>Таймер</div>
+        <div class="tab"><span class="icon">🕐</span>Часы</div>
+        <div class="tab"><span class="icon">🖥️</span>Дисплей</div>
+      </div>
+
+      <!-- Tab Timer content -->
+      <div class="settings-group">
+        <div class="sg-title">🎨 Стиль и масштаб</div>
+        <div class="sg-row">Стиль таймера <span class="sel">⭕ Круговой</span></div>
+        <div class="sg-row">Масштаб <input type="range" style="width:100px;" value="100"></div>
+      </div>
+
+      <div class="settings-group">
+        <div class="sg-title">✨ Цветовая тема</div>
+        <div class="themes-grid">
+          <div class="theme-dot" style="background:linear-gradient(135deg,#667eea,#764ba2)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#11998e,#38ef7d)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#f093fb,#f5576c)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#fa709a,#fee140)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#ff6a00,#ee0979)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#00b4db,#0083b0)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#e65c00,#f9d423)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#c31432,#240b36)"></div>
+        </div>
+      </div>
+
+      <div class="settings-group problem-highlight" style="position:relative;">
+        <span class="problem-label">НЕ НА МЕСТЕ</span>
+        <div class="sg-row">⏱️ Считать ниже нуля <div class="toggle"></div></div>
+      </div>
+
+      <div class="settings-group problem-highlight" style="position:relative;">
+        <span class="problem-label">ПЕРЕГРУЗКА</span>
+        <div class="sg-title">🔊 Звуковые уведомления</div>
+        <div class="sg-row">🔊 Включить звук <div class="toggle on"></div></div>
+
+        <div class="sound-row">
+          <input type="checkbox" class="sound-check"> <span style="min-width:90px;">При старте</span>
+          <select class="sound-sel"><option>Без звука</option></select>
+          <div class="sound-play">▶</div>
+        </div>
+        <div class="sound-row">
+          <input type="checkbox" class="sound-check" checked> <span style="min-width:90px;">При финише</span>
+          <select class="sound-sel"><option>Без звука</option></select>
+          <div class="sound-play">▶</div>
+        </div>
+        <div class="sound-row">
+          <input type="checkbox" class="sound-check"> <span style="min-width:90px;">Каждую мин</span>
+          <select class="sound-sel"><option>Без звука</option></select>
+          <div class="sound-play">▶</div>
+        </div>
+        <div class="sound-row" style="border-top:1px solid rgba(0,0,0,0.08);padding-top:12px;margin-top:4px;">
+          <input type="checkbox" class="sound-check"> <span style="min-width:90px;">Перерасход</span>
+          <select class="sound-sel"><option>Тройной</option></select>
+          <div class="sound-play">▶</div>
+        </div>
+        <div class="sound-row" style="padding-left:20px;">
+          <span>Напоминать каждые</span>
+          <select class="sound-sel" style="max-width:100px;"><option>1 мин</option></select>
+        </div>
+
+        <div class="custom-section">
+          <div class="custom-title">🎵 Ваши звуки</div>
+          <div class="add-btn">➕ Загрузить звук</div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PROPOSED LAYOUT (A) ===== -->
+<div class="panel-wrapper" onclick="document.querySelectorAll('.panel-wrapper').forEach(p=>p.classList.remove('selected'));this.classList.add('selected');">
+  <div class="panel-label proposed">ВАРИАНТ A — 4 ТАБА</div>
+  <div class="control-panel">
+    <div class="titlebar">
+      <span class="title">Timer Widget</span>
+      <div class="btns"><div class="btn">—</div><div class="btn">✕</div></div>
+    </div>
+
+    <div class="timer-header">
+      <h1>⏱️ ТАЙМЕР</h1>
+      <div class="timer-display">05:00</div>
+      <div class="timer-status"><div class="status-dot"></div> Готов к запуску</div>
+    </div>
+
+    <div class="main-controls">
+      <div class="ctrl-btn pause">⏸</div>
+      <div class="ctrl-btn start">▶</div>
+      <div class="ctrl-btn reset">↺</div>
+    </div>
+
+    <div class="compact-section">
+      <div class="quick-presets">
+        <div class="quick-preset">5 мин</div>
+        <div class="quick-preset">10 мин</div>
+        <div class="quick-preset">15 мин</div>
+        <div class="quick-preset">20 мин</div>
+        <div class="quick-preset">25 мин</div>
+        <div class="quick-preset">30 мин</div>
+        <div class="quick-preset">45 мин</div>
+        <div class="quick-preset">1 час</div>
+      </div>
+      <div class="adjust-row">
+        <span class="adjust-sign minus">−</span>
+        <div class="adjust-btn minus">1 ч</div>
+        <div class="adjust-btn minus">5 мин</div>
+        <div class="adjust-btn minus">1 мин</div>
+        <div class="adjust-divider"></div>
+        <div class="adjust-btn plus">1 мин</div>
+        <div class="adjust-btn plus">5 мин</div>
+        <div class="adjust-btn plus">1 ч</div>
+        <span class="adjust-sign plus">+</span>
+      </div>
+      <div class="quick-windows">
+        <div class="qw-btn widget">⏱ Виджет</div>
+        <div class="qw-btn clock">🕐 Часы</div>
+        <div class="qw-btn display">🖥 Дисплей</div>
+        <div class="win-divider"></div>
+        <div class="qw-btn sound">🔊 Звук</div>
+      </div>
+    </div>
+
+    <div class="settings-bar">
+      <div class="settings-toggle-btn">⚙️ Настройки ▾</div>
+    </div>
+
+    <div class="scroll-inner">
+    <div class="settings-area">
+      <div class="tabs">
+        <div class="tab active"><span class="icon">⏱️</span>Таймер</div>
+        <div class="tab"><span class="icon">🕐</span>Часы</div>
+        <div class="tab"><span class="icon">🖥️</span>Дисплей</div>
+        <div class="tab" style="color:#38ef7d;font-weight:700;"><span class="icon">🔊</span>Звуки</div>
+      </div>
+
+      <!-- Tab Timer — CLEAN -->
+      <div class="settings-group fix-highlight" style="position:relative;">
+        <span class="fix-label">ЧИСТО</span>
+        <div class="sg-title">🎨 Стиль и масштаб</div>
+        <div class="sg-row">Стиль таймера <span class="sel">⭕ Круговой</span></div>
+        <div class="sg-row">Масштаб <input type="range" style="width:100px;" value="100"></div>
+      </div>
+
+      <div class="settings-group">
+        <div class="sg-title">✨ Цветовая тема</div>
+        <div class="themes-grid">
+          <div class="theme-dot" style="background:linear-gradient(135deg,#667eea,#764ba2)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#11998e,#38ef7d)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#f093fb,#f5576c)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#fa709a,#fee140)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#ff6a00,#ee0979)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#00b4db,#0083b0)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#e65c00,#f9d423)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#2193b0,#6dd5ed)"></div>
+          <div class="theme-dot" style="background:linear-gradient(135deg,#c31432,#240b36)"></div>
+        </div>
+      </div>
+
+      <div class="settings-group fix-highlight" style="position:relative;">
+        <span class="fix-label">ПОВЕДЕНИЕ</span>
+        <div class="sg-title">⚙️ Поведение таймера</div>
+        <div class="sg-row">Считать ниже нуля <div class="toggle"></div></div>
+      </div>
+
+    </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
