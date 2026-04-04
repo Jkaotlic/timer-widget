@@ -1448,6 +1448,7 @@
                 // Регистрируем обработчики
                 ipcRenderer.on('timer-state', this.timerStateHandler);
                 ipcRenderer.on('colors-update', this.colorsUpdateHandler);
+                ipcRenderer.on('widget-colors-update', this.colorsUpdateHandler);
                 ipcRenderer.on('display-settings-update', this.displaySettingsUpdateHandler);
             }
 
@@ -1458,6 +1459,7 @@
                 }
                 if (this.colorsUpdateHandler) {
                     ipcRenderer.removeListener('colors-update', this.colorsUpdateHandler);
+                    ipcRenderer.removeListener('widget-colors-update', this.colorsUpdateHandler);
                 }
                 if (this.displaySettingsUpdateHandler) {
                     ipcRenderer.removeListener('display-settings-update', this.displaySettingsUpdateHandler);

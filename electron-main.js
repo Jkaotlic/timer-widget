@@ -32,6 +32,11 @@ let timerInterval = null;
 // Сохраняем последние настройки дисплея для синхронизации
 let lastDisplaySettings = null;
 
+// Per-window colors (independent themes)
+let lastWidgetColors = null;
+let lastClockColors = null;
+let lastDisplayColors = null;
+
 // Enable Ctrl+Wheel to resize window
 function enableWindowResizeOnScroll(win) {
     if (!win || !win.webContents) {return;}
@@ -504,6 +509,28 @@ ipcMain.on('colors-update', (event, colors) => {
     }
 });
 
+// Per-window color updates (independent themes)
+ipcMain.on('widget-colors-update', (_event, colors) => {
+    lastWidgetColors = colors;
+    safelySendToWindow(widgetWindow, 'widget-colors-update', colors);
+    safelySendToWindow(controlWindow, 'widget-colors-update', colors);
+});
+
+ipcMain.on('clock-colors-update', (_event, colors) => {
+    lastClockColors = colors;
+    safelySendToWindow(clockWidgetWindow, 'clock-colors-update', colors);
+});
+
+ipcMain.on('display-colors-update', (_event, colors) => {
+    lastDisplayColors = colors;
+    safelySendToWindow(displayWindow, 'display-colors-update', colors);
+});
+
+// Widget style update (independent from display style)
+ipcMain.on('widget-style-update', (_event, settings) => {
+    safelySendToWindow(widgetWindow, 'widget-style-update', settings);
+});
+
 // Рассылка настроек отображения fullscreen и widget (clockStyle/background)
 ipcMain.on('display-settings-update', (event, settings) => {
     // Сохраняем настройки для синхронизации при открытии новых окон
@@ -523,6 +550,10 @@ ipcMain.on('open-widget', () => {
                 // Отправляем сохранённые настройки дисплея (включая стиль)
                 if (lastDisplaySettings) {
                     safelySendToWindow(widgetWindow, 'display-settings-update', lastDisplaySettings);
+                }
+                // Per-window colors
+                if (lastWidgetColors) {
+                    safelySendToWindow(widgetWindow, 'widget-colors-update', lastWidgetColors);
                 }
             });
             // Уведомляем окно управления что виджет открыт
@@ -565,6 +596,10 @@ ipcMain.on('open-clock-widget', () => {
                 // Отправляем сохранённые настройки дисплея (включая стиль часов)
                 if (lastDisplaySettings) {
                     safelySendToWindow(clockWidgetWindow, 'display-settings-update', lastDisplaySettings);
+                }
+                // Per-window colors
+                if (lastClockColors) {
+                    safelySendToWindow(clockWidgetWindow, 'clock-colors-update', lastClockColors);
                 }
             });
             // Уведомляем окно управления что виджет часов открыт
@@ -637,6 +672,10 @@ ipcMain.on('open-display', (event, options = {}) => {
             // Отправляем сохранённые настройки дисплея (включая стиль)
             if (lastDisplaySettings) {
                 safelySendToWindow(displayWindow, 'display-settings-update', lastDisplaySettings);
+            }
+            // Per-window colors
+            if (lastDisplayColors) {
+                safelySendToWindow(displayWindow, 'display-colors-update', lastDisplayColors);
             }
         });
         // Уведомляем окно управления что дисплей открыт

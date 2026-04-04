@@ -8,7 +8,9 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="components.css">
     <style>
-        /* Новый современный UI */
+        /* =============================================
+           Apple Dark Glassmorphism UI
+           ============================================= */
         * {
             box-sizing: border-box;
         }
@@ -16,28 +18,40 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
+
         .control-window {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: #000;
+            background-image:
+                radial-gradient(ellipse at 20% 50%, rgba(88, 40, 180, 0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(10, 132, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(88, 40, 180, 0.08) 0%, transparent 40%);
             height: 100vh;
-            padding: 12px;
+            padding: 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .control-panel {
-            background: rgba(255, 255, 255, 0.98);
+            background: rgba(28, 28, 30, 0.72);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
             border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             padding: 0;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
             max-width: 100%;
-            width: 100%;
-            margin: 0 auto;
+            width: calc(100% - 16px);
+            margin: 8px auto;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 24px);
+            height: calc(100vh - 16px);
         }
 
         /* Scrollable content area */
@@ -48,231 +62,247 @@
         }
 
         .scrollable-content::-webkit-scrollbar {
-            width: 8px;
+            width: 4px;
         }
 
         .scrollable-content::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
+            background: transparent;
         }
 
         .scrollable-content::-webkit-scrollbar-thumb {
-            background: rgba(102, 126, 234, 0.3);
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
         }
 
         .scrollable-content::-webkit-scrollbar-thumb:hover {
-            background: rgba(102, 126, 234, 0.5);
+            background: rgba(255, 255, 255, 0.2);
         }
 
-        /* Кастомная панель заголовка (вместо системной) */
+        /* Custom titlebar — traffic light style */
         .custom-titlebar {
             -webkit-app-region: drag;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 6px 8px 6px 14px;
-            background: linear-gradient(135deg, #556ad0 0%, #6a3f9a 100%);
+            padding: 10px 14px;
+            background: transparent;
             border-radius: 20px 20px 0 0;
             flex-shrink: 0;
-            min-height: 32px;
+            min-height: 38px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
         .custom-titlebar .title-text {
-            color: rgba(255,255,255,0.85);
+            color: rgba(255, 255, 255, 0.5);
             font-size: 12px;
             font-weight: 500;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             pointer-events: none;
         }
         .custom-titlebar .window-controls {
             display: flex;
-            gap: 6px;
+            gap: 7px;
             -webkit-app-region: no-drag;
         }
         .custom-titlebar .win-btn {
-            width: 28px;
-            height: 28px;
+            width: 13px;
+            height: 13px;
             border: none;
-            border-radius: 8px;
-            background: rgba(255,255,255,0.15);
-            color: rgba(255,255,255,0.9);
-            font-size: 14px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            color: transparent;
+            font-size: 0;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s;
+            transition: all 0.15s;
             line-height: 1;
+            padding: 0;
         }
         .custom-titlebar .win-btn:hover {
-            background: rgba(255,255,255,0.25);
+            color: rgba(0, 0, 0, 0.7);
+            font-size: 8px;
+        }
+        .custom-titlebar .win-btn.close-btn {
+            background: #ff5f57;
         }
         .custom-titlebar .win-btn.close-btn:hover {
-            background: #e74c3c;
-            color: white;
+            background: #ff5f57;
+            color: rgba(0, 0, 0, 0.5);
+        }
+        .custom-titlebar .win-btn:nth-child(1) {
+            background: #ff5f57;
+        }
+        .custom-titlebar .win-btn:nth-child(2) {
+            background: #febc2e;
+        }
+        .custom-titlebar .win-btn:nth-child(3) {
+            background: #28c840;
         }
 
-        /* Верхняя секция с таймером */
+        /* Timer header */
         .timer-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px 16px;
+            background: transparent;
+            padding: 16px 16px 12px;
             text-align: center;
             position: relative;
             flex-shrink: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .timer-header h1 {
-            color: white;
-            font-size: 1em;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
             font-weight: 500;
-            margin: 0 0 10px 0;
-            opacity: 0.9;
-            letter-spacing: 1px;
+            margin: 0 0 6px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .timer-display-main {
-            font-size: 3.5em;
-            font-weight: 700;
-            color: white;
-            font-family: 'Courier New', monospace;
-            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            letter-spacing: 2px;
-            margin-bottom: 12px;
+            font-size: 64px;
+            font-weight: 200;
+            color: rgba(255, 255, 255, 0.95);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
             transition: color 0.3s;
         }
 
         .timer-display-main.danger {
-            color: #ff4444;
-            text-shadow: 0 4px 20px rgba(255, 68, 68, 0.5);
+            color: #ff453a;
+            text-shadow: 0 0 30px rgba(255, 69, 58, 0.3);
         }
 
         .timer-display-main.warning {
-            color: #ffc107;
-            text-shadow: 0 4px 20px rgba(255, 193, 7, 0.5);
+            color: #ffd60a;
+            text-shadow: 0 0 30px rgba(255, 214, 10, 0.2);
         }
 
         .timer-status {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 12px;
-            background: rgba(255,255,255,0.2);
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.06);
             border-radius: 20px;
-            color: white;
-            font-size: 0.8em;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
             font-weight: 500;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: #ccc;
+            background: rgba(255, 255, 255, 0.3);
         }
 
         .status-dot.running {
-            background: #38ef7d;
-            box-shadow: 0 0 8px #38ef7d;
+            background: #30d158;
+            box-shadow: 0 0 6px rgba(48, 209, 88, 0.6);
             animation: pulse-dot 1.5s infinite;
         }
 
         .status-dot.paused {
-            background: #ffd700;
+            background: #ffd60a;
         }
 
         .status-dot.finished {
-            background: #ff4757;
+            background: #ff453a;
             animation: pulse-dot 0.5s infinite;
         }
 
         @keyframes pulse-dot {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.2); }
+            50% { opacity: 0.5; transform: scale(1.3); }
         }
 
-        /* Главные кнопки управления */
+        /* Main control buttons */
         .main-controls {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            padding: 14px 16px;
-            background: #f8f9ff;
-            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+            gap: 12px;
+            padding: 12px 16px;
+            background: transparent;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             flex-shrink: 0;
         }
 
         .main-btn {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s ease;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        .main-btn.start {
-            width: 62px;
-            height: 62px;
-            font-size: 24px;
-        }
-
-        .main-btn:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-
-        .main-btn:active:not(:disabled) {
-            transform: translateY(-1px);
-        }
-
-        .main-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .main-btn.start {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            box-shadow: none;
             color: white;
         }
 
+        .main-btn.start {
+            width: 56px;
+            height: 56px;
+            font-size: 22px;
+            background: #30d158;
+            color: white;
+        }
+
+        .main-btn:hover:not(:disabled) {
+            transform: scale(1.08);
+            filter: brightness(1.15);
+        }
+
+        .main-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .main-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
         .main-btn.pause {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: #ff9f0a;
             color: white;
         }
 
         .main-btn.reset {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
         }
 
-        /* Секция контента */
+        /* Content section */
         .content-section {
             padding: 12px 16px;
         }
 
-        /* Табы */
+        /* Tabs */
         .tabs {
             display: flex;
-            background: #f0f2ff;
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
-            padding: 3px;
+            padding: 2px;
             margin-bottom: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .tab-btn {
             flex: 1;
-            padding: 8px 2px;
+            padding: 7px 2px;
             border: none;
             background: transparent;
-            color: #666;
-            font-size: 0.7em;
-            font-weight: 600;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            font-weight: 500;
             cursor: pointer;
-            border-radius: 7px;
+            border-radius: 8px;
             transition: all 0.2s;
             display: flex;
             flex-direction: column;
@@ -286,13 +316,13 @@
         }
 
         .tab-btn:hover {
-            color: #667eea;
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .tab-btn.active {
-            background: white;
-            color: #667eea;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         .tab-content {
@@ -306,33 +336,32 @@
             padding-right: 4px;
         }
 
-        /* Стилизация скроллбара для вкладок */
+        /* Tab scrollbar */
         .tab-content::-webkit-scrollbar {
-            width: 6px;
+            width: 4px;
         }
 
         .tab-content::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 3px;
+            background: transparent;
         }
 
         .tab-content::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
         }
 
         .tab-content::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.2);
         }
 
-        /* Кнопки позиционирования */
+        /* Position buttons */
         .pos-btn {
             width: 32px;
             height: 32px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.05);
-            color: inherit;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.6);
             cursor: pointer;
             font-size: 14px;
             transition: all 0.2s;
@@ -342,205 +371,219 @@
         }
 
         .pos-btn:hover {
-            background: rgba(102, 126, 234, 0.3);
-            border-color: #667eea;
+            background: rgba(10, 132, 255, 0.2);
+            border-color: rgba(10, 132, 255, 0.4);
+            color: #0a84ff;
         }
 
         .pos-btn.active {
-            background: #667eea;
-            border-color: #667eea;
+            background: #0a84ff;
+            border-color: #0a84ff;
             color: white;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Пресеты времени */
+        /* Time presets */
         .time-presets {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
             margin-bottom: 12px;
         }
 
         .preset-btn {
-            padding: 12px 6px;
-            font-size: 0.9em;
-            border: 2px solid #e8ecff;
+            padding: 10px 6px;
+            font-size: 13px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 10px;
-            background: white;
-            color: #333;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.8);
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 500;
             transition: all 0.2s;
         }
 
         .preset-btn:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
-            transform: translateY(-2px);
+            border-color: rgba(10, 132, 255, 0.4);
+            background: rgba(10, 132, 255, 0.15);
+            color: #0a84ff;
         }
 
         .preset-btn:active {
-            transform: translateY(0);
+            transform: scale(0.96);
         }
 
-        /* Ввод времени */
+        /* Time input */
         .time-input-group {
             display: flex;
             gap: 6px;
             align-items: center;
-            background: #f8f9ff;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.04);
             padding: 10px;
-            border-radius: 10px;
+            border-radius: 12px;
             margin-bottom: 12px;
         }
 
         .time-input {
             flex: 1;
-            padding: 10px;
-            font-size: 1.1em;
+            padding: 8px;
+            font-size: 15px;
             text-align: center;
-            border: 2px solid #e8ecff;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-weight: 600;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
             transition: border-color 0.2s;
         }
 
         .time-input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #0a84ff;
+            background: rgba(10, 132, 255, 0.08);
         }
 
         .time-separator {
-            font-size: 1.3em;
-            font-weight: 700;
-            color: #667eea;
+            font-size: 1.2em;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.3);
         }
 
         .set-time-btn {
-            padding: 10px 18px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 8px 16px;
+            background: #0a84ff;
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: 600;
+            font-size: 13px;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .set-time-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            filter: brightness(1.15);
         }
 
-        /* Корректировка времени */
+        /* Adjust section */
         .adjust-section {
-            background: #f8f9ff;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.04);
             padding: 12px;
-            border-radius: 10px;
+            border-radius: 12px;
         }
 
         .adjust-title {
-            font-size: 0.75em;
-            color: #666;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.35);
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             margin-bottom: 10px;
             font-weight: 600;
         }
 
         .adjust-btns {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .adjust-btn {
             flex: 1;
             min-width: 70px;
-            padding: 10px 8px;
-            font-size: 0.9em;
-            border: none;
+            padding: 8px 6px;
+            font-size: 13px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 8px;
-            background: white;
-            color: #333;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 500;
             transition: all 0.2s;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            box-shadow: none;
         }
 
         .adjust-btn:hover {
-            background: #667eea;
-            color: white;
-            transform: translateY(-2px);
+            background: rgba(10, 132, 255, 0.2);
+            color: #0a84ff;
+            border-color: rgba(10, 132, 255, 0.3);
         }
 
         .adjust-btn.minus {
-            color: #f5576c;
+            color: rgba(255, 69, 58, 0.8);
         }
 
         .adjust-btn.minus:hover {
-            background: #f5576c;
-            color: white;
+            background: rgba(255, 69, 58, 0.15);
+            color: #ff453a;
+            border-color: rgba(255, 69, 58, 0.3);
         }
 
-        /* Кнопки открытия окон */
+        /* Window buttons */
         .window-btns {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
         }
 
         .window-btn {
             padding: 12px;
-            border: none;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 10px;
             cursor: pointer;
-            font-weight: 600;
-            font-size: 0.85em;
+            font-weight: 500;
+            font-size: 12px;
             transition: all 0.2s;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .window-btn .icon {
-            font-size: 1.5em;
+            font-size: 1.4em;
         }
 
         .window-btn.widget {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .window-btn.display {
-            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .window-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.95);
         }
 
-        /* Настройки - секции */
+        /* Settings groups */
         .settings-group {
-            background: #f8f9ff;
-            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
             padding: 12px;
             margin-bottom: 12px;
         }
 
         .settings-group-title {
-            font-size: 0.8em;
-            font-weight: 700;
-            color: #333;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.35);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -551,7 +594,7 @@
             font-size: 1em;
         }
 
-        /* Цвета */
+        /* Colors */
         .color-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -564,62 +607,65 @@
 
         .color-item label {
             display: block;
-            font-size: 0.7em;
-            color: #666;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
             margin-bottom: 4px;
         }
 
         .color-picker {
             width: 100%;
-            height: 40px;
-            border: none;
+            height: 36px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 8px;
             cursor: pointer;
-            padding: 0;
+            padding: 2px;
+            background: rgba(255, 255, 255, 0.04);
         }
 
-        /* Темы */
+        /* Themes */
         .themes-grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
-            gap: 3px;
+            gap: 4px;
         }
 
         .theme-btn {
-            width: 20px;
-            height: 20px;
-            border: 1px solid transparent;
-            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
             cursor: pointer;
             position: relative;
             overflow: hidden;
             transition: all 0.2s;
+            background-clip: padding-box;
         }
 
         .theme-btn:hover {
             transform: scale(1.15);
-            border-color: rgba(0,0,0,0.3);
+            border-color: rgba(255, 255, 255, 0.25);
         }
 
         .theme-btn.active {
-            border-color: #333;
-            box-shadow: 0 0 0 1px #333;
+            border-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
         }
 
         .theme-btn::after {
             content: '';
             position: absolute;
             inset: 0;
+            border-radius: 50%;
             background: linear-gradient(135deg, var(--t1) 0%, var(--t2) 100%);
         }
 
-        /* Звуки */
+        /* Sound rows */
         .sound-row {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 10px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .sound-row:last-child {
@@ -634,43 +680,45 @@
         }
 
         .sound-toggle input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: #667eea;
+            width: 16px;
+            height: 16px;
+            accent-color: #0a84ff;
         }
 
         .sound-select {
             flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
+            padding: 7px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 8px;
-            font-size: 0.85em;
+            font-size: 12px;
             min-width: 0;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .sound-preview {
-            width: 36px;
-            height: 36px;
+            width: 34px;
+            height: 34px;
             border: none;
             border-radius: 8px;
-            background: #667eea;
-            color: white;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.6);
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             transition: all 0.2s;
             flex-shrink: 0;
         }
 
         .sound-preview:hover {
-            background: #5568d3;
-            transform: scale(1.1);
+            background: rgba(10, 132, 255, 0.2);
+            color: #0a84ff;
         }
 
-        /* Кастомные звуки */
+        /* Custom sounds */
         .custom-sounds-section {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 2px dashed rgba(102, 126, 234, 0.2);
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .custom-sound-list {
@@ -684,10 +732,11 @@
             align-items: center;
             gap: 8px;
             padding: 8px 10px;
-            background: #f0f2ff;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.04);
             border-radius: 8px;
             margin-bottom: 6px;
-            font-size: 0.85em;
+            font-size: 12px;
         }
 
         .custom-sound-item .name {
@@ -695,16 +744,16 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            color: #333;
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .custom-sound-item .btn {
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -712,13 +761,13 @@
         }
 
         .custom-sound-item .play-btn {
-            background: #667eea;
-            color: white;
+            background: rgba(10, 132, 255, 0.2);
+            color: #0a84ff;
         }
 
         .custom-sound-item .delete-btn {
-            background: rgba(245, 87, 108, 0.15);
-            color: #f5576c;
+            background: rgba(255, 69, 58, 0.12);
+            color: #ff453a;
         }
 
         .custom-sound-item .btn:hover {
@@ -733,13 +782,13 @@
         .add-sound-btn {
             flex: 1;
             padding: 10px 16px;
-            border: 2px dashed #ccc;
-            background: white;
+            border: 1px dashed rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.02);
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.85em;
+            font-size: 12px;
             font-weight: 500;
-            color: #666;
+            color: rgba(255, 255, 255, 0.4);
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -748,22 +797,22 @@
         }
 
         .add-sound-btn:hover {
-            border-color: #667eea;
-            color: #667eea;
-            background: #f8f9ff;
+            border-color: rgba(10, 132, 255, 0.4);
+            color: #0a84ff;
+            background: rgba(10, 132, 255, 0.06);
         }
 
         .hidden-file-input {
             display: none;
         }
 
-        /* Переключатели */
+        /* Toggle rows (settings rows) */
         .toggle-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 8px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .toggle-row:last-child {
@@ -772,14 +821,15 @@
         }
 
         .toggle-label {
-            font-size: 0.8em;
-            color: #333;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
         }
 
+        /* Apple-style toggle switch */
         .toggle-switch {
             position: relative;
-            width: 44px;
-            height: 24px;
+            width: 42px;
+            height: 26px;
         }
 
         .toggle-switch input {
@@ -792,33 +842,33 @@
             position: absolute;
             cursor: pointer;
             inset: 0;
-            background-color: #ccc;
+            background-color: rgba(255, 255, 255, 0.15);
             transition: .3s;
-            border-radius: 24px;
+            border-radius: 26px;
         }
 
         .toggle-slider:before {
             position: absolute;
             content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
+            height: 22px;
+            width: 22px;
+            left: 2px;
+            bottom: 2px;
             background-color: white;
             transition: .3s;
             border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
 
         .toggle-switch input:checked + .toggle-slider {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #30d158;
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(20px);
+            transform: translateX(16px);
         }
 
-        /* Фон */
+        /* Background mode tabs */
         .bg-mode-tabs {
             display: flex;
             gap: 6px;
@@ -827,21 +877,21 @@
 
         .bg-mode-btn {
             flex: 1;
-            padding: 8px 4px;
-            border: 2px solid #e8ecff;
-            background: white;
+            padding: 7px 4px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.75em;
-            font-weight: 600;
-            color: #666;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.5);
             transition: all 0.2s;
         }
 
         .bg-mode-btn.active {
-            border-color: #667eea;
-            background: #f0f2ff;
-            color: #667eea;
+            border-color: rgba(10, 132, 255, 0.4);
+            background: rgba(10, 132, 255, 0.12);
+            color: #0a84ff;
         }
 
         .bg-controls {
@@ -860,18 +910,21 @@
 
         .url-input {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e8ecff;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 8px;
-            font-size: 0.9em;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .url-input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #0a84ff;
+            background: rgba(10, 132, 255, 0.08);
         }
 
-        /* Загрузка локального фона */
+        /* Local background upload */
         .local-bg-section {
             margin-top: 12px;
         }
@@ -881,8 +934,8 @@
             width: 100%;
             height: 120px;
             border-radius: 12px;
-            background: #f0f2ff;
-            border: 2px dashed #ccc;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px dashed rgba(255, 255, 255, 0.12);
             overflow: hidden;
             display: flex;
             align-items: center;
@@ -892,13 +945,13 @@
         }
 
         .local-bg-preview:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
+            border-color: rgba(10, 132, 255, 0.4);
+            background: rgba(10, 132, 255, 0.06);
         }
 
         .local-bg-preview.has-image {
             border-style: solid;
-            border-color: #667eea;
+            border-color: rgba(10, 132, 255, 0.3);
         }
 
         .local-bg-preview img {
@@ -909,7 +962,7 @@
 
         .local-bg-placeholder {
             text-align: center;
-            color: #999;
+            color: rgba(255, 255, 255, 0.3);
         }
 
         .local-bg-placeholder .icon {
@@ -919,7 +972,7 @@
         }
 
         .local-bg-placeholder .text {
-            font-size: 0.85em;
+            font-size: 12px;
             font-weight: 500;
         }
 
@@ -938,25 +991,26 @@
         }
 
         .local-bg-action-btn {
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(10px);
         }
 
         .local-bg-action-btn.change {
-            background: rgba(102, 126, 234, 0.9);
+            background: rgba(10, 132, 255, 0.8);
             color: white;
         }
 
         .local-bg-action-btn.delete {
-            background: rgba(245, 87, 108, 0.9);
+            background: rgba(255, 69, 58, 0.8);
             color: white;
         }
 
@@ -972,21 +1026,21 @@
 
         .bg-fit-btn {
             flex: 1;
-            padding: 8px;
-            border: 2px solid #e8ecff;
-            background: white;
+            padding: 7px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
             border-radius: 6px;
             cursor: pointer;
-            font-size: 0.75em;
-            font-weight: 600;
-            color: #666;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.5);
             transition: all 0.2s;
         }
 
         .bg-fit-btn.active {
-            border-color: #667eea;
-            background: #f0f2ff;
-            color: #667eea;
+            border-color: rgba(10, 132, 255, 0.4);
+            background: rgba(10, 132, 255, 0.12);
+            color: #0a84ff;
         }
 
         .bg-overlay-row {
@@ -997,16 +1051,17 @@
         }
 
         .bg-overlay-row label {
-            font-size: 0.8em;
-            color: #666;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
             white-space: nowrap;
         }
 
+        /* Range slider: custom webkit */
         .bg-overlay-row input[type="range"] {
             flex: 1;
-            height: 6px;
-            background: #e8ecff;
-            border-radius: 3px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
             outline: none;
             appearance: none;
             -webkit-appearance: none;
@@ -1016,76 +1071,79 @@
             -webkit-appearance: none;
             width: 18px;
             height: 18px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: white;
             cursor: pointer;
             border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
         }
 
         .bg-overlay-value {
-            font-size: 0.8em;
-            color: #667eea;
-            font-weight: 600;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 500;
             min-width: 35px;
             text-align: right;
+            font-variant-numeric: tabular-nums;
         }
 
-        /* Кнопка сброса */
+        /* Reset button */
         .reset-btn {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e8ecff;
-            background: white;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.04);
             border-radius: 10px;
-            color: #666;
-            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 500;
+            font-size: 13px;
             cursor: pointer;
             transition: all 0.2s;
             margin-top: 8px;
         }
 
         .reset-btn:hover {
-            border-color: #f5576c;
-            color: #f5576c;
+            border-color: rgba(255, 69, 58, 0.4);
+            color: #ff453a;
+            background: rgba(255, 69, 58, 0.08);
         }
 
-        /* Скролл в окне */
+        /* Control window scrollbar */
         .control-window {
             overflow-y: auto;
         }
 
         .control-window::-webkit-scrollbar {
-            width: 8px;
+            width: 4px;
         }
 
         .control-window::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.1);
+            background: transparent;
         }
 
         .control-window::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.3);
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
         }
 
-        /* Адаптивность */
+        /* Responsive */
         @media (max-width: 500px) {
             .timer-display-main {
-                font-size: 3.5em;
+                font-size: 52px;
             }
-            
+
             .time-presets {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(3, 1fr);
             }
-            
+
             .themes-grid {
-                grid-template-columns: repeat(6, 1fr);
+                grid-template-columns: repeat(7, 1fr);
             }
         }
 
-        /* Компактный режим */
+        /* Compact section */
         .compact-section {
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+            padding: 10px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
             flex-shrink: 0;
         }
 
@@ -1097,26 +1155,27 @@
         }
 
         .quick-preset {
-            padding: 8px 12px;
-            border: 2px solid #e8ecff;
-            border-radius: 8px;
-            background: white;
-            color: #333;
-            font-weight: 600;
-            font-size: 0.8em;
+            padding: 7px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 500;
+            font-size: 12px;
             cursor: pointer;
             transition: all 0.2s;
             white-space: nowrap;
         }
 
         .quick-preset:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
+            border-color: rgba(10, 132, 255, 0.3);
+            background: rgba(10, 132, 255, 0.1);
+            color: #0a84ff;
         }
 
         .quick-preset.active {
-            border-color: #667eea;
-            background: #667eea;
+            border-color: #0a84ff;
+            background: #0a84ff;
             color: white;
         }
 
@@ -1126,86 +1185,104 @@
 
         .adjust-main-row {
             display: flex;
-            gap: 4px;
+            gap: 3px;
             justify-content: center;
             flex-wrap: wrap;
         }
 
         .adjust-main-btn {
-            padding: 6px 8px;
-            border: 1px solid #e0e0e0;
+            padding: 5px 7px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 6px;
-            background: white;
-            font-size: 0.72em;
-            font-weight: 600;
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 11px;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
             white-space: nowrap;
+            color: rgba(255, 255, 255, 0.5);
         }
 
         .adjust-main-btn.plus {
-            color: #667eea;
+            color: rgba(10, 132, 255, 0.8);
         }
 
         .adjust-main-btn.plus:hover {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
+            background: rgba(10, 132, 255, 0.15);
+            color: #0a84ff;
+            border-color: rgba(10, 132, 255, 0.3);
         }
 
         .adjust-main-btn.minus {
-            color: #f5576c;
+            color: rgba(255, 69, 58, 0.7);
         }
 
         .adjust-main-btn.minus:hover {
-            background: #f5576c;
-            color: white;
-            border-color: #f5576c;
+            background: rgba(255, 69, 58, 0.12);
+            color: #ff453a;
+            border-color: rgba(255, 69, 58, 0.3);
+        }
+
+        .overtime-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+        }
+
+        .overtime-toggle-row .toggle-label {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-windows {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 8px;
-            justify-content: center;
         }
 
         .quick-window-btn {
-            padding: 8px 12px;
-            border: none;
+            padding: 7px 11px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 8px;
-            font-size: 0.8em;
-            font-weight: 600;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 4px;
             transition: all 0.2s;
             white-space: nowrap;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-window-btn.widget {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-window-btn.clock {
-            background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-window-btn.display {
-            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-window-btn.sound {
-            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-            color: white;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-window-btn.sound.muted {
-            background: #ccc;
-            color: #999;
+            background: rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.25);
         }
 
         /* Presets: equal-width 4-per-row grid */
@@ -1214,17 +1291,17 @@
             min-width: 0;
         }
 
-        /* Visual divider between − and + stepper groups */
+        /* Visual divider between minus and plus stepper groups */
         .adjust-divider {
             width: 1px;
-            height: 20px;
-            background: rgba(0, 0, 0, 0.15);
+            height: 18px;
+            background: rgba(255, 255, 255, 0.08);
             align-self: center;
             margin: 0 6px;
             flex-shrink: 0;
         }
 
-        /* − and + sign labels flanking the stepper buttons */
+        /* Sign labels flanking stepper buttons */
         .adjust-sign {
             font-size: 1.1em;
             font-weight: 700;
@@ -1233,19 +1310,19 @@
             line-height: 1;
         }
 
-        .adjust-sign.minus { color: #f5576c; margin-right: 2px; }
-        .adjust-sign.plus  { color: #667eea; margin-left: 2px; }
+        .adjust-sign.minus { color: rgba(255, 69, 58, 0.7); margin-right: 2px; }
+        .adjust-sign.plus  { color: rgba(10, 132, 255, 0.8); margin-left: 2px; }
 
-        /* Thin vertical divider before Sound button in windows row */
+        /* Thin vertical divider before Sound button */
         .windows-sound-divider {
             width: 1px;
-            background: rgba(255, 255, 255, 0.35);
+            background: rgba(255, 255, 255, 0.08);
             margin: 4px 2px;
             align-self: stretch;
             flex-shrink: 0;
         }
 
-        /* Settings row: settings-toggle + FAQ small button */
+        /* Settings row bar */
         .settings-row-bar {
             display: flex;
             align-items: stretch;
@@ -1260,53 +1337,56 @@
         .faq-small {
             width: 38px;
             border: none;
-            background: #f0f2ff;
-            color: #667eea;
-            font-size: 14px;
-            font-weight: 700;
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.35);
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            border-left: 1px solid rgba(102, 126, 234, 0.15);
+            border-left: 1px solid rgba(255, 255, 255, 0.04);
             transition: all 0.2s;
             flex-shrink: 0;
         }
 
         .faq-small:hover {
-            background: #e8ecff;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .quick-window-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.9);
         }
 
         .quick-window-btn.active {
-            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5), 0 4px 12px rgba(0,0,0,0.3);
-            transform: scale(1.05);
+            background: rgba(10, 132, 255, 0.2);
+            border-color: rgba(10, 132, 255, 0.4);
+            color: #0a84ff;
         }
 
         .quick-window-btn.active:hover {
-            transform: scale(1.05) translateY(-2px);
+            background: rgba(10, 132, 255, 0.25);
         }
 
-        /* Кнопка настроек */
+        /* Settings toggle */
         .settings-toggle {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
             padding: 10px;
-            background: #f8f9ff;
+            background: rgba(255, 255, 255, 0.02);
             border: none;
             cursor: pointer;
             width: 100%;
-            font-size: 0.85em;
-            color: #666;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
             transition: all 0.2s;
         }
 
         .settings-toggle:hover {
-            background: #f0f2ff;
-            color: #667eea;
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .settings-toggle .arrow {
@@ -1317,7 +1397,7 @@
             transform: rotate(180deg);
         }
 
-        /* Расширенные настройки */
+        /* Advanced settings */
         .advanced-settings {
             display: none;
             flex: 1;
@@ -1334,7 +1414,7 @@
         @keyframes slideDown {
             from {
                 opacity: 0;
-                transform: translateY(-10px);
+                transform: translateY(-8px);
             }
             to {
                 opacity: 1;
@@ -1344,51 +1424,51 @@
 
         .advanced-settings .content-section {
             padding: 0 16px 20px;
-            background: rgba(255, 255, 255, 0.98);
+            background: transparent;
             border-radius: 0 0 20px 20px;
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
         }
 
-        /* FAQ кнопка */
+        /* FAQ button */
         .faq-btn {
             position: absolute;
             top: 12px;
             right: 12px;
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            font-size: 14px;
-            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(10px);
             z-index: 100;
             -webkit-app-region: no-drag;
         }
 
         .faq-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: white;
-            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.8);
         }
 
-        /* Диалог подтверждения выхода */
+        /* Exit modal */
         .exit-modal {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
             z-index: 10001;
             display: flex;
             align-items: center;
@@ -1404,9 +1484,12 @@
         }
 
         .exit-dialog {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: rgba(28, 28, 30, 0.9);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
-            padding: 28px 32px;
+            padding: 24px 28px;
             min-width: 280px;
             box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
             transform: translateY(20px) scale(0.95);
@@ -1420,14 +1503,15 @@
 
         .exit-dialog h3 {
             margin: 0 0 8px;
-            font-size: 18px;
-            color: #fff;
+            font-size: 17px;
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 600;
         }
 
         .exit-dialog p {
             margin: 0 0 20px;
             font-size: 13px;
-            color: rgba(255,255,255,0.6);
+            color: rgba(255, 255, 255, 0.45);
         }
 
         .exit-dialog-buttons {
@@ -1437,41 +1521,43 @@
         }
 
         .exit-dialog-buttons button {
-            padding: 8px 24px;
+            padding: 8px 22px;
             border: none;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 13px;
+            font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .exit-btn-cancel {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .exit-btn-cancel:hover {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .exit-btn-confirm {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: #fff;
+            background: #ff453a;
+            color: white;
         }
 
         .exit-btn-confirm:hover {
-            background: linear-gradient(135deg, #ff6b6b, #e74c3c);
+            filter: brightness(1.15);
         }
 
-        /* FAQ модальное окно */
+        /* FAQ modal */
         .faq-modal {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
             z-index: 10000;
             display: flex;
             align-items: center;
@@ -1487,7 +1573,10 @@
         }
 
         .faq-content {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: rgba(28, 28, 30, 0.92);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 20px;
             width: 95%;
             max-width: 500px;
@@ -1505,7 +1594,8 @@
         }
 
         .faq-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             padding: 16px 20px;
             display: flex;
             justify-content: space-between;
@@ -1514,8 +1604,8 @@
 
         .faq-header h2 {
             margin: 0;
-            color: white;
-            font-size: 1.1em;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 15px;
             font-weight: 600;
             display: flex;
             align-items: center;
@@ -1523,13 +1613,13 @@
         }
 
         .faq-close {
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             border: none;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            font-size: 18px;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1538,8 +1628,8 @@
         }
 
         .faq-close:hover {
-            background: rgba(255, 68, 68, 0.6);
-            transform: scale(1.1);
+            background: rgba(255, 69, 58, 0.3);
+            color: #ff453a;
         }
 
         .faq-body {
@@ -1553,11 +1643,11 @@
         }
 
         .faq-section-title {
-            color: #667eea;
-            font-size: 0.85em;
-            font-weight: 700;
+            color: #0a84ff;
+            font-size: 11px;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -1565,18 +1655,18 @@
         }
 
         .faq-item {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
             border-radius: 10px;
             margin-bottom: 8px;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .faq-question {
             padding: 12px 14px;
-            color: white;
-            font-size: 0.85em;
-            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
+            font-weight: 500;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
@@ -1585,13 +1675,13 @@
         }
 
         .faq-question:hover {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
         }
 
         .faq-question .arrow {
             font-size: 0.8em;
             transition: transform 0.3s;
-            opacity: 0.6;
+            opacity: 0.4;
         }
 
         .faq-item.open .faq-question .arrow {
@@ -1603,8 +1693,8 @@
             overflow: hidden;
             transition: max-height 0.3s ease-out;
             padding: 0 14px;
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 12px;
             line-height: 1.6;
         }
 
@@ -1616,32 +1706,30 @@
         .faq-answer ul {
             margin: 8px 0;
             padding-left: 20px;
-            color: rgba(255, 255, 255, 0.85);
+            color: rgba(255, 255, 255, 0.65);
         }
 
         .faq-answer ul li {
             margin-bottom: 6px;
             line-height: 1.5;
-            color: rgba(255, 255, 255, 0.85);
+            color: rgba(255, 255, 255, 0.65);
         }
 
         .faq-answer p {
             margin: 8px 0;
             line-height: 1.5;
-            color: rgba(255, 255, 255, 0.85);
+            color: rgba(255, 255, 255, 0.65);
         }
 
         .faq-answer strong {
-            color: #fff;
+            color: rgba(255, 255, 255, 0.9);
         }
-
-
 
         .faq-shortcut {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.06);
             padding: 3px 8px;
             border-radius: 4px;
             font-size: 0.9em;
@@ -1662,46 +1750,33 @@
         }
 
         .key {
-            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            padding: 4px 10px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.85em;
-            color: #fff;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            padding: 3px 9px;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
         .shortcut-desc {
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.5);
             margin-left: 8px;
-        }
-
-        .faq-answer ul {
-            margin: 8px 0;
-            padding-left: 20px;
-        }
-
-        .faq-answer ul li {
-            margin-bottom: 6px;
-            line-height: 1.5;
-        }
-
-        .faq-answer p {
-            margin: 8px 0;
-            line-height: 1.5;
+            font-size: 12px;
         }
 
         .faq-footer {
             padding: 12px 20px;
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.15);
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
             text-align: center;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.75em;
+            color: rgba(255, 255, 255, 0.35);
+            font-size: 11px;
         }
 
         .faq-footer a {
-            color: #667eea;
+            color: #0a84ff;
             text-decoration: none;
         }
 
@@ -1709,22 +1784,22 @@
             text-decoration: underline;
         }
 
-        /* FIX BUG-011: Стили для валидации ввода */
+        /* Input validation */
         .input-error {
-            border-color: #ff4444 !important;
-            background-color: rgba(255, 68, 68, 0.1) !important;
+            border-color: #ff453a !important;
+            background-color: rgba(255, 69, 58, 0.08) !important;
             animation: shake 0.3s;
         }
 
         .error-message {
-            color: #ff4444;
-            font-size: 0.75rem;
+            color: #ff453a;
+            font-size: 11px;
             margin-top: 4px;
             display: none;
             padding: 4px 8px;
-            background: rgba(255, 68, 68, 0.1);
+            background: rgba(255, 69, 58, 0.08);
             border-radius: 4px;
-            border-left: 3px solid #ff4444;
+            border-left: 2px solid #ff453a;
         }
 
         @keyframes shake {
@@ -1733,14 +1808,15 @@
             75% { transform: translateX(5px); }
         }
 
-        /* FIX BUG-028: Loading indicator styles */
+        /* Loading overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1748,18 +1824,18 @@
         }
 
         .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #fff;
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255, 255, 255, 0.15);
+            border-top: 3px solid rgba(255, 255, 255, 0.8);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
 
         .loading-text {
-            color: white;
+            color: rgba(255, 255, 255, 0.6);
             margin-top: 15px;
-            font-size: 14px;
+            font-size: 13px;
             text-align: center;
         }
 
@@ -1768,13 +1844,13 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Inline loading indicator (small) */
+        /* Inline loader */
         .inline-loader {
             display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(74, 175, 80, 0.3);
-            border-top: 2px solid #4CAF50;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(48, 209, 88, 0.2);
+            border-top: 2px solid #30d158;
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
             margin-left: 8px;
@@ -1782,36 +1858,36 @@
         }
 
         .loading-button {
-            opacity: 0.6;
+            opacity: 0.5;
             pointer-events: none;
             position: relative;
         }
 
-        /* Info banners for better UX */
+        /* Info banners */
         .info-banner {
-            background: rgba(103, 126, 234, 0.12);
-            border-left: 3px solid #667eea;
-            padding: 10px 12px;
+            background: rgba(10, 132, 255, 0.08);
+            border-left: 2px solid #0a84ff;
+            padding: 8px 12px;
             border-radius: 6px;
             margin-bottom: 12px;
-            font-size: 0.85em;
+            font-size: 12px;
             line-height: 1.5;
-            color: #3d3d3d;
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .info-banner.tip {
-            background: rgba(74, 175, 80, 0.12);
-            border-left-color: #4CAF50;
-            color: #2e5d2e;
+            background: rgba(48, 209, 88, 0.08);
+            border-left-color: #30d158;
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .info-banner.warning {
-            background: rgba(255, 152, 0, 0.12);
-            border-left-color: #FF9800;
-            color: #7a4d00;
+            background: rgba(255, 159, 10, 0.08);
+            border-left-color: #ff9f0a;
+            color: rgba(255, 255, 255, 0.6);
         }
 
-        /* Toast notifications (replacement for alert dialogs) */
+        /* Toast notifications */
         .toast-container {
             position: fixed;
             top: 40px;
@@ -1825,12 +1901,14 @@
             pointer-events: none;
         }
         .toast {
-            background: #333;
-            color: #fff;
+            background: rgba(44, 44, 46, 0.95);
+            backdrop-filter: blur(20px);
+            color: rgba(255, 255, 255, 0.9);
             padding: 10px 20px;
-            border-radius: 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             font-size: 13px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             opacity: 0;
             transform: translateY(-10px);
             transition: opacity 0.3s, transform 0.3s;
@@ -1843,90 +1921,94 @@
             transform: translateY(0);
         }
         .toast.error {
-            background: linear-gradient(135deg, #d32f2f, #b71c1c);
+            background: rgba(255, 69, 58, 0.9);
+            border-color: rgba(255, 69, 58, 0.3);
         }
         .toast.warning {
-            background: linear-gradient(135deg, #f57c00, #e65100);
+            background: rgba(255, 159, 10, 0.9);
+            border-color: rgba(255, 159, 10, 0.3);
         }
         .toast.success {
-            background: linear-gradient(135deg, #388e3c, #2e7d32);
+            background: rgba(48, 209, 88, 0.9);
+            border-color: rgba(48, 209, 88, 0.3);
         }
 
         .info-banner strong {
-            color: #1a1a1a;
-            font-weight: 700;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
         }
 
         .info-banner code {
-            background: rgba(102, 126, 234, 0.25);
-            padding: 3px 7px;
+            background: rgba(10, 132, 255, 0.15);
+            padding: 2px 6px;
             border-radius: 4px;
-            font-family: 'Courier New', monospace;
+            font-family: 'SF Mono', 'Consolas', monospace;
             font-size: 0.9em;
-            color: #4a3ba2;
-            font-weight: 600;
+            color: #0a84ff;
+            font-weight: 500;
         }
 
         /* Media queries for small screens */
         @media (max-height: 600px) {
             .timer-header {
-                padding: 12px 16px;
+                padding: 10px 16px 8px;
             }
 
             .timer-display-main {
-                font-size: 2rem !important;
-                margin: 4px 0 !important;
+                font-size: 40px !important;
+                margin: 2px 0 !important;
             }
 
             .main-controls {
-                padding: 8px;
+                padding: 6px;
                 gap: 8px;
             }
 
             .main-btn {
-                width: 50px !important;
-                height: 50px !important;
-                font-size: 1.3em !important;
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 1.2em !important;
             }
 
             .quick-presets {
-                padding: 8px;
+                padding: 6px;
             }
 
             .quick-preset {
-                padding: 6px 10px;
-                font-size: 0.75em;
+                padding: 5px 8px;
+                font-size: 11px;
             }
 
             .info-banner {
-                padding: 6px 8px;
-                font-size: 0.75em;
+                padding: 5px 8px;
+                font-size: 11px;
                 margin-bottom: 8px;
             }
         }
 
         @media (max-width: 380px) {
-            .control-window {
-                padding: 8px;
+            .control-panel {
+                width: calc(100% - 8px);
+                margin: 4px auto;
             }
 
             .timer-header h1 {
-                font-size: 0.9em;
+                font-size: 10px;
             }
 
             .quick-preset {
-                padding: 4px 8px;
-                font-size: 0.7em;
+                padding: 4px 6px;
+                font-size: 10px;
             }
 
             .quick-window-btn {
-                font-size: 0.75em;
-                padding: 8px;
+                font-size: 11px;
+                padding: 6px;
             }
 
             .tab-btn {
-                font-size: 0.75em;
-                padding: 8px;
+                font-size: 10px;
+                padding: 6px;
             }
 
             .tab-btn .icon {
@@ -1938,53 +2020,54 @@
             }
         }
 
-        /* Scrollbar for content section */
+        /* Scrollbar for advanced settings */
         .advanced-settings .content-section::-webkit-scrollbar,
         .advanced-settings::-webkit-scrollbar {
-            width: 6px;
+            width: 4px;
         }
 
         .advanced-settings .content-section::-webkit-scrollbar-track,
         .advanced-settings::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
-            border-radius: 3px;
+            background: transparent;
         }
 
         .advanced-settings .content-section::-webkit-scrollbar-thumb,
         .advanced-settings::-webkit-scrollbar-thumb {
-            background: rgba(102, 126, 234, 0.3);
-            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
         }
 
         .advanced-settings .content-section::-webkit-scrollbar-thumb:hover,
         .advanced-settings::-webkit-scrollbar-thumb:hover {
-            background: rgba(102, 126, 234, 0.5);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         /* Media queries for large screens */
         @media (min-height: 900px) {
             .timer-display-main {
-                font-size: 3.8rem;
+                font-size: 72px;
             }
 
             .main-btn {
-                width: 60px;
-                height: 60px;
+                width: 52px;
+                height: 52px;
             }
         }
 
         @media (min-width: 500px) {
-            .control-window {
-                padding: 20px;
+            .control-panel {
+                width: calc(100% - 24px);
+                margin: 12px auto;
+                height: calc(100vh - 24px);
             }
 
             .timer-display-main {
-                font-size: 2.8rem;
+                font-size: 56px;
             }
 
             .main-btn {
-                width: 70px;
-                height: 70px;
+                width: 52px;
+                height: 52px;
             }
         }
     </style>
@@ -2046,16 +2129,27 @@
             </div>
         </div>
 
-        <!-- Открыть окна + звук (в одной строке, разделитель перед звуком) -->
+        <!-- Считать ниже нуля — глобальная настройка -->
+        <div class="compact-section">
+            <div class="overtime-toggle-row">
+                <span class="toggle-label">⏱ Считать ниже нуля</span>
+                <label class="toggle-switch" title="Таймер продолжит отсчёт в минус после окончания">
+                    <input type="checkbox" id="allowNegative">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Открыть окна -->
         <div class="compact-section">
             <div class="quick-windows">
                 <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)">⏱️ Виджет</button>
                 <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)">🕐 Часы</button>
-                <button class="quick-window-btn display" id="openDisplayBtn" title="На весь экран для презентаций (D)">🖥️ Дисплей</button>
-                <div class="windows-sound-divider"></div>
-                <button class="quick-window-btn sound" id="soundToggleBtn" title="Вкл/Выкл звуковые уведомления">🔊 Звук</button>
+                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)">🖥️ Полноэкранный</button>
             </div>
         </div>
+        <!-- Hidden sound toggle for JS compatibility -->
+        <button id="soundToggleBtn" style="display:none;"></button>
 
         <!-- Настройки + FAQ -->
         <div class="settings-row-bar">
@@ -2070,43 +2164,45 @@
         <div class="advanced-settings" id="advancedSettings">
             <div class="content-section">
                 <div class="tabs">
-                    <button class="tab-btn active" data-tab="timer" title="Стиль, масштаб, звук и тема таймера">
+                    <button class="tab-btn active" data-tab="timer" title="Стиль, масштаб и цвета виджета">
                         <span class="icon">⏱️</span>
-                        <span>Таймер</span>
+                        <span>Виджет</span>
                     </button>
                     <button class="tab-btn" data-tab="clock" title="Стиль и настройки часов">
                         <span class="icon">🕐</span>
                         <span>Часы</span>
                     </button>
-                    <button class="tab-btn" data-tab="display" title="Монитор, фон и блоки времени">
+                    <button class="tab-btn" data-tab="display" title="Полноэкранный режим: стиль, цвета, фон">
                         <span class="icon">🖥️</span>
-                        <span>Дисплей</span>
+                        <span>Полноэкранный</span>
+                    </button>
+                    <button class="tab-btn" data-tab="sound" title="Звуковые уведомления">
+                        <span class="icon">🔊</span>
+                        <span>Звуки</span>
                     </button>
                 </div>
 
-                <!-- Таб: Таймер -->
+                <!-- Таб: Виджет -->
                 <div class="tab-content active" id="tab-timer">
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🎨</span>
-                            Стиль и масштаб
+                            Стиль виджета
                         </div>
-
                         <div class="toggle-row">
                             <span class="toggle-label">Стиль таймера</span>
-                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 6px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; font-size: 0.85em; min-width: 160px;">
-                                <option value="circle" style="background: #1a1a2e; color: white;">⭕ Круговой</option>
-                                <option value="digital" style="background: #1a1a2e; color: white;">🔢 Цифровой LED</option>
-                                <option value="flip" style="background: #1a1a2e; color: white;">🔄 Перекидные</option>
-                                <option value="analog" style="background: #1a1a2e; color: white;">🕐 Аналоговые</option>
+                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
+                                <option value="circle">⭕ Круговой</option>
+                                <option value="digital">🔢 Цифровой LED</option>
+                                <option value="flip">🔄 Перекидные</option>
+                                <option value="analog">🕐 Аналоговые</option>
                             </select>
                         </div>
-
                         <div class="toggle-row">
-                            <span class="toggle-label">Масштаб таймера</span>
+                            <span class="toggle-label">Масштаб</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <input type="range" id="timerScale" min="50" max="300" value="100" style="width: 80px;">
-                                <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em;">100%</span>
+                                <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
                             </div>
                         </div>
                     </div>
@@ -2114,29 +2210,21 @@
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">✨</span>
-                            Цветовая тема
+                            Цвета виджета
                         </div>
                         <div class="themes-grid" id="themesGrid"></div>
                     </div>
+                </div>
 
-                    <div class="settings-group">
-                        <div class="toggle-row">
-                            <span class="toggle-label">⏱️ Считать ниже нуля</span>
-                            <label class="toggle-switch" title="Таймер продолжит отсчёт в минус после окончания">
-                                <input type="checkbox" id="allowNegative">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
+                <!-- Таб: Звуки -->
+                <div class="tab-content" id="tab-sound">
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🔊</span>
-                            Звуковые уведомления
+                            Основное
                         </div>
-
                         <div class="toggle-row">
-                            <span class="toggle-label" style="font-weight: 600;">🔊 Включить звук</span>
+                            <span class="toggle-label">Звуковые уведомления</span>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="soundMasterEnabled" checked>
                                 <span class="toggle-slider"></span>
@@ -2145,6 +2233,10 @@
                     </div>
 
                     <div class="settings-group" id="soundSettings">
+                        <div class="settings-group-title">
+                            <span class="icon">🔔</span>
+                            События
+                        </div>
                         <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundStartEnabled">
@@ -2166,7 +2258,6 @@
                             </select>
                             <button class="sound-preview" id="soundStartPreview" title="Прослушать">▶</button>
                         </div>
-
                         <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundEndEnabled" checked>
@@ -2189,7 +2280,6 @@
                             </select>
                             <button class="sound-preview" id="soundEndPreview" title="Прослушать">▶</button>
                         </div>
-
                         <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundMinuteEnabled">
@@ -2211,8 +2301,7 @@
                             </select>
                             <button class="sound-preview" id="soundMinutePreview" title="Прослушать">▶</button>
                         </div>
-
-                        <div class="sound-row" style="border-top: 1px solid rgba(0,0,0,0.08); padding-top: 14px; margin-top: 6px;">
+                        <div class="sound-row" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 14px; margin-top: 6px;">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundOverrunEnabled">
                                 <label for="soundOverrunEnabled">При перерасходе</label>
@@ -2233,9 +2322,8 @@
                             </select>
                             <button class="sound-preview" id="soundOverrunPreview" title="Прослушать">▶</button>
                         </div>
-
                         <div class="sound-row" style="padding-left: 24px;">
-                            <label style="font-size: 0.85em; color: #666; white-space: nowrap;">Напоминать каждые</label>
+                            <label style="font-size: 0.85em; color: rgba(255,255,255,0.5); white-space: nowrap;">Напоминать каждые</label>
                             <select class="sound-select" id="overrunIntervalMinutes" style="max-width: 130px;">
                                 <option value="1">1 минуту</option>
                                 <option value="2">2 минуты</option>
@@ -2244,21 +2332,21 @@
                                 <option value="10">10 минут</option>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="custom-sounds-section">
-                            <div class="settings-group-title">
-                                <span class="icon">🎵</span>
-                                Ваши звуки
-                            </div>
-                            <div class="custom-sound-list" id="customSoundList"></div>
-                            <div class="add-sound-row">
-                                <button class="add-sound-btn" id="addSoundBtn" title="Загрузить аудиофайл с компьютера">
-                                    <span>➕</span>
-                                    <span>Загрузить звук</span>
-                                </button>
-                                <input type="file" class="hidden-file-input" id="soundFileInput"
-                                       accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
-                            </div>
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">🎵</span>
+                            Ваши звуки
+                        </div>
+                        <div class="custom-sound-list" id="customSoundList"></div>
+                        <div class="add-sound-row">
+                            <button class="add-sound-btn" id="addSoundBtn" title="Загрузить аудиофайл с компьютера">
+                                <span>➕</span>
+                                <span>Загрузить звук</span>
+                            </button>
+                            <input type="file" class="hidden-file-input" id="soundFileInput"
+                                   accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
                         </div>
                     </div>
                 </div>
@@ -2270,17 +2358,15 @@
                             <span class="icon">🎨</span>
                             Стиль часов
                         </div>
-
                         <div class="toggle-row">
                             <span class="toggle-label">Стиль</span>
-                            <select id="clockStyle" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em;">
-                                <option value="circle" style="background: #1a1a2e;">⭕ Круговой</option>
-                                <option value="digital" style="background: #1a1a2e;">🔢 Цифровой LED</option>
-                                <option value="flip" style="background: #1a1a2e;">🔄 Перекидные часы</option>
-                                <option value="analog" style="background: #1a1a2e;">🕐 Аналоговые</option>
+                            <select id="clockStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em;">
+                                <option value="circle">⭕ Круговой</option>
+                                <option value="digital">🔢 Цифровой LED</option>
+                                <option value="flip">🔄 Перекидные часы</option>
+                                <option value="analog">🕐 Аналоговые</option>
                             </select>
                         </div>
-
                         <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
                             <span class="toggle-label">Цифры на циферблате</span>
                             <label class="toggle-switch">
@@ -2288,7 +2374,21 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                    </div>
 
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">✨</span>
+                            Цвета часов
+                        </div>
+                        <div class="themes-grid" id="clockThemesGrid"></div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">📋</span>
+                            Отображение
+                        </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Показывать дату</span>
                             <label class="toggle-switch">
@@ -2305,18 +2405,48 @@
                     <input type="checkbox" id="clockFormat24h" checked style="display:none;">
                 </div>
 
-                <!-- Таб: Дисплей -->
+                <!-- Таб: Полноэкранный -->
                 <div class="tab-content" id="tab-display">
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🖥️</span>
-                            Полноэкранный дисплей
+                            <span class="icon">🎨</span>
+                            Стиль таймера
                         </div>
+                        <div class="toggle-row">
+                            <span class="toggle-label">Стиль</span>
+                            <select id="displayTimerStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
+                                <option value="circle">⭕ Круговой</option>
+                                <option value="digital">🔢 Цифровой LED</option>
+                                <option value="flip">🔄 Перекидные</option>
+                                <option value="analog">🕐 Аналоговые</option>
+                            </select>
+                        </div>
+                        <div class="toggle-row">
+                            <span class="toggle-label">Масштаб</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="range" id="displayTimerScale" min="50" max="300" value="100" style="width: 80px;">
+                                <span id="displayTimerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
+                            </div>
+                        </div>
+                    </div>
 
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">✨</span>
+                            Цвета таймера
+                        </div>
+                        <div class="themes-grid" id="displayThemesGrid"></div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-group-title">
+                            <span class="icon">🖥️</span>
+                            Полноэкранный режим
+                        </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Монитор</span>
-                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; cursor: pointer; font-size: 0.85em; max-width: 140px;">
-                                <option value="auto" style="background: #1a1a2e;">🖥️ Авто</option>
+                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
+                                <option value="auto">🖥️ Авто</option>
                             </select>
                         </div>
                     </div>

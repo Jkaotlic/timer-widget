@@ -1336,6 +1336,25 @@
                 this.secondsBar.style.strokeDashoffset = this.circumference;
             }
 
+            applyColors(colors = null) {
+                if (!colors) {
+                    const saved = localStorage.getItem('clockColors');
+                    colors = saved ? JSON.parse(saved) : null;
+                }
+                if (!colors) { return; }
+
+                const isSafeColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+
+                if (isSafeColor(colors.timer) && this.timeDisplay) {
+                    this.timeDisplay.style.color = colors.timer;
+                }
+                if (isSafeColor(colors.progress) && this.secondsBar) {
+                    this.secondsBar.style.stroke = colors.progress;
+                }
+
+                localStorage.setItem('clockColors', JSON.stringify(colors));
+            }
+
             setupEventListeners() {
                 // Отслеживание мыши для показа границ
                 this.mouseTimeout = null;
@@ -1599,6 +1618,13 @@
                     this.updateDisplay();
                 };
                 ipcRenderer.on('clock-settings', this._onClockSettings);
+
+                // Per-window color theme (+ backward compat with global colors-update)
+                this._onColorsUpdate = (_event, colors) => {
+                    this.applyColors(colors);
+                };
+                ipcRenderer.on('colors-update', this._onColorsUpdate);
+                ipcRenderer.on('clock-colors-update', this._onColorsUpdate);
             }
 
             cleanup() {
@@ -1617,6 +1643,10 @@
                 if (this._onSetClockStyle) ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);
                 if (this._onDisplaySettingsUpdate) ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);
                 if (this._onClockSettings) ipcRenderer.removeListener('clock-settings', this._onClockSettings);
+                if (this._onColorsUpdate) {
+                    ipcRenderer.removeListener('colors-update', this._onColorsUpdate);
+                    ipcRenderer.removeListener('clock-colors-update', this._onColorsUpdate);
+                }
             }
 
             startClock() {
