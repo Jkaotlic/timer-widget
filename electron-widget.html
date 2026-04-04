@@ -1436,12 +1436,16 @@
                         widgetSettings.bgMode = 'default';
                     }
                     this.applyBackground(widgetSettings);
-                    if (settings.timerStyle) {
-                        this.setTimerStyle(settings.timerStyle);
-                    }
+                    // timerStyle из display-settings-update игнорируем — виджет получает стиль через widget-style-update
                     // Показ цифр на аналоговом циферблате
                     if (settings.showAnalogNumbers !== undefined && this.widgetClockNumbers) {
                         this.widgetClockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
+                    }
+                };
+
+                this.widgetStyleUpdateHandler = (event, settings) => {
+                    if (settings.timerStyle) {
+                        this.setTimerStyle(settings.timerStyle);
                     }
                 };
 
@@ -1450,6 +1454,7 @@
                 ipcRenderer.on('colors-update', this.colorsUpdateHandler);
                 ipcRenderer.on('widget-colors-update', this.colorsUpdateHandler);
                 ipcRenderer.on('display-settings-update', this.displaySettingsUpdateHandler);
+                ipcRenderer.on('widget-style-update', this.widgetStyleUpdateHandler);
             }
 
             cleanup() {
@@ -1463,6 +1468,9 @@
                 }
                 if (this.displaySettingsUpdateHandler) {
                     ipcRenderer.removeListener('display-settings-update', this.displaySettingsUpdateHandler);
+                }
+                if (this.widgetStyleUpdateHandler) {
+                    ipcRenderer.removeListener('widget-style-update', this.widgetStyleUpdateHandler);
                 }
 
                 // Очищаем интервал обновления

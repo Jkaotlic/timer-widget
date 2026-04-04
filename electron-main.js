@@ -36,6 +36,7 @@ let lastDisplaySettings = null;
 let lastWidgetColors = null;
 let lastClockColors = null;
 let lastDisplayColors = null;
+let lastWidgetStyle = null;
 
 // Enable Ctrl+Wheel to resize window
 function enableWindowResizeOnScroll(win) {
@@ -528,6 +529,7 @@ ipcMain.on('display-colors-update', (_event, colors) => {
 
 // Widget style update (independent from display style)
 ipcMain.on('widget-style-update', (_event, settings) => {
+    lastWidgetStyle = settings;
     safelySendToWindow(widgetWindow, 'widget-style-update', settings);
 });
 
@@ -551,9 +553,12 @@ ipcMain.on('open-widget', () => {
                 if (lastDisplaySettings) {
                     safelySendToWindow(widgetWindow, 'display-settings-update', lastDisplaySettings);
                 }
-                // Per-window colors
+                // Per-window colors and style
                 if (lastWidgetColors) {
                     safelySendToWindow(widgetWindow, 'widget-colors-update', lastWidgetColors);
+                }
+                if (lastWidgetStyle) {
+                    safelySendToWindow(widgetWindow, 'widget-style-update', lastWidgetStyle);
                 }
             });
             // Уведомляем окно управления что виджет открыт
