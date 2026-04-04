@@ -267,6 +267,7 @@ class DisplayTimer {
         // Регистрируем обработчики
         this.ipcRenderer.on('timer-state', this.ipcHandlers.timerState);
         this.ipcRenderer.on('colors-update', this.ipcHandlers.colorsUpdate);
+        this.ipcRenderer.on('display-colors-update', this.ipcHandlers.colorsUpdate);
         this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
     }
     
@@ -999,6 +1000,7 @@ class DisplayTimer {
             }
             if (this.ipcHandlers.colorsUpdate) {
                 this.ipcRenderer.removeListener('colors-update', this.ipcHandlers.colorsUpdate);
+                this.ipcRenderer.removeListener('display-colors-update', this.ipcHandlers.colorsUpdate);
             }
             if (this.ipcHandlers.displaySettingsUpdate) {
                 this.ipcRenderer.removeListener('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
