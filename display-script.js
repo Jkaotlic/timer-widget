@@ -33,10 +33,7 @@ class DisplayTimer {
         };
 
         // Настройки отображения
-        this.showCurrentTime = false;
-        this.showEventTime = false;
         this.eventTime = '10:00';
-        this.showEndTime = false;
         this.endTime = '12:00';
         this.timerScale = 100;
         this.timerStyle = 'circle';
@@ -572,9 +569,13 @@ class DisplayTimer {
             const c1 = this._isSafeColor(settings.bgGrad1) ? settings.bgGrad1 : '#0f0c29';
             const c2 = this._isSafeColor(settings.bgGrad2) ? settings.bgGrad2 : '#302b63';
             bg = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
-        } else if (mode === 'image' && settings.bgImageUrl && this._isSafeUrl(settings.bgImageUrl)) {
-            const safeUrl = settings.bgImageUrl.replace(/'/g, '');
-            bg = `url('${safeUrl}') center/cover no-repeat fixed, #000`;
+        } else if (mode === 'image' && settings.bgImageUrl) {
+            const validation = window.SecurityUtils
+                ? window.SecurityUtils.validateImageSource(settings.bgImageUrl)
+                : null;
+            if (validation && validation.valid) {
+                bg = `url("${validation.sanitized.replace(/"/g, '\\"')}") center/cover no-repeat fixed, #000`;
+            }
         } else if (mode === 'local' && settings.bgLocalImage) {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';

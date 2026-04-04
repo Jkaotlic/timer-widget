@@ -130,6 +130,28 @@ function safeJSONParse(jsonString, defaultValue = null) {
 }
 
 /**
+ * Проверяет безопасность CSS цвета
+ * Допускает hex (#rgb, #rrggbb, #rrggbbaa) и rgba() с числовой валидацией
+ * @param {string} value - CSS цвет
+ * @returns {boolean}
+ */
+function isSafeColor(value) {
+    if (!value || typeof value !== 'string') { return false; }
+    if (/^#[0-9a-fA-F]{3,8}$/.test(value)) { return true; }
+    const rgba = /^rgba?\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})(?:,\s*([\d.]+%?))?\)$/.exec(value);
+    if (!rgba) { return false; }
+    const r = Number(rgba[1]);
+    const g = Number(rgba[2]);
+    const b = Number(rgba[3]);
+    if (r > 255 || g > 255 || b > 255) { return false; }
+    if (rgba[4] !== undefined) {
+        const a = rgba[4].endsWith('%') ? parseFloat(rgba[4]) / 100 : parseFloat(rgba[4]);
+        if (isNaN(a) || a < 0 || a > 1) { return false; }
+    }
+    return true;
+}
+
+/**
  * Escape HTML специальных символов
  * Предотвращает XSS при вставке пользовательского текста в HTML
  */
@@ -156,6 +178,7 @@ if (typeof module !== 'undefined' && module.exports) {
         validateImageSource,
         safeSetBackgroundImage,
         safeJSONParse,
+        isSafeColor,
         escapeHTML
     };
 }
@@ -168,6 +191,7 @@ if (typeof window !== 'undefined') {
         validateImageSource,
         safeSetBackgroundImage,
         safeJSONParse,
+        isSafeColor,
         escapeHTML
     };
 }

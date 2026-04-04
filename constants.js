@@ -196,6 +196,8 @@ const CONFIG = {
         TIMER_CONTROL: 'timer-control',
         TIMER_STATE: 'timer-state',
         TIMER_MINUTE: 'timer-minute',
+        TIMER_REACHED_ZERO: 'timer-reached-zero',
+        TIMER_OVERRUN_MINUTE: 'timer-overrun-minute',
         GET_TIMER_STATE: 'get-timer-state',
 
         // Window management
@@ -205,12 +207,20 @@ const CONFIG = {
         CLOSE_DISPLAY: 'close-display',
         OPEN_CLOCK_WIDGET: 'open-clock-widget',
         CLOSE_CLOCK_WIDGET: 'close-clock-widget',
+        MINIMIZE_WINDOW: 'minimize-window',
+        CLOSE_WINDOW: 'close-window',
+        QUIT_APP: 'quit-app',
 
         // Settings
         COLORS_UPDATE: 'colors-update',
         DISPLAY_SETTINGS_UPDATE: 'display-settings-update',
         CLOCK_SETTINGS: 'clock-settings',
         SET_CLOCK_STYLE: 'set-clock-style',
+        CLOCK_WIDGET_RESIZE: 'clock-widget-resize',
+        CLOCK_WIDGET_SCALE: 'clock-widget-scale',
+        CLOCK_WIDGET_SET_STYLE: 'clock-widget-set-style',
+        CLOCK_WIDGET_SETTINGS: 'clock-widget-settings',
+        RESIZE_CONTROL_WINDOW: 'resize-control-window',
 
         // Widget controls
         WIDGET_SET_POSITION: 'widget-set-position',
@@ -218,6 +228,11 @@ const CONFIG = {
         WIDGET_RESIZE: 'widget-resize',
         WIDGET_SCALE: 'widget-scale',
         WIDGET_MOVE: 'widget-move',
+
+        // Window state notifications
+        DISPLAY_WINDOW_STATE: 'display-window-state',
+        WIDGET_WINDOW_STATE: 'widget-window-state',
+        CLOCK_WINDOW_STATE: 'clock-window-state',
 
         // Display controls
         GET_DISPLAYS: 'get-displays',

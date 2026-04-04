@@ -3364,7 +3364,17 @@
                         const base64 = e.target.result;
 
                         // Сохраняем в localStorage
-                        localStorage.setItem('localBgImage', base64);
+                        try {
+                            localStorage.setItem('localBgImage', base64);
+                        } catch (err) {
+                            if (err.name === 'QuotaExceededError') {
+                                Toast.show('Изображение слишком большое для хранилища', 'error');
+                            } else {
+                                Toast.show('Ошибка сохранения изображения', 'error');
+                            }
+                            LoadingIndicator.hide(loadingOverlay);
+                            return;
+                        }
 
                         // Обновляем UI
                         this.showLocalBgPreview(base64);
