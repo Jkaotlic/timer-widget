@@ -7,7 +7,6 @@ let controlWindow;
 
 test.beforeAll(async () => {
     electronApp = await electron.launch({
-        executablePath: path.join(__dirname, '..', 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'MacOS', 'Electron'),
         args: [path.join(__dirname, '..', 'electron-main.js')],
     });
     controlWindow = await electronApp.firstWindow();
