@@ -102,6 +102,10 @@ const CONFIG = {
     // ============================================
     STORAGE_KEYS: {
         TIMER_COLORS: 'timerColors',
+        WIDGET_COLORS: 'widgetColors',
+        CLOCK_COLORS: 'clockColors',
+        DISPLAY_COLORS: 'displayColors',
+        WIDGET_STYLE: 'widgetStyle',
         DISPLAY_SETTINGS: 'displaySettings',
         TIMER_SOUND: 'timerSound',
         MINUTE_SOUND: 'minuteSound',
@@ -213,6 +217,10 @@ const CONFIG = {
 
         // Settings
         COLORS_UPDATE: 'colors-update',
+        WIDGET_COLORS_UPDATE: 'widget-colors-update',
+        CLOCK_COLORS_UPDATE: 'clock-colors-update',
+        DISPLAY_COLORS_UPDATE: 'display-colors-update',
+        WIDGET_STYLE_UPDATE: 'widget-style-update',
         DISPLAY_SETTINGS_UPDATE: 'display-settings-update',
         CLOCK_SETTINGS: 'clock-settings',
         SET_CLOCK_STYLE: 'set-clock-style',
