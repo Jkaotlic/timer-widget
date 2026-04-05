@@ -41,7 +41,7 @@
         }
 
         body.mouse-active .widget-border {
-            border-color: rgba(102, 126, 234, 0.4);
+            border-color: transparent;
         }
 
         /* Индикаторы углов для ресайза - скрыты по умолчанию */
@@ -187,14 +187,13 @@
             max-height: 100%;
             pointer-events: none;
             -webkit-app-region: drag;
-            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
         }
 
         /* Фоновый круг с градиентом */
         .bg-circle {
-            fill: var(--widget-bg-fill, rgba(15, 15, 25, 0.85));
-            stroke: rgba(255, 255, 255, 0.08);
-            stroke-width: 2;
+            fill: var(--widget-bg-fill, rgba(15, 15, 25, 0.7));
+            stroke: rgba(255, 255, 255, 0.12);
+            stroke-width: 1.5;
         }
 
         /* Фоновое изображение (для режима local/image) */
@@ -541,13 +540,11 @@
         }
 
         .widget-digital-display {
-            background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
-            border: 2px solid #333;
+            background: rgba(10, 10, 15, 0.75);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            backdrop-filter: blur(20px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            box-shadow: 
-                inset 0 0 30px rgba(0, 0, 0, 0.8),
-                0 4px 20px rgba(0, 0, 0, 0.6),
-                0 0 40px rgba(0, 255, 136, 0.1);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -684,9 +681,9 @@
             position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 49.9%, #0a0a0a 50%, #1a1a1a 100%);
+            background: linear-gradient(180deg, rgba(40, 40, 50, 0.8) 0%, rgba(25, 25, 35, 0.8) 49.9%, rgba(10, 10, 15, 0.85) 50%, rgba(25, 25, 35, 0.8) 100%);
             border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             overflow: hidden;
         }
 
@@ -773,10 +770,10 @@
             width: 150px;
             height: 150px;
             border-radius: 50%;
-            background: linear-gradient(145deg, rgba(26, 26, 46, 0.9) 0%, rgba(15, 15, 26, 0.9) 100%);
-            box-shadow: 
-                0 0 0 3px rgba(102, 126, 234, 0.3),
-                inset 0 0 30px rgba(0, 0, 0, 0.5);
+            background: rgba(15, 15, 25, 0.7);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            backdrop-filter: blur(20px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1107,8 +1104,7 @@
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
-        // safeJSONParse — use SecurityUtils directly (security.js always loaded before this script)
-        const safeJSONParse = window.SecurityUtils.safeJSONParse;
+        // safeJSONParse доступна глобально из security.js
 
         class WidgetTimer {
             constructor() {
@@ -1120,18 +1116,22 @@
                 this.isPaused = false;
                 this.lastTimestamp = 0;
                 this.lastUpdateCounter = -1;
+                this._hasWidgetStyle = false;
 
                 this.initElements();
                 this.initProgress();
-                this.loadSettings();
-                this.applyColors();
-                this.loadBackgroundSettings();
+
+                try {
+                    this.loadSettings();
+                    this.applyColors();
+                    this.loadBackgroundSettings();
+                } catch (e) {
+                    console.warn('Widget init warning:', e.message);
+                }
+
                 this.setupIPC();
                 this.setupEventListeners();
                 this.setupSettings();
-
-                // FIX BUG-020: Removed dead code - checkColorChanges interval
-                // Colors are updated via IPC 'colors-update' event in setupIPC()
             }
 
             initElements() {
@@ -1302,21 +1302,54 @@
 
                 // Валидация цветов
                 const isSafeColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+                const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
+                const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
 
-                // Обновляем градиент
+                // Circle style — SVG gradient + text glow
                 const gradient = document.getElementById('widgetGradient');
                 if (gradient) {
                     const stops = gradient.querySelectorAll('stop');
-                    // FIX BUG-015: Check array length before accessing elements
                     if (stops.length >= 2) {
-                        if (isSafeColor(colors.timer)) { stops[0].setAttribute('stop-color', colors.timer); }
-                        if (isSafeColor(colors.progress)) { stops[1].setAttribute('stop-color', colors.progress); }
+                        if (timerColor) { stops[0].setAttribute('stop-color', timerColor); }
+                        if (progressColor) { stops[1].setAttribute('stop-color', progressColor); }
                     }
                 }
+                if (timerColor && this.timeDisplay) {
+                    this.timeDisplay.style.setProperty('--glow-color', `${timerColor}80`);
+                }
 
-                // Обновляем свечение текста
-                if (isSafeColor(colors.timer)) {
-                    this.timeDisplay.style.setProperty('--glow-color', `${colors.timer}80`);
+                // Digital style
+                if (timerColor && this.widgetDigitalTime) {
+                    this.widgetDigitalTime.style.color = timerColor;
+                    this.widgetDigitalTime.style.textShadow =
+                        `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
+                }
+
+                // Flip style
+                if (timerColor) {
+                    document.querySelectorAll('.widget-flip-digit').forEach(el => {
+                        el.style.color = timerColor;
+                    });
+                    document.querySelectorAll('.widget-flip-separator').forEach(el => {
+                        el.style.color = timerColor;
+                    });
+                }
+
+                // Analog style
+                const secondHand = document.getElementById('widgetHandSecond');
+                const clockCenter = document.getElementById('widgetClockCenter');
+                const analogDigital = document.getElementById('widgetAnalogDigital');
+                if (progressColor && secondHand) {
+                    secondHand.style.background =
+                        `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
+                }
+                if (timerColor && clockCenter) {
+                    clockCenter.style.background = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
+                    clockCenter.style.boxShadow = `0 0 10px ${timerColor}80`;
+                }
+                if (timerColor && analogDigital) {
+                    analogDigital.style.color = `${timerColor}b3`;
+                    analogDigital.style.textShadow = `0 0 10px ${timerColor}4d`;
                 }
             }
 
@@ -1450,6 +1483,11 @@
                     if (settings.timerStyle) {
                         this._hasWidgetStyle = true;
                         this.setTimerStyle(settings.timerStyle);
+                    }
+                    if (settings.timerScale !== undefined) {
+                        const scale = parseInt(settings.timerScale) || 100;
+                        const newSize = Math.round(250 * scale / 100);
+                        ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
                     }
                 };
 

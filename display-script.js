@@ -529,20 +529,52 @@ class DisplayTimer {
     }
 
     applyColors(colors) {
+        const timerColor = colors.timer && this._isSafeColor(colors.timer) ? colors.timer : null;
+        const progressColor = colors.progress && this._isSafeColor(colors.progress) ? colors.progress : null;
+
+        // Circle style — SVG gradient stops + text glow
         const stop1 = document.querySelector('.grad-stop-1');
         const stop2 = document.querySelector('.grad-stop-2');
-
-        if (stop1 && colors.timer && this._isSafeColor(colors.timer)) {
-            stop1.setAttribute('stop-color', colors.timer);
+        if (stop1 && timerColor) { stop1.setAttribute('stop-color', timerColor); }
+        if (stop2 && progressColor) { stop2.setAttribute('stop-color', progressColor); }
+        if (timerColor) {
+            document.documentElement.style.setProperty('--text-glow', `${timerColor}80`);
+            document.documentElement.style.setProperty('--glow-color', `${timerColor}80`);
         }
-        if (stop2 && colors.progress && this._isSafeColor(colors.progress)) {
-            stop2.setAttribute('stop-color', colors.progress);
+
+        // Digital style
+        const digitalTime = document.getElementById('digitalTime');
+        if (timerColor && digitalTime) {
+            digitalTime.style.color = timerColor;
+            digitalTime.style.textShadow =
+                `0 0 20px ${timerColor}, 0 0 40px ${timerColor}, 0 0 80px ${timerColor}66`;
         }
 
-        // Свечение текста
-        if (colors.timer && this._isSafeColor(colors.timer)) {
-            document.documentElement.style.setProperty('--text-glow', `${colors.timer}80`);
-            document.documentElement.style.setProperty('--glow-color', `${colors.timer}80`);
+        // Flip style
+        if (timerColor) {
+            document.querySelectorAll('.flip-digit').forEach(el => {
+                el.style.color = timerColor;
+            });
+            document.querySelectorAll('.flip-separator').forEach(el => {
+                el.style.color = timerColor;
+            });
+        }
+
+        // Analog style
+        const secondHand = document.getElementById('analogHandSecond');
+        const clockCenter = document.querySelector('.clock-center');
+        const analogDigital = document.getElementById('analogDigitalTime');
+        if (progressColor && secondHand) {
+            secondHand.style.background =
+                `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
+            secondHand.style.boxShadow = `0 0 15px ${progressColor}80`;
+        }
+        if (timerColor && clockCenter) {
+            clockCenter.style.background = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
+            clockCenter.style.boxShadow = `0 0 15px ${timerColor}99`;
+        }
+        if (timerColor && analogDigital) {
+            analogDigital.style.color = `${timerColor}b3`;
         }
     }
 

@@ -38,6 +38,7 @@ const ALLOWED_CHANNELS = {
         'widget-colors-update',
         'clock-colors-update',
         'display-colors-update',
+        'widget-style-update',
         'timer-minute',
         'timer-reached-zero',
         'timer-overrun-minute',
