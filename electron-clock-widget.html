@@ -42,7 +42,7 @@
         }
 
         body.mouse-active .widget-border {
-            border-color: rgba(56, 239, 125, 0.4);
+            border-color: transparent;
         }
 
         /* Индикаторы углов для ресайза - скрыты по умолчанию */
@@ -186,14 +186,13 @@
             height: 100%;
             max-width: 100%;
             max-height: 100%;
-            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
         }
 
         /* Фоновый круг с градиентом */
         .bg-circle {
-            fill: rgba(15, 15, 25, 0.85);
-            stroke: rgba(255, 255, 255, 0.08);
-            stroke-width: 2;
+            fill: rgba(15, 15, 25, 0.7);
+            stroke: rgba(255, 255, 255, 0.12);
+            stroke-width: 1.5;
         }
 
         /* Декоративный внутренний круг */
@@ -596,13 +595,11 @@
         }
 
         .widget-digital-display {
-            background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
-            border: 2px solid #333;
+            background: rgba(10, 10, 15, 0.75);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            backdrop-filter: blur(20px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            box-shadow:
-                inset 0 0 30px rgba(0, 0, 0, 0.8),
-                0 4px 20px rgba(0, 0, 0, 0.6),
-                0 0 40px rgba(0, 255, 136, 0.1);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -738,9 +735,9 @@
             position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 49.9%, #0a0a0a 50%, #1a1a1a 100%);
+            background: linear-gradient(180deg, rgba(40, 40, 50, 0.8) 0%, rgba(25, 25, 35, 0.8) 49.9%, rgba(10, 10, 15, 0.85) 50%, rgba(25, 25, 35, 0.8) 100%);
             border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .widget-flip-inner::before {
@@ -822,12 +819,10 @@
             width: 200px;
             height: 200px;
             border-radius: 50%;
-            background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
-            box-shadow:
-                0 0 0 4px rgba(56, 239, 125, 0.3),
-                0 0 0 8px rgba(56, 239, 125, 0.1),
-                inset 0 0 30px rgba(0, 0, 0, 0.5);
-            filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4));
+            background: rgba(15, 15, 25, 0.7);
+            -webkit-backdrop-filter: blur(20px) saturate(150%);
+            backdrop-filter: blur(20px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1344,12 +1339,49 @@
                 if (!colors) { return; }
 
                 const isSafeColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+                const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
+                const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
 
-                if (isSafeColor(colors.timer) && this.timeDisplay) {
-                    this.timeDisplay.style.color = colors.timer;
+                // Circle style
+                if (timerColor && this.timeDisplay) {
+                    this.timeDisplay.style.color = timerColor;
                 }
-                if (isSafeColor(colors.progress) && this.secondsBar) {
-                    this.secondsBar.style.stroke = colors.progress;
+                if (progressColor && this.secondsBar) {
+                    this.secondsBar.style.stroke = progressColor;
+                }
+                // Update SVG gradient stops
+                const gradStops = document.querySelectorAll('#clockGradient stop');
+                if (gradStops.length >= 2) {
+                    if (timerColor) { gradStops[0].setAttribute('stop-color', timerColor); }
+                    if (progressColor) { gradStops[1].setAttribute('stop-color', progressColor); }
+                }
+
+                // Digital style
+                if (timerColor && this.widgetDigitalTime) {
+                    this.widgetDigitalTime.style.color = timerColor;
+                    this.widgetDigitalTime.style.textShadow =
+                        `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
+                }
+
+                // Flip style
+                if (timerColor) {
+                    document.querySelectorAll('.widget-flip-digit').forEach(el => {
+                        el.style.color = timerColor;
+                    });
+                    document.querySelectorAll('.widget-flip-separator').forEach(el => {
+                        el.style.color = timerColor;
+                    });
+                }
+
+                // Analog style
+                if (progressColor && this.clockAnalogSecond) {
+                    this.clockAnalogSecond.style.background =
+                        `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
+                    this.clockAnalogSecond.style.boxShadow = `0 0 12px ${progressColor}80`;
+                }
+                if (timerColor) {
+                    const center = document.querySelector('.widget-analog-center');
+                    if (center) { center.style.background = timerColor; }
                 }
 
                 localStorage.setItem('clockColors', JSON.stringify(colors));

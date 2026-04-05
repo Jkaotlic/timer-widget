@@ -539,7 +539,6 @@ ipcMain.on('display-settings-update', (event, settings) => {
     lastDisplaySettings = settings;
 
     safelySendToWindow(displayWindow, 'display-settings-update', settings);
-    safelySendToWindow(widgetWindow, 'display-settings-update', settings);
     safelySendToWindow(clockWidgetWindow, 'display-settings-update', settings);
 });
 

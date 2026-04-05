@@ -25,16 +25,17 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 **Main process** (`electron-main.js`) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
-1. **Control Window** (`electron-control.html`) — main management panel with 3 settings tabs (Таймер, Часы, Дисплей). ~4500 lines, all inline HTML/CSS/JS.
-2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. Draggable and resizable.
-3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. Supports 4 styles: circle, digital, flip, analog. Has a `DisplayTimer` class.
-4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget, analog/digital.
+1. **Control Window** (`electron-control.html`) — main management panel with 4 settings tabs (Виджет, Часы, Полноэкранный, Звуки). ~4800 lines, all inline HTML/CSS/JS. Settings always visible (no toggle).
+2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, digital, flip, analog. Glassmorphism design.
+3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, digital, flip, analog. Has a `DisplayTimer` class.
+4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, digital, flip, analog. Glassmorphism design.
 
 ### IPC Communication
 
 - `preload.js` exposes `window.electronAPI` with a channel whitelist (`ALLOWED_CHANNELS`). Context isolation and sandbox are enabled on all windows.
 - `ipc-compat.js` provides backward compatibility mapping old `ipcRenderer` calls to the new `electronAPI`.
-- Control window sends commands (`timer-command`, `colors-update`, `display-settings-update`); main process broadcasts state (`timer-state`) to all windows every second.
+- Control window sends commands (`timer-command`, `widget-colors-update`, `display-settings-update`); main process broadcasts state (`timer-state`) to all windows every second.
+- Per-window color channels: `widget-colors-update`, `clock-colors-update`, `display-colors-update` — each window gets only its own colors (no global broadcast).
 - Timer state uses a monotonic `updateCounter` (not timestamps) for reliable sync.
 
 ### Shared Modules
@@ -77,7 +78,10 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 |---------|---------|
 | `timer-command` | Start/pause/reset/set timer with payload `{ type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes }` |
 | `timer-control` | Keyboard shortcuts from display: `'start'` / `'pause'` / `'reset'` (plain string) |
-| `colors-update` | `{ timer: '#hex', progress: '#hex' }` |
+| `widget-colors-update` | `{ timer: '#hex', progress: '#hex' }` — widget only |
+| `clock-colors-update` | `{ timer: '#hex', progress: '#hex' }` — clock only |
+| `display-colors-update` | `{ timer: '#hex', progress: '#hex' }` — display only |
+| `widget-style-update` | `{ timerStyle, timerScale }` — widget style/scale |
 | `display-settings-update` | Display style, background, clock settings |
 | `get-timer-state` | Request current timer state |
 | `get-displays` | Request list of available displays |
@@ -94,7 +98,11 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | Channel | Payload |
 |---------|---------|
 | `timer-state` | Full `timerState` object (see below) — broadcast every second |
-| `colors-update` | `{ timer, progress }` |
+| `colors-update` | `{ timer, progress }` (legacy, unused) |
+| `widget-colors-update` | `{ timer, progress }` — per-window |
+| `clock-colors-update` | `{ timer, progress }` — per-window |
+| `display-colors-update` | `{ timer, progress }` — per-window |
+| `widget-style-update` | `{ timerStyle, timerScale }` |
 | `timer-minute` | Fired when 1 minute remains |
 | `timer-reached-zero` | Fired at 00:00 |
 | `timer-overrun-minute` | Fired every N minutes in overrun mode |
@@ -121,7 +129,7 @@ Broadcast via `timer-state` channel every second:
 
 ## Testing
 
-67 tests using Node.js built-in test runner (`node --test`). Test files in `tests/`:
+70 tests using Node.js built-in test runner (`node --test`). Test files in `tests/`:
 
 | File | Covers |
 |------|--------|
@@ -139,3 +147,24 @@ Broadcast via `timer-state` channel every second:
 
 GitHub Actions (`.github/workflows/nodejs.yml`): Node 22, ubuntu-latest — runs `npm run ci` (lint + test).
 Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
+
+## Gotchas
+
+- **IPC whitelist is duplicated**: `preload.js` inlines the whitelist from `channel-validator.js` (sandbox blocks `require()`). Both files MUST stay in sync — the test `channel-validator.test.js` verifies this.
+- **Adding new IPC channel**: Add to BOTH `send` and `receive` arrays in BOTH `preload.js` and `channel-validator.js`. Missing receive = widget silently ignores messages.
+- **Per-window colors**: Never use global `colors-update` broadcast. Use `widget-colors-update`, `clock-colors-update`, `display-colors-update` to avoid color bleeding between windows.
+- **`ipc-compat.js`**: All renderer HTML files use `ipcRenderer.on/send` which is shimmed to `electronAPI` via this compat layer. Don't use `electronAPI` directly in renderers.
+- **Inline styles in HTML**: Each HTML file has ~1000+ lines of inline CSS/JS. CSP requires `unsafe-inline`. No external CSS frameworks.
+- **Widget devTools**: Set to `false` in production. Change to `true` in `electron-main.js` for debugging.
+- **Design previews**: Always read real HTML structure first, replicate exact layout, then apply CSS-only improvements. Never generate new layouts from scratch.
+- **Sounds**: 20 built-in sounds synthesized via Web Audio API in `electron-control.html` `generateSound()`. No audio files — all oscillator-based.
+- **Control panel layout**: Titlebar → Timer (68px) → Start/Pause/Reset → Presets 2x4 → Adjust +/- → Overtime toggle → Window buttons (3-col) → Tabs always visible (Виджет, Часы, Полноэкранный, Звуки).
+- **syncClockStyle**: Defaults to `true` (hidden checkbox). When true, clock style follows widget style dropdown. The widget `timerStyleEl` change handler must send both `widget-style-update` AND `clock-widget-set-style`.
+- **applyColors must cover all 4 styles**: In widget/clock/display, `applyColors()` must update circle (SVG gradient), digital (LED text + text-shadow), flip (digits + separators), and analog (second hand + center dot). Not just the circle style.
+- **No external shadows on transparent windows**: Widget and clock windows have `transparent: true` + `hasShadow: false`. Never use `drop-shadow`, `box-shadow` (external), or `filter: shadow` on elements — they create visible dark rectangles. Use only `inset` shadows or `border` for depth.
+
+## Automation
+
+- **Hooks** (`.claude/settings.json`): Auto-lint on Edit/Write, block `.env` file edits
+- **Subagent** (`.claude/agents/code-reviewer.md`): IPC consistency checker for post-change review
+- **Skills**: `ui-ux-pro-max` installed in `.claude/skills/` for design system generation

@@ -23,12 +23,24 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
+        /* Subtle noise texture for glass depth */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+        }
+
         .control-window {
-            background: #000;
+            background: #050508;
             background-image:
-                radial-gradient(ellipse at 20% 50%, rgba(88, 40, 180, 0.15) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 20%, rgba(10, 132, 255, 0.1) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 100%, rgba(88, 40, 180, 0.08) 0%, transparent 40%);
+                radial-gradient(ellipse at 20% 40%, rgba(88, 40, 180, 0.2) 0%, transparent 55%),
+                radial-gradient(ellipse at 80% 15%, rgba(10, 132, 255, 0.15) 0%, transparent 45%),
+                radial-gradient(ellipse at 40% 90%, rgba(120, 50, 200, 0.12) 0%, transparent 40%);
             height: 100vh;
             padding: 0;
             overflow: hidden;
@@ -38,20 +50,20 @@
         }
 
         .control-panel {
-            background: rgba(28, 28, 30, 0.72);
-            backdrop-filter: blur(40px) saturate(180%);
-            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            background: rgba(22, 22, 26, 0.78);
+            backdrop-filter: blur(50px) saturate(200%);
+            -webkit-backdrop-filter: blur(50px) saturate(200%);
             border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.07);
             padding: 0;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.7), 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.08), inset 0 -0.5px 0 rgba(0, 0, 0, 0.2);
             max-width: 100%;
             width: calc(100% - 16px);
             margin: 8px auto;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 16px);
+            max-height: calc(100vh - 16px);
         }
 
         /* Scrollable content area */
@@ -162,18 +174,21 @@
         }
         .custom-titlebar .win-btn:nth-child(1) {
             background: #ff5f57;
+            box-shadow: 0 0 6px rgba(255, 95, 87, 0.3);
         }
         .custom-titlebar .win-btn:nth-child(2) {
             background: #febc2e;
+            box-shadow: 0 0 6px rgba(254, 188, 46, 0.3);
         }
         .custom-titlebar .win-btn:nth-child(3) {
             background: #28c840;
+            box-shadow: 0 0 6px rgba(40, 200, 64, 0.3);
         }
 
         /* Timer header */
         .timer-header {
-            background: transparent;
-            padding: 16px 16px 12px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            padding: 20px 16px 16px;
             text-align: center;
             position: relative;
             flex-shrink: 0;
@@ -190,14 +205,15 @@
         }
 
         .timer-display-main {
-            font-size: 64px;
+            font-size: 68px;
             font-weight: 200;
-            color: rgba(255, 255, 255, 0.95);
+            color: #fff;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
             font-variant-numeric: tabular-nums;
-            letter-spacing: -1px;
-            margin-bottom: 8px;
+            letter-spacing: -2px;
+            margin-bottom: 10px;
             transition: color 0.3s;
+            text-shadow: 0 0 60px rgba(10, 132, 255, 0.15), 0 2px 4px rgba(0,0,0,0.3);
         }
 
         .timer-display-main.danger {
@@ -277,16 +293,21 @@
         }
 
         .main-btn.start {
-            width: 56px;
-            height: 56px;
-            font-size: 22px;
-            background: #30d158;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #34d65c 0%, #28b84a 100%);
             color: white;
+            box-shadow: 0 6px 24px rgba(48, 209, 88, 0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
         }
 
         .main-btn:hover:not(:disabled) {
             transform: scale(1.08);
             filter: brightness(1.15);
+        }
+
+        .main-btn.start:hover:not(:disabled) {
+            box-shadow: 0 8px 32px rgba(48, 209, 88, 0.6), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
         }
 
         .main-btn:active:not(:disabled) {
@@ -299,13 +320,21 @@
         }
 
         .main-btn.pause {
-            background: #ff9f0a;
+            background: linear-gradient(135deg, #ffab1a 0%, #e8900a 100%);
             color: white;
+            box-shadow: 0 4px 18px rgba(255, 159, 10, 0.35), inset 0 1px 0 rgba(255,255,255,0.2);
         }
 
         .main-btn.reset {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.06);
             color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(10px);
+        }
+
+        .main-btn.reset:hover:not(:disabled) {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.15);
         }
 
         /* Content section */
@@ -350,9 +379,9 @@
         }
 
         .tab-btn.active {
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
         }
 
         .tab-content {
@@ -601,11 +630,12 @@
 
         /* Settings groups */
         .settings-group {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.04);
-            border-radius: 12px;
-            padding: 12px;
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 14px;
             margin-bottom: 12px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.2);
         }
 
         .settings-group-title {
@@ -672,13 +702,15 @@
         }
 
         .theme-btn:hover {
-            transform: scale(1.15);
-            border-color: rgba(255, 255, 255, 0.25);
+            transform: scale(1.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 8px rgba(255,255,255,0.1);
         }
 
         .theme-btn.active {
-            border-color: rgba(255, 255, 255, 0.6);
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+            border-color: #fff;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 0 16px rgba(255,255,255,0.15);
+            transform: scale(1.1);
         }
 
         .theme-btn::after {
@@ -726,6 +758,19 @@
             color: rgba(255, 255, 255, 0.8);
         }
 
+        /* Fix dropdown visibility for all selects */
+        select option,
+        .sound-select option {
+            background: #1c1c1e;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        select optgroup,
+        .sound-select optgroup {
+            background: #1c1c1e;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
         .sound-preview {
             width: 34px;
             height: 34px;
@@ -741,7 +786,8 @@
 
         .sound-preview:hover {
             background: rgba(10, 132, 255, 0.2);
-            color: #0a84ff;
+            color: #3ea6ff;
+            box-shadow: 0 0 10px rgba(10,132,255,0.15);
         }
 
         /* Custom sounds */
@@ -891,7 +937,8 @@
         }
 
         .toggle-switch input:checked + .toggle-slider {
-            background: #30d158;
+            background: linear-gradient(135deg, #34d65c 0%, #28b84a 100%);
+            box-shadow: 0 0 16px rgba(48, 209, 88, 0.4), 0 2px 4px rgba(0,0,0,0.2);
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
@@ -1198,15 +1245,17 @@
         }
 
         .quick-preset:hover {
-            border-color: rgba(10, 132, 255, 0.3);
-            background: rgba(10, 132, 255, 0.1);
+            border-color: rgba(10, 132, 255, 0.4);
+            background: rgba(10, 132, 255, 0.12);
             color: #0a84ff;
+            box-shadow: 0 0 12px rgba(10,132,255,0.1);
         }
 
         .quick-preset.active {
-            border-color: #0a84ff;
-            background: #0a84ff;
+            border-color: transparent;
+            background: linear-gradient(135deg, #0a84ff 0%, #0070e0 100%);
             color: white;
+            box-shadow: 0 4px 16px rgba(10, 132, 255, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
         }
 
         .adjust-main-section {
@@ -1238,9 +1287,10 @@
         }
 
         .adjust-main-btn.plus:hover {
-            background: rgba(10, 132, 255, 0.15);
-            color: #0a84ff;
-            border-color: rgba(10, 132, 255, 0.3);
+            background: rgba(10, 132, 255, 0.18);
+            color: #3ea6ff;
+            border-color: rgba(10, 132, 255, 0.35);
+            box-shadow: 0 0 10px rgba(10,132,255,0.1);
         }
 
         .adjust-main-btn.minus {
@@ -1248,9 +1298,10 @@
         }
 
         .adjust-main-btn.minus:hover {
-            background: rgba(255, 69, 58, 0.12);
-            color: #ff453a;
-            border-color: rgba(255, 69, 58, 0.3);
+            background: rgba(255, 69, 58, 0.15);
+            color: #ff5c52;
+            border-color: rgba(255, 69, 58, 0.35);
+            box-shadow: 0 0 10px rgba(255,69,58,0.1);
         }
 
         .overtime-toggle-row {
@@ -1400,13 +1451,14 @@
         }
 
         .quick-window-btn.active {
-            background: rgba(10, 132, 255, 0.2);
+            background: rgba(10, 132, 255, 0.12);
             border-color: rgba(10, 132, 255, 0.4);
-            color: #0a84ff;
+            color: #3ea6ff;
+            box-shadow: 0 0 20px rgba(10, 132, 255, 0.15), inset 0 0.5px 0 rgba(255,255,255,0.08);
         }
 
         .quick-window-btn.active:hover {
-            background: rgba(10, 132, 255, 0.25);
+            background: rgba(10, 132, 255, 0.2);
         }
 
         /* Settings toggle */
@@ -1440,16 +1492,11 @@
 
         /* Advanced settings */
         .advanced-settings {
-            display: none;
+            display: flex;
+            flex-direction: column;
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-        }
-
-        .advanced-settings.open {
-            display: flex;
-            flex-direction: column;
-            animation: slideDown 0.3s ease-out;
         }
 
         @keyframes slideDown {
@@ -2192,16 +2239,8 @@
         <!-- Hidden sound toggle for JS compatibility -->
         <button id="soundToggleBtn" style="display:none;"></button>
 
-        <!-- Настройки -->
-        <div class="settings-row-bar">
-            <button class="settings-toggle" id="settingsToggle" title="Развернуть настройки">
-                <span>⚙️ Настройки</span>
-                <span class="arrow">▼</span>
-            </button>
-        </div>
-
-        <!-- Расширенные настройки (скрыты по умолчанию) -->
-        <div class="advanced-settings" id="advancedSettings">
+        <!-- Настройки (всегда видны) -->
+        <div class="advanced-settings open" id="advancedSettings">
             <div class="content-section">
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="timer" title="Стиль, масштаб и цвета виджета">
@@ -2293,6 +2332,10 @@
                                     <option value="ding">Динь</option>
                                     <option value="whoosh">Свист</option>
                                     <option value="click">Клик</option>
+                                    <option value="chime">Перезвон</option>
+                                    <option value="notification">Нотификация</option>
+                                    <option value="rising">Нарастающий</option>
+                                    <option value="pulse">Пульс</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
                             </select>
@@ -2315,6 +2358,10 @@
                                     <option value="alarm">Будильник</option>
                                     <option value="fanfare">Фанфары</option>
                                     <option value="gong">Гонг</option>
+                                    <option value="chime">Перезвон</option>
+                                    <option value="complete">Завершение</option>
+                                    <option value="notification">Нотификация</option>
+                                    <option value="drop">Падающий тон</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
                             </select>
@@ -2336,6 +2383,9 @@
                                     <option value="ding">Динь</option>
                                     <option value="tick">Тик</option>
                                     <option value="soft-alert">Мягкий сигнал</option>
+                                    <option value="countdown-tick">Обратный отсчёт</option>
+                                    <option value="pulse">Пульс</option>
+                                    <option value="notification">Нотификация</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
                             </select>
@@ -2357,6 +2407,9 @@
                                     <option value="ding">Динь</option>
                                     <option value="alarm">Будильник</option>
                                     <option value="soft-alert">Мягкий сигнал</option>
+                                    <option value="countdown-tick">Обратный отсчёт</option>
+                                    <option value="rising">Нарастающий</option>
+                                    <option value="pulse">Пульс</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupOverrun"></optgroup>
                             </select>
@@ -2406,6 +2459,13 @@
                                 <option value="flip">🔄 Перекидные часы</option>
                                 <option value="analog">🕐 Аналоговые</option>
                             </select>
+                        </div>
+                        <div class="toggle-row">
+                            <span class="toggle-label">Масштаб</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="range" id="clockScale" min="50" max="300" value="100" style="width: 80px;">
+                                <span id="clockScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
+                            </div>
                         </div>
                         <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
                             <span class="toggle-label">Цифры на циферблате</span>
@@ -2472,14 +2532,6 @@
 
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">✨</span>
-                            Цвета таймера
-                        </div>
-                        <div class="themes-grid" id="displayThemesGrid"></div>
-                    </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
                             <span class="icon">🖥️</span>
                             Полноэкранный режим
                         </div>
@@ -2528,9 +2580,12 @@
 
                     <div class="settings-group">
                         <div class="settings-group-title">
-                            <span class="icon">🖼️</span>
-                            Фон дисплея
+                            <span class="icon">🎨</span>
+                            Оформление дисплея
                         </div>
+                        <div class="settings-group-title" style="font-size:10px;margin-top:4px">Цвета таймера</div>
+                        <div class="themes-grid" id="displayThemesGrid"></div>
+                        <div class="settings-group-title" style="font-size:10px;margin-top:12px">Фон</div>
                         <div class="bg-mode-tabs">
                             <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
                             <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
@@ -2688,7 +2743,7 @@
                     <div class="faq-item">
                         <div class="faq-question">Полноэкранный дисплей</div>
                         <div class="faq-answer">
-                            <p>Таймер на весь экран — для презентаций, стримов и мероприятий. Настраивается во вкладке <strong>Дисплей</strong>.</p>
+                            <p>Таймер на весь экран — для презентаций, стримов и мероприятий. Настраивается во вкладке <strong>Полноэкранный</strong>.</p>
                             <ul>
                                 <li>Выбор монитора (если их несколько)</li>
                                 <li>4 стиля таймера + настройка масштаба</li>
@@ -2712,7 +2767,7 @@
                                 <li><strong>🔄 Перекидные</strong> — механические flip-часы</li>
                                 <li><strong>🕐 Аналоговые</strong> — классический циферблат со стрелками</li>
                             </ul>
-                            <p>Стиль выбирается во вкладке <strong>Дисплей</strong>. Виджет часов может использовать тот же стиль или свой.</p>
+                            <p>Стиль выбирается во вкладке <strong>Полноэкранный</strong>. Виджет часов может использовать тот же стиль или свой.</p>
                         </div>
                     </div>
                     <div class="faq-item">
@@ -2807,7 +2862,7 @@
                                 <li>🔄 Все окна синхронизированы — изменения видны мгновенно</li>
                                 <li>🖱️ <strong>Ctrl+Колесо</strong> — самый быстрый способ подобрать размер</li>
                                 <li>⏱️ Виджет удобен для постоянного отслеживания времени</li>
-                                <li>🎥 Дисплей идеален для презентаций и трансляций</li>
+                                <li>🎥 Полноэкранный идеален для презентаций и трансляций</li>
                                 <li>❓ <strong>F1</strong> — шпаргалка по горячим клавишам в любой момент</li>
                             </ul>
                         </div>
@@ -3030,19 +3085,11 @@
             }
 
             initTabs() {
-                // Кнопка настроек
-                const settingsToggle = document.getElementById('settingsToggle');
+                // Настройки всегда видны (кнопка toggle убрана)
                 const advancedSettings = document.getElementById('advancedSettings');
-                
-                settingsToggle.addEventListener('click', () => {
-                    settingsToggle.classList.toggle('open');
-                    advancedSettings.classList.toggle('open');
-                    
-                    // Изменяем размер окна после анимации
-                    setTimeout(() => {
-                        this.autoResizeWindow();
-                    }, 400);
-                });
+                if (advancedSettings) {
+                    advancedSettings.classList.add('open');
+                }
 
                 // Табы внутри настроек
                 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -3301,21 +3348,18 @@
                 });
                 
                 this.timerStyleEl.addEventListener('change', () => {
-                    // Send widget-specific style update
+                    // Send widget-specific style update (only affects widget, not display)
                     ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value });
-                    this.pushDisplaySettings();
-                    // Синхронизируем стиль с виджетом часов если включена синхронизация
+                    // Sync clock style when syncClockStyle is enabled
                     if (this.syncClockStyle) {
-                        this.clockStyleEl.value = this.timerStyleEl.value;
-                        this.updateClockAnalogNumbersVisibility();
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
+                    this.updateClockAnalogNumbersVisibility();
                 });
                 
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
                     ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: parseInt(this.timerScaleEl.value) });
-                    this.pushDisplaySettings();
                 });
 
                 // Display-specific style/scale (Полноэкранный tab)
@@ -3353,6 +3397,18 @@
                     this.updateClockAnalogNumbersVisibility();
                     this.saveExtSettings();
                 });
+
+                // Масштаб часов
+                const clockScaleEl = document.getElementById('clockScale');
+                const clockScaleValueEl = document.getElementById('clockScaleValue');
+                if (clockScaleEl) {
+                    clockScaleEl.addEventListener('input', () => {
+                        const val = parseInt(clockScaleEl.value);
+                        clockScaleValueEl.textContent = val + '%';
+                        const newSize = Math.round(220 * val / 100);
+                        ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                    });
+                }
 
                 // Цифры на циферблате для часов
                 this.clockShowAnalogNumbersEl.addEventListener('change', () => {
@@ -3825,9 +3881,8 @@
                     localStorage.setItem('displayColors', JSON.stringify(colors));
                     ipcRenderer.send('display-colors-update', colors);
                 }
-                // Backward compat
+                // Backward compat (localStorage only, no global IPC broadcast)
                 localStorage.setItem('timerColors', JSON.stringify(this.currentColors));
-                ipcRenderer.send('colors-update', this.currentColors);
             }
 
             saveExtSettings() {
@@ -3901,8 +3956,8 @@
                     eventTime: this.eventTimeInputEl.value,
                     endTime: this.endTimeInputEl.value,
                     timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
-                    timerStyle: this.timerStyleEl.value,
-                    timerScale: parseInt(this.timerScaleEl.value)
+                    timerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
+                    timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value)
                 };
                 ipcRenderer.send('display-settings-update', settings);
             }
@@ -4160,15 +4215,16 @@
             autoResizeWindow() {
                 // Измеряем реальную высоту всего контента
                 const panel = document.querySelector('.control-panel');
-                
-                // Получаем реальную высоту панели + отступы + заголовок окна
-                const panelHeight = panel.getBoundingClientRect().height;
-                const extra = 75; // отступы + заголовок окна Windows + запас
-                
-                const neededHeight = Math.ceil(panelHeight + extra);
-                
-                ipcRenderer.send('resize-control-window', { 
-                    width: (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 420, 
+
+                // scrollHeight даёт полную высоту контента, даже если overflow скрывает часть
+                const contentHeight = panel.scrollHeight;
+                const margin = 16; // margin: 8px auto (top + bottom)
+                const extra = 40; // заголовок окна Windows + запас
+
+                const neededHeight = Math.ceil(contentHeight + margin + extra);
+
+                ipcRenderer.send('resize-control-window', {
+                    width: (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 420,
                     height: neededHeight
                 });
             }
@@ -4390,6 +4446,117 @@
                         });
                         break;
                     }
+                    case 'chime': {
+                        // Колокольный перезвон
+                        [1318, 1175, 1046, 784].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env.gain.setValueAtTime(0.0001, now + i * 0.2);
+                            env.gain.exponentialRampToValueAtTime(0.12, now + i * 0.2 + 0.01);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.2 + 0.6);
+                            o.start(now + i * 0.2);
+                            o.stop(now + i * 0.2 + 0.65);
+                        });
+                        break;
+                    }
+                    case 'pulse': {
+                        // Пульсирующий бип
+                        for (let i = 0; i < 5; i++) {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            o.frequency.value = 660;
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            env.gain.setValueAtTime(0.0001, now + i * 0.12);
+                            env.gain.exponentialRampToValueAtTime(0.15, now + i * 0.12 + 0.02);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.12 + 0.08);
+                            o.start(now + i * 0.12);
+                            o.stop(now + i * 0.12 + 0.1);
+                        }
+                        break;
+                    }
+                    case 'rising': {
+                        // Нарастающий тон
+                        const o = ctx.createOscillator();
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(300, now);
+                        o.frequency.exponentialRampToValueAtTime(1200, now + 0.5);
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.15, now);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+                        o.start(now);
+                        o.stop(now + 0.6);
+                        break;
+                    }
+                    case 'drop': {
+                        // Падающий тон
+                        const o = ctx.createOscillator();
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(1200, now);
+                        o.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.15, now);
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+                        o.start(now);
+                        o.stop(now + 0.5);
+                        break;
+                    }
+                    case 'notification': {
+                        // iOS-стиль нотификация
+                        [880, 1109, 1319].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'triangle';
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env.gain.setValueAtTime(0.0001, now + i * 0.08);
+                            env.gain.exponentialRampToValueAtTime(0.1, now + i * 0.08 + 0.01);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.2);
+                            o.start(now + i * 0.08);
+                            o.stop(now + i * 0.08 + 0.25);
+                        });
+                        break;
+                    }
+                    case 'countdown-tick': {
+                        // Тик-так обратный отсчёт
+                        for (let i = 0; i < 3; i++) {
+                            const o = ctx.createOscillator();
+                            o.type = 'square';
+                            o.frequency.value = i < 2 ? 600 : 900;
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            env.gain.setValueAtTime(0.0001, now + i * 0.3);
+                            env.gain.exponentialRampToValueAtTime(i < 2 ? 0.08 : 0.15, now + i * 0.3 + 0.01);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.3 + 0.06);
+                            o.start(now + i * 0.3);
+                            o.stop(now + i * 0.3 + 0.08);
+                        }
+                        break;
+                    }
+                    case 'complete': {
+                        // Аккорд завершения
+                        [523, 659, 784, 1047].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env.gain.setValueAtTime(0.0001, now);
+                            env.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                            o.start(now + i * 0.05);
+                            o.stop(now + 1.3);
+                        });
+                        break;
+                    }
                     default:
                         beep(880, now, 0.15);
                 }
@@ -4606,7 +4773,7 @@
         if (window.ipcRenderer) {
             window.ipcRenderer.on('display-window-state', (event, data) => {
                 isDisplayOpen = data.isOpen;
-                updateWindowButton('openDisplayBtn', isDisplayOpen, '🖥️ Дисплей');
+                updateWindowButton('openDisplayBtn', isDisplayOpen, '🖥️ Полноэкранный');
             });
 
             window.ipcRenderer.on('widget-window-state', (event, data) => {
