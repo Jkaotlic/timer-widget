@@ -33,11 +33,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            border: 2px solid transparent;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             pointer-events: none;
             z-index: 9998;
-            transition: border-color 0.3s ease;
-            border-radius: 8px;
+            transition: border-color 0.2s ease-out;
+            border-radius: 24px;
         }
 
         body.mouse-active .widget-border {
@@ -247,25 +247,25 @@
             stroke-width: 8;
             stroke-linecap: round;
             transition: stroke-dashoffset 0.3s ease-out;
-            filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.5));
+            filter: none;
         }
 
         /* FIX BUG-018: Use data attributes for status */
         .progress-bar[data-status="warning"] {
             stroke: url(#warningGradient);
-            filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.5));
+            filter: none;
         }
 
         .progress-bar[data-status="danger"],
         .progress-bar[data-status="overtime"] {
             stroke: url(#dangerGradient);
-            filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
+            filter: none;
             animation: pulse-glow 1s infinite;
         }
 
         @keyframes pulse-glow {
-            0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6)); }
-            50% { filter: drop-shadow(0 0 16px rgba(255, 68, 68, 0.9)); }
+            0%, 100% { filter: none; }
+            50% { filter: none; }
         }
 
         /* Шкала с делениями */
@@ -291,14 +291,14 @@
 
         .time-display {
             font-size: clamp(1.5rem, min(18vw, 18vh), 8rem);
-            font-weight: 700;
+            font-weight: 200;
             color: white;
-            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-family: 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif;
             letter-spacing: 0.05em;
             text-shadow: 
                 0 2px 4px rgba(0, 0, 0, 0.5),
                 0 0 30px var(--glow-color, rgba(102, 126, 234, 0.6));
-            transition: color 0.3s, text-shadow 0.3s;
+            transition: color 0.2s ease-out, text-shadow 0.2s ease-out;
             white-space: nowrap;
         }
 
@@ -330,7 +330,7 @@
             background: rgba(255, 255, 255, 0.1);
             color: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(5px);
-            transition: all 0.3s;
+            transition: all 0.2s ease-out;
         }
 
         .status-badge.running {
@@ -410,7 +410,7 @@
             top: 15%;
             right: 10%;
             background: rgba(20, 20, 35, 0.95);
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(40px) saturate(180%);
             border-radius: 16px;
             padding: clamp(10px, 4%, 20px);
             min-width: min(180px, 70%);
@@ -422,7 +422,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             z-index: 1000;
             -webkit-app-region: no-drag;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .settings-panel.visible {
@@ -937,8 +937,8 @@
                 <defs>
                     <!-- Основной градиент -->
                     <linearGradient id="widgetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#667eea" />
-                        <stop offset="100%" stop-color="#764ba2" />
+                        <stop offset="0%" stop-color="#0a84ff" />
+                        <stop offset="100%" stop-color="#30d158" />
                     </linearGradient>
                     <!-- Предупреждение -->
                     <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
