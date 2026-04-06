@@ -55,3 +55,22 @@
 - Variant B "Spacious 700×760" approved
 - Mockup: `.superpowers/brainstorm/1518-1775466547/content/design-v2.html`
 - Spec: `docs/superpowers/specs/2026-04-06-settings-panel-v2.md`
+
+## Apr 6, 2026 — Design Improvements v2 (Glassmorphism Polish)
+
+### What was done
+- All windows: blur(20px) → blur(40px) saturate(180%) (VisionOS standard)
+- Timer font: SF Mono Bold → Inter Light (weight 200)
+- Digital LED: Courier New → JetBrains Mono
+- Progress ring: solid color → gradient #0a84ff → #30d158 (Apple Activity Rings style)
+- Widget/Clock: removed all external shadows (transparent window safe)
+- Border radius: 8px → 24px on window frames
+- Transitions: 0.3s → 0.2s ease-out
+- Settings panel: inset shadow instead of external box-shadow
+- Apple semantic color palette standardized across all windows
+- Google Fonts @import added to widget, clock, display
+
+### Design
+- Mockup: `.superpowers/brainstorm/1913-1775470678/content/design-improvements.html`
+- Spec: `docs/superpowers/specs/2026-04-06-design-improvements-v2.md`
+- Figma: https://www.figma.com/design/ojj21B75qClGUlDgqAUFIU (control panel, Starter limit)
