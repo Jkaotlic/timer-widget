@@ -40,3 +40,18 @@
 - `602ba6e` — UI polish (titlebar, buttons, per-window wiring)
 - `81ae146` — original glassmorphism redesign
 - `5283824` — security audit
+
+## Apr 6, 2026 — Settings Panel Redesign v2
+
+### What was done
+- Widened control panel: 320px → 700px (min 600, max 800)
+- Presets: 4×2 → 8×1 single row
+- Overtime toggle + window buttons merged into one row
+- All settings tabs use 2-column grid layout
+- Sounds tab stays single-column (full-width events)
+- Window height: 760px, all tabs fit without scrolling
+
+### Design
+- Variant B "Spacious 700×760" approved
+- Mockup: `.superpowers/brainstorm/1518-1775466547/content/design-v2.html`
+- Spec: `docs/superpowers/specs/2026-04-06-settings-panel-v2.md`

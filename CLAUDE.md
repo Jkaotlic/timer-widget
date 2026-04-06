@@ -25,7 +25,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 **Main process** (`electron-main.js`) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
-1. **Control Window** (`electron-control.html`) — main management panel with 4 settings tabs (Виджет, Часы, Полноэкранный, Звуки). ~4800 lines, all inline HTML/CSS/JS. Settings always visible (no toggle).
+1. **Control Window** (`electron-control.html`) — main management panel with 4 settings tabs (Виджет, Часы, Полноэкранный, Звуки). ~4800 lines, all inline HTML/CSS/JS. Settings in 2-column grid layout, 700px wide.
 2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, digital, flip, analog. Glassmorphism design.
 3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, digital, flip, analog. Has a `DisplayTimer` class.
 4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, digital, flip, analog. Glassmorphism design.
@@ -158,7 +158,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Widget devTools**: Set to `false` in production. Change to `true` in `electron-main.js` for debugging.
 - **Design previews**: Always read real HTML structure first, replicate exact layout, then apply CSS-only improvements. Never generate new layouts from scratch.
 - **Sounds**: 20 built-in sounds synthesized via Web Audio API in `electron-control.html` `generateSound()`. No audio files — all oscillator-based.
-- **Control panel layout**: Titlebar → Timer (68px) → Start/Pause/Reset → Presets 2x4 → Adjust +/- → Overtime toggle → Window buttons (3-col) → Tabs always visible (Виджет, Часы, Полноэкранный, Звуки).
+- **Control panel layout**: Titlebar → Timer (52px) → Start/Pause/Reset → Presets 8×1 → Adjust +/- → Overtime+Windows (merged row) → Tabs always visible (Виджет, Часы, Полноэкранный, Звуки). Settings in 2-column grid.
 - **syncClockStyle**: Defaults to `true` (hidden checkbox). When true, clock style follows widget style dropdown. The widget `timerStyleEl` change handler must send both `widget-style-update` AND `clock-widget-set-style`.
 - **applyColors must cover all 4 styles**: In widget/clock/display, `applyColors()` must update circle (SVG gradient), digital (LED text + text-shadow), flip (digits + separators), and analog (second hand + center dot). Not just the circle style.
 - **No external shadows on transparent windows**: Widget and clock windows have `transparent: true` + `hasShadow: false`. Never use `drop-shadow`, `box-shadow` (external), or `filter: shadow` on elements — they create visible dark rectangles. Use only `inset` shadows or `border` for depth.
