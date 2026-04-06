@@ -36,7 +36,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 2px solid transparent;
             pointer-events: none;
             z-index: 9998;
             transition: border-color 0.2s ease-out;
@@ -44,7 +44,7 @@
         }
 
         body.mouse-active .widget-border {
-            border-color: transparent;
+            border-color: rgba(255, 255, 255, 0.08);
         }
 
         /* Индикаторы углов для ресайза - скрыты по умолчанию */
@@ -218,7 +218,7 @@
             stroke-width: 6;
             stroke-linecap: round;
             transition: stroke-dashoffset 0.2s linear;
-            filter: none;
+            filter: drop-shadow(0 0 8px rgba(10, 132, 255, 0.5));
         }
 
         /* Шкала с делениями */
