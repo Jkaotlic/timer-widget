@@ -1318,32 +1318,40 @@
             color: rgba(255, 255, 255, 0.6);
         }
 
-        .quick-windows {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+        .overtime-windows-row {
+            display: flex;
             gap: 8px;
+            align-items: center;
+        }
+
+        .overtime-windows-row .overtime-toggle-row {
+            flex: 1;
+        }
+
+        .quick-windows {
+            display: flex;
+            gap: 6px;
         }
 
         .quick-window-btn {
-            padding: 12px 4px;
+            padding: 7px 12px;
             border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 11px;
             font-weight: 500;
             cursor: pointer;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
-            gap: 4px;
+            gap: 5px;
             transition: all 0.2s;
             white-space: nowrap;
             background: rgba(255, 255, 255, 0.06);
             color: rgba(255, 255, 255, 0.6);
-            text-align: center;
         }
 
         .quick-window-btn .qw-icon {
-            font-size: 20px;
+            font-size: 14px;
             line-height: 1;
         }
 
@@ -2215,23 +2223,21 @@
             </div>
         </div>
 
-        <!-- Считать ниже нуля — глобальная настройка -->
+        <!-- Overtime + Window buttons — merged row -->
         <div class="compact-section">
-            <div class="overtime-toggle-row">
-                <span class="toggle-label">⏱ Считать ниже нуля</span>
-                <label class="toggle-switch" title="Таймер продолжит отсчёт в минус после окончания">
-                    <input type="checkbox" id="allowNegative">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-        </div>
-
-        <!-- Открыть окна -->
-        <div class="compact-section">
-            <div class="quick-windows">
-                <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)"><span class="qw-icon">⏱</span><span class="qw-label">Виджет</span></button>
-                <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)"><span class="qw-icon">🕐</span><span class="qw-label">Часы</span></button>
-                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon">🖥</span><span class="qw-label">Полноэкранный</span></button>
+            <div class="overtime-windows-row">
+                <div class="overtime-toggle-row">
+                    <span class="toggle-label">⏱ Считать ниже нуля</span>
+                    <label class="toggle-switch" title="Таймер продолжит отсчёт в минус после окончания">
+                        <input type="checkbox" id="allowNegative">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="quick-windows">
+                    <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)"><span class="qw-icon">⏱</span><span class="qw-label">Виджет</span></button>
+                    <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)"><span class="qw-icon">🕐</span><span class="qw-label">Часы</span></button>
+                    <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon">🖥</span><span class="qw-label">Полноэкранный</span></button>
+                </div>
             </div>
         </div>
         <!-- Hidden sound toggle for JS compatibility -->
