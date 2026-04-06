@@ -34,11 +34,11 @@
             left: 0;
             right: 0;
             bottom: 0;
-            border: 2px solid transparent;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             pointer-events: none;
             z-index: 9998;
-            transition: border-color 0.3s ease;
-            border-radius: 8px;
+            transition: border-color 0.2s ease-out;
+            border-radius: 24px;
         }
 
         body.mouse-active .widget-border {
@@ -216,7 +216,7 @@
             stroke-width: 6;
             stroke-linecap: round;
             transition: stroke-dashoffset 0.2s linear;
-            filter: drop-shadow(0 0 8px rgba(56, 239, 125, 0.5));
+            filter: none;
         }
 
         /* Шкала с делениями */
@@ -242,14 +242,14 @@
 
         .time-display {
             font-size: clamp(1.2rem, min(14vw, 14vh), 5rem);
-            font-weight: 700;
+            font-weight: 200;
             color: white;
-            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+            font-family: 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif;
             letter-spacing: 0.02em;
             text-shadow: 
                 0 2px 4px rgba(0, 0, 0, 0.5),
                 0 0 30px rgba(56, 239, 125, 0.6);
-            transition: color 0.3s, text-shadow 0.3s;
+            transition: color 0.2s ease-out, text-shadow 0.2s ease-out;
             white-space: nowrap;
         }
 
@@ -382,7 +382,7 @@
             top: 15%;
             right: 10%;
             background: rgba(20, 20, 35, 0.95);
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(40px) saturate(180%);
             border-radius: 16px;
             padding: clamp(10px, 4%, 20px);
             min-width: min(180px, 70%);
@@ -394,7 +394,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             z-index: 1000;
             -webkit-app-region: no-drag;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .settings-panel.visible {
@@ -624,7 +624,7 @@
         }
 
         .widget-digital-time {
-            font-family: 'Courier New', 'Consolas', monospace;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
             font-size: var(--digital-font-size, 24px);
             font-weight: bold;
             color: #00ff88;
@@ -1031,8 +1031,8 @@
                 <defs>
                     <!-- Градиент для часов -->
                     <linearGradient id="clockGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#38ef7d" />
-                        <stop offset="100%" stop-color="#11998e" />
+                        <stop offset="0%" stop-color="#0a84ff" />
+                        <stop offset="100%" stop-color="#30d158" />
                     </linearGradient>
                     <!-- Свечение -->
                     <filter id="glow">
