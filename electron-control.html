@@ -389,10 +389,27 @@
         }
 
         .tab-content.active {
-            display: block;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
             animation: fadeIn 0.3s ease;
             overflow: visible;
             padding-right: 4px;
+        }
+
+        .tab-content .settings-group {
+            margin: 0;
+        }
+
+        /* Sound tab uses single column (full-width items) */
+        #tab-sound.active {
+            display: block;
+        }
+
+        .settings-column {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         /* Tab scrollbar */
@@ -2450,199 +2467,195 @@
 
                 <!-- Таб: Часы -->
                 <div class="tab-content" id="tab-clock">
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">🎨</span>
-                            Стиль часов
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Стиль</span>
-                            <select id="clockStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em;">
-                                <option value="circle">⭕ Круговой</option>
-                                <option value="digital">🔢 Цифровой LED</option>
-                                <option value="flip">🔄 Перекидные часы</option>
-                                <option value="analog">🕐 Аналоговые</option>
-                            </select>
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Масштаб</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="clockScale" min="50" max="300" value="100" style="width: 80px;">
-                                <span id="clockScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
+                    <div class="settings-column">
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">🎨</span>
+                                Стиль часов
+                            </div>
+                            <div class="toggle-row">
+                                <span class="toggle-label">Стиль</span>
+                                <select id="clockStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em;">
+                                    <option value="circle">⭕ Круговой</option>
+                                    <option value="digital">🔢 Цифровой LED</option>
+                                    <option value="flip">🔄 Перекидные часы</option>
+                                    <option value="analog">🕐 Аналоговые</option>
+                                </select>
+                            </div>
+                            <div class="toggle-row">
+                                <span class="toggle-label">Масштаб</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="range" id="clockScale" min="50" max="300" value="100" style="width: 80px;">
+                                    <span id="clockScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
+                                </div>
+                            </div>
+                            <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
+                                <span class="toggle-label">Цифры на циферблате</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="clockShowAnalogNumbers">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
                         </div>
-                        <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
-                            <span class="toggle-label">Цифры на циферблате</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="clockShowAnalogNumbers">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
                     </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">✨</span>
-                            Цвета часов
+                    <div class="settings-column">
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">✨</span>
+                                Цвета часов
+                            </div>
+                            <div class="themes-grid" id="clockThemesGrid"></div>
                         </div>
-                        <div class="themes-grid" id="clockThemesGrid"></div>
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">📋</span>
+                                Отображение
+                            </div>
+                            <div class="toggle-row">
+                                <span class="toggle-label">Показывать дату</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="clockShowDate">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- Hidden elements kept for JS compatibility -->
+                        <input type="checkbox" id="syncClockStyle" style="display:none;">
+                        <input type="checkbox" id="clockShowTimezone" style="display:none;">
+                        <input type="checkbox" id="clockShowSeconds" checked style="display:none;">
+                        <input type="checkbox" id="clockFormat24h" checked style="display:none;">
                     </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">📋</span>
-                            Отображение
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Показывать дату</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="clockShowDate">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Hidden elements kept for JS compatibility -->
-                    <input type="checkbox" id="syncClockStyle" style="display:none;">
-                    <input type="checkbox" id="clockShowTimezone" style="display:none;">
-                    <input type="checkbox" id="clockShowSeconds" checked style="display:none;">
-                    <input type="checkbox" id="clockFormat24h" checked style="display:none;">
                 </div>
 
                 <!-- Таб: Полноэкранный -->
                 <div class="tab-content" id="tab-display">
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">🎨</span>
-                            Стиль таймера
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Стиль</span>
-                            <select id="displayTimerStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
-                                <option value="circle">⭕ Круговой</option>
-                                <option value="digital">🔢 Цифровой LED</option>
-                                <option value="flip">🔄 Перекидные</option>
-                                <option value="analog">🕐 Аналоговые</option>
-                            </select>
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Масштаб</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="displayTimerScale" min="50" max="300" value="100" style="width: 80px;">
-                                <span id="displayTimerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
+                    <div class="settings-column">
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">🎨</span>
+                                Стиль таймера
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">🖥️</span>
-                            Полноэкранный режим
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Монитор</span>
-                            <select id="displaySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
-                                <option value="auto">🖥️ Авто</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">📋</span>
-                            Блоки времени
-                        </div>
-
-                        <div class="toggle-row">
-                            <span class="toggle-label">Показывать блоки</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="showTimeBlocks">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <div id="timeBlocksSettings" style="display: none;">
                             <div class="toggle-row">
-                                <span class="toggle-label">Расположение</span>
-                                <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
-                                    <option value="frame">Рамка</option>
-                                    <option value="top-line">Сверху</option>
-                                    <option value="bottom-line">Снизу</option>
-                                    <option value="corners">По углам</option>
+                                <span class="toggle-label">Стиль</span>
+                                <select id="displayTimerStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
+                                    <option value="circle">⭕ Круговой</option>
+                                    <option value="digital">🔢 Цифровой LED</option>
+                                    <option value="flip">🔄 Перекидные</option>
+                                    <option value="analog">🕐 Аналоговые</option>
                                 </select>
                             </div>
-
                             <div class="toggle-row">
-                                <span class="toggle-label">Размер блоков</span>
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
-                                    <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
+                                <span class="toggle-label">Масштаб</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="range" id="displayTimerScale" min="50" max="300" value="100" style="width: 80px;">
+                                    <span id="displayTimerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">🖥️</span>
+                                Полноэкранный режим
+                            </div>
+                            <div class="toggle-row">
+                                <span class="toggle-label">Монитор</span>
+                                <select id="displaySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
+                                    <option value="auto">🖥️ Авто</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">📋</span>
+                                Блоки времени
+                            </div>
+                            <div class="toggle-row">
+                                <span class="toggle-label">Показывать блоки</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showTimeBlocks">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div id="timeBlocksSettings" style="display: none;">
+                                <div class="toggle-row">
+                                    <span class="toggle-label">Расположение</span>
+                                    <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
+                                        <option value="frame">Рамка</option>
+                                        <option value="top-line">Сверху</option>
+                                        <option value="bottom-line">Снизу</option>
+                                        <option value="corners">По углам</option>
+                                    </select>
+                                </div>
+                                <div class="toggle-row">
+                                    <span class="toggle-label">Размер блоков</span>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
+                                        <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <div class="settings-group">
-                        <div class="settings-group-title">
-                            <span class="icon">🎨</span>
-                            Оформление дисплея
-                        </div>
-                        <div class="settings-group-title" style="font-size:10px;margin-top:4px">Цвета таймера</div>
-                        <div class="themes-grid" id="displayThemesGrid"></div>
-                        <div class="settings-group-title" style="font-size:10px;margin-top:12px">Фон</div>
-                        <div class="bg-mode-tabs">
-                            <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
-                            <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
-                            <button class="bg-mode-btn" data-mode="image">По URL</button>
-                            <button class="bg-mode-btn" data-mode="local">Файл</button>
-                        </div>
-                        <div class="bg-controls active" id="bgSolidControls">
-                            <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;">
-                        </div>
-                        <div class="bg-controls" id="bgGradientControls">
-                            <div class="gradient-row">
-                                <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29">
-                                <input type="color" class="color-picker" id="bgGrad2" value="#302b63">
+                    <div class="settings-column">
+                        <div class="settings-group">
+                            <div class="settings-group-title">
+                                <span class="icon">🎨</span>
+                                Оформление дисплея
                             </div>
-                        </div>
-                        <div class="bg-controls" id="bgImageControls">
-                            <input type="url" class="url-input" id="bgImageUrl" placeholder="https://example.com/image.jpg">
-                        </div>
-                        <div class="bg-controls" id="bgLocalControls">
-                            <div class="local-bg-section">
-                                <div class="local-bg-preview" id="localBgPreview">
-                                    <div class="local-bg-placeholder" id="localBgPlaceholder">
-                                        <span class="icon">📁</span>
-                                        <span class="text">Нажмите для выбора изображения</span>
-                                    </div>
-                                    <img id="localBgImage" style="display: none;">
-                                    <div class="local-bg-actions">
-                                        <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить">🔄</button>
-                                        <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить">✕</button>
-                                    </div>
-                                </div>
-                                <input type="file" class="hidden-file-input" id="bgFileInput"
-                                       accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,.jpg,.jpeg,.png,.gif,.webp,.bmp">
-
-                                <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
-                                    <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
-                                    <button class="bg-fit-btn" data-fit="contain">Вписать</button>
-                                    <button class="bg-fit-btn" data-fit="tile">Плитка</button>
-                                </div>
-
-                                <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
-                                    <label>Затемнение:</label>
-                                    <input type="range" id="bgOverlaySlider" min="0" max="80" value="30">
-                                    <span class="bg-overlay-value" id="bgOverlayValue">30%</span>
+                            <div class="settings-group-title" style="font-size:10px;margin-top:4px">Цвета таймера</div>
+                            <div class="themes-grid" id="displayThemesGrid"></div>
+                            <div class="settings-group-title" style="font-size:10px;margin-top:12px">Фон</div>
+                            <div class="bg-mode-tabs">
+                                <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
+                                <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
+                                <button class="bg-mode-btn" data-mode="image">По URL</button>
+                                <button class="bg-mode-btn" data-mode="local">Файл</button>
+                            </div>
+                            <div class="bg-controls active" id="bgSolidControls">
+                                <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;">
+                            </div>
+                            <div class="bg-controls" id="bgGradientControls">
+                                <div class="gradient-row">
+                                    <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29">
+                                    <input type="color" class="color-picker" id="bgGrad2" value="#302b63">
                                 </div>
                             </div>
+                            <div class="bg-controls" id="bgImageControls">
+                                <input type="url" class="url-input" id="bgImageUrl" placeholder="https://example.com/image.jpg">
+                            </div>
+                            <div class="bg-controls" id="bgLocalControls">
+                                <div class="local-bg-section">
+                                    <div class="local-bg-preview" id="localBgPreview">
+                                        <div class="local-bg-placeholder" id="localBgPlaceholder">
+                                            <span class="icon">📁</span>
+                                            <span class="text">Нажмите для выбора изображения</span>
+                                        </div>
+                                        <img id="localBgImage" style="display: none;">
+                                        <div class="local-bg-actions">
+                                            <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить">🔄</button>
+                                            <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить">✕</button>
+                                        </div>
+                                    </div>
+                                    <input type="file" class="hidden-file-input" id="bgFileInput"
+                                           accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,.jpg,.jpeg,.png,.gif,.webp,.bmp">
+                                    <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
+                                        <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
+                                        <button class="bg-fit-btn" data-fit="contain">Вписать</button>
+                                        <button class="bg-fit-btn" data-fit="tile">Плитка</button>
+                                    </div>
+                                    <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
+                                        <label>Затемнение:</label>
+                                        <input type="range" id="bgOverlaySlider" min="0" max="80" value="30">
+                                        <span class="bg-overlay-value" id="bgOverlayValue">30%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="reset-btn" id="resetStyleBtn">Сбросить фон по умолчанию</button>
                         </div>
-                        <button class="reset-btn" id="resetStyleBtn">Сбросить фон по умолчанию</button>
+                        <!-- Hidden elements for JS compat -->
+                        <input type="time" id="eventTimeInput" value="10:00" style="display:none;">
+                        <input type="time" id="endTimeInput" value="12:00" style="display:none;">
                     </div>
-
-                    <!-- Hidden elements for JS compat -->
-                    <input type="time" id="eventTimeInput" value="10:00" style="display:none;">
-                    <input type="time" id="endTimeInput" value="12:00" style="display:none;">
                 </div>
 
                 <!-- Hidden elements: removed from UI but needed by JS -->
