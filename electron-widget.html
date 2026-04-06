@@ -35,7 +35,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 2px solid transparent;
             pointer-events: none;
             z-index: 9998;
             transition: border-color 0.2s ease-out;
@@ -43,7 +43,7 @@
         }
 
         body.mouse-active .widget-border {
-            border-color: transparent;
+            border-color: rgba(255, 255, 255, 0.08);
         }
 
         /* Индикаторы углов для ресайза - скрыты по умолчанию */
@@ -249,25 +249,25 @@
             stroke-width: 8;
             stroke-linecap: round;
             transition: stroke-dashoffset 0.3s ease-out;
-            filter: none;
+            filter: drop-shadow(0 0 8px rgba(10, 132, 255, 0.5));
         }
 
         /* FIX BUG-018: Use data attributes for status */
         .progress-bar[data-status="warning"] {
             stroke: url(#warningGradient);
-            filter: none;
+            filter: drop-shadow(0 0 12px rgba(255, 193, 7, 0.6));
         }
 
         .progress-bar[data-status="danger"],
         .progress-bar[data-status="overtime"] {
             stroke: url(#dangerGradient);
-            filter: none;
+            filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.7));
             animation: pulse-glow 1s infinite;
         }
 
         @keyframes pulse-glow {
-            0%, 100% { filter: none; }
-            50% { filter: none; }
+            0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.7)); }
+            50% { filter: drop-shadow(0 0 35px rgba(255, 68, 68, 0.9)); }
         }
 
         /* Шкала с делениями */
@@ -569,7 +569,7 @@
         }
 
         .widget-digital-time {
-            font-family: 'Courier New', 'Consolas', monospace;
+            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
             font-size: var(--digital-font-size, 24px);
             font-weight: bold;
             color: #00ff88;
