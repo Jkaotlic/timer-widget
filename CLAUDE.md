@@ -157,6 +157,10 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Adding new IPC channel**: Add to BOTH `send` and `receive` arrays in BOTH `preload.js` and `channel-validator.js`. Missing receive = widget silently ignores messages.
 - **Per-window colors**: Never use global `colors-update` broadcast. Use `widget-colors-update`, `clock-colors-update`, `display-colors-update` to avoid color bleeding between windows.
 - **`ipc-compat.js`**: All renderer HTML files use `ipcRenderer.on/send` which is shimmed to `electronAPI` via this compat layer. Don't use `electronAPI` directly in renderers.
+- **Global keyboard shortcuts**: Space (start/pause), R (reset), 1-8 (presets 5-60 min), W/C/D (toggle windows) work from ALL windows (widget, clock, display, control). Guarded with `if (e.ctrlKey || e.altKey) return` to avoid conflicts with scale/drag.
+- **Window state broadcast**: `broadcastWindowState()` in main process sends `*-window-state` to ALL windows (not just control). Required for W/C/D toggle shortcuts to know current state.
+- **Start sound from remote windows**: Control panel detects `!wasRunning → isRunning` transition in `timer-state` handler and plays start sound. `_localStartTriggered` flag prevents double-play when start button clicked locally.
+- **Monitor selection persistence**: Main process stores `lastDisplayIndex`. When `open-display` arrives without `displayIndex` (from widget/clock D key), reuses last selection instead of defaulting to auto.
 - **Inline styles in HTML**: Each HTML file has ~1000+ lines of inline CSS/JS. CSP requires `unsafe-inline`. No external CSS frameworks.
 - **Widget devTools**: Set to `false` in production. Change to `true` in `electron-main.js` for debugging.
 - **Design previews**: Always read real HTML structure first, replicate exact layout, then apply CSS-only improvements. Never generate new layouts from scratch.

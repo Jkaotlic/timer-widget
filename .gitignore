@@ -16,3 +16,10 @@ _electron/.cache/
 
 # Test artifacts
 titlebar-test.png
+
+# Screenshots & visual checks
+screenshots/
+*.png
+
+# Superpowers brainstorm sessions
+.superpowers/
