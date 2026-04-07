@@ -957,9 +957,34 @@
             white-space: nowrap;
             pointer-events: none;
         }
+        .widget-hint {
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.6);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 10px;
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            padding: 4px 10px;
+            border-radius: 8px;
+            opacity: 0;
+            animation: hintFade 4s ease forwards;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        @keyframes hintFade {
+            0% { opacity: 0; }
+            15% { opacity: 1; }
+            75% { opacity: 1; }
+            100% { opacity: 0; display: none; }
+        }
     </style>
 </head>
 <body>
+    <div class="widget-hint" id="clockHint">Ctrl — масштаб</div>
+
     <!-- Scale bar slider — Ctrl + hover -->
     <div class="scale-bar-zone" id="scaleBarZone">
         <div class="scale-bar" id="scaleBar">
@@ -1453,6 +1478,14 @@
                             ipcRenderer.send(_displayIsOpen ? 'close-display' : 'open-display');
                             break;
                     }
+
+                    // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
+                    if (e.code >= 'Digit1' && e.code <= 'Digit8') {
+                        e.preventDefault();
+                        const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                        const idx = parseInt(e.code.replace('Digit', '')) - 1;
+                        ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                    }
                 });
 
                 // Scale bar click & drag — uses screen coords to avoid feedback loop
@@ -1892,6 +1925,14 @@
                     this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
                 }
             }
+        }
+
+        // Show hint only on first open
+        if (localStorage.getItem('clockHintShown')) {
+            const h = document.getElementById('clockHint');
+            if (h) { h.style.display = 'none'; }
+        } else {
+            localStorage.setItem('clockHintShown', '1');
         }
 
         const clockWidget = new ClockWidget();
