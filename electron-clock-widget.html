@@ -1409,6 +1409,52 @@
                     document.body.classList.remove('ctrl-active');
                 });
 
+                // Track timer and window states for keyboard shortcuts
+                let _timerIsRunning = false;
+                let _displayIsOpen = false;
+                let _widgetIsOpen = false;
+                ipcRenderer.on('timer-state', (_event, state) => {
+                    _timerIsRunning = !!state.isRunning;
+                });
+                ipcRenderer.on('display-window-state', (_event, state) => {
+                    _displayIsOpen = !!state.isOpen;
+                });
+                ipcRenderer.on('widget-window-state', (_event, state) => {
+                    _widgetIsOpen = !!state.isOpen;
+                });
+
+                // Keyboard shortcuts (Space, R, Escape, C, W, D)
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey || e.altKey || e.metaKey) { return; }
+                    switch (e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            if (_timerIsRunning) {
+                                ipcRenderer.send('timer-control', 'pause');
+                            } else {
+                                ipcRenderer.send('timer-control', 'start');
+                            }
+                            break;
+                        case 'KeyR':
+                            e.preventDefault();
+                            ipcRenderer.send('timer-control', 'reset');
+                            break;
+                        case 'Escape':
+                        case 'KeyC':
+                            e.preventDefault();
+                            ipcRenderer.send('close-clock-widget');
+                            break;
+                        case 'KeyW':
+                            e.preventDefault();
+                            ipcRenderer.send(_widgetIsOpen ? 'close-widget' : 'open-widget');
+                            break;
+                        case 'KeyD':
+                            e.preventDefault();
+                            ipcRenderer.send(_displayIsOpen ? 'close-display' : 'open-display');
+                            break;
+                    }
+                });
+
                 // Scale bar click & drag — uses screen coords to avoid feedback loop
                 if (scaleBar) {
                     scaleBar.addEventListener('mousedown', (e) => {

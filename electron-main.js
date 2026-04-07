@@ -85,6 +85,14 @@ function emitTimerState(partial = {}) {
     safelySendToWindow(controlWindow, 'timer-state', timerState);
 }
 
+// Broadcast window state to all windows
+function broadcastWindowState(channel, data) {
+    safelySendToWindow(controlWindow, channel, data);
+    safelySendToWindow(widgetWindow, channel, data);
+    safelySendToWindow(displayWindow, channel, data);
+    safelySendToWindow(clockWidgetWindow, channel, data);
+}
+
 function finishTimer(finalRemaining) {
     clearTimerInterval();
     const remaining = finalRemaining !== undefined
@@ -261,7 +269,7 @@ function createWidgetWindow() {
     widgetWindow.on('closed', () => {
         widgetWindow = null;
         // Уведомляем окно управления что виджет закрыт
-        safelySendToWindow(controlWindow, 'widget-window-state', { isOpen: false });
+        broadcastWindowState('widget-window-state', { isOpen: false });
     });
 }
 
@@ -300,7 +308,7 @@ function createClockWidgetWindow() {
     clockWidgetWindow.on('closed', () => {
         clockWidgetWindow = null;
         // Уведомляем окно управления что виджет часов закрыт
-        safelySendToWindow(controlWindow, 'clock-window-state', { isOpen: false });
+        broadcastWindowState('clock-window-state', { isOpen: false });
     });
 }
 
@@ -347,7 +355,7 @@ function createDisplayWindow(displayIndex) {
         if (displayWindow === thisWindow) {
             displayWindow = null;
         }
-        safelySendToWindow(controlWindow, 'display-window-state', { isOpen: false });
+        broadcastWindowState('display-window-state', { isOpen: false });
     });
 }
 
@@ -539,7 +547,7 @@ ipcMain.on('open-widget', () => {
                 }
             });
             // Уведомляем окно управления что виджет открыт
-            safelySendToWindow(controlWindow, 'widget-window-state', { isOpen: true });
+            broadcastWindowState('widget-window-state', { isOpen: true });
         }
     } else {
         widgetWindow.focus();
@@ -585,7 +593,7 @@ ipcMain.on('open-clock-widget', () => {
                 }
             });
             // Уведомляем окно управления что виджет часов открыт
-            safelySendToWindow(controlWindow, 'clock-window-state', { isOpen: true });
+            broadcastWindowState('clock-window-state', { isOpen: true });
         }
     } else {
         clockWidgetWindow.focus();
@@ -662,7 +670,7 @@ ipcMain.on('open-display', (event, options = {}) => {
             }
         });
         // Уведомляем окно управления что дисплей открыт
-        safelySendToWindow(controlWindow, 'display-window-state', { isOpen: true });
+        broadcastWindowState('display-window-state', { isOpen: true });
     }
 });
 
