@@ -133,6 +133,16 @@ class DisplayTimer {
                     }
                     break;
             }
+
+            // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
+            if (e.code >= 'Digit1' && e.code <= 'Digit8') {
+                e.preventDefault();
+                const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                const idx = parseInt(e.code.replace('Digit', '')) - 1;
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                }
+            }
         });
     }
 
