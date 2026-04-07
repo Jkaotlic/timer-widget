@@ -104,3 +104,38 @@
 - `#38ef7d` → `#30d158` in display.html status pills
 - `rgba(56, 239, 125` → `rgba(48, 209, 88` across widget/display
 - Google Fonts @import added to electron-control.html
+
+## Apr 7, 2026 — Scale Bar Feature + Display Controls
+
+### Scale Bar Feature (Widget + Clock)
+- Removed `-webkit-app-region: drag` from widget and clock windows
+- Implemented JS-based window dragging via IPC (`widget-move`, `clock-widget-move`)
+- Added Ctrl+slider scale bar (30-600%) to both widget and clock windows
+- Removed resize handles and border UI from widgets
+- Removed Ctrl+wheel zoom (unreliable)
+
+### Fullscreen Display Controls
+- Added dual Ctrl+slider: "Таймер" (30-300%) and "Блоки" (50-600%)
+- Added Alt+drag for repositioning info blocks freely on screen
+- Positions and scale persist to localStorage
+- Preset changes from control panel clear custom positions
+
+### Clock Widget Font Scaling
+- Circle style: time font increased from 14vw to 20vw for larger display at max scale
+- Flip style: reduced base dimensions for higher scale factor
+- Date/timezone badges: increased vw/vh percentages
+
+### Shadow Cleanup
+- Removed all external box-shadow and drop-shadow from widget and clock windows
+- Converted to inset shadows or borders where needed (26 fixes total)
+
+### UI Fixes
+- Fixed themes-grid overflow in control panel (repeat(10) → auto-fill)
+- Added min-width:0 and overflow:hidden to settings-group
+- Fixed display settings resetting block positions on color/date changes
+
+### FAQ Update
+- Updated keyboard shortcuts section (removed Ctrl+wheel, added Ctrl slider and Alt+drag)
+- Updated window descriptions with new scaling features
+- Added persistence tips
+- Added one-time hint tooltip on fullscreen display
