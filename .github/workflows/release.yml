@@ -103,8 +103,39 @@ jobs:
             dist/*.exe
           retention-days: 5
 
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Linux
+        run: npx electron-builder --linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+          retention-days: 5
+
   release:
-    needs: [build-macos-intel, build-macos-arm, build-windows]
+    needs: [build-macos-intel, build-macos-arm, build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,24 +152,68 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: "TimerWidget ${{ github.ref_name }}"
+          generate_release_notes: false
           body: |
-            ## TimerWidget ${{ github.ref_name }}
+            # TimerWidget 2.0
 
-            ### Что нового
-            - Исправлен звук финиша в режиме перерасхода: теперь звук воспроизводится при достижении 00:00, а не только при достижении лимита перерасхода
+            Полная переработка таймера — новый дизайн, новые возможности, кроссплатформенность.
 
-            ### Скачать
-            | Платформа | Файл |
-            |-----------|------|
-            | 🍎 macOS Apple Silicon | `TimerWidget-1.2.9-arm64.dmg` |
-            | 🍎 macOS Intel | `TimerWidget-1.2.9-x64.dmg` |
-            | 🪟 Windows (установщик) | `TimerWidget-Setup-1.2.9.exe` |
-            | 🪟 Windows (портативная) | `TimerWidget-Portable.exe` |
+            ## Что нового в 2.0
+
+            ### Дизайн
+            - Apple VisionOS glassmorphism — `backdrop-filter: blur(40px)`, градиентные кольца, прозрачные окна
+            - 4 стиля таймера: круговой, цифровой LED, перекидные часы, аналоговый
+            - Шрифты Inter Light + JetBrains Mono, Apple semantic colors
+            - Полностью переработанная панель управления (700×860px, 4 вкладки, 2-колоночный layout)
+
+            ### Масштабирование и перемещение
+            - **Ctrl+слайдер** на виджете и часах — масштаб от 30% до 600%
+            - **Ctrl+два слайдера** в полноэкранном режиме — отдельно для таймера (30–300%) и блоков времени (50–600%)
+            - **Alt+перетаскивание** — перемещение блоков времени в полноэкранном режиме
+            - Все позиции и масштабы сохраняются между сессиями
+
+            ### Клавиатура
+            - **Space** — старт/пауза из любого окна
+            - **R** — сброс из любого окна
+            - **1–8** — быстрые пресеты (5–60 мин) из любого окна
+            - **W/C/D** — переключение виджета/часов/полноэкранного из любого окна
+            - **Escape** — закрыть текущее окно
+
+            ### Звук
+            - 20 встроенных звуков через Web Audio API (без файлов)
+            - Звук старта воспроизводится из любого окна
+            - Загрузка пользовательских звуков
+
+            ### Мультимонитор
+            - Выбор монитора для полноэкранного режима
+            - Запоминание выбранного монитора между сессиями
+
+            ### Прочее
+            - Overtime режим с красной пульсацией во всех стилях
+            - Формат H:MM:SS при таймере > 1 часа
+            - FAQ с горячими клавишами (F1)
+            - 70 юнит-тестов, ESLint, CI на GitHub Actions
+
+            ## Скачать
+
+            | Платформа | Файл | Описание |
+            |-----------|------|----------|
+            | 🪟 Windows | `TimerWidget-Setup-2.0.0.exe` | Установщик (NSIS) |
+            | 🪟 Windows | `TimerWidget-Portable.exe` | Портативная версия |
+            | 🍎 macOS Apple Silicon | `TimerWidget-2.0.0-arm64.dmg` | Для M1/M2/M3/M4 |
+            | 🍎 macOS Intel | `TimerWidget-2.0.0-x64.dmg` | Для Intel Mac |
+            | 🐧 Linux | `TimerWidget-2.0.0-amd64.deb` | Debian/Ubuntu |
+            | 🐧 Linux | `TimerWidget-2.0.0-x86_64.AppImage` | Универсальный |
+
+            ---
+            *Built with Electron 41 + vanilla JS. No frameworks, no bundler.*
           draft: false
           prerelease: false
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.zip
             artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

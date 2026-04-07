@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "1.2.9",
+  "version": "2.0.0",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -70,6 +70,15 @@
     },
     "dmg": {
       "title": "${productName}"
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Utility",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "icon": "build/icon.png"
     },
     "publish": null,
     "files": [
