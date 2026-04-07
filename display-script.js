@@ -136,11 +136,17 @@ class DisplayTimer {
         this.timerDigital = document.getElementById('timerDigital');
         this.timerFlip = document.getElementById('timerFlip');
         this.digitalTime = document.getElementById('digitalTime');
+        this.digitalHoursGroup = document.getElementById('digitalHoursGroup');
+        this.digitalHours = document.getElementById('digitalHours');
         this.digitalMinutes = document.getElementById('digitalMinutes');
         this.digitalSeconds = document.getElementById('digitalSeconds');
         
         // Flip карточки
         this.flipMinus = document.getElementById('flipMinus');
+        this.flipHoursUnit = document.getElementById('flipHoursUnit');
+        this.flipHoursSep = document.getElementById('flipHoursSep');
+        this.flipHr1 = document.getElementById('flipHr1');
+        this.flipHr2 = document.getElementById('flipHr2');
         this.flipMin1 = document.getElementById('flipMin1');
         this.flipMin2 = document.getElementById('flipMin2');
         this.flipSec1 = document.getElementById('flipSec1');
@@ -308,8 +314,9 @@ class DisplayTimer {
         const positions = presetPositions[preset] || presetPositions['frame'];
         
         // Показ/скрытие всех блоков времени
+        const showCurrentTime = settings.showCurrentTime !== false;
         if (this.currentTimeBlock) {
-            this.currentTimeBlock.classList.toggle('visible', showBlocks);
+            this.currentTimeBlock.classList.toggle('visible', showBlocks && showCurrentTime);
             this.applyPosition(this.currentTimeBlock, positions.current);
         }
         if (this.eventTimeBlock) {
@@ -542,18 +549,23 @@ class DisplayTimer {
             document.documentElement.style.setProperty('--glow-color', `${timerColor}80`);
         }
 
-        // Digital style
+        // Digital style — save base color, apply only if not in danger/overtime
         const digitalTime = document.getElementById('digitalTime');
-        if (timerColor && digitalTime) {
+        if (timerColor) {
+            this._baseTimerColor = timerColor;
+            this._baseTimerGlow = `0 0 20px ${timerColor}, 0 0 40px ${timerColor}, 0 0 80px ${timerColor}66`;
+        }
+        if (timerColor && digitalTime && !digitalTime.classList.contains('danger')) {
             digitalTime.style.color = timerColor;
-            digitalTime.style.textShadow =
-                `0 0 20px ${timerColor}, 0 0 40px ${timerColor}, 0 0 80px ${timerColor}66`;
+            digitalTime.style.textShadow = this._baseTimerGlow;
         }
 
-        // Flip style
+        // Flip style — save base color, apply only if not in danger/overtime
         if (timerColor) {
             document.querySelectorAll('.flip-digit').forEach(el => {
-                el.style.color = timerColor;
+                if (!el.closest('.danger')) {
+                    el.style.color = timerColor;
+                }
             });
             document.querySelectorAll('.flip-separator').forEach(el => {
                 el.style.color = timerColor;
@@ -575,6 +587,59 @@ class DisplayTimer {
         }
         if (timerColor && analogDigital) {
             analogDigital.style.color = `${timerColor}b3`;
+        }
+    }
+
+    // Called every tick to ensure overtime red color persists
+    // (applyColors or cache logic may reset inline styles)
+    _enforceOvertimeColors(secs) {
+        const isOvertime = secs < 0;
+        if (!isOvertime) { return; }
+
+        // Circle time-text
+        if (this.timeDisplay) {
+            if (!this.timeDisplay.classList.contains('danger')) {
+                this.timeDisplay.classList.add('danger', 'overtime');
+            }
+            this.timeDisplay.style.color = '#ff4444';
+        }
+
+        // Circle progress ring
+        if (this.progressRing && !this.progressRing.classList.contains('danger')) {
+            this.progressRing.classList.add('danger', 'overtime');
+        }
+
+        // Digital
+        if (this.digitalTime) {
+            if (!this.digitalTime.classList.contains('danger')) {
+                this.digitalTime.classList.add('danger', 'overtime');
+            }
+            this.digitalTime.style.color = '#ff3333';
+            this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
+        }
+
+        // Flip
+        const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2].filter(Boolean);
+        flipCards.forEach(card => {
+            if (!card.classList.contains('danger')) {
+                card.classList.add('danger', 'overtime');
+            }
+            const digit = card.querySelector('.flip-digit');
+            if (digit) { digit.style.color = '#ff4444'; }
+        });
+
+        // Analog
+        if (this.analogHandSecond) {
+            this.analogHandSecond.style.background = 'linear-gradient(180deg, #ff4444 0%, #cc0000 100%)';
+            this.analogHandSecond.style.boxShadow = '0 0 15px rgba(255,68,68,0.8)';
+        }
+        const clockCenter = this.timerAnalog ? this.timerAnalog.querySelector('.clock-center') : null;
+        if (clockCenter) {
+            clockCenter.style.background = 'linear-gradient(145deg, #ff4444, #cc0000)';
+            clockCenter.style.boxShadow = '0 0 15px rgba(255,68,68,0.6)';
+        }
+        if (this.analogDigitalTime) {
+            this.analogDigitalTime.style.color = '#ff4444';
         }
     }
 
@@ -752,6 +817,9 @@ class DisplayTimer {
             this.cache.lastProgress = progress;
         }
 
+        // Force overtime color on every tick (applyColors or cache may reset it)
+        this._enforceOvertimeColors(secs);
+
         // Статус меняется редко (normal → warning → danger → overtime)
         const status = this.getTimerStatusValue(secs);
         if (this.cache.lastStatus !== status) {
@@ -794,27 +862,53 @@ class DisplayTimer {
     
     updateDigitalDisplay(secs, _formatted) {
         if (!this.digitalMinutes || !this.digitalSeconds) {return;}
-        
+
         const absSecs = Math.abs(secs);
-        const mins = Math.floor(absSecs / 60);
+        const hours = Math.floor(absSecs / 3600);
+        const mins = Math.floor((absSecs % 3600) / 60);
         const seconds = absSecs % 60;
-        
+
         const prefix = secs < 0 ? '-' : '';
-        this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
+
+        // Show/hide hours group
+        if (this.digitalHoursGroup && this.digitalHours) {
+            if (hours > 0) {
+                this.digitalHoursGroup.style.display = '';
+                this.digitalHours.textContent = prefix + String(hours);
+                this.digitalMinutes.textContent = String(mins).padStart(2, '0');
+            } else {
+                this.digitalHoursGroup.style.display = 'none';
+                this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
+            }
+        } else {
+            this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
+        }
         this.digitalSeconds.textContent = String(seconds).padStart(2, '0');
         
-        // Классы предупреждения
+        // Классы предупреждения + inline color override (applyColors sets inline style)
         this.digitalTime.classList.remove('warning', 'danger', 'overtime');
         const isOvertime = secs < 0;
         if (isOvertime) {
             this.digitalTime.classList.add('danger', 'overtime');
+            this.digitalTime.style.color = '#ff3333';
+            this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
         } else if (this.totalSeconds > 0) {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             if (percentLeft <= 10 && percentLeft > 0) {
                 this.digitalTime.classList.add('danger');
+                this.digitalTime.style.color = '#ff3333';
+                this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
             } else if (percentLeft <= 25) {
                 this.digitalTime.classList.add('warning');
+                this.digitalTime.style.color = '#ffc107';
+                this.digitalTime.style.textShadow = '0 0 20px #ffc107, 0 0 40px #ffc107, 0 0 80px #ffc10766';
+            } else if (this._baseTimerColor) {
+                this.digitalTime.style.color = this._baseTimerColor;
+                this.digitalTime.style.textShadow = this._baseTimerGlow || '';
             }
+        } else if (this._baseTimerColor) {
+            this.digitalTime.style.color = this._baseTimerColor;
+            this.digitalTime.style.textShadow = this._baseTimerGlow || '';
         }
     }
     
@@ -823,42 +917,73 @@ class DisplayTimer {
         
         const isNegative = secs < 0;
         const absSecs = Math.abs(secs);
-        const mins = Math.floor(absSecs / 60);
+        const hours = Math.floor(absSecs / 3600);
+        const mins = Math.floor((absSecs % 3600) / 60);
         const seconds = absSecs % 60;
-        
+
         // Показываем/скрываем знак минуса
         if (this.flipMinus) {
             this.flipMinus.classList.toggle('visible', isNegative);
         }
-        
+
+        // Показываем/скрываем часы
+        const showHours = hours > 0 || this.totalSeconds >= 3600;
+        if (this.flipHoursUnit && this.flipHoursSep) {
+            this.flipHoursUnit.style.display = showHours ? '' : 'none';
+            this.flipHoursSep.style.display = showHours ? '' : 'none';
+            if (showHours && this.flipHr1 && this.flipHr2) {
+                this.updateFlipCard(this.flipHr1, String(Math.floor(hours / 10) % 10), 'hr1');
+                this.updateFlipCard(this.flipHr2, String(hours % 10), 'hr2');
+            }
+        }
+
         const min1 = String(Math.floor(mins / 10) % 10);
         const min2 = String(mins % 10);
         const sec1 = String(Math.floor(seconds / 10));
         const sec2 = String(seconds % 10);
-        
+
         // Анимация перекидывания при изменении
         this.updateFlipCard(this.flipMin1, min1, 'min1');
         this.updateFlipCard(this.flipMin2, min2, 'min2');
         this.updateFlipCard(this.flipSec1, sec1, 'sec1');
         this.updateFlipCard(this.flipSec2, sec2, 'sec2');
-        
-        // Классы предупреждения
+
+        // Классы предупреждения + inline color override (applyColors sets inline style)
         const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2];
+        if (showHours && this.flipHr1 && this.flipHr2) {
+            flipCards.push(this.flipHr1, this.flipHr2);
+        }
         flipCards.forEach(card => {
             card.classList.remove('warning', 'danger', 'overtime');
         });
-        
+
         const isOvertime = secs < 0;
         if (isOvertime) {
-            flipCards.forEach(card => card.classList.add('danger', 'overtime'));
+            flipCards.forEach(card => {
+                card.classList.add('danger', 'overtime');
+                const digit = card.querySelector('.flip-digit');
+                if (digit) { digit.style.color = '#ff4444'; }
+            });
         } else if (this.totalSeconds > 0) {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             flipCards.forEach(card => {
                 if (percentLeft <= 10 && percentLeft > 0) {
                     card.classList.add('danger');
+                    const digit = card.querySelector('.flip-digit');
+                    if (digit) { digit.style.color = '#ff4444'; }
                 } else if (percentLeft <= 25) {
                     card.classList.add('warning');
+                    const digit = card.querySelector('.flip-digit');
+                    if (digit) { digit.style.color = '#ffc107'; }
+                } else {
+                    const digit = card.querySelector('.flip-digit');
+                    if (digit && this._baseTimerColor) { digit.style.color = this._baseTimerColor; }
                 }
+            });
+        } else {
+            flipCards.forEach(card => {
+                const digit = card.querySelector('.flip-digit');
+                if (digit && this._baseTimerColor) { digit.style.color = this._baseTimerColor; }
             });
         }
     }
@@ -895,9 +1020,14 @@ class DisplayTimer {
 
         // Обновляем цифровое время под циферблатом
         if (this.analogDigitalTime) {
-            const mins = Math.floor(absSecs / 60);
+            const hours = Math.floor(absSecs / 3600);
+            const mins = Math.floor((absSecs % 3600) / 60);
             const prefix = secs < 0 ? '-' : '';
-            this.analogDigitalTime.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            if (hours > 0) {
+                this.analogDigitalTime.textContent = `${prefix}${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            } else {
+                this.analogDigitalTime.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
         }
 
         // Классы предупреждения для центра и стрелок
@@ -918,6 +1048,16 @@ class DisplayTimer {
             });
             if (this.analogDigitalTime) {
                 this.analogDigitalTime.classList.add('danger', 'overtime');
+                this.analogDigitalTime.style.color = '#ff4444';
+            }
+            // Override inline styles from applyColors
+            if (this.analogHandSecond) {
+                this.analogHandSecond.style.background = 'linear-gradient(180deg, #ff4444 0%, #cc0000 100%)';
+                this.analogHandSecond.style.boxShadow = '0 0 15px rgba(255,68,68,0.8)';
+            }
+            if (clockCenter) {
+                clockCenter.style.background = 'linear-gradient(145deg, #ff4444, #cc0000)';
+                clockCenter.style.boxShadow = '0 0 15px rgba(255,68,68,0.6)';
             }
         } else if (this.totalSeconds > 0) {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
@@ -959,12 +1099,18 @@ class DisplayTimer {
             if (isOvertime) {
                 this.progressRing.classList.add('danger', 'overtime');
                 this.timeDisplay.classList.add('danger', 'overtime');
+                // Force inline color override — CSS class alone may be insufficient
+                this.timeDisplay.style.color = '#ff4444';
             } else if (percentLeft <= 10 && percentLeft > 0) {
                 this.progressRing.classList.add('danger');
                 this.timeDisplay.classList.add('danger');
+                this.timeDisplay.style.color = '#ff4444';
             } else if (percentLeft <= 25) {
                 this.progressRing.classList.add('warning');
                 this.timeDisplay.classList.add('warning');
+                this.timeDisplay.style.color = '#ffc107';
+            } else {
+                this.timeDisplay.style.color = '';
             }
         } else {
             this.progressRing.style.strokeDashoffset = this.circumference;

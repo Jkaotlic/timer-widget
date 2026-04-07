@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="components.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
         /* =============================================
            Apple Dark Glassmorphism UI
            ============================================= */
@@ -357,7 +359,7 @@
             padding: 7px 2px;
             border: none;
             background: transparent;
-            color: rgba(255, 255, 255, 0.4);
+            color: rgba(255, 255, 255, 0.55);
             font-size: 11px;
             font-weight: 500;
             cursor: pointer;
@@ -371,7 +373,8 @@
         }
 
         .tab-btn span.icon {
-            font-size: 1.1em;
+            font-size: 1.3em;
+            filter: brightness(1.3);
         }
 
         .tab-btn:hover {
@@ -393,17 +396,36 @@
             grid-template-columns: 1fr 1fr;
             gap: 8px;
             animation: fadeIn 0.3s ease;
-            overflow: visible;
+            overflow-y: auto;
+            overflow-x: hidden;
             padding-right: 4px;
+            max-height: calc(100vh - 520px);
+        }
+
+        .tab-content.active::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .tab-content.active::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .tab-content.active::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
         }
 
         .tab-content .settings-group {
             margin: 0;
         }
 
-        /* Sound tab uses single column (full-width items) */
+        /* Sound tab uses 2-column grid like other tabs */
         #tab-sound.active {
-            display: block;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            overflow-y: auto;
+            max-height: calc(100vh - 520px);
         }
 
         .settings-column {
@@ -658,13 +680,18 @@
         .settings-group-title {
             font-size: 11px;
             font-weight: 600;
-            color: rgba(255, 255, 255, 0.35);
+            color: rgba(255, 255, 255, 0.5);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .settings-group-title .icon {
+            font-size: 1.2em;
+            filter: brightness(1.3);
         }
 
         .settings-group-title .icon {
@@ -2303,6 +2330,7 @@
 
                 <!-- Таб: Звуки -->
                 <div class="tab-content" id="tab-sound">
+                    <div class="settings-column">
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🔊</span>
@@ -2433,6 +2461,8 @@
                         </div>
                     </div>
 
+                    </div>
+                    <div class="settings-column">
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🎵</span>
@@ -2447,6 +2477,7 @@
                             <input type="file" class="hidden-file-input" id="soundFileInput"
                                    accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
                         </div>
+                    </div>
                     </div>
                 </div>
 
@@ -2548,6 +2579,13 @@
                                     <option value="auto">🖥️ Авто</option>
                                 </select>
                             </div>
+                            <div class="toggle-row">
+                                <span class="toggle-label">Текущее время</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showCurrentTime" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
                         </div>
                         <div class="settings-group">
                             <div class="settings-group-title">
@@ -2577,6 +2615,14 @@
                                         <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
                                         <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
                                     </div>
+                                </div>
+                                <div class="toggle-row">
+                                    <span class="toggle-label">Начало</span>
+                                    <input type="time" id="eventTimeInput" value="10:00" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
+                                </div>
+                                <div class="toggle-row">
+                                    <span class="toggle-label">Конец</span>
+                                    <input type="time" id="endTimeInput" value="12:00" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
                                 </div>
                             </div>
                         </div>
@@ -2637,9 +2683,7 @@
                             </div>
                             <button class="reset-btn" id="resetStyleBtn">Сбросить фон по умолчанию</button>
                         </div>
-                        <!-- Hidden elements for JS compat -->
-                        <input type="time" id="eventTimeInput" value="10:00" style="display:none;">
-                        <input type="time" id="endTimeInput" value="12:00" style="display:none;">
+                        <!-- eventTimeInput and endTimeInput moved to Блоки времени section -->
                     </div>
                 </div>
 
@@ -3053,6 +3097,7 @@
                 
                 // Настройки полноэкранного режима
                 this.displaySelectEl = document.getElementById('displaySelect');
+                this.showCurrentTimeEl = document.getElementById('showCurrentTime');
                 this.showTimeBlocksEl = document.getElementById('showTimeBlocks');
                 this.timeLayoutPresetEl = document.getElementById('timeLayoutPreset');
                 this.eventTimeInputEl = document.getElementById('eventTimeInput');
@@ -3328,6 +3373,9 @@
                         this.allowNegativeEl.checked ? 'flex' : 'none';
                     this.saveExtSettings();
                 });
+
+                // Настройка текущего времени
+                this.showCurrentTimeEl.addEventListener('change', () => this.pushDisplaySettings());
 
                 // Настройки блоков времени
                 this.showTimeBlocksEl.addEventListener('change', () => {
@@ -3801,6 +3849,8 @@
                 document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
                 document.getElementById(`bg${this.capitalize(bgMode)}Controls`).classList.add('active');
                 
+                // Текущее время
+                this.showCurrentTimeEl.checked = ext.showCurrentTime !== false;
                 // Настройки блоков времени
                 this.showTimeBlocksEl.checked = !!ext.showTimeBlocks;
                 document.getElementById('timeBlocksSettings').style.display = ext.showTimeBlocks ? 'block' : 'none';
@@ -3910,6 +3960,8 @@
                     bgGrad1: document.getElementById('bgGrad1').value,
                     bgGrad2: document.getElementById('bgGrad2').value,
                     bgImageUrl: document.getElementById('bgImageUrl').value,
+                    // Текущее время
+                    showCurrentTime: this.showCurrentTimeEl.checked,
                     // Настройки блоков времени
                     showTimeBlocks: this.showTimeBlocksEl.checked,
                     timeLayoutPreset: this.timeLayoutPreset,
@@ -3952,6 +4004,8 @@
                     bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
                     bgLocalFit: localBgSettings.fit || 'cover',
                     bgLocalOverlay: localBgSettings.overlay || 30,
+                    // Текущее время
+                    showCurrentTime: this.showCurrentTimeEl.checked,
                     // Настройки блоков времени
                     showTimeBlocks: this.showTimeBlocksEl.checked,
                     timeLayoutPreset: this.timeLayoutPreset,
