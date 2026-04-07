@@ -336,9 +336,9 @@
         }
 
         .status-badge.running {
-            background: rgba(56, 239, 125, 0.2);
-            color: #38ef7d;
-            box-shadow: 0 0 10px rgba(56, 239, 125, 0.3);
+            background: rgba(48, 209, 88, 0.2);
+            color: #30d158;
+            box-shadow: 0 0 10px rgba(48, 209, 88, 0.3);
         }
 
         .status-badge.paused {
@@ -597,12 +597,12 @@
                 0 0 10px #ff3333,
                 0 0 20px #ff3333,
                 0 0 40px #ff333366;
-            animation: widget-led-blink 0.5s infinite;
+            animation: widget-led-pulse 1s infinite;
         }
 
-        @keyframes widget-led-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+        @keyframes widget-led-pulse {
+            0%, 100% { opacity: 1; text-shadow: 0 0 10px #ff3333, 0 0 20px #ff3333, 0 0 40px #ff333366; }
+            50% { opacity: 0.7; text-shadow: 0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 60px #ff333399; }
         }
 
         /* ============================================
@@ -715,6 +715,15 @@
         .widget-flip-card[data-status="warning"] .widget-flip-digit { color: #ffc107; }
         .widget-flip-card[data-status="danger"] .widget-flip-digit,
         .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: #ff4444; }
+        .widget-flip-card[data-status="danger"],
+        .widget-flip-card[data-status="overtime"] {
+            animation: widget-flip-pulse 1s infinite;
+            box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 2px 12px rgba(255,68,68,0.2);
+        }
+        @keyframes widget-flip-pulse {
+            0%, 100% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 2px 12px rgba(255,68,68,0.2); }
+            50% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3), 0 2px 20px rgba(255,68,68,0.4); }
+        }
         
         /* Адаптивные размеры для flip-карточек когда есть часы (6 цифр) */
         .widget-flip.has-hours .widget-flip-card {
@@ -900,17 +909,27 @@
         .widget-clock-center[data-status="overtime"] {
             background: linear-gradient(145deg, #ff4444, #cc0000);
             box-shadow: 0 0 15px rgba(255, 68, 68, 0.6);
+            animation: widget-center-pulse 1s infinite;
         }
 
         .widget-analog-digital[data-status="danger"],
         .widget-analog-digital[data-status="overtime"] {
             color: #ff4444;
             text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+            animation: widget-analog-text-pulse 1s infinite;
         }
 
         @keyframes widget-hand-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.6; }
+        }
+        @keyframes widget-center-pulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(255, 68, 68, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(255, 68, 68, 0.9); }
+        }
+        @keyframes widget-analog-text-pulse {
+            0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
+            50% { opacity: 0.7; text-shadow: 0 0 20px rgba(255, 68, 68, 0.8); }
         }
     </style>
 </head>
@@ -1320,17 +1339,22 @@
                     this.timeDisplay.style.setProperty('--glow-color', `${timerColor}80`);
                 }
 
-                // Digital style
-                if (timerColor && this.widgetDigitalTime) {
+                // Digital style — save base color, skip if in danger/overtime
+                if (timerColor) {
+                    this._baseTimerColor = timerColor;
+                    this._baseDigitalGlow = `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
+                }
+                if (timerColor && this.widgetDigitalTime && !this.widgetDigitalTime.dataset.status?.match(/danger|overtime/)) {
                     this.widgetDigitalTime.style.color = timerColor;
-                    this.widgetDigitalTime.style.textShadow =
-                        `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
+                    this.widgetDigitalTime.style.textShadow = this._baseDigitalGlow;
                 }
 
-                // Flip style
+                // Flip style — save base color, skip if in danger/overtime
                 if (timerColor) {
                     document.querySelectorAll('.widget-flip-digit').forEach(el => {
-                        el.style.color = timerColor;
+                        if (!el.closest('[data-status="danger"]') && !el.closest('[data-status="overtime"]')) {
+                            el.style.color = timerColor;
+                        }
                     });
                     document.querySelectorAll('.widget-flip-separator').forEach(el => {
                         el.style.color = timerColor;
@@ -1592,28 +1616,58 @@
                     const ratio = Math.max(0, Math.min(1, this.remainingSeconds / this.totalSeconds));
                     const offset = this.circumference - (ratio * this.circumference);
                     this.progressBar.style.strokeDashoffset = offset;
+                } else {
+                    this.progressBar.style.strokeDashoffset = this.circumference;
+                }
 
-                    // FIX BUG-018: Use data attributes instead of classList manipulations
+                // Status detection — always runs, not gated by totalSeconds
+                const isOvertime = secs < 0;
+                let status = 'normal';
+                if (isOvertime) {
+                    status = 'overtime';
+                } else if (this.totalSeconds > 0) {
                     const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    const isOvertime = secs < 0;
-
-                    let status = 'normal';
-                    if (isOvertime) {
-                        status = 'overtime';
-                    } else if (percentLeft <= 10 && percentLeft > 0) {
+                    if (percentLeft <= 10 && percentLeft > 0) {
                         status = 'danger';
                     } else if (percentLeft <= 25) {
                         status = 'warning';
                     }
+                }
 
-                    // Set data attribute once instead of multiple classList operations
-                    this.progressBar.dataset.status = status;
-                    this.timeDisplay.dataset.status = status;
-                    if (this.widgetDigitalTime) {
-                        this.widgetDigitalTime.dataset.status = status;
-                    }
+                // Apply status to all elements
+                this.progressBar.dataset.status = status;
+                this.timeDisplay.dataset.status = status;
+
+                // Circle time-display: force inline color for overtime/danger
+                if (status === 'danger' || status === 'overtime') {
+                    this.timeDisplay.style.color = '#ff4444';
+                    this.timeDisplay.style.setProperty('--glow-color', 'rgba(255, 68, 68, 0.8)');
+                } else if (status === 'warning') {
+                    this.timeDisplay.style.color = '#ffc107';
+                    this.timeDisplay.style.setProperty('--glow-color', 'rgba(255, 193, 7, 0.6)');
                 } else {
-                    this.progressBar.style.strokeDashoffset = this.circumference;
+                    this.timeDisplay.style.color = '';
+                    if (this._baseTimerColor) {
+                        this.timeDisplay.style.setProperty('--glow-color', `${this._baseTimerColor}80`);
+                    }
+                }
+
+                // Digital time: force inline color
+                if (this.widgetDigitalTime) {
+                    this.widgetDigitalTime.dataset.status = status;
+                    if (status === 'danger' || status === 'overtime') {
+                        this.widgetDigitalTime.style.color = '#ff3333';
+                        this.widgetDigitalTime.style.textShadow = '0 0 10px #ff3333, 0 0 20px #ff3333, 0 0 40px #ff333366';
+                    } else if (status === 'warning') {
+                        this.widgetDigitalTime.style.color = '#ffcc00';
+                        this.widgetDigitalTime.style.textShadow = '0 0 10px #ffcc00, 0 0 20px #ffcc00, 0 0 40px #ffcc0066';
+                    } else if (this._baseTimerColor) {
+                        this.widgetDigitalTime.style.color = this._baseTimerColor;
+                        this.widgetDigitalTime.style.textShadow = this._baseDigitalGlow || '';
+                    } else {
+                        this.widgetDigitalTime.style.color = '';
+                        this.widgetDigitalTime.style.textShadow = '';
+                    }
                 }
 
                 // Обновляем статус
@@ -1688,7 +1742,20 @@
                     }
                 }
 
-                flipCards.forEach(card => card.dataset.status = status);
+                flipCards.forEach(card => {
+                    card.dataset.status = status;
+                    // Override inline color set by applyColors()
+                    const digit = card.querySelector('.widget-flip-digit');
+                    if (digit) {
+                        if (status === 'danger' || status === 'overtime') {
+                            digit.style.color = '#ff4444';
+                        } else if (status === 'warning') {
+                            digit.style.color = '#ffc107';
+                        } else if (this._baseTimerColor) {
+                            digit.style.color = this._baseTimerColor;
+                        }
+                    }
+                });
             }
 
             updateAnalogDisplay(secs) {
@@ -1708,9 +1775,14 @@
 
                 // Обновляем цифровое время
                 if (this.widgetAnalogDigital) {
-                    const mins = Math.floor(absSecs / 60);
+                    const hours = Math.floor(absSecs / 3600);
+                    const mins = Math.floor((absSecs % 3600) / 60);
                     const prefix = secs < 0 ? '-' : '';
-                    this.widgetAnalogDigital.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                    if (hours > 0) {
+                        this.widgetAnalogDigital.textContent = `${prefix}${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                    } else {
+                        this.widgetAnalogDigital.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                    }
                 }
 
                 // FIX BUG-018: Use data attributes instead of classList
@@ -1730,8 +1802,23 @@
                 }
 
                 analogElements.forEach(el => {
-                    if (el) el.dataset.status = status;
+                    if (el) { el.dataset.status = status; }
                 });
+
+                // Override inline colors for analog overtime
+                if (status === 'danger' || status === 'overtime') {
+                    if (this.widgetHandSecond) {
+                        this.widgetHandSecond.style.background = '#ff453a';
+                        this.widgetHandSecond.style.boxShadow = '0 0 8px rgba(255,69,58,0.6)';
+                    }
+                    if (this.widgetClockCenter) {
+                        this.widgetClockCenter.style.background = '#ff453a';
+                        this.widgetClockCenter.style.boxShadow = '0 0 10px rgba(255,69,58,0.6)';
+                    }
+                    if (this.widgetAnalogDigital) {
+                        this.widgetAnalogDigital.style.color = 'rgba(255,69,58,0.7)';
+                    }
+                }
             }
 
             updateStatus(secs) {
