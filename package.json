@@ -22,7 +22,10 @@
     "overlay",
     "transparent"
   ],
-  "author": "Jkaotlic",
+  "author": {
+    "name": "Jkaotlic",
+    "email": "jkaotlic@users.noreply.github.com"
+  },
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "^1.58.2",
