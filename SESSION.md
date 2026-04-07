@@ -139,3 +139,15 @@
 - Updated window descriptions with new scaling features
 - Added persistence tips
 - Added one-time hint tooltip on fullscreen display
+
+### Global Keyboard Shortcuts
+- Added Space/R/1-8/W/C/D shortcuts to widget, clock, and display windows
+- Start sound now plays from any window (control detects remote start via timer-state transition)
+- Window state broadcast to ALL windows via `broadcastWindowState()` (not just control)
+- Monitor selection remembered in main process (`lastDisplayIndex`) for D key from any window
+
+### Clock Color Bug Fix
+- `applyColors()` now updates date-badge and timezone-badge color in all 4 styles
+
+### Project Cleanup
+- Added screenshots/, *.png, .superpowers/ to .gitignore
