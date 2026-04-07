@@ -20,6 +20,7 @@ const ALLOWED_CHANNELS = {
         'close-clock-widget',
         'clock-widget-resize',
         'clock-widget-scale',
+        'clock-widget-move',
         'clock-widget-set-style',
         'clock-widget-settings',
         'resize-control-window',

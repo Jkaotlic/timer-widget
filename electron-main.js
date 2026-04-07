@@ -38,35 +38,15 @@ let lastClockColors = null;
 let lastDisplayColors = null;
 let lastWidgetStyle = null;
 
-// Enable Ctrl+Wheel to resize window
-function enableWindowResizeOnScroll(win) {
+// Block Ctrl+=/- keyboard zoom on widget/clock windows (prevents content zoom)
+function blockKeyboardZoom(win) {
     if (!win || !win.webContents) {return;}
-
-    const onBeforeInput = (event, input) => {
+    win.webContents.on('before-input-event', (event, input) => {
         if (win.isDestroyed()) {return;}
-        // Prevent default zoom behavior
         if (input.control && (input.key === '=' || input.key === '+' || input.key === '-' || input.key === '0')) {
             event.preventDefault();
         }
-    };
-
-    const onZoomChanged = (_event, zoomDirection) => {
-        if (win.isDestroyed()) {return;}
-        const [currentWidth, currentHeight] = win.getSize();
-        const increment = CONFIG.SCALE_STEP || 20;
-
-        if (zoomDirection === 'in') {
-            win.setSize(currentWidth + increment, currentHeight + increment);
-        } else {
-            const [minWidth, minHeight] = win.getMinimumSize();
-            const newWidth = Math.max(currentWidth - increment, minWidth);
-            const newHeight = Math.max(currentHeight - increment, minHeight);
-            win.setSize(newWidth, newHeight);
-        }
-    };
-
-    win.webContents.on('before-input-event', onBeforeInput);
-    win.webContents.on('zoom-changed', onZoomChanged);
+    });
 }
 
 // Защита от навигации и открытия новых окон
@@ -208,7 +188,7 @@ function createControlWindow() {
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
     // Calculate optimal window size (adapt to screen size)
-    const windowWidth = Math.min(700, Math.max(600, screenWidth - 100));
+    const windowWidth = Math.min(750, Math.max(650, screenWidth - 100));
     const windowHeight = Math.min(860, Math.max(760, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
@@ -236,7 +216,7 @@ function createControlWindow() {
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
-        enableWindowResizeOnScroll(controlWindow);
+        blockKeyboardZoom(controlWindow);
     });
 
     controlWindow.on('closed', () => {
@@ -274,9 +254,8 @@ function createWidgetWindow() {
     widgetWindow.loadFile('electron-widget.html');
     hardenWindow(widgetWindow);
 
-    // Enable Ctrl+Wheel window resizing
     widgetWindow.webContents.once('did-finish-load', () => {
-        enableWindowResizeOnScroll(widgetWindow);
+        blockKeyboardZoom(widgetWindow);
     });
 
     widgetWindow.on('closed', () => {
@@ -314,9 +293,8 @@ function createClockWidgetWindow() {
     clockWidgetWindow.loadFile('electron-clock-widget.html');
     hardenWindow(clockWidgetWindow);
 
-    // Enable Ctrl+Wheel window resizing
     clockWidgetWindow.webContents.once('did-finish-load', () => {
-        enableWindowResizeOnScroll(clockWidgetWindow);
+        blockKeyboardZoom(clockWidgetWindow);
     });
 
     clockWidgetWindow.on('closed', () => {
@@ -621,20 +599,21 @@ ipcMain.on('close-clock-widget', () => {
     }
 });
 
-ipcMain.on('clock-widget-resize', (event, { width, height }) => {
-    if (clockWidgetWindow) {
-        const w = Math.max(120, Math.min(800, Number(width) || 220));
-        const h = Math.max(120, Math.min(800, Number(height) || 220));
-        clockWidgetWindow.setSize(w, h, true);
+ipcMain.on('clock-widget-resize', (_event, { width, height }) => {
+    if (clockWidgetWindow && !clockWidgetWindow.isDestroyed()) {
+        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+        const w = Math.max(100, Math.min(screenW, Number(width) || 220));
+        const h = Math.max(100, Math.min(screenH, Number(height) || 220));
+        clockWidgetWindow.setSize(w, h);
     }
 });
 
-// Масштабирование окна часов через Ctrl+колесико
-ipcMain.on('clock-widget-scale', (event, delta) => {
-    if (clockWidgetWindow && Number.isFinite(delta)) {
-        const [currentWidth] = clockWidgetWindow.getSize();
-        const newSize = Math.max(150, Math.min(600, currentWidth + delta));
-        clockWidgetWindow.setSize(newSize, newSize, true);
+
+
+ipcMain.on('clock-widget-move', (_event, { deltaX, deltaY }) => {
+    if (clockWidgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
+        const [currentX, currentY] = clockWidgetWindow.getPosition();
+        clockWidgetWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
     }
 });
 
@@ -707,22 +686,17 @@ ipcMain.on('widget-set-position', (event, { x, y }) => {
     }
 });
 
-ipcMain.on('widget-resize', (event, { width, height }) => {
-    if (widgetWindow) {
-        const w = Math.max(120, Math.min(1920, Number(width) || 220));
-        const h = Math.max(120, Math.min(1080, Number(height) || 220));
-        widgetWindow.setSize(w, h, true);
+ipcMain.on('widget-resize', (_event, data) => {
+    if (widgetWindow && !widgetWindow.isDestroyed()) {
+        const { width, height } = data;
+        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+        const w = Math.max(100, Math.min(screenW, Number(width) || 220));
+        const h = Math.max(100, Math.min(screenH, Number(height) || 220));
+        widgetWindow.setSize(w, h);
     }
 });
 
-// Масштабирование окна таймера через Ctrl+колесико
-ipcMain.on('widget-scale', (event, delta) => {
-    if (widgetWindow && Number.isFinite(delta)) {
-        const [currentWidth] = widgetWindow.getSize();
-        const newSize = Math.max(150, Math.min(600, currentWidth + delta));
-        widgetWindow.setSize(newSize, newSize, true);
-    }
-});
+
 
 ipcMain.on('widget-move', (event, { deltaX, deltaY }) => {
     if (widgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
