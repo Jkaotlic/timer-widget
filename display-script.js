@@ -54,6 +54,16 @@ class DisplayTimer {
         this.startCurrentTimeClock();
         this.setupResizeHandler();
         this.setupKeyboardShortcuts();
+        this.setupBlockControls();
+        this.restoreBlockPositions();
+
+        // Show controls hint once
+        if (!localStorage.getItem('displayHintShown')) {
+            localStorage.setItem('displayHintShown', '1');
+        } else {
+            const hint = document.getElementById('controlsHint');
+            if (hint) { hint.style.display = 'none'; }
+        }
     }
     
     setupResizeHandler() {
@@ -286,46 +296,65 @@ class DisplayTimer {
         // Пресет расположения блоков времени
         const showBlocks = settings.showTimeBlocks !== undefined ? settings.showTimeBlocks : false;
         const preset = settings.timeLayoutPreset || 'frame';
-        
+
         // Определяем позиции по пресету
         const presetPositions = {
-            'frame': { 
-                current: 'top-center', 
-                start: 'bottom-left', 
-                end: 'bottom-right' 
+            'frame': {
+                current: 'top-center',
+                start: 'bottom-left',
+                end: 'bottom-right'
             },
-            'top-line': { 
-                current: 'top-center', 
-                start: 'top-left-third', 
-                end: 'top-right-third' 
+            'top-line': {
+                current: 'top-center',
+                start: 'top-left-third',
+                end: 'top-right-third'
             },
-            'bottom-line': { 
-                current: 'bottom-center', 
-                start: 'bottom-left-third', 
-                end: 'bottom-right-third' 
+            'bottom-line': {
+                current: 'bottom-center',
+                start: 'bottom-left-third',
+                end: 'bottom-right-third'
             },
-            'corners': { 
-                current: 'top-left', 
-                start: 'top-right', 
-                end: 'bottom-right' 
+            'corners': {
+                current: 'top-left',
+                start: 'top-right',
+                end: 'bottom-right'
             }
         };
-        
+
         const positions = presetPositions[preset] || presetPositions['frame'];
-        
+
+        // Only reapply positions when preset changes — preserve custom drag positions
+        const presetChanged = this._lastPreset !== undefined && this._lastPreset !== preset;
+        const firstLoad = this._lastPreset === undefined;
+        this._lastPreset = preset;
+
+        // Check if blocks have custom positions (from Alt+drag)
+        const hasCustomPositions = (block) => block && block.classList.contains('custom-position');
+
         // Показ/скрытие всех блоков времени
         const showCurrentTime = settings.showCurrentTime !== false;
         if (this.currentTimeBlock) {
             this.currentTimeBlock.classList.toggle('visible', showBlocks && showCurrentTime);
-            this.applyPosition(this.currentTimeBlock, positions.current);
+            if (presetChanged || (firstLoad && !hasCustomPositions(this.currentTimeBlock))) {
+                this.applyPosition(this.currentTimeBlock, positions.current);
+            }
         }
         if (this.eventTimeBlock) {
             this.eventTimeBlock.classList.toggle('visible', showBlocks);
-            this.applyPosition(this.eventTimeBlock, positions.start);
+            if (presetChanged || (firstLoad && !hasCustomPositions(this.eventTimeBlock))) {
+                this.applyPosition(this.eventTimeBlock, positions.start);
+            }
         }
         if (this.endTimeBlock) {
             this.endTimeBlock.classList.toggle('visible', showBlocks);
-            this.applyPosition(this.endTimeBlock, positions.end);
+            if (presetChanged || (firstLoad && !hasCustomPositions(this.endTimeBlock))) {
+                this.applyPosition(this.endTimeBlock, positions.end);
+            }
+        }
+
+        // Clear saved positions only on explicit preset change
+        if (presetChanged) {
+            try { localStorage.removeItem('displayBlockPositions'); } catch (_e) { /* ok */ }
         }
         
         // Время начала
@@ -346,14 +375,18 @@ class DisplayTimer {
         if (settings.timerScale !== undefined) {
             this.timerScale = settings.timerScale;
             const scale = settings.timerScale / 100;
-            
+
             // Для кругового стиля - обновляем размер динамически
             this.updateRingSize();
-            
+
             // Для других стилей - transform
             if (this.timerDigital) {this.timerDigital.style.transform = `scale(${scale})`;}
             if (this.timerFlip) {this.timerFlip.style.transform = `scale(${scale})`;}
             if (this.timerAnalog) {this.timerAnalog.style.transform = `scale(${scale})`;}
+
+            // Update timer scale bar + persist
+            if (this._scaleBarRefs) { this._scaleBarRefs.timerUpdateVisuals(settings.timerScale); }
+            try { localStorage.setItem('displayTimerScale', String(settings.timerScale)); } catch (_e) { /* ok */ }
         }
         
         // Показ цифр на аналоговом циферблате
@@ -407,13 +440,20 @@ class DisplayTimer {
     }
     
     applyPosition(element, position) {
-        // Удаляем все классы позиции
+        // Clear custom positioning if present
         element.classList.remove(
             'top-left', 'top-center', 'top-right',
             'bottom-left', 'bottom-center', 'bottom-right',
             'top-left-third', 'top-right-third',
-            'bottom-left-third', 'bottom-right-third'
+            'bottom-left-third', 'bottom-right-third',
+            'custom-position'
         );
+        element.style.left = '';
+        element.style.top = '';
+        element.style.right = '';
+        element.style.bottom = '';
+        element.style.marginLeft = '';
+        element.style.marginRight = '';
         // Добавляем новый класс позиции
         element.classList.add(position);
     }
@@ -570,6 +610,13 @@ class DisplayTimer {
             document.querySelectorAll('.flip-separator').forEach(el => {
                 el.style.color = timerColor;
             });
+        }
+
+        // Info blocks (time blocks) — inherit timer color
+        if (timerColor) {
+            document.documentElement.style.setProperty('--info-color', timerColor);
+            document.documentElement.style.setProperty('--info-color-dim', `${timerColor}80`);
+            document.documentElement.style.setProperty('--info-glow', `${timerColor}33`);
         }
 
         // Analog style
@@ -1158,6 +1205,267 @@ class DisplayTimer {
 
     formatTime(seconds) {
         return window.TimeUtils.formatTimeShort(seconds);
+    }
+
+    // ===== Block Controls: Ctrl+Scale, Alt+Drag =====
+
+    setupBlockControls() {
+        const BLOCK_MIN_SCALE = 50;
+        const BLOCK_MAX_SCALE = 600;
+        const TIMER_MIN_SCALE = 30;
+        const TIMER_MAX_SCALE = 300;
+        const STORAGE_KEY = 'displayBlockPositions';
+        const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
+        const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
+
+        // --- Ctrl/Alt key tracking ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Control') { document.body.classList.add('ctrl-active'); }
+            if (e.key === 'Alt') { e.preventDefault(); document.body.classList.add('alt-active'); }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Control') { document.body.classList.remove('ctrl-active'); }
+            if (e.key === 'Alt') { document.body.classList.remove('alt-active'); }
+        });
+        window.addEventListener('blur', () => {
+            document.body.classList.remove('ctrl-active', 'alt-active');
+        });
+
+        // --- Helper: create scale bar drag handler ---
+        const setupScaleBarDrag = (barEl, fillEl, thumbEl, tooltipEl, minScale, maxScale, getCurrentPct, onScale) => {
+            const updateVisuals = (pct) => {
+                const frac = (pct - minScale) / (maxScale - minScale) * 100;
+                fillEl.style.width = frac + '%';
+                thumbEl.style.left = frac + '%';
+                tooltipEl.textContent = pct + '%';
+            };
+
+            // Init visuals
+            updateVisuals(getCurrentPct());
+
+            barEl.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                barEl.classList.add('dragging');
+                const startScreenX = e.screenX;
+                const startPct = getCurrentPct();
+                const dragRange = 300;
+                let lastPct = 0;
+                let rafId = 0;
+
+                const apply = (dx) => {
+                    const deltaPct = Math.round((dx / dragRange) * (maxScale - minScale));
+                    const newPct = Math.max(minScale, Math.min(maxScale, startPct + deltaPct));
+                    if (newPct !== lastPct) {
+                        lastPct = newPct;
+                        updateVisuals(newPct);
+                        onScale(newPct);
+                    }
+                };
+
+                const onMove = (ev) => {
+                    ev.preventDefault();
+                    if (rafId) { cancelAnimationFrame(rafId); }
+                    rafId = requestAnimationFrame(() => { apply(ev.screenX - startScreenX); });
+                };
+
+                const onUp = () => {
+                    barEl.classList.remove('dragging');
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    if (rafId) { cancelAnimationFrame(rafId); }
+                };
+
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+
+            return updateVisuals;
+        };
+
+        // --- Timer Scale Bar ---
+        const timerUpdateVisuals = setupScaleBarDrag(
+            document.getElementById('timerScaleBar'),
+            document.getElementById('timerScaleBarFill'),
+            document.getElementById('timerScaleBarThumb'),
+            document.getElementById('timerScaleBarTooltip'),
+            TIMER_MIN_SCALE, TIMER_MAX_SCALE,
+            () => this.timerScale || 100,
+            (pct) => {
+                this.timerScale = pct;
+                const scale = pct / 100;
+                this.updateRingSize();
+                if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
+                if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
+                if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
+                try { localStorage.setItem(STORAGE_TIMER_SCALE_KEY, String(pct)); } catch (_e) { /* ok */ }
+            }
+        );
+
+        // --- Block Scale Bar ---
+        const blockUpdateVisuals = setupScaleBarDrag(
+            document.getElementById('scaleBar'),
+            document.getElementById('scaleBarFill'),
+            document.getElementById('scaleBarThumb'),
+            document.getElementById('scaleBarTooltip'),
+            BLOCK_MIN_SCALE, BLOCK_MAX_SCALE,
+            () => {
+                const raw = this.currentTimeBlock
+                    ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
+                    : '1.2';
+                return Math.round(parseFloat(raw) * 100) || 120;
+            },
+            (pct) => {
+                const scale = pct / 100;
+                [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
+                    if (b) { b.style.setProperty('--info-scale', scale); }
+                });
+                try { localStorage.setItem(STORAGE_BLOCK_SCALE_KEY, String(pct)); } catch (_e) { /* ok */ }
+            }
+        );
+
+        // Store refs for external updates
+        this._scaleBarRefs = { timerUpdateVisuals, blockUpdateVisuals };
+
+        // --- Alt+Drag blocks ---
+        const infoBlocks = [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].filter(Boolean);
+        const blockIds = ['currentTime', 'eventTime', 'endTime'];
+
+        const saveBlockPositions = () => {
+            const positions = {};
+            infoBlocks.forEach((block, i) => {
+                if (block.classList.contains('custom-position')) {
+                    positions[blockIds[i]] = {
+                        left: parseInt(block.style.left) || 0,
+                        top: parseInt(block.style.top) || 0
+                    };
+                }
+            });
+            if (Object.keys(positions).length > 0) {
+                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); } catch (_e) { /* ok */ }
+            }
+        };
+
+        infoBlocks.forEach((block) => {
+            block.addEventListener('mousedown', (e) => {
+                if (!e.altKey) { return; }
+                e.preventDefault();
+                e.stopPropagation();
+                block.classList.add('dragging-block');
+
+                // If block uses preset positioning, switch to absolute left/top
+                if (!block.classList.contains('custom-position')) {
+                    const rect = block.getBoundingClientRect();
+                    // Remove all position classes
+                    block.classList.remove(
+                        'top-left', 'top-center', 'top-right',
+                        'bottom-left', 'bottom-center', 'bottom-right',
+                        'top-left-third', 'top-right-third',
+                        'bottom-left-third', 'bottom-right-third'
+                    );
+                    block.classList.add('custom-position');
+                    // Clear any preset CSS positioning
+                    block.style.right = '';
+                    block.style.bottom = '';
+                    block.style.marginLeft = '';
+                    block.style.marginRight = '';
+                    block.style.left = rect.left + 'px';
+                    block.style.top = rect.top + 'px';
+                }
+
+                const startScreenX = e.screenX;
+                const startScreenY = e.screenY;
+                const startLeft = parseInt(block.style.left) || 0;
+                const startTop = parseInt(block.style.top) || 0;
+                let rafId = 0;
+
+                const onMove = (ev) => {
+                    ev.preventDefault();
+                    if (rafId) { cancelAnimationFrame(rafId); }
+                    rafId = requestAnimationFrame(() => {
+                        const dx = ev.screenX - startScreenX;
+                        const dy = ev.screenY - startScreenY;
+                        block.style.left = (startLeft + dx) + 'px';
+                        block.style.top = (startTop + dy) + 'px';
+                    });
+                };
+
+                const onUp = () => {
+                    block.classList.remove('dragging-block');
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    if (rafId) { cancelAnimationFrame(rafId); }
+                    saveBlockPositions();
+                };
+
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+
+        // Store references for preset reset
+        this._blockControlRefs = { infoBlocks, blockIds, STORAGE_KEY, STORAGE_BLOCK_SCALE_KEY };
+    }
+
+    restoreBlockPositions() {
+        const STORAGE_KEY = 'displayBlockPositions';
+        const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
+        const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
+
+        // Restore timer scale
+        try {
+            const savedTimerScale = localStorage.getItem(STORAGE_TIMER_SCALE_KEY);
+            if (savedTimerScale) {
+                const pct = parseInt(savedTimerScale);
+                if (pct >= 30 && pct <= 300) {
+                    this.timerScale = pct;
+                    const scale = pct / 100;
+                    this.updateRingSize();
+                    if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
+                    if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
+                    if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
+                }
+            }
+        } catch (_e) { /* ok */ }
+
+        // Restore block scale
+        try {
+            const savedScale = localStorage.getItem(STORAGE_BLOCK_SCALE_KEY);
+            if (savedScale) {
+                const pct = parseInt(savedScale);
+                if (pct >= 50 && pct <= 600) {
+                    const scale = pct / 100;
+                    [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
+                        if (b) { b.style.setProperty('--info-scale', scale); }
+                    });
+                }
+            }
+        } catch (_e) { /* ok */ }
+
+        // Restore positions
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) { return; }
+            const positions = JSON.parse(saved);
+            const blocks = { currentTime: this.currentTimeBlock, eventTime: this.eventTimeBlock, endTime: this.endTimeBlock };
+            for (const [key, block] of Object.entries(blocks)) {
+                if (block && positions[key]) {
+                    block.classList.remove(
+                        'top-left', 'top-center', 'top-right',
+                        'bottom-left', 'bottom-center', 'bottom-right',
+                        'top-left-third', 'top-right-third',
+                        'bottom-left-third', 'bottom-right-third'
+                    );
+                    block.classList.add('custom-position');
+                    block.style.right = '';
+                    block.style.bottom = '';
+                    block.style.marginLeft = '';
+                    block.style.marginRight = '';
+                    block.style.left = positions[key].left + 'px';
+                    block.style.top = positions[key].top + 'px';
+                }
+            }
+        } catch (_e) { /* ok */ }
     }
 
     cleanup() {

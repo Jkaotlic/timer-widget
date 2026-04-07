@@ -39,8 +39,8 @@ const CONFIG = {
     // ============================================
     SCALE_STEP: 20,                         // Шаг масштабирования (пиксели)
     ZOOM_SCALE_FACTOR: 0.1,                 // Фактор масштабирования при Ctrl+Wheel
-    MIN_SCALE: 0.5,                         // Минимальный масштаб (50%)
-    MAX_SCALE: 3.0,                         // Максимальный масштаб (300%)
+    MIN_SCALE: 0.3,                         // Минимальный масштаб (30%)
+    MAX_SCALE: 5.0,                         // Максимальный масштаб (500%)
     DEFAULT_SCALE: 1.0,                     // Масштаб по умолчанию (100%)
 
     // ============================================
@@ -226,6 +226,7 @@ const CONFIG = {
         SET_CLOCK_STYLE: 'set-clock-style',
         CLOCK_WIDGET_RESIZE: 'clock-widget-resize',
         CLOCK_WIDGET_SCALE: 'clock-widget-scale',
+        CLOCK_WIDGET_MOVE: 'clock-widget-move',
         CLOCK_WIDGET_SET_STYLE: 'clock-widget-set-style',
         CLOCK_WIDGET_SETTINGS: 'clock-widget-settings',
         RESIZE_CONTROL_WINDOW: 'resize-control-window',

@@ -295,12 +295,12 @@
         }
 
         .main-btn.start {
-            width: 60px;
-            height: 60px;
-            font-size: 24px;
-            background: linear-gradient(135deg, #34d65c 0%, #28b84a 100%);
+            width: 52px;
+            height: 52px;
+            font-size: 22px;
+            background: #30d158;
             color: white;
-            box-shadow: 0 6px 24px rgba(48, 209, 88, 0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+            box-shadow: 0 4px 16px rgba(48, 209, 88, 0.3);
         }
 
         .main-btn:hover:not(:disabled) {
@@ -309,7 +309,7 @@
         }
 
         .main-btn.start:hover:not(:disabled) {
-            box-shadow: 0 8px 32px rgba(48, 209, 88, 0.6), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+            box-shadow: 0 6px 24px rgba(48, 209, 88, 0.45);
         }
 
         .main-btn:active:not(:disabled) {
@@ -322,9 +322,9 @@
         }
 
         .main-btn.pause {
-            background: linear-gradient(135deg, #ffab1a 0%, #e8900a 100%);
-            color: white;
-            box-shadow: 0 4px 18px rgba(255, 159, 10, 0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+            background: #ff9f0a;
+            color: #000;
+            box-shadow: 0 4px 16px rgba(255, 159, 10, 0.3);
         }
 
         .main-btn.reset {
@@ -350,7 +350,7 @@
             background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
             padding: 2px;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
             border: 1px solid rgba(255, 255, 255, 0.04);
         }
 
@@ -382,9 +382,10 @@
         }
 
         .tab-btn.active {
-            background: rgba(255, 255, 255, 0.12);
-            color: #fff;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+            background: rgba(10, 132, 255, 0.15);
+            border: 1px solid rgba(10, 132, 255, 0.3);
+            color: #0a84ff;
+            font-weight: 600;
         }
 
         .tab-content {
@@ -399,7 +400,7 @@
             overflow-y: auto;
             overflow-x: hidden;
             padding-right: 4px;
-            max-height: calc(100vh - 520px);
+            max-height: calc(100vh - 500px);
         }
 
         .tab-content.active::-webkit-scrollbar {
@@ -422,16 +423,79 @@
         /* Sound tab uses 2-column grid like other tabs */
         #tab-sound.active {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.2fr 0.8fr;
             gap: 8px;
             overflow-y: auto;
-            max-height: calc(100vh - 520px);
+            overflow-x: hidden;
+            max-height: calc(100vh - 500px);
+        }
+
+        #tab-sound .settings-group {
+            padding: 10px;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        #tab-sound .settings-column {
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        #tab-sound .settings-group-title {
+            margin-bottom: 4px;
+        }
+
+        /* Display tab compact layout */
+        #tab-display .settings-group {
+            padding: 10px;
+        }
+
+        #tab-display .settings-group-title {
+            margin-bottom: 4px;
+            font-size: 10px;
+        }
+
+        #tab-display .toggle-row {
+            padding: 4px 0;
+        }
+
+        #tab-display .toggle-label {
+            font-size: 12px;
+        }
+
+        #tab-display .settings-column {
+            gap: 6px;
+        }
+
+        #tab-display .local-bg-preview {
+            height: 80px;
+        }
+
+        #tab-display .bg-mode-tabs {
+            margin-bottom: 6px;
+        }
+
+        #tab-display .bg-mode-btn {
+            padding: 5px 4px;
+            font-size: 10px;
+        }
+
+        #tab-display .reset-btn {
+            padding: 6px;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        #tab-display .theme-btn {
+            width: 24px;
+            height: 24px;
         }
 
         .settings-column {
             display: flex;
             flex-direction: column;
             gap: 8px;
+            min-width: 0;
         }
 
         /* Tab scrollbar */
@@ -669,20 +733,20 @@
 
         /* Settings groups */
         .settings-group {
-            background: rgba(255, 255, 255, 0.025);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
             padding: 14px;
             margin-bottom: 12px;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.2);
+            min-width: 0;
+            overflow: hidden;
         }
 
         .settings-group-title {
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
-            color: rgba(255, 255, 255, 0.5);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 0.3px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -729,7 +793,7 @@
         /* Themes */
         .themes-grid {
             display: grid;
-            grid-template-columns: repeat(10, 1fr);
+            grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
             gap: 4px;
         }
 
@@ -769,8 +833,8 @@
         .sound-row {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 0;
+            gap: 6px;
+            padding: 5px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         }
 
@@ -781,22 +845,23 @@
         .sound-toggle {
             display: flex;
             align-items: center;
-            gap: 8px;
-            min-width: 110px;
+            gap: 5px;
+            min-width: 95px;
+            font-size: 11px;
         }
 
         .sound-toggle input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             accent-color: #0a84ff;
         }
 
         .sound-select {
             flex: 1;
-            padding: 7px 10px;
+            padding: 5px 8px;
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            font-size: 12px;
+            border-radius: 6px;
+            font-size: 11px;
             min-width: 0;
             background: rgba(255, 255, 255, 0.06);
             color: rgba(255, 255, 255, 0.8);
@@ -816,14 +881,14 @@
         }
 
         .sound-preview {
-            width: 34px;
-            height: 34px;
+            width: 28px;
+            height: 28px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             background: rgba(255, 255, 255, 0.08);
             color: rgba(255, 255, 255, 0.6);
             cursor: pointer;
-            font-size: 13px;
+            font-size: 11px;
             transition: all 0.2s;
             flex-shrink: 0;
         }
@@ -842,21 +907,22 @@
         }
 
         .custom-sound-list {
-            max-height: 120px;
-            overflow-y: auto;
+            max-height: none;
+            overflow-y: visible;
             margin-bottom: 10px;
         }
 
         .custom-sound-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
+            gap: 6px;
+            padding: 6px 8px;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.04);
             border-radius: 8px;
-            margin-bottom: 6px;
-            font-size: 12px;
+            margin-bottom: 4px;
+            font-size: 11px;
+            min-width: 0;
         }
 
         .custom-sound-item .name {
@@ -901,19 +967,21 @@
 
         .add-sound-btn {
             flex: 1;
-            padding: 10px 16px;
+            padding: 8px 10px;
             border: 1px dashed rgba(255, 255, 255, 0.12);
             background: rgba(255, 255, 255, 0.02);
             border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             color: rgba(255, 255, 255, 0.4);
             transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 4px;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .add-sound-btn:hover {
@@ -931,8 +999,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 6px 0;
+            border-bottom: none;
         }
 
         .toggle-row:last-child {
@@ -941,8 +1009,8 @@
         }
 
         .toggle-label {
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.8);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
         }
 
         /* Apple-style toggle switch */
@@ -2313,7 +2381,7 @@
                         <div class="toggle-row">
                             <span class="toggle-label">Масштаб</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="timerScale" min="50" max="300" value="100" style="width: 80px;">
+                                <input type="range" id="timerScale" min="30" max="600" value="100" style="width: 80px;">
                                 <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
                             </div>
                         </div>
@@ -2331,24 +2399,14 @@
                 <!-- Таб: Звуки -->
                 <div class="tab-content" id="tab-sound">
                     <div class="settings-column">
-                    <div class="settings-group">
-                        <div class="settings-group-title">
+                    <div class="settings-group" id="soundSettings">
+                        <div class="settings-group-title" style="margin-bottom: 6px;">
                             <span class="icon">🔊</span>
-                            Основное
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label">Звуковые уведомления</span>
-                            <label class="toggle-switch">
+                            Звуки
+                            <label class="toggle-switch" style="margin-left: auto;">
                                 <input type="checkbox" id="soundMasterEnabled" checked>
                                 <span class="toggle-slider"></span>
                             </label>
-                        </div>
-                    </div>
-
-                    <div class="settings-group" id="soundSettings">
-                        <div class="settings-group-title">
-                            <span class="icon">🔔</span>
-                            События
                         </div>
                         <div class="sound-row">
                             <div class="sound-toggle">
@@ -2425,10 +2483,10 @@
                             </select>
                             <button class="sound-preview" id="soundMinutePreview" title="Прослушать">▶</button>
                         </div>
-                        <div class="sound-row" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 14px; margin-top: 6px;">
+                        <div class="sound-row" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px; margin-top: 2px;">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundOverrunEnabled">
-                                <label for="soundOverrunEnabled">При перерасходе</label>
+                                <label for="soundOverrunEnabled">Перерасход</label>
                             </div>
                             <select class="sound-select" id="soundOverrunPreset">
                                 <option value="none">— без звука —</option>
@@ -2449,14 +2507,14 @@
                             </select>
                             <button class="sound-preview" id="soundOverrunPreview" title="Прослушать">▶</button>
                         </div>
-                        <div class="sound-row" style="padding-left: 24px;">
-                            <label style="font-size: 0.85em; color: rgba(255,255,255,0.5); white-space: nowrap;">Напоминать каждые</label>
-                            <select class="sound-select" id="overrunIntervalMinutes" style="max-width: 130px;">
-                                <option value="1">1 минуту</option>
-                                <option value="2">2 минуты</option>
-                                <option value="3">3 минуты</option>
-                                <option value="5">5 минут</option>
-                                <option value="10">10 минут</option>
+                        <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0 2px 20px;">
+                            <label style="font-size: 10px; color: rgba(255,255,255,0.4); white-space: nowrap;">каждые</label>
+                            <select class="sound-select" id="overrunIntervalMinutes" style="max-width: 100px; padding: 3px 6px; font-size: 10px;">
+                                <option value="1">1 мин</option>
+                                <option value="2">2 мин</option>
+                                <option value="3">3 мин</option>
+                                <option value="5">5 мин</option>
+                                <option value="10">10 мин</option>
                             </select>
                         </div>
                     </div>
@@ -2501,7 +2559,7 @@
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="range" id="clockScale" min="50" max="300" value="100" style="width: 80px;">
+                                    <input type="range" id="clockScale" min="30" max="600" value="100" style="width: 80px;">
                                     <span id="clockScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
                                 </div>
                             </div>
@@ -2563,16 +2621,11 @@
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="range" id="displayTimerScale" min="50" max="300" value="100" style="width: 80px;">
+                                    <input type="range" id="displayTimerScale" min="30" max="600" value="100" style="width: 80px;">
                                     <span id="displayTimerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255,255,255,0.4);">100%</span>
                                 </div>
                             </div>
-                        </div>
-                        <div class="settings-group">
-                            <div class="settings-group-title">
-                                <span class="icon">🖥️</span>
-                                Полноэкранный режим
-                            </div>
+                            <div style="height: 1px; background: rgba(255,255,255,0.06); margin: 6px 0;"></div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Монитор</span>
                                 <select id="displaySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
@@ -2633,9 +2686,9 @@
                                 <span class="icon">🎨</span>
                                 Оформление дисплея
                             </div>
-                            <div class="settings-group-title" style="font-size:10px;margin-top:4px">Цвета таймера</div>
+                            <div class="settings-group-title" style="font-size:10px;margin-top:2px;margin-bottom:2px">Цвета таймера</div>
                             <div class="themes-grid" id="displayThemesGrid"></div>
-                            <div class="settings-group-title" style="font-size:10px;margin-top:12px">Фон</div>
+                            <div class="settings-group-title" style="font-size:10px;margin-top:6px;margin-bottom:2px">Фон</div>
                             <div class="bg-mode-tabs">
                                 <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
                                 <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
@@ -2768,7 +2821,7 @@
                             <ul>
                                 <li>Перетаскивается мышкой в любое место</li>
                                 <li>Кнопки управления появляются при наведении</li>
-                                <li><strong>Ctrl+Колесо</strong> — изменить размер</li>
+                                <li><strong>Ctrl</strong> — показать слайдер масштабирования (30–600%)</li>
                                 <li>Горячая клавиша: <strong>W</strong> (открыть / закрыть)</li>
                             </ul>
                         </div>
@@ -2780,7 +2833,7 @@
                             <ul>
                                 <li>4 стиля: круговой, цифровой LED, перекидные, аналоговые</li>
                                 <li>Опционально: дата, часовой пояс, секунды, 12/24ч формат</li>
-                                <li><strong>Ctrl+Колесо</strong> — изменить размер</li>
+                                <li><strong>Ctrl</strong> — показать слайдер масштабирования (30–600%)</li>
                                 <li>Прозрачный, всегда поверх других окон</li>
                                 <li>Горячая клавиша: <strong>C</strong> (открыть / закрыть)</li>
                             </ul>
@@ -2796,6 +2849,7 @@
                                 <li>Блоки времени: текущее время начала/окончания мероприятия</li>
                                 <li>Настраиваемый фон: заливка, градиент, изображение (URL или файл)</li>
                                 <li>Горячая клавиша: <strong>D</strong> (открыть / закрыть), <strong>Esc</strong> (закрыть все)</li>
+                                <li>В полноэкранном режиме зажмите <strong>Ctrl</strong> для масштабирования таймера и блоков времени (два слайдера). Зажмите <strong>Alt</strong> и перетащите блоки времени в любое место экрана.</li>
                             </ul>
                         </div>
                     </div>
@@ -2885,14 +2939,13 @@
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Масштабирование</div>
+                        <div class="faq-question">Масштабирование и перемещение</div>
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
-                                <div class="shortcut"><span class="key">Ctrl</span> + <span class="key">Колесо</span> <span class="shortcut-desc">Изменить размер любого окна</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> <span class="shortcut-desc">На виджете/часах — показать слайдер масштабирования (30–600%)</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> <span class="shortcut-desc">В полноэкранном — показать слайдеры масштаба таймера и блоков</span></div>
+                                <div class="shortcut"><span class="key">Alt</span> + перетаскивание <span class="shortcut-desc">В полноэкранном — переместить блок времени</span></div>
                             </div>
-                            <p style="margin-top: 8px; font-size: 0.9em; opacity: 0.8;">
-                                Работает везде: в настройках, виджете, часах и на дисплее.
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -2906,10 +2959,11 @@
                             <ul>
                                 <li>💾 Все настройки сохраняются автоматически</li>
                                 <li>🔄 Все окна синхронизированы — изменения видны мгновенно</li>
-                                <li>🖱️ <strong>Ctrl+Колесо</strong> — самый быстрый способ подобрать размер</li>
                                 <li>⏱️ Виджет удобен для постоянного отслеживания времени</li>
                                 <li>🎥 Полноэкранный идеален для презентаций и трансляций</li>
                                 <li>❓ <strong>F1</strong> — шпаргалка по горячим клавишам в любой момент</li>
+                                <li>📐 Позиции блоков и масштаб в полноэкранном режиме сохраняются между сессиями</li>
+                                <li>📐 Масштаб виджета и часов также сохраняется</li>
                             </ul>
                         </div>
                     </div>

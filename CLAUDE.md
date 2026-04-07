@@ -49,6 +49,8 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 - Window references are global (`controlWindow`, `widgetWindow`, `displayWindow`, `clockWidgetWindow`). Always use `safelySendToWindow()` to avoid "Object has been destroyed" crashes.
 - Renderer windows persist settings in `localStorage`. Storage keys are defined in `constants.js` (`STORAGE_KEYS`).
 - Each HTML file is self-contained with inline `<script>` and `<style>` blocks (CSP allows `unsafe-inline`).
+- JS-based window drag: Widget and clock windows use JavaScript mousedown/mousemove + IPC (`widget-move`, `clock-widget-move`) instead of `-webkit-app-region: drag`. This is because on Windows, transparent frameless windows with `drag` on parent elements intercept ALL mouse events before `no-drag` children.
+- Scale bar: Widget, clock, and fullscreen display have Ctrl+slider for scaling. Uses `screenX` delta from mousedown (not clientX — avoids feedback loops when element resizes). `requestAnimationFrame` throttle + `lastSentSize` dedup.
 
 ## Code Style
 
@@ -91,6 +93,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
 | `widget-resize` / `widget-scale` / `widget-move` / `widget-set-position` / `widget-set-opacity` | Widget geometry/opacity |
 | `clock-widget-resize` / `clock-widget-scale` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
+| `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
 | `minimize-window` / `close-window` / `quit-app` | Window management |
 
 ### Receive (main → renderer)
@@ -166,6 +169,8 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Display settings `showCurrentTime`**: Controls visibility of the "Текущее время" block on fullscreen display. Defaults to `true`. Sent via `display-settings-update` channel alongside `showTimeBlocks`.
 - **No external shadows on transparent windows**: Widget and clock windows have `transparent: true` + `hasShadow: false`. Never use `drop-shadow`, `box-shadow` (external), or `filter: shadow` on elements — they create visible dark rectangles. Use only `inset` shadows or `border` for depth.
 - **Design system v2**: All windows use VisionOS glassmorphism — `blur(40px) saturate(180%)`, gradient ring `#0a84ff→#30d158`, Inter Light (weight 200) for timer text. Widget/clock: NO external shadows (transparent windows). Digital LED uses JetBrains Mono. Fonts loaded via Google Fonts @import in each HTML file. Apple semantic colors: systemBlue `#0a84ff`, systemGreen `#30d158`, systemRed `#ff453a`, systemOrange `#ff9f0a`.
+- **Display block positions**: Fullscreen info blocks can be Alt+dragged to custom positions. Positions persist in localStorage (`displayBlockPositions`). `applyDisplaySettings` must NOT reapply preset positions unless `timeLayoutPreset` actually changed — otherwise color/date updates clear custom positions.
+- **Dual scale bars on display**: Fullscreen display has two Ctrl+sliders: 'Таймер' (30-300%) and 'Блоки' (50-600%). Both persist to localStorage (`displayTimerScale`, `displayBlockScale`).
 
 ## Automation
 
