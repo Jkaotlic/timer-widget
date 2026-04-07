@@ -80,7 +80,16 @@ class DisplayTimer {
     }
 
     setupKeyboardShortcuts() {
+        // Track window states for W/C/D toggles
+        this._widgetOpen = false;
+        this._clockOpen = false;
+        if (this.ipcRenderer) {
+            this.ipcRenderer.on('widget-window-state', (_e, data) => { this._widgetOpen = data && data.isOpen; });
+            this.ipcRenderer.on('clock-window-state', (_e, data) => { this._clockOpen = data && data.isOpen; });
+        }
+
         document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.altKey || e.metaKey) { return; }
             switch (e.code) {
                 case 'Space':
                     e.preventDefault();
@@ -105,9 +114,22 @@ class DisplayTimer {
                     }
                     break;
                 case 'Escape':
+                case 'KeyD':
                     e.preventDefault();
                     if (this.ipcRenderer) {
                         this.ipcRenderer.send('close-display');
+                    }
+                    break;
+                case 'KeyW':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send(this._widgetOpen ? 'close-widget' : 'open-widget');
+                    }
+                    break;
+                case 'KeyC':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send(this._clockOpen ? 'close-clock-widget' : 'open-clock-widget');
                     }
                     break;
             }

@@ -4126,6 +4126,7 @@
                     this.lastUpdateCounter = updateCounter;
                     this.lastTimestamp = state.timestamp || Date.now();
 
+                    const wasRunningBefore = this.isRunning;
                     const wasFinishedBefore = this.wasFinished;
                     this.totalSeconds = state.totalSeconds;
                     this.remainingSeconds = state.remainingSeconds;
@@ -4135,6 +4136,15 @@
 
                     this.updateDisplay();
                     this.updateControls();
+
+                    // Звук старта при запуске из другого окна
+                    if (!wasRunningBefore && state.isRunning) {
+                        if (this._localStartTriggered) {
+                            this._localStartTriggered = false;
+                        } else if (this.soundStartEl.checked) {
+                            this.playSound('start');
+                        }
+                    }
 
                     // Звук окончания таймера
                     if (state.finished && !wasFinishedBefore) {
@@ -4210,6 +4220,7 @@
                     setTimeout(() => this.controlTimeEl.style.animation = '', 300);
                     return;
                 }
+                this._localStartTriggered = true;
                 this.sendCommand('start');
                 if (this.soundStartEl.checked) this.playSound('start');
             }
