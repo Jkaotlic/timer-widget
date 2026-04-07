@@ -74,3 +74,33 @@
 - Mockup: `.superpowers/brainstorm/1913-1775470678/content/design-improvements.html`
 - Spec: `docs/superpowers/specs/2026-04-06-design-improvements-v2.md`
 - Figma: https://www.figma.com/design/ojj21B75qClGUlDgqAUFIU (control panel, Starter limit)
+
+## Apr 6, 2026 — Overtime Visuals + UI Polish
+
+### Overtime red color + pulse across ALL styles
+- **Root cause**: `applyColors()` sets inline `style.color` which overrides CSS classes (`danger`, `overtime`)
+- **Fix**: Each `updateXxxDisplay()` now sets inline red color when overtime/danger
+- Display: added `_enforceOvertimeColors()` called every tick to guarantee red stays
+- Pulse animations: added for digital (glow pulse), flip (box-shadow pulse), analog (center + hands pulse)
+- Widget + Display: all 4 styles (circle, digital, flip, analog) now show red + pulse in overtime
+
+### Time format with hours
+- Analog digital, Digital LED, Flip: all now show `H:MM:SS` when timer >= 1 hour
+- Display flip: added hours card group (`flipHoursUnit`, `flipHoursSep`, `flipHr1`, `flipHr2`)
+- Display digital: added hours group (`digitalHoursGroup`, `digitalHours`)
+
+### Control panel improvements
+- Window height: 760→860 (min 760, max 1000)
+- Tab icons + settings-group-title icons: brighter (filter: brightness(1.3), color 0.35→0.5)
+- Sound tab: switched from single-column to 2-column grid (left: Основное+События, right: Ваши звуки)
+- All tab content: scrollable with `max-height: calc(100vh - 520px)`
+- "Текущее время" toggle added to Полноэкранный settings (controls `currentTimeBlock` visibility)
+- "Начало"/"Конец" time inputs moved from hidden to visible in Блоки времени section
+
+### Clock widget
+- Flip + digital: seconds now enabled by default (was only circle/analog)
+
+### Status color consistency
+- `#38ef7d` → `#30d158` in display.html status pills
+- `rgba(56, 239, 125` → `rgba(48, 209, 88` across widget/display
+- Google Fonts @import added to electron-control.html

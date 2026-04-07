@@ -1472,12 +1472,9 @@
                 }
 
                 // Принудительные форматы по стилю:
-                // Круговой/Аналоговый: секунды всегда включены
-                // Цифровой/Перекидные: 24ч формат, секунды выключены
-                if (style === 'circle' || style === 'analog') {
-                    this.showSeconds = true;
-                } else {
-                    this.showSeconds = false;
+                // Все стили: секунды включены, цифровой/перекидные: 24ч формат
+                this.showSeconds = true;
+                if (style === 'digital' || style === 'flip') {
                     this.format24h = true;
                 }
                 this.updateSecondsVisibility();

@@ -492,9 +492,9 @@
         }
 
         .status-pill.running {
-            background: rgba(56, 239, 125, 0.15);
-            color: #38ef7d;
-            box-shadow: 0 0 25px rgba(56, 239, 125, 0.2);
+            background: rgba(48, 209, 88, 0.15);
+            color: #30d158;
+            box-shadow: 0 0 25px rgba(48, 209, 88, 0.2);
         }
 
         .status-pill.overtime {
@@ -653,16 +653,16 @@
 
         .digital-time.danger {
             color: #ff3333;
-            text-shadow: 
+            text-shadow:
                 0 0 20px #ff3333,
                 0 0 40px #ff3333,
                 0 0 80px #ff333366;
-            animation: led-blink 0.5s infinite;
+            animation: led-danger-pulse 1s infinite;
         }
 
-        @keyframes led-blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+        @keyframes led-danger-pulse {
+            0%, 100% { opacity: 1; text-shadow: 0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366; }
+            50% { opacity: 0.7; text-shadow: 0 0 30px #ff3333, 0 0 60px #ff3333, 0 0 100px #ff333399; }
         }
 
         .digital-dots {
@@ -794,6 +794,14 @@
 
         .flip-card.danger .flip-digit {
             color: #ff4444;
+        }
+        .flip-card.danger {
+            animation: flip-danger-pulse 1s infinite;
+            box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 4px 20px rgba(255,68,68,0.2);
+        }
+        @keyframes flip-danger-pulse {
+            0%, 100% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 4px 20px rgba(255,68,68,0.2); }
+            50% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3), 0 4px 30px rgba(255,68,68,0.4); }
         }
 
         .flip-label {
@@ -1273,7 +1281,7 @@
         <div class="timer-digital" id="timerDigital">
             <div class="digital-display">
                 <div class="digital-time" id="digitalTime">
-                    <span id="digitalMinutes">00</span><span class="digital-dots">:</span><span id="digitalSeconds">00</span>
+                    <span id="digitalHoursGroup" style="display:none"><span id="digitalHours">0</span><span class="digital-dots">:</span></span><span id="digitalMinutes">00</span><span class="digital-dots">:</span><span id="digitalSeconds">00</span>
                 </div>
             </div>
         </div>
@@ -1281,6 +1289,22 @@
         <!-- Стиль: Перекидные часы -->
         <div class="timer-flip" id="timerFlip">
             <div class="flip-minus" id="flipMinus"><span class="flip-minus-sign">−</span></div>
+            <div class="flip-unit" id="flipHoursUnit" style="display:none">
+                <div class="flip-group" id="flipHours">
+                    <div class="flip-card" id="flipHr1">
+                        <div class="flip-card-inner">
+                            <span class="flip-digit">0</span>
+                        </div>
+                    </div>
+                    <div class="flip-card" id="flipHr2">
+                        <div class="flip-card-inner">
+                            <span class="flip-digit">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flip-label">часы</div>
+            </div>
+            <div class="flip-separator" id="flipHoursSep" style="display:none">:</div>
             <div class="flip-unit">
                 <div class="flip-group" id="flipMinutes">
                     <div class="flip-card" id="flipMin1">

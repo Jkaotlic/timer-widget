@@ -209,15 +209,15 @@ function createControlWindow() {
 
     // Calculate optimal window size (adapt to screen size)
     const windowWidth = Math.min(700, Math.max(600, screenWidth - 100));
-    const windowHeight = Math.min(760, Math.max(700, screenHeight - 100));
+    const windowHeight = Math.min(860, Math.max(760, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
         minWidth: 600,
-        minHeight: 700,
+        minHeight: 760,
         maxWidth: 800,
-        maxHeight: 920,
+        maxHeight: 1000,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -482,9 +482,9 @@ ipcMain.on('resize-control-window', (event, size) => {
     if (controlWindow && size && typeof size === 'object') {
         const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
         const w = Number.isFinite(size.width) ? size.width : 700;
-        const h = Number.isFinite(size.height) ? size.height : 760;
+        const h = Number.isFinite(size.height) ? size.height : 860;
         const targetWidth = Math.max(600, Math.min(w, screenWidth - 50));
-        const targetHeight = Math.max(700, Math.min(h, screenHeight - 50));
+        const targetHeight = Math.max(760, Math.min(h, screenHeight - 50));
         
         // Получаем текущую позицию окна
         const [x, y] = controlWindow.getPosition();
