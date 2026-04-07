@@ -31,6 +31,7 @@ let timerInterval = null;
 
 // Сохраняем последние настройки дисплея для синхронизации
 let lastDisplaySettings = null;
+let lastDisplayIndex = 'auto';
 
 // Per-window colors (independent themes)
 let lastWidgetColors = null;
@@ -641,8 +642,12 @@ ipcMain.on('get-displays', (event) => {
 });
 
 ipcMain.on('open-display', (event, options = {}) => {
+    // Use provided displayIndex, or fall back to last used
+    const displayIndex = options.displayIndex !== undefined ? options.displayIndex : lastDisplayIndex;
+    lastDisplayIndex = displayIndex;
+
     // Если дисплей уже открыт и запрос на тот же монитор - просто фокус
-    if (displayWindow && options.displayIndex === displayWindow._displayIndex) {
+    if (displayWindow && displayIndex === displayWindow._displayIndex) {
         displayWindow.focus();
         return;
     }
@@ -653,10 +658,10 @@ ipcMain.on('open-display', (event, options = {}) => {
         displayWindow = null;
     }
 
-    createDisplayWindow(options.displayIndex);
+    createDisplayWindow(displayIndex);
     if (displayWindow) {
         // Сохраняем индекс монитора для проверки
-        displayWindow._displayIndex = options.displayIndex;
+        displayWindow._displayIndex = displayIndex;
 
         displayWindow.webContents.on('did-finish-load', () => {
             safelySendToWindow(displayWindow, 'timer-state', timerState);
