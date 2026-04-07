@@ -1356,6 +1356,16 @@
                     if (center) { center.style.background = timerColor; }
                 }
 
+                // Date & timezone badges — all styles
+                if (timerColor) {
+                    [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
+                        if (el) { el.style.color = timerColor; }
+                    });
+                    [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
+                        if (el) { el.style.color = timerColor; }
+                    });
+                }
+
                 localStorage.setItem('clockColors', JSON.stringify(colors));
             }
 
