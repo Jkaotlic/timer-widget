@@ -614,6 +614,7 @@
             background: linear-gradient(180deg, rgba(40, 40, 50, 0.8) 0%, rgba(25, 25, 35, 0.8) 49.9%, rgba(10, 10, 15, 0.85) 50%, rgba(25, 25, 35, 0.8) 100%);
             border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.08);
+            overflow: hidden;
         }
 
         .widget-flip-inner::before {
@@ -644,11 +645,11 @@
             width: 40px;
             height: 56px;
         }
-        
+
         .widget-flip.has-seconds .widget-flip-separator {
             font-size: 36px;
         }
-        
+
         .widget-flip.has-seconds .widget-flip-digit {
             font-size: 32px;
         }
@@ -983,7 +984,7 @@
     </style>
 </head>
 <body>
-    <div class="widget-hint" id="clockHint">Ctrl — масштаб</div>
+    <div class="widget-hint" id="clockHint">Ctrl + слайдер или колесо — масштаб</div>
 
     <!-- Scale bar slider — Ctrl + hover -->
     <div class="scale-bar-zone" id="scaleBarZone">
@@ -1274,11 +1275,14 @@
                 const digitalFontSize = Math.min(maxFontByWidth, maxFontByHeight);
                 this.container.style.setProperty('--digital-font-size', digitalFontSize + 'px');
                 
-                // Масштаб для flip (базовая ширина для 6 карточек HH:MM:SS)
-                // Учитываем небольшую высоту с датой и timezone (они теперь маленькие)
-                const baseFlipWidth = showSeconds ? 280 : 200;
+                // Масштаб для flip:
+                // С секундами (HH:MM:SS): 6 карт×40 + 2×4 gap + 2 сеп×~20 + 4×8 flex gap ≈ 320
+                // Без секунд (HH:MM): 4 карт×50 + 1×4 gap + 1 сеп×~25 + 2×8 flex gap ≈ 253
+                const baseFlipWidth = showSeconds ? 320 : 255;
                 const hasExtraInfo = this.showDate || this.showTimezone;
-                const baseFlipHeight = hasExtraInfo ? 85 : 70;
+                // Карточки: 56px (с секундами) или 70px (без), плюс ~35px на дату/timezone
+                const baseCardHeight = showSeconds ? 56 : 70;
+                const baseFlipHeight = hasExtraInfo ? baseCardHeight + 35 : baseCardHeight;
                 
                 const scaleX = (containerWidth * 0.95) / baseFlipWidth;
                 const scaleY = (containerHeight * 0.95) / baseFlipHeight;
@@ -1402,32 +1406,34 @@
                 const BASE_SIZE = 220;
                 const MIN_SCALE = 30;
                 const MAX_SCALE = 600;
+                let currentScalePct = Math.round(window.outerWidth / BASE_SIZE * 100);
 
                 const scaleBar = document.getElementById('scaleBar');
                 const scaleBarFill = document.getElementById('scaleBarFill');
                 const scaleBarThumb = document.getElementById('scaleBarThumb');
                 const scaleTooltip = document.getElementById('scaleTooltip');
 
-                const updateScaleBarPosition = () => {
-                    if (!scaleBar) { return; }
-                    const currentPct = Math.round(window.outerWidth / BASE_SIZE * 100);
-                    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, currentPct));
-                    const ratio = (clamped - MIN_SCALE) / (MAX_SCALE - MIN_SCALE);
-                    const pctPos = ratio * 100;
+                const updateScaleBarUI = (pct) => {
+                    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pct));
+                    const pctPos = ((clamped - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
                     if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
                     if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
                     if (scaleTooltip) { scaleTooltip.textContent = clamped + '%'; }
+                };
+
+                const updateScaleBarPosition = () => {
+                    if (!scaleBar) { return; }
+                    currentScalePct = Math.round(window.outerWidth / BASE_SIZE * 100);
+                    updateScaleBarUI(currentScalePct);
                 };
 
                 const setScaleFromRatio = (ratio) => {
                     const pct = Math.round(MIN_SCALE + ratio * (MAX_SCALE - MIN_SCALE));
                     const clampedPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pct));
                     const newSize = Math.round(BASE_SIZE * clampedPct / 100);
+                    currentScalePct = clampedPct;
                     ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
-                    const pctPos = ((clampedPct - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
-                    if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
-                    if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
-                    if (scaleTooltip) { scaleTooltip.textContent = clampedPct + '%'; }
+                    updateScaleBarUI(clampedPct);
                 };
 
                 // Ctrl key — show/hide scale bar
@@ -1498,50 +1504,69 @@
                     }
                 });
 
-                // Scale bar click & drag — uses screen coords to avoid feedback loop
+                // Scale bar drag — CSS transform preview during drag, resize on release
+                const widgetContainer = document.getElementById('widgetContainer');
                 if (scaleBar) {
-                    scaleBar.addEventListener('mousedown', (e) => {
+                    scaleBar.addEventListener('pointerdown', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        scaleBar.setPointerCapture(e.pointerId);
                         scaleBar.classList.add('dragging');
 
                         const startScreenX = e.screenX;
-                        const startPct = Math.round(window.outerWidth / BASE_SIZE * 100);
+                        const startPct = currentScalePct;
                         const dragRange = 300;
-                        let lastSentSize = 0;
+                        let targetPct = startPct;
                         let rafId = 0;
 
-                        const applyScale = (dx) => {
+                        const previewScale = (dx) => {
                             const deltaPct = Math.round((dx / dragRange) * (MAX_SCALE - MIN_SCALE));
-                            const newPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startPct + deltaPct));
-                            const newSize = Math.round(BASE_SIZE * newPct / 100);
-                            const pctPos = ((newPct - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
-                            if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
-                            if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
-                            if (scaleTooltip) { scaleTooltip.textContent = newPct + '%'; }
-                            if (newSize !== lastSentSize) {
-                                lastSentSize = newSize;
-                                ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                            targetPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startPct + deltaPct));
+                            updateScaleBarUI(targetPct);
+                            if (widgetContainer) {
+                                const ratio = targetPct / startPct;
+                                widgetContainer.style.transform = `scale(${ratio})`;
+                                widgetContainer.style.transformOrigin = 'center center';
                             }
                         };
 
                         const onMove = (ev) => {
                             ev.preventDefault();
+                            const sx = ev.screenX;
                             if (rafId) { cancelAnimationFrame(rafId); }
-                            rafId = requestAnimationFrame(() => {
-                                applyScale(ev.screenX - startScreenX);
-                            });
+                            rafId = requestAnimationFrame(() => previewScale(sx - startScreenX));
                         };
                         const onUp = () => {
                             scaleBar.classList.remove('dragging');
                             if (rafId) { cancelAnimationFrame(rafId); }
-                            document.removeEventListener('mousemove', onMove);
-                            document.removeEventListener('mouseup', onUp);
+                            if (widgetContainer) {
+                                widgetContainer.style.transform = '';
+                                widgetContainer.style.transformOrigin = '';
+                            }
+                            currentScalePct = targetPct;
+                            const newSize = Math.round(BASE_SIZE * targetPct / 100);
+                            ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                            scaleBar.removeEventListener('pointermove', onMove);
+                            scaleBar.removeEventListener('pointerup', onUp);
                         };
-                        document.addEventListener('mousemove', onMove);
-                        document.addEventListener('mouseup', onUp);
+                        scaleBar.addEventListener('pointermove', onMove);
+                        scaleBar.addEventListener('pointerup', onUp);
                     });
                 }
+
+                // Ctrl+Wheel scaling — resize clock by 10% per scroll tick
+                document.addEventListener('wheel', (e) => {
+                    if (!e.ctrlKey) { return; }
+                    e.preventDefault();
+                    const step = 10;
+                    const delta = e.deltaY < 0 ? step : -step;
+                    const newPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, currentScalePct + delta));
+                    if (newPct === currentScalePct) { return; }
+                    currentScalePct = newPct;
+                    const newSize = Math.round(BASE_SIZE * newPct / 100);
+                    ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                    updateScaleBarUI(newPct);
+                }, { passive: false });
 
                 window.addEventListener('resize', updateScaleBarPosition);
             }
@@ -1938,11 +1963,11 @@
         }
 
         // Show hint only on first open
-        if (localStorage.getItem('clockHintShown')) {
+        if (localStorage.getItem('clockHintShown') === 'v2') {
             const h = document.getElementById('clockHint');
             if (h) { h.style.display = 'none'; }
         } else {
-            localStorage.setItem('clockHintShown', '1');
+            localStorage.setItem('clockHintShown', 'v2');
         }
 
         const clockWidget = new ClockWidget();

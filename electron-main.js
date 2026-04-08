@@ -1,7 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
 const path = require('path');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
+
+// Remove default Electron menu (File, Edit, View, Help)
+Menu.setApplicationMenu(null);
 
 let controlWindow = null;
 let widgetWindow = null;
@@ -39,8 +42,8 @@ let lastClockColors = null;
 let lastDisplayColors = null;
 let lastWidgetStyle = null;
 
-// Block Ctrl+=/- keyboard zoom on widget/clock windows (prevents content zoom)
-function blockKeyboardZoom(win) {
+// Block Ctrl+=/- keyboard zoom and Ctrl+Wheel page zoom on all windows
+function blockZoom(win) {
     if (!win || !win.webContents) {return;}
     win.webContents.on('before-input-event', (event, input) => {
         if (win.isDestroyed()) {return;}
@@ -48,6 +51,10 @@ function blockKeyboardZoom(win) {
             event.preventDefault();
         }
     });
+    // Reset zoom and block Ctrl+Wheel page zoom
+    win.webContents.setZoomFactor(1);
+    win.webContents.setZoomLevel(0);
+    win.webContents.setVisualZoomLevelLimits(1, 1);
 }
 
 // Защита от навигации и открытия новых окон
@@ -212,7 +219,7 @@ function createControlWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: true,
-            devTools: true
+            devTools: false
         },
         title: 'Управление Таймером',
         icon: path.join(__dirname, 'icon.ico'),
@@ -225,7 +232,7 @@ function createControlWindow() {
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
-        blockKeyboardZoom(controlWindow);
+        blockZoom(controlWindow);
     });
 
     controlWindow.on('closed', () => {
@@ -264,7 +271,7 @@ function createWidgetWindow() {
     hardenWindow(widgetWindow);
 
     widgetWindow.webContents.once('did-finish-load', () => {
-        blockKeyboardZoom(widgetWindow);
+        blockZoom(widgetWindow);
     });
 
     widgetWindow.on('closed', () => {
@@ -303,7 +310,7 @@ function createClockWidgetWindow() {
     hardenWindow(clockWidgetWindow);
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
-        blockKeyboardZoom(clockWidgetWindow);
+        blockZoom(clockWidgetWindow);
     });
 
     clockWidgetWindow.on('closed', () => {
@@ -349,6 +356,7 @@ function createDisplayWindow(displayIndex) {
 
     displayWindow.loadFile('display.html');
     hardenWindow(displayWindow);
+    blockZoom(displayWindow);
 
     const thisWindow = displayWindow;
     displayWindow.on('closed', () => {
