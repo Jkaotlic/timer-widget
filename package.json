@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -53,8 +53,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}",
-      "useZip": true
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "portable": {
       "artifactName": "${productName}-Portable.exe"

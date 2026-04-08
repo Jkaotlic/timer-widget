@@ -187,12 +187,12 @@ jobs:
 
             | Платформа | Файл | Описание |
             |-----------|------|----------|
-            | 🪟 Windows | `TimerWidget-Setup-2.1.0.exe` | Установщик (NSIS) |
+            | 🪟 Windows | `TimerWidget-Setup-2.1.1.exe` | Установщик (NSIS) |
             | 🪟 Windows | `TimerWidget-Portable.exe` | Портативная версия |
-            | 🍎 macOS Apple Silicon | `TimerWidget-2.1.0-arm64.dmg` | Для M1/M2/M3/M4 |
-            | 🍎 macOS Intel | `TimerWidget-2.1.0-x64.dmg` | Для Intel Mac |
-            | 🐧 Linux | `TimerWidget-2.1.0-amd64.deb` | Debian/Ubuntu |
-            | 🐧 Linux | `TimerWidget-2.1.0-x86_64.AppImage` | Универсальный |
+            | 🍎 macOS Apple Silicon | `TimerWidget-2.1.1-arm64.dmg` | Для M1/M2/M3/M4 |
+            | 🍎 macOS Intel | `TimerWidget-2.1.1-x64.dmg` | Для Intel Mac |
+            | 🐧 Linux | `TimerWidget-2.1.1-amd64.deb` | Debian/Ubuntu |
+            | 🐧 Linux | `TimerWidget-2.1.1-x86_64.AppImage` | Универсальный |
 
             ---
             *Built with Electron 41 + vanilla JS. No frameworks, no bundler.*
