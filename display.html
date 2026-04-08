@@ -446,6 +446,14 @@
             animation: time-pulse 0.5s infinite;
         }
 
+        /* Минус-знак «висит» слева от цифр через отрицательный margin */
+        .time-minus,
+        .analog-time-minus {
+            display: inline-block;
+            margin-left: -0.6em;
+            margin-right: 0.05em;
+        }
+
         @keyframes time-pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.02); }
@@ -1326,7 +1334,7 @@
         </div>
     </div>
 
-    <div class="controls-hint" id="controlsHint">Ctrl — масштаб · Alt — переместить блоки · 1-8 — пресеты</div>
+    <div class="controls-hint" id="controlsHint">Ctrl + слайдер/колесо — таймер · Shift + колесо — блоки · Alt — переместить · 1-8 — пресеты</div>
 
     <!-- Кнопка закрытия -->
     <button class="close-btn" id="closeBtn" title="Закрыть">✕</button>
