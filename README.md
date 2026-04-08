@@ -6,7 +6,7 @@
 
 **Прозрачный таймер для презентаций и рабочего стола**
 
-[![Version](https://img.shields.io/badge/v2.0.0-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.1.1-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_41-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
@@ -45,7 +45,7 @@
 - 8 пресетов от 5 до 60 минут
 - Формат `H:MM:SS` при таймере больше часа
 - Счёт ниже нуля с уведомлениями каждые N минут
-- 20 встроенных звуков (Web Audio API) + загрузка своих mp3/wav/ogg
+- 30 встроенных звуков (Web Audio API) + загрузка своих mp3/wav/ogg
 
 </details>
 
@@ -115,10 +115,16 @@
 
 | | Платформа | Файл |
 |:--|:----------|:-----|
-| <img src="https://cdn.simpleicons.org/windows/0078D6" width="16"> | Windows | `TimerWidget-Setup-2.0.0.exe` — установщик |
+| <img src="https://cdn.simpleicons.org/windows/0078D6" width="16"> | Windows | `TimerWidget-Setup.exe` — установщик |
 | <img src="https://cdn.simpleicons.org/windows/0078D6" width="16"> | Windows | `TimerWidget-Portable.exe` — без установки |
-| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Apple Silicon | `TimerWidget-2.0.0-arm64.dmg` |
-| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Intel | `TimerWidget-2.0.0-x64.dmg` |
+| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Apple Silicon | `TimerWidget-arm64.dmg` |
+| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Intel | `TimerWidget-x64.dmg` |
+
+> **macOS**: приложение не подписано Apple Developer сертификатом. При первом запуске:
+> 1. Откройте DMG и перетащите приложение в Applications
+> 2. **Правый клик** на TimerWidget → **Открыть** → подтвердите запуск
+>
+> Или в терминале: `xattr -cr /Applications/TimerWidget.app`
 
 <details>
 <summary>Linux</summary>
@@ -127,8 +133,8 @@
 
 | | Формат | Файл |
 |:--|:-------|:-----|
-| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | DEB | `TimerWidget-2.0.0-amd64.deb` |
-| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | AppImage | `TimerWidget-2.0.0-x86_64.AppImage` |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | DEB | `TimerWidget-amd64.deb` |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | AppImage | `TimerWidget-x86_64.AppImage` |
 
 </details>
 
