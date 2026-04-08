@@ -6,7 +6,7 @@
 
 **Transparent timer for presentations and desktop**
 
-[![Version](https://img.shields.io/badge/v2.0.0-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.1.1-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_41-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
@@ -45,7 +45,7 @@
 - 8 presets from 5 to 60 minutes
 - `H:MM:SS` format when timer exceeds one hour
 - Negative count with notifications every N minutes
-- 20 built-in sounds (Web Audio API) + custom mp3/wav/ogg upload
+- 30 built-in sounds (Web Audio API) + custom mp3/wav/ogg upload
 
 </details>
 
@@ -115,10 +115,16 @@ Download from [**Releases**](../../releases/latest):
 
 | | Platform | File |
 |:--|:---------|:-----|
-| <img src="https://cdn.simpleicons.org/windows/0078D6" width="16"> | Windows | `TimerWidget-Setup-2.0.0.exe` — installer |
+| <img src="https://cdn.simpleicons.org/windows/0078D6" width="16"> | Windows | `TimerWidget-Setup.exe` — installer |
 | <img src="https://cdn.simpleicons.org/windows/0078D6" width="16"> | Windows | `TimerWidget-Portable.exe` — portable |
-| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Apple Silicon | `TimerWidget-2.0.0-arm64.dmg` |
-| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Intel | `TimerWidget-2.0.0-x64.dmg` |
+| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Apple Silicon | `TimerWidget-arm64.dmg` |
+| <img src="https://cdn.simpleicons.org/apple/999" width="16"> | macOS Intel | `TimerWidget-x64.dmg` |
+
+> **macOS**: The app is not signed with an Apple Developer certificate. On first launch:
+> 1. Open the DMG and drag the app to Applications
+> 2. **Right-click** TimerWidget → **Open** → confirm
+>
+> Or in Terminal: `xattr -cr /Applications/TimerWidget.app`
 
 <details>
 <summary>Linux</summary>
@@ -127,8 +133,8 @@ Download from [**Releases**](../../releases/latest):
 
 | | Format | File |
 |:--|:-------|:-----|
-| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | DEB | `TimerWidget-2.0.0-amd64.deb` |
-| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | AppImage | `TimerWidget-2.0.0-x86_64.AppImage` |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | DEB | `TimerWidget-amd64.deb` |
+| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | AppImage | `TimerWidget-x86_64.AppImage` |
 
 </details>
 
@@ -287,7 +293,7 @@ Bugs and suggestions — in [Issues](../../issues).
 - Ctrl+slider scaling 30–600%
 - Alt+drag block repositioning on fullscreen display
 - Global keyboard shortcuts from any window
-- 20 built-in sounds via Web Audio API
+- 30 built-in sounds via Web Audio API
 - Per-window color and style settings
 - Overtime with pulsation and H:MM:SS format
 
