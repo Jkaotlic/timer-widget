@@ -2428,6 +2428,10 @@
                                     <option value="notification">Нотификация</option>
                                     <option value="rising">Нарастающий</option>
                                     <option value="pulse">Пульс</option>
+                                    <option value="drum-roll">Барабанная дробь</option>
+                                    <option value="epic-brass">Эпичная труба</option>
+                                    <option value="air-horn">Воздушный рожок</option>
+                                    <option value="metal-strike">Металлический удар</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
                             </select>
@@ -2454,6 +2458,15 @@
                                     <option value="complete">Завершение</option>
                                     <option value="notification">Нотификация</option>
                                     <option value="drop">Падающий тон</option>
+                                    <option value="cymbal">Тарелки</option>
+                                    <option value="deep-gong">Глубокий гонг</option>
+                                    <option value="air-horn">Воздушный рожок</option>
+                                    <option value="siren">Сирена</option>
+                                    <option value="church-bell">Церковный колокол</option>
+                                    <option value="drum-roll">Барабанная дробь</option>
+                                    <option value="ship-horn">Корабельный гудок</option>
+                                    <option value="metal-strike">Металлический удар</option>
+                                    <option value="epic-brass">Эпичная труба</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
                             </select>
@@ -2478,6 +2491,8 @@
                                     <option value="countdown-tick">Обратный отсчёт</option>
                                     <option value="pulse">Пульс</option>
                                     <option value="notification">Нотификация</option>
+                                    <option value="metal-strike">Металлический удар</option>
+                                    <option value="church-bell">Церковный колокол</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
                             </select>
@@ -2502,6 +2517,12 @@
                                     <option value="countdown-tick">Обратный отсчёт</option>
                                     <option value="rising">Нарастающий</option>
                                     <option value="pulse">Пульс</option>
+                                    <option value="cymbal">Тарелки</option>
+                                    <option value="siren">Сирена</option>
+                                    <option value="air-horn">Воздушный рожок</option>
+                                    <option value="deep-gong">Глубокий гонг</option>
+                                    <option value="ship-horn">Корабельный гудок</option>
+                                    <option value="metal-strike">Металлический удар</option>
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupOverrun"></optgroup>
                             </select>
@@ -2821,7 +2842,7 @@
                             <ul>
                                 <li>Перетаскивается мышкой в любое место</li>
                                 <li>Кнопки управления появляются при наведении</li>
-                                <li><strong>Ctrl</strong> — показать слайдер масштабирования (30–600%)</li>
+                                <li><strong>Ctrl</strong> + слайдер или колесо мыши — масштабирование (30–600%)</li>
                                 <li>Горячая клавиша: <strong>W</strong> (открыть / закрыть)</li>
                             </ul>
                         </div>
@@ -2833,7 +2854,7 @@
                             <ul>
                                 <li>4 стиля: круговой, цифровой LED, перекидные, аналоговые</li>
                                 <li>Опционально: дата, часовой пояс, секунды, 12/24ч формат</li>
-                                <li><strong>Ctrl</strong> — показать слайдер масштабирования (30–600%)</li>
+                                <li><strong>Ctrl</strong> + слайдер или колесо мыши — масштабирование (30–600%)</li>
                                 <li>Прозрачный, всегда поверх других окон</li>
                                 <li>Горячая клавиша: <strong>C</strong> (открыть / закрыть)</li>
                             </ul>
@@ -2849,7 +2870,7 @@
                                 <li>Блоки времени: текущее время начала/окончания мероприятия</li>
                                 <li>Настраиваемый фон: заливка, градиент, изображение (URL или файл)</li>
                                 <li>Горячая клавиша: <strong>D</strong> (открыть / закрыть), <strong>Esc</strong> (закрыть все)</li>
-                                <li>В полноэкранном режиме зажмите <strong>Ctrl</strong> для масштабирования таймера и блоков времени (два слайдера). Зажмите <strong>Alt</strong> и перетащите блоки времени в любое место экрана.</li>
+                                <li>Масштаб: <strong>Ctrl</strong> + слайдер или колесо мыши — таймер, <strong>Shift</strong> + колесо — блоки. <strong>Alt</strong> + перетащить — переместить блоки.</li>
                             </ul>
                         </div>
                     </div>
@@ -2942,8 +2963,9 @@
                         <div class="faq-question">Масштабирование и перемещение</div>
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
-                                <div class="shortcut"><span class="key">Ctrl</span> <span class="shortcut-desc">На виджете/часах — показать слайдер масштабирования (30–600%)</span></div>
-                                <div class="shortcut"><span class="key">Ctrl</span> <span class="shortcut-desc">В полноэкранном — показать слайдеры масштаба таймера и блоков</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> + слайдер / колесо <span class="shortcut-desc">На виджете/часах — масштабирование (30–600%)</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> + слайдер / колесо <span class="shortcut-desc">В полноэкранном — масштаб таймера (30–300%)</span></div>
+                                <div class="shortcut"><span class="key">Shift</span> + колесо <span class="shortcut-desc">В полноэкранном — масштаб блоков (50–600%)</span></div>
                                 <div class="shortcut"><span class="key">Alt</span> + перетаскивание <span class="shortcut-desc">В полноэкранном — переместить блок времени</span></div>
                             </div>
                         </div>
@@ -3179,7 +3201,7 @@
                 this.clockFormat24hEl = document.getElementById('clockFormat24h');
                 
                 // Синхронизация стилей (по умолчанию включена)
-                this.syncClockStyle = true;
+                this.syncClockStyle = false;
                 
                 // Пресет расположения по умолчанию - "Рамка"
                 this.timeLayoutPreset = 'frame';
@@ -3493,11 +3515,13 @@
                     this.saveExtSettings();
                 });
 
-                // Отдельный стиль часов
+                // Отдельный стиль часов — явное изменение из вкладки Часы отключает синхронизацию
                 this.clockStyleEl.addEventListener('change', () => {
-                    if (!this.syncClockStyle) {
-                        ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
+                    if (this.syncClockStyle) {
+                        this.syncClockStyle = false;
+                        if (this.syncClockStyleEl) { this.syncClockStyleEl.checked = false; }
                     }
+                    ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
                     this.updateClockAnalogNumbersVisibility();
                     this.saveExtSettings();
                 });
@@ -3929,7 +3953,7 @@
                 }
                 
                 // Синхронизация стиля часов
-                this.syncClockStyle = ext.syncClockStyle !== false; // по умолчанию true
+                this.syncClockStyle = !!ext.syncClockStyle; // по умолчанию false
                 this.syncClockStyleEl.checked = this.syncClockStyle;
                 this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
                 this.clockStyleEl.value = ext.clockStyle || ext.timerStyle || 'circle';
@@ -4673,6 +4697,195 @@
                             env.gain.setValueAtTime(0.0001, now);
                             env.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
                             env.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                            o.start(now + i * 0.05);
+                            o.stop(now + 1.3);
+                        });
+                        break;
+                    }
+                    case 'cymbal': {
+                        // Тарелки (крэш) — белый шум через bandpass
+                        const bufSize = ctx.sampleRate * 1.5;
+                        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+                        const data = buf.getChannelData(0);
+                        for (let i = 0; i < bufSize; i++) { data[i] = Math.random() * 2 - 1; }
+                        const noise = ctx.createBufferSource();
+                        noise.buffer = buf;
+                        const hp = ctx.createBiquadFilter();
+                        hp.type = 'highpass';
+                        hp.frequency.value = 5000;
+                        const bp = ctx.createBiquadFilter();
+                        bp.type = 'bandpass';
+                        bp.frequency.value = 8000;
+                        bp.Q.value = 0.8;
+                        const env = ctx.createGain();
+                        noise.connect(hp);
+                        hp.connect(bp);
+                        bp.connect(env);
+                        env.connect(ctx.destination);
+                        env.gain.setValueAtTime(0.0001, now);
+                        env.gain.exponentialRampToValueAtTime(0.35, now + 0.005);
+                        env.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+                        noise.start(now);
+                        noise.stop(now + 1.5);
+                        break;
+                    }
+                    case 'deep-gong': {
+                        // Глубокий гонг — низкие частоты с долгим затуханием
+                        [65, 98, 131, 196].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env.gain.setValueAtTime(0.0001, now);
+                            env.gain.exponentialRampToValueAtTime(0.2 / (i + 1), now + 0.02);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + 3);
+                            o.start(now);
+                            o.stop(now + 3.1);
+                        });
+                        break;
+                    }
+                    case 'air-horn': {
+                        // Воздушный рожок — мощный гудок
+                        [220, 277, 330].forEach((freq) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sawtooth';
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env.gain.setValueAtTime(0.0001, now);
+                            env.gain.exponentialRampToValueAtTime(0.15, now + 0.05);
+                            env.gain.setValueAtTime(0.15, now + 0.8);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                            o.start(now);
+                            o.stop(now + 1.3);
+                        });
+                        break;
+                    }
+                    case 'siren': {
+                        // Сирена — волнообразный тон
+                        const o = ctx.createOscillator();
+                        o.type = 'sawtooth';
+                        const filter = ctx.createBiquadFilter();
+                        filter.type = 'lowpass';
+                        filter.frequency.value = 2000;
+                        o.connect(filter);
+                        filter.connect(g);
+                        g.gain.setValueAtTime(0.0001, now);
+                        g.gain.exponentialRampToValueAtTime(0.2, now + 0.05);
+                        for (let i = 0; i < 4; i++) {
+                            o.frequency.setValueAtTime(500, now + i * 0.5);
+                            o.frequency.exponentialRampToValueAtTime(1000, now + i * 0.5 + 0.25);
+                            o.frequency.setValueAtTime(1000, now + i * 0.5 + 0.25);
+                            o.frequency.exponentialRampToValueAtTime(500, now + i * 0.5 + 0.5);
+                        }
+                        g.gain.exponentialRampToValueAtTime(0.0001, now + 2);
+                        o.start(now);
+                        o.stop(now + 2.1);
+                        break;
+                    }
+                    case 'church-bell': {
+                        // Церковный колокол — глубокий с обертонами
+                        const fundamentals = [220, 440, 554, 660, 880];
+                        fundamentals.forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sine';
+                            const env = ctx.createGain();
+                            o.connect(env);
+                            env.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env.gain.setValueAtTime(0.0001, now);
+                            env.gain.exponentialRampToValueAtTime(0.2 / (i + 1), now + 0.01);
+                            env.gain.exponentialRampToValueAtTime(0.0001, now + 2.5 - i * 0.3);
+                            o.start(now);
+                            o.stop(now + 2.6);
+                        });
+                        break;
+                    }
+                    case 'drum-roll': {
+                        // Барабанная дробь
+                        const bufSize2 = ctx.sampleRate * 2;
+                        const buf2 = ctx.createBuffer(1, bufSize2, ctx.sampleRate);
+                        const data2 = buf2.getChannelData(0);
+                        for (let i = 0; i < bufSize2; i++) { data2[i] = Math.random() * 2 - 1; }
+                        const noise2 = ctx.createBufferSource();
+                        noise2.buffer = buf2;
+                        const lp = ctx.createBiquadFilter();
+                        lp.type = 'lowpass';
+                        lp.frequency.value = 300;
+                        const env2 = ctx.createGain();
+                        noise2.connect(lp);
+                        lp.connect(env2);
+                        env2.connect(ctx.destination);
+                        // Нарастающая дробь
+                        env2.gain.setValueAtTime(0.0001, now);
+                        env2.gain.exponentialRampToValueAtTime(0.05, now + 0.1);
+                        env2.gain.exponentialRampToValueAtTime(0.3, now + 1.2);
+                        env2.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+                        noise2.start(now);
+                        noise2.stop(now + 1.6);
+                        break;
+                    }
+                    case 'ship-horn': {
+                        // Корабельный гудок — глубокий низкий гул
+                        [82, 110, 123].forEach((freq) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sawtooth';
+                            const filter2 = ctx.createBiquadFilter();
+                            filter2.type = 'lowpass';
+                            filter2.frequency.value = 400;
+                            const env3 = ctx.createGain();
+                            o.connect(filter2);
+                            filter2.connect(env3);
+                            env3.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env3.gain.setValueAtTime(0.0001, now);
+                            env3.gain.exponentialRampToValueAtTime(0.15, now + 0.1);
+                            env3.gain.setValueAtTime(0.15, now + 1.5);
+                            env3.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+                            o.start(now);
+                            o.stop(now + 2.3);
+                        });
+                        break;
+                    }
+                    case 'metal-strike': {
+                        // Металлический удар
+                        [800, 1200, 2400, 3600].forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = i < 2 ? 'square' : 'sine';
+                            const env4 = ctx.createGain();
+                            o.connect(env4);
+                            env4.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env4.gain.setValueAtTime(0.0001, now);
+                            env4.gain.exponentialRampToValueAtTime(0.2 / (i + 1), now + 0.003);
+                            env4.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+                            o.start(now);
+                            o.stop(now + 0.55);
+                        });
+                        break;
+                    }
+                    case 'epic-brass': {
+                        // Эпичная труба — мажорный аккорд
+                        const brass = [262, 330, 392, 523];
+                        brass.forEach((freq, i) => {
+                            const o = ctx.createOscillator();
+                            o.type = 'sawtooth';
+                            const filter3 = ctx.createBiquadFilter();
+                            filter3.type = 'lowpass';
+                            filter3.frequency.value = 1200;
+                            filter3.frequency.exponentialRampToValueAtTime(3000, now + 0.3);
+                            const env5 = ctx.createGain();
+                            o.connect(filter3);
+                            filter3.connect(env5);
+                            env5.connect(ctx.destination);
+                            o.frequency.value = freq;
+                            env5.gain.setValueAtTime(0.0001, now + i * 0.05);
+                            env5.gain.exponentialRampToValueAtTime(0.1, now + i * 0.05 + 0.04);
+                            env5.gain.setValueAtTime(0.1, now + 0.8);
+                            env5.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
                             o.start(now + i * 0.05);
                             o.stop(now + 1.3);
                         });

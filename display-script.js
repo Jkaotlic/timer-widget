@@ -57,12 +57,12 @@ class DisplayTimer {
         this.setupBlockControls();
         this.restoreBlockPositions();
 
-        // Show controls hint once
-        if (!localStorage.getItem('displayHintShown')) {
-            localStorage.setItem('displayHintShown', '1');
-        } else {
+        // Show controls hint once (v2 = added wheel+shift info)
+        if (localStorage.getItem('displayHintShown') === 'v2') {
             const hint = document.getElementById('controlsHint');
             if (hint) { hint.style.display = 'none'; }
+        } else {
+            localStorage.setItem('displayHintShown', 'v2');
         }
     }
     
@@ -406,19 +406,17 @@ class DisplayTimer {
         // Масштаб таймера
         if (settings.timerScale !== undefined) {
             this.timerScale = settings.timerScale;
-            const scale = settings.timerScale / 100;
-
-            // Для кругового стиля - обновляем размер динамически
-            this.updateRingSize();
-
-            // Для других стилей - transform
-            if (this.timerDigital) {this.timerDigital.style.transform = `scale(${scale})`;}
-            if (this.timerFlip) {this.timerFlip.style.transform = `scale(${scale})`;}
-            if (this.timerAnalog) {this.timerAnalog.style.transform = `scale(${scale})`;}
-
             // Update timer scale bar + persist
             if (this._scaleBarRefs) { this._scaleBarRefs.timerUpdateVisuals(settings.timerScale); }
             try { localStorage.setItem('displayTimerScale', String(settings.timerScale)); } catch (_e) { /* ok */ }
+        }
+        // Всегда применяем текущий масштаб (сохранённый или новый)
+        {
+            const scale = (this.timerScale || 100) / 100;
+            this.updateRingSize();
+            if (this.timerDigital) {this.timerDigital.style.transform = `scale(${scale})`;}
+            if (this.timerFlip) {this.timerFlip.style.transform = `scale(${scale})`;}
+            if (this.timerAnalog) {this.timerAnalog.style.transform = `scale(${scale})`;}
         }
         
         // Показ цифр на аналоговом циферблате
@@ -697,7 +695,7 @@ class DisplayTimer {
             this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
         }
 
-        // Flip
+        // Flip cards + separators
         const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2].filter(Boolean);
         flipCards.forEach(card => {
             if (!card.classList.contains('danger')) {
@@ -705,6 +703,9 @@ class DisplayTimer {
             }
             const digit = card.querySelector('.flip-digit');
             if (digit) { digit.style.color = '#ff4444'; }
+        });
+        document.querySelectorAll('.flip-separator').forEach(el => {
+            el.style.color = '#ff4444';
         });
 
         // Analog
@@ -862,7 +863,12 @@ class DisplayTimer {
 
         // Обновляем время для кругового стиля (только если изменилось)
         if (hasFormattedChanged) {
-            this.timeDisplay.textContent = formatted;
+            // Минус-знак в отдельном span с width:0, чтобы цифры оставались по центру
+            if (secs < 0 && formatted.startsWith('-')) {
+                this.timeDisplay.innerHTML = '<span class="time-minus">\u2212</span>' + formatted.slice(1);
+            } else {
+                this.timeDisplay.textContent = formatted;
+            }
 
             // Добавляем класс compact для длинного времени (минус или часы)
             const isCompact = secs < 0 || Math.abs(secs) >= 3600 || formatted.length > 5;
@@ -1037,12 +1043,14 @@ class DisplayTimer {
         });
 
         const isOvertime = secs < 0;
+        const flipSeparators = document.querySelectorAll('.flip-separator');
         if (isOvertime) {
             flipCards.forEach(card => {
                 card.classList.add('danger', 'overtime');
                 const digit = card.querySelector('.flip-digit');
                 if (digit) { digit.style.color = '#ff4444'; }
             });
+            flipSeparators.forEach(el => { el.style.color = '#ff4444'; });
         } else if (this.totalSeconds > 0) {
             const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
             flipCards.forEach(card => {
@@ -1059,11 +1067,21 @@ class DisplayTimer {
                     if (digit && this._baseTimerColor) { digit.style.color = this._baseTimerColor; }
                 }
             });
+            if (percentLeft <= 10 && percentLeft > 0) {
+                flipSeparators.forEach(el => { el.style.color = '#ff4444'; });
+            } else if (percentLeft <= 25) {
+                flipSeparators.forEach(el => { el.style.color = '#ffc107'; });
+            } else if (this._baseTimerColor) {
+                flipSeparators.forEach(el => { el.style.color = this._baseTimerColor; });
+            }
         } else {
             flipCards.forEach(card => {
                 const digit = card.querySelector('.flip-digit');
                 if (digit && this._baseTimerColor) { digit.style.color = this._baseTimerColor; }
             });
+            if (this._baseTimerColor) {
+                flipSeparators.forEach(el => { el.style.color = this._baseTimerColor; });
+            }
         }
     }
     
@@ -1101,11 +1119,13 @@ class DisplayTimer {
         if (this.analogDigitalTime) {
             const hours = Math.floor(absSecs / 3600);
             const mins = Math.floor((absSecs % 3600) / 60);
-            const prefix = secs < 0 ? '-' : '';
+            const minusSpan = '<span class="analog-time-minus">\u2212</span>';
             if (hours > 0) {
-                this.analogDigitalTime.textContent = `${prefix}${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                const timeStr = `${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                this.analogDigitalTime.innerHTML = (secs < 0 ? minusSpan : '') + timeStr;
             } else {
-                this.analogDigitalTime.textContent = `${prefix}${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                const timeStr = `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                this.analogDigitalTime.innerHTML = (secs < 0 ? minusSpan : '') + timeStr;
             }
         }
 
@@ -1358,6 +1378,45 @@ class DisplayTimer {
 
         // Store refs for external updates
         this._scaleBarRefs = { timerUpdateVisuals, blockUpdateVisuals };
+
+        // --- Ctrl+Wheel = timer scale, Shift+Wheel = block scale ---
+        document.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey && !e.shiftKey) { return; }
+            e.preventDefault();
+            const step = 10;
+            const delta = e.deltaY < 0 ? step : -step;
+
+            if (e.ctrlKey && !e.shiftKey) {
+                // Ctrl+Wheel → timer scale
+                const cur = this.timerScale || 100;
+                const newPct = Math.max(TIMER_MIN_SCALE, Math.min(TIMER_MAX_SCALE, cur + delta));
+                if (newPct !== cur) {
+                    const scale = newPct / 100;
+                    this.timerScale = newPct;
+                    this.updateRingSize();
+                    if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
+                    if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
+                    if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
+                    try { localStorage.setItem(STORAGE_TIMER_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
+                    timerUpdateVisuals(newPct);
+                }
+            } else if (e.shiftKey) {
+                // Shift+Wheel → block scale
+                const raw = this.currentTimeBlock
+                    ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
+                    : '1.2';
+                const cur = Math.round(parseFloat(raw) * 100) || 120;
+                const newPct = Math.max(BLOCK_MIN_SCALE, Math.min(BLOCK_MAX_SCALE, cur + delta));
+                if (newPct !== cur) {
+                    const scale = newPct / 100;
+                    [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
+                        if (b) { b.style.setProperty('--info-scale', scale); }
+                    });
+                    try { localStorage.setItem(STORAGE_BLOCK_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
+                    blockUpdateVisuals(newPct);
+                }
+            }
+        }, { passive: false });
 
         // --- Alt+Drag blocks ---
         const infoBlocks = [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].filter(Boolean);

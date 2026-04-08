@@ -589,11 +589,10 @@
         .widget-flip-card[data-status="danger"],
         .widget-flip-card[data-status="overtime"] {
             animation: widget-flip-pulse 1s infinite;
-            box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), inset 0 -2px 12px rgba(255,68,68,0.2);
         }
         @keyframes widget-flip-pulse {
-            0%, 100% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), inset 0 -2px 12px rgba(255,68,68,0.2); }
-            50% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3), inset 0 -2px 20px rgba(255,68,68,0.4); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
         
         /* Адаптивные размеры для flip-карточек когда есть часы (6 цифр) */
@@ -902,7 +901,7 @@
     </style>
 </head>
 <body>
-    <div class="widget-hint" id="widgetHint">Ctrl — масштаб</div>
+    <div class="widget-hint" id="widgetHint">Ctrl + слайдер или колесо — масштаб</div>
 
     <!-- Scale bar slider — Ctrl + hover -->
     <div class="scale-bar-zone" id="scaleBarZone">
@@ -1243,32 +1242,34 @@
                 const BASE_SIZE = 250;
                 const MIN_SCALE = 30;
                 const MAX_SCALE = 600;
+                let currentScalePct = Math.round(window.outerWidth / BASE_SIZE * 100);
 
                 const scaleBar = document.getElementById('scaleBar');
                 const scaleBarFill = document.getElementById('scaleBarFill');
                 const scaleBarThumb = document.getElementById('scaleBarThumb');
                 const scaleTooltip = document.getElementById('scaleTooltip');
 
-                const updateScaleBarPosition = () => {
-                    if (!scaleBar) { return; }
-                    const currentPct = Math.round(window.outerWidth / BASE_SIZE * 100);
-                    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, currentPct));
-                    const ratio = (clamped - MIN_SCALE) / (MAX_SCALE - MIN_SCALE);
-                    const pctPos = ratio * 100;
+                const updateScaleBarUI = (pct) => {
+                    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pct));
+                    const pctPos = ((clamped - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
                     if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
                     if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
                     if (scaleTooltip) { scaleTooltip.textContent = clamped + '%'; }
+                };
+
+                const updateScaleBarPosition = () => {
+                    if (!scaleBar) { return; }
+                    currentScalePct = Math.round(window.outerWidth / BASE_SIZE * 100);
+                    updateScaleBarUI(currentScalePct);
                 };
 
                 const setScaleFromRatio = (ratio) => {
                     const pct = Math.round(MIN_SCALE + ratio * (MAX_SCALE - MIN_SCALE));
                     const clampedPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pct));
                     const newSize = Math.round(BASE_SIZE * clampedPct / 100);
+                    currentScalePct = clampedPct;
                     ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
-                    const pctPos = ((clampedPct - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
-                    if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
-                    if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
-                    if (scaleTooltip) { scaleTooltip.textContent = clampedPct + '%'; }
+                    updateScaleBarUI(clampedPct);
                 };
 
                 // Ctrl key — show/hide scale bar
@@ -1335,57 +1336,79 @@
                     }
                 });
 
-                // Scale bar click & drag — uses screen coords to avoid feedback loop
+                // Scale bar drag — CSS transform preview during drag, resize on release
+                // This avoids resizing the window mid-drag which loses pointer capture
+                const widgetContainer = document.getElementById('widgetContainer');
                 if (scaleBar) {
-                    scaleBar.addEventListener('mousedown', (e) => {
+                    scaleBar.addEventListener('pointerdown', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        scaleBar.setPointerCapture(e.pointerId);
                         scaleBar.classList.add('dragging');
 
                         const startScreenX = e.screenX;
-                        const startPct = Math.round(window.outerWidth / BASE_SIZE * 100);
+                        const startPct = currentScalePct;
                         const dragRange = 300;
-                        let lastSentSize = 0;
+                        let targetPct = startPct;
                         let rafId = 0;
 
-                        const applyScale = (dx) => {
+                        const previewScale = (dx) => {
                             const deltaPct = Math.round((dx / dragRange) * (MAX_SCALE - MIN_SCALE));
-                            const newPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startPct + deltaPct));
-                            const newSize = Math.round(BASE_SIZE * newPct / 100);
-                            const pctPos = ((newPct - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
-                            if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
-                            if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
-                            if (scaleTooltip) { scaleTooltip.textContent = newPct + '%'; }
-                            if (newSize !== lastSentSize) {
-                                lastSentSize = newSize;
-                                ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
+                            targetPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startPct + deltaPct));
+                            updateScaleBarUI(targetPct);
+                            // CSS transform preview — no window resize during drag
+                            if (widgetContainer) {
+                                const ratio = targetPct / startPct;
+                                widgetContainer.style.transform = `scale(${ratio})`;
+                                widgetContainer.style.transformOrigin = 'center center';
                             }
                         };
 
                         const onMove = (ev) => {
                             ev.preventDefault();
+                            const sx = ev.screenX;
                             if (rafId) { cancelAnimationFrame(rafId); }
-                            rafId = requestAnimationFrame(() => {
-                                applyScale(ev.screenX - startScreenX);
-                            });
+                            rafId = requestAnimationFrame(() => previewScale(sx - startScreenX));
                         };
                         const onUp = () => {
                             scaleBar.classList.remove('dragging');
                             if (rafId) { cancelAnimationFrame(rafId); }
-                            document.removeEventListener('mousemove', onMove);
-                            document.removeEventListener('mouseup', onUp);
+                            // Remove CSS preview transform
+                            if (widgetContainer) {
+                                widgetContainer.style.transform = '';
+                                widgetContainer.style.transformOrigin = '';
+                            }
+                            // Apply final size as single resize
+                            currentScalePct = targetPct;
+                            const newSize = Math.round(BASE_SIZE * targetPct / 100);
+                            ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
+                            scaleBar.removeEventListener('pointermove', onMove);
+                            scaleBar.removeEventListener('pointerup', onUp);
                         };
-                        document.addEventListener('mousemove', onMove);
-                        document.addEventListener('mouseup', onUp);
+                        scaleBar.addEventListener('pointermove', onMove);
+                        scaleBar.addEventListener('pointerup', onUp);
                     });
                 }
+
+                // Ctrl+Wheel scaling — resize widget by 10% per scroll tick
+                document.addEventListener('wheel', (e) => {
+                    if (!e.ctrlKey) { return; }
+                    e.preventDefault();
+                    const step = 10;
+                    const delta = e.deltaY < 0 ? step : -step;
+                    const newPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, currentScalePct + delta));
+                    if (newPct === currentScalePct) { return; }
+                    currentScalePct = newPct;
+                    const newSize = Math.round(BASE_SIZE * newPct / 100);
+                    ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
+                    updateScaleBarUI(newPct);
+                }, { passive: false });
 
                 window.addEventListener('resize', updateScaleBarPosition);
             }
 
             setupSettings() {
                 // Настройки управляются из главного окна
-                // Ctrl+Wheel resize сохранён в setupEventListeners
             }
 
             setSize(size) {
@@ -1875,6 +1898,17 @@
                         }
                     }
                 });
+
+                // Color separators to match digit status
+                document.querySelectorAll('.widget-flip-separator').forEach(el => {
+                    if (status === 'danger' || status === 'overtime') {
+                        el.style.color = '#ff4444';
+                    } else if (status === 'warning') {
+                        el.style.color = '#ffc107';
+                    } else if (this._baseTimerColor) {
+                        el.style.color = this._baseTimerColor;
+                    }
+                });
             }
 
             updateAnalogDisplay(secs) {
@@ -1962,12 +1996,12 @@
             }
         }
 
-        // Show hint only on first open
-        if (localStorage.getItem('widgetHintShown')) {
+        // Show hint on first open or after hint update (v2 = added wheel info)
+        if (localStorage.getItem('widgetHintShown') === 'v2') {
             const h = document.getElementById('widgetHint');
             if (h) { h.style.display = 'none'; }
         } else {
-            localStorage.setItem('widgetHintShown', '1');
+            localStorage.setItem('widgetHintShown', 'v2');
         }
 
         const widgetTimer = new WidgetTimer();
