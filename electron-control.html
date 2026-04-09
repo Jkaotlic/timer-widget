@@ -3746,7 +3746,6 @@
                             } else if (target === 'display') {
                                 this.displayColors = colors;
                                 this.saveColors('display');
-                                this.pushDisplaySettings();
                             }
                         });
                         grid.appendChild(btn);
@@ -5785,7 +5784,6 @@
                 const tc = window.timerController;
                 tc.displayColors = { timer: hex, progress: hex };
                 tc.saveColors('display');
-                tc.pushDisplaySettings();
             }
         });
 

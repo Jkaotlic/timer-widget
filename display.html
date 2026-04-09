@@ -1100,33 +1100,43 @@
             border: 1px solid rgba(102, 126, 234, 0.3);
         }
 
-        /* Кнопка закрытия */
-        .close-btn {
+        /* Кнопки управления окном (закрыть, свернуть) */
+        .window-controls {
             position: fixed;
             top: 20px;
             right: 20px;
-            width: 40px;
-            height: 40px;
+            display: flex;
+            gap: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        body:hover .window-controls {
+            opacity: 0.4;
+        }
+        .window-controls:hover {
+            opacity: 1 !important;
+        }
+        .window-ctrl-btn {
+            width: 32px;
+            height: 32px;
             border: none;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s;
-            z-index: 1000;
-            opacity: 0;
+            transition: all 0.2s;
         }
-        .close-btn:hover {
-            background: rgba(255, 68, 68, 0.8);
+        .window-ctrl-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
             color: white;
-            opacity: 1;
         }
-        body:hover .close-btn {
-            opacity: 1;
+        .window-ctrl-btn.close-btn:hover {
+            background: rgba(255, 68, 68, 0.8);
         }
 
         /* Предупреждения для стрелок */
@@ -1214,8 +1224,11 @@
 <body>
     <div class="controls-hint" id="controlsHint">Ctrl+колесо — масштаб таймера (на блоках — блоки) · Shift+колесо — блоки · Alt — переместить · 1-8 — пресеты</div>
 
-    <!-- Кнопка закрытия -->
-    <button class="close-btn" id="closeBtn" title="Закрыть">✕</button>
+    <!-- Кнопки управления окном -->
+    <div class="window-controls">
+        <button class="window-ctrl-btn minimize-btn" id="minimizeBtn" title="Свернуть">─</button>
+        <button class="window-ctrl-btn close-btn" id="closeBtn" title="Закрыть">✕</button>
+    </div>
     
     <!-- Информационные блоки (независимое позиционирование) -->
     <div class="info-block top-left" id="currentTimeBlock">
