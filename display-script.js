@@ -282,6 +282,12 @@ class DisplayTimer {
                 this.ipcRenderer.send('minimize-window');
             });
         }
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', () => {
+                this.ipcRenderer.send('toggle-fullscreen');
+            });
+        }
 
         // Запрашиваем текущее состояние
         this.ipcRenderer.send('get-timer-state');
@@ -1414,6 +1420,36 @@ class DisplayTimer {
                 document.addEventListener('mousemove', onMove);
                 document.addEventListener('mouseup', onUp);
             });
+        });
+
+        // --- Window drag in windowed (non-fullscreen) mode ---
+        let isWindowDrag = false;
+        let winDragStartX = 0, winDragStartY = 0;
+
+        document.addEventListener('mousedown', (e) => {
+            // Only drag when not fullscreen, not Alt (block drag), not on controls/buttons
+            if (e.altKey || e.ctrlKey || e.shiftKey) { return; }
+            if (e.target.closest('.window-controls, .info-block, button')) { return; }
+            // Check if window is NOT fullscreen (body width === screen width as heuristic)
+            if (window.innerWidth === screen.width && window.innerHeight === screen.height) { return; }
+            isWindowDrag = true;
+            winDragStartX = e.screenX;
+            winDragStartY = e.screenY;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isWindowDrag) { return; }
+            const dx = e.screenX - winDragStartX;
+            const dy = e.screenY - winDragStartY;
+            if (dx !== 0 || dy !== 0) {
+                this.ipcRenderer.send('display-move', { deltaX: dx, deltaY: dy });
+                winDragStartX = e.screenX;
+                winDragStartY = e.screenY;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isWindowDrag = false;
         });
 
         // Store references for preset reset
