@@ -82,7 +82,7 @@
 <br>
 
 - Keyboard shortcuts from **any** window (Space, R, 1-8, W, C, D)
-- **Ctrl + hold** — scale slider 30–600%
+- Scale slider 30–600% (widget, clock, fullscreen), **Ctrl+wheel** for quick scaling
 - **Alt + drag** — freely reposition blocks on the fullscreen display
 - All positions, scales, and settings persist between sessions
 - Monitor selection for fullscreen mode
@@ -104,7 +104,7 @@ All shortcuts work from **any** application window.
 | `C` | Toggle clock |
 | `D` | Toggle fullscreen display |
 | `Esc` | Close current window |
-| `Ctrl` (hold) | Show scale slider |
+| `Ctrl` + wheel | Scale widget/clock/display |
 | `Alt` + drag | Move block (fullscreen mode) |
 
 ---
@@ -232,7 +232,7 @@ timer-widget/
 <details>
 <summary><b>How do I change the widget scale?</b></summary>
 
-Hold `Ctrl` — a scale slider will appear (30–600%). Works on the widget, clock, and fullscreen display.
+Use the slider at the bottom of the window (30–600%) or `Ctrl+mouse wheel`. Double-click the slider to reset to 100%. Works on the widget, clock, and fullscreen display.
 
 </details>
 

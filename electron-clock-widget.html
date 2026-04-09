@@ -882,82 +882,6 @@
             border: 1px solid rgba(10, 132, 255, 0.2);
             color: rgba(255, 255, 255, 0.6);
         }
-        /* Scale bar — slider that appears on Ctrl hold */
-        .scale-bar-zone {
-            position: fixed;
-            bottom: 4px;
-            left: 0;
-            right: 0;
-            height: 30px;
-            z-index: 10000;
-            -webkit-app-region: no-drag;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            display: flex;
-            align-items: center;
-            padding: 0 10%;
-        }
-
-        body.ctrl-active .scale-bar-zone {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .scale-bar {
-            position: relative;
-            width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 3px;
-            cursor: ew-resize;
-        }
-
-        .scale-bar:hover,
-        .scale-bar.dragging {
-            height: 8px;
-        }
-
-        .scale-bar-fill {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            background: linear-gradient(90deg, #0a84ff, #30d158);
-            border-radius: 3px 0 0 3px;
-            pointer-events: none;
-        }
-
-        .scale-bar-thumb {
-            position: absolute;
-            top: 50%;
-            width: 16px;
-            height: 16px;
-            background: #fff;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            pointer-events: none;
-        }
-
-        .scale-bar.dragging .scale-bar-thumb {
-            transform: translate(-50%, -50%) scale(1.2);
-        }
-
-        .scale-bar-tooltip {
-            position: absolute;
-            top: -24px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: #fff;
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 8px;
-            border-radius: 6px;
-            white-space: nowrap;
-            pointer-events: none;
-        }
         .widget-hint {
             position: fixed;
             bottom: 8px;
@@ -984,16 +908,7 @@
     </style>
 </head>
 <body>
-    <div class="widget-hint" id="clockHint">Ctrl + слайдер или колесо — масштаб</div>
-
-    <!-- Scale bar slider — Ctrl + hover -->
-    <div class="scale-bar-zone" id="scaleBarZone">
-        <div class="scale-bar" id="scaleBar">
-            <div class="scale-bar-fill" id="scaleBarFill"></div>
-            <div class="scale-bar-thumb" id="scaleBarThumb"></div>
-            <div class="scale-bar-tooltip" id="scaleTooltip"></div>
-        </div>
-    </div>
+    <div class="widget-hint" id="clockHint">Ctrl+колесо — масштаб</div>
 
     <div class="widget-container" id="widgetContainer">
         <!-- Контролы и настройки убраны — управление из главного окна -->
@@ -1379,8 +1294,6 @@
                 let dragStartX = 0, dragStartY = 0;
 
                 this.container.addEventListener('mousedown', (e) => {
-                    if (e.ctrlKey) { return; }
-                    if (e.target.closest('.scale-bar-zone') || e.target.closest('.scale-bar')) { return; }
                     isDragging = true;
                     dragStartX = e.screenX;
                     dragStartY = e.screenY;
@@ -1400,54 +1313,6 @@
 
                 document.addEventListener('mouseup', () => {
                     isDragging = false;
-                });
-
-                // === Scale bar slider (Ctrl + hover) ===
-                const BASE_SIZE = 220;
-                const MIN_SCALE = 30;
-                const MAX_SCALE = 600;
-                let currentScalePct = Math.round(window.outerWidth / BASE_SIZE * 100);
-
-                const scaleBar = document.getElementById('scaleBar');
-                const scaleBarFill = document.getElementById('scaleBarFill');
-                const scaleBarThumb = document.getElementById('scaleBarThumb');
-                const scaleTooltip = document.getElementById('scaleTooltip');
-
-                const updateScaleBarUI = (pct) => {
-                    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pct));
-                    const pctPos = ((clamped - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100;
-                    if (scaleBarFill) { scaleBarFill.style.width = pctPos + '%'; }
-                    if (scaleBarThumb) { scaleBarThumb.style.left = pctPos + '%'; }
-                    if (scaleTooltip) { scaleTooltip.textContent = clamped + '%'; }
-                };
-
-                const updateScaleBarPosition = () => {
-                    if (!scaleBar) { return; }
-                    currentScalePct = Math.round(window.outerWidth / BASE_SIZE * 100);
-                    updateScaleBarUI(currentScalePct);
-                };
-
-                const setScaleFromRatio = (ratio) => {
-                    const pct = Math.round(MIN_SCALE + ratio * (MAX_SCALE - MIN_SCALE));
-                    const clampedPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pct));
-                    const newSize = Math.round(BASE_SIZE * clampedPct / 100);
-                    currentScalePct = clampedPct;
-                    ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
-                    updateScaleBarUI(clampedPct);
-                };
-
-                // Ctrl key — show/hide scale bar
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Control') {
-                        document.body.classList.add('ctrl-active');
-                        updateScaleBarPosition();
-                    }
-                });
-                document.addEventListener('keyup', (e) => {
-                    if (e.key === 'Control') { document.body.classList.remove('ctrl-active'); }
-                });
-                window.addEventListener('blur', () => {
-                    document.body.classList.remove('ctrl-active');
                 });
 
                 // Track timer and window states for keyboard shortcuts
@@ -1504,71 +1369,25 @@
                     }
                 });
 
-                // Scale bar drag — CSS transform preview during drag, resize on release
-                const widgetContainer = document.getElementById('widgetContainer');
-                if (scaleBar) {
-                    scaleBar.addEventListener('pointerdown', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        scaleBar.setPointerCapture(e.pointerId);
-                        scaleBar.classList.add('dragging');
-
-                        const startScreenX = e.screenX;
-                        const startPct = currentScalePct;
-                        const dragRange = 300;
-                        let targetPct = startPct;
-                        let rafId = 0;
-
-                        const previewScale = (dx) => {
-                            const deltaPct = Math.round((dx / dragRange) * (MAX_SCALE - MIN_SCALE));
-                            targetPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, startPct + deltaPct));
-                            updateScaleBarUI(targetPct);
-                            if (widgetContainer) {
-                                const ratio = targetPct / startPct;
-                                widgetContainer.style.transform = `scale(${ratio})`;
-                                widgetContainer.style.transformOrigin = 'center center';
-                            }
-                        };
-
-                        const onMove = (ev) => {
-                            ev.preventDefault();
-                            const sx = ev.screenX;
-                            if (rafId) { cancelAnimationFrame(rafId); }
-                            rafId = requestAnimationFrame(() => previewScale(sx - startScreenX));
-                        };
-                        const onUp = () => {
-                            scaleBar.classList.remove('dragging');
-                            if (rafId) { cancelAnimationFrame(rafId); }
-                            if (widgetContainer) {
-                                widgetContainer.style.transform = '';
-                                widgetContainer.style.transformOrigin = '';
-                            }
-                            currentScalePct = targetPct;
-                            const newSize = Math.round(BASE_SIZE * targetPct / 100);
-                            ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
-                            scaleBar.removeEventListener('pointermove', onMove);
-                            scaleBar.removeEventListener('pointerup', onUp);
-                        };
-                        scaleBar.addEventListener('pointermove', onMove);
-                        scaleBar.addEventListener('pointerup', onUp);
-                    });
-                }
-
                 // Ctrl+Wheel scaling — resize clock by 10% per scroll tick
+                const CLOCK_BASE_SIZE = 220;
+                const CLOCK_MIN_SCALE = 30;
+                const CLOCK_MAX_SCALE = 600;
+                let clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
                 document.addEventListener('wheel', (e) => {
                     if (!e.ctrlKey) { return; }
                     e.preventDefault();
                     const step = 10;
                     const delta = e.deltaY < 0 ? step : -step;
-                    const newPct = Math.max(MIN_SCALE, Math.min(MAX_SCALE, currentScalePct + delta));
-                    if (newPct === currentScalePct) { return; }
-                    currentScalePct = newPct;
-                    const newSize = Math.round(BASE_SIZE * newPct / 100);
+                    const newPct = Math.max(CLOCK_MIN_SCALE, Math.min(CLOCK_MAX_SCALE, clockScalePct + delta));
+                    if (newPct === clockScalePct) { return; }
+                    clockScalePct = newPct;
+                    const newSize = Math.round(CLOCK_BASE_SIZE * newPct / 100);
                     ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
-                    updateScaleBarUI(newPct);
                 }, { passive: false });
-
-                window.addEventListener('resize', updateScaleBarPosition);
+                window.addEventListener('resize', () => {
+                    clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
+                });
             }
 
             setupSettings() {

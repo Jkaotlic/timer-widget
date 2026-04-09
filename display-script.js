@@ -407,7 +407,6 @@ class DisplayTimer {
         if (settings.timerScale !== undefined) {
             this.timerScale = settings.timerScale;
             // Update timer scale bar + persist
-            if (this._scaleBarRefs) { this._scaleBarRefs.timerUpdateVisuals(settings.timerScale); }
             try { localStorage.setItem('displayTimerScale', String(settings.timerScale)); } catch (_e) { /* ok */ }
         }
         // Всегда применяем текущий масштаб (сохранённый или новый)
@@ -1270,151 +1269,66 @@ class DisplayTimer {
         const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
 
-        // --- Ctrl/Alt key tracking ---
+        // --- Alt key tracking (for block drag) ---
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Control') { document.body.classList.add('ctrl-active'); }
             if (e.key === 'Alt') { e.preventDefault(); document.body.classList.add('alt-active'); }
         });
         document.addEventListener('keyup', (e) => {
-            if (e.key === 'Control') { document.body.classList.remove('ctrl-active'); }
             if (e.key === 'Alt') { document.body.classList.remove('alt-active'); }
         });
         window.addEventListener('blur', () => {
-            document.body.classList.remove('ctrl-active', 'alt-active');
+            document.body.classList.remove('alt-active');
         });
 
-        // --- Helper: create scale bar drag handler ---
-        const setupScaleBarDrag = (barEl, fillEl, thumbEl, tooltipEl, minScale, maxScale, getCurrentPct, onScale) => {
-            const updateVisuals = (pct) => {
-                const frac = (pct - minScale) / (maxScale - minScale) * 100;
-                fillEl.style.width = frac + '%';
-                thumbEl.style.left = frac + '%';
-                tooltipEl.textContent = pct + '%';
-            };
-
-            // Init visuals
-            updateVisuals(getCurrentPct());
-
-            barEl.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                barEl.classList.add('dragging');
-                const startScreenX = e.screenX;
-                const startPct = getCurrentPct();
-                const dragRange = 300;
-                let lastPct = 0;
-                let rafId = 0;
-
-                const apply = (dx) => {
-                    const deltaPct = Math.round((dx / dragRange) * (maxScale - minScale));
-                    const newPct = Math.max(minScale, Math.min(maxScale, startPct + deltaPct));
-                    if (newPct !== lastPct) {
-                        lastPct = newPct;
-                        updateVisuals(newPct);
-                        onScale(newPct);
-                    }
-                };
-
-                const onMove = (ev) => {
-                    ev.preventDefault();
-                    if (rafId) { cancelAnimationFrame(rafId); }
-                    rafId = requestAnimationFrame(() => { apply(ev.screenX - startScreenX); });
-                };
-
-                const onUp = () => {
-                    barEl.classList.remove('dragging');
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                    if (rafId) { cancelAnimationFrame(rafId); }
-                };
-
-                document.addEventListener('mousemove', onMove);
-                document.addEventListener('mouseup', onUp);
-            });
-
-            return updateVisuals;
-        };
-
-        // --- Timer Scale Bar ---
-        const timerUpdateVisuals = setupScaleBarDrag(
-            document.getElementById('timerScaleBar'),
-            document.getElementById('timerScaleBarFill'),
-            document.getElementById('timerScaleBarThumb'),
-            document.getElementById('timerScaleBarTooltip'),
-            TIMER_MIN_SCALE, TIMER_MAX_SCALE,
-            () => this.timerScale || 100,
-            (pct) => {
-                this.timerScale = pct;
-                const scale = pct / 100;
+        // --- Ctrl+Wheel = scale (context-sensitive: hover over blocks → block scale, else → timer scale) ---
+        // --- Shift+Wheel = block scale (explicit) ---
+        const scaleTimer = (delta) => {
+            const cur = this.timerScale || 100;
+            const newPct = Math.max(TIMER_MIN_SCALE, Math.min(TIMER_MAX_SCALE, cur + delta));
+            if (newPct !== cur) {
+                const scale = newPct / 100;
+                this.timerScale = newPct;
                 this.updateRingSize();
                 if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
                 if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
                 if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
-                try { localStorage.setItem(STORAGE_TIMER_SCALE_KEY, String(pct)); } catch (_e) { /* ok */ }
+                try { localStorage.setItem(STORAGE_TIMER_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
             }
-        );
-
-        // --- Block Scale Bar ---
-        const blockUpdateVisuals = setupScaleBarDrag(
-            document.getElementById('scaleBar'),
-            document.getElementById('scaleBarFill'),
-            document.getElementById('scaleBarThumb'),
-            document.getElementById('scaleBarTooltip'),
-            BLOCK_MIN_SCALE, BLOCK_MAX_SCALE,
-            () => {
-                const raw = this.currentTimeBlock
-                    ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
-                    : '1.2';
-                return Math.round(parseFloat(raw) * 100) || 120;
-            },
-            (pct) => {
-                const scale = pct / 100;
+        };
+        const scaleBlocks = (delta) => {
+            const raw = this.currentTimeBlock
+                ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
+                : '1.2';
+            const cur = Math.round(parseFloat(raw) * 100) || 120;
+            const newPct = Math.max(BLOCK_MIN_SCALE, Math.min(BLOCK_MAX_SCALE, cur + delta));
+            if (newPct !== cur) {
+                const scale = newPct / 100;
                 [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
                     if (b) { b.style.setProperty('--info-scale', scale); }
                 });
-                try { localStorage.setItem(STORAGE_BLOCK_SCALE_KEY, String(pct)); } catch (_e) { /* ok */ }
+                try { localStorage.setItem(STORAGE_BLOCK_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
             }
-        );
+        };
 
-        // Store refs for external updates
-        this._scaleBarRefs = { timerUpdateVisuals, blockUpdateVisuals };
-
-        // --- Ctrl+Wheel = timer scale, Shift+Wheel = block scale ---
         document.addEventListener('wheel', (e) => {
             if (!e.ctrlKey && !e.shiftKey) { return; }
             e.preventDefault();
             const step = 10;
             const delta = e.deltaY < 0 ? step : -step;
 
-            if (e.ctrlKey && !e.shiftKey) {
-                // Ctrl+Wheel → timer scale
-                const cur = this.timerScale || 100;
-                const newPct = Math.max(TIMER_MIN_SCALE, Math.min(TIMER_MAX_SCALE, cur + delta));
-                if (newPct !== cur) {
-                    const scale = newPct / 100;
-                    this.timerScale = newPct;
-                    this.updateRingSize();
-                    if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
-                    if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
-                    if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
-                    try { localStorage.setItem(STORAGE_TIMER_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
-                    timerUpdateVisuals(newPct);
-                }
-            } else if (e.shiftKey) {
-                // Shift+Wheel → block scale
-                const raw = this.currentTimeBlock
-                    ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
-                    : '1.2';
-                const cur = Math.round(parseFloat(raw) * 100) || 120;
-                const newPct = Math.max(BLOCK_MIN_SCALE, Math.min(BLOCK_MAX_SCALE, cur + delta));
-                if (newPct !== cur) {
-                    const scale = newPct / 100;
-                    [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
-                        if (b) { b.style.setProperty('--info-scale', scale); }
-                    });
-                    try { localStorage.setItem(STORAGE_BLOCK_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
-                    blockUpdateVisuals(newPct);
-                }
+            // Shift+Wheel always scales blocks
+            if (e.shiftKey) {
+                scaleBlocks(delta);
+                return;
+            }
+
+            // Ctrl+Wheel — context-sensitive: hover over info block → block scale, else → timer scale
+            const target = e.target;
+            const isOverBlock = target.closest('.info-block');
+            if (isOverBlock) {
+                scaleBlocks(delta);
+            } else {
+                scaleTimer(delta);
             }
         }, { passive: false });
 
