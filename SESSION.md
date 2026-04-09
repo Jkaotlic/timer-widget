@@ -151,3 +151,41 @@
 
 ### Project Cleanup
 - Added screenshots/, *.png, .superpowers/ to .gitignore
+
+## Apr 8-9, 2026 — v2.1.0/2.1.1 Release + UI Improvements
+
+### Releases
+- v2.1.0: Ctrl+wheel scaling, 30 sounds, overtime fixes, reset settings
+- v2.1.1: NSIS installer fix (removed useZip), macOS unsigned app instructions
+
+### New Sounds (20→30)
+- 10 new: cymbal, deep-gong, air-horn, siren, church-bell, drum-roll, ship-horn, metal-strike, epic-brass + extra
+
+### Reset Settings Button
+- Button in FAQ footer with confirmation modal
+- `session.clearStorageData()` + `app.quit()` (relaunch unreliable with npm start)
+- IPC channel `reset-and-relaunch` added to whitelist
+
+### Control Panel UI Improvements
+- **Manual time input**: smart parsing (90=90sec, 5:30=5m30s, 1:30:00=1h30m). Between adjust buttons and overtime toggle
+- **HSV Color picker**: Canvas-based SV area + hue slider + hex input. 3 independent instances (Widget/Clock/Display). Toggle via rainbow gradient button
+- **Scale bar manual input**: click percentage → input mode, dblclick → reset to default. Applied to all 4 scale bars
+- **Adaptive window height**: auto-resizes per active tab via `autoResizeWindow()`. Min 650px, max 1000px
+
+### Scale Bar Removal
+- Removed Ctrl+hold visual slider from widget, clock, and display
+- Scale bars completely removed (HTML, CSS, JS)
+- Ctrl+wheel scaling preserved for all windows
+- Display: Ctrl+wheel context-sensitive (hover on info-block → block scale, else → timer scale)
+- Shift+wheel for blocks still works
+
+### Bug Fixes
+- Overtime minus sign overlapping digits (margin-left approach)
+- Clock flip digits clipped (baseFlipWidth underestimated)
+- Display scaling resetting on settings change
+- Widget flip separator not red during overtime
+
+### Documentation
+- READMEs updated (RU + EN): scale bar → Ctrl+wheel, new features
+- FAQ updated with new feature hints and tooltips
+- Design spec: `docs/superpowers/specs/2026-04-08-control-panel-ui-improvements-design.md`

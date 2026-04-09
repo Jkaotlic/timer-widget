@@ -205,13 +205,13 @@ function createControlWindow() {
 
     // Calculate optimal window size (adapt to screen size)
     const windowWidth = Math.min(750, Math.max(650, screenWidth - 100));
-    const windowHeight = Math.min(860, Math.max(760, screenHeight - 100));
+    const windowHeight = Math.min(860, Math.max(650, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
         minWidth: 600,
-        minHeight: 760,
+        minHeight: 650,
         maxWidth: 800,
         maxHeight: 1000,
         webPreferences: {
@@ -479,7 +479,7 @@ ipcMain.on('resize-control-window', (event, size) => {
         const w = Number.isFinite(size.width) ? size.width : 700;
         const h = Number.isFinite(size.height) ? size.height : 860;
         const targetWidth = Math.max(600, Math.min(w, screenWidth - 50));
-        const targetHeight = Math.max(760, Math.min(h, screenHeight - 50));
+        const targetHeight = Math.max(650, Math.min(h, screenHeight - 50));
         
         // Получаем текущую позицию окна
         const [x, y] = controlWindow.getPosition();
@@ -583,6 +583,21 @@ ipcMain.on('close-window', (event) => {
 
 ipcMain.on('quit-app', () => {
     clearTimerInterval();
+    app.quit();
+});
+
+ipcMain.on('reset-and-relaunch', async () => {
+    // Очищаем кеш всех окон
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+        if (!win.isDestroyed()) {
+            try {
+                await win.webContents.session.clearStorageData();
+            } catch (_e) { /* window may be closing */ }
+        }
+    }
+    clearTimerInterval();
+    // app.relaunch() ненадёжен при npm start — просто закрываем
     app.quit();
 });
 

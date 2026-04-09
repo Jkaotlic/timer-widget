@@ -41,7 +41,8 @@ const ALLOWED_CHANNELS = {
         'widget-move',
         'minimize-window',
         'close-window',
-        'quit-app'
+        'quit-app',
+        'reset-and-relaunch'
     ],
     receive: [
         'timer-state',

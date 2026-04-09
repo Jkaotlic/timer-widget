@@ -25,7 +25,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 **Main process** (`electron-main.js`) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
-1. **Control Window** (`electron-control.html`) — main management panel with 4 settings tabs (Виджет, Часы, Полноэкранный, Звуки). ~5000 lines, all inline HTML/CSS/JS. Settings in 2-column grid layout, 700×860px (min 760h, max 1000h). All tabs use 2-column grid including Звуки. Tab content is scrollable (`max-height: calc(100vh - 520px)`).
+1. **Control Window** (`electron-control.html`) — main management panel with 4 settings tabs (Виджет, Часы, Полноэкранный, Звуки). ~6000 lines, all inline HTML/CSS/JS. Settings in 2-column grid layout, 700×860px (min 650h, max 1000h). All tabs use 2-column grid including Звуки. Tab content is scrollable (`max-height: calc(100vh - 500px)`). Window auto-resizes per active tab via `autoResizeWindow()`.
 2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, digital, flip, analog. Glassmorphism design.
 3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, digital, flip, analog. Has a `DisplayTimer` class.
 4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, digital, flip, analog. Glassmorphism design.
@@ -50,7 +50,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 - Renderer windows persist settings in `localStorage`. Storage keys are defined in `constants.js` (`STORAGE_KEYS`).
 - Each HTML file is self-contained with inline `<script>` and `<style>` blocks (CSP allows `unsafe-inline`).
 - JS-based window drag: Widget and clock windows use JavaScript mousedown/mousemove + IPC (`widget-move`, `clock-widget-move`) instead of `-webkit-app-region: drag`. This is because on Windows, transparent frameless windows with `drag` on parent elements intercept ALL mouse events before `no-drag` children.
-- Scale bar: Widget, clock, and fullscreen display have Ctrl+slider for scaling. Uses `screenX` delta from mousedown (not clientX — avoids feedback loops when element resizes). `requestAnimationFrame` throttle + `lastSentSize` dedup.
+- Scaling: Widget and clock use Ctrl+wheel for scaling (30-600%). Display uses Ctrl+wheel context-sensitive (hover on info-block → block scale, else → timer scale) + Shift+wheel for blocks. No visual slider — all via keyboard+mouse.
 
 ## Code Style
 
@@ -164,8 +164,8 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Inline styles in HTML**: Each HTML file has ~1000+ lines of inline CSS/JS. CSP requires `unsafe-inline`. No external CSS frameworks.
 - **Widget devTools**: Set to `false` in production. Change to `true` in `electron-main.js` for debugging.
 - **Design previews**: Always read real HTML structure first, replicate exact layout, then apply CSS-only improvements. Never generate new layouts from scratch.
-- **Sounds**: 20 built-in sounds synthesized via Web Audio API in `electron-control.html` `generateSound()`. No audio files — all oscillator-based.
-- **Control panel layout**: Titlebar → Timer (52px) → Start/Pause/Reset → Presets 8×1 → Adjust +/- → Overtime+Windows (merged row) → Tabs always visible (Виджет, Часы, Полноэкранный, Звуки). Settings in 2-column grid.
+- **Sounds**: 30 built-in sounds synthesized via Web Audio API in `electron-control.html` `generateSound()`. No audio files — all oscillator-based.
+- **Control panel layout**: Titlebar → Timer (52px) → Start/Pause/Reset → Presets 8×1 → Adjust +/- → Manual time input → Overtime+Windows (merged row) → Tabs always visible (Виджет, Часы, Полноэкранный, Звуки). Settings in 2-column grid.
 - **syncClockStyle**: Defaults to `true` (hidden checkbox). When true, clock style follows widget style dropdown. The widget `timerStyleEl` change handler must send both `widget-style-update` AND `clock-widget-set-style`.
 - **applyColors must cover all 4 styles**: In widget/clock/display, `applyColors()` must update circle (SVG gradient), digital (LED text + text-shadow), flip (digits + separators), and analog (second hand + center dot). Not just the circle style.
 - **applyColors vs overtime colors (CRITICAL)**: `applyColors()` sets inline `style.color` on digital/flip elements. CSS classes (`danger`, `overtime`) CANNOT override inline styles. Solution: each `updateXxxDisplay()` method must set inline `style.color = '#ff4444'` when overtime/danger, and restore base color otherwise. Display uses `_enforceOvertimeColors()` called every tick. Widget stores `_baseTimerColor` in applyColors and overrides in updateDisplay.
@@ -174,7 +174,12 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **No external shadows on transparent windows**: Widget and clock windows have `transparent: true` + `hasShadow: false`. Never use `drop-shadow`, `box-shadow` (external), or `filter: shadow` on elements — they create visible dark rectangles. Use only `inset` shadows or `border` for depth.
 - **Design system v2**: All windows use VisionOS glassmorphism — `blur(40px) saturate(180%)`, gradient ring `#0a84ff→#30d158`, Inter Light (weight 200) for timer text. Widget/clock: NO external shadows (transparent windows). Digital LED uses JetBrains Mono. Fonts loaded via Google Fonts @import in each HTML file. Apple semantic colors: systemBlue `#0a84ff`, systemGreen `#30d158`, systemRed `#ff453a`, systemOrange `#ff9f0a`.
 - **Display block positions**: Fullscreen info blocks can be Alt+dragged to custom positions. Positions persist in localStorage (`displayBlockPositions`). `applyDisplaySettings` must NOT reapply preset positions unless `timeLayoutPreset` actually changed — otherwise color/date updates clear custom positions.
-- **Dual scale bars on display**: Fullscreen display has two Ctrl+sliders: 'Таймер' (30-300%) and 'Блоки' (50-600%). Both persist to localStorage (`displayTimerScale`, `displayBlockScale`).
+- **Display scaling**: Fullscreen display: Ctrl+wheel scales timer (30-300%) or blocks (50-600%) depending on hover target. Shift+wheel always scales blocks. Both persist to localStorage (`displayTimerScale`, `displayBlockScale`).
+- **Manual time input**: Smart parsing in control panel — bare number = seconds, `X:Y` = min:sec, `X:Y:Z` = hr:min:sec. Max 99:59:59. Uses `parseManualTime()` function.
+- **Color picker**: HSV color picker (`ColorPicker` class) with Canvas-based SV area + hue slider + hex input. 3 independent instances for Widget/Clock/Display tabs. Toggle via rainbow gradient button appended to themes-grid.
+- **Scale value edit**: Click percentage text on any scale bar → input mode. Double-click → reset to default (100%). Uses `setupScaleValueEdit()` with 250ms click delay to distinguish from dblclick.
+- **Adaptive window height**: Control window resizes per active tab via `autoResizeWindow()`. Temporarily removes `max-height` from active tab to measure true content, then sends `resize-control-window` IPC. Min 650px, max 1000px.
+- **Reset settings**: Button in FAQ footer. Clears localStorage via `session.clearStorageData()` in main process, then `app.quit()` (user restarts manually since `app.relaunch()` unreliable with npm start).
 
 ## Automation
 
