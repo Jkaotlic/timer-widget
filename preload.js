@@ -39,7 +39,9 @@ const ALLOWED_CHANNELS = {
         'widget-resize',
         'widget-scale',
         'widget-move',
+        'display-move',
         'minimize-window',
+        'toggle-fullscreen',
         'close-window',
         'quit-app',
         'reset-and-relaunch'

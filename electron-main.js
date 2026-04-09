@@ -575,6 +575,18 @@ ipcMain.on('minimize-window', (event) => {
     if (win) { win.minimize(); }
 });
 
+ipcMain.on('display-move', (_event, { deltaX, deltaY }) => {
+    if (displayWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
+        const [currentX, currentY] = displayWindow.getPosition();
+        displayWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
+    }
+});
+
+ipcMain.on('toggle-fullscreen', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) { win.setFullScreen(!win.isFullScreen()); }
+});
+
 ipcMain.on('close-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) { win.close(); }
