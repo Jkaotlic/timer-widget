@@ -270,10 +270,16 @@ class DisplayTimer {
     }
 
     setupIPC() {
-        // Кнопка закрытия
+        // Кнопки управления окном
         if (this.closeBtn) {
             this.closeBtn.addEventListener('click', () => {
                 this.ipcRenderer.send('close-display');
+            });
+        }
+        const minimizeBtn = document.getElementById('minimizeBtn');
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                this.ipcRenderer.send('minimize-window');
             });
         }
 
@@ -403,13 +409,13 @@ class DisplayTimer {
             this.updateStaticMiniClock(this.endTimeBlock, settings.endTime);
         }
         
-        // Масштаб таймера
+        // Масштаб таймера — localStorage (от Ctrl+колесо) имеет приоритет над settings
         if (settings.timerScale !== undefined) {
-            this.timerScale = settings.timerScale;
-            // Update timer scale bar + persist
-            try { localStorage.setItem('displayTimerScale', String(settings.timerScale)); } catch (_e) { /* ok */ }
+            const localScale = parseInt(localStorage.getItem('displayTimerScale'));
+            // Используем localStorage если он есть, иначе settings из control panel
+            this.timerScale = localScale || settings.timerScale;
         }
-        // Всегда применяем текущий масштаб (сохранённый или новый)
+        // Всегда применяем текущий масштаб
         {
             const scale = (this.timerScale || 100) / 100;
             this.updateRingSize();
@@ -425,10 +431,12 @@ class DisplayTimer {
         
         // Масштаб блоков времени (общий)
         if (settings.timeBlocksScale !== undefined) {
-            const scale = settings.timeBlocksScale / 100;
-            if (this.currentTimeBlock) {this.currentTimeBlock.style.setProperty('--info-scale', scale);}
-            if (this.eventTimeBlock) {this.eventTimeBlock.style.setProperty('--info-scale', scale);}
-            if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', scale);}
+            // localStorage (от Ctrl+колесо/Shift+колесо) имеет приоритет
+            const localBlockScale = parseInt(localStorage.getItem('displayBlockScale'));
+            const effectiveScale = (localBlockScale || settings.timeBlocksScale) / 100;
+            if (this.currentTimeBlock) {this.currentTimeBlock.style.setProperty('--info-scale', effectiveScale);}
+            if (this.eventTimeBlock) {this.eventTimeBlock.style.setProperty('--info-scale', effectiveScale);}
+            if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', effectiveScale);}
         }
     }
     

@@ -3,9 +3,6 @@ const path = require('path');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
 
-// Remove default Electron menu (File, Edit, View, Help)
-Menu.setApplicationMenu(null);
-
 let controlWindow = null;
 let widgetWindow = null;
 let displayWindow = null;
@@ -369,6 +366,8 @@ function createDisplayWindow(displayIndex) {
 }
 
 app.whenReady().then(() => {
+    // Remove default Electron menu (File, Edit, View, Help)
+    Menu.setApplicationMenu(null);
     createControlWindow();
 
     app.on('activate', () => {
@@ -586,19 +585,13 @@ ipcMain.on('quit-app', () => {
     app.quit();
 });
 
-ipcMain.on('reset-and-relaunch', async () => {
-    // Очищаем кеш всех окон
-    const windows = BrowserWindow.getAllWindows();
-    for (const win of windows) {
-        if (!win.isDestroyed()) {
-            try {
-                await win.webContents.session.clearStorageData();
-            } catch (_e) { /* window may be closing */ }
-        }
-    }
+ipcMain.on('reset-and-relaunch', () => {
     clearTimerInterval();
-    // app.relaunch() ненадёжен при npm start — просто закрываем
-    app.quit();
+    // Очищаем хранилище, но не ждём — закрываемся через 500ms в любом случае
+    const { session } = require('electron');
+    session.defaultSession.clearStorageData().catch(() => {});
+    session.defaultSession.clearCache().catch(() => {});
+    setTimeout(() => app.quit(), 500);
 });
 
 // Виджет часов
