@@ -20,6 +20,17 @@ class DisplayTimer {
         // Обработчики IPC для cleanup
         this.ipcHandlers = {};
 
+        // Именованные listeners для cleanup (document/window)
+        this._handlers = {};
+
+        // Кэшированные DOM-узлы для timeDisplay (минус-знак)
+        this._timeDisplayMinusSpan = null;
+        this._timeDisplayTextNode = null;
+
+        // Кэшированные DOM-узлы для analogDigitalTime (минус-знак + текст)
+        this._analogMinusSpan = null;
+        this._analogTextNode = null;
+
         // Кэш для оптимизации re-renders (FIX BUG-007)
         this.cache = {
             lastSeconds: null,
@@ -62,10 +73,28 @@ class DisplayTimer {
             const hint = document.getElementById('controlsHint');
             if (hint) { hint.style.display = 'none'; }
         } else {
-            localStorage.setItem('displayHintShown', 'v2');
+            this._safeSetItem('displayHintShown', 'v2');
         }
     }
-    
+
+    // localStorage.setItem с защитой от QuotaExceeded и лимитом 1MB на значение
+    _safeSetItem(key, value) {
+        try {
+            if (new Blob([value]).size > 1024 * 1024) { // 1 MB limit
+                console.warn(`localStorage skipped (too big): ${key}`);
+                return false;
+            }
+            localStorage.setItem(key, value);
+            return true;
+        } catch (e) {
+            if (e && e.name === 'QuotaExceededError') {
+                console.error('localStorage quota exceeded');
+                return false;
+            }
+            throw e;
+        }
+    }
+
     setupResizeHandler() {
         // Пересчитываем размеры при изменении окна с debounce
         const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
@@ -74,7 +103,8 @@ class DisplayTimer {
             }, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
             : () => this.updateRingSize();
 
-        window.addEventListener('resize', debouncedResize);
+        this._handlers.windowResize = debouncedResize;
+        window.addEventListener('resize', this._handlers.windowResize);
         // Начальный расчёт
         this.updateRingSize();
     }
@@ -84,11 +114,13 @@ class DisplayTimer {
         this._widgetOpen = false;
         this._clockOpen = false;
         if (this.ipcRenderer) {
-            this.ipcRenderer.on('widget-window-state', (_e, data) => { this._widgetOpen = data && data.isOpen; });
-            this.ipcRenderer.on('clock-window-state', (_e, data) => { this._clockOpen = data && data.isOpen; });
+            this.ipcHandlers.widgetWindowState = (_event, data) => { this._widgetOpen = data && data.isOpen; };
+            this.ipcHandlers.clockWindowState = (_event, data) => { this._clockOpen = data && data.isOpen; };
+            this.ipcRenderer.on('widget-window-state', this.ipcHandlers.widgetWindowState);
+            this.ipcRenderer.on('clock-window-state', this.ipcHandlers.clockWindowState);
         }
 
-        document.addEventListener('keydown', (e) => {
+        this._handlers.shortcutsKeydown = (e) => {
             if (e.ctrlKey || e.altKey || e.metaKey) { return; }
             switch (e.code) {
                 case 'Space':
@@ -143,7 +175,8 @@ class DisplayTimer {
                     this.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
                 }
             }
-        });
+        };
+        document.addEventListener('keydown', this._handlers.shortcutsKeydown);
     }
 
     updateRingSize() {
@@ -153,7 +186,7 @@ class DisplayTimer {
             this.timerRing.style.transform = `scale(${scale})`;
         }
     }
-    
+
     initDefaultStyle() {
         // По умолчанию показываем круговой стиль
         if (this.timerRing) {this.timerRing.classList.add('active');}
@@ -173,7 +206,7 @@ class DisplayTimer {
         this.eventTimeEl = document.getElementById('eventTime');
         this.endTimeEl = document.getElementById('endTime');
         this.closeBtn = document.getElementById('closeBtn');
-        
+
         // Элементы для разных стилей
         this.timerDigital = document.getElementById('timerDigital');
         this.timerFlip = document.getElementById('timerFlip');
@@ -182,7 +215,7 @@ class DisplayTimer {
         this.digitalHours = document.getElementById('digitalHours');
         this.digitalMinutes = document.getElementById('digitalMinutes');
         this.digitalSeconds = document.getElementById('digitalSeconds');
-        
+
         // Flip карточки
         this.flipMinus = document.getElementById('flipMinus');
         this.flipHoursUnit = document.getElementById('flipHoursUnit');
@@ -193,7 +226,7 @@ class DisplayTimer {
         this.flipMin2 = document.getElementById('flipMin2');
         this.flipSec1 = document.getElementById('flipSec1');
         this.flipSec2 = document.getElementById('flipSec2');
-        
+
         // Аналоговые часы
         this.timerAnalog = document.getElementById('timerAnalog');
         this.analogHandHour = document.getElementById('analogHandHour');
@@ -207,7 +240,7 @@ class DisplayTimer {
         this.progressRing.style.strokeDasharray = `${this.circumference}`;
         this.progressRing.style.strokeDashoffset = this.circumference;
     }
-    
+
     startCurrentTimeClock() {
         const updateClock = () => {
             const now = new Date();
@@ -224,13 +257,13 @@ class DisplayTimer {
         const intervalId = setInterval(updateClock, 1000);
         this.intervals.push(intervalId);
     }
-    
+
     updateMiniClockHands(block, hours, minutes, seconds = 0) {
         if (!block) {return;}
         const hourHand = block.querySelector('.mini-hand-hour');
         const minuteHand = block.querySelector('.mini-hand-minute');
         const secondHand = block.querySelector('.mini-hand-second');
-        
+
         if (hourHand) {
             // Часовая стрелка: 360/12 = 30 градусов на час + смещение от минут
             const hourDeg = (hours % 12) * 30 + minutes * 0.5;
@@ -247,7 +280,7 @@ class DisplayTimer {
             secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
         }
     }
-    
+
     updateStaticMiniClock(block, timeString) {
         if (!block || !timeString) {return;}
         const parts = timeString.split(':');
@@ -272,21 +305,26 @@ class DisplayTimer {
     setupIPC() {
         // Кнопки управления окном
         if (this.closeBtn) {
-            this.closeBtn.addEventListener('click', () => {
+            this._handlers.closeBtnClick = () => {
                 this.ipcRenderer.send('close-display');
-            });
+            };
+            this.closeBtn.addEventListener('click', this._handlers.closeBtnClick);
         }
         const minimizeBtn = document.getElementById('minimizeBtn');
         if (minimizeBtn) {
-            minimizeBtn.addEventListener('click', () => {
+            this._minimizeBtn = minimizeBtn;
+            this._handlers.minimizeBtnClick = () => {
                 this.ipcRenderer.send('minimize-window');
-            });
+            };
+            minimizeBtn.addEventListener('click', this._handlers.minimizeBtnClick);
         }
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         if (fullscreenBtn) {
-            fullscreenBtn.addEventListener('click', () => {
+            this._fullscreenBtn = fullscreenBtn;
+            this._handlers.fullscreenBtnClick = () => {
                 this.ipcRenderer.send('toggle-fullscreen');
-            });
+            };
+            fullscreenBtn.addEventListener('click', this._handlers.fullscreenBtnClick);
         }
 
         // Запрашиваем текущее состояние
@@ -330,13 +368,13 @@ class DisplayTimer {
         this.ipcRenderer.on('display-colors-update', this.ipcHandlers.colorsUpdate);
         this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
     }
-    
+
     applyDisplaySettings(settings) {
         // Стиль таймера
         if (settings.timerStyle) {
             this.setTimerStyle(settings.timerStyle);
         }
-        
+
         // Пресет расположения блоков времени
         const showBlocks = settings.showTimeBlocks !== undefined ? settings.showTimeBlocks : false;
         const preset = settings.timeLayoutPreset || 'frame';
@@ -398,23 +436,23 @@ class DisplayTimer {
 
         // Clear saved positions only on explicit preset change
         if (presetChanged) {
-            try { localStorage.removeItem('displayBlockPositions'); } catch (_e) { /* ok */ }
+            try { localStorage.removeItem('displayBlockPositions'); } catch { /* ok */ }
         }
-        
+
         // Время начала
         if (settings.eventTime && this.eventTimeEl) {
             this.eventTime = settings.eventTime;
             this.eventTimeEl.textContent = settings.eventTime;
             this.updateStaticMiniClock(this.eventTimeBlock, settings.eventTime);
         }
-        
+
         // Время окончания
         if (settings.endTime && this.endTimeEl) {
             this.endTime = settings.endTime;
             this.endTimeEl.textContent = settings.endTime;
             this.updateStaticMiniClock(this.endTimeBlock, settings.endTime);
         }
-        
+
         // Масштаб таймера — localStorage (от Ctrl+колесо) имеет приоритет над settings
         if (settings.timerScale !== undefined) {
             const localScale = parseInt(localStorage.getItem('displayTimerScale'));
@@ -429,12 +467,12 @@ class DisplayTimer {
             if (this.timerFlip) {this.timerFlip.style.transform = `scale(${scale})`;}
             if (this.timerAnalog) {this.timerAnalog.style.transform = `scale(${scale})`;}
         }
-        
+
         // Показ цифр на аналоговом циферблате
         if (settings.showAnalogNumbers !== undefined && this.clockNumbers) {
             this.clockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
         }
-        
+
         // Масштаб блоков времени (общий)
         if (settings.timeBlocksScale !== undefined) {
             // localStorage (от Ctrl+колесо/Shift+колесо) имеет приоритет
@@ -445,19 +483,19 @@ class DisplayTimer {
             if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', effectiveScale);}
         }
     }
-    
+
     setTimerStyle(style) {
         this.timerStyle = style;
-        
+
         // Удаляем все классы стилей с body
         document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
-        
+
         // Скрываем все стили таймера
         if (this.timerRing) {this.timerRing.classList.remove('active');}
         if (this.timerDigital) {this.timerDigital.classList.remove('active');}
         if (this.timerFlip) {this.timerFlip.classList.remove('active');}
         if (this.timerAnalog) {this.timerAnalog.classList.remove('active');}
-        
+
         // Показываем выбранный и добавляем класс на body
         switch (style) {
             case 'circle':
@@ -477,11 +515,11 @@ class DisplayTimer {
                 document.body.classList.add('style-analog');
                 break;
         }
-        
+
         // Обновляем отображение
         this.updateDisplay();
     }
-    
+
     applyPosition(element, position) {
         // Clear custom positioning if present
         element.classList.remove(
@@ -530,7 +568,7 @@ class DisplayTimer {
         applyState(localStorage.getItem('timerState'));
 
         // Слушаем изменения через storage event (вместо 100ms polling)
-        window.addEventListener('storage', (e) => {
+        this._handlers.storage = (e) => {
             if (e.key === 'timerState' && e.newValue) {
                 applyState(e.newValue);
             }
@@ -542,7 +580,8 @@ class DisplayTimer {
                     this.applyColors(colors);
                 }
             }
-        });
+        };
+        window.addEventListener('storage', this._handlers.storage);
 
         // Fallback: редкий polling для случаев когда storage event не срабатывает
         // (происходит в рамках того же окна)
@@ -771,7 +810,7 @@ class DisplayTimer {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';
             const overlay = settings.bgLocalOverlay || 30;
-            
+
             // Создаём или обновляем оверлей
             this.applyLocalBackground(settings.bgLocalImage, fit, overlay);
             return; // Не применяем стандартный фон
@@ -855,6 +894,69 @@ class DisplayTimer {
         document.body.style.backgroundAttachment = '';
     }
 
+    // Заменяет innerHTML на безопасное обновление через DOM API.
+    // Кэширует span/textNode, чтобы не пересоздавать DOM каждую секунду.
+    _setTimeDisplayContent(formatted, isNegative) {
+        if (!this.timeDisplay) { return; }
+        if (isNegative && formatted.startsWith('-')) {
+            const textPart = formatted.slice(1);
+            if (!this._timeDisplayMinusSpan) {
+                // Первая инициализация: очищаем и создаём span + textNode
+                while (this.timeDisplay.firstChild) { this.timeDisplay.removeChild(this.timeDisplay.firstChild); }
+                this._timeDisplayMinusSpan = document.createElement('span');
+                this._timeDisplayMinusSpan.className = 'time-minus';
+                this._timeDisplayMinusSpan.textContent = '\u2212';
+                this._timeDisplayTextNode = document.createTextNode(textPart);
+                this.timeDisplay.appendChild(this._timeDisplayMinusSpan);
+                this.timeDisplay.appendChild(this._timeDisplayTextNode);
+            } else {
+                // Убедимся, что наши кэшированные узлы всё ещё в DOM
+                if (this._timeDisplayMinusSpan.parentNode !== this.timeDisplay) {
+                    while (this.timeDisplay.firstChild) { this.timeDisplay.removeChild(this.timeDisplay.firstChild); }
+                    this.timeDisplay.appendChild(this._timeDisplayMinusSpan);
+                    this.timeDisplay.appendChild(this._timeDisplayTextNode);
+                }
+                this._timeDisplayTextNode.data = textPart;
+            }
+        } else {
+            // Переход в обычный режим — сбрасываем кэш span
+            this.timeDisplay.textContent = formatted;
+            this._timeDisplayMinusSpan = null;
+            this._timeDisplayTextNode = null;
+        }
+    }
+
+    // Заменяет innerHTML в analogDigitalTime на DOM API с кэшированием узлов.
+    _setAnalogTimeContent(timeStr, isNegative) {
+        if (!this.analogDigitalTime) { return; }
+        if (isNegative) {
+            if (!this._analogMinusSpan) {
+                while (this.analogDigitalTime.firstChild) {
+                    this.analogDigitalTime.removeChild(this.analogDigitalTime.firstChild);
+                }
+                this._analogMinusSpan = document.createElement('span');
+                this._analogMinusSpan.className = 'analog-time-minus';
+                this._analogMinusSpan.textContent = '\u2212';
+                this._analogTextNode = document.createTextNode(timeStr);
+                this.analogDigitalTime.appendChild(this._analogMinusSpan);
+                this.analogDigitalTime.appendChild(this._analogTextNode);
+            } else {
+                if (this._analogMinusSpan.parentNode !== this.analogDigitalTime) {
+                    while (this.analogDigitalTime.firstChild) {
+                        this.analogDigitalTime.removeChild(this.analogDigitalTime.firstChild);
+                    }
+                    this.analogDigitalTime.appendChild(this._analogMinusSpan);
+                    this.analogDigitalTime.appendChild(this._analogTextNode);
+                }
+                this._analogTextNode.data = timeStr;
+            }
+        } else {
+            this.analogDigitalTime.textContent = timeStr;
+            this._analogMinusSpan = null;
+            this._analogTextNode = null;
+        }
+    }
+
     updateDisplay() {
         const secs = Math.floor(this.remainingSeconds);
 
@@ -877,11 +979,7 @@ class DisplayTimer {
         // Обновляем время для кругового стиля (только если изменилось)
         if (hasFormattedChanged) {
             // Минус-знак в отдельном span с width:0, чтобы цифры оставались по центру
-            if (secs < 0 && formatted.startsWith('-')) {
-                this.timeDisplay.innerHTML = '<span class="time-minus">\u2212</span>' + formatted.slice(1);
-            } else {
-                this.timeDisplay.textContent = formatted;
-            }
+            this._setTimeDisplayContent(formatted, secs < 0);
 
             // Добавляем класс compact для длинного времени (минус или часы)
             const isCompact = secs < 0 || Math.abs(secs) >= 3600 || formatted.length > 5;
@@ -957,7 +1055,7 @@ class DisplayTimer {
         if (secs <= 60 && secs > 0) {return 'warning';}
         return 'normal';
     }
-    
+
     updateDigitalDisplay(secs, _formatted) {
         if (!this.digitalMinutes || !this.digitalSeconds) {return;}
 
@@ -982,7 +1080,7 @@ class DisplayTimer {
             this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
         }
         this.digitalSeconds.textContent = String(seconds).padStart(2, '0');
-        
+
         // Классы предупреждения + inline color override (applyColors sets inline style)
         this.digitalTime.classList.remove('warning', 'danger', 'overtime');
         const isOvertime = secs < 0;
@@ -1009,10 +1107,10 @@ class DisplayTimer {
             this.digitalTime.style.textShadow = this._baseTimerGlow || '';
         }
     }
-    
+
     updateFlipDisplay(secs) {
         if (!this.flipMin1 || !this.flipMin2 || !this.flipSec1 || !this.flipSec2) {return;}
-        
+
         const isNegative = secs < 0;
         const absSecs = Math.abs(secs);
         const hours = Math.floor(absSecs / 3600);
@@ -1097,7 +1195,7 @@ class DisplayTimer {
             }
         }
     }
-    
+
     updateFlipCard(card, value, key) {
         const digit = card.querySelector('.flip-digit');
         if (digit.textContent !== value) {
@@ -1105,7 +1203,7 @@ class DisplayTimer {
             card.classList.add('flipping');
             digit.textContent = value;
             this.lastFlipValues[key] = value;
-            
+
             setTimeout(() => {
                 card.classList.remove('flipping');
             }, 300);
@@ -1132,20 +1230,19 @@ class DisplayTimer {
         if (this.analogDigitalTime) {
             const hours = Math.floor(absSecs / 3600);
             const mins = Math.floor((absSecs % 3600) / 60);
-            const minusSpan = '<span class="analog-time-minus">\u2212</span>';
+            let timeStr;
             if (hours > 0) {
-                const timeStr = `${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                this.analogDigitalTime.innerHTML = (secs < 0 ? minusSpan : '') + timeStr;
+                timeStr = `${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             } else {
-                const timeStr = `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                this.analogDigitalTime.innerHTML = (secs < 0 ? minusSpan : '') + timeStr;
+                timeStr = `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             }
+            this._setAnalogTimeContent(timeStr, secs < 0);
         }
 
         // Классы предупреждения для центра и стрелок
         const clockCenter = this.timerAnalog ? this.timerAnalog.querySelector('.clock-center') : null;
         const analogElements = [this.analogHandMinute, this.analogHandSecond, clockCenter];
-        
+
         analogElements.forEach(el => {
             if (el) {el.classList.remove('warning', 'danger', 'overtime');}
         });
@@ -1284,15 +1381,18 @@ class DisplayTimer {
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
 
         // --- Alt key tracking (for block drag) ---
-        document.addEventListener('keydown', (e) => {
+        this._handlers.altKeydown = (e) => {
             if (e.key === 'Alt') { e.preventDefault(); document.body.classList.add('alt-active'); }
-        });
-        document.addEventListener('keyup', (e) => {
+        };
+        this._handlers.altKeyup = (e) => {
             if (e.key === 'Alt') { document.body.classList.remove('alt-active'); }
-        });
-        window.addEventListener('blur', () => {
+        };
+        this._handlers.altBlur = () => {
             document.body.classList.remove('alt-active');
-        });
+        };
+        document.addEventListener('keydown', this._handlers.altKeydown);
+        document.addEventListener('keyup', this._handlers.altKeyup);
+        window.addEventListener('blur', this._handlers.altBlur);
 
         // --- Ctrl+Wheel = scale (context-sensitive: hover over blocks → block scale, else → timer scale) ---
         // --- Shift+Wheel = block scale (explicit) ---
@@ -1306,7 +1406,7 @@ class DisplayTimer {
                 if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
                 if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
                 if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
-                try { localStorage.setItem(STORAGE_TIMER_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
+                this._safeSetItem(STORAGE_TIMER_SCALE_KEY, String(newPct));
             }
         };
         const scaleBlocks = (delta) => {
@@ -1320,11 +1420,11 @@ class DisplayTimer {
                 [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
                     if (b) { b.style.setProperty('--info-scale', scale); }
                 });
-                try { localStorage.setItem(STORAGE_BLOCK_SCALE_KEY, String(newPct)); } catch (_e) { /* ok */ }
+                this._safeSetItem(STORAGE_BLOCK_SCALE_KEY, String(newPct));
             }
         };
 
-        document.addEventListener('wheel', (e) => {
+        this._handlers.wheel = (e) => {
             if (!e.ctrlKey && !e.shiftKey) { return; }
             e.preventDefault();
             const step = 10;
@@ -1344,7 +1444,8 @@ class DisplayTimer {
             } else {
                 scaleTimer(delta);
             }
-        }, { passive: false });
+        };
+        document.addEventListener('wheel', this._handlers.wheel, { passive: false });
 
         // --- Alt+Drag blocks ---
         const infoBlocks = [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].filter(Boolean);
@@ -1361,12 +1462,15 @@ class DisplayTimer {
                 }
             });
             if (Object.keys(positions).length > 0) {
-                try { localStorage.setItem(STORAGE_KEY, JSON.stringify(positions)); } catch (_e) { /* ok */ }
+                this._safeSetItem(STORAGE_KEY, JSON.stringify(positions));
             }
         };
 
+        // Храним ссылки на mousedown handlers блоков для cleanup
+        this._handlers.blockMousedowns = [];
+
         infoBlocks.forEach((block) => {
-            block.addEventListener('mousedown', (e) => {
+            const blockMousedown = (e) => {
                 if (!e.altKey) { return; }
                 e.preventDefault();
                 e.stopPropagation();
@@ -1419,14 +1523,16 @@ class DisplayTimer {
 
                 document.addEventListener('mousemove', onMove);
                 document.addEventListener('mouseup', onUp);
-            });
+            };
+            this._handlers.blockMousedowns.push({ block, handler: blockMousedown });
+            block.addEventListener('mousedown', blockMousedown);
         });
 
         // --- Window drag in windowed (non-fullscreen) mode ---
         let isWindowDrag = false;
         let winDragStartX = 0, winDragStartY = 0;
 
-        document.addEventListener('mousedown', (e) => {
+        this._handlers.windowDragMousedown = (e) => {
             // Only drag when not fullscreen, not Alt (block drag), not on controls/buttons
             if (e.altKey || e.ctrlKey || e.shiftKey) { return; }
             if (e.target.closest('.window-controls, .info-block, button')) { return; }
@@ -1435,9 +1541,9 @@ class DisplayTimer {
             isWindowDrag = true;
             winDragStartX = e.screenX;
             winDragStartY = e.screenY;
-        });
+        };
 
-        document.addEventListener('mousemove', (e) => {
+        this._handlers.windowDragMousemove = (e) => {
             if (!isWindowDrag) { return; }
             const dx = e.screenX - winDragStartX;
             const dy = e.screenY - winDragStartY;
@@ -1446,11 +1552,15 @@ class DisplayTimer {
                 winDragStartX = e.screenX;
                 winDragStartY = e.screenY;
             }
-        });
+        };
 
-        document.addEventListener('mouseup', () => {
+        this._handlers.windowDragMouseup = () => {
             isWindowDrag = false;
-        });
+        };
+
+        document.addEventListener('mousedown', this._handlers.windowDragMousedown);
+        document.addEventListener('mousemove', this._handlers.windowDragMousemove);
+        document.addEventListener('mouseup', this._handlers.windowDragMouseup);
 
         // Store references for preset reset
         this._blockControlRefs = { infoBlocks, blockIds, STORAGE_KEY, STORAGE_BLOCK_SCALE_KEY };
@@ -1475,7 +1585,7 @@ class DisplayTimer {
                     if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
                 }
             }
-        } catch (_e) { /* ok */ }
+        } catch { /* ok */ }
 
         // Restore block scale
         try {
@@ -1489,32 +1599,40 @@ class DisplayTimer {
                     });
                 }
             }
-        } catch (_e) { /* ok */ }
+        } catch { /* ok */ }
 
-        // Restore positions
+        // Restore positions (with JSON structure validation)
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (!saved) { return; }
-            const positions = JSON.parse(saved);
+            let positions;
+            try { positions = JSON.parse(saved); } catch { return; }
+            if (typeof positions !== 'object' || positions === null) { return; }
+
             const blocks = { currentTime: this.currentTimeBlock, eventTime: this.eventTimeBlock, endTime: this.endTimeBlock };
             for (const [key, block] of Object.entries(blocks)) {
-                if (block && positions[key]) {
-                    block.classList.remove(
-                        'top-left', 'top-center', 'top-right',
-                        'bottom-left', 'bottom-center', 'bottom-right',
-                        'top-left-third', 'top-right-third',
-                        'bottom-left-third', 'bottom-right-third'
-                    );
-                    block.classList.add('custom-position');
-                    block.style.right = '';
-                    block.style.bottom = '';
-                    block.style.marginLeft = '';
-                    block.style.marginRight = '';
-                    block.style.left = positions[key].left + 'px';
-                    block.style.top = positions[key].top + 'px';
-                }
+                if (!block) { continue; }
+                const pos = positions[key];
+                if (!pos || typeof pos !== 'object') { continue; }
+                if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) { continue; }
+                // Clamp to reasonable screen bounds (protects against corrupted data)
+                const left = Math.max(-5000, Math.min(5000, pos.left));
+                const top = Math.max(-5000, Math.min(5000, pos.top));
+                block.classList.remove(
+                    'top-left', 'top-center', 'top-right',
+                    'bottom-left', 'bottom-center', 'bottom-right',
+                    'top-left-third', 'top-right-third',
+                    'bottom-left-third', 'bottom-right-third'
+                );
+                block.classList.add('custom-position');
+                block.style.right = '';
+                block.style.bottom = '';
+                block.style.marginLeft = '';
+                block.style.marginRight = '';
+                block.style.left = left + 'px';
+                block.style.top = top + 'px';
             }
-        } catch (_e) { /* ok */ }
+        } catch { /* ok */ }
     }
 
     cleanup() {
@@ -1540,19 +1658,122 @@ class DisplayTimer {
             if (this.ipcHandlers.displaySettingsUpdate) {
                 this.ipcRenderer.removeListener('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
             }
+            if (this.ipcHandlers.widgetWindowState) {
+                this.ipcRenderer.removeListener('widget-window-state', this.ipcHandlers.widgetWindowState);
+            }
+            if (this.ipcHandlers.clockWindowState) {
+                this.ipcRenderer.removeListener('clock-window-state', this.ipcHandlers.clockWindowState);
+            }
         }
+
+        // Удаляем document/window listeners
+        if (this._handlers.windowResize) {
+            window.removeEventListener('resize', this._handlers.windowResize);
+        }
+        if (this._handlers.shortcutsKeydown) {
+            document.removeEventListener('keydown', this._handlers.shortcutsKeydown);
+        }
+        if (this._handlers.altKeydown) {
+            document.removeEventListener('keydown', this._handlers.altKeydown);
+        }
+        if (this._handlers.altKeyup) {
+            document.removeEventListener('keyup', this._handlers.altKeyup);
+        }
+        if (this._handlers.altBlur) {
+            window.removeEventListener('blur', this._handlers.altBlur);
+        }
+        if (this._handlers.wheel) {
+            document.removeEventListener('wheel', this._handlers.wheel);
+        }
+        if (this._handlers.windowDragMousedown) {
+            document.removeEventListener('mousedown', this._handlers.windowDragMousedown);
+        }
+        if (this._handlers.windowDragMousemove) {
+            document.removeEventListener('mousemove', this._handlers.windowDragMousemove);
+        }
+        if (this._handlers.windowDragMouseup) {
+            document.removeEventListener('mouseup', this._handlers.windowDragMouseup);
+        }
+        if (this._handlers.storage) {
+            window.removeEventListener('storage', this._handlers.storage);
+        }
+        // Block mousedown handlers
+        if (Array.isArray(this._handlers.blockMousedowns)) {
+            this._handlers.blockMousedowns.forEach(({ block, handler }) => {
+                if (block && handler) {
+                    block.removeEventListener('mousedown', handler);
+                }
+            });
+            this._handlers.blockMousedowns = [];
+        }
+        // Button click handlers
+        if (this.closeBtn && this._handlers.closeBtnClick) {
+            this.closeBtn.removeEventListener('click', this._handlers.closeBtnClick);
+        }
+        if (this._minimizeBtn && this._handlers.minimizeBtnClick) {
+            this._minimizeBtn.removeEventListener('click', this._handlers.minimizeBtnClick);
+        }
+        if (this._fullscreenBtn && this._handlers.fullscreenBtnClick) {
+            this._fullscreenBtn.removeEventListener('click', this._handlers.fullscreenBtnClick);
+        }
+
+        this._handlers = {};
     }
+}
+
+// Pure helpers для переиспользования и тестирования
+// Работает в браузере (через window.DisplayTimerHelpers) и в Node (module.exports).
+
+// Валидирует структуру позиций блоков после JSON.parse.
+// Возвращает очищенный объект { [key]: { left, top } } или null.
+function validateBlockPositions(positions) {
+    if (typeof positions !== 'object' || positions === null) { return null; }
+    const result = {};
+    for (const [key, pos] of Object.entries(positions)) {
+        if (!pos || typeof pos !== 'object') { continue; }
+        if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) { continue; }
+        const left = Math.max(-5000, Math.min(5000, pos.left));
+        const top = Math.max(-5000, Math.min(5000, pos.top));
+        result[key] = { left, top };
+    }
+    return result;
+}
+
+// Проверяет, безопасно ли записать значение в localStorage (без выброса).
+// 1 MB лимит на значение + проверка QuotaExceeded.
+function canSafelyStore(value, limitBytes = 1024 * 1024) {
+    if (typeof value !== 'string') { return false; }
+    try {
+        const size = typeof Blob !== 'undefined'
+            ? new Blob([value]).size
+            : Buffer.byteLength(value, 'utf8');
+        return size <= limitBytes;
+    } catch {
+        return false;
+    }
+}
+
+// Экспорт: в браузер через window, в Node через module.exports.
+if (typeof window !== 'undefined') {
+    window.DisplayTimerHelpers = { validateBlockPositions, canSafelyStore };
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { validateBlockPositions, canSafelyStore };
 }
 
 // Инициализация
 let displayTimer;
-document.addEventListener('DOMContentLoaded', () => {
-    displayTimer = new DisplayTimer();
-});
+if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', () => {
+        displayTimer = new DisplayTimer();
+    });
 
-// Cleanup при закрытии окна
-window.addEventListener('beforeunload', () => {
-    if (displayTimer) {
-        displayTimer.cleanup();
+    // Cleanup при закрытии окна
+    if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('beforeunload', () => {
+            if (displayTimer) {
+                displayTimer.cleanup();
+            }
+        });
     }
-});
+}
