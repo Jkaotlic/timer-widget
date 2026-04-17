@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
 const path = require('path');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
+const timerEngine = require('./timer-engine');
 
 let controlWindow = null;
 let widgetWindow = null;
@@ -111,6 +112,12 @@ function finishTimer(finalRemaining) {
     });
 }
 
+function broadcastEvent(eventName) {
+    safelySendToWindow(controlWindow, eventName);
+    safelySendToWindow(widgetWindow, eventName);
+    safelySendToWindow(displayWindow, eventName);
+}
+
 function startTimer() {
     // Защита от повторного запуска: проверяем и state, и наличие интервала
     if (timerState.isRunning || timerInterval) {return;}
@@ -118,53 +125,28 @@ function startTimer() {
     // Убедиться что предыдущий интервал полностью очищен
     clearTimerInterval();
 
-    emitTimerState({ isRunning: true, isPaused: false, finished: false });
+    const started = timerEngine.start(timerState);
+    emitTimerState({
+        isRunning: started.isRunning,
+        isPaused: started.isPaused,
+        finished: started.finished
+    });
 
     timerInterval = setInterval(() => {
-        const prevRemaining = timerState.remainingSeconds;
-        let nextRemaining = prevRemaining - 1;
-        let shouldFinish = false;
+        const { state: nextState, events, finished } = timerEngine.tick(timerState, timerConfig);
 
-        if (!timerConfig.allowNegative && nextRemaining <= 0) {
-            nextRemaining = 0;
-            shouldFinish = true;
-        }
-        // Перерасход без ограничений — таймер продолжает считать в минус
-        // (лимит перерасхода убран по запросу пользователя)
-
-        // Событие "таймер достиг нуля" (для звука финиша в режиме перерасхода)
-        if (prevRemaining > 0 && nextRemaining <= 0 && timerConfig.allowNegative) {
-            safelySendToWindow(controlWindow, 'timer-reached-zero');
-            safelySendToWindow(widgetWindow, 'timer-reached-zero');
-            safelySendToWindow(displayWindow, 'timer-reached-zero');
+        // Broadcast events (timer-reached-zero / timer-minute / timer-overrun-minute)
+        for (const eventName of events) {
+            broadcastEvent(eventName);
         }
 
-        // Событие "осталась минута"
-        if (prevRemaining > 60 && nextRemaining <= 60 && nextRemaining >= 0) {
-            safelySendToWindow(controlWindow, 'timer-minute');
-            safelySendToWindow(widgetWindow, 'timer-minute');
-            safelySendToWindow(displayWindow, 'timer-minute');
-        }
-
-        // Событие "перерасход - напоминание"
-        if (nextRemaining < 0 && timerConfig.allowNegative) {
-            const intervalSec = (timerConfig.overrunIntervalMinutes || 1) * 60;
-            const absNext = Math.abs(nextRemaining);
-            const absPrev = Math.abs(prevRemaining);
-            if (Math.floor(absNext / intervalSec) > Math.floor(absPrev / intervalSec)) {
-                safelySendToWindow(controlWindow, 'timer-overrun-minute');
-                safelySendToWindow(widgetWindow, 'timer-overrun-minute');
-                safelySendToWindow(displayWindow, 'timer-overrun-minute');
-            }
-        }
-
-        if (shouldFinish) {
-            finishTimer(nextRemaining);
+        if (finished) {
+            finishTimer(nextState.remainingSeconds);
             return;
         }
 
         emitTimerState({
-            remainingSeconds: nextRemaining,
+            remainingSeconds: nextState.remainingSeconds,
             finished: false
         });
     }, CONFIG.TIMER_TICK_INTERVAL || 1000);
@@ -181,19 +163,32 @@ function handleTimerStart() {
 
 function handleTimerPause() {
     clearTimerInterval();
-    emitTimerState({ isRunning: false, isPaused: true, finished: false });
+    const paused = timerEngine.pause(timerState);
+    emitTimerState({
+        isRunning: paused.isRunning,
+        isPaused: paused.isPaused,
+        finished: paused.finished
+    });
 }
 
+// Race guard — prevent concurrent reset requests from overlapping
+let isResetting = false;
 function handleTimerReset() {
-    clearTimerInterval();
-    const resetTo = timerState.presetSeconds || timerState.totalSeconds;
-    emitTimerState({
-        totalSeconds: resetTo,
-        remainingSeconds: resetTo,
-        isRunning: false,
-        isPaused: false,
-        finished: false
-    });
+    if (isResetting) { return; }
+    isResetting = true;
+    try {
+        clearTimerInterval();
+        const resetState = timerEngine.reset(timerState);
+        emitTimerState({
+            totalSeconds: resetState.totalSeconds,
+            remainingSeconds: resetState.remainingSeconds,
+            isRunning: resetState.isRunning,
+            isPaused: resetState.isPaused,
+            finished: resetState.finished
+        });
+    } finally {
+        setTimeout(() => { isResetting = false; }, 100);
+    }
 }
 
 function createControlWindow() {
@@ -224,7 +219,7 @@ function createControlWindow() {
         resizable: true // Allow user to resize if needed
     });
 
-    controlWindow.loadFile('electron-control.html');
+    controlWindow.loadFile('electron-control.html').catch(err => console.error('loadFile failed:', err));
     hardenWindow(controlWindow);
 
     // Enable Ctrl+Wheel window resizing
@@ -264,7 +259,7 @@ function createWidgetWindow() {
         hasShadow: false
     });
 
-    widgetWindow.loadFile('electron-widget.html');
+    widgetWindow.loadFile('electron-widget.html').catch(err => console.error('loadFile failed:', err));
     hardenWindow(widgetWindow);
 
     widgetWindow.webContents.once('did-finish-load', () => {
@@ -303,7 +298,7 @@ function createClockWidgetWindow() {
         hasShadow: false
     });
 
-    clockWidgetWindow.loadFile('electron-clock-widget.html');
+    clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => console.error('loadFile failed:', err));
     hardenWindow(clockWidgetWindow);
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
@@ -351,7 +346,7 @@ function createDisplayWindow(displayIndex) {
         }
     });
 
-    displayWindow.loadFile('display.html');
+    displayWindow.loadFile('display.html').catch(err => console.error('loadFile failed:', err));
     hardenWindow(displayWindow);
     blockZoom(displayWindow);
 
@@ -418,26 +413,24 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
     switch (type) {
         case 'set': {
             if (timerState.isRunning) {break;}
-            const next = Math.max(0, Number(seconds) || 0);
+            const presetState = timerEngine.setPreset(timerState, seconds);
             emitTimerState({
-                totalSeconds: next,
-                remainingSeconds: next,
-                presetSeconds: next,  // Сохраняем оригинальное время пресета
-                isRunning: false,
-                isPaused: false,
-                finished: false
+                totalSeconds: presetState.totalSeconds,
+                remainingSeconds: presetState.remainingSeconds,
+                presetSeconds: presetState.presetSeconds,
+                isRunning: presetState.isRunning,
+                isPaused: presetState.isPaused,
+                finished: presetState.finished
             });
             emittedByCommand = true;
             break;
         }
         case 'adjust': {
-            const delta = Number(deltaSeconds) || 0;
-            const nextRemaining = timerConfig.allowNegative ? timerState.remainingSeconds + delta : Math.max(0, timerState.remainingSeconds + delta);
-            const nextTotal = Math.max(timerState.totalSeconds, nextRemaining);
+            const adjustedState = timerEngine.adjust(timerState, deltaSeconds, timerConfig.allowNegative);
             emitTimerState({
-                totalSeconds: nextTotal,
-                remainingSeconds: nextRemaining,
-                finished: false
+                totalSeconds: adjustedState.totalSeconds,
+                remainingSeconds: adjustedState.remainingSeconds,
+                finished: adjustedState.finished
             });
             emittedByCommand = true;
             break;
@@ -597,13 +590,18 @@ ipcMain.on('quit-app', () => {
     app.quit();
 });
 
-ipcMain.on('reset-and-relaunch', () => {
+ipcMain.on('reset-and-relaunch', async () => {
     clearTimerInterval();
-    // Очищаем хранилище, но не ждём — закрываемся через 500ms в любом случае
     const { session } = require('electron');
-    session.defaultSession.clearStorageData().catch(() => {});
-    session.defaultSession.clearCache().catch(() => {});
-    setTimeout(() => app.quit(), 500);
+    try {
+        await Promise.all([
+            session.defaultSession.clearStorageData(),
+            session.defaultSession.clearCache()
+        ]);
+    } catch (err) {
+        console.error('Storage clear failed:', err);
+    }
+    app.quit();
 });
 
 // Виджет часов
