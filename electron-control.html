@@ -8,7 +8,28 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="components.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+        /* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
+        @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-latin-200-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-200-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        /* JetBrains Mono: latin + cyrillic, weights 300/400/500/700 */
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
 
         /* =============================================
            Apple Dark Glassmorphism UI
@@ -3490,6 +3511,8 @@
                 this.lastUpdateCounter = -1;
                 this.wasFinished = false;
                 this.currentBgMode = 'solid';
+                // Stored handler refs for cleanup
+                this._handlers = {};
 
                 // FIX BUG-023: Track active theme button to avoid querySelectorAll
                 this.activeThemeButton = null;
@@ -3640,7 +3663,7 @@
                     }
 
                     // Max 99:59:59
-                    if (seconds > 359999 || seconds <= 0) { return null; }
+                    if (seconds > 359999 || seconds < 0) { return null; }
                     return seconds;
                 };
 
@@ -4659,6 +4682,16 @@
                 if (this._onTimerMinute) ipcRenderer.removeListener('timer-minute', this._onTimerMinute);
                 if (this._onTimerReachedZero) ipcRenderer.removeListener('timer-reached-zero', this._onTimerReachedZero);
                 if (this._onTimerOverrun) ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);
+
+                // Удаляем глобальные DOM и IPC handlers из _handlers
+                const h = this._handlers || {};
+                if (h.onDisplayWindowState) { ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState); }
+                if (h.onWidgetWindowState) { ipcRenderer.removeListener('widget-window-state', h.onWidgetWindowState); }
+                if (h.onClockWindowState) { ipcRenderer.removeListener('clock-window-state', h.onClockWindowState); }
+                if (h.onEscapeKeydown) { document.removeEventListener('keydown', h.onEscapeKeydown); }
+                if (h.onGlobalShortcutsKeydown) { document.removeEventListener('keydown', h.onGlobalShortcutsKeydown); }
+                this._handlers = {};
+
                 if (this._audioCtx) {
                     this._audioCtx.close().catch(() => {});
                     this._audioCtx = null;
@@ -5816,21 +5849,23 @@
         }
 
         // Слушатели для обновления состояния окон
-        if (window.ipcRenderer) {
-            window.ipcRenderer.on('display-window-state', (event, data) => {
+        if (window.ipcRenderer && window.timerController) {
+            const tc = window.timerController;
+            tc._handlers.onDisplayWindowState = (event, data) => {
                 isDisplayOpen = data.isOpen;
                 updateWindowButton('openDisplayBtn', isDisplayOpen, '🖥️ Полноэкранный');
-            });
-
-            window.ipcRenderer.on('widget-window-state', (event, data) => {
+            };
+            tc._handlers.onWidgetWindowState = (event, data) => {
                 isWidgetOpen = data.isOpen;
                 updateWindowButton('openWidgetBtn', isWidgetOpen, '⏱️ Виджет');
-            });
-
-            window.ipcRenderer.on('clock-window-state', (event, data) => {
+            };
+            tc._handlers.onClockWindowState = (event, data) => {
                 isClockOpen = data.isOpen;
                 updateWindowButton('openClockBtn', isClockOpen, '🕐 Часы');
-            });
+            };
+            window.ipcRenderer.on('display-window-state', tc._handlers.onDisplayWindowState);
+            window.ipcRenderer.on('widget-window-state', tc._handlers.onWidgetWindowState);
+            window.ipcRenderer.on('clock-window-state', tc._handlers.onClockWindowState);
         }
 
         // Кнопки кастомной панели заголовка
@@ -5897,13 +5932,17 @@
         });
 
         // Close on Escape key
-        document.addEventListener('keydown', (e) => {
+        const _onEscapeKeydown = (e) => {
             if (e.key === 'Escape') {
                 if (resetModal.classList.contains('show')) resetModal.classList.remove('show');
                 if (exitModal.classList.contains('show')) exitModal.classList.remove('show');
                 if (faqModal.classList.contains('show')) faqModal.classList.remove('show');
             }
-        });
+        };
+        document.addEventListener('keydown', _onEscapeKeydown);
+        if (window.timerController) {
+            window.timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
+        }
 
         // Toggle FAQ items (accordion)
         faqQuestions.forEach(question => {
@@ -5923,7 +5962,7 @@
         });
 
         // FIX BUG-027: Keyboard shortcuts
-        document.addEventListener('keydown', (event) => {
+        const _onGlobalShortcutsKeydown = (event) => {
             // Ignore if user is typing in an input field
             if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
                 return;
@@ -6027,7 +6066,11 @@
                 event.preventDefault();
                 showKeyboardShortcuts();
             }
-        });
+        };
+        document.addEventListener('keydown', _onGlobalShortcutsKeydown);
+        if (window.timerController) {
+            window.timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;
+        }
 
         // Show keyboard shortcuts help
         function showKeyboardShortcuts() {
