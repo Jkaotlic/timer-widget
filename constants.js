@@ -225,7 +225,6 @@ const CONFIG = {
         CLOCK_SETTINGS: 'clock-settings',
         SET_CLOCK_STYLE: 'set-clock-style',
         CLOCK_WIDGET_RESIZE: 'clock-widget-resize',
-        CLOCK_WIDGET_SCALE: 'clock-widget-scale',
         CLOCK_WIDGET_MOVE: 'clock-widget-move',
         CLOCK_WIDGET_SET_STYLE: 'clock-widget-set-style',
         CLOCK_WIDGET_SETTINGS: 'clock-widget-settings',
@@ -235,7 +234,6 @@ const CONFIG = {
         WIDGET_SET_POSITION: 'widget-set-position',
         WIDGET_SET_OPACITY: 'widget-set-opacity',
         WIDGET_RESIZE: 'widget-resize',
-        WIDGET_SCALE: 'widget-scale',
         WIDGET_MOVE: 'widget-move',
 
         // Window state notifications
