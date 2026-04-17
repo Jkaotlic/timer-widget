@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -32,8 +32,7 @@
     "electron": "^41.2.1",
     "electron-builder": "^26.8.1",
     "eslint": "^9.39.4",
-    "globals": "^17.4.0",
-    "playwright-electron": "^0.5.0"
+    "globals": "^17.4.0"
   },
   "build": {
     "appId": "com.timer.widget",
@@ -95,6 +94,7 @@
     "publish": null,
     "files": [
       "electron-main.js",
+      "timer-engine.js",
       "preload.js",
       "ipc-compat.js",
       "security.js",
@@ -107,7 +107,8 @@
       "components.css",
       "display.html",
       "display-script.js",
-      "sounds/**/*"
+      "sounds/**/*",
+      "fonts/**/*"
     ]
   }
 }
