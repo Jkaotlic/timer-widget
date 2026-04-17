@@ -20,6 +20,7 @@ titlebar-test.png
 # Screenshots & visual checks
 screenshots/
 *.png
+!build/icon.png
 
 # Superpowers brainstorm sessions
 .superpowers/

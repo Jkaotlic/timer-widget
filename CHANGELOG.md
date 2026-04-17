@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.2.2] - 2026-04-17
+
+### Security / Compliance
+- Google Fonts заменены на локальные woff2 (Inter 200/300/400/500/600/700, JetBrains Mono 300/400/500/700, латиница+кириллица) — нет сетевых запросов на запуске, CSP `font-src 'self'` соблюдается
+- Таймер-логика выделена в чистый модуль `timer-engine.js` (без Electron API) — 196 строк, 27 новых unit-тестов
+- Удалены мёртвые IPC каналы `widget-scale`, `clock-widget-scale` (без handlers)
+- `playwright-electron` удалена как неиспользуемая зависимость
+
+### Fixed
+- Утечки listeners: cleanup() добавлен в WidgetTimer, ClockWidget, TimerController, DisplayTimer — 14+ handler'ов корректно снимаются при закрытии окна
+- `display-script.js`: innerHTML заменён на DOM API (3 места) с кешированием узлов
+- `display-script.js`: JSON.parse валидируется на структуру + clamping позиций ±5000px
+- `display-script.js`: `_safeSetItem()` с 1MB лимитом + QuotaExceededError guard
+- `parseManualTime`: 0 секунд теперь валиден (было `<= 0 → null`)
+- Race guard в `handleTimerReset()` (флаг isResetting, 100ms cooldown)
+- `reset-and-relaunch`: await Promise.all для clearStorage/clearCache вместо setTimeout(500)
+- `loadFile().catch()` во всех 4 окнах
+- 7 ESLint warnings устранены (catch без параметра)
+- `.gitignore`: `!build/icon.png` исключение, иначе иконка игнорилась
+- README badges обновлены v2.1.1 → v2.2.2
+
+### Removed
+- `analysis/`, `docs/superpowers/` — stale директории
+
+### Tests
+- `tests/timer-engine.test.js` — 27 тестов (tick / overrun / adjust / reset / setPreset / start / pause)
+- `tests/display-timer.test.js` — 12 тестов (валидация позиций блоков, safe localStorage)
+- Итого: 70 → 109 тестов
+
 ## [2.2.1] - 2026-04-17
 
 ### Security (аудит SberTech)

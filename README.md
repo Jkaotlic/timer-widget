@@ -6,7 +6,7 @@
 
 **Прозрачный таймер для презентаций и рабочего стола**
 
-[![Version](https://img.shields.io/badge/v2.1.1-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.2.2-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_41-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
