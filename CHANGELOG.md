@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1] - 2026-04-17
+
+### Security (аудит SberTech)
+- Удалён политизированный баннер StandWithUkraine из `LICENSES.chromium.html` через `afterPack` hook — ссылка на acornjs репо заменена на нейтральный npmjs URL
+- Linux: `afterInstall` скрипт снимает SUID бит с `chrome-sandbox` (0755 без SUID)
+- Linux: `executableArgs: ["--no-sandbox"]` — fallback для систем без user namespaces
+- Electron обновлён до 41.2.1 (патчи безопасности Chromium)
+
 ## [1.2.9] - 2026-03-28
 
 ### Fixed
