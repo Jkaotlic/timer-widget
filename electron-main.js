@@ -8,6 +8,7 @@ const log = require('electron-log/main');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
+const recovery = require('./recovery');
 
 // Logger setup
 log.initialize();
@@ -424,62 +425,20 @@ function createDisplayWindow(displayIndex) {
 
 // ============================================================================
 // Crash recovery — persist timer state to file so we can offer to resume after crash
+// Implementation lives in ./recovery.js (pure, no electron deps) — thin wrappers
+// below inject the userData path & electron-log logger.
 // ============================================================================
-function getRecoveryStatePath() {
-    return path.join(app.getPath('userData'), 'last-state.json');
-}
-
 function saveTimerStateToFile() {
-    try {
-        const statePath = getRecoveryStatePath();
-        const data = JSON.stringify({
-            totalSeconds: timerState.totalSeconds,
-            remainingSeconds: timerState.remainingSeconds,
-            presetSeconds: timerState.presetSeconds,
-            isRunning: timerState.isRunning,
-            savedAt: Date.now()
-        });
-        // Async write — keeps event loop free during the 10s periodic save.
-        fs.promises.writeFile(statePath, data).catch(err => log.error('saveTimerStateToFile:', err));
-    } catch (err) {
-        log.error('saveTimerStateToFile:', err);
-    }
+    return recovery.saveTimerStateToFile(app.getPath('userData'), timerState, log);
 }
 
 function loadSavedTimerState() {
-    try {
-        const statePath = getRecoveryStatePath();
-        if (!fs.existsSync(statePath)) { return null; }
-        const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-        const ageMs = Date.now() - (parsed.savedAt || 0);
-        // Stale after 5 minutes — discard.
-        if (ageMs > 5 * 60 * 1000) {
-            fs.unlinkSync(statePath);
-            return null;
-        }
-        return parsed;
-    } catch (err) {
-        log.warn('loadSavedTimerState failed:', err);
-        return null;
-    }
+    return recovery.loadSavedTimerState(app.getPath('userData'), log);
 }
 
 function clearSavedTimerState() {
-    try {
-        const statePath = getRecoveryStatePath();
-        if (fs.existsSync(statePath)) { fs.unlinkSync(statePath); }
-    } catch { /* ignore */ }
+    recovery.clearSavedTimerState(app.getPath('userData'));
 }
-
-// Export for testing
-exports.isRecoveryValid = function isRecoveryValid(data, now) {
-    if (!data || typeof data !== 'object') { return false; }
-    if (typeof data.savedAt !== 'number' || !Number.isFinite(data.savedAt)) { return false; }
-    const age = (now || Date.now()) - data.savedAt;
-    if (age < 0 || age > 5 * 60 * 1000) { return false; }
-    if (typeof data.presetSeconds !== 'number' || data.presetSeconds < 0) { return false; }
-    return true;
-};
 
 // Persist state every 10 seconds while timer is running
 if (!__inTestMode) {
@@ -625,7 +584,7 @@ app.whenReady().then(() => {
 
     // Recovery check before UI
     const saved = loadSavedTimerState();
-    if (exports.isRecoveryValid(saved, Date.now())) {
+    if (recovery.isRecoveryValid(saved, Date.now())) {
         log.info(`Recovery candidate found (age ${Math.round((Date.now() - saved.savedAt) / 1000)}s)`);
         timerState.presetSeconds = saved.presetSeconds;
         // We don't auto-start — control window will offer resume via IPC timer-recovery-available
