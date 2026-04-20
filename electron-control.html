@@ -889,8 +889,56 @@
         }
 
         /* =======================================================
-           Sound tab — library-style redesign
+           Sound tab — library-style redesign (kit: sound-tab.html)
            ======================================================= */
+
+        /* Group card — wraps each event (start/end/minute/overrun). */
+        .sound-group {
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            border-radius: var(--tw-r-lg);
+            padding: var(--tw-s-3);
+            margin-bottom: var(--tw-s-2);
+        }
+
+        .sound-group:last-child { margin-bottom: 0; }
+
+        .sound-group-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--tw-s-3);
+            margin-bottom: var(--tw-s-3);
+        }
+
+        .sound-group-head .meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sound-group-head .title {
+            font-size: var(--tw-t-label);
+            font-weight: 600;
+            color: var(--tw-fg);
+            letter-spacing: -0.1px;
+        }
+
+        .sound-group-head .sub {
+            font-size: var(--tw-t-caption);
+            color: var(--tw-fg-dim);
+            margin-top: 2px;
+        }
+
+        /* Disabled row/group — dim when the row's enabled checkbox is off.
+           Keeps the toggle itself interactive; everything else is greyed. */
+        .sound-row.disabled,
+        .sound-group.disabled .sound-row { opacity: 0.4; pointer-events: none; }
+        .sound-row:not(:has(input[type="checkbox"]:checked)) .select-wrap,
+        .sound-row:not(:has(input[type="checkbox"]:checked)) .sound-preview {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
         .sound-row {
             display: flex;
             align-items: center;
@@ -899,10 +947,8 @@
             background: rgba(0, 0, 0, 0.28);
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-md);
-            margin-bottom: var(--tw-s-2);
+            margin-bottom: 0;
         }
-
-        .sound-row:last-child { margin-bottom: 0; }
 
         .sound-toggle {
             display: flex;
@@ -919,9 +965,29 @@
             accent-color: var(--tw-blue);
         }
 
-        .sound-select {
+        /* Select wrapper — gives us space for custom chevron on the right. */
+        .select-wrap {
+            position: relative;
             flex: 1;
-            padding: 8px 10px;
+            min-width: 0;
+        }
+
+        .select-wrap::after {
+            content: "";
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            border-right: 1.5px solid rgba(255, 255, 255, 0.55);
+            border-bottom: 1.5px solid rgba(255, 255, 255, 0.55);
+            transform: translateY(-70%) rotate(45deg);
+            pointer-events: none;
+        }
+
+        .sound-select {
+            width: 100%;
+            padding: 9px 32px 9px 12px;
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-xs);
             font-size: var(--tw-t-label);
@@ -953,19 +1019,22 @@
             color: var(--tw-fg-secondary);
         }
 
-        /* Play button — blue→green gradient chip */
+        /* Play button — blue→green gradient chip, 36×36 per kit.
+           .playing state swaps to red gradient (toggled by JS). */
         .sound-preview {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border: none;
             border-radius: var(--tw-r-md);
             background: var(--tw-ring);
             color: var(--tw-fg);
             cursor: pointer;
-            font-size: var(--tw-t-tiny);
+            font-size: 13px;
             font-weight: 600;
             transition: transform var(--tw-dur-fast) var(--tw-ease),
-                        filter var(--tw-dur-base) var(--tw-ease);
+                        filter var(--tw-dur-base) var(--tw-ease),
+                        background var(--tw-dur-base) var(--tw-ease),
+                        box-shadow var(--tw-dur-base) var(--tw-ease);
             flex-shrink: 0;
             box-shadow: 0 3px 10px rgba(10, 132, 255, 0.25);
             display: inline-flex;
@@ -976,6 +1045,11 @@
         .sound-preview:hover {
             filter: brightness(1.1);
             transform: scale(1.05);
+        }
+
+        .sound-preview.playing {
+            background: linear-gradient(135deg, #f5576c, var(--tw-red));
+            box-shadow: 0 3px 10px rgba(245, 87, 108, 0.3);
         }
 
         .sound-preview:focus-visible {
@@ -996,12 +1070,12 @@
             margin-bottom: var(--tw-s-3);
         }
 
-        /* Library item — maps .custom-sound-item to .lib-item aesthetic */
+        /* Library item — kit .lib-item: icon + meta + actions. */
         .custom-sound-item {
             display: flex;
             align-items: center;
             gap: var(--tw-s-2);
-            padding: var(--tw-s-2) var(--tw-s-3);
+            padding: 10px 12px;
             background: rgba(0, 0, 0, 0.25);
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-md);
@@ -1017,8 +1091,42 @@
             border-color: var(--tw-border-strong);
         }
 
-        .custom-sound-item .name {
+        .custom-sound-item.selected {
+            border-color: rgba(10, 132, 255, 0.5);
+            background: rgba(10, 132, 255, 0.08);
+        }
+
+        .custom-sound-item .lib-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--tw-r-sm);
+            background: rgba(48, 209, 88, 0.15);
+            color: var(--tw-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .custom-sound-item .lib-icon svg {
+            width: 16px;
+            height: 16px;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .custom-sound-item .lib-meta {
             flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .custom-sound-item .name {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -1026,9 +1134,16 @@
             font-weight: 500;
         }
 
+        .custom-sound-item .lib-sub {
+            font-size: var(--tw-t-caption);
+            color: var(--tw-fg-dim);
+            font-family: var(--tw-font-mono);
+            letter-spacing: 0.3px;
+        }
+
         .custom-sound-item .btn {
-            width: 28px;
-            height: 28px;
+            width: 30px;
+            height: 30px;
             border: 1px solid transparent;
             border-radius: var(--tw-r-sm);
             cursor: pointer;
@@ -1043,6 +1158,12 @@
             color: var(--tw-fg-muted);
         }
 
+        .custom-sound-item .btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.08);
+            color: var(--tw-fg);
+        }
+
         .custom-sound-item .play-btn {
             background: rgba(10, 132, 255, 0.15);
             color: var(--tw-blue);
@@ -1054,36 +1175,118 @@
             color: var(--tw-red);
         }
 
-        .custom-sound-item .btn:hover { transform: scale(1.08); }
-
-        /* Dropzone — add sound button */
+        /* Dropzone — kit .drop composite: icon + title + sub. */
         .add-sound-row { display: flex; gap: var(--tw-s-2); }
 
         .add-sound-btn {
             flex: 1;
-            padding: var(--tw-s-4);
+            padding: 18px;
             border: 1.5px dashed rgba(255, 255, 255, 0.14);
             background: rgba(255, 255, 255, 0.015);
             border-radius: var(--tw-r-lg);
             cursor: pointer;
-            font-size: var(--tw-t-label);
-            font-weight: 500;
-            color: var(--tw-fg-secondary);
             transition: border-color var(--tw-dur-base) var(--tw-ease),
                         background var(--tw-dur-base) var(--tw-ease),
                         color var(--tw-dur-base) var(--tw-ease);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: var(--tw-s-2);
+            gap: 8px;
             min-width: 0;
             overflow: hidden;
+            color: var(--tw-fg-secondary);
         }
 
         .add-sound-btn:hover {
             border-color: var(--tw-blue);
-            color: var(--tw-blue);
             background: rgba(10, 132, 255, 0.05);
+        }
+
+        .add-sound-btn .drop-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: var(--tw-r-md);
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.55);
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        color var(--tw-dur-base) var(--tw-ease);
+        }
+
+        .add-sound-btn:hover .drop-icon {
+            background: rgba(10, 132, 255, 0.1);
+            color: var(--tw-blue);
+        }
+
+        .add-sound-btn .drop-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            fill: none;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .add-sound-btn .drop-title {
+            font-size: var(--tw-t-label);
+            font-weight: 600;
+            color: var(--tw-fg);
+        }
+
+        .add-sound-btn .drop-sub {
+            font-size: var(--tw-t-caption);
+            color: var(--tw-fg-dim);
+            font-family: var(--tw-font-mono);
+            letter-spacing: 0.3px;
+        }
+
+        /* Error banner — kit .err with round red ! badge. Hidden by default,
+           JS flips display via .visible class. */
+        .sound-err {
+            display: none;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(255, 69, 58, 0.1);
+            border: 1px solid rgba(255, 69, 58, 0.28);
+            border-radius: var(--tw-r-md);
+            margin-top: 10px;
+        }
+
+        .sound-err.visible { display: flex; }
+
+        .sound-err .err-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--tw-red);
+            color: var(--tw-fg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .sound-err .err-body { flex: 1; }
+
+        .sound-err .err-title {
+            font-size: var(--tw-t-label);
+            font-weight: 600;
+            color: #ff7a72;
+            margin-bottom: 2px;
+        }
+
+        .sound-err .err-msg {
+            font-size: var(--tw-t-caption);
+            color: var(--tw-fg-secondary);
+            line-height: 1.4;
         }
 
         .hidden-file-input { display: none; }
@@ -1418,7 +1621,7 @@
 
         .quick-presets {
             display: grid;
-            grid-template-columns: repeat(8, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 6px;
         }
 
@@ -2404,6 +2607,7 @@
 
         <!-- Таймер -->
         <div class="timer-header">
+            <h1>Осталось</h1>
             <div class="timer-display-main" id="controlTime">00:00</div>
             <div class="timer-status">
                 <span class="status-dot" id="statusDot"></span>
@@ -2541,7 +2745,7 @@
                 <div class="tab-content" id="tab-sound">
                     <div class="settings-column">
                     <div class="settings-group" id="soundSettings">
-                        <div class="settings-group-title" style="margin-bottom: 6px;">
+                        <div class="settings-group-title" style="margin-bottom: 10px;">
                             <span class="icon">🔊</span>
                             Звуки
                             <label class="toggle-switch" style="margin-left: auto;">
@@ -2549,11 +2753,19 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                        <div class="sound-row">
+                        <div class="sound-group">
+                          <div class="sound-group-head">
+                            <div class="meta">
+                              <div class="title">Сигнал старта</div>
+                              <div class="sub">Проиграется при запуске таймера</div>
+                            </div>
+                          </div>
+                          <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundStartEnabled">
-                                <label for="soundStartEnabled">При старте</label>
+                                <label for="soundStartEnabled">Вкл</label>
                             </div>
+                            <div class="select-wrap">
                             <select class="sound-select" id="soundStartPreset" aria-label="Звук старта">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
@@ -2576,13 +2788,23 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
                             </select>
+                            </div>
                             <button class="sound-preview" id="soundStartPreview" title="Прослушать" aria-label="Прослушать">▶</button>
+                          </div>
                         </div>
-                        <div class="sound-row">
+                        <div class="sound-group">
+                          <div class="sound-group-head">
+                            <div class="meta">
+                              <div class="title">Сигнал окончания</div>
+                              <div class="sub">Проиграется когда таймер достигнет нуля</div>
+                            </div>
+                          </div>
+                          <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundEndEnabled" checked>
-                                <label for="soundEndEnabled">При финише</label>
+                                <label for="soundEndEnabled">Вкл</label>
                             </div>
+                            <div class="select-wrap">
                             <select class="sound-select" id="soundEndPreset" aria-label="Звук окончания">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
@@ -2611,13 +2833,23 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
                             </select>
+                            </div>
                             <button class="sound-preview" id="soundEndPreview" title="Прослушать" aria-label="Прослушать">▶</button>
+                          </div>
                         </div>
-                        <div class="sound-row">
+                        <div class="sound-group">
+                          <div class="sound-group-head">
+                            <div class="meta">
+                              <div class="title">Последняя минута</div>
+                              <div class="sub">Тикает на финальной 60-секундной отсечке</div>
+                            </div>
+                          </div>
+                          <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundMinuteEnabled">
-                                <label for="soundMinuteEnabled">Каждую минуту</label>
+                                <label for="soundMinuteEnabled">Вкл</label>
                             </div>
+                            <div class="select-wrap">
                             <select class="sound-select" id="soundMinutePreset" aria-label="Звук за минуту до конца">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
@@ -2637,13 +2869,23 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
                             </select>
+                            </div>
                             <button class="sound-preview" id="soundMinutePreview" title="Прослушать" aria-label="Прослушать">▶</button>
+                          </div>
                         </div>
-                        <div class="sound-row" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px; margin-top: 2px;">
+                        <div class="sound-group">
+                          <div class="sound-group-head">
+                            <div class="meta">
+                              <div class="title">Перерасход</div>
+                              <div class="sub">Сигнал, когда время ушло в минус</div>
+                            </div>
+                          </div>
+                          <div class="sound-row">
                             <div class="sound-toggle">
                                 <input type="checkbox" id="soundOverrunEnabled">
-                                <label for="soundOverrunEnabled">Перерасход</label>
+                                <label for="soundOverrunEnabled">Вкл</label>
                             </div>
+                            <div class="select-wrap">
                             <select class="sound-select" id="soundOverrunPreset" aria-label="Звук овертайма">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
@@ -2667,17 +2909,21 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupOverrun"></optgroup>
                             </select>
+                            </div>
                             <button class="sound-preview" id="soundOverrunPreview" title="Прослушать" aria-label="Прослушать">▶</button>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0 2px 20px;">
-                            <label style="font-size: 10px; color: rgba(255, 255, 255, 0.7); white-space: nowrap;">каждые</label>
-                            <select class="sound-select" id="overrunIntervalMinutes" aria-label="Интервал сигналов овертайма в минутах" style="max-width: 100px; padding: 3px 6px; font-size: 10px;">
-                                <option value="1">1 мин</option>
-                                <option value="2">2 мин</option>
-                                <option value="3">3 мин</option>
-                                <option value="5">5 мин</option>
-                                <option value="10">10 мин</option>
-                            </select>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 6px; padding: 10px 0 0 4px;">
+                            <label style="font-size: 10px; color: var(--tw-fg-dim); white-space: nowrap;">каждые</label>
+                            <div class="select-wrap" style="flex: 0 0 auto;">
+                              <select class="sound-select" id="overrunIntervalMinutes" aria-label="Интервал сигналов овертайма в минутах" style="max-width: 120px; padding: 5px 28px 5px 10px; font-size: 11px;">
+                                  <option value="1">1 мин</option>
+                                  <option value="2">2 мин</option>
+                                  <option value="3">3 мин</option>
+                                  <option value="5">5 мин</option>
+                                  <option value="10">10 мин</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
                     </div>
 
@@ -2687,12 +2933,23 @@
                         <div class="settings-group-title">
                             <span class="icon">🎵</span>
                             Ваши звуки
+                            <span style="margin-left: auto; font-size: var(--tw-t-caption); color: var(--tw-fg-dim); font-weight: 400; font-family: var(--tw-font-mono); text-transform: none; letter-spacing: 0.3px;">mp3 · wav · ogg · aac · flac · до 5 МБ</span>
                         </div>
                         <div class="custom-sound-list" id="customSoundList"></div>
+                        <div class="sound-err" id="soundUploadError">
+                            <div class="err-icon">!</div>
+                            <div class="err-body">
+                                <div class="err-title" id="soundErrorTitle">Ошибка загрузки</div>
+                                <div class="err-msg" id="soundErrorMsg"></div>
+                            </div>
+                        </div>
                         <div class="add-sound-row">
                             <button class="add-sound-btn" id="addSoundBtn" title="Загрузить аудиофайл с компьютера">
-                                <span>➕</span>
-                                <span>Загрузить звук</span>
+                                <span class="drop-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                </span>
+                                <span class="drop-title">Перетащите файл сюда</span>
+                                <span class="drop-sub">или нажмите для выбора</span>
                             </button>
                             <input type="file" class="hidden-file-input" id="soundFileInput"
                                    accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/webm,audio/aac,audio/flac,.mp3,.wav,.ogg,.webm,.aac,.flac">
@@ -5243,21 +5500,46 @@
                 }
             }
 
+            // Показать/скрыть kit-style error banner для загрузки звука.
+            showSoundUploadError(title, msg) {
+                const el = document.getElementById('soundUploadError');
+                const t = document.getElementById('soundErrorTitle');
+                const m = document.getElementById('soundErrorMsg');
+                if (!el) { return; }
+                if (!title) { el.classList.remove('visible'); return; }
+                if (t) { t.textContent = title; }
+                if (m) { m.textContent = msg || ''; }
+                el.classList.add('visible');
+            }
+
             // Пользовательские звуки
             async handleSoundFileUpload(event) {
                 const file = event.target.files[0];
                 if (!file) return;
 
+                this.showSoundUploadError(null);
+
+                // Форматируем размер для сообщения об ошибке.
+                const sizeKB = (n) => n < 1024 * 1024 ? (n / 1024).toFixed(0) + ' КБ' : (n / 1024 / 1024).toFixed(1) + ' МБ';
+
                 // FIX BUG-025: Validation for sound file uploads
                 const MAX_SOUND_SIZE = (window.CONFIG && window.CONFIG.MAX_SOUND_FILE_SIZE) || 5 * 1024 * 1024;
                 if (file.size > MAX_SOUND_SIZE) {
                     Toast.show('Файл слишком большой (максимум 5 MB)', 'error');
+                    this.showSoundUploadError(
+                        'Файл слишком большой',
+                        `${file.name} (${sizeKB(file.size)}) превышает лимит ${sizeKB(MAX_SOUND_SIZE)}`
+                    );
                     event.target.value = '';
                     return;
                 }
                 const allowedAudioTypes = (window.CONFIG && window.CONFIG.ALLOWED_AUDIO_TYPES) || ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'];
                 if (!file.type || !allowedAudioTypes.includes(file.type)) {
                     Toast.show('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC', 'warning');
+                    this.showSoundUploadError(
+                        'Неподдерживаемый тип файла',
+                        'Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC'
+                    );
                     event.target.value = '';
                     return;
                 }
@@ -5278,6 +5560,10 @@
                 const isAAC = audioBytes[0] === 0xFF && (audioBytes[1] & 0xF0) === 0xF0;
                 if (!isMP3 && !isWAV && !isOGG && !isFLAC && !isWebM && !isAAC) {
                     Toast.show('Файл не прошёл проверку формата', 'error');
+                    this.showSoundUploadError(
+                        'Файл не прошёл проверку формата',
+                        `${file.name} имеет неподдерживаемую сигнатуру`
+                    );
                     event.target.value = '';
                     return;
                 }
@@ -5338,30 +5624,67 @@
                     return;
                 }
 
+                // SVG иконка ноты + иконки play/delete в стиле lucide (kit allowlist)
+                const ICON_MUSIC = '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+                const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21"/></svg>';
+                const ICON_DELETE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+
+                const formatSize = (b) => {
+                    if (!b || !Number.isFinite(b)) { return ''; }
+                    if (b < 1024) { return b + ' Б'; }
+                    if (b < 1024 * 1024) { return (b / 1024).toFixed(0) + ' КБ'; }
+                    return (b / 1024 / 1024).toFixed(1) + ' МБ';
+                };
+                // Приблизительный размер из data URL (base64 ≈ 4/3 от бинарника).
+                const sizeFromDataURL = (d) => {
+                    if (!d || typeof d !== 'string') { return 0; }
+                    const i = d.indexOf(',');
+                    return i < 0 ? 0 : Math.floor((d.length - i - 1) * 3 / 4);
+                };
+
                 customSounds.forEach(sound => {
                     const item = document.createElement('div');
                     item.className = 'custom-sound-item';
-                    
+
+                    const libIcon = document.createElement('div');
+                    libIcon.className = 'lib-icon';
+                    libIcon.setAttribute('aria-hidden', 'true');
+                    libIcon.innerHTML = ICON_MUSIC;
+
+                    const libMeta = document.createElement('div');
+                    libMeta.className = 'lib-meta';
+
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'name';
-                    nameSpan.textContent = '🎵 ' + sound.name;
-                    
+                    nameSpan.textContent = sound.name;
+                    nameSpan.title = sound.name;
+
+                    const subSpan = document.createElement('span');
+                    subSpan.className = 'lib-sub';
+                    const bytes = sizeFromDataURL(sound.data);
+                    subSpan.textContent = formatSize(bytes);
+
+                    libMeta.appendChild(nameSpan);
+                    libMeta.appendChild(subSpan);
+
                     const playBtn = document.createElement('button');
                     playBtn.className = 'btn play-btn';
                     playBtn.title = 'Воспроизвести';
-                    playBtn.textContent = '▶';
-                    
+                    playBtn.setAttribute('aria-label', 'Воспроизвести');
+                    playBtn.innerHTML = ICON_PLAY;
+
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'btn delete-btn';
                     deleteBtn.title = 'Удалить';
-                    deleteBtn.textContent = '✕';
-                    
-                    item.appendChild(nameSpan);
+                    deleteBtn.setAttribute('aria-label', 'Удалить');
+                    deleteBtn.innerHTML = ICON_DELETE;
+
+                    item.appendChild(libIcon);
+                    item.appendChild(libMeta);
                     item.appendChild(playBtn);
                     item.appendChild(deleteBtn);
                     listEl.appendChild(item);
-                    
-                    // Обработчики с оригинальным именем
+
                     playBtn.addEventListener('click', () => this.playCustomSound(sound.name));
                     deleteBtn.addEventListener('click', () => this.deleteCustomSound(sound.name));
                 });
