@@ -2,9 +2,11 @@
    TimerWidget — Design Tokens  v2
    Dark (default) · Light · High-contrast · Reduced-motion
    + semantic state colors with colorblind patterns
-   ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+   Fonts are loaded via local @font-face blocks in each HTML file
+   (see electron-*.html / display.html) — not via Google Fonts CDN,
+   since CSP `font-src 'self' data:` blocks external font sources.
+   ============================================================ */
 
 /* ---------------- DARK (default) ---------------- */
 :root,
