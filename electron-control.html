@@ -3092,9 +3092,9 @@
 
     <!-- FAQ Modal -->
     <!-- Диалог подтверждения выхода -->
-    <div class="exit-modal" id="exitModal">
+    <div class="exit-modal" id="exitModal" role="dialog" aria-modal="true" aria-labelledby="exitModalTitle">
         <div class="exit-dialog">
-            <h3>Закрыть приложение?</h3>
+            <h3 id="exitModalTitle">Закрыть приложение?</h3>
             <p>Все окна (виджет, часы, дисплей) будут закрыты</p>
             <div class="exit-dialog-buttons">
                 <button class="exit-btn-cancel" id="exitCancel">Отмена</button>
@@ -3103,10 +3103,10 @@
         </div>
     </div>
 
-    <div class="faq-modal" id="faqModal">
+    <div class="faq-modal" id="faqModal" role="dialog" aria-modal="true" aria-labelledby="faqModalTitle">
         <div class="faq-content">
             <div class="faq-header">
-                <h2>📖 Справка по Timer App</h2>
+                <h2 id="faqModalTitle">📖 Справка по Timer App</h2>
                 <button class="faq-close" id="faqClose" aria-label="Закрыть">&times;</button>
             </div>
             <div class="faq-body">
@@ -3316,9 +3316,9 @@
     </div>
 
     <!-- Reset Confirmation Modal -->
-    <div class="reset-modal" id="resetModal">
+    <div class="reset-modal" id="resetModal" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
         <div class="reset-dialog">
-            <h3>Сбросить все настройки?</h3>
+            <h3 id="resetModalTitle">Сбросить все настройки?</h3>
             <p>Все настройки, позиции окон и пользовательские звуки будут удалены. Приложение закроется — запустите заново.</p>
             <div class="reset-dialog-buttons">
                 <button class="reset-btn-cancel" id="resetCancel">Отмена</button>
@@ -5884,19 +5884,65 @@
         document.getElementById('minimizeBtn').addEventListener('click', () => {
             if (window.ipcRenderer) window.ipcRenderer.send('minimize-window');
         });
+
+        // Modal accessibility: initial focus + focus trap (Tab/Shift+Tab cycle)
+        const _modalFocusReturnMap = new WeakMap();
+        function _getFocusable(modal) {
+            return Array.from(modal.querySelectorAll(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )).filter((el) => el.offsetParent !== null || el === document.activeElement);
+        }
+        function _modalTrapHandler(modal) {
+            return (e) => {
+                if (e.key !== 'Tab') { return; }
+                const focusable = _getFocusable(modal);
+                if (focusable.length === 0) { e.preventDefault(); return; }
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            };
+        }
+        function openModal(modal, initialFocusEl) {
+            _modalFocusReturnMap.set(modal, document.activeElement);
+            modal.classList.add('show');
+            const trap = _modalTrapHandler(modal);
+            modal._focusTrap = trap;
+            modal.addEventListener('keydown', trap);
+            const target = initialFocusEl || _getFocusable(modal)[0];
+            if (target) { setTimeout(() => target.focus(), 0); }
+        }
+        function closeModal(modal) {
+            modal.classList.remove('show');
+            if (modal._focusTrap) {
+                modal.removeEventListener('keydown', modal._focusTrap);
+                modal._focusTrap = null;
+            }
+            const prev = _modalFocusReturnMap.get(modal);
+            if (prev && typeof prev.focus === 'function') {
+                try { prev.focus(); } catch (_err) { /* ignore */ }
+            }
+        }
+
         // Диалог подтверждения выхода
         const exitModal = document.getElementById('exitModal');
+        const exitCancelBtn = document.getElementById('exitCancel');
         document.getElementById('closeAppBtn').addEventListener('click', () => {
-            exitModal.classList.add('show');
+            openModal(exitModal, exitCancelBtn);
         });
-        document.getElementById('exitCancel').addEventListener('click', () => {
-            exitModal.classList.remove('show');
+        exitCancelBtn.addEventListener('click', () => {
+            closeModal(exitModal);
         });
         document.getElementById('exitConfirm').addEventListener('click', () => {
             if (window.ipcRenderer) window.ipcRenderer.send('quit-app');
         });
         exitModal.addEventListener('click', (e) => {
-            if (e.target === exitModal) exitModal.classList.remove('show');
+            if (e.target === exitModal) { closeModal(exitModal); }
         });
 
         // Cleanup при закрытии окна
@@ -5912,31 +5958,32 @@
 
         // Open FAQ modal
         faqBtn.addEventListener('click', () => {
-            faqModal.classList.add('show');
+            openModal(faqModal, faqClose);
         });
 
         // Close FAQ modal
         faqClose.addEventListener('click', () => {
-            faqModal.classList.remove('show');
+            closeModal(faqModal);
         });
 
         // Close on backdrop click
         faqModal.addEventListener('click', (e) => {
             if (e.target === faqModal) {
-                faqModal.classList.remove('show');
+                closeModal(faqModal);
             }
         });
 
         // Reset settings modal
         const resetModal = document.getElementById('resetModal');
+        const resetCancelBtn = document.getElementById('resetCancel');
         document.getElementById('resetSettingsBtn').addEventListener('click', () => {
-            resetModal.classList.add('show');
+            openModal(resetModal, resetCancelBtn);
         });
-        document.getElementById('resetCancel').addEventListener('click', () => {
-            resetModal.classList.remove('show');
+        resetCancelBtn.addEventListener('click', () => {
+            closeModal(resetModal);
         });
         resetModal.addEventListener('click', (e) => {
-            if (e.target === resetModal) { resetModal.classList.remove('show'); }
+            if (e.target === resetModal) { closeModal(resetModal); }
         });
         document.getElementById('resetConfirm').addEventListener('click', () => {
             localStorage.clear();
@@ -5946,9 +5993,9 @@
         // Close on Escape key
         const _onEscapeKeydown = (e) => {
             if (e.key === 'Escape') {
-                if (resetModal.classList.contains('show')) resetModal.classList.remove('show');
-                if (exitModal.classList.contains('show')) exitModal.classList.remove('show');
-                if (faqModal.classList.contains('show')) faqModal.classList.remove('show');
+                if (resetModal.classList.contains('show')) { closeModal(resetModal); }
+                if (exitModal.classList.contains('show')) { closeModal(exitModal); }
+                if (faqModal.classList.contains('show')) { closeModal(faqModal); }
             }
         };
         document.addEventListener('keydown', _onEscapeKeydown);
@@ -6092,6 +6139,9 @@
 
             const overlay = document.createElement('div');
             overlay.id = 'keyboard-shortcuts-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-labelledby', 'keyboard-shortcuts-title');
             overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0;' +
                 'background: rgba(0,0,0,0.7); display: flex; align-items: center;' +
                 'justify-content: center; z-index: 10000;';
@@ -6100,6 +6150,7 @@
             panel.style.cssText = 'background: white; padding: 20px; border-radius: 10px; max-width: 400px;';
 
             const title = document.createElement('h3');
+            title.id = 'keyboard-shortcuts-title';
             title.style.cssText = 'margin-top: 0; color: #333;';
             title.textContent = '⌨️ Горячие клавиши';
             panel.appendChild(title);
@@ -6138,7 +6189,15 @@
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) { overlay.remove(); }
             });
+            const _onOverlayKey = (e) => {
+                if (e.key === 'Escape') {
+                    overlay.remove();
+                    document.removeEventListener('keydown', _onOverlayKey);
+                }
+            };
+            document.addEventListener('keydown', _onOverlayKey);
             document.body.appendChild(overlay);
+            setTimeout(() => closeBtn.focus(), 0);
         }
 
     </script>
