@@ -1,6 +1,22 @@
 // [perf] Capture process start as early as possible for startup timing.
 const __startupT0 = Date.now();
 
+// Guard: ELECTRON_RUN_AS_NODE в окружении превращает electron.exe в голой Node
+// без Chromium/main-process API, и require('electron') возвращает строку-путь,
+// а не API-модуль. Сообщаем ясно вместо непонятного 'Cannot read app.getVersion'.
+if (process.env.ELECTRON_RUN_AS_NODE) {
+    console.error(
+        '\n[TimerWidget] ELECTRON_RUN_AS_NODE=%s is set in the environment.\n' +
+        '  Это переменная Electron для запуска electron.exe как обычной Node.js.\n' +
+        '  Приложение не может стартовать в таком режиме. Снимите её:\n' +
+        '    PowerShell: $env:ELECTRON_RUN_AS_NODE=""\n' +
+        '    cmd.exe:    set ELECTRON_RUN_AS_NODE=\n' +
+        '    bash/zsh:   unset ELECTRON_RUN_AS_NODE\n',
+        process.env.ELECTRON_RUN_AS_NODE
+    );
+    process.exit(1);
+}
+
 const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -569,7 +585,7 @@ function bindTrayBehavior(win) {
 function bindRenderCrashHandler(win, label) {
     if (!win || !win.webContents) { return; }
     win.webContents.on('render-process-gone', (_event, details) => {
-        log.error(`Render process gone in ${label}: ${details.reason}`);
+        log.error(`Render process gone in ${label}: ${JSON.stringify(details)}`);
         if (details.reason !== 'clean-exit' && !win.isDestroyed()) {
             try { win.reload(); } catch (err) { log.error('Reload failed:', err); }
         }
