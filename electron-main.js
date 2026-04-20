@@ -1,8 +1,42 @@
-const { app, BrowserWindow, ipcMain, screen, Menu } = require('electron');
+// [perf] Capture process start as early as possible for startup timing.
+const __startupT0 = Date.now();
+
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const log = require('electron-log/main');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
+
+// Logger setup
+log.initialize();
+log.transports.file.level = 'info';
+log.transports.file.maxSize = 10 * 1024 * 1024; // 10 MB per file
+log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
+log.transports.console.level = process.argv.includes('--dev') ? 'debug' : 'warn';
+log.info(`TimerWidget starting — version ${app.getVersion()}, platform ${process.platform}`);
+
+// Crash handlers
+process.on('uncaughtException', (err) => {
+    log.error('UNCAUGHT EXCEPTION:', err && err.stack ? err.stack : err);
+    try { saveTimerStateToFile(); } catch { /* best effort */ }
+});
+process.on('unhandledRejection', (reason) => {
+    log.error('UNHANDLED REJECTION:', reason);
+    try { saveTimerStateToFile(); } catch { /* best effort */ }
+});
+
+// Test-mode guard — node:test stubs 'electron', we skip runtime side-effects.
+const __inTestMode = process.env.NODE_TEST_CONTEXT !== undefined;
+
+// Runtime memory monitor (dev only, not in tests)
+if (process.argv.includes('--dev') && !__inTestMode) {
+    setInterval(() => {
+        const mem = process.memoryUsage();
+        log.debug(`[perf] heap: ${(mem.heapUsed/1024/1024).toFixed(1)}MB rss: ${(mem.rss/1024/1024).toFixed(1)}MB`);
+    }, 60000);
+}
 
 let controlWindow = null;
 let widgetWindow = null;
@@ -89,6 +123,7 @@ function emitTimerState(partial = {}) {
     safelySendToWindow(widgetWindow, 'timer-state', timerState);
     safelySendToWindow(displayWindow, 'timer-state', timerState);
     safelySendToWindow(controlWindow, 'timer-state', timerState);
+    if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
 }
 
 // Broadcast window state to all windows
@@ -192,6 +227,7 @@ function handleTimerReset() {
 }
 
 function createControlWindow() {
+    const __ctrlT0 = Date.now();
     // Get screen dimensions for adaptive sizing
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
@@ -219,12 +255,16 @@ function createControlWindow() {
         resizable: true // Allow user to resize if needed
     });
 
-    controlWindow.loadFile('electron-control.html').catch(err => console.error('loadFile failed:', err));
+    controlWindow.loadFile('electron-control.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(controlWindow);
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
         blockZoom(controlWindow);
+    });
+
+    controlWindow.once('ready-to-show', () => {
+        log.info(`[perf] control window ready in ${Date.now() - __ctrlT0}ms`);
     });
 
     controlWindow.on('closed', () => {
@@ -233,8 +273,9 @@ function createControlWindow() {
 }
 
 function createWidgetWindow() {
+    const __widgetT0 = Date.now();
     const { width } = screen.getPrimaryDisplay().workAreaSize;
-    
+
     widgetWindow = new BrowserWindow({
         width: 250,
         height: 280,
@@ -259,11 +300,15 @@ function createWidgetWindow() {
         hasShadow: false
     });
 
-    widgetWindow.loadFile('electron-widget.html').catch(err => console.error('loadFile failed:', err));
+    widgetWindow.loadFile('electron-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(widgetWindow);
 
     widgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(widgetWindow);
+    });
+
+    widgetWindow.once('ready-to-show', () => {
+        log.info(`[perf] widget window ready in ${Date.now() - __widgetT0}ms`);
     });
 
     widgetWindow.on('closed', () => {
@@ -274,8 +319,9 @@ function createWidgetWindow() {
 }
 
 function createClockWidgetWindow() {
+    const __clockT0 = Date.now();
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-    
+
     clockWidgetWindow = new BrowserWindow({
         width: 220,
         height: 220,
@@ -298,11 +344,15 @@ function createClockWidgetWindow() {
         hasShadow: false
     });
 
-    clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => console.error('loadFile failed:', err));
+    clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(clockWidgetWindow);
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(clockWidgetWindow);
+    });
+
+    clockWidgetWindow.once('ready-to-show', () => {
+        log.info(`[perf] clock window ready in ${Date.now() - __clockT0}ms`);
     });
 
     clockWidgetWindow.on('closed', () => {
@@ -313,6 +363,7 @@ function createClockWidgetWindow() {
 }
 
 function createDisplayWindow(displayIndex) {
+    const __displayT0 = Date.now();
     const displays = screen.getAllDisplays();
     let targetDisplay;
     
@@ -346,9 +397,13 @@ function createDisplayWindow(displayIndex) {
         }
     });
 
-    displayWindow.loadFile('display.html').catch(err => console.error('loadFile failed:', err));
+    displayWindow.loadFile('display.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(displayWindow);
     blockZoom(displayWindow);
+
+    displayWindow.once('ready-to-show', () => {
+        log.info(`[perf] display window ready in ${Date.now() - __displayT0}ms`);
+    });
 
     const thisWindow = displayWindow;
     displayWindow.on('closed', () => {
@@ -360,10 +415,184 @@ function createDisplayWindow(displayIndex) {
     });
 }
 
+// ============================================================================
+// Crash recovery — persist timer state to file so we can offer to resume after crash
+// ============================================================================
+function getRecoveryStatePath() {
+    return path.join(app.getPath('userData'), 'last-state.json');
+}
+
+function saveTimerStateToFile() {
+    try {
+        const statePath = getRecoveryStatePath();
+        const data = JSON.stringify({
+            totalSeconds: timerState.totalSeconds,
+            remainingSeconds: timerState.remainingSeconds,
+            presetSeconds: timerState.presetSeconds,
+            isRunning: timerState.isRunning,
+            savedAt: Date.now()
+        });
+        fs.writeFileSync(statePath, data);
+    } catch (err) {
+        log.error('saveTimerStateToFile:', err);
+    }
+}
+
+function loadSavedTimerState() {
+    try {
+        const statePath = getRecoveryStatePath();
+        if (!fs.existsSync(statePath)) { return null; }
+        const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        const ageMs = Date.now() - (parsed.savedAt || 0);
+        // Stale after 5 minutes — discard.
+        if (ageMs > 5 * 60 * 1000) {
+            fs.unlinkSync(statePath);
+            return null;
+        }
+        return parsed;
+    } catch (err) {
+        log.warn('loadSavedTimerState failed:', err);
+        return null;
+    }
+}
+
+function clearSavedTimerState() {
+    try {
+        const statePath = getRecoveryStatePath();
+        if (fs.existsSync(statePath)) { fs.unlinkSync(statePath); }
+    } catch { /* ignore */ }
+}
+
+// Export for testing
+exports.isRecoveryValid = function isRecoveryValid(data, now) {
+    if (!data || typeof data !== 'object') { return false; }
+    if (typeof data.savedAt !== 'number' || !Number.isFinite(data.savedAt)) { return false; }
+    const age = (now || Date.now()) - data.savedAt;
+    if (age < 0 || age > 5 * 60 * 1000) { return false; }
+    if (typeof data.presetSeconds !== 'number' || data.presetSeconds < 0) { return false; }
+    return true;
+};
+
+// Persist state every 10 seconds while timer is running
+if (!__inTestMode) {
+    setInterval(() => {
+        if (timerState.isRunning) { saveTimerStateToFile(); }
+    }, 10000);
+}
+
+// ============================================================================
+// System Tray
+// ============================================================================
+let tray = null;
+let isQuitting = false;
+
+function createTray() {
+    try {
+        const iconPath = path.join(__dirname, 'build', 'icon.png');
+        const icon = nativeImage.createFromPath(iconPath);
+        const trayIcon = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 });
+        tray = new Tray(trayIcon);
+        tray.setToolTip('Timer Widget');
+        updateTrayMenu();
+        tray.on('click', () => {
+            if (!controlWindow) { createControlWindow(); return; }
+            if (controlWindow.isVisible()) { controlWindow.hide(); }
+            else { controlWindow.show(); controlWindow.focus(); }
+        });
+        log.info('System tray created');
+    } catch (err) {
+        log.warn('Tray creation failed (no tray support?):', err);
+    }
+}
+
+function formatTrayTime(secs) {
+    const neg = secs < 0;
+    const abs = Math.abs(secs);
+    const h = Math.floor(abs / 3600);
+    const m = Math.floor((abs % 3600) / 60);
+    const s = abs % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    const body = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    return (neg ? '-' : '') + body;
+}
+
+function updateTrayMenu() {
+    if (!tray) { return; }
+    const running = timerState.isRunning;
+    const remaining = formatTrayTime(timerState.remainingSeconds || 0);
+    const menu = Menu.buildFromTemplate([
+        { label: `⏱  ${remaining}`, enabled: false },
+        { type: 'separator' },
+        { label: running ? 'Пауза' : 'Старт', click: () => {
+            if (running) { handleTimerPause(); }
+            else { handleTimerStart(); }
+            updateTrayMenu();
+        }},
+        { label: 'Сбросить', click: () => { handleTimerReset(); updateTrayMenu(); }},
+        { type: 'separator' },
+        { label: 'Панель управления', click: () => {
+            if (!controlWindow) { createControlWindow(); return; }
+            controlWindow.show();
+            controlWindow.focus();
+        }},
+        { label: 'Виджет', type: 'checkbox', checked: !!widgetWindow, click: () => {
+            if (widgetWindow) { widgetWindow.close(); }
+            else { createWidgetWindow(); }
+            setTimeout(updateTrayMenu, 200);
+        }},
+        { label: 'Часы', type: 'checkbox', checked: !!clockWidgetWindow, click: () => {
+            if (clockWidgetWindow) { clockWidgetWindow.close(); }
+            else { createClockWidgetWindow(); }
+            setTimeout(updateTrayMenu, 200);
+        }},
+        { type: 'separator' },
+        { label: 'Выход', click: () => { isQuitting = true; app.quit(); }}
+    ]);
+    tray.setContextMenu(menu);
+}
+
+// Intercept control window close — hide to tray instead of quit
+function bindTrayBehavior(win) {
+    if (!win) { return; }
+    win.on('close', (event) => {
+        if (!isQuitting && tray) {
+            event.preventDefault();
+            win.hide();
+        }
+    });
+}
+
+// Render process crash handler
+function bindRenderCrashHandler(win, label) {
+    if (!win || !win.webContents) { return; }
+    win.webContents.on('render-process-gone', (_event, details) => {
+        log.error(`Render process gone in ${label}: ${details.reason}`);
+        if (details.reason !== 'clean-exit' && !win.isDestroyed()) {
+            try { win.reload(); } catch (err) { log.error('Reload failed:', err); }
+        }
+    });
+}
+
+app.on('before-quit', () => { isQuitting = true; clearSavedTimerState(); });
+
 app.whenReady().then(() => {
     // Remove default Electron menu (File, Edit, View, Help)
     Menu.setApplicationMenu(null);
+
+    // Recovery check before UI
+    const saved = loadSavedTimerState();
+    if (exports.isRecoveryValid(saved, Date.now())) {
+        log.info(`Recovery candidate found (age ${Math.round((Date.now() - saved.savedAt) / 1000)}s)`);
+        timerState.presetSeconds = saved.presetSeconds;
+        // We don't auto-start — control window will offer resume via IPC timer-recovery-available
+    }
+
     createControlWindow();
+    createTray();
+    bindTrayBehavior(controlWindow);
+    bindRenderCrashHandler(controlWindow, 'control');
+
+    log.info(`[perf] app ready in ${Date.now() - __startupT0}ms`);
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
@@ -599,7 +828,7 @@ ipcMain.on('reset-and-relaunch', async () => {
             session.defaultSession.clearCache()
         ]);
     } catch (err) {
-        console.error('Storage clear failed:', err);
+        log.error('Storage clear failed:', err);
     }
     app.quit();
 });
@@ -750,5 +979,38 @@ ipcMain.on('timer-control', (_event, action) => {
         case 'start': handleTimerStart(); break;
         case 'pause': handleTimerPause(); break;
         case 'reset': handleTimerReset(); break;
+    }
+});
+
+// Autostart (open at login)
+ipcMain.on('set-autostart', (_event, enabled) => {
+    try {
+        app.setLoginItemSettings({ openAtLogin: !!enabled, openAsHidden: true });
+        log.info(`Autostart: ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (err) {
+        log.error('set-autostart failed:', err);
+    }
+});
+ipcMain.handle('get-autostart', () => {
+    try { return app.getLoginItemSettings().openAtLogin; }
+    catch { return false; }
+});
+
+// Export logs for diagnostics
+ipcMain.handle('export-logs', async () => {
+    try {
+        const logPath = log.transports.file.getFile().path;
+        const stamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
+        const result = await dialog.showSaveDialog({
+            defaultPath: `timer-widget-logs-${stamp}.log`,
+            filters: [{ name: 'Log files', extensions: ['log'] }]
+        });
+        if (result.canceled || !result.filePath) { return { ok: false, canceled: true }; }
+        fs.copyFileSync(logPath, result.filePath);
+        log.info(`Logs exported to ${result.filePath}`);
+        return { ok: true, path: result.filePath };
+    } catch (err) {
+        log.error('export-logs failed:', err);
+        return { ok: false, error: String(err) };
     }
 });
