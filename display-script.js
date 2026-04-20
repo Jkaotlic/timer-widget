@@ -17,6 +17,11 @@ class DisplayTimer {
         // Массив для хранения ID всех интервалов
         this.intervals = [];
 
+        // F-024: трекинг всех setTimeout / setInterval для cleanup
+        // (intervals[] уже существует для setInterval — дублируем сюда для единой очистки)
+        this._timeouts = [];
+        this._intervals = [];
+
         // Обработчики IPC для cleanup
         this.ipcHandlers = {};
 
@@ -1219,9 +1224,13 @@ class DisplayTimer {
             digit.textContent = value;
             this.lastFlipValues[key] = value;
 
-            setTimeout(() => {
+            // F-024: трекинг setTimeout для cleanup
+            const flipTimeoutId = setTimeout(() => {
                 card.classList.remove('flipping');
+                const idx = this._timeouts.indexOf(flipTimeoutId);
+                if (idx !== -1) { this._timeouts.splice(idx, 1); }
             }, 300);
+            this._timeouts.push(flipTimeoutId);
         }
     }
 
@@ -1374,10 +1383,14 @@ class DisplayTimer {
 
             if (this.flashCount >= maxFlashes * 2) {
                 clearInterval(this.flashInterval);
+                const idx = this._intervals.indexOf(this.flashInterval);
+                if (idx !== -1) { this._intervals.splice(idx, 1); }
                 this.flashInterval = null;
                 document.body.classList.remove('flash-mode');
             }
         }, flashInterval);
+        // F-024: трекинг flashInterval для cleanup
+        this._intervals.push(this.flashInterval);
     }
 
     formatTime(seconds) {
@@ -1660,6 +1673,13 @@ class DisplayTimer {
             clearInterval(this.flashInterval);
             this.flashInterval = null;
         }
+
+        // F-024: Очищаем все отслеживаемые setTimeout / setInterval, чтобы не было
+        // утечек таймеров при закрытии окна (flip-анимации, flashInterval и пр.)
+        for (const id of this._timeouts) { clearTimeout(id); }
+        for (const id of this._intervals) { clearInterval(id); }
+        this._timeouts = [];
+        this._intervals = [];
 
         // Удаляем IPC listeners если они есть
         if (this.ipcRenderer) {
