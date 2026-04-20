@@ -6,7 +6,7 @@
 
 Используется для:
 - **Vulnerability scanning** — `grype sbom:sbom.json` или Dependency-Track
-- **Compliance аудитов** — corp-аудиторы (SberTech, ФСТЭК) могут импортировать
+- **Compliance аудитов** — corp-аудиторы (ФСТЭК, внутренние security-команды) могут импортировать
 - **Supply-chain атак** — быстро проверить наличие конкретной версии уязвимого пакета
 
 ### Регенерация
