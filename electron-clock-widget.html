@@ -194,7 +194,7 @@
             font-weight: 500;
             letter-spacing: 0.05em;
             background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(5px);
             transition: all 0.3s;
             display: none;
@@ -471,7 +471,7 @@
             right: 0;
             top: -16px;
             font-size: 0.65em;
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.7);
         }
 
         /* ============================================
@@ -751,7 +751,7 @@
         .widget-analog-tick.major {
             width: 3px;
             height: 14px;
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.7);
             top: 10px;
             margin-left: -1.5px;
         }
@@ -870,7 +870,7 @@
             left: 20%;
             width: 30%;
             height: 30%;
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.7);
             border-radius: 50%;
         }
 
@@ -925,6 +925,25 @@
             15% { opacity: 1; }
             75% { opacity: 1; }
             100% { opacity: 0; display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [role="button"]:focus-visible,
+        [tabindex]:focus-visible {
+            outline: 2px solid #0a84ff;
+            outline-offset: 2px;
         }
     </style>
 </head>
