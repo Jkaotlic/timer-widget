@@ -2,47 +2,50 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Таймер - Полноэкранное отображение</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="design-tokens.css">
     <link rel="stylesheet" href="components.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+        /* ============================================================
+           Fullscreen Display — VisionOS glassmorphism v2
+           Uses design-tokens.css. Hex only in SVG stops + LED glow.
+           ============================================================ */
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
 
         body {
-            font-family: 'SF Pro Display', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--tw-font-sans);
+            color: var(--tw-fg);
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
-            background: var(--bg, linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%));
-            transition: background 0.5s ease;
+            /* Default background = kit gradient. --bg var is set by applyBackground() for user themes. */
+            background: var(--bg, linear-gradient(135deg, #1a1b3a 0%, #0d1117 45%, #000 100%));
+            transition: background var(--tw-dur-slow) var(--tw-ease);
             background-size: cover;
             background-attachment: fixed;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Декоративные блики */
+        /* Soft radial glow layers — blue + green, the brand gesture.
+           Only present when --bg was NOT overridden with a user image/solid.
+           We use ::before regardless; it sits above bg and under content. */
         body::before {
             content: "";
             position: absolute;
             inset: 0;
-            background: 
-                radial-gradient(circle at 20% 20%, rgba(255,255,255,0.06), transparent 35%),
-                radial-gradient(circle at 80% 10%, rgba(255,255,255,0.04), transparent 40%),
-                radial-gradient(circle at 50% 80%, rgba(255,255,255,0.05), transparent 45%);
+            background:
+                radial-gradient(ellipse at 30% 30%, rgba(10, 132, 255, 0.22) 0%, transparent 55%),
+                radial-gradient(ellipse at 70% 70%, rgba(48, 209, 88, 0.14) 0%, transparent 55%),
+                radial-gradient(ellipse at 50% 50%, rgba(88, 86, 214, 0.08) 0%, transparent 60%);
             pointer-events: none;
+            z-index: 0;
         }
 
         .display-container {
@@ -51,7 +54,7 @@
             z-index: 1;
             width: 100%;
             max-width: 1200px;
-            padding: 40px;
+            padding: var(--tw-s-10);
             margin: 0 auto;
             display: flex;
             flex-direction: column;
@@ -59,21 +62,24 @@
             justify-content: center;
         }
 
-        /* Информационные блоки (текущее время, время мероприятия) */
+        /* ============================================================
+           INFO BLOCKS — Alt-draggable, per-block localStorage positions
+           ============================================================ */
         .info-block {
             --info-scale: 1.2;
             position: fixed;
             text-align: center;
             opacity: 0;
             transform: scale(calc(0.9 * var(--info-scale)));
-            transition: all 0.4s ease;
+            transition: opacity var(--tw-dur-slow) var(--tw-ease),
+                        transform var(--tw-dur-slow) var(--tw-ease);
             z-index: 100;
-            padding: 16px 28px;
-            background: rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            /* Ограничиваем размер чтобы не выходить за края */
+            padding: 16px 26px;
+            background: var(--tw-bg-surface);
+            -webkit-backdrop-filter: var(--tw-blur-sm);
+            backdrop-filter: var(--tw-blur-sm);
+            border: 1px solid var(--tw-border-strong);
+            border-radius: var(--tw-r-xl);
             max-width: calc(33vw - 40px);
         }
 
@@ -82,101 +88,107 @@
             transform: scale(var(--info-scale));
         }
 
-        /* Позиции с правильными transform-origin */
-        .info-block.top-left { top: 20px; left: 20px; transform-origin: top left; }
-        .info-block.top-center { top: 20px; left: 50%; transform-origin: top center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        /* Preset positions — transform-origin anchors corner/edge scaling */
+        .info-block.top-left    { top: 20px; left: 20px;   transform-origin: top left; }
+        .info-block.top-center  { top: 20px; left: 50%;    transform-origin: top center;
+                                   transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.top-center.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.top-right { top: 20px; right: 20px; transform-origin: top right; }
-        .info-block.bottom-left { bottom: 100px; left: 20px; transform-origin: bottom left; }
-        .info-block.bottom-center { bottom: 100px; left: 50%; transform-origin: bottom center; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-right   { top: 20px; right: 20px;  transform-origin: top right; }
+        .info-block.bottom-left  { bottom: 100px; left: 20px;  transform-origin: bottom left; }
+        .info-block.bottom-center { bottom: 100px; left: 50%;  transform-origin: bottom center;
+                                     transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.bottom-center.visible { transform: translateX(-50%) scale(var(--info-scale)); }
         .info-block.bottom-right { bottom: 100px; right: 20px; transform-origin: bottom right; }
-        
-        /* Дополнительные позиции для линейных пресетов */
-        .info-block.top-left-third { top: 20px; left: 20%; transform-origin: top left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+
+        .info-block.top-left-third { top: 20px; left: 20%; transform-origin: top left;
+                                      transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.top-left-third.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.top-right-third { top: 20px; right: 20%; transform-origin: top right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.top-right-third { top: 20px; right: 20%; transform-origin: top right;
+                                       transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.top-right-third.visible { transform: translateX(50%) scale(var(--info-scale)); }
-        .info-block.bottom-left-third { bottom: 100px; left: 20%; transform-origin: bottom left; transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-left-third { bottom: 100px; left: 20%; transform-origin: bottom left;
+                                         transform: translateX(-50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.bottom-left-third.visible { transform: translateX(-50%) scale(var(--info-scale)); }
-        .info-block.bottom-right-third { bottom: 100px; right: 20%; transform-origin: bottom right; transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
+        .info-block.bottom-right-third { bottom: 100px; right: 20%; transform-origin: bottom right;
+                                          transform: translateX(50%) scale(calc(0.9 * var(--info-scale))); }
         .info-block.bottom-right-third.visible { transform: translateX(50%) scale(var(--info-scale)); }
 
         .info-label {
-            font-size: 0.9em;
+            font-family: var(--tw-font-sans);
+            font-size: var(--tw-t-caption);
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 3px;
-            color: var(--info-color-dim, rgba(255, 255, 255, 0.7));
+            letter-spacing: 0.5px;
+            color: var(--info-color-dim, var(--tw-fg-dim));
             margin-bottom: 10px;
-            transition: all 0.3s ease;
+            transition: color var(--tw-dur-base) var(--tw-ease);
         }
 
         .info-value {
             font-size: clamp(1.2rem, 2.5vw, 2.2rem);
-            font-weight: 600;
-            font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
-            color: var(--info-color, rgba(255, 255, 255, 0.9));
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            font-weight: 500;
+            font-family: var(--tw-font-sans);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.3px;
+            color: var(--info-color, var(--tw-fg));
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
             white-space: nowrap;
-            transition: all 0.3s ease;
+            transition: color var(--tw-dur-base) var(--tw-ease),
+                        text-shadow var(--tw-dur-base) var(--tw-ease);
         }
 
-        /* ===== Стили информационных блоков для разных режимов ===== */
-        
-        /* Стиль: Цифровой LED */
+        /* ===== Per-style overrides for info-blocks ===== */
+
+        /* LED style */
         body.style-digital .info-block {
-            background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
-            border: 2px solid #333;
-            border-radius: 12px;
+            background: var(--tw-bg-led);
+            border: 1px solid var(--tw-border-strong);
+            border-radius: var(--tw-r-lg);
             box-shadow:
-                inset 0 0 20px rgba(0, 0, 0, 0.8),
-                0 4px 20px rgba(0, 0, 0, 0.5),
-                0 0 30px var(--info-glow, rgba(0, 255, 136, 0.1));
+                inset 0 0 20px rgba(0, 0, 0, 0.6),
+                0 4px 20px rgba(0, 0, 0, 0.4),
+                0 0 30px var(--info-glow, rgba(48, 209, 88, 0.15));
         }
-
         body.style-digital .info-label {
-            color: var(--info-color-dim, rgba(0, 255, 136, 0.5));
-            text-shadow: 0 0 5px var(--info-glow, rgba(0, 255, 136, 0.3));
+            color: var(--info-color-dim, rgba(48, 209, 88, 0.55));
+            text-shadow: 0 0 5px var(--info-glow, rgba(48, 209, 88, 0.3));
         }
-
         body.style-digital .info-value {
-            font-family: 'Courier New', 'Consolas', monospace;
-            color: var(--info-color, #00ff88);
+            font-family: var(--tw-font-mono);
+            font-weight: 700;
+            color: var(--info-color, var(--tw-led-green));
             text-shadow:
-                0 0 10px var(--info-color, #00ff88),
-                0 0 20px var(--info-color, #00ff88),
-                0 0 40px var(--info-glow, rgba(0, 255, 136, 0.4));
+                0 0 10px var(--info-color, var(--tw-led-green)),
+                0 0 20px var(--info-color, var(--tw-led-green)),
+                0 0 40px var(--info-glow, rgba(48, 209, 88, 0.4));
         }
 
-        /* Стиль: Перекидные часы */
+        /* Flip style */
         body.style-flip .info-block {
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-radius: 10px;
-            border: none;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(180deg, rgba(42, 42, 53, 0.85) 0%, rgba(26, 26, 37, 0.85) 100%);
+            border-radius: var(--tw-r-md);
+            border: 1px solid var(--tw-border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
         }
-
-        body.style-flip .info-label {
-            color: var(--info-color-dim, rgba(255, 255, 255, 0.7));
-        }
-
+        body.style-flip .info-label { color: var(--info-color-dim, var(--tw-fg-muted)); }
         body.style-flip .info-value {
-            font-family: 'Arial Black', 'Helvetica', sans-serif;
-            font-weight: 900;
-            color: var(--info-color, white);
+            font-family: var(--tw-font-sans);
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            color: var(--info-color, var(--tw-fg));
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
             position: relative;
             z-index: 1;
         }
 
-        /* Стиль: Аналоговые часы */
+        /* Analog style — circular mini-clocks */
         body.style-analog .info-block {
-            background: linear-gradient(145deg, rgba(26, 26, 46, 0.95) 0%, rgba(15, 15, 26, 0.95) 100%);
+            background: radial-gradient(circle at 30% 30%, rgba(40, 40, 60, 0.85), rgba(15, 15, 26, 0.95));
             border-radius: 50%;
-            border: 2px solid rgba(100, 120, 180, 0.4);
-            box-shadow: 
-                inset 0 0 30px rgba(0, 0, 0, 0.6),
-                0 4px 20px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(10, 132, 255, 0.35);
+            box-shadow:
+                inset 0 0 30px rgba(0, 0, 0, 0.55),
+                0 4px 20px rgba(0, 0, 0, 0.45);
             padding: 0;
             width: 100px;
             height: 100px;
@@ -189,51 +201,20 @@
             justify-content: center;
         }
 
-        /* Переопределение позиций для аналогового стиля (круглые блоки) */
-        /* transform-origin выставляется так, чтобы при масштабировании блок рос от угла/края */
-        body.style-analog .info-block.top-left { 
-            top: 20px; left: 20px; 
-            transform-origin: top left;
-        }
-        body.style-analog .info-block.top-center { 
-            top: 20px; left: 50%; margin-left: -50px; 
-            transform-origin: top center;
-        }
-        body.style-analog .info-block.top-right { 
-            top: 20px; right: 20px; 
-            transform-origin: top right;
-        }
-        body.style-analog .info-block.bottom-left { 
-            bottom: 100px; left: 20px; 
-            transform-origin: bottom left;
-        }
-        body.style-analog .info-block.bottom-center { 
-            bottom: 100px; left: 50%; margin-left: -50px; 
-            transform-origin: bottom center;
-        }
-        body.style-analog .info-block.bottom-right { 
-            bottom: 100px; right: 20px; 
-            transform-origin: bottom right;
-        }
-        body.style-analog .info-block.top-left-third { 
-            top: 20px; left: 20%; margin-left: -50px; 
-            transform-origin: top center;
-        }
-        body.style-analog .info-block.top-right-third { 
-            top: 20px; right: 20%; margin-right: -50px; 
-            transform-origin: top center;
-        }
-        body.style-analog .info-block.bottom-left-third { 
-            bottom: 100px; left: 20%; margin-left: -50px; 
-            transform-origin: bottom center;
-        }
-        body.style-analog .info-block.bottom-right-third { 
-            bottom: 100px; right: 20%; margin-right: -50px; 
-            transform-origin: bottom center;
-        }
+        /* Analog position overrides — keep circular blocks visually centered to anchor */
+        body.style-analog .info-block.top-left    { top: 20px; left: 20px;  transform-origin: top left; }
+        body.style-analog .info-block.top-center  { top: 20px; left: 50%; margin-left: -50px; transform-origin: top center; }
+        body.style-analog .info-block.top-right   { top: 20px; right: 20px; transform-origin: top right; }
+        body.style-analog .info-block.bottom-left  { bottom: 100px; left: 20px; transform-origin: bottom left; }
+        body.style-analog .info-block.bottom-center { bottom: 100px; left: 50%; margin-left: -50px; transform-origin: bottom center; }
+        body.style-analog .info-block.bottom-right { bottom: 100px; right: 20px; transform-origin: bottom right; }
+        body.style-analog .info-block.top-left-third    { top: 20px; left: 20%; margin-left: -50px; transform-origin: top center; }
+        body.style-analog .info-block.top-right-third   { top: 20px; right: 20%; margin-right: -50px; transform-origin: top center; }
+        body.style-analog .info-block.bottom-left-third  { bottom: 100px; left: 20%; margin-left: -50px; transform-origin: bottom center; }
+        body.style-analog .info-block.bottom-right-third { bottom: 100px; right: 20%; margin-right: -50px; transform-origin: bottom center; }
 
         body.style-analog .info-label {
-            color: var(--info-color-dim, rgba(255, 255, 255, 0.7));
+            color: var(--info-color-dim, var(--tw-fg-muted));
             font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -243,94 +224,70 @@
         }
 
         body.style-analog .info-value {
-            font-family: 'SF Mono', 'Consolas', monospace;
+            font-family: var(--tw-font-mono);
             font-weight: 600;
-            color: var(--info-color, rgba(255, 255, 255, 0.85));
+            color: var(--info-color, var(--tw-fg-secondary));
             font-size: 11px;
             position: absolute;
             bottom: 15%;
             z-index: 10;
         }
 
-        /* Переопределение transform для аналогового режима */
-        body.style-analog .info-block {
-            transform-origin: center center;
-        }
-        body.style-analog .info-block.visible {
-            opacity: 1;
-            transform: scale(var(--info-scale));
-        }
+        body.style-analog .info-block { transform-origin: center center; }
+        body.style-analog .info-block.visible { opacity: 1; transform: scale(var(--info-scale)); }
 
-        /* Мини-циферблат внутри info-block */
+        /* Mini-clock face inside analog info-block */
         body.style-analog .info-block .mini-clock {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 50%;
-            left: 50%;
+            width: 100%; height: 100%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             display: block;
         }
-
         body.style-analog .info-block .mini-hand {
             position: absolute;
-            bottom: 50%;
-            left: 50%;
+            bottom: 50%; left: 50%;
             transform-origin: center bottom;
             border-radius: 2px;
         }
-
         body.style-analog .info-block .mini-hand-hour {
-            width: 3px;
-            height: 18px;
-            background: linear-gradient(180deg, #fff 0%, #bbb 100%);
+            width: 3px; height: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #bbbbbb 100%);
             transform: translateX(-50%) rotate(0deg);
-            box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
             z-index: 2;
         }
-
         body.style-analog .info-block .mini-hand-minute {
-            width: 2px;
-            height: 26px;
-            background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+            width: 2px; height: 26px;
+            background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%);
             transform: translateX(-50%) rotate(0deg);
-            box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
             z-index: 3;
         }
-
         body.style-analog .info-block .mini-center {
             position: absolute;
-            width: 6px;
-            height: 6px;
-            background: linear-gradient(145deg, #7c5cbf, #5a4a99);
+            width: 6px; height: 6px;
+            background: linear-gradient(135deg, #0a84ff, #30d158);
             border-radius: 50%;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             z-index: 5;
-            box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
         }
-
-        /* Деления мини-часов */
         body.style-analog .info-block .mini-tick {
             position: absolute;
-            width: 1px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.25);
-            left: 50%;
-            top: 4px;
+            width: 1px; height: 4px;
+            background: rgba(255, 255, 255, 0.22);
+            left: 50%; top: 4px;
             transform-origin: center 46px;
         }
-
         body.style-analog .info-block .mini-tick.quarter {
-            width: 2px;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.7);
+            width: 2px; height: 6px;
+            background: rgba(255, 255, 255, 0.68);
             top: 3px;
             transform-origin: center 47px;
         }
 
-        /* Круговой таймер */
+        /* ============================================================
+           CIRCLE TIMER — the hero ring
+           ============================================================ */
         .timer-ring {
             --ring-size: min(60vw, 55vh, 800px);
             position: relative;
@@ -345,31 +302,28 @@
             width: 100%;
             height: 100%;
             transform: rotate(-90deg);
-            filter: drop-shadow(0 10px 40px rgba(0, 0, 0, 0.3));
+            filter: drop-shadow(0 10px 40px rgba(0, 0, 0, 0.35));
         }
 
-        /* Фоновый круг */
         .ring-bg {
             fill: rgba(255, 255, 255, 0.03);
-            stroke: rgba(255, 255, 255, 0.08);
+            stroke: var(--tw-border);
             stroke-width: 2;
         }
 
-        /* Трек прогресса */
         .ring-track {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.1);
+            stroke: rgba(255, 255, 255, 0.08);
             stroke-width: 12;
         }
 
-        /* Прогресс */
         .ring-progress {
             fill: none;
             stroke: url(#mainGradient);
             stroke-width: 12;
             stroke-linecap: round;
-            transition: stroke-dashoffset 0.5s ease-out;
-            filter: drop-shadow(0 0 15px var(--glow-color, rgba(102, 126, 234, 0.5)));
+            transition: stroke-dashoffset var(--tw-dur-slow) var(--tw-ease-out);
+            filter: drop-shadow(0 0 15px var(--glow-color, rgba(10, 132, 255, 0.55)));
         }
 
         .ring-progress.warning {
@@ -383,23 +337,29 @@
             animation: danger-pulse 1s infinite;
         }
 
-        @keyframes danger-pulse {
-            0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.7)); }
-            50% { filter: drop-shadow(0 0 35px rgba(255, 68, 68, 0.9)); }
+        /* OVERTIME — dashed orange ring, per SKILL overtime-storyboard */
+        .ring-progress.overtime {
+            stroke: url(#warningGradient);
+            stroke-dasharray: 4 6;
+            filter: drop-shadow(0 0 20px rgba(255, 159, 10, 0.7));
+            animation: danger-pulse 1s infinite;
         }
 
-        /* Деления по кругу */
+        @keyframes danger-pulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.55; }
+        }
+
         .tick-line {
-            stroke: rgba(255, 255, 255, 0.15);
+            stroke: rgba(255, 255, 255, 0.14);
             stroke-width: 1.5;
         }
-
         .tick-line.major {
-            stroke: rgba(255, 255, 255, 0.35);
+            stroke: rgba(255, 255, 255, 0.32);
             stroke-width: 2.5;
         }
 
-        /* Центральное время */
+        /* Center numeral */
         .center-display {
             position: absolute;
             top: 50%;
@@ -414,39 +374,38 @@
         }
 
         .time-text {
-            /* Размер шрифта = 22% от размера круга */
             font-size: calc(var(--ring-size, 400px) * 0.22);
             font-weight: 200;
-            font-family: 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif;
-            color: white;
+            font-family: var(--tw-font-display);
+            color: var(--tw-fg);
             letter-spacing: 0.02em;
-            text-shadow: 
+            font-variant-numeric: tabular-nums;
+            text-shadow:
                 0 4px 8px rgba(0, 0, 0, 0.4),
-                0 0 60px var(--text-glow, rgba(102, 126, 234, 0.5));
-            transition: color 0.2s ease-out, text-shadow 0.2s ease-out, font-size 0.2s ease-out;
+                0 0 60px var(--text-glow, rgba(10, 132, 255, 0.55));
+            transition: color var(--tw-dur-base) var(--tw-ease-out),
+                        text-shadow var(--tw-dur-base) var(--tw-ease-out),
+                        font-size var(--tw-dur-base) var(--tw-ease-out);
             white-space: nowrap;
             line-height: 1;
         }
 
-        /* Уменьшение шрифта при длинном времени (HH:MM:SS или минус) */
         .time-text.compact {
-            /* Размер шрифта = 16% от размера круга для длинного времени */
             font-size: calc(var(--ring-size, 400px) * 0.16);
             letter-spacing: 0.01em;
         }
 
-        .time-text.warning {
-            color: #ffc107;
-            --text-glow: rgba(255, 193, 7, 0.6);
-        }
-
+        .time-text.warning { color: var(--tw-yellow); --text-glow: rgba(255, 193, 7, 0.6); }
         .time-text.danger {
             color: #ff4444;
             --text-glow: rgba(255, 68, 68, 0.7);
             animation: time-pulse 0.5s infinite;
         }
+        .time-text.overtime {
+            color: var(--tw-orange);
+            --text-glow: rgba(255, 159, 10, 0.7);
+        }
 
-        /* Минус-знак «висит» слева от цифр через отрицательный margin */
         .time-minus,
         .analog-time-minus {
             display: inline-block;
@@ -456,10 +415,12 @@
 
         @keyframes time-pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
+            50%      { transform: scale(1.02); }
         }
 
-        /* Статус - фиксированный внизу */
+        /* ============================================================
+           STATUS PILL — 3 semantic tiers, color + glyph
+           ============================================================ */
         .status-container {
             position: fixed;
             bottom: 40px;
@@ -474,17 +435,44 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 12px 28px;
-            border-radius: 50px;
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(10px);
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1.2em;
-            font-weight: 500;
+            padding: 12px 26px;
+            border-radius: var(--tw-r-pill);
+            background: var(--tw-overlay-medium);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            border: 1px solid var(--tw-border);
+            color: var(--tw-fg-secondary);
+            font-family: var(--tw-font-sans);
+            font-size: 1.1em;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 3px;
-            transition: all 0.3s;
+            letter-spacing: 2px;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        color var(--tw-dur-base) var(--tw-ease),
+                        border-color var(--tw-dur-base) var(--tw-ease),
+                        box-shadow var(--tw-dur-base) var(--tw-ease);
         }
+
+        /* Glyph — pseudo-element carries state glyph (·/▶/‖/⧗/×) per SKILL */
+        .status-pill .status-glyph {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--tw-font-sans);
+            font-weight: 700;
+            font-size: 0;
+            min-width: 14px;
+            color: currentColor;
+        }
+        .status-pill .status-glyph::before {
+            content: '·';
+            font-size: 1rem;
+            line-height: 1;
+        }
+        .status-pill.running  .status-glyph::before { content: '▶'; font-size: 0.85rem; }
+        .status-pill.paused   .status-glyph::before { content: '‖'; font-size: 1rem; }
+        .status-pill.overtime .status-glyph::before { content: '⧗'; font-size: 1rem; }
+        .status-pill.finished .status-glyph::before { content: '×'; font-size: 1.1rem; }
 
         .status-dot {
             width: 10px;
@@ -496,218 +484,189 @@
 
         @keyframes dot-pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
+            50%      { opacity: 0.5; transform: scale(0.8); }
         }
 
+        /* Success tier — РАБОТАЕТ */
         .status-pill.running {
-            background: rgba(48, 209, 88, 0.15);
-            color: #30d158;
+            background: rgba(48, 209, 88, 0.18);
+            color: var(--tw-green);
+            border-color: rgba(48, 209, 88, 0.32);
             box-shadow: 0 0 25px rgba(48, 209, 88, 0.2);
         }
-
+        /* Attention tier — OVERTIME, FINISHED */
         .status-pill.overtime {
-            background: rgba(255, 51, 51, 0.2);
-            color: #ff3333;
-            box-shadow: 0 0 25px rgba(255, 51, 51, 0.3);
+            background: rgba(255, 159, 10, 0.2);
+            color: var(--tw-orange);
+            border-color: rgba(255, 159, 10, 0.38);
+            box-shadow: 0 0 25px rgba(255, 159, 10, 0.3);
             animation: overtime-pulse 0.8s infinite;
         }
-
         @keyframes overtime-pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 51, 51, 0.3); }
-            50% { opacity: 0.85; box-shadow: 0 0 40px rgba(255, 51, 51, 0.5); }
+            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 159, 10, 0.3); }
+            50%      { opacity: 0.85; box-shadow: 0 0 40px rgba(255, 159, 10, 0.5); }
         }
-
+        /* Neutral tier — ПАУЗА */
         .status-pill.paused {
-            background: rgba(245, 87, 108, 0.15);
-            color: #f5576c;
+            background: rgba(245, 87, 108, 0.16);
+            color: var(--tw-pink);
+            border-color: rgba(245, 87, 108, 0.3);
         }
-
-        .status-pill.paused .status-dot {
-            animation: none;
-        }
-
+        .status-pill.paused .status-dot { animation: none; }
+        /* Attention tier — ЗАВЕРШЁН */
         .status-pill.finished {
-            background: rgba(254, 225, 64, 0.2);
-            color: #fee140;
+            background: rgba(255, 69, 58, 0.22);
+            color: var(--tw-red);
+            border-color: rgba(255, 69, 58, 0.38);
             animation: finished-pulse 0.5s infinite;
         }
-
         @keyframes finished-pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(254, 225, 64, 0.3); }
-            50% { opacity: 0.7; box-shadow: 0 0 40px rgba(254, 225, 64, 0.5); }
+            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 69, 58, 0.3); }
+            50%      { opacity: 0.75; box-shadow: 0 0 40px rgba(255, 69, 58, 0.5); }
         }
 
-        /* Режим вспышки при завершении */
-        body.flash-mode {
-            animation: flash-bg 0.3s;
-        }
-
+        body.flash-mode { animation: flash-bg 0.3s; }
         @keyframes flash-bg {
             0%, 100% { filter: brightness(1); }
-            50% { filter: brightness(1.5); }
+            50%      { filter: brightness(1.5); }
         }
 
-        /* ===== Стили статус-пилюли для разных режимов ===== */
-        
-        /* Стиль: Цифровой LED */
+        /* ===== Per-style status pill ===== */
         body.style-digital .status-pill {
             background: transparent;
-            border: none;
-            border-radius: 10px;
-            color: #00ff88;
-            text-shadow: 0 0 10px #00ff88;
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-md);
+            color: var(--tw-led-green);
+            text-shadow: 0 0 10px var(--tw-led-green);
             box-shadow: none;
         }
-
-        body.style-digital .status-pill.running {
-            color: #00ff88;
-            text-shadow: 0 0 15px #00ff88;
-            box-shadow: none;
-        }
-
-        body.style-digital .status-pill.paused {
-            color: #ffcc00;
-            text-shadow: 0 0 10px #ffcc00;
-        }
-
-        body.style-digital .status-pill.finished {
-            color: #ff3333;
-            text-shadow: 0 0 15px #ff3333;
-        }
-
+        body.style-digital .status-pill.running  { color: var(--tw-led-green); text-shadow: 0 0 15px var(--tw-led-green); }
+        body.style-digital .status-pill.paused   { color: var(--tw-led-warn); text-shadow: 0 0 10px var(--tw-led-warn); }
+        body.style-digital .status-pill.finished { color: var(--tw-led-danger); text-shadow: 0 0 15px var(--tw-led-danger); }
         body.style-digital .status-pill.overtime {
-            color: #ff3333;
-            text-shadow: 0 0 15px #ff3333;
+            color: var(--tw-led-danger);
+            text-shadow: 0 0 15px var(--tw-led-danger);
             animation: led-overtime-pulse 1s infinite;
         }
-
         @keyframes led-overtime-pulse {
             0%, 100% { text-shadow: 0 0 15px #ff3333; }
-            50% { text-shadow: 0 0 30px #ff3333, 0 0 50px #ff3333; }
+            50%      { text-shadow: 0 0 30px #ff3333, 0 0 50px #ff3333; }
         }
+        body.style-digital .status-dot { box-shadow: 0 0 8px currentColor; }
 
-        body.style-digital .status-dot {
-            box-shadow: 0 0 8px currentColor;
-        }
-
-        /* Стиль: Перекидные часы */
         body.style-flip .status-pill {
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(180deg, rgba(42, 42, 53, 0.85) 0%, rgba(26, 26, 37, 0.85) 100%);
+            border-radius: var(--tw-r-sm);
+            border: 1px solid var(--tw-border);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.45);
         }
 
-        /* ============================================
-           СТИЛЬ: ЦИФРОВОЙ LED (Digital)
-           ============================================ */
+        /* ============================================================
+           DIGITAL LED STYLE
+           ============================================================ */
         .timer-digital {
             display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 40px;
+            padding: var(--tw-s-10);
         }
-
-        .timer-digital.active {
-            display: flex;
-        }
+        .timer-digital.active { display: flex; }
 
         .digital-display {
-            background: linear-gradient(180deg, #0a0a0a 0%, #151515 50%, #0a0a0a 100%);
-            border: 3px solid #333;
-            border-radius: 20px;
+            background: var(--tw-bg-led);
+            border: 1px solid var(--tw-border-strong);
+            border-radius: var(--tw-r-2xl);
             padding: 40px 60px;
-            box-shadow: 
-                inset 0 0 50px rgba(0, 0, 0, 0.8),
-                0 8px 40px rgba(0, 0, 0, 0.6),
-                0 0 60px rgba(0, 255, 136, 0.15);
+            box-shadow:
+                inset 0 0 50px rgba(0, 0, 0, 0.75),
+                0 8px 40px rgba(0, 0, 0, 0.55),
+                0 0 60px rgba(48, 209, 88, 0.12);
             position: relative;
             overflow: hidden;
         }
-
         .digital-display::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             height: 50%;
-            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
             pointer-events: none;
-            border-radius: 17px 17px 0 0;
+            border-radius: 19px 19px 0 0;
         }
 
         .digital-time {
-            font-family: 'Courier New', 'Consolas', monospace;
+            font-family: var(--tw-font-mono);
             font-size: clamp(4rem, 12vw, 12rem);
-            font-weight: bold;
-            color: #00ff88;
-            text-shadow: 
-                0 0 20px #00ff88,
-                0 0 40px #00ff88,
-                0 0 80px #00ff8866;
+            font-weight: 700;
+            color: var(--tw-led-green);
+            text-shadow:
+                0 0 20px var(--tw-led-green),
+                0 0 40px var(--tw-led-green),
+                0 0 80px rgba(48, 209, 88, 0.4);
             letter-spacing: 8px;
             position: relative;
+            font-variant-numeric: tabular-nums;
         }
 
         .digital-time.warning {
-            color: #ffcc00;
-            text-shadow: 
-                0 0 20px #ffcc00,
-                0 0 40px #ffcc00,
-                0 0 80px #ffcc0066;
-        }
-
-        .digital-time.danger {
-            color: #ff3333;
+            color: var(--tw-led-warn);
             text-shadow:
-                0 0 20px #ff3333,
-                0 0 40px #ff3333,
-                0 0 80px #ff333366;
+                0 0 20px var(--tw-led-warn),
+                0 0 40px var(--tw-led-warn),
+                0 0 80px rgba(255, 204, 0, 0.4);
+        }
+        .digital-time.danger {
+            color: var(--tw-led-danger);
+            text-shadow:
+                0 0 20px var(--tw-led-danger),
+                0 0 40px var(--tw-led-danger),
+                0 0 80px rgba(255, 51, 51, 0.4);
+            animation: led-danger-pulse 1s infinite;
+        }
+        .digital-time.overtime {
+            color: var(--tw-orange);
+            text-shadow:
+                0 0 20px var(--tw-orange),
+                0 0 40px var(--tw-orange),
+                0 0 80px rgba(255, 159, 10, 0.4);
             animation: led-danger-pulse 1s infinite;
         }
 
         @keyframes led-danger-pulse {
-            0%, 100% { opacity: 1; text-shadow: 0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366; }
-            50% { opacity: 0.7; text-shadow: 0 0 30px #ff3333, 0 0 60px #ff3333, 0 0 100px #ff333399; }
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.7; }
         }
 
         .digital-dots {
             display: inline-block;
             animation: dots-blink 1s infinite;
         }
-
         @keyframes dots-blink {
-            0%, 50% { opacity: 1; }
+            0%, 50%   { opacity: 1; }
             51%, 100% { opacity: 0.3; }
         }
 
-        /* ============================================
-           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip Clock)
-           ============================================ */
+        /* ============================================================
+           FLIP STYLE
+           ============================================================ */
         .timer-flip {
             display: none;
             flex-direction: row;
             align-items: center;
             justify-content: center;
             gap: 20px;
-            padding: 40px;
+            padding: var(--tw-s-10);
         }
+        .timer-flip.active { display: flex; }
 
-        .timer-flip.active {
-            display: flex;
-        }
-
-        .flip-group {
-            display: flex;
-            gap: 8px;
-        }
+        .flip-group { display: flex; gap: 8px; }
 
         .flip-separator {
             font-size: clamp(3rem, 10vw, 8rem);
-            font-weight: bold;
-            color: rgba(255, 255, 255, 0.6);
+            font-weight: 200;
+            font-family: var(--tw-font-display);
+            color: var(--tw-fg-muted);
             display: flex;
             align-items: center;
             padding: 0 10px;
@@ -720,27 +679,25 @@
             display: none;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-radius: 10px;
-            box-shadow: 
-                0 4px 20px rgba(0, 0, 0, 0.5),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            background: linear-gradient(180deg, #2a2a35 0%, #1a1a25 100%);
+            border-radius: var(--tw-r-md);
+            border: 1px solid var(--tw-border);
+            box-shadow:
+                0 4px 20px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
             margin-right: 10px;
         }
 
         .flip-minus-sign {
-            font-family: 'Arial Black', 'Helvetica', sans-serif;
+            font-family: var(--tw-font-display);
             font-size: clamp(2rem, 7vw, 5rem);
-            font-weight: 900;
-            color: #ff3333;
-            text-shadow: 
+            font-weight: 700;
+            color: var(--tw-red);
+            text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 20px rgba(255, 51, 51, 0.5);
+                0 0 20px rgba(255, 69, 58, 0.5);
         }
-
-        .flip-minus.visible {
-            display: flex;
-        }
+        .flip-minus.visible { display: flex; }
 
         .flip-card {
             position: relative;
@@ -753,120 +710,101 @@
             position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 49.9%, #0a0a0a 50%, #1a1a1a 100%);
-            border-radius: 12px;
-            box-shadow: 
+            background: linear-gradient(180deg, #2a2a35 0%, #1a1a25 49.9%, #151520 50%, #0a0a15 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--tw-r-lg);
+            box-shadow:
                 0 4px 20px rgba(0, 0, 0, 0.5),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
             overflow: hidden;
         }
 
         .flip-card-inner::before {
             content: '';
             position: absolute;
-            top: 49.5%;
-            left: 0;
-            right: 0;
+            top: 49.5%; left: 0; right: 0;
             height: 2px;
-            background: #000;
+            background: rgba(0, 0, 0, 0.85);
             z-index: 10;
         }
-
         .flip-card-inner::after {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             height: 50%;
-            background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, transparent 100%);
             pointer-events: none;
             z-index: 5;
         }
 
         .flip-digit {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            font-family: 'Arial Black', 'Helvetica', sans-serif;
+            font-family: var(--tw-font-display);
             font-size: clamp(2.5rem, 9vw, 7rem);
-            font-weight: 900;
-            color: white;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            font-weight: 600;
+            color: var(--tw-fg);
+            letter-spacing: -0.02em;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
         }
 
-        .flip-card.warning .flip-digit {
-            color: #ffc107;
-        }
-
-        .flip-card.danger .flip-digit {
-            color: #ff4444;
-        }
+        .flip-card.warning .flip-digit { color: var(--tw-yellow); }
+        .flip-card.danger .flip-digit  { color: #ff4444; }
+        .flip-card.overtime .flip-digit { color: var(--tw-orange); }
         .flip-card.danger {
             animation: flip-danger-pulse 1s infinite;
-            box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 4px 20px rgba(255,68,68,0.2);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 68, 68, 0.15),
+                0 4px 20px rgba(255, 68, 68, 0.2);
         }
         @keyframes flip-danger-pulse {
             0%, 100% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 4px 20px rgba(255,68,68,0.2); }
-            50% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3), 0 4px 30px rgba(255,68,68,0.4); }
+            50%      { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3),  0 4px 30px rgba(255,68,68,0.4); }
         }
 
         .flip-label {
             text-align: center;
             margin-top: 15px;
-            font-size: 0.9em;
+            font-family: var(--tw-font-sans);
+            font-size: var(--tw-t-caption);
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 3px;
-            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 0.5px;
+            color: var(--tw-fg-dim);
             display: none;
         }
 
-        /* Анимация перекидывания */
         .flip-card.flipping .flip-card-inner {
             animation: flip-animation 0.3s ease-in-out;
         }
-
         @keyframes flip-animation {
-            0% { transform: rotateX(0); }
-            50% { transform: rotateX(-10deg); }
+            0%   { transform: rotateX(0); }
+            50%  { transform: rotateX(-10deg); }
             100% { transform: rotateX(0); }
         }
 
-        /* Скрытие неактивных стилей - все скрыты по умолчанию */
+        /* Hide inactive timer styles — all hidden by default */
         .timer-ring,
         .timer-digital,
         .timer-flip,
-        .timer-analog {
-            display: none !important;
-        }
+        .timer-analog { display: none !important; }
 
-        /* Показываем только активный */
-        .timer-ring.active {
-            display: block !important;
-        }
-        
-        .timer-digital.active {
-            display: flex !important;
-        }
-        
-        .timer-flip.active {
-            display: flex !important;
-        }
+        .timer-ring.active    { display: block !important; }
+        .timer-digital.active { display: flex !important; }
+        .timer-flip.active    { display: flex !important; }
+        .timer-analog.active  { display: flex !important; }
 
-        .timer-analog.active {
-            display: flex !important;
-        }
-
-        /* ============================================
-           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
-           ============================================ */
+        /* ============================================================
+           ANALOG STYLE
+           ============================================================ */
         .timer-analog {
             --analog-size: min(55vw, 50vh, 700px);
             display: none;
             align-items: center;
             justify-content: center;
-            padding: 40px;
+            padding: var(--tw-s-10);
         }
 
         .analog-clock {
@@ -874,10 +812,10 @@
             width: var(--analog-size);
             height: var(--analog-size);
             border-radius: 50%;
-            background: linear-gradient(145deg, #1a1a2e 0%, #0f0f1a 100%);
-            box-shadow: 
-                0 0 0 8px rgba(102, 126, 234, 0.3),
-                0 0 0 12px rgba(102, 126, 234, 0.1),
+            background: radial-gradient(circle at 30% 30%, rgba(40, 40, 60, 0.85) 0%, rgba(15, 15, 26, 0.95) 70%);
+            box-shadow:
+                0 0 0 8px rgba(10, 132, 255, 0.25),
+                0 0 0 12px rgba(10, 132, 255, 0.08),
                 inset 0 0 60px rgba(0, 0, 0, 0.5),
                 0 20px 60px rgba(0, 0, 0, 0.5);
             display: flex;
@@ -890,85 +828,62 @@
             position: absolute;
             inset: 15px;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.05), transparent 60%);
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.05), transparent 60%);
             pointer-events: none;
         }
 
-        /* Циферблат */
-        .clock-face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-        }
+        .clock-face { position: absolute; width: 100%; height: 100%; }
 
-        /* Деления на циферблате */
         .clock-tick {
             position: absolute;
-            width: 2px;
-            height: 12px;
-            background: rgba(255, 255, 255, 0.3);
-            left: 50%;
-            top: 8%;
+            width: 2px; height: 12px;
+            background: rgba(255, 255, 255, 0.28);
+            left: 50%; top: 8%;
             transform-origin: 50% calc(var(--analog-size) * 0.42);
             border-radius: 1px;
         }
-
         .clock-tick.major {
-            width: 3px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.6);
+            width: 3px; height: 20px;
+            background: rgba(255, 255, 255, 0.58);
             top: 6%;
         }
-
         .clock-tick.quarter {
-            width: 4px;
-            height: 28px;
-            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            width: 4px; height: 28px;
+            background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
             top: 4%;
-            box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 0 10px rgba(10, 132, 255, 0.5);
         }
 
-        /* Цифры на циферблате */
         .clock-numbers {
             position: absolute;
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             display: none;
         }
-
-        .clock-numbers.visible {
-            display: block;
-        }
+        .clock-numbers.visible { display: block; }
 
         .clock-number {
             position: absolute;
-            font-family: 'Georgia', 'Times New Roman', serif;
+            font-family: var(--tw-font-display);
             font-size: calc(var(--analog-size) * 0.08);
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+            color: var(--tw-fg-secondary);
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
             transform: translate(-50%, -50%);
         }
-
         .clock-number.n12 { top: 12%; left: 50%; }
-        .clock-number.n1 { top: 17%; left: 74%; }
-        .clock-number.n2 { top: 30%; left: 87%; }
-        .clock-number.n3 { top: 50%; left: 92%; }
-        .clock-number.n4 { top: 70%; left: 87%; }
-        .clock-number.n5 { top: 83%; left: 74%; }
-        .clock-number.n6 { top: 88%; left: 50%; }
-        .clock-number.n7 { top: 83%; left: 26%; }
-        .clock-number.n8 { top: 70%; left: 13%; }
-        .clock-number.n9 { top: 50%; left: 8%; }
+        .clock-number.n1  { top: 17%; left: 74%; }
+        .clock-number.n2  { top: 30%; left: 87%; }
+        .clock-number.n3  { top: 50%; left: 92%; }
+        .clock-number.n4  { top: 70%; left: 87%; }
+        .clock-number.n5  { top: 83%; left: 74%; }
+        .clock-number.n6  { top: 88%; left: 50%; }
+        .clock-number.n7  { top: 83%; left: 26%; }
+        .clock-number.n8  { top: 70%; left: 13%; }
+        .clock-number.n9  { top: 50%; left: 8%; }
         .clock-number.n10 { top: 30%; left: 13%; }
         .clock-number.n11 { top: 17%; left: 26%; }
 
-        /* Стрелки */
-        .clock-hands {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-        }
+        .clock-hands { position: absolute; width: 100%; height: 100%; }
 
         .clock-hand {
             position: absolute;
@@ -978,27 +893,20 @@
             border-radius: 4px;
         }
 
-        /* Часовая стрелка (для часов) / Минутная (для таймера) */
         .hand-hour {
             width: 6px;
             height: calc(var(--analog-size) * 0.22);
-            background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%);
             margin-left: -3px;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
             z-index: 2;
         }
-
-        /* Минутная стрелка (для часов) / Секундная (для таймера) */
         .hand-minute {
             width: 4px;
             height: calc(var(--analog-size) * 0.32);
-            background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #dddddd 100%);
             margin-left: -2px;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
             z-index: 3;
         }
-
-        /* Секундная стрелка */
         .hand-second {
             width: 2px;
             height: calc(var(--analog-size) * 0.38);
@@ -1007,12 +915,10 @@
             box-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
             z-index: 4;
         }
-
         .hand-second::after {
             content: '';
             position: absolute;
-            bottom: -20%;
-            left: 50%;
+            bottom: -20%; left: 50%;
             transform: translateX(-50%);
             width: 2px;
             height: calc(var(--analog-size) * 0.08);
@@ -1020,87 +926,82 @@
             border-radius: 2px;
         }
 
-        /* Центральная точка */
         .clock-center {
             position: absolute;
             width: calc(var(--analog-size) * 0.04);
             height: calc(var(--analog-size) * 0.04);
-            background: linear-gradient(145deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #0a84ff, #30d158);
             border-radius: 50%;
             z-index: 10;
-            box-shadow: 
-                0 0 15px rgba(102, 126, 234, 0.6),
+            box-shadow:
+                0 0 15px rgba(10, 132, 255, 0.6),
                 inset 0 2px 4px rgba(255, 255, 255, 0.3);
         }
-
         .clock-center::after {
             content: '';
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 40%;
-            height: 40%;
-            background: #fff;
+            width: 40%; height: 40%;
+            background: var(--tw-fg);
             border-radius: 50%;
         }
 
-        /* Цифровое время под циферблатом */
         .analog-digital-time {
             position: absolute;
             bottom: 22%;
-            left: 0;
-            right: 0;
+            left: 0; right: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'SF Mono', 'Consolas', monospace;
+            font-family: var(--tw-font-mono);
             font-size: calc(var(--analog-size) * 0.1);
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.7);
+            font-weight: 500;
+            color: var(--tw-fg-muted);
             text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
             letter-spacing: 2px;
+            font-variant-numeric: tabular-nums;
         }
-
-        .analog-digital-time.warning {
-            color: #ffc107;
-        }
-
+        .analog-digital-time.warning { color: var(--tw-yellow); }
         .analog-digital-time.danger {
             color: #ff4444;
             animation: time-pulse 0.5s infinite;
         }
+        .analog-digital-time.overtime {
+            color: var(--tw-orange);
+            animation: time-pulse 0.5s infinite;
+        }
 
-        /* Декоративное кольцо */
         .analog-ring {
             position: absolute;
             inset: 3%;
             border-radius: 50%;
-            border: 2px solid rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(10, 132, 255, 0.22);
             pointer-events: none;
         }
 
-        /* Название бренда */
         .clock-brand {
             position: absolute;
             top: 30%;
             left: 50%;
             transform: translateX(-50%);
-            font-family: 'Georgia', serif;
+            font-family: var(--tw-font-display);
             font-size: calc(var(--analog-size) * 0.04);
+            font-weight: 300;
             font-style: italic;
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--tw-fg-muted);
             letter-spacing: 3px;
             text-transform: uppercase;
         }
 
-        /* Стили для аналогового в режиме таймера */
         body.style-analog .status-pill {
-            background: rgba(26, 26, 46, 0.8);
-            border: 1px solid rgba(102, 126, 234, 0.3);
+            background: var(--tw-bg-surface);
+            border: 1px solid rgba(10, 132, 255, 0.3);
         }
 
-        /* Кнопки управления окном (закрыть, свернуть) */
+        /* ============================================================
+           WINDOW CONTROLS (close / minimize / fullscreen)
+           ============================================================ */
         .window-controls {
             position: fixed;
             top: 20px;
@@ -1109,79 +1010,74 @@
             gap: 8px;
             z-index: 1000;
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: opacity var(--tw-dur-slow) var(--tw-ease);
         }
-        body:hover .window-controls {
-            opacity: 0.4;
-        }
-        .window-controls:hover {
-            opacity: 1 !important;
-        }
+        body:hover .window-controls { opacity: 0.45; }
+        .window-controls:hover { opacity: 1 !important; }
+
         .window-ctrl-btn {
             width: 32px;
             height: 32px;
-            border: none;
+            border: 1px solid var(--tw-border);
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.7);
+            background: var(--tw-overlay-light);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            color: var(--tw-fg-muted);
             font-size: 16px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        color var(--tw-dur-base) var(--tw-ease),
+                        border-color var(--tw-dur-base) var(--tw-ease),
+                        transform var(--tw-dur-fast) var(--tw-ease);
         }
         .window-ctrl-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
+            background: var(--tw-overlay-medium);
+            color: var(--tw-fg);
         }
-        .window-ctrl-btn.fullscreen-btn:hover {
-            background: rgba(48, 209, 88, 0.8);
-        }
-        .window-ctrl-btn.close-btn:hover {
-            background: rgba(255, 68, 68, 0.8);
-        }
+        .window-ctrl-btn:active { transform: scale(0.96); }
+        .window-ctrl-btn.fullscreen-btn:hover { background: rgba(48, 209, 88, 0.7); border-color: rgba(48, 209, 88, 0.45); }
+        .window-ctrl-btn.close-btn:hover      { background: rgba(255, 69, 58, 0.75); border-color: rgba(255, 69, 58, 0.5); }
 
-        /* Предупреждения для стрелок */
+        /* Hand warning/danger cues */
         .hand-minute.warning,
         .hand-second.warning {
             filter: hue-rotate(-30deg) saturate(1.5);
         }
-
         .clock-center.warning {
-            background: linear-gradient(145deg, #ffc107, #ff9800);
+            background: linear-gradient(135deg, var(--tw-yellow), #ff9800);
         }
-
         .hand-minute.danger,
         .hand-second.danger {
             animation: hand-pulse 0.5s infinite;
         }
-
         .clock-center.danger {
-            background: linear-gradient(145deg, #ff4444, #cc0000);
+            background: linear-gradient(135deg, #ff4444, #cc0000);
             animation: center-pulse 0.5s infinite;
         }
-
         @keyframes hand-pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+            50%      { opacity: 0.6; }
         }
-
         @keyframes center-pulse {
             0%, 100% { box-shadow: 0 0 15px rgba(255, 68, 68, 0.6); }
-            50% { box-shadow: 0 0 30px rgba(255, 68, 68, 0.9); }
+            50%      { box-shadow: 0 0 30px rgba(255, 68, 68, 0.9); }
         }
-        /* ===== Alt Drag Mode ===== */
+
+        /* ============================================================
+           ALT DRAG MODE
+           ============================================================ */
         body.alt-active .info-block.visible {
             cursor: grab;
             outline: 1px dashed rgba(255, 255, 255, 0.3);
             outline-offset: 4px;
         }
-
         body.alt-active .info-block.visible:hover {
             outline-color: rgba(10, 132, 255, 0.6);
         }
-
         body.alt-active .info-block.dragging-block {
             cursor: grabbing;
             outline-color: rgba(10, 132, 255, 0.8);
@@ -1189,12 +1085,9 @@
         }
 
         /* Custom-positioned blocks — override preset class positioning */
-        .info-block.custom-position {
-            transform-origin: center center;
-        }
-        .info-block.custom-position.visible {
-            transform: scale(var(--info-scale));
-        }
+        .info-block.custom-position { transform-origin: center center; }
+        .info-block.custom-position.visible { transform: scale(var(--info-scale)); }
+
         /* One-time hint */
         .controls-hint {
             position: fixed;
@@ -1202,44 +1095,45 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 10001;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 12px;
-            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background: var(--tw-bg-surface);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            color: var(--tw-fg-muted);
+            font-family: var(--tw-font-sans);
+            font-size: var(--tw-t-caption);
             padding: 8px 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--tw-r-lg);
+            border: 1px solid var(--tw-border);
             opacity: 0;
             animation: hintFadeInOut 5s ease forwards;
             pointer-events: none;
             white-space: nowrap;
         }
-
         @keyframes hintFadeInOut {
-            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
-            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            0%   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            10%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80%  { opacity: 1; transform: translateX(-50%) translateY(0); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
         }
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
-                animation-duration: 0.01ms !important;
+                animation-duration: 1ms !important;
                 animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
+                transition-duration: 1ms !important;
                 scroll-behavior: auto !important;
             }
         }
 
+        /* Focus ring — mandatory keyboard a11y */
         button:focus-visible,
         input:focus-visible,
         select:focus-visible,
         textarea:focus-visible,
         [role="button"]:focus-visible,
         [tabindex]:focus-visible {
-            outline: 2px solid #0a84ff;
-            outline-offset: 2px;
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
         }
     </style>
 </head>
@@ -1252,7 +1146,7 @@
         <button class="window-ctrl-btn fullscreen-btn" id="fullscreenBtn" title="Оконный режим" aria-label="Оконный режим">⛶</button>
         <button class="window-ctrl-btn close-btn" id="closeBtn" title="Закрыть" aria-label="Закрыть">✕</button>
     </div>
-    
+
     <!-- Информационные блоки (независимое позиционирование) -->
     <div class="info-block top-left" id="currentTimeBlock">
         <div class="info-label">Текущее время</div>
@@ -1361,10 +1255,10 @@
 
                 <!-- Трек прогресса -->
                 <circle class="ring-track" cx="200" cy="200" r="160" />
-                
+
                 <!-- Прогресс -->
-                <circle class="ring-progress" id="progressRing" cx="200" cy="200" r="160" 
-                        stroke-dasharray="1005.31" 
+                <circle class="ring-progress" id="progressRing" cx="200" cy="200" r="160"
+                        stroke-dasharray="1005.31"
                         stroke-dashoffset="1005.31" />
             </svg>
 
@@ -1439,7 +1333,7 @@
         <div class="timer-analog" id="timerAnalog">
             <div class="analog-clock">
                 <div class="analog-ring"></div>
-                
+
                 <!-- Деления на циферблате -->
                 <div class="clock-face">
                     <!-- 60 мелких делений -->
@@ -1541,10 +1435,11 @@
         </div>
     </div>
 
-    <!-- Статус (фиксированный внизу) -->
+    <!-- Статус (фиксированный внизу) — color + glyph per SKILL -->
     <div class="status-container">
-        <div class="status-pill" id="statusPill">
+        <div class="status-pill" id="statusPill" role="status" aria-live="polite">
             <span class="status-dot"></span>
+            <span class="status-glyph" aria-hidden="true">·</span>
             <span id="statusText">Готов к запуску</span>
         </div>
     </div>

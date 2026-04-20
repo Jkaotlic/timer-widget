@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Widget</title>
+    <link rel="stylesheet" href="design-tokens.css">
     <style>
         /* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
         @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-latin-200-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
@@ -43,15 +44,14 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--tw-font-sans);
             /* Near-transparent background enables drag/hit-testing on Windows transparent windows */
             background: rgba(0, 0, 0, 0.01);
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Рамка окна - скрыта по умолчанию, видна при наведении */
-        /* Border and resize handles removed — scaling via scale bar slider */
-
+        /* Widget container — no outer shadow (transparent Electron window) */
         .widget-container {
             position: relative;
             width: 100%;
@@ -60,12 +60,13 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            /* drag handled via JS */
             container-type: size;
             container-name: widget;
         }
 
-        /* Круговой виджет */
+        /* ============================================
+           СТИЛЬ: КРУГОВОЙ (Circle)
+           ============================================ */
         .circular-widget {
             position: relative;
             width: 100%;
@@ -83,17 +84,16 @@
             max-width: 100%;
             max-height: 100%;
             pointer-events: none;
-            /* drag handled via JS */
         }
 
-        /* Фоновый круг с градиентом */
+        /* Glass face backdrop behind the ring */
         .bg-circle {
-            fill: var(--widget-bg-fill, rgba(15, 15, 25, 0.7));
-            stroke: rgba(255, 255, 255, 0.12);
+            fill: var(--widget-bg-fill, var(--tw-bg-timer));
+            stroke: var(--tw-border-strong);
             stroke-width: 1.5;
         }
 
-        /* Фоновое изображение (для режима local/image) */
+        /* Background image mode */
         .widget-bg-image {
             position: absolute;
             top: 50%;
@@ -123,46 +123,48 @@
             border-radius: 50%;
         }
 
-        /* Декоративный внутренний круг */
+        /* Decorative inner ring */
         .inner-glow {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.03);
+            stroke: var(--tw-overlay-light);
             stroke-width: 1;
         }
 
-        /* Трек прогресса (фон) */
+        /* Progress track (background) */
         .progress-track {
             fill: none;
             stroke: rgba(255, 255, 255, 0.08);
-            stroke-width: 8;
+            stroke-width: 6;
         }
 
-        /* Прогресс-бар */
+        /* Progress ring — blue→green gradient @ 135° */
         .progress-bar {
             fill: none;
             stroke: url(#widgetGradient);
-            stroke-width: 8;
+            stroke-width: 6;
             stroke-linecap: round;
-            transition: stroke-dashoffset 0.3s ease-out;
+            transition: stroke-dashoffset var(--tw-dur-slow) var(--tw-ease);
+            filter: drop-shadow(0 0 12px rgba(10, 132, 255, 0.35));
         }
 
-        /* FIX BUG-018: Use data attributes for status */
         .progress-bar[data-status="warning"] {
             stroke: url(#warningGradient);
+            filter: drop-shadow(0 0 12px rgba(255, 193, 7, 0.4));
         }
 
         .progress-bar[data-status="danger"],
         .progress-bar[data-status="overtime"] {
             stroke: url(#dangerGradient);
-            animation: pulse-glow 1s infinite;
+            filter: drop-shadow(0 0 14px rgba(255, 68, 68, 0.55));
+            animation: pulse-glow 1s ease-in-out infinite;
         }
 
         @keyframes pulse-glow {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+            50%     { opacity: 0.6; }
         }
 
-        /* Шкала с делениями */
+        /* Tick marks */
         .tick-marks {
             stroke: rgba(255, 255, 255, 0.15);
             stroke-width: 1;
@@ -173,7 +175,7 @@
             stroke-width: 2;
         }
 
-        /* Центральный контент */
+        /* Centered time + status */
         .center-content {
             position: absolute;
             top: 50%;
@@ -186,18 +188,21 @@
         .time-display {
             font-size: clamp(1.5rem, min(18vw, 18vh), 20rem);
             font-weight: 200;
-            color: white;
-            font-family: 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif;
+            color: var(--tw-fg);
+            font-family: var(--tw-font-display);
             letter-spacing: 0.05em;
-            text-shadow: 
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 30px var(--glow-color, rgba(10, 132, 255, 0.6));
-            transition: color 0.2s ease-out, text-shadow 0.2s ease-out;
+                0 0 20px var(--glow-color, rgba(10, 132, 255, 0.6));
+            transition: color var(--tw-dur-base) var(--tw-ease),
+                        text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
         }
 
         .time-display[data-status="warning"] {
-            color: #ffc107;
+            color: var(--tw-yellow);
             --glow-color: rgba(255, 193, 7, 0.6);
         }
 
@@ -205,219 +210,61 @@
         .time-display[data-status="overtime"] {
             color: #ff4444;
             --glow-color: rgba(255, 68, 68, 0.8);
-            animation: time-pulse 1s infinite;
+            animation: time-pulse 1s ease-in-out infinite;
         }
 
         @keyframes time-pulse {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
+            50%     { transform: scale(1.03); }
         }
 
+        /* Status chip — pill, backdrop-blur, 3 semantic tiers */
         .status-badge {
             margin-top: clamp(4px, 2vh, 16px);
             padding: clamp(4px, 1.5vh, 10px) clamp(10px, 4vw, 24px);
-            border-radius: 20px;
+            border-radius: var(--tw-r-pill);
             font-size: clamp(0.5rem, min(3vw, 3vh), 5rem);
             font-weight: 600;
+            font-family: var(--tw-font-sans);
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(5px);
-            transition: all 0.2s ease-out;
+            letter-spacing: 0.5px;
+            background: var(--tw-overlay-medium);
+            color: var(--tw-fg-secondary);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            border: 1px solid transparent;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        color var(--tw-dur-base) var(--tw-ease),
+                        border-color var(--tw-dur-base) var(--tw-ease);
         }
 
         .status-badge.running {
-            background: rgba(48, 209, 88, 0.2);
-            color: #30d158;
-            border: 1px solid rgba(48, 209, 88, 0.3);
+            background: rgba(48, 209, 88, 0.18);
+            color: var(--tw-green);
+            border-color: rgba(48, 209, 88, 0.32);
         }
 
         .status-badge.paused {
             background: rgba(245, 87, 108, 0.2);
-            color: #f5576c;
+            color: var(--tw-pink);
+            border-color: rgba(245, 87, 108, 0.32);
         }
 
         .status-badge.finished {
-            background: rgba(254, 225, 64, 0.2);
-            color: #fee140;
-            animation: badge-pulse 0.5s infinite;
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--tw-yellow);
+            border-color: rgba(255, 193, 7, 0.32);
+            animation: badge-pulse 0.8s ease-in-out infinite;
         }
 
         @keyframes badge-pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        /* Кнопки управления */
-        .controls-overlay {
-            position: absolute;
-            top: clamp(8px, 5%, 30px);
-            right: clamp(8px, 5%, 30px);
-            display: flex;
-            justify-content: flex-end;
-            align-items: flex-start;
-            gap: clamp(6px, 2vw, 16px);
-            opacity: 0;
-            transition: all 0.25s ease;
-            -webkit-app-region: no-drag;
-            z-index: 100;
-            pointer-events: none;
-            box-sizing: border-box;
-        }
-
-        body.mouse-active .controls-overlay {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .ctrl-btn {
-            width: clamp(24px, min(8vw, 8vh), 44px);
-            height: clamp(24px, min(8vw, 8vh), 44px);
-            border-radius: 50%;
-            border: none;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            color: white;
-            pointer-events: auto;
-            -webkit-app-region: no-drag;
-            font-size: clamp(10px, min(3vw, 3vh), 18px);
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .ctrl-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
-        }
-
-        .ctrl-btn.close:hover {
-            background: rgba(255, 68, 68, 0.6);
-        }
-
-        /* Панель настроек */
-        .settings-panel {
-            position: absolute;
-            top: 15%;
-            right: 10%;
-            background: rgba(20, 20, 35, 0.95);
-            backdrop-filter: blur(40px) saturate(180%);
-            border-radius: 16px;
-            padding: clamp(10px, 4%, 20px);
-            min-width: min(180px, 70%);
-            max-width: 90%;
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-10px) scale(0.95);
-            transition: all 0.25s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 1000;
-            -webkit-app-region: no-drag;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        }
-
-        .settings-panel.visible {
-            opacity: 1;
-            pointer-events: auto !important;
-            transform: translateY(0) scale(1);
-        }
-
-        .settings-title {
-            color: white;
-            font-size: 0.75em;
-            margin-bottom: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            opacity: 0.7;
-        }
-
-        .size-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .size-btn {
-            padding: 10px 6px;
-            font-size: 0.7em;
-            font-weight: 700;
-            border: none;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.7);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .size-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-        }
-
-        .size-btn.active {
-            background: linear-gradient(135deg, #0a84ff, #30d158);
-            color: white;
-            border: 1px solid rgba(10, 132, 255, 0.4);
-        }
-
-        .setting-row {
-            margin-bottom: 12px;
-        }
-
-        .setting-label {
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 0.7em;
-            margin-bottom: 6px;
-            display: block;
-        }
-
-        .slider-container {
-            position: relative;
-            height: 24px;
-            display: flex;
-            align-items: center;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 2px;
-            outline: none;
-            appearance: none;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            background: linear-gradient(135deg, #0a84ff, #30d158);
-            cursor: pointer;
-            border-radius: 50%;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: transform 0.2s;
-        }
-
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.15);
-        }
-
-        .slider-value {
-            position: absolute;
-            right: 0;
-            top: -16px;
-            font-size: 0.65em;
-            color: rgba(255, 255, 255, 0.7);
+            50%     { opacity: 0.6; }
         }
 
         /* ============================================
-           СТИЛЬ: ЦИФРОВОЙ LED (Digital) - Виджет
+           СТИЛЬ: ЦИФРОВОЙ LED (Digital)
+           — Dark enclosure + JetBrains Mono green glow
            ============================================ */
         .widget-digital {
             display: none;
@@ -434,11 +281,11 @@
         }
 
         .widget-digital-display {
-            background: rgba(10, 10, 15, 0.75);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-            backdrop-filter: blur(20px) saturate(150%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
+            background: rgba(10, 10, 15, 0.85);
+            -webkit-backdrop-filter: var(--tw-blur-sm);
+            backdrop-filter: var(--tw-blur-sm);
+            border: 1px solid var(--tw-border);
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -446,6 +293,8 @@
             height: 100%;
             padding: 10%;
             position: relative;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            overflow: hidden;
         }
 
         .widget-digital-display::before {
@@ -455,50 +304,44 @@
             left: 0;
             right: 0;
             height: 50%;
-            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
             pointer-events: none;
-            border-radius: 10px 10px 0 0;
+            border-radius: 14px 14px 0 0;
         }
 
         .widget-digital-time {
-            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+            font-family: var(--tw-font-mono);
             font-size: var(--digital-font-size, 24px);
-            font-weight: bold;
-            color: #00ff88;
-            text-shadow: 
-                0 0 10px #00ff88,
-                0 0 20px #00ff88,
-                0 0 40px #00ff8866;
-            letter-spacing: 0.02em;
+            font-weight: 700;
+            color: var(--tw-led-green);
+            text-shadow:
+                0 0 10px currentColor,
+                0 0 20px currentColor,
+                0 0 40px color-mix(in srgb, currentColor 40%, transparent);
+            letter-spacing: 0.04em;
             white-space: nowrap;
             line-height: 1;
+            font-variant-numeric: tabular-nums;
         }
 
         .widget-digital-time[data-status="warning"] {
-            color: #ffcc00;
-            text-shadow:
-                0 0 10px #ffcc00,
-                0 0 20px #ffcc00,
-                0 0 40px #ffcc0066;
+            color: var(--tw-led-warn);
         }
 
         .widget-digital-time[data-status="danger"],
         .widget-digital-time[data-status="overtime"] {
-            color: #ff3333;
-            text-shadow:
-                0 0 10px #ff3333,
-                0 0 20px #ff3333,
-                0 0 40px #ff333366;
-            animation: widget-led-pulse 1s infinite;
+            color: var(--tw-led-danger);
+            animation: widget-led-pulse 1s ease-in-out infinite;
         }
 
         @keyframes widget-led-pulse {
-            0%, 100% { opacity: 1; text-shadow: 0 0 10px #ff3333, 0 0 20px #ff3333, 0 0 40px #ff333366; }
-            50% { opacity: 0.7; text-shadow: 0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 60px #ff333399; }
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.65; }
         }
 
         /* ============================================
-           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip) - Виджет
+           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip)
+           — Inter 600, split-flap cards, gradient colon
            ============================================ */
         .widget-flip {
             display: none;
@@ -526,15 +369,20 @@
 
         .widget-flip-group {
             display: flex;
-            gap: 4px;
+            gap: 6px;
         }
 
+        /* Colon separator: gradient-filled ':' character.
+           JS overrides color inline for overtime/warning. */
         .widget-flip-separator {
+            font-family: var(--tw-font-sans);
             font-size: 48px;
-            font-weight: bold;
-            color: rgba(255, 255, 255, 0.6);
+            font-weight: 600;
+            line-height: 1;
+            color: rgba(255, 255, 255, 0.72);
             display: flex;
             align-items: center;
+            justify-content: center;
             margin: 0 2px;
         }
 
@@ -545,20 +393,21 @@
             display: none;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-radius: 5px;
-            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(180deg, #2a2a35 0%, #1a1a25 50%, #151520 50%, #0a0a15 100%);
+            border-radius: var(--tw-r-sm);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
+                        inset 0 -2px 4px rgba(0, 0, 0, 0.4);
             margin-right: 4px;
         }
 
         .widget-flip-minus-sign {
-            font-family: 'Arial Black', sans-serif;
+            font-family: var(--tw-font-sans);
             font-size: 32px;
-            font-weight: 900;
-            color: #ff3333;
-            text-shadow: 
+            font-weight: 700;
+            color: var(--tw-red);
+            text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 10px rgba(255, 51, 51, 0.5);
+                0 0 10px rgba(255, 69, 58, 0.5);
         }
 
         .widget-flip-minus.visible {
@@ -567,28 +416,38 @@
 
         .widget-flip-card {
             position: relative;
-            width: 50px;
-            height: 70px;
+            width: 62px;
+            height: 90px;
         }
 
         .widget-flip-inner {
             position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg, rgba(40, 40, 50, 0.8) 0%, rgba(25, 25, 35, 0.8) 49.9%, rgba(10, 10, 15, 0.85) 50%, rgba(25, 25, 35, 0.8) 100%);
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: linear-gradient(180deg,
+                #2a2a35 0%,
+                #1a1a25 50%,
+                #151520 50%,
+                #0a0a15 100%);
+            border-radius: var(--tw-r-sm);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
             overflow: hidden;
         }
 
+        /* Split-flap hairline — clipped inside opaque card (overflow:hidden) */
         .widget-flip-inner::before {
             content: '';
             position: absolute;
-            top: 49.5%;
+            top: 50%;
             left: 0;
             right: 0;
             height: 2px;
-            background: #000;
+            background: linear-gradient(180deg,
+                rgba(0, 0, 0, 0.9) 0%,
+                rgba(0, 0, 0, 0.9) 50%,
+                rgba(255, 255, 255, 0.04) 50%,
+                rgba(255, 255, 255, 0.04) 100%);
             z-index: 10;
         }
 
@@ -597,37 +456,40 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-family: 'Arial Black', sans-serif;
-            font-size: 42px;
-            font-weight: 900;
-            color: white;
+            font-family: var(--tw-font-sans);
+            font-size: 52px;
+            font-weight: 600;
+            color: var(--tw-fg);
             line-height: 1;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
         }
 
-        .widget-flip-card[data-status="warning"] .widget-flip-digit { color: #ffc107; }
-        .widget-flip-card[data-status="danger"] .widget-flip-digit,
+        .widget-flip-card[data-status="warning"] .widget-flip-digit { color: var(--tw-yellow); }
+        .widget-flip-card[data-status="danger"]   .widget-flip-digit,
         .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: #ff4444; }
         .widget-flip-card[data-status="danger"],
         .widget-flip-card[data-status="overtime"] {
-            animation: widget-flip-pulse 1s infinite;
+            animation: widget-flip-pulse 1s ease-in-out infinite;
         }
+
         @keyframes widget-flip-pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+            50%     { opacity: 0.7; }
         }
-        
-        /* Адаптивные размеры для flip-карточек когда есть часы (6 цифр) */
+
+        /* Adaptive sizing for 6-digit mode (H:MM:SS) */
         .widget-flip.has-hours .widget-flip-card {
-            width: 40px;
-            height: 56px;
+            width: 44px;
+            height: 64px;
         }
-        
+
         .widget-flip.has-hours .widget-flip-separator {
             font-size: 36px;
         }
-        
+
         .widget-flip.has-hours .widget-flip-digit {
-            font-size: 32px;
+            font-size: 36px;
         }
 
         /* Скрытие неактивных стилей - все скрыты по умолчанию */
@@ -645,7 +507,8 @@
         .widget-analog.active { display: flex !important; }
 
         /* ============================================
-           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog) - для виджета
+           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
+           — Radial face, gradient hour hand, red second hand
            ============================================ */
         .widget-analog {
             display: none;
@@ -672,16 +535,19 @@
             width: 150px;
             height: 150px;
             border-radius: 50%;
-            background: rgba(15, 15, 25, 0.7);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-            backdrop-filter: blur(20px) saturate(150%);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background:
+                radial-gradient(circle at 50% 50%,
+                    rgba(28, 28, 30, 0.82) 0%,
+                    rgba(10, 10, 15, 0.95) 100%);
+            -webkit-backdrop-filter: var(--tw-blur-sm);
+            backdrop-filter: var(--tw-blur-sm);
+            border: 1px solid var(--tw-border-strong);
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        /* Деления на циферблате виджета */
+        /* Tick marks on clock face */
         .widget-clock-tick {
             position: absolute;
             width: 2px;
@@ -703,11 +569,11 @@
         .widget-clock-tick.quarter {
             width: 3px;
             height: 14px;
-            background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
+            background: var(--tw-ring);
             top: 4%;
         }
 
-        /* Стрелки виджета */
+        /* Hands */
         .widget-clock-hand {
             position: absolute;
             bottom: 50%;
@@ -719,7 +585,7 @@
         .widget-hand-minute {
             width: 3px;
             height: 48px;
-            background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+            background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
             margin-left: -1.5px;
             z-index: 3;
         }
@@ -727,7 +593,7 @@
         .widget-hand-second {
             width: 2px;
             height: 57px;
-            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+            background: var(--tw-red);
             margin-left: -1px;
             z-index: 4;
         }
@@ -736,12 +602,13 @@
             position: absolute;
             width: 12px;
             height: 12px;
-            background: linear-gradient(145deg, #0a84ff, #30d158);
+            background: var(--tw-ring);
             border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.92);
             z-index: 5;
         }
 
-        /* Цифровое время под циферблатом */
+        /* Digital time under the face */
         .widget-analog-digital {
             position: absolute;
             bottom: 20%;
@@ -749,13 +616,14 @@
             right: 0;
             display: flex;
             justify-content: center;
-            font-family: 'Consolas', 'Monaco', monospace;
+            font-family: var(--tw-font-mono);
             font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--tw-fg-muted);
+            font-variant-numeric: tabular-nums;
             text-shadow: 0 0 10px rgba(10, 132, 255, 0.3);
         }
 
-        /* Цифры на циферблате */
+        /* Numerals 12/3/6/9 */
         .widget-clock-numbers {
             position: absolute;
             width: 100%;
@@ -769,19 +637,19 @@
 
         .widget-clock-number {
             position: absolute;
-            font-family: 'Georgia', serif;
+            font-family: var(--tw-font-sans);
             font-size: 14px;
             font-weight: 600;
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--tw-fg-muted);
             transform: translate(-50%, -50%);
         }
 
         .widget-clock-number.n12 { top: 15%; left: 50%; }
-        .widget-clock-number.n3 { top: 50%; left: 88%; }
-        .widget-clock-number.n6 { top: 85%; left: 50%; }
-        .widget-clock-number.n9 { top: 50%; left: 12%; }
+        .widget-clock-number.n3  { top: 50%; left: 88%; }
+        .widget-clock-number.n6  { top: 85%; left: 50%; }
+        .widget-clock-number.n9  { top: 50%; left: 12%; }
 
-        /* Предупреждения для стрелок виджета */
+        /* Warning / danger for hands */
         .widget-hand-minute[data-status="warning"],
         .widget-hand-second[data-status="warning"] {
             filter: hue-rotate(-30deg) saturate(1.5);
@@ -791,35 +659,37 @@
         .widget-hand-second[data-status="danger"],
         .widget-hand-minute[data-status="overtime"],
         .widget-hand-second[data-status="overtime"] {
-            background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%) !important;
-            animation: widget-hand-pulse 0.5s infinite;
+            background: #ff453a !important;
+            animation: widget-hand-pulse 0.8s ease-in-out infinite;
         }
 
         .widget-clock-center[data-status="danger"],
         .widget-clock-center[data-status="overtime"] {
-            background: linear-gradient(145deg, #ff4444, #cc0000);
-            animation: widget-center-pulse 1s infinite;
+            background: #ff453a;
+            animation: widget-center-pulse 1s ease-in-out infinite;
         }
 
         .widget-analog-digital[data-status="danger"],
         .widget-analog-digital[data-status="overtime"] {
-            color: #ff4444;
-            text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
-            animation: widget-analog-text-pulse 1s infinite;
+            color: #ff453a;
+            text-shadow: 0 0 10px rgba(255, 69, 58, 0.5);
+            animation: widget-analog-text-pulse 1s ease-in-out infinite;
         }
 
         @keyframes widget-hand-pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+            50%     { opacity: 0.6; }
         }
         @keyframes widget-center-pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+            50%     { opacity: 0.6; }
         }
         @keyframes widget-analog-text-pulse {
-            0%, 100% { opacity: 1; text-shadow: 0 0 10px rgba(255, 68, 68, 0.5); }
-            50% { opacity: 0.7; text-shadow: 0 0 20px rgba(255, 68, 68, 0.8); }
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.7; }
         }
+
+        /* First-run hint strip — inset shadow only, no outer */
         .widget-hint {
             position: fixed;
             bottom: 8px;
@@ -827,40 +697,45 @@
             transform: translateX(-50%);
             z-index: 9999;
             background: rgba(0, 0, 0, 0.6);
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--tw-fg-secondary);
             font-size: 10px;
-            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            font-family: var(--tw-font-sans);
+            letter-spacing: 0.2px;
             padding: 4px 10px;
-            border-radius: 8px;
+            border-radius: var(--tw-r-sm);
+            border: 1px solid var(--tw-border);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
             opacity: 0;
-            animation: hintFade 4s ease forwards;
+            animation: hintFade 4s var(--tw-ease) forwards;
             pointer-events: none;
             white-space: nowrap;
         }
         @keyframes hintFade {
-            0% { opacity: 0; }
-            15% { opacity: 1; }
-            75% { opacity: 1; }
+            0%   { opacity: 0; }
+            15%  { opacity: 1; }
+            75%  { opacity: 1; }
             100% { opacity: 0; display: none; }
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-                scroll-behavior: auto !important;
-            }
-        }
-
+        /* Focus-visible — a11y, mandatory */
         button:focus-visible,
         input:focus-visible,
         select:focus-visible,
         textarea:focus-visible,
         [role="button"]:focus-visible,
         [tabindex]:focus-visible {
-            outline: 2px solid #0a84ff;
-            outline-offset: 2px;
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
+        }
+
+        /* Reduced motion — collapse durations and kill pulses */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 1ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 1ms !important;
+                scroll-behavior: auto !important;
+            }
         }
     </style>
 </head>
