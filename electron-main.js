@@ -8,6 +8,7 @@ const log = require('electron-log/main');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
+const recovery = require('./recovery');
 
 // Logger setup
 log.initialize();
@@ -123,6 +124,8 @@ function emitTimerState(partial = {}) {
     safelySendToWindow(widgetWindow, 'timer-state', timerState);
     safelySendToWindow(displayWindow, 'timer-state', timerState);
     safelySendToWindow(controlWindow, 'timer-state', timerState);
+    // F-022: cheap path on every tick — just update the tooltip.
+    // updateTrayMenu() handles Menu rebuild only when running state actually changes.
     if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
 }
 
@@ -132,6 +135,8 @@ function broadcastWindowState(channel, data) {
     safelySendToWindow(widgetWindow, channel, data);
     safelySendToWindow(displayWindow, channel, data);
     safelySendToWindow(clockWidgetWindow, channel, data);
+    // F-022: widget/clock open-close changes tray menu checkboxes; trigger rebuild.
+    if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
 }
 
 function finishTimer(finalRemaining) {
@@ -302,6 +307,7 @@ function createWidgetWindow() {
 
     widgetWindow.loadFile('electron-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(widgetWindow);
+    bindRenderCrashHandler(widgetWindow, 'widget');
 
     widgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(widgetWindow);
@@ -346,6 +352,7 @@ function createClockWidgetWindow() {
 
     clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(clockWidgetWindow);
+    bindRenderCrashHandler(clockWidgetWindow, 'clock');
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(clockWidgetWindow);
@@ -399,6 +406,7 @@ function createDisplayWindow(displayIndex) {
 
     displayWindow.loadFile('display.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(displayWindow);
+    bindRenderCrashHandler(displayWindow, 'display');
     blockZoom(displayWindow);
 
     displayWindow.once('ready-to-show', () => {
@@ -417,61 +425,20 @@ function createDisplayWindow(displayIndex) {
 
 // ============================================================================
 // Crash recovery — persist timer state to file so we can offer to resume after crash
+// Implementation lives in ./recovery.js (pure, no electron deps) — thin wrappers
+// below inject the userData path & electron-log logger.
 // ============================================================================
-function getRecoveryStatePath() {
-    return path.join(app.getPath('userData'), 'last-state.json');
-}
-
 function saveTimerStateToFile() {
-    try {
-        const statePath = getRecoveryStatePath();
-        const data = JSON.stringify({
-            totalSeconds: timerState.totalSeconds,
-            remainingSeconds: timerState.remainingSeconds,
-            presetSeconds: timerState.presetSeconds,
-            isRunning: timerState.isRunning,
-            savedAt: Date.now()
-        });
-        fs.writeFileSync(statePath, data);
-    } catch (err) {
-        log.error('saveTimerStateToFile:', err);
-    }
+    return recovery.saveTimerStateToFile(app.getPath('userData'), timerState, log);
 }
 
 function loadSavedTimerState() {
-    try {
-        const statePath = getRecoveryStatePath();
-        if (!fs.existsSync(statePath)) { return null; }
-        const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-        const ageMs = Date.now() - (parsed.savedAt || 0);
-        // Stale after 5 minutes — discard.
-        if (ageMs > 5 * 60 * 1000) {
-            fs.unlinkSync(statePath);
-            return null;
-        }
-        return parsed;
-    } catch (err) {
-        log.warn('loadSavedTimerState failed:', err);
-        return null;
-    }
+    return recovery.loadSavedTimerState(app.getPath('userData'), log);
 }
 
 function clearSavedTimerState() {
-    try {
-        const statePath = getRecoveryStatePath();
-        if (fs.existsSync(statePath)) { fs.unlinkSync(statePath); }
-    } catch { /* ignore */ }
+    recovery.clearSavedTimerState(app.getPath('userData'));
 }
-
-// Export for testing
-exports.isRecoveryValid = function isRecoveryValid(data, now) {
-    if (!data || typeof data !== 'object') { return false; }
-    if (typeof data.savedAt !== 'number' || !Number.isFinite(data.savedAt)) { return false; }
-    const age = (now || Date.now()) - data.savedAt;
-    if (age < 0 || age > 5 * 60 * 1000) { return false; }
-    if (typeof data.presetSeconds !== 'number' || data.presetSeconds < 0) { return false; }
-    return true;
-};
 
 // Persist state every 10 seconds while timer is running
 if (!__inTestMode) {
@@ -486,6 +453,12 @@ if (!__inTestMode) {
 let tray = null;
 let isQuitting = false;
 
+// F-022: cache last-seen booleans; only rebuild Menu when they actually change.
+// Remaining-seconds updates every tick are routed through the tooltip only.
+let _trayLastRunning = null;
+let _trayLastWidgetOpen = null;
+let _trayLastClockOpen = null;
+
 function createTray() {
     try {
         const iconPath = path.join(__dirname, 'build', 'icon.png');
@@ -493,7 +466,8 @@ function createTray() {
         const trayIcon = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 });
         tray = new Tray(trayIcon);
         tray.setToolTip('Timer Widget');
-        updateTrayMenu();
+        rebuildTrayMenu();
+        updateTrayTime();
         tray.on('click', () => {
             if (!controlWindow) { createControlWindow(); return; }
             if (controlWindow.isVisible()) { controlWindow.hide(); }
@@ -516,9 +490,16 @@ function formatTrayTime(secs) {
     return (neg ? '-' : '') + body;
 }
 
-function updateTrayMenu() {
+// Full Menu rebuild — only when boolean state changes (isRunning / widget open / clock open).
+function rebuildTrayMenu() {
     if (!tray) { return; }
     const running = timerState.isRunning;
+    const widgetOpen = !!widgetWindow;
+    const clockOpen = !!clockWidgetWindow;
+    _trayLastRunning = running;
+    _trayLastWidgetOpen = widgetOpen;
+    _trayLastClockOpen = clockOpen;
+
     const remaining = formatTrayTime(timerState.remainingSeconds || 0);
     const menu = Menu.buildFromTemplate([
         { label: `⏱  ${remaining}`, enabled: false },
@@ -535,12 +516,12 @@ function updateTrayMenu() {
             controlWindow.show();
             controlWindow.focus();
         }},
-        { label: 'Виджет', type: 'checkbox', checked: !!widgetWindow, click: () => {
+        { label: 'Виджет', type: 'checkbox', checked: widgetOpen, click: () => {
             if (widgetWindow) { widgetWindow.close(); }
             else { createWidgetWindow(); }
             setTimeout(updateTrayMenu, 200);
         }},
-        { label: 'Часы', type: 'checkbox', checked: !!clockWidgetWindow, click: () => {
+        { label: 'Часы', type: 'checkbox', checked: clockOpen, click: () => {
             if (clockWidgetWindow) { clockWidgetWindow.close(); }
             else { createClockWidgetWindow(); }
             setTimeout(updateTrayMenu, 200);
@@ -549,6 +530,28 @@ function updateTrayMenu() {
         { label: 'Выход', click: () => { isQuitting = true; app.quit(); }}
     ]);
     tray.setContextMenu(menu);
+}
+
+// Lightweight per-tick update — only touches the tooltip (no Menu rebuild).
+function updateTrayTime() {
+    if (!tray) { return; }
+    const remaining = formatTrayTime(timerState.remainingSeconds || 0);
+    try { tray.setToolTip(`Timer Widget — ${remaining}`); } catch { /* tray destroyed */ }
+}
+
+// Decide whether to rebuild the Menu. Called from tray-click handlers & window close.
+// emitTimerState calls updateTrayTime directly (cheap path).
+function updateTrayMenu() {
+    if (!tray) { return; }
+    const running = timerState.isRunning;
+    const widgetOpen = !!widgetWindow;
+    const clockOpen = !!clockWidgetWindow;
+    if (running !== _trayLastRunning
+        || widgetOpen !== _trayLastWidgetOpen
+        || clockOpen !== _trayLastClockOpen) {
+        rebuildTrayMenu();
+    }
+    updateTrayTime();
 }
 
 // Intercept control window close — hide to tray instead of quit
@@ -581,7 +584,8 @@ app.whenReady().then(() => {
 
     // Recovery check before UI
     const saved = loadSavedTimerState();
-    if (exports.isRecoveryValid(saved, Date.now())) {
+    const hasRecovery = recovery.isRecoveryValid(saved, Date.now());
+    if (hasRecovery) {
         log.info(`Recovery candidate found (age ${Math.round((Date.now() - saved.savedAt) / 1000)}s)`);
         timerState.presetSeconds = saved.presetSeconds;
         // We don't auto-start — control window will offer resume via IPC timer-recovery-available
@@ -591,6 +595,14 @@ app.whenReady().then(() => {
     createTray();
     bindTrayBehavior(controlWindow);
     bindRenderCrashHandler(controlWindow, 'control');
+
+    // F-005: broadcast recovery snapshot to control window once it has loaded.
+    // Renderer may ignore it for now, but the channel is no longer dead code.
+    if (hasRecovery && controlWindow) {
+        controlWindow.webContents.once('did-finish-load', () => {
+            safelySendToWindow(controlWindow, 'timer-recovery-available', saved);
+        });
+    }
 
     log.info(`[perf] app ready in ${Date.now() - __startupT0}ms`);
 

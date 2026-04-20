@@ -101,6 +101,7 @@
     "files": [
       "electron-main.js",
       "timer-engine.js",
+      "recovery.js",
       "preload.js",
       "ipc-compat.js",
       "security.js",
