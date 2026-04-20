@@ -432,7 +432,8 @@ function saveTimerStateToFile() {
             isRunning: timerState.isRunning,
             savedAt: Date.now()
         });
-        fs.writeFileSync(statePath, data);
+        // Async write — keeps event loop free during the 10s periodic save.
+        fs.promises.writeFile(statePath, data).catch(err => log.error('saveTimerStateToFile:', err));
     } catch (err) {
         log.error('saveTimerStateToFile:', err);
     }
