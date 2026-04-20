@@ -59,7 +59,7 @@
 
 ## [2.2.1] - 2026-04-17
 
-### Security (аудит SberTech)
+### Security (аудит безопасности)
 - Удалён политизированный баннер StandWithUkraine из `LICENSES.chromium.html` через `afterPack` hook — ссылка на acornjs репо заменена на нейтральный npmjs URL
 - Linux: `afterInstall` скрипт снимает SUID бит с `chrome-sandbox` (0755 без SUID)
 - Linux: `executableArgs: ["--no-sandbox"]` — fallback для систем без user namespaces
