@@ -32,7 +32,10 @@ const ALLOWED_CHANNELS = {
         'toggle-fullscreen',
         'close-window',
         'quit-app',
-        'reset-and-relaunch'
+        'reset-and-relaunch',
+        'set-autostart',
+        'get-autostart',
+        'export-logs'
     ],
     receive: [
         'timer-state',
@@ -50,7 +53,8 @@ const ALLOWED_CHANNELS = {
         'clock-settings',
         'display-window-state',
         'widget-window-state',
-        'clock-window-state'
+        'clock-window-state',
+        'timer-recovery-available'
     ]
 };
 

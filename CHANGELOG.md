@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.2.3] - 2026-04-20
+
+### Added
+- **System Tray** — иконка в трее Windows/Linux/macOS menu bar с контекстным меню (Старт/Пауза/Сбросить, показать панель, toggle виджет/часы, выход). При закрытии control окна — сворачивается в трей, а не quit.
+- **Autostart** — IPC `set-autostart` / `get-autostart` для "запускать при старте ОС" (Windows реестр / macOS Login Items / Linux `.desktop`).
+- **Logger** (`electron-log`) — логи в `%APPDATA%/TimerWidget/logs/main.log`, ротация 10MB, уровни `info` (prod) / `debug` (`--dev`). Все `console.*` в main заменены.
+- **Crash Recovery** — `uncaughtException` / `unhandledRejection` сохраняют state в `last-state.json`, при следующем запуске восстанавливается если < 5 мин. `render-process-gone` автоматически перезагружает окно.
+- **Export Logs** — IPC `export-logs` показывает диалог сохранения и копирует main.log в выбранное место (для bug reports).
+- **Performance benchmarks** — `tests/perf.test.js` (9 тестов): `tick` 25ns, heap стабилен на 1M итераций. Startup instrumentation логирует `[perf] … window ready in Xms`.
+- **SBOM** (CycloneDX 1.5, 863 KB) — генерация через `npm run sbom`. Pошёл в app.asar.
+- **NOTICE** (49.9 KB) — атрибуция 365 пакетов через `npm run notice`. Pошёл в app.asar.
+- **Uninstall cleanness**:
+  - Windows NSIS: спрашивает при удалении "Удалить также настройки?"
+  - Linux .deb: `postrm` скрипт чистит `~/.config/timer-widget` при `apt purge`
+  - Документация `docs/UNINSTALL.md` — ручная чистка для macOS
+- **Документация**: `docs/PERFORMANCE.md`, `docs/SUPPLY_CHAIN.md`, `docs/UNINSTALL.md`
+- **Тесты recovery** — `tests/recovery.test.js` (10 тестов) через stub Electron/electron-log
+- **IPC invoke support** — в preload.js добавлен `electronAPI.invoke()` для two-way запросов
+
+### Changed
+- **package.json** — первая прод-зависимость: `electron-log` (MIT, ~550k weekly)
+- **CSP**: `font-src 'self' data:` — работает без Google Fonts
+- **Итого тестов**: 109 → 128
+
+### Security
+- Все IPC каналы синхронизированы в `channel-validator.js` ↔ `preload.js`
+- Новые каналы: `set-autostart`, `get-autostart`, `export-logs`, `timer-recovery-available`
+
 ## [2.2.2] - 2026-04-17
 
 ### Security / Compliance

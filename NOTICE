@@ -1,0 +1,2298 @@
+Timer Widget
+Copyright (c) 2026 Jkaotlic
+Licensed under the MIT License.
+
+This software includes the following third-party components.
+Each is distributed under its own license terms (listed below).
+
+For the embedded Electron runtime (Chromium, V8, Node.js, libuv and their dependencies),
+see LICENSES.chromium.html shipped with the application installation.
+
+================================================================================
+
+=== @develar/schema-utils ===
+Version: 2.6.5
+License: MIT
+Repository: https://github.com/webpack/schema-utils
+Publisher: webpack Contrib
+Homepage: https://github.com/webpack-contrib
+
+=== @electron/asar ===
+Version: 3.4.1
+License: MIT
+Repository: https://github.com/electron/asar
+
+=== @electron/fuses ===
+Version: 1.8.0
+License: MIT
+Repository: https://github.com/electron/fuses
+Publisher: Electron Community
+
+=== @electron/get ===
+Version: 2.0.3
+License: MIT
+Repository: https://github.com/electron/get
+Publisher: Samuel Attard
+
+=== @electron/get ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/electron/get
+Publisher: Samuel Attard
+
+=== @electron/notarize ===
+Version: 2.5.0
+License: MIT
+Repository: https://github.com/electron/notarize
+Publisher: Samuel Attard
+
+=== @electron/osx-sign ===
+Version: 1.3.3
+License: BSD-2-Clause
+Repository: https://github.com/electron/osx-sign
+Publisher: electron
+
+=== @electron/rebuild ===
+Version: 4.0.3
+License: MIT
+Repository: https://github.com/electron/rebuild
+
+=== @electron/universal ===
+Version: 2.0.3
+License: MIT
+Repository: https://github.com/electron/universal
+Publisher: Samuel Attard
+
+=== @electron/windows-sign ===
+Version: 1.2.2
+License: BSD-2-Clause
+Repository: https://github.com/electron/windows-sign
+Publisher: Felix Rieseberg
+
+=== @eslint-community/eslint-utils ===
+Version: 4.9.1
+License: MIT
+Repository: https://github.com/eslint-community/eslint-utils
+Publisher: Toru Nagashima
+
+=== @eslint-community/regexpp ===
+Version: 4.12.2
+License: MIT
+Repository: https://github.com/eslint-community/regexpp
+Publisher: Toru Nagashima
+
+=== @eslint/config-array ===
+Version: 0.21.2
+License: Apache-2.0
+Repository: https://github.com/eslint/rewrite
+Publisher: Nicholas C. Zakas
+
+=== @eslint/config-helpers ===
+Version: 0.4.2
+License: Apache-2.0
+Repository: https://github.com/eslint/rewrite
+
+=== @eslint/core ===
+Version: 0.17.0
+License: Apache-2.0
+Repository: https://github.com/eslint/rewrite
+Publisher: Nicholas C. Zakas
+
+=== @eslint/eslintrc ===
+Version: 3.3.5
+License: MIT
+Repository: https://github.com/eslint/eslintrc
+Publisher: Nicholas C. Zakas
+
+=== @eslint/js ===
+Version: 9.39.4
+License: MIT
+Repository: https://github.com/eslint/eslint
+
+=== @eslint/object-schema ===
+Version: 2.1.7
+License: Apache-2.0
+Repository: https://github.com/eslint/rewrite
+Publisher: Nicholas C. Zakas
+
+=== @eslint/plugin-kit ===
+Version: 0.4.1
+License: Apache-2.0
+Repository: https://github.com/eslint/rewrite
+Publisher: Nicholas C. Zakas
+
+=== @humanfs/core ===
+Version: 0.19.1
+License: Apache-2.0
+Repository: https://github.com/humanwhocodes/humanfs
+Publisher: Nicholas C. Zakas
+
+=== @humanfs/node ===
+Version: 0.16.7
+License: Apache-2.0
+Repository: https://github.com/humanwhocodes/humanfs
+Publisher: Nicholas C. Zakas
+
+=== @humanwhocodes/module-importer ===
+Version: 1.0.1
+License: Apache-2.0
+Repository: https://github.com/humanwhocodes/module-importer
+Publisher: Nicholas C. Zaks
+
+=== @humanwhocodes/retry ===
+Version: 0.4.3
+License: Apache-2.0
+Repository: https://github.com/humanwhocodes/retry
+Publisher: Nicholas C. Zaks
+
+=== @isaacs/cliui ===
+Version: 8.0.2
+License: ISC
+Repository: https://github.com/yargs/cliui
+Publisher: Ben Coe
+
+=== @isaacs/fs-minipass ===
+Version: 4.0.1
+License: ISC
+Repository: https://github.com/npm/fs-minipass
+Publisher: Isaac Z. Schlueter
+
+=== @malept/cross-spawn-promise ===
+Version: 2.0.0
+License: Apache-2.0
+Repository: https://github.com/malept/cross-spawn-promise
+Publisher: Mark Lee
+
+=== @malept/flatpak-bundler ===
+Version: 0.4.0
+License: MIT
+Repository: https://github.com/malept/flatpak-bundler
+Publisher: Matt Watson
+
+=== @npmcli/agent ===
+Version: 3.0.0
+License: ISC
+Repository: https://github.com/npm/agent
+Publisher: GitHub Inc.
+
+=== @npmcli/fs ===
+Version: 4.0.0
+License: ISC
+Repository: https://github.com/npm/fs
+Publisher: GitHub Inc.
+
+=== @pkgjs/parseargs ===
+Version: 0.11.0
+License: MIT
+Repository: https://github.com/pkgjs/parseargs
+
+=== @playwright/test ===
+Version: 1.59.1
+License: Apache-2.0
+Repository: https://github.com/microsoft/playwright
+Publisher: Microsoft Corporation
+
+=== @sindresorhus/is ===
+Version: 4.6.0
+License: MIT
+Repository: https://github.com/sindresorhus/is
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== @szmarczak/http-timer ===
+Version: 4.0.6
+License: MIT
+Repository: https://github.com/szmarczak/http-timer
+Publisher: Szymon Marczak
+
+=== @types/cacheable-request ===
+Version: 6.0.3
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/debug ===
+Version: 4.1.13
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/estree ===
+Version: 1.0.8
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/fs-extra ===
+Version: 9.0.13
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/http-cache-semantics ===
+Version: 4.2.0
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/json-schema ===
+Version: 7.0.15
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/keyv ===
+Version: 3.1.4
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/ms ===
+Version: 2.1.0
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/node ===
+Version: 24.12.2
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/responselike ===
+Version: 1.0.3
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/yauzl ===
+Version: 2.10.3
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @xmldom/xmldom ===
+Version: 0.8.12
+License: MIT
+Repository: https://github.com/xmldom/xmldom
+
+=== 7zip-bin ===
+Version: 5.2.0
+License: MIT
+Repository: https://github.com/develar/7zip-bin
+
+=== abbrev ===
+Version: 3.0.1
+License: ISC
+Repository: https://github.com/npm/abbrev-js
+Publisher: GitHub Inc.
+
+=== acorn-jsx ===
+Version: 5.3.2
+License: MIT
+Repository: https://github.com/acornjs/acorn-jsx
+
+=== acorn ===
+Version: 8.16.0
+License: MIT
+Repository: https://github.com/acornjs/acorn
+
+=== agent-base ===
+Version: 7.1.4
+License: MIT
+Repository: https://github.com/TooTallNate/proxy-agents
+Publisher: Nathan Rajlich
+Homepage: http://n8.io/
+
+=== ajv-keywords ===
+Version: 3.5.2
+License: MIT
+Repository: https://github.com/epoberezkin/ajv-keywords
+Publisher: Evgeny Poberezkin
+
+=== ajv ===
+Version: 6.14.0
+License: MIT
+Repository: https://github.com/ajv-validator/ajv
+Publisher: Evgeny Poberezkin
+
+=== ansi-regex ===
+Version: 5.0.1
+License: MIT
+Repository: https://github.com/chalk/ansi-regex
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== ansi-regex ===
+Version: 6.2.2
+License: MIT
+Repository: https://github.com/chalk/ansi-regex
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== ansi-styles ===
+Version: 4.3.0
+License: MIT
+Repository: https://github.com/chalk/ansi-styles
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== ansi-styles ===
+Version: 6.2.3
+License: MIT
+Repository: https://github.com/chalk/ansi-styles
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== app-builder-bin ===
+Version: 5.0.0-alpha.12
+License: MIT
+Repository: https://github.com/develar/app-builder
+
+=== app-builder-lib ===
+Version: 26.8.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== argparse ===
+Version: 2.0.1
+License: Python-2.0
+Repository: https://github.com/nodeca/argparse
+
+=== async-exit-hook ===
+Version: 2.0.1
+License: MIT
+Repository: https://github.com/tapppi/async-exit-hook
+Publisher: Tapani Moilanen
+Homepage: https://github.com/tapppi
+
+=== async ===
+Version: 3.2.6
+License: MIT
+Repository: https://github.com/caolan/async
+Publisher: Caolan McMahon
+
+=== asynckit ===
+Version: 0.4.0
+License: MIT
+Repository: https://github.com/alexindigo/asynckit
+Publisher: Alex Indigo
+
+=== at-least-node ===
+Version: 1.0.0
+License: ISC
+Repository: https://github.com/RyanZim/at-least-node
+Publisher: Ryan Zimmerman
+
+=== balanced-match ===
+Version: 1.0.2
+License: MIT
+Repository: https://github.com/juliangruber/balanced-match
+Publisher: Julian Gruber
+Homepage: http://juliangruber.com
+
+=== balanced-match ===
+Version: 4.0.4
+License: MIT
+Repository: https://github.com/juliangruber/balanced-match
+
+=== base64-js ===
+Version: 1.5.1
+License: MIT
+Repository: https://github.com/beatgammit/base64-js
+Publisher: T. Jameson Little
+
+=== bl ===
+Version: 4.1.0
+License: MIT
+Repository: https://github.com/rvagg/bl
+
+=== boolean ===
+Version: 3.2.0
+License: MIT
+Repository: https://github.com/thenativeweb/boolean
+
+=== brace-expansion ===
+Version: 1.1.13
+License: MIT
+Repository: https://github.com/juliangruber/brace-expansion
+Publisher: Julian Gruber
+Homepage: http://juliangruber.com
+
+=== brace-expansion ===
+Version: 2.0.3
+License: MIT
+Repository: https://github.com/juliangruber/brace-expansion
+Publisher: Julian Gruber
+Homepage: http://juliangruber.com
+
+=== brace-expansion ===
+Version: 5.0.5
+License: MIT
+Repository: https://github.com/juliangruber/brace-expansion
+
+=== buffer-crc32 ===
+Version: 0.2.13
+License: MIT
+Repository: https://github.com/brianloveswords/buffer-crc32
+Publisher: Brian J. Brennan
+
+=== buffer-from ===
+Version: 1.1.2
+License: MIT
+Repository: https://github.com/LinusU/buffer-from
+
+=== buffer ===
+Version: 5.7.1
+License: MIT
+Repository: https://github.com/feross/buffer
+Publisher: Feross Aboukhadijeh
+Homepage: https://feross.org
+
+=== builder-util-runtime ===
+Version: 9.5.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== builder-util ===
+Version: 26.8.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== cacache ===
+Version: 19.0.1
+License: ISC
+Repository: https://github.com/npm/cacache
+Publisher: GitHub Inc.
+
+=== cacheable-lookup ===
+Version: 5.0.4
+License: MIT
+Repository: https://github.com/szmarczak/cacheable-lookup
+Publisher: Szymon Marczak
+
+=== cacheable-request ===
+Version: 7.0.4
+License: MIT
+Repository: https://github.com/lukechilds/cacheable-request
+Publisher: Luke Childs
+Homepage: http://lukechilds.co.uk
+
+=== call-bind-apply-helpers ===
+Version: 1.0.2
+License: MIT
+Repository: https://github.com/ljharb/call-bind-apply-helpers
+Publisher: Jordan Harband
+
+=== callsites ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/callsites
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== chalk ===
+Version: 4.1.2
+License: MIT
+Repository: https://github.com/chalk/chalk
+
+=== chownr ===
+Version: 3.0.0
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/chownr
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== chromium-pickle-js ===
+Version: 0.2.0
+License: MIT
+Repository: https://github.com/electron/node-chromium-pickle-js
+
+=== ci-info ===
+Version: 4.3.1
+License: MIT
+Repository: https://github.com/watson/ci-info
+Publisher: Thomas Watson Steen
+Homepage: https://twitter.com/wa7son
+
+=== ci-info ===
+Version: 4.4.0
+License: MIT
+Repository: https://github.com/watson/ci-info
+Publisher: Thomas Watson Steen
+Homepage: https://twitter.com/wa7son
+
+=== cli-cursor ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/cli-cursor
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== cli-spinners ===
+Version: 2.9.2
+License: MIT
+Repository: https://github.com/sindresorhus/cli-spinners
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== cliui ===
+Version: 8.0.1
+License: ISC
+Repository: https://github.com/yargs/cliui
+Publisher: Ben Coe
+
+=== clone-response ===
+Version: 1.0.3
+License: MIT
+Repository: https://github.com/sindresorhus/clone-response
+Publisher: Luke Childs
+Homepage: http://lukechilds.co.uk
+
+=== clone ===
+Version: 1.0.4
+License: MIT
+Repository: https://github.com/pvorb/node-clone
+Publisher: Paul Vorbach
+Homepage: http://paul.vorba.ch/
+
+=== color-convert ===
+Version: 2.0.1
+License: MIT
+Repository: https://github.com/Qix-/color-convert
+Publisher: Heather Arthur
+
+=== color-name ===
+Version: 1.1.4
+License: MIT
+Repository: https://github.com/colorjs/color-name
+Publisher: DY
+
+=== combined-stream ===
+Version: 1.0.8
+License: MIT
+Repository: https://github.com/felixge/node-combined-stream
+Publisher: Felix Geisendörfer
+Homepage: http://debuggable.com/
+
+=== commander ===
+Version: 5.1.0
+License: MIT
+Repository: https://github.com/tj/commander.js
+Publisher: TJ Holowaychuk
+
+=== commander ===
+Version: 9.5.0
+License: MIT
+Repository: https://github.com/tj/commander.js
+Publisher: TJ Holowaychuk
+
+=== compare-version ===
+Version: 0.1.2
+License: MIT
+Repository: https://github.com/kevva/compare-version
+Publisher: Kevin Mårtensson
+Homepage: https://github.com/kevva
+
+=== concat-map ===
+Version: 0.0.1
+License: MIT
+Repository: https://github.com/substack/node-concat-map
+Publisher: James Halliday
+Homepage: http://substack.net
+
+=== cross-dirname ===
+Version: 0.1.0
+License: MIT
+Repository: https://github.com/JumpLink/cross-dirname
+
+=== cross-spawn ===
+Version: 7.0.6
+License: MIT
+Repository: https://github.com/moxystudio/node-cross-spawn
+Publisher: André Cruz
+
+=== debug ===
+Version: 4.4.3
+License: MIT
+Repository: https://github.com/debug-js/debug
+Publisher: Josh Junon
+Homepage: https://github.com/qix-
+
+=== decompress-response ===
+Version: 6.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/decompress-response
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== deep-is ===
+Version: 0.1.4
+License: MIT
+Repository: https://github.com/thlorenz/deep-is
+Publisher: Thorsten Lorenz
+Homepage: http://thlorenz.com
+
+=== defaults ===
+Version: 1.0.4
+License: MIT
+Repository: https://github.com/sindresorhus/node-defaults
+Publisher: Elijah Insua
+
+=== defer-to-connect ===
+Version: 2.0.1
+License: MIT
+Repository: https://github.com/szmarczak/defer-to-connect
+Publisher: Szymon Marczak
+
+=== define-data-property ===
+Version: 1.1.4
+License: MIT
+Repository: https://github.com/ljharb/define-data-property
+Publisher: Jordan Harband
+
+=== define-properties ===
+Version: 1.2.1
+License: MIT
+Repository: https://github.com/ljharb/define-properties
+Publisher: Jordan Harband
+
+=== delayed-stream ===
+Version: 1.0.0
+License: MIT
+Repository: https://github.com/felixge/node-delayed-stream
+Publisher: Felix Geisendörfer
+Homepage: http://debuggable.com/
+
+=== detect-libc ===
+Version: 2.1.2
+License: Apache-2.0
+Repository: https://github.com/lovell/detect-libc
+Publisher: Lovell Fuller
+
+=== detect-node ===
+Version: 2.1.0
+License: MIT
+Repository: https://github.com/iliakan/detect-node
+Publisher: Ilya Kantor
+
+=== dir-compare ===
+Version: 4.2.0
+License: MIT
+Repository: https://github.com/gliviu/dir-compare
+Publisher: Liviu Grigorescu
+
+=== dmg-builder ===
+Version: 26.8.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== dotenv-expand ===
+Version: 11.0.7
+License: BSD-2-Clause
+Repository: https://github.com/motdotla/dotenv-expand
+Publisher: motdotla
+
+=== dotenv ===
+Version: 16.6.1
+License: BSD-2-Clause
+Repository: https://github.com/motdotla/dotenv
+
+=== dunder-proto ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/es-shims/dunder-proto
+Publisher: Jordan Harband
+
+=== eastasianwidth ===
+Version: 0.2.0
+License: MIT
+Repository: https://github.com/komagata/eastasianwidth
+Publisher: Masaki Komagata
+
+=== ejs ===
+Version: 3.1.10
+License: Apache-2.0
+Repository: https://github.com/mde/ejs
+Publisher: Matthew Eernisse
+Homepage: http://fleegix.org
+
+=== electron-builder-squirrel-windows ===
+Version: 26.8.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== electron-builder ===
+Version: 26.8.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== electron-log ===
+Version: 5.4.3
+License: MIT
+Repository: https://github.com/megahertz/electron-log
+Publisher: Alexey Prokhorov
+
+=== electron-publish ===
+Version: 26.8.1
+License: MIT
+Repository: https://github.com/electron-userland/electron-builder
+Publisher: Vladimir Krivosheev
+
+=== electron-winstaller ===
+Version: 5.4.0
+License: MIT
+Repository: https://github.com/electron/windows-installer
+
+=== electron ===
+Version: 41.2.1
+License: MIT
+Repository: https://github.com/electron/electron
+Publisher: Electron Community
+
+=== emoji-regex ===
+Version: 8.0.0
+License: MIT
+Repository: https://github.com/mathiasbynens/emoji-regex
+Publisher: Mathias Bynens
+Homepage: https://mathiasbynens.be/
+
+=== emoji-regex ===
+Version: 9.2.2
+License: MIT
+Repository: https://github.com/mathiasbynens/emoji-regex
+Publisher: Mathias Bynens
+Homepage: https://mathiasbynens.be/
+
+=== encoding ===
+Version: 0.1.13
+License: MIT
+Repository: https://github.com/andris9/encoding
+Publisher: Andris Reinman
+
+=== end-of-stream ===
+Version: 1.4.5
+License: MIT
+Repository: https://github.com/mafintosh/end-of-stream
+Publisher: Mathias Buus
+
+=== env-paths ===
+Version: 2.2.1
+License: MIT
+Repository: https://github.com/sindresorhus/env-paths
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== err-code ===
+Version: 2.0.3
+License: MIT
+Repository: https://github.com/IndigoUnited/js-err-code
+Publisher: IndigoUnited
+Homepage: http://indigounited.com
+
+=== es-define-property ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/ljharb/es-define-property
+Publisher: Jordan Harband
+
+=== es-errors ===
+Version: 1.3.0
+License: MIT
+Repository: https://github.com/ljharb/es-errors
+Publisher: Jordan Harband
+
+=== es-object-atoms ===
+Version: 1.1.1
+License: MIT
+Repository: https://github.com/ljharb/es-object-atoms
+Publisher: Jordan Harband
+
+=== es-set-tostringtag ===
+Version: 2.1.0
+License: MIT
+Repository: https://github.com/es-shims/es-set-tostringtag
+Publisher: Jordan Harband
+
+=== es6-error ===
+Version: 4.1.1
+License: MIT
+Repository: https://github.com/bjyoungblood/es6-error
+Publisher: Ben Youngblood
+
+=== escalade ===
+Version: 3.2.0
+License: MIT
+Repository: https://github.com/lukeed/escalade
+Publisher: Luke Edwards
+Homepage: https://lukeed.com
+
+=== escape-string-regexp ===
+Version: 4.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/escape-string-regexp
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== eslint-scope ===
+Version: 8.4.0
+License: BSD-2-Clause
+Repository: https://github.com/eslint/js
+
+=== eslint-visitor-keys ===
+Version: 3.4.3
+License: Apache-2.0
+Repository: https://github.com/eslint/eslint-visitor-keys
+Publisher: Toru Nagashima
+Homepage: https://github.com/mysticatea
+
+=== eslint-visitor-keys ===
+Version: 4.2.1
+License: Apache-2.0
+Repository: https://github.com/eslint/js
+Publisher: Toru Nagashima
+Homepage: https://github.com/mysticatea
+
+=== eslint ===
+Version: 9.39.4
+License: MIT
+Repository: https://github.com/eslint/eslint
+Publisher: Nicholas C. Zakas
+
+=== espree ===
+Version: 10.4.0
+License: BSD-2-Clause
+Repository: https://github.com/eslint/js
+Publisher: Nicholas C. Zakas
+
+=== esquery ===
+Version: 1.7.0
+License: BSD-3-Clause
+Repository: https://github.com/estools/esquery
+Publisher: Joel Feenstra
+
+=== esrecurse ===
+Version: 4.3.0
+License: BSD-2-Clause
+Repository: https://github.com/estools/esrecurse
+
+=== estraverse ===
+Version: 5.3.0
+License: BSD-2-Clause
+Repository: https://github.com/estools/estraverse
+
+=== esutils ===
+Version: 2.0.3
+License: BSD-2-Clause
+Repository: https://github.com/estools/esutils
+
+=== exponential-backoff ===
+Version: 3.1.3
+License: Apache-2.0
+Repository: https://github.com/coveooss/exponential-backoff
+Publisher: Sami Sayegh
+
+=== extract-zip ===
+Version: 2.0.1
+License: BSD-2-Clause
+Repository: https://github.com/maxogden/extract-zip
+Publisher: max ogden
+
+=== fast-deep-equal ===
+Version: 3.1.3
+License: MIT
+Repository: https://github.com/epoberezkin/fast-deep-equal
+Publisher: Evgeny Poberezkin
+
+=== fast-json-stable-stringify ===
+Version: 2.1.0
+License: MIT
+Repository: https://github.com/epoberezkin/fast-json-stable-stringify
+Publisher: James Halliday
+Homepage: http://substack.net
+
+=== fast-levenshtein ===
+Version: 2.0.6
+License: MIT
+Repository: https://github.com/hiddentao/fast-levenshtein
+Publisher: Ramesh Nair
+Homepage: http://www.hiddentao.com/
+
+=== fd-slicer ===
+Version: 1.1.0
+License: MIT
+Repository: https://github.com/andrewrk/node-fd-slicer
+Publisher: Andrew Kelley
+
+=== fdir ===
+Version: 6.5.0
+License: MIT
+Repository: https://github.com/thecodrr/fdir
+Publisher: thecodrr
+
+=== file-entry-cache ===
+Version: 8.0.0
+License: MIT
+Repository: https://github.com/jaredwray/file-entry-cache
+Publisher: Jared Wray
+Homepage: https://jaredwray.com
+
+=== filelist ===
+Version: 1.0.6
+License: Apache-2.0
+Repository: https://github.com/mde/filelist
+Publisher: Matthew Eernisse
+Homepage: http://fleegix.org
+
+=== find-up ===
+Version: 5.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/find-up
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== flat-cache ===
+Version: 4.0.1
+License: MIT
+Repository: https://github.com/jaredwray/flat-cache
+Publisher: Jared Wray
+Homepage: https://jaredwray.com
+
+=== flatted ===
+Version: 3.4.2
+License: ISC
+Repository: https://github.com/WebReflection/flatted
+Publisher: Andrea Giammarchi
+
+=== foreground-child ===
+Version: 3.3.1
+License: ISC
+Repository: https://github.com/tapjs/foreground-child
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== form-data ===
+Version: 4.0.5
+License: MIT
+Repository: https://github.com/form-data/form-data
+Publisher: Felix Geisendörfer
+Homepage: http://debuggable.com/
+
+=== fs-extra ===
+Version: 10.1.0
+License: MIT
+Repository: https://github.com/jprichardson/node-fs-extra
+Publisher: JP Richardson
+
+=== fs-extra ===
+Version: 11.3.4
+License: MIT
+Repository: https://github.com/jprichardson/node-fs-extra
+Publisher: JP Richardson
+
+=== fs-extra ===
+Version: 7.0.1
+License: MIT
+Repository: https://github.com/jprichardson/node-fs-extra
+Publisher: JP Richardson
+
+=== fs-extra ===
+Version: 8.1.0
+License: MIT
+Repository: https://github.com/jprichardson/node-fs-extra
+Publisher: JP Richardson
+
+=== fs-extra ===
+Version: 9.1.0
+License: MIT
+Repository: https://github.com/jprichardson/node-fs-extra
+Publisher: JP Richardson
+
+=== fs-minipass ===
+Version: 3.0.3
+License: ISC
+Repository: https://github.com/npm/fs-minipass
+Publisher: GitHub Inc.
+
+=== fs.realpath ===
+Version: 1.0.0
+License: ISC
+Repository: https://github.com/isaacs/fs.realpath
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== function-bind ===
+Version: 1.1.2
+License: MIT
+Repository: https://github.com/Raynos/function-bind
+Publisher: Raynos
+
+=== get-caller-file ===
+Version: 2.0.5
+License: ISC
+Repository: https://github.com/stefanpenner/get-caller-file
+Publisher: Stefan Penner
+
+=== get-intrinsic ===
+Version: 1.3.0
+License: MIT
+Repository: https://github.com/ljharb/get-intrinsic
+Publisher: Jordan Harband
+
+=== get-proto ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/ljharb/get-proto
+Publisher: Jordan Harband
+
+=== get-stream ===
+Version: 5.2.0
+License: MIT
+Repository: https://github.com/sindresorhus/get-stream
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== glob-parent ===
+Version: 6.0.2
+License: ISC
+Repository: https://github.com/gulpjs/glob-parent
+Publisher: Gulp Team
+Homepage: https://gulpjs.com/
+
+=== glob ===
+Version: 10.5.0
+License: ISC
+Repository: https://github.com/isaacs/node-glob
+Publisher: Isaac Z. Schlueter
+Homepage: https://blog.izs.me/
+
+=== glob ===
+Version: 7.2.3
+License: ISC
+Repository: https://github.com/isaacs/node-glob
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== global-agent ===
+Version: 3.0.0
+License: BSD-3-Clause
+Repository: https://github.com/gajus/global-agent
+Publisher: Gajus Kuizinas
+Homepage: http://gajus.com
+
+=== globals ===
+Version: 14.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/globals
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== globals ===
+Version: 17.4.0
+License: MIT
+Repository: https://github.com/sindresorhus/globals
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== globalthis ===
+Version: 1.0.4
+License: MIT
+Repository: https://github.com/ljharb/System.global
+Publisher: Jordan Harband
+
+=== gopd ===
+Version: 1.2.0
+License: MIT
+Repository: https://github.com/ljharb/gopd
+Publisher: Jordan Harband
+
+=== got ===
+Version: 11.8.6
+License: MIT
+Repository: https://github.com/sindresorhus/got
+
+=== graceful-fs ===
+Version: 4.2.11
+License: ISC
+Repository: https://github.com/isaacs/node-graceful-fs
+
+=== has-flag ===
+Version: 4.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/has-flag
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== has-property-descriptors ===
+Version: 1.0.2
+License: MIT
+Repository: https://github.com/inspect-js/has-property-descriptors
+Publisher: Jordan Harband
+
+=== has-symbols ===
+Version: 1.1.0
+License: MIT
+Repository: https://github.com/inspect-js/has-symbols
+Publisher: Jordan Harband
+Homepage: http://ljharb.codes
+
+=== has-tostringtag ===
+Version: 1.0.2
+License: MIT
+Repository: https://github.com/inspect-js/has-tostringtag
+Publisher: Jordan Harband
+Homepage: http://ljharb.codes
+
+=== hasown ===
+Version: 2.0.2
+License: MIT
+Repository: https://github.com/inspect-js/hasOwn
+Publisher: Jordan Harband
+
+=== hosted-git-info ===
+Version: 4.1.0
+License: ISC
+Repository: https://github.com/npm/hosted-git-info
+Publisher: Rebecca Turner
+Homepage: http://re-becca.org
+
+=== http-cache-semantics ===
+Version: 4.2.0
+License: BSD-2-Clause
+Repository: https://github.com/kornelski/http-cache-semantics
+Publisher: Kornel Lesiński
+Homepage: https://kornel.ski/
+
+=== http-proxy-agent ===
+Version: 7.0.2
+License: MIT
+Repository: https://github.com/TooTallNate/proxy-agents
+Publisher: Nathan Rajlich
+Homepage: http://n8.io/
+
+=== http2-wrapper ===
+Version: 1.0.3
+License: MIT
+Repository: https://github.com/szmarczak/http2-wrapper
+Publisher: Szymon Marczak
+
+=== https-proxy-agent ===
+Version: 7.0.6
+License: MIT
+Repository: https://github.com/TooTallNate/proxy-agents
+Publisher: Nathan Rajlich
+Homepage: http://n8.io/
+
+=== iconv-lite ===
+Version: 0.6.3
+License: MIT
+Repository: https://github.com/ashtuchkin/iconv-lite
+Publisher: Alexander Shtuchkin
+
+=== ieee754 ===
+Version: 1.2.1
+License: BSD-3-Clause
+Repository: https://github.com/feross/ieee754
+Publisher: Feross Aboukhadijeh
+Homepage: https://feross.org
+
+=== ignore ===
+Version: 5.3.2
+License: MIT
+Repository: https://github.com/kaelzhang/node-ignore
+Publisher: kael
+
+=== import-fresh ===
+Version: 3.3.1
+License: MIT
+Repository: https://github.com/sindresorhus/import-fresh
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== imurmurhash ===
+Version: 0.1.4
+License: MIT
+Repository: https://github.com/jensyt/imurmurhash-js
+Publisher: Jens Taylor
+Homepage: https://github.com/homebrewing
+
+=== inflight ===
+Version: 1.0.6
+License: ISC
+Repository: https://github.com/npm/inflight
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== inherits ===
+Version: 2.0.4
+License: ISC
+Repository: https://github.com/isaacs/inherits
+
+=== ip-address ===
+Version: 10.1.0
+License: MIT
+Repository: https://github.com/beaugunderson/ip-address
+Publisher: Beau Gunderson
+Homepage: https://beaugunderson.com/
+
+=== is-extglob ===
+Version: 2.1.1
+License: MIT
+Repository: https://github.com/jonschlinkert/is-extglob
+Publisher: Jon Schlinkert
+Homepage: https://github.com/jonschlinkert
+
+=== is-fullwidth-code-point ===
+Version: 3.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/is-fullwidth-code-point
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== is-glob ===
+Version: 4.0.3
+License: MIT
+Repository: https://github.com/micromatch/is-glob
+Publisher: Jon Schlinkert
+Homepage: https://github.com/jonschlinkert
+
+=== is-interactive ===
+Version: 1.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/is-interactive
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== is-unicode-supported ===
+Version: 0.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/is-unicode-supported
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== isbinaryfile ===
+Version: 4.0.10
+License: MIT
+Repository: https://github.com/gjtorikian/isBinaryFile
+
+=== isbinaryfile ===
+Version: 5.0.7
+License: MIT
+Repository: https://github.com/gjtorikian/isBinaryFile
+
+=== isexe ===
+Version: 2.0.0
+License: ISC
+Repository: https://github.com/isaacs/isexe
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== isexe ===
+Version: 3.1.5
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/isexe
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== jackspeak ===
+Version: 3.4.3
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/jackspeak
+Publisher: Isaac Z. Schlueter
+
+=== jake ===
+Version: 10.9.4
+License: Apache-2.0
+Repository: https://github.com/jakejs/jake
+Publisher: Matthew Eernisse
+Homepage: http://fleegix.org
+
+=== jiti ===
+Version: 2.6.1
+License: MIT
+Repository: https://github.com/unjs/jiti
+
+=== js-yaml ===
+Version: 4.1.1
+License: MIT
+Repository: https://github.com/nodeca/js-yaml
+Publisher: Vladimir Zapparov
+
+=== json-buffer ===
+Version: 3.0.1
+License: MIT
+Repository: https://github.com/dominictarr/json-buffer
+Publisher: Dominic Tarr
+Homepage: http://dominictarr.com
+
+=== json-schema-traverse ===
+Version: 0.4.1
+License: MIT
+Repository: https://github.com/epoberezkin/json-schema-traverse
+Publisher: Evgeny Poberezkin
+
+=== json-stable-stringify-without-jsonify ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/samn/json-stable-stringify
+Publisher: James Halliday
+Homepage: http://substack.net
+
+=== json-stringify-safe ===
+Version: 5.0.1
+License: ISC
+Repository: https://github.com/isaacs/json-stringify-safe
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me
+
+=== json5 ===
+Version: 2.2.3
+License: MIT
+Repository: https://github.com/json5/json5
+Publisher: Aseem Kishore
+
+=== jsonfile ===
+Version: 4.0.0
+License: MIT
+Repository: https://github.com/jprichardson/node-jsonfile
+Publisher: JP Richardson
+
+=== jsonfile ===
+Version: 6.2.0
+License: MIT
+Repository: https://github.com/jprichardson/node-jsonfile
+Publisher: JP Richardson
+
+=== keyv ===
+Version: 4.5.4
+License: MIT
+Repository: https://github.com/jaredwray/keyv
+Publisher: Jared Wray
+Homepage: http://jaredwray.com
+
+=== lazy-val ===
+Version: 1.0.5
+License: MIT
+Repository: https://github.com/develar/lazy-val
+Publisher: Vladimir Krivosheev
+
+=== levn ===
+Version: 0.4.1
+License: MIT
+Repository: https://github.com/gkz/levn
+Publisher: George Zahariev
+
+=== locate-path ===
+Version: 6.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/locate-path
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== lodash.merge ===
+Version: 4.6.2
+License: MIT
+Repository: https://github.com/lodash/lodash
+Publisher: John-David Dalton
+
+=== lodash ===
+Version: 4.18.1
+License: MIT
+Repository: https://github.com/lodash/lodash
+Publisher: John-David Dalton
+
+=== log-symbols ===
+Version: 4.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/log-symbols
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== lowercase-keys ===
+Version: 2.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/lowercase-keys
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== lru-cache ===
+Version: 10.4.3
+License: ISC
+Repository: https://github.com/isaacs/node-lru-cache
+Publisher: Isaac Z. Schlueter
+
+=== lru-cache ===
+Version: 6.0.0
+License: ISC
+Repository: https://github.com/isaacs/node-lru-cache
+Publisher: Isaac Z. Schlueter
+
+=== make-fetch-happen ===
+Version: 14.0.3
+License: ISC
+Repository: https://github.com/npm/make-fetch-happen
+Publisher: GitHub Inc.
+
+=== matcher ===
+Version: 3.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/matcher
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== math-intrinsics ===
+Version: 1.1.0
+License: MIT
+Repository: https://github.com/es-shims/math-intrinsics
+Publisher: Jordan Harband
+
+=== mime-db ===
+Version: 1.52.0
+License: MIT
+Repository: https://github.com/jshttp/mime-db
+
+=== mime-types ===
+Version: 2.1.35
+License: MIT
+Repository: https://github.com/jshttp/mime-types
+
+=== mime ===
+Version: 2.6.0
+License: MIT
+Repository: https://github.com/broofa/mime
+Publisher: Robert Kieffer
+Homepage: http://github.com/broofa
+
+=== mimic-fn ===
+Version: 2.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/mimic-fn
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== mimic-response ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/sindresorhus/mimic-response
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== mimic-response ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/mimic-response
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== minimatch ===
+Version: 10.2.5
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/minimatch
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me
+
+=== minimatch ===
+Version: 3.1.5
+License: ISC
+Repository: https://github.com/isaacs/minimatch
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me
+
+=== minimatch ===
+Version: 5.1.9
+License: ISC
+Repository: https://github.com/isaacs/minimatch
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me
+
+=== minimatch ===
+Version: 9.0.9
+License: ISC
+Repository: https://github.com/isaacs/minimatch
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me
+
+=== minimist ===
+Version: 1.2.8
+License: MIT
+Repository: https://github.com/minimistjs/minimist
+Publisher: James Halliday
+Homepage: http://substack.net
+
+=== minipass-collect ===
+Version: 2.0.1
+License: ISC
+Repository: https://github.com/isaacs/minipass-collect
+Publisher: Isaac Z. Schlueter
+Homepage: https://izs.me
+
+=== minipass-fetch ===
+Version: 4.0.1
+License: MIT
+Repository: https://github.com/npm/minipass-fetch
+Publisher: GitHub Inc.
+
+=== minipass-flush ===
+Version: 1.0.7
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/minipass-flush
+Publisher: Isaac Z. Schlueter
+Homepage: https://izs.me
+
+=== minipass-pipeline ===
+Version: 1.2.4
+License: ISC
+Publisher: Isaac Z. Schlueter
+Homepage: https://izs.me
+
+=== minipass-sized ===
+Version: 1.0.3
+License: ISC
+Repository: https://github.com/isaacs/minipass-sized
+Publisher: Isaac Z. Schlueter
+Homepage: https://izs.me
+
+=== minipass ===
+Version: 3.3.6
+License: ISC
+Repository: https://github.com/isaacs/minipass
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== minipass ===
+Version: 7.1.3
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/minipass
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== minizlib ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/isaacs/minizlib
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== mkdirp ===
+Version: 0.5.6
+License: MIT
+Repository: https://github.com/substack/node-mkdirp
+Publisher: James Halliday
+Homepage: http://substack.net
+
+=== ms ===
+Version: 2.1.3
+License: MIT
+Repository: https://github.com/vercel/ms
+
+=== natural-compare ===
+Version: 1.4.0
+License: MIT
+Repository: https://github.com/litejs/natural-compare-lite
+Publisher: Lauri Rooden
+Homepage: https://github.com/litejs/natural-compare-lite
+
+=== negotiator ===
+Version: 1.0.0
+License: MIT
+Repository: https://github.com/jshttp/negotiator
+
+=== node-abi ===
+Version: 4.28.0
+License: MIT
+Repository: https://github.com/electron/node-abi
+Publisher: Lukas Geiger
+
+=== node-api-version ===
+Version: 0.2.1
+License: MIT
+Repository: https://github.com/timfish/node-api-version
+Publisher: Tim Fish
+
+=== node-gyp ===
+Version: 11.5.0
+License: MIT
+Repository: https://github.com/nodejs/node-gyp
+Publisher: Nathan Rajlich
+Homepage: http://tootallnate.net
+
+=== nopt ===
+Version: 8.1.0
+License: ISC
+Repository: https://github.com/npm/nopt
+Publisher: GitHub Inc.
+
+=== normalize-url ===
+Version: 6.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/normalize-url
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== object-keys ===
+Version: 1.1.1
+License: MIT
+Repository: https://github.com/ljharb/object-keys
+Publisher: Jordan Harband
+Homepage: http://ljharb.codes
+
+=== once ===
+Version: 1.4.0
+License: ISC
+Repository: https://github.com/isaacs/once
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== onetime ===
+Version: 5.1.2
+License: MIT
+Repository: https://github.com/sindresorhus/onetime
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== optionator ===
+Version: 0.9.4
+License: MIT
+Repository: https://github.com/gkz/optionator
+Publisher: George Zahariev
+
+=== ora ===
+Version: 5.4.1
+License: MIT
+Repository: https://github.com/sindresorhus/ora
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== p-cancelable ===
+Version: 2.1.1
+License: MIT
+Repository: https://github.com/sindresorhus/p-cancelable
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== p-limit ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/p-limit
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== p-locate ===
+Version: 5.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/p-locate
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== p-map ===
+Version: 7.0.4
+License: MIT
+Repository: https://github.com/sindresorhus/p-map
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== package-json-from-dist ===
+Version: 1.0.1
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/package-json-from-dist
+Publisher: Isaac Z. Schlueter
+Homepage: https://izs.me
+
+=== parent-module ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/sindresorhus/parent-module
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== path-exists ===
+Version: 4.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/path-exists
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== path-is-absolute ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/sindresorhus/path-is-absolute
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== path-key ===
+Version: 3.1.1
+License: MIT
+Repository: https://github.com/sindresorhus/path-key
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== path-scurry ===
+Version: 1.11.1
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/path-scurry
+Publisher: Isaac Z. Schlueter
+Homepage: https://blog.izs.me
+
+=== pe-library ===
+Version: 0.4.1
+License: MIT
+Repository: https://github.com/jet2jet/pe-library-js
+Publisher: jet
+
+=== pend ===
+Version: 1.2.0
+License: MIT
+Repository: https://github.com/andrewrk/node-pend
+Publisher: Andrew Kelley
+
+=== picocolors ===
+Version: 1.1.1
+License: ISC
+Repository: https://github.com/alexeyraspopov/picocolors
+Publisher: Alexey Raspopov
+
+=== picomatch ===
+Version: 4.0.4
+License: MIT
+Repository: https://github.com/micromatch/picomatch
+Publisher: Jon Schlinkert
+Homepage: https://github.com/jonschlinkert
+
+=== playwright-core ===
+Version: 1.59.1
+License: Apache-2.0
+Repository: https://github.com/microsoft/playwright
+Publisher: Microsoft Corporation
+
+=== playwright ===
+Version: 1.59.1
+License: Apache-2.0
+Repository: https://github.com/microsoft/playwright
+Publisher: Microsoft Corporation
+
+=== plist ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/TooTallNate/node-plist
+Publisher: Nathan Rajlich
+
+=== postject ===
+Version: 1.0.0-alpha.6
+License: MIT
+Repository: https://github.com/nodejs/postject
+
+=== prelude-ls ===
+Version: 1.2.1
+License: MIT
+Repository: https://github.com/gkz/prelude-ls
+Publisher: George Zahariev
+
+=== proc-log ===
+Version: 5.0.0
+License: ISC
+Repository: https://github.com/npm/proc-log
+Publisher: GitHub Inc.
+
+=== progress ===
+Version: 2.0.3
+License: MIT
+Repository: https://github.com/visionmedia/node-progress
+Publisher: TJ Holowaychuk
+
+=== promise-retry ===
+Version: 2.0.1
+License: MIT
+Repository: https://github.com/IndigoUnited/node-promise-retry
+Publisher: IndigoUnited
+Homepage: http://indigounited.com
+
+=== proper-lockfile ===
+Version: 4.1.2
+License: MIT
+Repository: https://github.com/moxystudio/node-proper-lockfile
+Publisher: André Cruz
+
+=== pump ===
+Version: 3.0.4
+License: MIT
+Repository: https://github.com/mafintosh/pump
+Publisher: Mathias Buus Madsen
+
+=== punycode ===
+Version: 2.3.1
+License: MIT
+Repository: https://github.com/mathiasbynens/punycode.js
+Publisher: Mathias Bynens
+Homepage: https://mathiasbynens.be/
+
+=== quick-lru ===
+Version: 5.1.1
+License: MIT
+Repository: https://github.com/sindresorhus/quick-lru
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== read-binary-file-arch ===
+Version: 1.0.6
+License: MIT
+Repository: https://github.com/samuelmaddock/read-binary-file-arch
+Publisher: Samuel Maddock
+
+=== readable-stream ===
+Version: 3.6.2
+License: MIT
+Repository: https://github.com/nodejs/readable-stream
+
+=== require-directory ===
+Version: 2.1.1
+License: MIT
+Repository: https://github.com/troygoode/node-require-directory
+Publisher: Troy Goode
+Homepage: http://github.com/troygoode/
+
+=== resedit ===
+Version: 1.7.2
+License: MIT
+Repository: https://github.com/jet2jet/resedit-js
+Publisher: jet
+
+=== resolve-alpn ===
+Version: 1.2.1
+License: MIT
+Repository: https://github.com/szmarczak/resolve-alpn
+Publisher: Szymon Marczak
+
+=== resolve-from ===
+Version: 4.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/resolve-from
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== responselike ===
+Version: 2.0.1
+License: MIT
+Repository: https://github.com/sindresorhus/responselike
+Publisher: lukechilds
+
+=== restore-cursor ===
+Version: 3.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/restore-cursor
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== retry ===
+Version: 0.12.0
+License: MIT
+Repository: https://github.com/tim-kos/node-retry
+Publisher: Tim Koschützki
+Homepage: http://debuggable.com/
+
+=== rimraf ===
+Version: 2.6.3
+License: ISC
+Repository: https://github.com/isaacs/rimraf
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== roarr ===
+Version: 2.15.4
+License: BSD-3-Clause
+Repository: https://github.com/gajus/roarr
+Publisher: Gajus Kuizinas
+Homepage: http://gajus.com
+
+=== safe-buffer ===
+Version: 5.2.1
+License: MIT
+Repository: https://github.com/feross/safe-buffer
+Publisher: Feross Aboukhadijeh
+Homepage: https://feross.org
+
+=== safer-buffer ===
+Version: 2.1.2
+License: MIT
+Repository: https://github.com/ChALkeR/safer-buffer
+Publisher: Nikita Skovoroda
+Homepage: https://github.com/ChALkeR
+
+=== sanitize-filename ===
+Version: 1.6.4
+License: WTFPL OR ISC
+Repository: https://github.com/parshap/node-sanitize-filename
+Publisher: Parsha Pourkhomami
+
+=== sax ===
+Version: 1.6.0
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/sax-js
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== semver-compare ===
+Version: 1.0.0
+License: MIT
+Repository: https://github.com/substack/semver-compare
+Publisher: James Halliday
+Homepage: http://substack.net
+
+=== semver ===
+Version: 5.7.2
+License: ISC
+Repository: https://github.com/npm/node-semver
+Publisher: GitHub Inc.
+
+=== semver ===
+Version: 6.3.1
+License: ISC
+Repository: https://github.com/npm/node-semver
+Publisher: GitHub Inc.
+
+=== semver ===
+Version: 7.7.4
+License: ISC
+Repository: https://github.com/npm/node-semver
+Publisher: GitHub Inc.
+
+=== serialize-error ===
+Version: 7.0.1
+License: MIT
+Repository: https://github.com/sindresorhus/serialize-error
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== shebang-command ===
+Version: 2.0.0
+License: MIT
+Repository: https://github.com/kevva/shebang-command
+Publisher: Kevin Mårtensson
+Homepage: github.com/kevva
+
+=== shebang-regex ===
+Version: 3.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/shebang-regex
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== signal-exit ===
+Version: 3.0.7
+License: ISC
+Repository: https://github.com/tapjs/signal-exit
+Publisher: Ben Coe
+
+=== signal-exit ===
+Version: 4.1.0
+License: ISC
+Repository: https://github.com/tapjs/signal-exit
+Publisher: Ben Coe
+
+=== simple-update-notifier ===
+Version: 2.0.0
+License: MIT
+Repository: https://github.com/alexbrazier/simple-update-notifier
+Publisher: alexbrazier
+
+=== smart-buffer ===
+Version: 4.2.0
+License: MIT
+Repository: https://github.com/JoshGlazebrook/smart-buffer
+Publisher: Josh Glazebrook
+
+=== socks-proxy-agent ===
+Version: 8.0.5
+License: MIT
+Repository: https://github.com/TooTallNate/proxy-agents
+Publisher: Nathan Rajlich
+Homepage: http://n8.io/
+
+=== socks ===
+Version: 2.8.7
+License: MIT
+Repository: https://github.com/JoshGlazebrook/socks
+Publisher: Josh Glazebrook
+
+=== source-map-support ===
+Version: 0.5.21
+License: MIT
+Repository: https://github.com/evanw/node-source-map-support
+
+=== source-map ===
+Version: 0.6.1
+License: BSD-3-Clause
+Repository: https://github.com/mozilla/source-map
+Publisher: Nick Fitzgerald
+
+=== sprintf-js ===
+Version: 1.1.3
+License: BSD-3-Clause
+Repository: https://github.com/alexei/sprintf.js
+Publisher: Alexandru Mărășteanu
+
+=== ssri ===
+Version: 12.0.0
+License: ISC
+Repository: https://github.com/npm/ssri
+Publisher: GitHub Inc.
+
+=== stat-mode ===
+Version: 1.0.0
+License: MIT
+Repository: https://github.com/TooTallNate/stat-mode
+Publisher: Nathan Rajlich
+Homepage: http://n8.io/
+
+=== string_decoder ===
+Version: 1.3.0
+License: MIT
+Repository: https://github.com/nodejs/string_decoder
+
+=== string-width ===
+Version: 4.2.3
+License: MIT
+Repository: https://github.com/sindresorhus/string-width
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== string-width ===
+Version: 5.1.2
+License: MIT
+Repository: https://github.com/sindresorhus/string-width
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== strip-ansi ===
+Version: 6.0.1
+License: MIT
+Repository: https://github.com/chalk/strip-ansi
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== strip-ansi ===
+Version: 7.2.0
+License: MIT
+Repository: https://github.com/chalk/strip-ansi
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== strip-json-comments ===
+Version: 3.1.1
+License: MIT
+Repository: https://github.com/sindresorhus/strip-json-comments
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== sumchecker ===
+Version: 3.0.1
+License: Apache-2.0
+Repository: https://github.com/malept/sumchecker
+Publisher: Mark Lee
+
+=== supports-color ===
+Version: 7.2.0
+License: MIT
+Repository: https://github.com/chalk/supports-color
+Publisher: Sindre Sorhus
+Homepage: sindresorhus.com
+
+=== tar ===
+Version: 7.5.13
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/node-tar
+Publisher: Isaac Z. Schlueter
+
+=== temp-file ===
+Version: 3.4.0
+License: MIT
+Repository: https://github.com/develar/temp-file
+Publisher: Vladimir Krivosheev
+
+=== temp ===
+Version: 0.9.4
+License: MIT
+Repository: https://github.com/bruce/node-temp
+Publisher: Bruce Williams
+
+=== tiny-async-pool ===
+Version: 1.3.0
+License: MIT
+Repository: https://github.com/rxaviers/async-pool
+Publisher: Rafael Xavier de Souza
+
+=== tinyglobby ===
+Version: 0.2.15
+License: MIT
+Repository: https://github.com/SuperchupuDev/tinyglobby
+Publisher: Superchupu
+
+=== tmp-promise ===
+Version: 3.0.3
+License: MIT
+Repository: https://github.com/benjamingr/tmp-promise
+Publisher: Benjamin Gruenbaum and Collaborators.
+
+=== tmp ===
+Version: 0.2.5
+License: MIT
+Repository: https://github.com/raszi/node-tmp
+Publisher: KARASZI István
+
+=== truncate-utf8-bytes ===
+Version: 1.0.2
+License: WTFPL
+Repository: https://github.com/parshap/truncate-utf8-bytes
+Publisher: Carl Xiong
+
+=== type-check ===
+Version: 0.4.0
+License: MIT
+Repository: https://github.com/gkz/type-check
+Publisher: George Zahariev
+
+=== type-fest ===
+Version: 0.13.1
+License: (MIT OR CC0-1.0)
+Repository: https://github.com/sindresorhus/type-fest
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== undici-types ===
+Version: 7.16.0
+License: MIT
+Repository: https://github.com/nodejs/undici
+
+=== unique-filename ===
+Version: 4.0.0
+License: ISC
+Repository: https://github.com/npm/unique-filename
+Publisher: GitHub Inc.
+
+=== unique-slug ===
+Version: 5.0.0
+License: ISC
+Repository: https://github.com/npm/unique-slug
+Publisher: GitHub Inc.
+
+=== universalify ===
+Version: 0.1.2
+License: MIT
+Repository: https://github.com/RyanZim/universalify
+Publisher: Ryan Zimmerman
+
+=== universalify ===
+Version: 2.0.1
+License: MIT
+Repository: https://github.com/RyanZim/universalify
+Publisher: Ryan Zimmerman
+
+=== uri-js ===
+Version: 4.4.1
+License: BSD-2-Clause
+Repository: https://github.com/garycourt/uri-js
+Publisher: Gary Court
+
+=== utf8-byte-length ===
+Version: 1.0.5
+License: (WTFPL OR MIT)
+Repository: https://github.com/parshap/utf8-byte-length
+Publisher: Carl Xiong
+
+=== util-deprecate ===
+Version: 1.0.2
+License: MIT
+Repository: https://github.com/TooTallNate/util-deprecate
+Publisher: Nathan Rajlich
+Homepage: http://n8.io/
+
+=== wcwidth ===
+Version: 1.0.1
+License: MIT
+Repository: https://github.com/timoxley/wcwidth
+Publisher: Tim Oxley
+
+=== which ===
+Version: 2.0.2
+License: ISC
+Repository: https://github.com/isaacs/node-which
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me
+
+=== which ===
+Version: 5.0.0
+License: ISC
+Repository: https://github.com/npm/node-which
+Publisher: GitHub Inc.
+
+=== word-wrap ===
+Version: 1.2.5
+License: MIT
+Repository: https://github.com/jonschlinkert/word-wrap
+Publisher: Jon Schlinkert
+Homepage: https://github.com/jonschlinkert
+
+=== wrap-ansi ===
+Version: 7.0.0
+License: MIT
+Repository: https://github.com/chalk/wrap-ansi
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== wrap-ansi ===
+Version: 8.1.0
+License: MIT
+Repository: https://github.com/chalk/wrap-ansi
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== wrappy ===
+Version: 1.0.2
+License: ISC
+Repository: https://github.com/npm/wrappy
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== xmlbuilder ===
+Version: 15.1.1
+License: MIT
+Repository: https://github.com/oozcitak/xmlbuilder-js
+Publisher: Ozgur Ozcitak
+
+=== y18n ===
+Version: 5.0.8
+License: ISC
+Repository: https://github.com/yargs/y18n
+Publisher: Ben Coe
+
+=== yallist ===
+Version: 4.0.0
+License: ISC
+Repository: https://github.com/isaacs/yallist
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== yallist ===
+Version: 5.0.0
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/yallist
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
+
+=== yargs-parser ===
+Version: 21.1.1
+License: ISC
+Repository: https://github.com/yargs/yargs-parser
+Publisher: Ben Coe
+
+=== yargs ===
+Version: 17.7.2
+License: MIT
+Repository: https://github.com/yargs/yargs
+
+=== yauzl ===
+Version: 2.10.0
+License: MIT
+Repository: https://github.com/thejoshwolfe/yauzl
+Publisher: Josh Wolfe
+
+=== yocto-queue ===
+Version: 0.1.0
+License: MIT
+Repository: https://github.com/sindresorhus/yocto-queue
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com

@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -10,6 +10,8 @@
     "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
     "test:e2e": "npx playwright test",
+    "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5",
+    "notice": "node scripts/generate-notice.js",
     "build": "npx --yes electron-builder",
     "build:win": "npx --yes electron-builder --win",
     "build:mac": "npx --yes electron-builder --mac",
@@ -53,7 +55,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "include": "build/nsis-include.nsh",
+      "deleteAppDataOnUninstall": false
     },
     "portable": {
       "artifactName": "${productName}-Portable.exe"
@@ -87,7 +91,8 @@
     },
     "deb": {
       "fpm": [
-        "--deb-no-default-config-files"
+        "--deb-no-default-config-files",
+        "--after-remove=build/linux-post-remove.sh"
       ],
       "afterInstall": "build/linux-after-install.sh"
     },
@@ -108,7 +113,12 @@
       "display.html",
       "display-script.js",
       "sounds/**/*",
-      "fonts/**/*"
+      "fonts/**/*",
+      "NOTICE",
+      "sbom.json"
     ]
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3"
   }
 }
