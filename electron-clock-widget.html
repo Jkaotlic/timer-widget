@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clock Widget</title>
+    <link rel="stylesheet" href="design-tokens.css">
     <link rel="stylesheet" href="components.css">
     <style>
         /* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
@@ -44,10 +45,12 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--tw-font-sans);
             /* Near-transparent background enables drag/hit-testing on Windows transparent windows */
             background: rgba(0, 0, 0, 0.01);
             overflow: hidden;
+            color: var(--tw-fg);
+            -webkit-font-smoothing: antialiased;
         }
 
         /* Рамка окна - скрыта по умолчанию, видна при наведении */
@@ -66,7 +69,9 @@
             container-name: widget;
         }
 
-        /* Круговой виджет */
+        /* ============================================
+           СТИЛЬ: КРУГОВОЙ (Circle)
+           ============================================ */
         .circular-widget {
             position: relative;
             width: 100%;
@@ -87,22 +92,22 @@
 
         /* Фоновый круг с градиентом */
         .bg-circle {
-            fill: rgba(15, 15, 25, 0.7);
-            stroke: rgba(255, 255, 255, 0.12);
+            fill: var(--tw-bg-timer);
+            stroke: var(--tw-border-strong);
             stroke-width: 1.5;
         }
 
         /* Декоративный внутренний круг */
         .inner-glow {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.03);
+            stroke: var(--tw-divider);
             stroke-width: 1;
         }
 
         /* Трек секундной стрелки (фон) */
         .seconds-track {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.08);
+            stroke: var(--tw-border);
             stroke-width: 6;
         }
 
@@ -112,18 +117,19 @@
             stroke: url(#clockGradient);
             stroke-width: 6;
             stroke-linecap: round;
-            transition: stroke-dashoffset 0.2s linear;
-            /* no external shadow on transparent window */
+            transition: stroke-dashoffset var(--tw-dur-base) linear;
+            /* SVG drop-shadow is safe on a stroke even on transparent windows */
+            filter: drop-shadow(0 0 6px rgba(10, 132, 255, 0.45));
         }
 
         /* Шкала с делениями */
         .tick-marks {
-            stroke: rgba(255, 255, 255, 0.15);
+            stroke: var(--tw-border-strong);
             stroke-width: 1;
         }
 
         .tick-marks-major {
-            stroke: rgba(255, 255, 255, 0.3);
+            stroke: var(--tw-fg-dim);
             stroke-width: 2;
         }
 
@@ -140,47 +146,59 @@
         .time-display {
             font-size: clamp(1.2rem, min(20vw, 20vh), 20rem);
             font-weight: 200;
-            color: white;
-            font-family: 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif;
-            letter-spacing: 0.02em;
-            text-shadow: 
+            color: var(--tw-fg);
+            font-family: var(--tw-font-display);
+            letter-spacing: 0.05em;
+            font-variant-numeric: tabular-nums;
+            text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 30px rgba(10, 132, 255, 0.6);
-            transition: color 0.2s ease-out, text-shadow 0.2s ease-out;
+                var(--tw-glow-blue);
+            transition: color var(--tw-dur-base) var(--tw-ease),
+                        text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
+            line-height: 1;
         }
 
+        /* ============================================
+           Шильдики даты и часового пояса (базовые)
+           ============================================ */
         .date-badge {
             margin-top: clamp(4px, 2vh, 16px);
             padding: clamp(4px, 1.5vh, 10px) clamp(10px, 4vw, 24px);
-            border-radius: 20px;
+            border-radius: var(--tw-r-pill);
             font-size: clamp(0.5rem, min(4.5vw, 4.5vh), 5rem);
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            background: rgba(255, 255, 255, 0.1);
-            color: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(5px);
-            transition: all 0.3s;
+            letter-spacing: 1px;
+            background: var(--tw-overlay-medium);
+            color: var(--tw-fg-secondary);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            border: 1px solid var(--tw-border);
+            transition: background var(--tw-dur-slow) var(--tw-ease),
+                        color var(--tw-dur-slow) var(--tw-ease);
         }
 
-        /* Стили date-badge для Digital режима */
+        /* Digital: LED-style date plate on dark enclosure */
         body.style-digital .date-badge {
-            background: linear-gradient(180deg, #0a0a0a 0%, #151515 100%);
-            border: 1px solid #333;
-            border-radius: 8px;
-            color: #00ff88;
-            text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+            background: var(--tw-bg-led);
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-sm);
+            color: var(--tw-led-green);
+            text-shadow: 0 0 8px currentColor;
             box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+            font-family: var(--tw-font-mono);
         }
 
-        /* Стили date-badge для Flip режима */
+        /* Flip: split-flap style date card */
         body.style-flip .date-badge {
-            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-            border-radius: 6px;
-            color: rgba(255, 255, 255, 0.8);
-            font-family: 'Arial Black', 'Helvetica', sans-serif;
-            font-weight: 900;
+            background: linear-gradient(180deg, rgba(42,42,53,0.85) 0%, rgba(26,26,37,0.85) 100%);
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-xs);
+            color: var(--tw-fg-secondary);
+            font-family: var(--tw-font-sans);
+            font-weight: 700;
+            letter-spacing: 1px;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
             box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
         }
@@ -189,14 +207,18 @@
         .timezone-badge {
             margin-top: clamp(2px, 1vh, 8px);
             padding: clamp(2px, 0.8vh, 6px) clamp(6px, 2vw, 14px);
-            border-radius: 12px;
+            border-radius: var(--tw-r-md);
             font-size: clamp(0.4rem, min(3.5vw, 3.5vh), 4rem);
             font-weight: 500;
             letter-spacing: 0.05em;
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(5px);
-            transition: all 0.3s;
+            background: var(--tw-overlay-light);
+            color: var(--tw-fg-muted);
+            font-family: var(--tw-font-mono);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            border: 1px solid var(--tw-border);
+            transition: background var(--tw-dur-slow) var(--tw-ease),
+                        color var(--tw-dur-slow) var(--tw-ease);
             display: none;
         }
 
@@ -204,27 +226,29 @@
             display: inline-block;
         }
 
-        /* Стили timezone для Digital режима */
         body.style-digital .timezone-badge {
-            background: linear-gradient(180deg, #0a0a0a 0%, #101010 100%);
-            border: 1px solid #222;
-            border-radius: 6px;
-            color: #00cc66;
-            text-shadow: 0 0 6px rgba(0, 204, 102, 0.4);
+            background: var(--tw-bg-led);
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-xs);
+            color: var(--tw-led-green);
+            text-shadow: 0 0 6px currentColor;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+            font-family: var(--tw-font-mono);
         }
 
-        /* Стили timezone для Flip режима */
         body.style-flip .timezone-badge {
-            background: linear-gradient(180deg, #222 0%, #1a1a1a 100%);
-            border-radius: 4px;
-            color: rgba(255, 255, 255, 0.6);
-            font-family: 'Arial', sans-serif;
-            font-weight: 600;
+            background: linear-gradient(180deg, rgba(34,34,42,0.85) 0%, rgba(26,26,32,0.85) 100%);
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-xs);
+            color: var(--tw-fg-muted);
+            font-family: var(--tw-font-mono);
+            font-weight: 500;
             box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.3);
         }
 
-        /* Кнопки управления */
+        /* ============================================
+           Кнопки управления (overlay — сохранено на будущее)
+           ============================================ */
         .controls-overlay {
             position: absolute;
             top: clamp(8px, 5%, 30px);
@@ -234,7 +258,7 @@
             align-items: flex-start;
             gap: clamp(6px, 2vw, 16px);
             opacity: 0;
-            transition: all 0.25s ease;
+            transition: opacity var(--tw-dur-base) var(--tw-ease);
             -webkit-app-region: no-drag;
             z-index: 100;
             pointer-events: none;
@@ -250,48 +274,59 @@
             width: clamp(24px, min(8vw, 8vh), 44px);
             height: clamp(24px, min(8vw, 8vh), 44px);
             border-radius: 50%;
-            border: none;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            color: white;
+            border: 1px solid var(--tw-border);
+            background: var(--tw-overlay-medium);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            color: var(--tw-fg);
             pointer-events: auto;
             -webkit-app-region: no-drag;
             font-size: clamp(10px, min(3vw, 3vh), 18px);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        transform var(--tw-dur-fast) var(--tw-ease);
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
         .ctrl-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
+            background: var(--tw-overlay-medium);
+            transform: scale(1.08);
         }
 
         .ctrl-btn.close:hover {
             background: rgba(255, 68, 68, 0.6);
         }
 
-        /* Панель настроек */
+        .ctrl-btn:focus-visible {
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
+        }
+
+        /* ============================================
+           Панель настроек (не отображается в этом окне, но стили сохранены)
+           ============================================ */
         .settings-panel {
             position: absolute;
             top: 15%;
             right: 10%;
-            background: rgba(20, 20, 35, 0.95);
-            backdrop-filter: blur(40px) saturate(180%);
-            border-radius: 16px;
+            background: var(--tw-bg-glass);
+            -webkit-backdrop-filter: var(--tw-blur);
+            backdrop-filter: var(--tw-blur);
+            border-radius: var(--tw-r-xl);
             padding: clamp(10px, 4%, 20px);
             min-width: min(180px, 70%);
             max-width: 90%;
             opacity: 0;
             pointer-events: none;
             transform: translateY(-10px) scale(0.95);
-            transition: all 0.25s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: opacity var(--tw-dur-base) var(--tw-ease),
+                        transform var(--tw-dur-base) var(--tw-ease);
+            border: 1px solid var(--tw-border);
             z-index: 1000;
             -webkit-app-region: no-drag;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            box-shadow: var(--tw-shadow-inner-top);
         }
 
         .settings-panel.visible {
@@ -301,7 +336,7 @@
         }
 
         .settings-title {
-            color: white;
+            color: var(--tw-fg);
             font-size: 0.75em;
             margin-bottom: 12px;
             font-weight: 600;
@@ -321,23 +356,29 @@
             padding: 10px 6px;
             font-size: 0.7em;
             font-weight: 700;
-            border: none;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid transparent;
+            border-radius: var(--tw-r-sm);
+            background: var(--tw-overlay-light);
+            color: var(--tw-fg-secondary);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        color var(--tw-dur-base) var(--tw-ease);
         }
 
         .size-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
+            background: var(--tw-overlay-medium);
+            color: var(--tw-fg);
         }
 
         .size-btn.active {
-            background: linear-gradient(135deg, #0a84ff, #30d158);
-            color: white;
-            border: 1px solid rgba(10, 132, 255, 0.4);
+            background: var(--tw-ring);
+            color: var(--tw-fg);
+            border-color: rgba(10, 132, 255, 0.4);
+        }
+
+        .size-btn:focus-visible {
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
         }
 
         .style-grid {
@@ -350,21 +391,27 @@
         .style-btn {
             padding: 10px 6px;
             font-size: 1em;
-            border: none;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid transparent;
+            border-radius: var(--tw-r-sm);
+            background: var(--tw-overlay-light);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        transform var(--tw-dur-fast) var(--tw-ease);
         }
 
         .style-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
+            background: var(--tw-overlay-medium);
             transform: scale(1.05);
         }
 
         .style-btn.active {
-            background: linear-gradient(135deg, #0a84ff, #30d158);
-            border: 1px solid rgba(10, 132, 255, 0.4);
+            background: var(--tw-ring);
+            border-color: rgba(10, 132, 255, 0.4);
+        }
+
+        .style-btn:focus-visible {
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
         }
 
         .setting-row {
@@ -372,7 +419,7 @@
         }
 
         .setting-label {
-            color: rgba(255, 255, 255, 0.6);
+            color: var(--tw-fg-muted);
             font-size: 0.7em;
             margin-bottom: 6px;
             display: block;
@@ -386,7 +433,7 @@
         }
 
         .toggle-label {
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--tw-fg-secondary);
             font-size: 0.7em;
         }
 
@@ -409,9 +456,9 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(255, 255, 255, 0.2);
-            transition: 0.3s;
-            border-radius: 20px;
+            background-color: var(--tw-overlay-medium);
+            transition: background-color var(--tw-dur-slow) var(--tw-ease);
+            border-radius: var(--tw-r-pill);
         }
 
         .toggle-slider:before {
@@ -421,17 +468,21 @@
             width: 14px;
             left: 3px;
             bottom: 3px;
-            background-color: white;
-            transition: 0.3s;
+            background-color: var(--tw-fg);
+            transition: transform var(--tw-dur-slow) var(--tw-ease);
             border-radius: 50%;
         }
 
         .toggle-switch input:checked + .toggle-slider {
-            background: linear-gradient(135deg, #0a84ff, #30d158);
+            background: var(--tw-ring);
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
             transform: translateX(16px);
+        }
+
+        .toggle-switch input:focus-visible + .toggle-slider {
+            box-shadow: var(--tw-focus-ring);
         }
 
         .slider-container {
@@ -444,7 +495,7 @@
         input[type="range"] {
             width: 100%;
             height: 4px;
-            background: rgba(255, 255, 255, 0.15);
+            background: var(--tw-overlay-medium);
             border-radius: 2px;
             outline: none;
             appearance: none;
@@ -455,15 +506,20 @@
             -webkit-appearance: none;
             width: 16px;
             height: 16px;
-            background: linear-gradient(135deg, #0a84ff, #30d158);
+            background: var(--tw-ring);
             cursor: pointer;
             border-radius: 50%;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: transform 0.2s;
+            border: 1px solid var(--tw-border-strong);
+            transition: transform var(--tw-dur-base) var(--tw-ease);
         }
 
         input[type="range"]::-webkit-slider-thumb:hover {
             transform: scale(1.15);
+        }
+
+        input[type="range"]:focus-visible {
+            box-shadow: var(--tw-focus-ring);
+            border-radius: var(--tw-r-pill);
         }
 
         .slider-value {
@@ -471,11 +527,11 @@
             right: 0;
             top: -16px;
             font-size: 0.65em;
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--tw-fg-secondary);
         }
 
         /* ============================================
-           СТИЛЬ: ЦИФРОВОЙ LED (Digital) - Виджет
+           СТИЛЬ: ЦИФРОВОЙ LED (Digital)
            ============================================ */
         .widget-digital {
             display: none;
@@ -491,12 +547,13 @@
             display: flex;
         }
 
+        /* LED enclosure — dark panel with top highlight */
         .widget-digital-display {
-            background: rgba(10, 10, 15, 0.75);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-            backdrop-filter: blur(20px) saturate(150%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
+            background: var(--tw-bg-led);
+            -webkit-backdrop-filter: var(--tw-blur-sm);
+            backdrop-filter: var(--tw-blur-sm);
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-lg);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -506,6 +563,7 @@
             gap: 4px;
             padding: 5% 8%;
             position: relative;
+            overflow: hidden;
         }
 
         .widget-digital-display::before {
@@ -515,23 +573,24 @@
             left: 0;
             right: 0;
             height: 50%;
-            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+            background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
             pointer-events: none;
-            border-radius: 10px 10px 0 0;
+            border-radius: var(--tw-r-md) var(--tw-r-md) 0 0;
         }
 
         .widget-digital-time {
-            font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+            font-family: var(--tw-font-mono);
             font-size: var(--digital-font-size, 24px);
-            font-weight: bold;
-            color: #00ff88;
-            text-shadow: 
-                0 0 10px #00ff88,
-                0 0 20px #00ff88,
-                0 0 40px #00ff8866;
+            font-weight: 700;
+            color: var(--tw-led-green);
+            text-shadow:
+                0 0 10px currentColor,
+                0 0 20px currentColor,
+                0 0 40px color-mix(in srgb, currentColor 40%, transparent);
             letter-spacing: 0.02em;
             white-space: nowrap;
             line-height: 1;
+            font-variant-numeric: tabular-nums;
         }
 
         /* Дата и timezone пропорционально размеру времени в digital */
@@ -550,7 +609,7 @@
         }
 
         /* ============================================
-           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip) - Виджет
+           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip)
            ============================================ */
         .widget-flip {
             display: none;
@@ -598,14 +657,14 @@
             margin-top: 0;
             padding: 3px 10px;
             font-size: 10px;
-            border-radius: 4px;
+            border-radius: var(--tw-r-xs);
         }
 
         .widget-flip-info .timezone-badge {
             margin-top: 0;
             padding: 2px 8px;
             font-size: 8px;
-            border-radius: 3px;
+            border-radius: var(--tw-r-xs);
         }
 
         .widget-flip-group {
@@ -614,12 +673,14 @@
         }
 
         .widget-flip-separator {
+            font-family: var(--tw-font-display);
             font-size: 48px;
-            font-weight: bold;
-            color: rgba(255, 255, 255, 0.6);
+            font-weight: 600;
+            color: var(--tw-fg-muted);
             display: flex;
             align-items: center;
             margin: 0 2px;
+            line-height: 1;
         }
 
         .widget-flip-card {
@@ -632,10 +693,15 @@
             position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg, rgba(40, 40, 50, 0.8) 0%, rgba(25, 25, 35, 0.8) 49.9%, rgba(10, 10, 15, 0.85) 50%, rgba(25, 25, 35, 0.8) 100%);
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: linear-gradient(180deg,
+                rgba(42,42,53,0.85) 0%,
+                rgba(26,26,37,0.85) 49.9%,
+                rgba(10,10,15,0.90) 50%,
+                rgba(21,21,32,0.85) 100%);
+            border-radius: var(--tw-r-xs);
+            border: 1px solid var(--tw-border);
             overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
         }
 
         .widget-flip-inner::before {
@@ -645,7 +711,7 @@
             left: 0;
             right: 0;
             height: 2px;
-            background: #000;
+            background: rgba(0, 0, 0, 0.85);
             z-index: 10;
         }
 
@@ -654,11 +720,13 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-family: 'Arial Black', sans-serif;
+            font-family: var(--tw-font-display);
             font-size: 42px;
-            font-weight: 900;
-            color: white;
+            font-weight: 600;
+            color: var(--tw-fg);
             line-height: 1;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
         }
 
         /* Адаптивные размеры для 6 цифр (ЧЧ:ММ:СС) */
@@ -682,7 +750,7 @@
         .widget-analog {
             display: none !important;
         }
-        
+
         /* Показываем только активный */
         .circular-widget.active { display: flex !important; }
         .widget-digital.active { display: flex !important; }
@@ -690,7 +758,7 @@
         .widget-analog.active { display: flex !important; }
 
         /* ============================================
-           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog) - для виджета часов
+           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
            ============================================ */
         .widget-analog {
             display: none;
@@ -717,13 +785,14 @@
             width: 200px;
             height: 200px;
             border-radius: 50%;
-            background: rgba(15, 15, 25, 0.7);
-            -webkit-backdrop-filter: blur(20px) saturate(150%);
-            backdrop-filter: blur(20px) saturate(150%);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: var(--tw-bg-timer);
+            -webkit-backdrop-filter: var(--tw-blur-sm);
+            backdrop-filter: var(--tw-blur-sm);
+            border: 1px solid var(--tw-border-strong);
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
         }
 
         .widget-analog-clock::before {
@@ -731,7 +800,7 @@
             position: absolute;
             inset: 5%;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.03), transparent 60%);
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.04), transparent 60%);
             pointer-events: none;
         }
 
@@ -740,7 +809,7 @@
             position: absolute;
             width: 2px;
             height: 10px;
-            background: rgba(255, 255, 255, 0.25);
+            background: var(--tw-fg-dim);
             left: 50%;
             top: 12px;
             transform-origin: 50% 88px;
@@ -751,7 +820,7 @@
         .widget-analog-tick.major {
             width: 3px;
             height: 14px;
-            background: rgba(255, 255, 255, 0.7);
+            background: var(--tw-fg-secondary);
             top: 10px;
             margin-left: -1.5px;
         }
@@ -759,7 +828,7 @@
         .widget-analog-tick.quarter {
             width: 4px;
             height: 20px;
-            background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
+            background: var(--tw-ring);
             top: 6px;
             margin-left: -2px;
         }
@@ -783,12 +852,13 @@
 
         .widget-analog-number {
             position: absolute;
-            font-family: 'Georgia', 'Times New Roman', serif;
+            font-family: var(--tw-font-display);
             font-size: 18px;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.75);
+            font-weight: 500;
+            color: var(--tw-fg-secondary);
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
             transform: translate(-50%, -50%);
+            font-variant-numeric: tabular-nums;
         }
 
         .widget-analog-number.n12 { top: 12%; left: 50%; }
@@ -817,7 +887,7 @@
         .widget-analog-hour {
             width: 5px;
             height: 44px;
-            background: linear-gradient(180deg, #fff 0%, #ccc 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%);
             margin-left: -2.5px;
             z-index: 2;
         }
@@ -826,7 +896,7 @@
         .widget-analog-minute {
             width: 3px;
             height: 64px;
-            background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #dddddd 100%);
             margin-left: -1.5px;
             z-index: 3;
         }
@@ -835,7 +905,7 @@
         .widget-analog-second {
             width: 2px;
             height: 76px;
-            background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
+            background: var(--tw-ring);
             margin-left: -1px;
             z-index: 4;
             transition: transform 0.1s cubic-bezier(0.4, 2.3, 0.3, 1);
@@ -849,7 +919,7 @@
             transform: translateX(-50%);
             width: 2px;
             height: 12px;
-            background: linear-gradient(180deg, #30d158, #0a84ff);
+            background: linear-gradient(180deg, var(--tw-green), var(--tw-blue));
             border-radius: 1px;
         }
 
@@ -858,7 +928,7 @@
             position: absolute;
             width: 12px;
             height: 12px;
-            background: linear-gradient(145deg, #0a84ff, #30d158);
+            background: var(--tw-ring);
             border-radius: 50%;
             z-index: 5;
         }
@@ -870,7 +940,7 @@
             left: 20%;
             width: 30%;
             height: 30%;
-            background: rgba(255, 255, 255, 0.7);
+            background: var(--tw-fg-secondary);
             border-radius: 50%;
         }
 
@@ -887,38 +957,44 @@
         .widget-analog-info .date-badge {
             display: none;
             padding: 4px 10px;
-            border-radius: 12px;
+            border-radius: var(--tw-r-lg);
             font-size: 12px;
-            background: rgba(10, 132, 255, 0.1);
-            border: 1px solid rgba(10, 132, 255, 0.3);
-            color: rgba(255, 255, 255, 0.8);
+            background: rgba(10, 132, 255, 0.10);
+            border: 1px solid rgba(10, 132, 255, 0.30);
+            color: var(--tw-fg-secondary);
         }
 
         .widget-analog-info .timezone-badge {
             display: none;
             padding: 3px 8px;
-            border-radius: 10px;
+            border-radius: var(--tw-r-md);
             font-size: 10px;
             background: rgba(10, 132, 255, 0.08);
-            border: 1px solid rgba(10, 132, 255, 0.2);
-            color: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(10, 132, 255, 0.20);
+            color: var(--tw-fg-muted);
+            font-family: var(--tw-font-mono);
         }
+
+        /* ============================================
+           Hint toast — first-run hint
+           ============================================ */
         .widget-hint {
             position: fixed;
             bottom: 8px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.6);
-            color: rgba(255, 255, 255, 0.7);
+            background: var(--tw-overlay);
+            color: var(--tw-fg-secondary);
             font-size: 10px;
-            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            font-family: var(--tw-font-sans);
             padding: 4px 10px;
-            border-radius: 8px;
+            border-radius: var(--tw-r-sm);
             opacity: 0;
-            animation: hintFade 4s ease forwards;
+            animation: hintFade 4s var(--tw-ease) forwards;
             pointer-events: none;
             white-space: nowrap;
+            border: 1px solid var(--tw-border);
         }
         @keyframes hintFade {
             0% { opacity: 0; }
@@ -929,21 +1005,22 @@
 
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
-                animation-duration: 0.01ms !important;
+                animation-duration: 1ms !important;
                 animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
+                transition-duration: 1ms !important;
                 scroll-behavior: auto !important;
             }
         }
 
+        /* Focus-visible fallback — tokens-driven ring */
         button:focus-visible,
         input:focus-visible,
         select:focus-visible,
         textarea:focus-visible,
         [role="button"]:focus-visible,
         [tabindex]:focus-visible {
-            outline: 2px solid #0a84ff;
-            outline-offset: 2px;
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
         }
     </style>
 </head>

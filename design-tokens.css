@@ -1,0 +1,391 @@
+/* ============================================================
+   TimerWidget — Design Tokens  v2
+   Dark (default) · Light · High-contrast · Reduced-motion
+   + semantic state colors with colorblind patterns
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+/* ---------------- DARK (default) ---------------- */
+:root,
+[data-theme="dark"] {
+  /* APPLE SEMANTIC ACCENT */
+  --tw-blue:   #0a84ff;
+  --tw-green:  #30d158;   /* the ONE success/progress green — use everywhere */
+  --tw-red:    #ff453a;
+  --tw-orange: #ff9f0a;
+  --tw-yellow: #ffc107;
+  --tw-pink:   #f5576c;
+
+  /* Gradient ring */
+  --tw-ring:         linear-gradient(135deg, var(--tw-blue) 0%, var(--tw-green) 100%);
+  --tw-ring-warning: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+  --tw-ring-danger:  linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+
+  /* SURFACES */
+  --tw-bg-void:     #000000;
+  --tw-bg-dark:     #141423;
+  --tw-bg-surface:  rgba(28, 28, 30, 0.72);
+  --tw-bg-glass:    rgba(20, 20, 35, 0.95);
+  --tw-bg-timer:    rgba(15, 15, 25, 0.7);
+  --tw-bg-led:      rgba(10, 10, 15, 0.75);
+
+  /* Solid fallbacks (used when backdrop-filter unavailable) */
+  --tw-bg-surface-solid: #1e1e22;
+  --tw-bg-glass-solid:   #17172a;
+
+  /* TEXT */
+  --tw-fg:            #ffffff;
+  --tw-fg-secondary:  rgba(255, 255, 255, 0.78);
+  --tw-fg-muted:      rgba(255, 255, 255, 0.58);
+  --tw-fg-dim:        rgba(255, 255, 255, 0.42);
+  --tw-fg-faint:      rgba(255, 255, 255, 0.1);
+
+  --tw-border:        rgba(255, 255, 255, 0.08);
+  --tw-border-strong: rgba(255, 255, 255, 0.14);
+  --tw-divider:       rgba(255, 255, 255, 0.06);
+
+  --tw-overlay:        rgba(0, 0, 0, 0.5);
+  --tw-overlay-light:  rgba(255, 255, 255, 0.05);
+  --tw-overlay-medium: rgba(255, 255, 255, 0.10);
+
+  /* LED uses the same green — removed the duplicate #00ff88 */
+  --tw-led-green:  var(--tw-green);
+  --tw-led-warn:   #ffcc00;
+  --tw-led-danger: #ff3333;
+
+  /* Focus ring — a11y first, aesthetic second */
+  --tw-focus-ring:    0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px var(--tw-blue);
+  --tw-focus-offset:  2px;
+
+  /* Glass blur */
+  --tw-blur:    blur(40px) saturate(180%);
+  --tw-blur-sm: blur(20px) saturate(150%);
+  --tw-blur-xs: blur(10px);
+
+  color-scheme: dark;
+}
+
+/* ---------------- LIGHT ---------------- */
+[data-theme="light"] {
+  --tw-blue:   #007aff;
+  --tw-green:  #28a745;
+  --tw-red:    #ff3b30;
+  --tw-orange: #ff9500;
+  --tw-yellow: #f0a800;
+  --tw-pink:   #e04565;
+
+  --tw-ring:         linear-gradient(135deg, var(--tw-blue) 0%, var(--tw-green) 100%);
+  --tw-ring-warning: linear-gradient(135deg, #f0a800 0%, #f56500 100%);
+  --tw-ring-danger:  linear-gradient(135deg, #ff3b30 0%, #c0392b 100%);
+
+  --tw-bg-void:     #e9e9ef;
+  --tw-bg-dark:     #ffffff;
+  --tw-bg-surface:  rgba(255, 255, 255, 0.72);
+  --tw-bg-glass:    rgba(255, 255, 255, 0.94);
+  --tw-bg-timer:    rgba(248, 249, 252, 0.82);
+  --tw-bg-led:      rgba(20, 20, 25, 0.9);     /* LED panels stay dark — readable glow only works on dark */
+
+  --tw-bg-surface-solid: #ffffff;
+  --tw-bg-glass-solid:   #f6f6f8;
+
+  --tw-fg:            #111115;
+  --tw-fg-secondary:  rgba(20, 20, 25, 0.78);
+  --tw-fg-muted:      rgba(20, 20, 25, 0.58);
+  --tw-fg-dim:        rgba(20, 20, 25, 0.42);
+  --tw-fg-faint:      rgba(20, 20, 25, 0.1);
+
+  --tw-border:        rgba(0, 0, 0, 0.08);
+  --tw-border-strong: rgba(0, 0, 0, 0.14);
+  --tw-divider:       rgba(0, 0, 0, 0.06);
+
+  --tw-overlay:        rgba(0, 0, 0, 0.35);
+  --tw-overlay-light:  rgba(0, 0, 0, 0.04);
+  --tw-overlay-medium: rgba(0, 0, 0, 0.08);
+
+  --tw-led-green:  var(--tw-green);
+  --tw-led-warn:   #f0a800;
+  --tw-led-danger: var(--tw-red);
+
+  --tw-focus-ring:    0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px var(--tw-blue);
+
+  color-scheme: light;
+}
+
+/* ---------------- HIGH CONTRAST ---------------- */
+[data-theme="hc-dark"] {
+  --tw-blue:   #4da3ff;
+  --tw-green:  #4ae58a;
+  --tw-red:    #ff6b61;
+  --tw-orange: #ffb650;
+  --tw-yellow: #ffde3a;
+  --tw-pink:   #ff7ea0;
+
+  --tw-bg-void:     #000000;
+  --tw-bg-surface:  #000000;       /* no transparency — solid */
+  --tw-bg-glass:    #0a0a14;
+  --tw-bg-timer:    #000000;
+  --tw-bg-led:      #000000;
+
+  --tw-bg-surface-solid: #000000;
+  --tw-bg-glass-solid:   #0a0a14;
+
+  --tw-fg:            #ffffff;
+  --tw-fg-secondary:  #ffffff;
+  --tw-fg-muted:      #e8e8e8;
+  --tw-fg-dim:        #c0c0c0;
+  --tw-fg-faint:      #606060;
+
+  --tw-border:        #ffffff;
+  --tw-border-strong: #ffffff;
+  --tw-divider:       #606060;
+
+  --tw-focus-ring:    0 0 0 3px #000, 0 0 0 6px #ffde3a;
+
+  --tw-blur:    none;
+  --tw-blur-sm: none;
+  --tw-blur-xs: none;
+
+  color-scheme: dark;
+}
+
+/* ---------------- REDUCED MOTION ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --tw-dur-fast:  1ms;
+    --tw-dur-base:  1ms;
+    --tw-dur-slow:  1ms;
+    --tw-dur-xslow: 1ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------- AUTO LIGHT via OS ---------------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    /* mirror [data-theme="light"] — user hasn't chosen, OS prefers light */
+    --tw-blue:   #007aff;
+    --tw-green:  #28a745;
+    --tw-red:    #ff3b30;
+    --tw-orange: #ff9500;
+    --tw-yellow: #f0a800;
+    --tw-pink:   #e04565;
+    --tw-bg-void: #e9e9ef;
+    --tw-bg-surface: rgba(255,255,255,0.72);
+    --tw-bg-glass: rgba(255,255,255,0.94);
+    --tw-bg-surface-solid: #ffffff;
+    --tw-bg-glass-solid: #f6f6f8;
+    --tw-fg: #111115;
+    --tw-fg-secondary: rgba(20,20,25,0.78);
+    --tw-fg-muted: rgba(20,20,25,0.58);
+    --tw-fg-dim: rgba(20,20,25,0.42);
+    --tw-fg-faint: rgba(20,20,25,0.1);
+    --tw-border: rgba(0,0,0,0.08);
+    --tw-divider: rgba(0,0,0,0.06);
+    color-scheme: light;
+  }
+}
+
+/* ---------------- SHARED (theme-independent) ---------------- */
+:root {
+  /* RADII */
+  --tw-r-xs: 6px; --tw-r-sm: 8px; --tw-r-md: 10px;
+  --tw-r-lg: 12px; --tw-r-xl: 16px; --tw-r-2xl: 20px;
+  --tw-r-pill: 9999px;
+
+  /* SPACING (4pt base) */
+  --tw-s-1: 4px; --tw-s-2: 8px; --tw-s-3: 12px; --tw-s-4: 16px;
+  --tw-s-5: 20px; --tw-s-6: 24px; --tw-s-8: 32px; --tw-s-10: 40px;
+
+  /* SHADOWS */
+  --tw-shadow-panel: 0 0 0 0.5px rgba(255,255,255,0.05),
+                     0 20px 60px rgba(0,0,0,0.5),
+                     inset 0 1px 0 rgba(255,255,255,0.05);
+  --tw-shadow-inner-top: inset 0 1px 0 rgba(255,255,255,0.08);
+  --tw-shadow-pressed:   inset 0 2px 8px rgba(0,0,0,0.5);
+  --tw-glow-blue:  0 0 30px rgba(10, 132, 255, 0.6);
+  --tw-glow-green: 0 0 20px rgba(48, 209, 88, 0.3);
+  --tw-glow-red:   0 0 20px rgba(255, 68, 68, 0.6);
+
+  /* TYPE FAMILIES */
+  --tw-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --tw-font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Courier New', monospace;
+  --tw-font-display: 'Inter', -apple-system, 'SF Pro Display', system-ui, sans-serif;
+
+  /* TYPE SIZES */
+  --tw-t-timer-hero:   clamp(120px, 22vw, 360px);  /* fullscreen projector — was 180px, too small */
+  --tw-t-timer-panel:  52px;
+  --tw-t-timer-widget: clamp(32px, 18vw, 140px);
+  --tw-t-h1:      24px;
+  --tw-t-h2:      17px;
+  --tw-t-body:    14px;    /* was 13px — bumped for WCAG contrast at .58 alpha */
+  --tw-t-label:   13px;    /* was 12px */
+  --tw-t-caption: 12px;    /* was 11px */
+  --tw-t-tiny:    11px;
+
+  /* EASING + DURATIONS */
+  --tw-ease:      cubic-bezier(0.4, 0, 0.2, 1);
+  --tw-ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --tw-dur-fast:  150ms;
+  --tw-dur-base:  200ms;
+  --tw-dur-slow:  300ms;
+  --tw-dur-xslow: 600ms;
+
+  /* TAP / HIT TARGETS */
+  --tw-hit-min:   32px;   /* desktop dense */
+  --tw-hit-base:  40px;   /* default */
+  --tw-hit-touch: 44px;   /* touch/hybrid */
+}
+
+/* ============================================================
+   Fallback when backdrop-filter is unavailable (Windows 10 / older)
+   ============================================================ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --tw-bg-surface: var(--tw-bg-surface-solid);
+    --tw-bg-glass:   var(--tw-bg-glass-solid);
+  }
+}
+
+/* ============================================================
+   Semantic type recipes
+   ============================================================ */
+.tw-timer-hero {
+  font-family: var(--tw-font-display);
+  font-weight: 200;
+  font-size: var(--tw-t-timer-hero);
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  color: var(--tw-fg);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5), var(--tw-glow-blue);
+  white-space: nowrap;
+  line-height: 1;
+}
+.tw-timer-panel {
+  font-family: var(--tw-font-display);
+  font-weight: 200;
+  font-size: var(--tw-t-timer-panel);
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tw-fg);
+  line-height: 1;
+}
+.tw-led {
+  font-family: var(--tw-font-mono);
+  font-weight: 700;
+  color: var(--tw-led-green);
+  text-shadow:
+    0 0 10px currentColor,
+    0 0 20px currentColor,
+    0 0 40px color-mix(in srgb, currentColor 40%, transparent);
+  letter-spacing: 0.02em;
+}
+
+h1, .tw-h1 { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-h1); letter-spacing: -0.3px; color: var(--tw-fg); }
+h2, .tw-h2 { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-h2); letter-spacing: -0.2px; color: var(--tw-fg); }
+.tw-body    { font-family: var(--tw-font-sans); font-weight: 400; font-size: var(--tw-t-body); color: var(--tw-fg-secondary); line-height: 1.45; }
+.tw-label   { font-family: var(--tw-font-sans); font-weight: 500; font-size: var(--tw-t-label); color: var(--tw-fg-muted); }
+.tw-caption { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-caption); color: var(--tw-fg-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.tw-mono    { font-family: var(--tw-font-mono); font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   Building blocks
+   ============================================================ */
+.tw-panel {
+  background: var(--tw-bg-surface);
+  -webkit-backdrop-filter: var(--tw-blur);
+  backdrop-filter: var(--tw-blur);
+  border: 1px solid var(--tw-border);
+  border-radius: var(--tw-r-2xl);
+  box-shadow: var(--tw-shadow-panel);
+}
+
+/* Chips — NORMALIZED: only 3 semantic tiers */
+.tw-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--tw-overlay-medium);
+  border-radius: var(--tw-r-pill);
+  font-family: var(--tw-font-sans);
+  font-size: var(--tw-t-caption);
+  font-weight: 600;
+  color: var(--tw-fg-secondary);
+  backdrop-filter: var(--tw-blur-xs);
+  border: 1px solid transparent;
+}
+.tw-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.tw-chip.is-neutral   { /* default · Готов / Пауза / Завершён */ }
+.tw-chip.is-success   { background: rgba(48,209,88,0.18); color: var(--tw-green); border-color: rgba(48,209,88,0.32); }
+.tw-chip.is-attention { background: rgba(255,69,58,0.20); color: var(--tw-red);   border-color: rgba(255,69,58,0.35); }
+
+/* ============================================================
+   STATES — focus / disabled / loading / error
+   ============================================================ */
+.tw-interactive {
+  transition: background var(--tw-dur-base) var(--tw-ease),
+              color var(--tw-dur-base) var(--tw-ease),
+              border-color var(--tw-dur-base) var(--tw-ease),
+              transform var(--tw-dur-fast) var(--tw-ease),
+              box-shadow var(--tw-dur-base) var(--tw-ease);
+}
+.tw-interactive:focus { outline: none; }
+.tw-interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--tw-focus-ring);
+}
+.tw-interactive:active:not(:disabled) { transform: scale(0.98); }
+.tw-interactive:disabled,
+.tw-interactive[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  filter: grayscale(0.6);
+}
+
+/* Loading spinner — neutral, reused across buttons / rows */
+.tw-spin {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: tw-spin 800ms linear infinite;
+  vertical-align: -2px;
+}
+@keyframes tw-spin { to { transform: rotate(360deg); } }
+
+/* Error field */
+.tw-error-msg {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--tw-red);
+  font-size: var(--tw-t-caption);
+  font-weight: 500;
+  margin-top: 6px;
+}
+.tw-error-msg::before { content: "!"; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: var(--tw-red); color: #fff; font-size: 10px; font-weight: 700; }
+
+/* ============================================================
+   Colorblind-safe pattern helpers
+   Every status also carries a GLYPH + shape, not color only.
+   See SKILL.md → "Status vocabulary" for the contract.
+   ============================================================ */
+.tw-status-glyph { font-family: var(--tw-font-mono); font-weight: 700; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 3px; background: currentColor; color: #000; }
+
+/* ============================================================
+   Overtime pulse — only when prefers-reduced-motion is OFF
+   ============================================================ */
+@keyframes tw-pulse-danger {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+@keyframes tw-breath {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.03); }
+}
+.tw-is-overtime { animation: tw-pulse-danger 1s ease-in-out infinite; }
+.tw-is-breathing { animation: tw-breath 2.4s ease-in-out infinite; }
