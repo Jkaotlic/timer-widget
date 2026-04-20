@@ -2550,12 +2550,12 @@
         <!-- Кастомная панель заголовка (macOS style) -->
         <div class="custom-titlebar">
             <div class="window-controls">
-                <button class="win-btn close-btn" id="closeAppBtn" title="Закрыть"></button>
-                <button class="win-btn minimize-btn" id="minimizeBtn" title="Свернуть"></button>
+                <button class="win-btn close-btn" id="closeAppBtn" title="Закрыть" aria-label="Закрыть"></button>
+                <button class="win-btn minimize-btn" id="minimizeBtn" title="Свернуть" aria-label="Свернуть"></button>
             </div>
             <span class="title-text">Timer Widget</span>
             <div class="titlebar-right">
-                <button class="titlebar-help" id="faqBtn" title="Справка (F1)">?</button>
+                <button class="titlebar-help" id="faqBtn" title="Справка (F1)" aria-label="Справка">?</button>
             </div>
         </div>
 
@@ -2570,9 +2570,9 @@
 
         <!-- Главные кнопки управления -->
         <div class="main-controls">
-            <button class="main-btn pause" id="pauseBtn" title="Приостановить (Space)" disabled>⏸</button>
-            <button class="main-btn start" id="startBtn" title="Запустить таймер (Space)">▶</button>
-            <button class="main-btn reset" id="resetBtn" title="Сбросить к начальному значению (R)">↺</button>
+            <button class="main-btn pause" id="pauseBtn" title="Приостановить (Space)" aria-label="Приостановить" disabled>⏸</button>
+            <button class="main-btn start" id="startBtn" title="Запустить таймер (Space)" aria-label="Запустить таймер">▶</button>
+            <button class="main-btn reset" id="resetBtn" title="Сбросить к начальному значению (R)" aria-label="Сбросить">↺</button>
         </div>
 
         <!-- Быстрые пресеты: 2×4 сетка -->
@@ -2606,7 +2606,7 @@
         <div class="compact-section" style="padding: 6px 16px;">
             <div class="time-input-row">
                 <input type="text" id="manualTimeInput" class="manual-time-input" placeholder="0:00" autocomplete="off" spellcheck="false" title="Введите время: 90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1ч 30 мин">
-                <button class="manual-time-apply" id="manualTimeApply" title="Установить время (Enter)">✓</button>
+                <button class="manual-time-apply" id="manualTimeApply" title="Установить время (Enter)" aria-label="Установить время">✓</button>
             </div>
         </div>
 
@@ -2733,7 +2733,7 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
                             </select>
-                            <button class="sound-preview" id="soundStartPreview" title="Прослушать">▶</button>
+                            <button class="sound-preview" id="soundStartPreview" title="Прослушать" aria-label="Прослушать">▶</button>
                         </div>
                         <div class="sound-row">
                             <div class="sound-toggle">
@@ -2768,7 +2768,7 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
                             </select>
-                            <button class="sound-preview" id="soundEndPreview" title="Прослушать">▶</button>
+                            <button class="sound-preview" id="soundEndPreview" title="Прослушать" aria-label="Прослушать">▶</button>
                         </div>
                         <div class="sound-row">
                             <div class="sound-toggle">
@@ -2794,7 +2794,7 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
                             </select>
-                            <button class="sound-preview" id="soundMinutePreview" title="Прослушать">▶</button>
+                            <button class="sound-preview" id="soundMinutePreview" title="Прослушать" aria-label="Прослушать">▶</button>
                         </div>
                         <div class="sound-row" style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px; margin-top: 2px;">
                             <div class="sound-toggle">
@@ -2824,7 +2824,7 @@
                                 </optgroup>
                                 <optgroup label="Ваши звуки" id="customSoundsGroupOverrun"></optgroup>
                             </select>
-                            <button class="sound-preview" id="soundOverrunPreview" title="Прослушать">▶</button>
+                            <button class="sound-preview" id="soundOverrunPreview" title="Прослушать" aria-label="Прослушать">▶</button>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0 2px 20px;">
                             <label style="font-size: 10px; color: rgba(255, 255, 255, 0.7); white-space: nowrap;">каждые</label>
@@ -3051,8 +3051,8 @@
                                         </div>
                                         <img id="localBgImage" style="display: none;">
                                         <div class="local-bg-actions">
-                                            <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить">🔄</button>
-                                            <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить">✕</button>
+                                            <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить" aria-label="Изменить">🔄</button>
+                                            <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить" aria-label="Удалить">✕</button>
                                         </div>
                                     </div>
                                     <input type="file" class="hidden-file-input" id="bgFileInput"
@@ -3107,7 +3107,7 @@
         <div class="faq-content">
             <div class="faq-header">
                 <h2>📖 Справка по Timer App</h2>
-                <button class="faq-close" id="faqClose">&times;</button>
+                <button class="faq-close" id="faqClose" aria-label="Закрыть">&times;</button>
             </div>
             <div class="faq-body">
                 <!-- Основное управление -->
@@ -5784,6 +5784,9 @@
             const toggle = document.createElement('div');
             toggle.className = 'color-picker-toggle';
             toggle.title = 'Выбрать свой цвет';
+            toggle.setAttribute('role', 'button');
+            toggle.setAttribute('tabindex', '0');
+            toggle.setAttribute('aria-label', 'Выбрать свой цвет');
             grid.appendChild(toggle);
 
             const picker = new ColorPicker(
