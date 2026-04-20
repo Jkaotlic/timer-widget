@@ -123,6 +123,8 @@ function emitTimerState(partial = {}) {
     safelySendToWindow(widgetWindow, 'timer-state', timerState);
     safelySendToWindow(displayWindow, 'timer-state', timerState);
     safelySendToWindow(controlWindow, 'timer-state', timerState);
+    // F-022: cheap path on every tick — just update the tooltip.
+    // updateTrayMenu() handles Menu rebuild only when running state actually changes.
     if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
 }
 
@@ -132,6 +134,8 @@ function broadcastWindowState(channel, data) {
     safelySendToWindow(widgetWindow, channel, data);
     safelySendToWindow(displayWindow, channel, data);
     safelySendToWindow(clockWidgetWindow, channel, data);
+    // F-022: widget/clock open-close changes tray menu checkboxes; trigger rebuild.
+    if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
 }
 
 function finishTimer(finalRemaining) {
@@ -487,6 +491,12 @@ if (!__inTestMode) {
 let tray = null;
 let isQuitting = false;
 
+// F-022: cache last-seen booleans; only rebuild Menu when they actually change.
+// Remaining-seconds updates every tick are routed through the tooltip only.
+let _trayLastRunning = null;
+let _trayLastWidgetOpen = null;
+let _trayLastClockOpen = null;
+
 function createTray() {
     try {
         const iconPath = path.join(__dirname, 'build', 'icon.png');
@@ -494,7 +504,8 @@ function createTray() {
         const trayIcon = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 });
         tray = new Tray(trayIcon);
         tray.setToolTip('Timer Widget');
-        updateTrayMenu();
+        rebuildTrayMenu();
+        updateTrayTime();
         tray.on('click', () => {
             if (!controlWindow) { createControlWindow(); return; }
             if (controlWindow.isVisible()) { controlWindow.hide(); }
@@ -517,9 +528,16 @@ function formatTrayTime(secs) {
     return (neg ? '-' : '') + body;
 }
 
-function updateTrayMenu() {
+// Full Menu rebuild — only when boolean state changes (isRunning / widget open / clock open).
+function rebuildTrayMenu() {
     if (!tray) { return; }
     const running = timerState.isRunning;
+    const widgetOpen = !!widgetWindow;
+    const clockOpen = !!clockWidgetWindow;
+    _trayLastRunning = running;
+    _trayLastWidgetOpen = widgetOpen;
+    _trayLastClockOpen = clockOpen;
+
     const remaining = formatTrayTime(timerState.remainingSeconds || 0);
     const menu = Menu.buildFromTemplate([
         { label: `⏱  ${remaining}`, enabled: false },
@@ -536,12 +554,12 @@ function updateTrayMenu() {
             controlWindow.show();
             controlWindow.focus();
         }},
-        { label: 'Виджет', type: 'checkbox', checked: !!widgetWindow, click: () => {
+        { label: 'Виджет', type: 'checkbox', checked: widgetOpen, click: () => {
             if (widgetWindow) { widgetWindow.close(); }
             else { createWidgetWindow(); }
             setTimeout(updateTrayMenu, 200);
         }},
-        { label: 'Часы', type: 'checkbox', checked: !!clockWidgetWindow, click: () => {
+        { label: 'Часы', type: 'checkbox', checked: clockOpen, click: () => {
             if (clockWidgetWindow) { clockWidgetWindow.close(); }
             else { createClockWidgetWindow(); }
             setTimeout(updateTrayMenu, 200);
@@ -550,6 +568,28 @@ function updateTrayMenu() {
         { label: 'Выход', click: () => { isQuitting = true; app.quit(); }}
     ]);
     tray.setContextMenu(menu);
+}
+
+// Lightweight per-tick update — only touches the tooltip (no Menu rebuild).
+function updateTrayTime() {
+    if (!tray) { return; }
+    const remaining = formatTrayTime(timerState.remainingSeconds || 0);
+    try { tray.setToolTip(`Timer Widget — ${remaining}`); } catch { /* tray destroyed */ }
+}
+
+// Decide whether to rebuild the Menu. Called from tray-click handlers & window close.
+// emitTimerState calls updateTrayTime directly (cheap path).
+function updateTrayMenu() {
+    if (!tray) { return; }
+    const running = timerState.isRunning;
+    const widgetOpen = !!widgetWindow;
+    const clockOpen = !!clockWidgetWindow;
+    if (running !== _trayLastRunning
+        || widgetOpen !== _trayLastWidgetOpen
+        || clockOpen !== _trayLastClockOpen) {
+        rebuildTrayMenu();
+    }
+    updateTrayTime();
 }
 
 // Intercept control window close — hide to tray instead of quit
