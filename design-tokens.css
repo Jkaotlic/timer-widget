@@ -221,7 +221,7 @@
 
   /* TYPE SIZES */
   --tw-t-timer-hero:   clamp(120px, 22vw, 360px);  /* fullscreen projector — was 180px, too small */
-  --tw-t-timer-panel:  52px;
+  --tw-t-timer-panel:  72px;
   --tw-t-timer-widget: clamp(32px, 18vw, 140px);
   --tw-t-h1:      24px;
   --tw-t-h2:      17px;
