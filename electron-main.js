@@ -584,7 +584,8 @@ app.whenReady().then(() => {
 
     // Recovery check before UI
     const saved = loadSavedTimerState();
-    if (recovery.isRecoveryValid(saved, Date.now())) {
+    const hasRecovery = recovery.isRecoveryValid(saved, Date.now());
+    if (hasRecovery) {
         log.info(`Recovery candidate found (age ${Math.round((Date.now() - saved.savedAt) / 1000)}s)`);
         timerState.presetSeconds = saved.presetSeconds;
         // We don't auto-start — control window will offer resume via IPC timer-recovery-available
@@ -594,6 +595,14 @@ app.whenReady().then(() => {
     createTray();
     bindTrayBehavior(controlWindow);
     bindRenderCrashHandler(controlWindow, 'control');
+
+    // F-005: broadcast recovery snapshot to control window once it has loaded.
+    // Renderer may ignore it for now, but the channel is no longer dead code.
+    if (hasRecovery && controlWindow) {
+        controlWindow.webContents.once('did-finish-load', () => {
+            safelySendToWindow(controlWindow, 'timer-recovery-available', saved);
+        });
+    }
 
     log.info(`[perf] app ready in ${Date.now() - __startupT0}ms`);
 
