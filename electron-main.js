@@ -306,6 +306,7 @@ function createWidgetWindow() {
 
     widgetWindow.loadFile('electron-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(widgetWindow);
+    bindRenderCrashHandler(widgetWindow, 'widget');
 
     widgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(widgetWindow);
@@ -350,6 +351,7 @@ function createClockWidgetWindow() {
 
     clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(clockWidgetWindow);
+    bindRenderCrashHandler(clockWidgetWindow, 'clock');
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(clockWidgetWindow);
@@ -403,6 +405,7 @@ function createDisplayWindow(displayIndex) {
 
     displayWindow.loadFile('display.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(displayWindow);
+    bindRenderCrashHandler(displayWindow, 'display');
     blockZoom(displayWindow);
 
     displayWindow.once('ready-to-show', () => {
