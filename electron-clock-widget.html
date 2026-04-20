@@ -159,6 +159,20 @@
             line-height: 1;
         }
 
+        /* Superscript seconds — kit recipe for circle style.
+           Sized relative to parent so it harmonises with the responsive
+           clamp() on .time-display. ~0.33em = 18px at 56px base. */
+        .time-display .clock-seconds {
+            display: inline-block;
+            font-size: 0.33em;
+            font-weight: 300;
+            margin-left: 0.12em;
+            transform: translateY(-0.3em);
+            letter-spacing: 0.02em;
+            color: var(--tw-fg-secondary);
+            text-shadow: none;
+        }
+
         /* ============================================
            Шильдики даты и часового пояса (базовые)
            ============================================ */
@@ -1833,12 +1847,19 @@
                     displayHours = hours % 12 || 12;
                 }
 
-                const timeStr = this.showSeconds 
-                    ? `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}${ampm}`
-                    : `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}${ampm}`;
+                const hhmm = `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                const ss = String(seconds).padStart(2, '0');
+                const timeStr = this.showSeconds
+                    ? `${hhmm}:${ss}${ampm}`
+                    : `${hhmm}${ampm}`;
 
-                // Обновляем круговой стиль
-                this.timeDisplay.textContent = timeStr;
+                // Круговой стиль: основной HH:MM + superscript секунды (если включены).
+                // innerHTML безопасен — все значения числовые или константа ampm ' AM'/' PM'.
+                if (this.showSeconds) {
+                    this.timeDisplay.innerHTML = `${hhmm}<span class="clock-seconds">:${ss}${ampm}</span>`;
+                } else {
+                    this.timeDisplay.textContent = `${hhmm}${ampm}`;
+                }
 
                 // Обновляем прогресс секунд
                 const ratio = seconds / 60;
