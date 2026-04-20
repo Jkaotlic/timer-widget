@@ -40,6 +40,10 @@ class DisplayTimer {
         this._cachedFlipDigits = null;
         this._cachedFlipSeparators = null;
 
+        // F-025: Кэш стрелок мини-часов по блоку (избегаем querySelector на каждый tick)
+        // WeakMap<HTMLElement, { hour, minute, second }>
+        this._miniClockHandsCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+
         // Кэш для оптимизации re-renders (FIX BUG-007)
         this.cache = {
             lastSeconds: null,
@@ -269,24 +273,34 @@ class DisplayTimer {
 
     updateMiniClockHands(block, hours, minutes, seconds = 0) {
         if (!block) {return;}
-        const hourHand = block.querySelector('.mini-hand-hour');
-        const minuteHand = block.querySelector('.mini-hand-minute');
-        const secondHand = block.querySelector('.mini-hand-second');
 
-        if (hourHand) {
+        // F-025: кэшируем стрелки по блоку, чтобы не звать querySelector каждый tick
+        let hands = this._miniClockHandsCache ? this._miniClockHandsCache.get(block) : null;
+        if (!hands) {
+            hands = {
+                hour: block.querySelector('.mini-hand-hour'),
+                minute: block.querySelector('.mini-hand-minute'),
+                second: block.querySelector('.mini-hand-second')
+            };
+            if (this._miniClockHandsCache) {
+                this._miniClockHandsCache.set(block, hands);
+            }
+        }
+
+        if (hands.hour) {
             // Часовая стрелка: 360/12 = 30 градусов на час + смещение от минут
             const hourDeg = (hours % 12) * 30 + minutes * 0.5;
-            hourHand.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
+            hands.hour.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
         }
-        if (minuteHand) {
+        if (hands.minute) {
             // Минутная стрелка: 360/60 = 6 градусов на минуту
             const minuteDeg = minutes * 6 + seconds * 0.1;
-            minuteHand.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
+            hands.minute.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
         }
-        if (secondHand) {
+        if (hands.second) {
             // Секундная стрелка: 6 градусов на секунду
             const secondDeg = seconds * 6;
-            secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
+            hands.second.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
         }
     }
 
