@@ -929,15 +929,9 @@
             margin-top: 2px;
         }
 
-        /* Disabled row/group — dim when the row's enabled checkbox is off.
-           Keeps the toggle itself interactive; everything else is greyed. */
+        /* Disabled row/group — dim when the row's enabled checkbox is off. */
         .sound-row.disabled,
         .sound-group.disabled .sound-row { opacity: 0.4; pointer-events: none; }
-        .sound-row:not(:has(input[type="checkbox"]:checked)) .select-wrap,
-        .sound-row:not(:has(input[type="checkbox"]:checked)) .sound-preview {
-            opacity: 0.45;
-            pointer-events: none;
-        }
 
         .sound-row {
             display: flex;
