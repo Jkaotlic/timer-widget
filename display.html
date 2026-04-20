@@ -106,7 +106,7 @@
             font-size: 0.9em;
             text-transform: uppercase;
             letter-spacing: 3px;
-            color: var(--info-color-dim, rgba(255, 255, 255, 0.5));
+            color: var(--info-color-dim, rgba(255, 255, 255, 0.7));
             margin-bottom: 10px;
             transition: all 0.3s ease;
         }
@@ -157,7 +157,7 @@
         }
 
         body.style-flip .info-label {
-            color: var(--info-color-dim, rgba(255, 255, 255, 0.4));
+            color: var(--info-color-dim, rgba(255, 255, 255, 0.7));
         }
 
         body.style-flip .info-value {
@@ -233,7 +233,7 @@
         }
 
         body.style-analog .info-label {
-            color: var(--info-color-dim, rgba(255, 255, 255, 0.4));
+            color: var(--info-color-dim, rgba(255, 255, 255, 0.7));
             font-size: 8px;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -325,7 +325,7 @@
         body.style-analog .info-block .mini-tick.quarter {
             width: 2px;
             height: 6px;
-            background: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.7);
             top: 3px;
             transform-origin: center 47px;
         }
@@ -818,7 +818,7 @@
             font-size: 0.9em;
             text-transform: uppercase;
             letter-spacing: 3px;
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.7);
             display: none;
         }
 
@@ -1089,7 +1089,7 @@
             font-family: 'Georgia', serif;
             font-size: calc(var(--analog-size) * 0.04);
             font-style: italic;
-            color: rgba(255, 255, 255, 0.4);
+            color: rgba(255, 255, 255, 0.7);
             letter-spacing: 3px;
             text-transform: uppercase;
         }
@@ -1123,7 +1123,7 @@
             border: none;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.7);
             font-size: 16px;
             cursor: pointer;
             display: flex;
@@ -1222,6 +1222,25 @@
             80% { opacity: 1; transform: translateX(-50%) translateY(0); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [role="button"]:focus-visible,
+        [tabindex]:focus-visible {
+            outline: 2px solid #0a84ff;
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
@@ -1229,9 +1248,9 @@
 
     <!-- Кнопки управления окном -->
     <div class="window-controls">
-        <button class="window-ctrl-btn minimize-btn" id="minimizeBtn" title="Свернуть">─</button>
-        <button class="window-ctrl-btn fullscreen-btn" id="fullscreenBtn" title="Оконный режим">⛶</button>
-        <button class="window-ctrl-btn close-btn" id="closeBtn" title="Закрыть">✕</button>
+        <button class="window-ctrl-btn minimize-btn" id="minimizeBtn" title="Свернуть" aria-label="Свернуть">─</button>
+        <button class="window-ctrl-btn fullscreen-btn" id="fullscreenBtn" title="Оконный режим" aria-label="Оконный режим">⛶</button>
+        <button class="window-ctrl-btn close-btn" id="closeBtn" title="Закрыть" aria-label="Закрыть">✕</button>
     </div>
     
     <!-- Информационные блоки (независимое позиционирование) -->
