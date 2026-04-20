@@ -31,6 +31,10 @@ class DisplayTimer {
         this._analogMinusSpan = null;
         this._analogTextNode = null;
 
+        // F-023: Кэш flip-элементов для applyColors (избегаем querySelectorAll на каждый вызов)
+        this._cachedFlipDigits = null;
+        this._cachedFlipSeparators = null;
+
         // Кэш для оптимизации re-renders (FIX BUG-007)
         this.cache = {
             lastSeconds: null,
@@ -487,6 +491,10 @@ class DisplayTimer {
     setTimerStyle(style) {
         this.timerStyle = style;
 
+        // F-023: Инвалидируем кэши DOM-узлов на случай, если смена стиля пересоздаёт элементы
+        this._cachedFlipDigits = null;
+        this._cachedFlipSeparators = null;
+
         // Удаляем все классы стилей с body
         document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
 
@@ -683,13 +691,20 @@ class DisplayTimer {
         }
 
         // Flip style — save base color, apply only if not in danger/overtime
+        // F-023: кэшируем узлы, чтобы не вызывать querySelectorAll на каждое обновление цвета
         if (timerColor) {
-            document.querySelectorAll('.flip-digit').forEach(el => {
+            if (!this._cachedFlipDigits) {
+                this._cachedFlipDigits = document.querySelectorAll('.flip-digit');
+            }
+            if (!this._cachedFlipSeparators) {
+                this._cachedFlipSeparators = document.querySelectorAll('.flip-separator');
+            }
+            this._cachedFlipDigits.forEach(el => {
                 if (!el.closest('.danger')) {
                     el.style.color = timerColor;
                 }
             });
-            document.querySelectorAll('.flip-separator').forEach(el => {
+            this._cachedFlipSeparators.forEach(el => {
                 el.style.color = timerColor;
             });
         }
