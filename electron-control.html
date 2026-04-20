@@ -6078,38 +6078,53 @@
             const existing = document.getElementById('keyboard-shortcuts-overlay');
             if (existing) { existing.remove(); return; }
 
-            const shortcuts = `
-                <div style="background: white; padding: 20px; border-radius: 10px; max-width: 400px;">
-                    <h3 style="margin-top: 0; color: #333;">⌨️ Горячие клавиши</h3>
-                    <div style="color: #666; line-height: 1.8;">
-                        <b>Space</b> - Старт/Пауза таймера<br>
-                        <b>R</b> - Сброс таймера<br>
-                        <b>S</b> - Остановить таймер<br>
-                        <b>W</b> - Виджет таймера (открыть/закрыть)<br>
-                        <b>C</b> - Виджет часов (открыть/закрыть)<br>
-                        <b>D</b> - Полноэкранный дисплей (открыть/закрыть)<br>
-                        <b>1-5</b> - Быстрые пресеты (1, 5, 10, 15, 30 мин)<br>
-                        <b>Esc</b> - Закрыть все виджеты<br>
-                        <b>F1</b> - Показать эту справку<br>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()"
-                            style="margin-top: 15px; padding: 8px 20px; background: #4CAF50;
-                                   color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        Закрыть
-                    </button>
-                </div>
-            `;
-
             const overlay = document.createElement('div');
             overlay.id = 'keyboard-shortcuts-overlay';
-            overlay.style.cssText = `
-                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.7); display: flex; align-items: center;
-                justify-content: center; z-index: 10000;
-            `;
-            overlay.innerHTML = shortcuts;
+            overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0;' +
+                'background: rgba(0,0,0,0.7); display: flex; align-items: center;' +
+                'justify-content: center; z-index: 10000;';
+
+            const panel = document.createElement('div');
+            panel.style.cssText = 'background: white; padding: 20px; border-radius: 10px; max-width: 400px;';
+
+            const title = document.createElement('h3');
+            title.style.cssText = 'margin-top: 0; color: #333;';
+            title.textContent = '⌨️ Горячие клавиши';
+            panel.appendChild(title);
+
+            const list = document.createElement('div');
+            list.style.cssText = 'color: #666; line-height: 1.8;';
+            const items = [
+                ['Space', 'Старт/Пауза таймера'],
+                ['R', 'Сброс таймера'],
+                ['S', 'Остановить таймер'],
+                ['W', 'Виджет таймера (открыть/закрыть)'],
+                ['C', 'Виджет часов (открыть/закрыть)'],
+                ['D', 'Полноэкранный дисплей (открыть/закрыть)'],
+                ['1-5', 'Быстрые пресеты (1, 5, 10, 15, 30 мин)'],
+                ['Esc', 'Закрыть все виджеты'],
+                ['F1', 'Показать эту справку']
+            ];
+            items.forEach(([key, desc]) => {
+                const b = document.createElement('b');
+                b.textContent = key;
+                list.appendChild(b);
+                list.appendChild(document.createTextNode(' - ' + desc));
+                list.appendChild(document.createElement('br'));
+            });
+            panel.appendChild(list);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = 'Закрыть';
+            closeBtn.setAttribute('aria-label', 'Закрыть');
+            closeBtn.style.cssText = 'margin-top: 15px; padding: 8px 20px; background: #4CAF50;' +
+                'color: white; border: none; border-radius: 5px; cursor: pointer;';
+            closeBtn.addEventListener('click', () => overlay.remove());
+            panel.appendChild(closeBtn);
+
+            overlay.appendChild(panel);
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) overlay.remove();
+                if (e.target === overlay) { overlay.remove(); }
             });
             document.body.appendChild(overlay);
         }
