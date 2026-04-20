@@ -42,7 +42,10 @@ const ALLOWED_CHANNELS = {
         'toggle-fullscreen',
         'close-window',
         'quit-app',
-        'reset-and-relaunch'
+        'reset-and-relaunch',
+        'set-autostart',
+        'get-autostart',
+        'export-logs'
     ],
     receive: [
         'timer-state',
@@ -60,7 +63,8 @@ const ALLOWED_CHANNELS = {
         'clock-settings',
         'display-window-state',
         'widget-window-state',
-        'clock-window-state'
+        'clock-window-state',
+        'timer-recovery-available'
     ]
 };
 
@@ -83,6 +87,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } else {
             console.error(`Blocked attempt to send to unauthorized channel: ${channel}`);
         }
+    },
+
+    /**
+     * Invoke IPC handler (two-way request-response)
+     */
+    invoke: (channel, data) => {
+        if (isValidChannel(channel, 'send')) {
+            return ipcRenderer.invoke(channel, data);
+        }
+        console.error(`Blocked attempt to invoke unauthorized channel: ${channel}`);
+        return Promise.reject(new Error(`Invalid channel: ${channel}`));
     },
 
     /**
