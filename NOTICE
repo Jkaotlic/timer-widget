@@ -82,41 +82,35 @@ Repository: https://github.com/eslint-community/regexpp
 Publisher: Toru Nagashima
 
 === @eslint/config-array ===
-Version: 0.21.2
+Version: 0.23.5
 License: Apache-2.0
 Repository: https://github.com/eslint/rewrite
 Publisher: Nicholas C. Zakas
 
 === @eslint/config-helpers ===
-Version: 0.4.2
+Version: 0.5.5
 License: Apache-2.0
 Repository: https://github.com/eslint/rewrite
 
 === @eslint/core ===
-Version: 0.17.0
+Version: 1.2.1
 License: Apache-2.0
 Repository: https://github.com/eslint/rewrite
 Publisher: Nicholas C. Zakas
 
-=== @eslint/eslintrc ===
-Version: 3.3.5
-License: MIT
-Repository: https://github.com/eslint/eslintrc
-Publisher: Nicholas C. Zakas
-
 === @eslint/js ===
-Version: 9.39.4
+Version: 10.0.1
 License: MIT
 Repository: https://github.com/eslint/eslint
 
 === @eslint/object-schema ===
-Version: 2.1.7
+Version: 3.0.5
 License: Apache-2.0
 Repository: https://github.com/eslint/rewrite
 Publisher: Nicholas C. Zakas
 
 === @eslint/plugin-kit ===
-Version: 0.4.1
+Version: 0.7.1
 License: Apache-2.0
 Repository: https://github.com/eslint/rewrite
 Publisher: Nicholas C. Zakas
@@ -212,6 +206,11 @@ Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
 === @types/debug ===
 Version: 4.1.13
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/esrecurse ===
+Version: 4.3.1
 License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
@@ -475,13 +474,6 @@ Version: 1.0.2
 License: MIT
 Repository: https://github.com/ljharb/call-bind-apply-helpers
 Publisher: Jordan Harband
-
-=== callsites ===
-Version: 3.1.0
-License: MIT
-Repository: https://github.com/sindresorhus/callsites
-Publisher: Sindre Sorhus
-Homepage: sindresorhus.com
 
 === chalk ===
 Version: 4.1.2
@@ -830,7 +822,7 @@ Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
 === eslint-scope ===
-Version: 8.4.0
+Version: 9.1.2
 License: BSD-2-Clause
 Repository: https://github.com/eslint/js
 
@@ -842,20 +834,20 @@ Publisher: Toru Nagashima
 Homepage: https://github.com/mysticatea
 
 === eslint-visitor-keys ===
-Version: 4.2.1
+Version: 5.0.1
 License: Apache-2.0
 Repository: https://github.com/eslint/js
 Publisher: Toru Nagashima
 Homepage: https://github.com/mysticatea
 
 === eslint ===
-Version: 9.39.4
+Version: 10.2.1
 License: MIT
 Repository: https://github.com/eslint/eslint
 Publisher: Nicholas C. Zakas
 
 === espree ===
-Version: 10.4.0
+Version: 11.2.0
 License: BSD-2-Clause
 Repository: https://github.com/eslint/js
 Publisher: Nicholas C. Zakas
@@ -1076,14 +1068,7 @@ Publisher: Gajus Kuizinas
 Homepage: http://gajus.com
 
 === globals ===
-Version: 14.0.0
-License: MIT
-Repository: https://github.com/sindresorhus/globals
-Publisher: Sindre Sorhus
-Homepage: https://sindresorhus.com
-
-=== globals ===
-Version: 17.4.0
+Version: 17.5.0
 License: MIT
 Repository: https://github.com/sindresorhus/globals
 Publisher: Sindre Sorhus
@@ -1196,13 +1181,6 @@ Version: 5.3.2
 License: MIT
 Repository: https://github.com/kaelzhang/node-ignore
 Publisher: kael
-
-=== import-fresh ===
-Version: 3.3.1
-License: MIT
-Repository: https://github.com/sindresorhus/import-fresh
-Publisher: Sindre Sorhus
-Homepage: https://sindresorhus.com
 
 === imurmurhash ===
 Version: 0.1.4
@@ -1383,12 +1361,6 @@ License: MIT
 Repository: https://github.com/sindresorhus/locate-path
 Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
-
-=== lodash.merge ===
-Version: 4.6.2
-License: MIT
-Repository: https://github.com/lodash/lodash
-Publisher: John-David Dalton
 
 === lodash ===
 Version: 4.18.1
@@ -1693,13 +1665,6 @@ Repository: https://github.com/isaacs/package-json-from-dist
 Publisher: Isaac Z. Schlueter
 Homepage: https://izs.me
 
-=== parent-module ===
-Version: 1.0.1
-License: MIT
-Repository: https://github.com/sindresorhus/parent-module
-Publisher: Sindre Sorhus
-Homepage: sindresorhus.com
-
 === path-exists ===
 Version: 4.0.0
 License: MIT
@@ -1856,13 +1821,6 @@ Version: 1.2.1
 License: MIT
 Repository: https://github.com/szmarczak/resolve-alpn
 Publisher: Szymon Marczak
-
-=== resolve-from ===
-Version: 4.0.0
-License: MIT
-Repository: https://github.com/sindresorhus/resolve-from
-Publisher: Sindre Sorhus
-Homepage: sindresorhus.com
 
 === responselike ===
 Version: 2.0.1
@@ -2068,13 +2026,6 @@ Homepage: sindresorhus.com
 Version: 7.2.0
 License: MIT
 Repository: https://github.com/chalk/strip-ansi
-Publisher: Sindre Sorhus
-Homepage: https://sindresorhus.com
-
-=== strip-json-comments ===
-Version: 3.1.1
-License: MIT
-Repository: https://github.com/sindresorhus/strip-json-comments
 Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
