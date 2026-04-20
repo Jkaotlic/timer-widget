@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.2.4] - 2026-04-20
+
+### Audit round 3 — 17 closed findings (full project-audit)
+
+Полный аудит по 15 категориям (audit/2026-04-20/), 39 findings, 17 закрыто, 4 deferred, 18 LARGE отложены.
+
+#### Performance (high+medium)
+- **F-021** [HIGH]: `fs.writeFileSync` → `fs.promises.writeFile` в `saveTimerStateToFile` — event loop main process больше не блокируется каждые 10s
+- **F-022**: tray menu split на `rebuildTrayMenu` / `updateTrayTime` / `updateTrayMenu` — полный rebuild только при смене isRunning/widget/clock open. Per-tick — только `tray.setToolTip`
+- **F-023**: кеш `_cachedFlipDigits` / `_cachedFlipSeparators` в `applyColors` (DisplayTimer)
+- **F-024**: tracking `_timeouts[]` / `_intervals[]` в DisplayTimer — flashInterval + setTimeout очищаются в cleanup()
+- **F-025**: `WeakMap _miniClockHandsCache` для аналоговых стрелок mini-clock
+
+#### Observability + Architecture (high+low)
+- **F-027** [HIGH]: `bindRenderCrashHandler` теперь привязан к widget/display/clock окнам (не только control)
+- **F-010**: extract `recovery.js` модуль — чистые функции (`isRecoveryValid`, `saveTimerStateToFile`, `loadSavedTimerState`, `clearSavedTimerState`); удалён test-export anti-pattern в electron-main.js; tests/recovery.test.js упрощён (без Module._resolveFilename stub)
+- **F-005**: реализован broadcast `timer-recovery-available` в control window после did-finish-load (если есть валидный recovery snapshot)
+
+#### Accessibility (high+medium)
+- **F-001**: `innerHTML` → DOM API в `showKeyboardShortcuts` overlay
+- **F-030** [HIGH]: aria-label на ~30 иконочных кнопках (✕, ⚙, 🔄, 🎵, 📁, …) во всех 4 окнах
+- **F-031** [HIGH]: modals (exit/faq/reset/shortcuts) — `role="dialog" aria-modal="true"` + focus trap + Escape close
+- **F-033**: контраст `rgba(255,255,255,0.4-0.5)` → `0.7` (WCAG AA)
+- **F-034**: `prefers-reduced-motion` media query во всех HTML
+- **F-035**: aria-label на ~17 input + 10 select
+- **F-036/F-037/F-038**: modal initial focus, FAQ Escape, `:focus-visible` outline
+- **F-039**: WONTFIX (manual time input `type="text"` — нужен умный парсинг)
+
+#### Dependencies
+- **F-003**: eslint 9.39.4 → 10.2.1 + добавлен явный `@eslint/js` (breaking change в ESLint 10)
+- **F-004**: globals 17.4.0 → 17.5.0
+
+### Deferred (require координации с другим раундом)
+- F-002: `window.SecurityUtils` → contextBridge (требует HTML + preload sync)
+- F-026: tray icon resize/preload (low impact)
+- F-028: renderer console → electron-log bridge (требует новый IPC канал)
+
+### LARGE — отложены на отдельный раунд
+- F-006: split `electron-control.html` god-file (6119 строк inline JS)
+- F-007: split `display-script.js` DisplayTimer на стратегии
+- F-008: split `electron-main.js` (1016 строк) на window-factory/tray/recovery/ipc-handlers
+- F-014: тесты для DisplayTimer (1779 строк, ~99% не покрыто)
+- F-015: тесты IPC handlers
+- F-032: color picker keyboard/screen-reader fallback
+
+### Tests + audit artifacts
+- `audit/2026-04-20/` — 16 markdown файлов: 15 категорий + executive README
+- 128/128 тестов pass после каждого merge (Policy C re-verify)
+- 0 lint warnings
+
 ## [2.2.3] - 2026-04-20
 
 ### Added
