@@ -2605,7 +2605,7 @@
         <!-- Ручной ввод времени -->
         <div class="compact-section" style="padding: 6px 16px;">
             <div class="time-input-row">
-                <input type="text" id="manualTimeInput" class="manual-time-input" placeholder="0:00" autocomplete="off" spellcheck="false" title="Введите время: 90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1ч 30 мин">
+                <input type="text" id="manualTimeInput" class="manual-time-input" placeholder="0:00" autocomplete="off" spellcheck="false" aria-label="Ручной ввод времени" title="Введите время: 90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1ч 30 мин">
                 <button class="manual-time-apply" id="manualTimeApply" title="Установить время (Enter)" aria-label="Установить время">✓</button>
             </div>
         </div>
@@ -2661,7 +2661,7 @@
                         </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Стиль таймера</span>
-                            <select id="timerStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
+                            <select id="timerStyle" aria-label="Стиль виджета" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
                                 <option value="circle">⭕ Круговой</option>
                                 <option value="digital">🔢 Цифровой LED</option>
                                 <option value="flip">🔄 Перекидные</option>
@@ -2671,7 +2671,7 @@
                         <div class="toggle-row">
                             <span class="toggle-label">Масштаб</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="timerScale" min="30" max="600" value="100" style="width: 80px;">
+                                <input type="range" id="timerScale" min="30" max="600" value="100" style="width: 80px;" aria-label="Масштаб таймера">
                                 <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
                             </div>
                         </div>
@@ -2688,7 +2688,7 @@
                         <canvas class="cp-hue-slider" id="widgetCpHue"></canvas>
                         <div class="cp-hex-row">
                             <div class="cp-preview" id="widgetCpPreview"></div>
-                            <input type="text" class="cp-hex-input" id="widgetCpHex" placeholder="#ffffff" maxlength="7">
+                            <input type="text" class="cp-hex-input" id="widgetCpHex" placeholder="#ffffff" maxlength="7" aria-label="HEX-код цвета виджета">
                         </div>
                     </div>
                     </div>
@@ -2711,7 +2711,7 @@
                                 <input type="checkbox" id="soundStartEnabled">
                                 <label for="soundStartEnabled">При старте</label>
                             </div>
-                            <select class="sound-select" id="soundStartPreset">
+                            <select class="sound-select" id="soundStartPreset" aria-label="Звук старта">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
                                     <option value="beep-short">Короткий бип</option>
@@ -2740,7 +2740,7 @@
                                 <input type="checkbox" id="soundEndEnabled" checked>
                                 <label for="soundEndEnabled">При финише</label>
                             </div>
-                            <select class="sound-select" id="soundEndPreset">
+                            <select class="sound-select" id="soundEndPreset" aria-label="Звук окончания">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
                                     <option value="beep-short">Короткий бип</option>
@@ -2775,7 +2775,7 @@
                                 <input type="checkbox" id="soundMinuteEnabled">
                                 <label for="soundMinuteEnabled">Каждую минуту</label>
                             </div>
-                            <select class="sound-select" id="soundMinutePreset">
+                            <select class="sound-select" id="soundMinutePreset" aria-label="Звук за минуту до конца">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
                                     <option value="beep-short">Короткий бип</option>
@@ -2801,7 +2801,7 @@
                                 <input type="checkbox" id="soundOverrunEnabled">
                                 <label for="soundOverrunEnabled">Перерасход</label>
                             </div>
-                            <select class="sound-select" id="soundOverrunPreset">
+                            <select class="sound-select" id="soundOverrunPreset" aria-label="Звук овертайма">
                                 <option value="none">— без звука —</option>
                                 <optgroup label="Стандартные">
                                     <option value="beep-short">Короткий бип</option>
@@ -2828,7 +2828,7 @@
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; padding: 4px 0 2px 20px;">
                             <label style="font-size: 10px; color: rgba(255, 255, 255, 0.7); white-space: nowrap;">каждые</label>
-                            <select class="sound-select" id="overrunIntervalMinutes" style="max-width: 100px; padding: 3px 6px; font-size: 10px;">
+                            <select class="sound-select" id="overrunIntervalMinutes" aria-label="Интервал сигналов овертайма в минутах" style="max-width: 100px; padding: 3px 6px; font-size: 10px;">
                                 <option value="1">1 мин</option>
                                 <option value="2">2 мин</option>
                                 <option value="3">3 мин</option>
@@ -2868,7 +2868,7 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Стиль</span>
-                                <select id="clockStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em;">
+                                <select id="clockStyle" aria-label="Стиль часов" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em;">
                                     <option value="circle">⭕ Круговой</option>
                                     <option value="digital">🔢 Цифровой LED</option>
                                     <option value="flip">🔄 Перекидные часы</option>
@@ -2878,7 +2878,7 @@
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="range" id="clockScale" min="30" max="600" value="100" style="width: 80px;">
+                                    <input type="range" id="clockScale" min="30" max="600" value="100" style="width: 80px;" aria-label="Масштаб часов">
                                     <span id="clockScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
                                 </div>
                             </div>
@@ -2903,7 +2903,7 @@
                                 <canvas class="cp-hue-slider" id="clockCpHue"></canvas>
                                 <div class="cp-hex-row">
                                     <div class="cp-preview" id="clockCpPreview"></div>
-                                    <input type="text" class="cp-hex-input" id="clockCpHex" placeholder="#ffffff" maxlength="7">
+                                    <input type="text" class="cp-hex-input" id="clockCpHex" placeholder="#ffffff" maxlength="7" aria-label="HEX-код цвета часов">
                                 </div>
                             </div>
                         </div>
@@ -2938,7 +2938,7 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Стиль</span>
-                                <select id="displayTimerStyle" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
+                                <select id="displayTimerStyle" aria-label="Стиль таймера дисплея" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
                                     <option value="circle">⭕ Круговой</option>
                                     <option value="digital">🔢 Цифровой LED</option>
                                     <option value="flip">🔄 Перекидные</option>
@@ -2948,14 +2948,14 @@
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="range" id="displayTimerScale" min="30" max="600" value="100" style="width: 80px;">
+                                    <input type="range" id="displayTimerScale" min="30" max="600" value="100" style="width: 80px;" aria-label="Масштаб таймера дисплея">
                                     <span id="displayTimerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
                                 </div>
                             </div>
                             <div style="height: 1px; background: rgba(255,255,255,0.06); margin: 6px 0;"></div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Монитор</span>
-                                <select id="displaySelect" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
+                                <select id="displaySelect" aria-label="Выбор монитора" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
                                     <option value="auto">🖥️ Авто</option>
                                 </select>
                             </div>
@@ -2982,7 +2982,7 @@
                             <div id="timeBlocksSettings" style="display: none;">
                                 <div class="toggle-row">
                                     <span class="toggle-label">Расположение</span>
-                                    <select id="timeLayoutPreset" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
+                                    <select id="timeLayoutPreset" aria-label="Пресет расположения блоков" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
                                         <option value="frame">Рамка</option>
                                         <option value="top-line">Сверху</option>
                                         <option value="bottom-line">Снизу</option>
@@ -2992,17 +2992,17 @@
                                 <div class="toggle-row">
                                     <span class="toggle-label">Размер блоков</span>
                                     <div style="display: flex; align-items: center; gap: 10px;">
-                                        <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;">
+                                        <input type="range" id="timeBlocksScale" min="50" max="400" value="100" style="width: 80px;" aria-label="Масштаб блоков времени">
                                         <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
                                     </div>
                                 </div>
                                 <div class="toggle-row">
                                     <span class="toggle-label">Начало</span>
-                                    <input type="time" id="eventTimeInput" value="10:00" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
+                                    <input type="time" id="eventTimeInput" value="10:00" aria-label="Время начала события" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
                                 </div>
                                 <div class="toggle-row">
                                     <span class="toggle-label">Конец</span>
-                                    <input type="time" id="endTimeInput" value="12:00" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
+                                    <input type="time" id="endTimeInput" value="12:00" aria-label="Время окончания события" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
                                 </div>
                             </div>
                         </div>
@@ -3020,7 +3020,7 @@
                                 <canvas class="cp-hue-slider" id="displayCpHue"></canvas>
                                 <div class="cp-hex-row">
                                     <div class="cp-preview" id="displayCpPreview"></div>
-                                    <input type="text" class="cp-hex-input" id="displayCpHex" placeholder="#ffffff" maxlength="7">
+                                    <input type="text" class="cp-hex-input" id="displayCpHex" placeholder="#ffffff" maxlength="7" aria-label="HEX-код цвета дисплея">
                                 </div>
                             </div>
                             <div class="settings-group-title" style="font-size:10px;margin-top:6px;margin-bottom:2px">Фон</div>
@@ -3031,12 +3031,12 @@
                                 <button class="bg-mode-btn" data-mode="local">Файл</button>
                             </div>
                             <div class="bg-controls active" id="bgSolidControls">
-                                <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;">
+                                <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;" aria-label="Цвет сплошной заливки фона">
                             </div>
                             <div class="bg-controls" id="bgGradientControls">
                                 <div class="gradient-row">
-                                    <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29">
-                                    <input type="color" class="color-picker" id="bgGrad2" value="#302b63">
+                                    <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29" aria-label="Первый цвет градиента">
+                                    <input type="color" class="color-picker" id="bgGrad2" value="#302b63" aria-label="Второй цвет градиента">
                                 </div>
                             </div>
                             <div class="bg-controls" id="bgImageControls">
@@ -3064,7 +3064,7 @@
                                     </div>
                                     <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
                                         <label>Затемнение:</label>
-                                        <input type="range" id="bgOverlaySlider" min="0" max="80" value="30">
+                                        <input type="range" id="bgOverlaySlider" min="0" max="80" value="30" aria-label="Прозрачность тёмного слоя фона">
                                         <span class="bg-overlay-value" id="bgOverlayValue">30%</span>
                                     </div>
                                 </div>
@@ -3077,10 +3077,10 @@
 
                 <!-- Hidden elements: removed from UI but needed by JS -->
                 <div style="display:none;">
-                    <input type="number" id="customMinutes" value="0">
-                    <input type="number" id="customSeconds" value="0">
+                    <input type="number" id="customMinutes" value="0" aria-label="Минуты">
+                    <input type="number" id="customSeconds" value="0" aria-label="Секунды">
                     <button id="setCustomTime"></button>
-                    <input type="text" id="overrunLimit" value="05:00">
+                    <input type="text" id="overrunLimit" value="05:00" aria-label="Лимит овертайма">
                     <div id="overrunRow"></div>
                     <div id="clockStyleRow"></div>
                 </div>
