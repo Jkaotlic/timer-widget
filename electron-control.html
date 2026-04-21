@@ -73,21 +73,17 @@
             color: var(--tw-fg-secondary);
         }
 
-        /* App shell — grid: [control panel] + [settings drawer slide-out].
-           Second column animates from 0px → 360px when drawer opens.
-           (Both endpoints in px — browsers don't smoothly interpolate
-            between fr and px units on grid-template-columns.) */
+        /* App shell — single column for the control panel. The drawer is an
+           overlay (absolutely positioned), so the panel never gets squished
+           on narrow windows. */
         .app-shell {
             display: grid;
-            grid-template-columns: 1fr 0px;
+            grid-template-columns: 1fr;
             grid-template-rows: 1fr;
             min-height: 100vh;
             width: 100%;
+            position: relative;
             overflow: hidden;
-            transition: grid-template-columns 240ms var(--tw-ease-out);
-        }
-        .app-shell.drawer-open {
-            grid-template-columns: 1fr 360px;
         }
         .control-panel {
             background: var(--tw-bg-surface);
@@ -98,11 +94,38 @@
             padding: 0;
             box-shadow: var(--tw-shadow-panel);
             min-width: 0;
+            width: 100%;
+            max-width: 640px;
+            justify-self: center;
+            align-self: center;
             margin: 8px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            height: max-content;
             max-height: calc(100vh - 16px);
+        }
+        /* Drawer is overlay on narrow windows; on wide windows the panel
+           shrinks so they sit side-by-side without overlap. */
+        .app-shell.drawer-open .control-panel {
+            justify-self: start;
+        }
+        @media (min-width: 760px) {
+            .app-shell.drawer-open .control-panel {
+                max-width: calc(100vw - clamp(320px, 38vw, 420px) - 24px);
+            }
+        }
+        /* Backdrop dim on narrow windows where drawer overlays the panel. */
+        @media (max-width: 759px) {
+            .app-shell.drawer-open::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.45);
+                z-index: 40;
+                animation: fadeIn 200ms var(--tw-ease);
+                pointer-events: none;
+            }
         }
 
         /* ============ Settings drawer (slide-out right) ============
@@ -112,10 +135,13 @@
            - 12–14px radii, 0.055 inner borders, subtle card nesting
            - Tight 8–10px rhythm inside the 336px column */
         .settings-drawer {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            bottom: 8px;
+            width: clamp(320px, 38vw, 420px);
+            max-width: calc(100vw - 16px);
             min-width: 0;
-            width: 100%;
-            margin: 8px 8px 8px 0;
-            max-height: calc(100vh - 16px);
             background: rgba(22, 22, 28, 0.72);
             backdrop-filter: blur(40px) saturate(180%);
             -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -128,10 +154,11 @@
             display: flex;
             flex-direction: column;
             opacity: 0;
-            transform: translateX(40px);
+            transform: translateX(calc(100% + 16px));
             transition: opacity 200ms var(--tw-ease), transform 240ms var(--tw-ease-out);
             pointer-events: none;
             overflow: hidden;
+            z-index: 50;
         }
         .settings-drawer.open {
             opacity: 1;
@@ -189,15 +216,19 @@
         .drawer-close:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
         .drawer-body {
             flex: 1 1 auto;
+            min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 14px 16px 16px;
+            padding: 14px 14px 14px 16px;
         }
-        .drawer-body::-webkit-scrollbar { width: 3px; }
+        .drawer-body::-webkit-scrollbar { width: 6px; }
         .drawer-body::-webkit-scrollbar-track { background: transparent; }
         .drawer-body::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 3px;
+        }
+        .drawer-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.22);
         }
         /* Tab-content inside drawer body — flat single-column list */
         .drawer-body .tab-content { display: none; }
@@ -254,9 +285,11 @@
             border-radius: 8px;
         }
 
-        /* Scrollable content area */
+        /* Scrollable content area — shrinks to content on tall windows so the
+           panel doesn't stretch into giant blank space; scrolls when needed. */
         .scrollable-content {
-            flex: 1;
+            flex: 0 1 auto;
+            min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -676,8 +709,8 @@
         .sound-item {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
+            gap: 6px;
+            padding: 7px 8px;
             background: rgba(0, 0, 0, 0.28);
             border: 1px solid rgba(255, 255, 255, 0.04);
             border-radius: 10px;
@@ -686,8 +719,8 @@
         .sound-check {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            flex: 0 0 104px;
+            gap: 6px;
+            flex: 0 0 88px;
             min-width: 0;
             font-size: 12px;
             color: rgba(255, 255, 255, 0.88);
@@ -765,15 +798,15 @@
         .sound-sub-item {
             background: transparent;
             border: none;
-            padding: 2px 8px 2px 12px;
+            padding: 2px 8px 2px 8px;
             gap: 6px;
         }
         .sound-sub-name {
-            flex: 0 0 104px;
+            flex: 0 0 88px;
             font-size: 10px;
             color: var(--tw-fg-dim);
             white-space: nowrap;
-            padding-left: 20px;
+            padding-left: 18px;
         }
         .sound-preview-placeholder {
             width: 28px;
@@ -783,49 +816,129 @@
             display: inline-block;
         }
 
-        /* Compact overrides for sound tab inside drawer */
+        /* ============ Sound tab inside drawer — compact reflow ============
+           Section layout flows naturally in drawer-body (no flex stretching).
+           Dropzone is one horizontal row: icon · (title / sub) instead of the
+           oversized vertical card used in the legacy 2-column layout. */
         .drawer-body #tab-sound.active {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            height: 100%;
+            gap: 10px;
+            max-height: none;
+            overflow: visible;
         }
-        .drawer-body #tab-sound .settings-group { padding: 10px; flex: 0 0 auto; }
-        /* Second group (Ваши звуки) fills remaining vertical space */
-        .drawer-body #tab-sound .settings-group + .settings-group {
-            flex: 1 1 auto;
+        .drawer-body #tab-sound .settings-group { padding: 10px 12px 12px; }
+        .drawer-body #tab-sound .settings-group-title { margin-bottom: 10px; }
+
+        /* Master toggle in "Звуки" header — compact variant */
+        .drawer-body #tab-sound .settings-group-title .toggle-switch {
+            width: 32px;
+            height: 18px;
+        }
+        .drawer-body #tab-sound .settings-group-title .toggle-slider {
+            border-radius: 10px;
+        }
+        .drawer-body #tab-sound .settings-group-title .toggle-slider::before {
+            width: 14px;
+            height: 14px;
+            left: 2px;
+            bottom: 2px;
+        }
+        .drawer-body #tab-sound .settings-group-title input:checked + .toggle-slider::before {
+            transform: translateX(14px);
+        }
+
+        /* Caption inside the "Ваши звуки" header (mp3 · wav · …) */
+        .sound-formats {
+            margin-left: auto;
+            font-size: 9.5px;
+            font-weight: 500;
+            font-family: var(--tw-font-mono);
+            letter-spacing: 0.4px;
+            color: rgba(255, 255, 255, 0.44);
+            text-transform: none;
+        }
+
+        /* Empty state for custom sounds list */
+        .sound-empty {
             display: flex;
-            flex-direction: column;
-            min-height: 0;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 12px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.48);
+            font-size: 11.5px;
+            font-weight: 500;
         }
-        .drawer-body #tab-sound .settings-group-title { margin-bottom: 8px; }
-        .drawer-body #tab-sound .custom-sound-list { flex: 0 0 auto; }
-        .drawer-body #tab-sound .add-sound-row { flex: 1 1 auto; display: flex; }
+        .sound-empty::before {
+            content: "♪";
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        /* Spacing between custom list and dropzone */
+        .drawer-body #tab-sound .custom-sound-list { margin-bottom: 10px; }
+        .drawer-body #tab-sound .custom-sound-list:empty { margin-bottom: 0; }
+
+        /* Compact horizontal dropzone: icon left, title+sub stacked right */
+        .drawer-body #tab-sound .add-sound-row { display: block; margin-top: 10px; }
         .drawer-body #tab-sound .add-sound-btn {
-            flex: 1;
-            padding: 14px;
-            gap: 6px;
-            border: 1.5px dashed rgba(10, 132, 255, 0.38);
-            background: rgba(10, 132, 255, 0.04);
+            width: 100%;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-auto-rows: auto;
+            align-items: center;
+            column-gap: 10px;
+            row-gap: 1px;
+            padding: 10px 12px;
+            border: 1.5px dashed rgba(10, 132, 255, 0.36);
+            background: rgba(10, 132, 255, 0.045);
             color: var(--tw-fg);
+            border-radius: 11px;
+            text-align: left;
+            min-height: 0;
         }
         .drawer-body #tab-sound .add-sound-btn:hover {
             border-color: var(--tw-blue);
-            background: rgba(10, 132, 255, 0.09);
+            background: rgba(10, 132, 255, 0.1);
         }
         .drawer-body #tab-sound .add-sound-btn .drop-icon {
-            width: 32px;
-            height: 32px;
-            background: rgba(10, 132, 255, 0.18);
+            grid-column: 1;
+            grid-row: 1 / span 2;
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            background: rgba(10, 132, 255, 0.2);
             color: var(--tw-blue);
+            align-self: center;
+        }
+        .drawer-body #tab-sound .add-sound-btn:hover .drop-icon {
+            background: rgba(10, 132, 255, 0.28);
         }
         .drawer-body #tab-sound .add-sound-btn .drop-icon svg {
-            width: 16px;
-            height: 16px;
-            stroke-width: 2;
+            width: 14px;
+            height: 14px;
+            stroke-width: 2.2;
         }
-        .drawer-body #tab-sound .add-sound-btn .drop-title { color: var(--tw-fg); }
-        .drawer-body #tab-sound .add-sound-btn .drop-sub { display: block; color: var(--tw-fg-dim); }
+        .drawer-body #tab-sound .add-sound-btn .drop-title {
+            grid-column: 2;
+            grid-row: 1;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.2;
+            color: var(--tw-fg);
+        }
+        .drawer-body #tab-sound .add-sound-btn .drop-sub {
+            grid-column: 2;
+            grid-row: 2;
+            font-size: 10px;
+            line-height: 1.2;
+            color: var(--tw-fg-dim);
+            letter-spacing: 0.2px;
+        }
 
         /* Display tab compact layout */
         #tab-display .settings-group { padding: 10px; }
@@ -2396,11 +2509,12 @@
         .settings-toggle .arrow { transition: transform var(--tw-dur-slow) var(--tw-ease); }
         .settings-toggle.open .arrow { transform: rotate(180deg); }
 
-        /* Advanced settings */
+        /* Advanced settings — sized by content; the panel itself can shrink. */
         .advanced-settings {
             display: flex;
             flex-direction: column;
-            flex: 1;
+            flex: 0 1 auto;
+            min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -2411,10 +2525,11 @@
         }
 
         .advanced-settings .content-section {
-            padding: 0 var(--tw-s-4) var(--tw-s-5);
+            padding: 0 var(--tw-s-4) var(--tw-s-3);
             background: transparent;
             border-radius: 0 0 var(--tw-r-2xl) var(--tw-r-2xl);
-            flex: 1;
+            flex: 0 1 auto;
+            min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
         }
@@ -3022,11 +3137,7 @@
         }
 
         @media (min-width: 500px) {
-            .control-panel {
-                width: calc(100% - 24px);
-                margin: 12px auto;
-                height: calc(100vh - 24px);
-            }
+            .control-panel { margin: 12px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -3048,6 +3159,69 @@
             outline: none;
             box-shadow: var(--tw-focus-ring);
         }
+
+        /* ============================================================
+           Compact panel — settings live in the drawer now, so the main
+           panel only carries timer + transport + presets + adjust + windows.
+           Tightened to fit ~480×600 minimum and scale up cleanly.
+           ============================================================ */
+        .custom-titlebar { padding: 5px 12px; min-height: 30px; }
+
+        .timer-header { padding: 10px 14px 8px; }
+        .timer-header h1 { margin: 0 0 4px 0; font-size: 10px; }
+        .timer-display-main {
+            font-size: clamp(46px, 9.5vw, 60px);
+            margin-bottom: 6px;
+        }
+        .timer-status { padding: 3px 10px; font-size: 10px; letter-spacing: 0.6px; }
+
+        .main-controls { padding: 6px 14px 8px; gap: 12px; }
+        .main-btn { width: 40px; height: 40px; font-size: 15px; }
+        .main-btn.start { width: 48px; height: 48px; font-size: 18px; }
+
+        .compact-section { padding: 8px 14px; }
+        .compact-section + .compact-section { padding-top: 4px; }
+        .group-title { margin: 4px 0 6px; font-size: 10px; }
+
+        .quick-presets { gap: 6px; }
+        .quick-preset { padding: 7px 4px !important; font-size: 12px !important; min-height: 0; }
+
+        .adjust-main-row { padding: 4px; gap: 4px; }
+        .adjust-main-btn { padding: 5px 4px !important; font-size: 12px !important; min-height: 26px; }
+        .adjust-divider { margin: 0 2px; }
+
+        .manual-time-row { padding: 4px 6px; gap: 6px; margin-top: 6px; }
+        .manual-time-input { padding: 5px 8px !important; font-size: 13px !important; height: 30px; }
+        .manual-time-apply { padding: 5px 10px !important; height: 30px; min-width: 36px; }
+        .manual-time-label { font-size: 11px; }
+
+        .timer-mode-row { padding: 4px 2px; margin-top: 4px; }
+        .timer-mode-label { font-size: 12px; }
+        .timer-mode-row .toggle-switch { width: 36px; height: 20px; }
+        .timer-mode-row .toggle-slider { border-radius: 10px; }
+        .timer-mode-row .toggle-slider::before { width: 16px; height: 16px; left: 2px; bottom: 2px; }
+        .timer-mode-row input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+        .quick-windows { gap: 6px; }
+        .quick-window-btn {
+            flex-direction: row;
+            justify-content: center;
+            padding: 7px 8px;
+            gap: 6px;
+            font-size: 11px;
+            min-height: 0;
+        }
+        .quick-window-btn .qw-icon { font-size: 1em; width: auto; height: auto; }
+        .quick-window-btn .qw-label { font-weight: 500; }
+
+        .tab-btn { padding: 7px 6px; font-size: 11px; }
+
+        .footer-hints { padding: 5px 12px 3px; margin-top: 4px; font-size: 10px; }
+
+        /* Drawer — compact head & body padding for narrow drawer widths */
+        .drawer-head { padding: 10px 14px 8px; }
+        .drawer-title { font-size: 15px; }
+        .drawer-body { padding: 10px 10px 12px 14px; }
     </style>
 </head>
 <body class="control-window">
@@ -3367,7 +3541,7 @@
                         <div class="settings-group-title">
                             <span class="icon">🎵</span>
                             Ваши звуки
-                            <span style="margin-left: auto; font-size: var(--tw-t-caption); color: var(--tw-fg-dim); font-weight: 400; font-family: var(--tw-font-mono); text-transform: none; letter-spacing: 0.3px;">mp3 · wav · ogg · aac · flac · до 5 МБ</span>
+                            <span class="sound-formats">mp3 · wav · ogg · aac · flac · до 5 МБ</span>
                         </div>
                         <div class="custom-sound-list" id="customSoundList"></div>
                         <div class="sound-err" id="soundUploadError">
@@ -6213,7 +6387,7 @@
 
                 // Отображаем список звуков
                 if (customSounds.length === 0) {
-                    listEl.innerHTML = '<div style="color: #999; font-size: 0.85em; padding: 8px; text-align: center;">Нет добавленных звуков</div>';
+                    listEl.innerHTML = '<div class="sound-empty">Нет добавленных звуков</div>';
                     return;
                 }
 
