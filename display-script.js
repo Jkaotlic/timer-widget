@@ -1391,23 +1391,30 @@ class DisplayTimer {
     updateChipState(state) {
         const pill = this.statusPill;
         const label = document.getElementById('heroLabel');
+        const glyphEl = pill && pill.querySelector('.status-glyph');
         if (!pill) { return; }
 
         pill.classList.remove('is-success', 'is-attention');
         let labelText = 'Осталось';
+        let glyph = '·';
 
         if (state.finished) {
             pill.classList.add('is-success');
             labelText = 'Завершено';
+            glyph = '✓';
         } else if (state.remainingSeconds < 0) {
             pill.classList.add('is-attention');
             labelText = 'Сверх времени';
+            glyph = '!';
         } else if (state.isRunning && !state.isPaused) {
             pill.classList.add('is-success');
+            glyph = '▶';
         } else if (state.isPaused) {
             labelText = 'Пауза';
+            glyph = '‖';
         }
 
+        if (glyphEl) { glyphEl.textContent = glyph; }
         if (label) { label.textContent = labelText; }
     }
 
