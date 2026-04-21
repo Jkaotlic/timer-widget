@@ -3721,13 +3721,14 @@
                     this.widgetShowTicksEl.addEventListener('change', () => {
                         const val = this.widgetShowTicksEl.checked;
                         localStorage.setItem('widgetShowTicks', val);
+                        localStorage.setItem('clockShowTicks', val);
                         ipcRenderer.send('widget-style-update', {
                             timerStyle: this.timerStyleEl.value,
                             timerScale: parseInt(this.timerScaleEl.value),
                             showTicks: val
                         });
                         if (this.syncClockStyle) {
-                            ipcRenderer.send('clock-widget-settings', { showTicks: val });
+                            this.pushClockSettings();
                         }
                     });
                 }
@@ -4747,7 +4748,8 @@
                     showTimezone: this.clockShowTimezoneEl.checked,
                     showSeconds: this.clockShowSecondsEl.checked,
                     format24h: this.clockFormat24hEl.checked,
-                    showNumbers: this.clockShowAnalogNumbersEl.checked
+                    showNumbers: this.clockShowAnalogNumbersEl.checked,
+                    showTicks: this.widgetShowTicksEl?.checked ?? false
                 };
                 
                 // Сохраняем в localStorage
