@@ -1384,6 +1384,31 @@ class DisplayTimer {
         } else {
             this.statusText.textContent = 'Готов к запуску';
         }
+
+        this.updateChipState({ finished: this.finished, remainingSeconds: secs, isRunning: this.isRunning, isPaused: this.isPaused });
+    }
+
+    updateChipState(state) {
+        const pill = this.statusPill;
+        const label = document.getElementById('heroLabel');
+        if (!pill) { return; }
+
+        pill.classList.remove('is-success', 'is-attention');
+        let labelText = 'Осталось';
+
+        if (state.finished) {
+            pill.classList.add('is-success');
+            labelText = 'Завершено';
+        } else if (state.remainingSeconds < 0) {
+            pill.classList.add('is-attention');
+            labelText = 'Сверх времени';
+        } else if (state.isRunning && !state.isPaused) {
+            pill.classList.add('is-success');
+        } else if (state.isPaused) {
+            labelText = 'Пауза';
+        }
+
+        if (label) { label.textContent = labelText; }
     }
 
     triggerFinishEffect() {
@@ -1815,6 +1840,21 @@ let displayTimer;
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', () => {
         displayTimer = new DisplayTimer();
+
+        // Hint-strip: автоскрытие через 4 сек бездействия мыши
+        (function hintFade() {
+            const hint = document.getElementById('controlsHint');
+            if (!hint) { return; }
+            let timer;
+            const reset = () => {
+                hint.classList.remove('faded');
+                clearTimeout(timer);
+                timer = setTimeout(() => hint.classList.add('faded'), 4000);
+            };
+            document.addEventListener('mousemove', reset, { passive: true });
+            document.addEventListener('keydown', reset);
+            reset();
+        })();
     });
 
     // Cleanup при закрытии окна
