@@ -73,6 +73,20 @@
             color: var(--tw-fg-secondary);
         }
 
+        /* App shell — grid: [control panel] + [settings drawer slide-out].
+           Second column animates from 0 → 360px when drawer opens. */
+        .app-shell {
+            display: grid;
+            grid-template-columns: 1fr 0fr;
+            grid-template-rows: 1fr;
+            min-height: 100vh;
+            width: 100%;
+            overflow: hidden;
+            transition: grid-template-columns 240ms var(--tw-ease-out);
+        }
+        .app-shell.drawer-open {
+            grid-template-columns: 1fr 360px;
+        }
         .control-panel {
             background: var(--tw-bg-surface);
             backdrop-filter: var(--tw-blur);
@@ -81,13 +95,94 @@
             border: 1px solid var(--tw-border);
             padding: 0;
             box-shadow: var(--tw-shadow-panel);
-            max-width: 100%;
-            width: calc(100% - 16px);
-            margin: 8px auto;
+            min-width: 0;
+            margin: 8px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             max-height: calc(100vh - 16px);
+        }
+
+        /* ============ Settings drawer (slide-out right) ============ */
+        .settings-drawer {
+            min-width: 0;
+            width: 100%;
+            margin: 8px 8px 8px 0;
+            max-height: calc(100vh - 16px);
+            background: var(--tw-bg-surface);
+            backdrop-filter: var(--tw-blur);
+            -webkit-backdrop-filter: var(--tw-blur);
+            border: 1px solid var(--tw-border);
+            border-radius: var(--tw-r-2xl);
+            box-shadow: var(--tw-shadow-panel);
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateX(40px);
+            transition: opacity 200ms var(--tw-ease), transform 240ms var(--tw-ease-out);
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .settings-drawer.open {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+        .drawer-head {
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--tw-divider);
+            flex: 0 0 auto;
+        }
+        .drawer-title {
+            font-size: var(--tw-t-h2);
+            font-weight: 600;
+            color: var(--tw-fg);
+            letter-spacing: -0.2px;
+        }
+        .drawer-close {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 50%;
+            background: var(--tw-overlay-light);
+            color: var(--tw-fg-secondary);
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background var(--tw-dur-fast) var(--tw-ease), color var(--tw-dur-fast) var(--tw-ease);
+        }
+        .drawer-close:hover {
+            background: var(--tw-overlay-medium);
+            color: var(--tw-fg);
+        }
+        .drawer-close:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
+        .drawer-body {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px;
+        }
+        .drawer-body::-webkit-scrollbar { width: 4px; }
+        .drawer-body::-webkit-scrollbar-track { background: transparent; }
+        .drawer-body::-webkit-scrollbar-thumb {
+            background: var(--tw-overlay-medium);
+            border-radius: 2px;
+        }
+        /* Tab-content inside drawer body — flat single-column list */
+        .drawer-body .tab-content { display: none; }
+        .drawer-body .tab-content.active {
+            display: flex;
+            flex-direction: column;
+            gap: var(--tw-s-3);
+            max-height: none;
+            padding: 0;
+            overflow: visible;
         }
 
         /* Scrollable content area */
@@ -2627,6 +2722,7 @@
     </style>
 </head>
 <body class="control-window">
+    <div class="app-shell">
     <div class="control-panel">
         <!-- Кастомная панель заголовка (macOS style) -->
         <div class="custom-titlebar">
@@ -2708,7 +2804,7 @@
             <div class="content-section">
                 <div class="group-title">НАСТРОЙКИ</div>
                 <div class="tabs-row">
-                    <button class="tab-btn active" data-tab="timer">Виджет</button>
+                    <button class="tab-btn" data-tab="timer">Виджет</button>
                     <button class="tab-btn" data-tab="clock">Часы</button>
                     <button class="tab-btn" data-tab="display">Полноэкр.</button>
                     <button class="tab-btn" data-tab="sound">Звуки</button>
@@ -3220,6 +3316,14 @@
         <div class="footer-hints">Space — старт/пауза · R — сброс · 1-8 — пресеты</div>
     </div>
         </div>
+    </div>
+    <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true" role="dialog" aria-label="Настройки">
+        <div class="drawer-head">
+            <span class="drawer-title" id="drawerTitle">Настройки</span>
+            <button class="drawer-close" id="drawerClose" type="button" title="Закрыть (Esc)" aria-label="Закрыть">×</button>
+        </div>
+        <div class="drawer-body" id="drawerBody"></div>
+    </aside>
     </div>
 
     <!-- FAQ Modal -->
@@ -3758,6 +3862,109 @@
                 this.timeLayoutPreset = 'frame';
             }
 
+            initSettingsDrawer() {
+                this.settingsDrawerEl = document.getElementById('settingsDrawer');
+                this.drawerTitleEl = document.getElementById('drawerTitle');
+                this.drawerBodyEl = document.getElementById('drawerBody');
+                this.drawerCloseBtn = document.getElementById('drawerClose');
+                this._currentDrawerTab = null;
+                this._drawerExtraWidth = 376; // 360 drawer + 16 gap
+
+                // Move tab-content elements from main panel into drawer body.
+                // Keep tabs-row buttons in their original spot for triggering.
+                if (this.drawerBodyEl) {
+                    document.querySelectorAll('.advanced-settings .tab-content').forEach(tc => {
+                        this.drawerBodyEl.appendChild(tc);
+                        tc.classList.remove('active');
+                    });
+                }
+                // Initial state: drawer closed, no tab active
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+                if (this.drawerCloseBtn) {
+                    this.drawerCloseBtn.addEventListener('click', () => this.closeSettingsDrawer());
+                }
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape'
+                        && this.settingsDrawerEl
+                        && this.settingsDrawerEl.classList.contains('open')
+                        && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                        // Don't steal Esc from inputs/textareas
+                        const tag = (e.target && e.target.tagName) || '';
+                        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+                            this.closeSettingsDrawer();
+                            e.preventDefault();
+                        }
+                    }
+                });
+            }
+
+            openSettingsDrawer(tabKey) {
+                if (!this.settingsDrawerEl || !this.drawerBodyEl) { return; }
+                const TITLES = { timer: 'Виджет', clock: 'Часы', display: 'Полноэкранный', sound: 'Звуки' };
+                const target = document.getElementById(`tab-${tabKey}`);
+                if (!target) { return; }
+
+                this.drawerBodyEl.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                target.classList.add('active');
+                if (this.drawerTitleEl) { this.drawerTitleEl.textContent = TITLES[tabKey] || 'Настройки'; }
+
+                document.querySelectorAll('.tab-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.tab === tabKey));
+
+                const wasOpen = this.settingsDrawerEl.classList.contains('open');
+                this._currentDrawerTab = tabKey;
+
+                if (!wasOpen) {
+                    // Resize window first, then animate drawer in.
+                    const baseWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 720;
+                    ipcRenderer.send('resize-control-window', {
+                        width: baseWidth + this._drawerExtraWidth,
+                        height: window.innerHeight
+                    });
+                    const shell = document.querySelector('.app-shell');
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            if (shell) { shell.classList.add('drawer-open'); }
+                            this.settingsDrawerEl.classList.add('open');
+                            this.settingsDrawerEl.setAttribute('aria-hidden', 'false');
+                        });
+                    });
+                }
+            }
+
+            closeSettingsDrawer() {
+                if (!this.settingsDrawerEl) { return; }
+                if (!this.settingsDrawerEl.classList.contains('open')) { return; }
+                const shell = document.querySelector('.app-shell');
+                this.settingsDrawerEl.classList.remove('open');
+                if (shell) { shell.classList.remove('drawer-open'); }
+                this.settingsDrawerEl.setAttribute('aria-hidden', 'true');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this._currentDrawerTab = null;
+
+                // Wait for slide-out, then shrink window back.
+                setTimeout(() => {
+                    if (this.settingsDrawerEl.classList.contains('open')) { return; }
+                    const baseWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 720;
+                    ipcRenderer.send('resize-control-window', {
+                        width: baseWidth,
+                        height: window.innerHeight
+                    });
+                }, 260);
+            }
+
+            toggleSettingsDrawer(tabKey) {
+                if (this._currentDrawerTab === tabKey
+                    && this.settingsDrawerEl
+                    && this.settingsDrawerEl.classList.contains('open')) {
+                    this.closeSettingsDrawer();
+                } else {
+                    this.openSettingsDrawer(tabKey);
+                }
+            }
+
             initTabs() {
                 // Настройки всегда видны (кнопка toggle убрана)
                 const advancedSettings = document.getElementById('advancedSettings');
@@ -3765,17 +3972,12 @@
                     advancedSettings.classList.add('open');
                 }
 
-                // Табы внутри настроек
+                this.initSettingsDrawer();
+
+                // Табы открывают/закрывают slide-out drawer
                 document.querySelectorAll('.tab-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                        btn.classList.add('active');
-                        const tabContent = document.getElementById(`tab-${btn.dataset.tab}`);
-                        tabContent.classList.add('active');
-                        
-                        // Авто-ресайз при смене таба
-                        setTimeout(() => this.autoResizeWindow(), 50);
+                        this.toggleSettingsDrawer(btn.dataset.tab);
                     });
                 });
 
@@ -5029,6 +5231,10 @@
             }
 
             autoResizeWindow() {
+                // Skip auto-resize while drawer is open — drawer manages width itself.
+                if (this.settingsDrawerEl && this.settingsDrawerEl.classList.contains('open')) {
+                    return;
+                }
                 // Временно убираем max-height с активного таба, чтобы измерить реальную высоту
                 const activeTab = document.querySelector('.tab-content.active');
                 if (activeTab) {

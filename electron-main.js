@@ -261,7 +261,7 @@ function createControlWindow() {
         height: windowHeight,
         minWidth: 600,
         minHeight: 650,
-        maxWidth: 800,
+        maxWidth: 1200,  // bumped from 800 to fit settings drawer (360px slide-out)
         maxHeight: 1000,
         webPreferences: {
             nodeIntegration: false,
