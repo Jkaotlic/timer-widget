@@ -189,11 +189,13 @@
         }
 
         .time-display {
-            font-size: clamp(1.5rem, min(18vw, 18vh), 20rem);
+            /* Размер подогнан так, чтобы даже вариант с минусом (-MM:SS, 6 символов)
+               умещался внутри кольца круга с запасом на padding 5%. */
+            font-size: clamp(1.2rem, min(15vw, 15vh), 16rem);
             font-weight: 200;
             color: var(--tw-fg);
             font-family: var(--tw-font-display);
-            letter-spacing: 0.05em;
+            letter-spacing: 0.02em;
             font-variant-numeric: tabular-nums;
             line-height: 1;
             text-shadow:
@@ -213,12 +215,22 @@
         .time-display[data-status="overtime"] {
             color: #ff4444;
             --glow-color: rgba(255, 68, 68, 0.8);
+            /* Убираем letter-spacing в перерасходе — «-» + 5 цифр уже шире обычного */
+            letter-spacing: 0;
             animation: time-pulse 1s ease-in-out infinite;
+        }
+
+        /* Sign slot — фиксированная ширина, цифры остаются в центре кольца */
+        .time-display .tm-sign {
+            display: inline-block;
+            width: 0.55ch;
+            text-align: right;
+            margin-right: 0.05ch;
         }
 
         @keyframes time-pulse {
             0%, 100% { transform: scale(1); }
-            50%     { transform: scale(1.03); }
+            50%     { transform: scale(1.015); }
         }
 
         /* Status chip — pill, backdrop-blur, 3 semantic tiers */
@@ -829,7 +841,7 @@
 
             <!-- Центральный контент -->
             <div class="center-content">
-                <div class="time-display" id="timeDisplay">00:00</div>
+                <div class="time-display" id="timeDisplay"><span class="tm-sign" id="timeDisplaySign"></span><span class="tm-digits" id="timeDisplayDigits">00:00</span></div>
                 <div class="status-badge" id="statusBadge">Готов</div>
             </div>
         </div>
@@ -979,6 +991,8 @@
             initElements() {
                 this.container = document.getElementById('widgetContainer');
                 this.timeDisplay = document.getElementById('timeDisplay');
+                this.timeDisplaySign = document.getElementById('timeDisplaySign');
+                this.timeDisplayDigits = document.getElementById('timeDisplayDigits');
                 this.statusBadge = document.getElementById('statusBadge');
                 this.progressBar = document.getElementById('progressBar');
                 // Контролы убраны — управление из главного окна
@@ -1036,8 +1050,9 @@
                 const digitalFontSize = Math.min(maxFontByWidth, maxFontByHeight);
                 this.container.style.setProperty('--digital-font-size', digitalFontSize + 'px');
                 
-                // Масштаб для flip (базовая ширина ~280px для 4 карточек MM:SS)
-                const baseFlipWidth = hasHours ? 380 : 280;
+                // Масштаб для flip (базовая ширина с запасом для возможного знака минуса:
+                // карточка минуса 25px + margin 4px ≈ 30px + буфер)
+                const baseFlipWidth = hasHours ? 420 : 320;
                 const baseFlipHeight = 100;
                 
                 const scaleX = (containerWidth * 0.9) / baseFlipWidth;
@@ -1517,9 +1532,14 @@
             updateDisplay() {
                 const secs = Math.floor(this.remainingSeconds);
                 const formatted = this.formatTime(secs);
-                
-                // Обновляем время для кругового стиля
-                this.timeDisplay.textContent = formatted;
+
+                // Circle: split sign and digits — цифры остаются в центре даже в минусе
+                if (this.timeDisplaySign && this.timeDisplayDigits) {
+                    this.timeDisplaySign.textContent = secs < 0 ? '−' : '';
+                    this.timeDisplayDigits.textContent = this.formatTime(Math.abs(secs));
+                } else {
+                    this.timeDisplay.textContent = formatted;
+                }
                 
                 // Обновляем цифровой стиль
                 if (this.widgetDigitalTime) {

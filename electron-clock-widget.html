@@ -147,11 +147,13 @@
         }
 
         .time-display {
-            font-size: clamp(1.2rem, min(20vw, 20vh), 20rem);
+            /* HH:MM плюс надстрочные SS — обрезали clamp под реальную ширину ring
+               (5% padding + 2 * stroke). 16rem/15vw совпадает с electron-widget. */
+            font-size: clamp(1rem, min(15vw, 15vh), 16rem);
             font-weight: 200;
             color: var(--tw-fg);
             font-family: var(--tw-font-display);
-            letter-spacing: 0.05em;
+            letter-spacing: 0.02em;
             font-variant-numeric: tabular-nums;
             text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
