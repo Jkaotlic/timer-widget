@@ -451,9 +451,9 @@
         .tab-content { display: none; }
 
         .tab-content.active {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--tw-s-2);
+            display: flex;
+            flex-direction: column;
+            gap: var(--tw-s-3);
             animation: fadeIn var(--tw-dur-slow) var(--tw-ease-out);
             overflow-y: auto;
             overflow-x: hidden;
@@ -1730,8 +1730,24 @@
             gap: var(--tw-s-2);
         }
 
+        .manual-time-row {
+            display: flex;
+            align-items: center;
+            gap: var(--tw-s-2);
+            margin-top: var(--tw-s-2);
+            padding: var(--tw-s-2) var(--tw-s-1) 0;
+            border-top: 1px solid var(--tw-divider);
+        }
+        .manual-time-label {
+            flex: 0 0 auto;
+            font-size: var(--tw-t-label);
+            font-weight: 500;
+            color: var(--tw-fg-muted);
+            letter-spacing: 0.1px;
+        }
         .manual-time-input {
-            width: 130px;
+            flex: 1 1 auto;
+            min-width: 0;
             padding: 8px 12px;
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-sm);
@@ -2656,7 +2672,7 @@
             </div>
         </div>
 
-        <!-- Корректировка -->
+        <!-- Корректировка + ручной ввод -->
         <div class="compact-section">
             <div class="group-title">ТОЧНАЯ НАСТРОЙКА</div>
             <div class="adjust-main-row">
@@ -2668,11 +2684,8 @@
                 <button class="adjust-main-btn plus" data-adjust="300">+5 м</button>
                 <button class="adjust-main-btn plus" data-adjust="3600">+1 ч</button>
             </div>
-        </div>
-
-        <!-- Ручной ввод времени -->
-        <div class="compact-section" style="padding: 6px 16px;">
-            <div class="time-input-row">
+            <div class="manual-time-row">
+                <span class="manual-time-label">Точное время</span>
                 <input type="text" id="manualTimeInput" class="manual-time-input" placeholder="0:00" autocomplete="off" spellcheck="false" aria-label="Ручной ввод времени" title="Введите время: 90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1ч 30 мин">
                 <button class="manual-time-apply" id="manualTimeApply" title="Установить время (Enter)" aria-label="Установить время">✓</button>
             </div>
@@ -2986,12 +2999,12 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Стиль</span>
-                                <select id="clockStyle" aria-label="Стиль часов" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em;">
-                                    <option value="circle">⭕ Круговой</option>
-                                    <option value="digital">🔢 Цифровой LED</option>
-                                    <option value="flip">🔄 Перекидные часы</option>
-                                    <option value="analog">🕐 Аналоговые</option>
-                                </select>
+                                <div class="segmented" id="clockStyle" role="tablist" aria-label="Стиль часов" data-value="circle">
+                                    <button type="button" data-val="circle" class="active">Круг</button>
+                                    <button type="button" data-val="digital">LED</button>
+                                    <button type="button" data-val="flip">Флип</button>
+                                    <button type="button" data-val="analog">Аналог</button>
+                                </div>
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
@@ -3056,12 +3069,12 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Стиль</span>
-                                <select id="displayTimerStyle" aria-label="Стиль таймера дисплея" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
-                                    <option value="circle">⭕ Круговой</option>
-                                    <option value="digital">🔢 Цифровой LED</option>
-                                    <option value="flip">🔄 Перекидные</option>
-                                    <option value="analog">🕐 Аналоговые</option>
-                                </select>
+                                <div class="segmented" id="displayTimerStyle" role="tablist" aria-label="Стиль таймера дисплея" data-value="circle">
+                                    <button type="button" data-val="circle" class="active">Круг</button>
+                                    <button type="button" data-val="digital">LED</button>
+                                    <button type="button" data-val="flip">Флип</button>
+                                    <button type="button" data-val="analog">Аналог</button>
+                                </div>
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
@@ -3699,22 +3712,7 @@
                 this.timeBlocksScaleEl = document.getElementById('timeBlocksScale');
                 this.timeBlocksScaleValueEl = document.getElementById('timeBlocksScaleValue');
                 this.timerStyleEl = document.getElementById('timerStyle');
-                // Backward-compat: .value getter/setter для segmented control
-                if (!Object.getOwnPropertyDescriptor(this.timerStyleEl, 'value')) {
-                    Object.defineProperty(this.timerStyleEl, 'value', {
-                        get() { return this.dataset.value || 'circle'; },
-                        set(v) {
-                            this.dataset.value = v;
-                            this.querySelectorAll('button').forEach(b =>
-                                b.classList.toggle('active', b.dataset.val === v));
-                            this.dispatchEvent(new Event('change'));
-                        },
-                        configurable: true
-                    });
-                }
-                this.timerStyleEl.querySelectorAll('button').forEach(btn => {
-                    btn.addEventListener('click', () => { this.timerStyleEl.value = btn.dataset.val; });
-                });
+                this._attachSegmented(this.timerStyleEl, 'circle');
                 this.widgetShowTicksEl = document.getElementById('widgetShowTicks');
                 if (this.widgetShowTicksEl) {
                     this.widgetShowTicksEl.checked = localStorage.getItem('widgetShowTicks') === 'true';
@@ -3737,12 +3735,14 @@
 
                 // Display-specific style/scale (Полноэкранный tab)
                 this.displayTimerStyleEl = document.getElementById('displayTimerStyle');
+                this._attachSegmented(this.displayTimerStyleEl, 'circle');
                 this.displayTimerScaleEl = document.getElementById('displayTimerScale');
                 this.displayTimerScaleValueEl = document.getElementById('displayTimerScaleValue');
 
                 // Настройки виджета часов
                 this.syncClockStyleEl = document.getElementById('syncClockStyle');
                 this.clockStyleEl = document.getElementById('clockStyle');
+                this._attachSegmented(this.clockStyleEl, 'circle');
                 this.clockStyleRowEl = document.getElementById('clockStyleRow');
                 this.clockAnalogNumbersRowEl = document.getElementById('clockAnalogNumbersRow');
                 this.clockShowAnalogNumbersEl = document.getElementById('clockShowAnalogNumbers');
@@ -4740,6 +4740,29 @@
                 if (this.clockAnalogNumbersRowEl) {
                     this.clockAnalogNumbersRowEl.style.display = clockStyle === 'analog' ? 'flex' : 'none';
                 }
+            }
+
+            _attachSegmented(el, defaultVal) {
+                if (!el || !el.classList || !el.classList.contains('segmented')) { return; }
+                if (!Object.getOwnPropertyDescriptor(el, 'value')) {
+                    Object.defineProperty(el, 'value', {
+                        get() {
+                            return this.dataset.value
+                                || (this.querySelector('button.active')?.dataset.val)
+                                || defaultVal || '';
+                        },
+                        set(v) {
+                            this.dataset.value = v;
+                            this.querySelectorAll('button').forEach(b =>
+                                b.classList.toggle('active', b.dataset.val === v));
+                            this.dispatchEvent(new Event('change'));
+                        },
+                        configurable: true
+                    });
+                }
+                el.querySelectorAll('button').forEach(btn => {
+                    btn.addEventListener('click', () => { el.value = btn.dataset.val; });
+                });
             }
 
             pushClockSettings() {
