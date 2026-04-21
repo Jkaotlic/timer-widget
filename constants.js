@@ -120,6 +120,8 @@ const CONFIG = {
         CLOCK_POSITION: 'clockPosition',
         CLOCK_SIZE: 'clockSize',
         CLOCK_WIDGET_SETTINGS: 'clockWidgetSettings',
+        WIDGET_SHOW_TICKS: 'widgetShowTicks',
+        CLOCK_SHOW_TICKS: 'clockShowTicks',
         TIMER_STATE: 'timerState',
         TIMER_CONFIG: 'timerConfig',
         DISPLAY_EXT_SETTINGS: 'displayExtSettings',

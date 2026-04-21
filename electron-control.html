@@ -2711,6 +2711,13 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="widgetShowTicks">Показывать деления</label>
+                            <label class="toggle-switch" title="Показывать деления на циферблате виджета">
+                                <input type="checkbox" id="widgetShowTicks">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
                     <div class="settings-group">
                         <div class="settings-group-title">
@@ -2719,12 +2726,12 @@
                         </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Стиль таймера</span>
-                            <select id="timerStyle" aria-label="Стиль виджета" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; min-width: 160px;">
-                                <option value="circle">⭕ Круговой</option>
-                                <option value="digital">🔢 Цифровой LED</option>
-                                <option value="flip">🔄 Перекидные</option>
-                                <option value="analog">🕐 Аналоговые</option>
-                            </select>
+                            <div class="segmented" id="timerStyle" role="tablist" aria-label="Стиль виджета" data-value="circle">
+                                <button type="button" data-val="circle" class="active">Круг</button>
+                                <button type="button" data-val="digital">LED</button>
+                                <button type="button" data-val="flip">Флип</button>
+                                <button type="button" data-val="analog">Аналог</button>
+                            </div>
                         </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Масштаб</span>
@@ -3692,6 +3699,38 @@
                 this.timeBlocksScaleEl = document.getElementById('timeBlocksScale');
                 this.timeBlocksScaleValueEl = document.getElementById('timeBlocksScaleValue');
                 this.timerStyleEl = document.getElementById('timerStyle');
+                // Backward-compat: .value getter/setter для segmented control
+                if (!Object.getOwnPropertyDescriptor(this.timerStyleEl, 'value')) {
+                    Object.defineProperty(this.timerStyleEl, 'value', {
+                        get() { return this.dataset.value || 'circle'; },
+                        set(v) {
+                            this.dataset.value = v;
+                            this.querySelectorAll('button').forEach(b =>
+                                b.classList.toggle('active', b.dataset.val === v));
+                            this.dispatchEvent(new Event('change'));
+                        },
+                        configurable: true
+                    });
+                }
+                this.timerStyleEl.querySelectorAll('button').forEach(btn => {
+                    btn.addEventListener('click', () => { this.timerStyleEl.value = btn.dataset.val; });
+                });
+                this.widgetShowTicksEl = document.getElementById('widgetShowTicks');
+                if (this.widgetShowTicksEl) {
+                    this.widgetShowTicksEl.checked = localStorage.getItem('widgetShowTicks') === 'true';
+                    this.widgetShowTicksEl.addEventListener('change', () => {
+                        const val = this.widgetShowTicksEl.checked;
+                        localStorage.setItem('widgetShowTicks', val);
+                        ipcRenderer.send('widget-style-update', {
+                            timerStyle: this.timerStyleEl.value,
+                            timerScale: parseInt(this.timerScaleEl.value),
+                            showTicks: val
+                        });
+                        if (this.syncClockStyle) {
+                            ipcRenderer.send('clock-widget-settings', { showTicks: val });
+                        }
+                    });
+                }
                 this.timerScaleEl = document.getElementById('timerScale');
                 this.timerScaleValueEl = document.getElementById('timerScaleValue');
 
@@ -3883,7 +3922,7 @@
                                 document.getElementById('bgGrad1').value = theme.bg;
                                 this.saveColors('widget');
                                 // Also send widget style update
-                                ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value });
+                                ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, showTicks: this.widgetShowTicksEl?.checked ?? false });
                             } else if (target === 'clock') {
                                 this.clockColors = colors;
                                 this.saveColors('clock');
@@ -4037,7 +4076,7 @@
                 
                 this.timerStyleEl.addEventListener('change', () => {
                     // Send widget-specific style update (only affects widget, not display)
-                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value });
+                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, showTicks: this.widgetShowTicksEl?.checked ?? false });
                     // Sync clock style when syncClockStyle is enabled
                     if (this.syncClockStyle) {
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
@@ -4047,7 +4086,7 @@
                 
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
-                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: parseInt(this.timerScaleEl.value) });
+                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: parseInt(this.timerScaleEl.value), showTicks: this.widgetShowTicksEl?.checked ?? false });
                 });
 
                 // Display-specific style/scale (Полноэкранный tab)
@@ -4106,7 +4145,7 @@
                     document.getElementById('timerScale'),
                     30, 600, 100,
                     (val) => {
-                        ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: val });
+                        ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: val, showTicks: this.widgetShowTicksEl?.checked ?? false });
                     }
                 );
 
@@ -4570,7 +4609,8 @@
                 setTimeout(() => {
                     ipcRenderer.send('widget-style-update', {
                         timerStyle: this.timerStyleEl.value,
-                        timerScale: parseInt(this.timerScaleEl.value)
+                        timerScale: parseInt(this.timerScaleEl.value),
+                        showTicks: this.widgetShowTicksEl?.checked ?? false
                     });
                 }, 600);
 
