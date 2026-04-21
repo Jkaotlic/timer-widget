@@ -167,31 +167,13 @@
   }
 }
 
-/* ---------------- AUTO LIGHT via OS ---------------- */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
-    /* mirror [data-theme="light"] — user hasn't chosen, OS prefers light */
-    --tw-blue:   #007aff;
-    --tw-green:  #28a745;
-    --tw-red:    #ff3b30;
-    --tw-orange: #ff9500;
-    --tw-yellow: #f0a800;
-    --tw-pink:   #e04565;
-    --tw-bg-void: #e9e9ef;
-    --tw-bg-surface: rgba(255,255,255,0.72);
-    --tw-bg-glass: rgba(255,255,255,0.94);
-    --tw-bg-surface-solid: #ffffff;
-    --tw-bg-glass-solid: #f6f6f8;
-    --tw-fg: #111115;
-    --tw-fg-secondary: rgba(20,20,25,0.78);
-    --tw-fg-muted: rgba(20,20,25,0.58);
-    --tw-fg-dim: rgba(20,20,25,0.42);
-    --tw-fg-faint: rgba(20,20,25,0.1);
-    --tw-border: rgba(0,0,0,0.08);
-    --tw-divider: rgba(0,0,0,0.06);
-    color-scheme: light;
-  }
-}
+/* ---------------- NOTE: no OS auto-light ----------------
+   Dark is the canonical default. Light theme is opt-in via
+   `<html data-theme="light">` — never triggered by OS preference,
+   because the VisionOS glass recipes (LED glow, neon hero shadow,
+   inset-only borders on transparent widget/clock) are tuned for
+   dark surfaces and degrade visibly on light.
+   ---------------------------------------------------------- */
 
 /* ---------------- SHARED (theme-independent) ---------------- */
 :root {
