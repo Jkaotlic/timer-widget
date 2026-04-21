@@ -252,17 +252,18 @@ function createControlWindow() {
     // Get screen dimensions for adaptive sizing
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
-    // Calculate optimal window size (adapt to screen size)
-    const windowWidth = Math.min(750, Math.max(650, screenWidth - 100));
-    const windowHeight = Math.min(860, Math.max(650, screenHeight - 100));
+    // Default size of the control panel WITHOUT drawer (drawer adds 360px when opened).
+    // Settings live in the drawer, so the panel itself can be narrow and short.
+    const windowWidth = Math.min(560, Math.max(460, screenWidth - 100));
+    const windowHeight = Math.min(720, Math.max(640, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        minWidth: 600,
-        minHeight: 650,
-        maxWidth: 1200,  // bumped from 800 to fit settings drawer (360px slide-out)
-        maxHeight: 1000,
+        minWidth: 480,
+        minHeight: 640,
+        maxWidth: 1280,  // 920 (panel max) + 360 (drawer) leaves room for resize
+        maxHeight: 1100,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
