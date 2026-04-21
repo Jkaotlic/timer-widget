@@ -74,10 +74,12 @@
         }
 
         /* App shell — grid: [control panel] + [settings drawer slide-out].
-           Second column animates from 0 → 360px when drawer opens. */
+           Second column animates from 0px → 360px when drawer opens.
+           (Both endpoints in px — browsers don't smoothly interpolate
+            between fr and px units on grid-template-columns.) */
         .app-shell {
             display: grid;
-            grid-template-columns: 1fr 0fr;
+            grid-template-columns: 1fr 0px;
             grid-template-rows: 1fr;
             min-height: 100vh;
             width: 100%;
@@ -3917,10 +3919,12 @@
                 this._currentDrawerTab = tabKey;
 
                 if (!wasOpen) {
-                    // Resize window first, then animate drawer in.
-                    const baseWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 720;
+                    // Capture current outer width so close can restore exactly.
+                    // Don't trust CONFIG.CONTROL_WINDOW_WIDTH — it's a legacy 420
+                    // constant that doesn't match the actual spawn size (~750).
+                    this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || 720;
                     ipcRenderer.send('resize-control-window', {
-                        width: baseWidth + this._drawerExtraWidth,
+                        width: this._baseWidthBeforeDrawer + this._drawerExtraWidth,
                         height: window.innerHeight
                     });
                     const shell = document.querySelector('.app-shell');
@@ -3944,12 +3948,12 @@
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 this._currentDrawerTab = null;
 
-                // Wait for slide-out, then shrink window back.
+                // Wait for slide-out, then shrink window back to captured base.
+                const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || 720;
                 setTimeout(() => {
                     if (this.settingsDrawerEl.classList.contains('open')) { return; }
-                    const baseWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 720;
                     ipcRenderer.send('resize-control-window', {
-                        width: baseWidth,
+                        width: restoreWidth,
                         height: window.innerHeight
                     });
                 }, 260);
