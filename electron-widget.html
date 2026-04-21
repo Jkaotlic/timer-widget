@@ -166,9 +166,12 @@
 
         /* Tick marks */
         .tick-marks {
+            display: none;
             stroke: rgba(255, 255, 255, 0.15);
             stroke-width: 1;
         }
+
+        .ticks-on .tick-marks { display: inline; }
 
         .tick-marks-major {
             stroke: rgba(255, 255, 255, 0.3);
@@ -937,6 +940,11 @@
 
         // safeJSONParse доступна глобально из security.js
 
+        function applyShowTicks(showTicks) {
+            const el = document.querySelector('.widget-container') || document.body;
+            el.classList.toggle('ticks-on', !!showTicks);
+        }
+
         class WidgetTimer {
             constructor() {
                 this.radius = 82;
@@ -962,6 +970,7 @@
                     console.warn('Widget init warning:', e.message);
                 }
 
+                applyShowTicks(false);
                 this.setupIPC();
                 this.setupEventListeners();
                 this.setupSettings();
@@ -1407,6 +1416,7 @@
                         const newSize = Math.round(250 * scale / 100);
                         ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
                     }
+                    applyShowTicks(settings?.showTicks ?? false);
                 };
 
                 // Регистрируем обработчики

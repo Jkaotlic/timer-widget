@@ -124,9 +124,12 @@
 
         /* Шкала с делениями */
         .tick-marks {
+            display: none;
             stroke: var(--tw-border-strong);
             stroke-width: 1;
         }
+
+        .ticks-on .tick-marks { display: inline; }
 
         .tick-marks-major {
             stroke: var(--tw-fg-dim);
@@ -1229,6 +1232,11 @@
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
+        function applyShowTicks(showTicks) {
+            const el = document.querySelector('.widget-container') || document.body;
+            el.classList.toggle('ticks-on', !!showTicks);
+        }
+
         class ClockWidget {
             constructor() {
                 this.radius = 82;
@@ -1247,6 +1255,7 @@
                 this.initElements();
                 this.initProgress();
                 this.loadSettings();
+                applyShowTicks(false);
                 this.setupEventListeners();
                 this.setupSettings();
                 this.setupIPC();
@@ -1763,6 +1772,7 @@
                     this.updateDateTimezoneVisibility();
                     this.saveSettings();
                     this.updateDisplay();
+                    if (settings && 'showTicks' in settings) { applyShowTicks(settings.showTicks); }
                 };
                 ipcRenderer.on('clock-settings', this._onClockSettings);
 
