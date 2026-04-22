@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Widget</title>
     <link rel="stylesheet" href="design-tokens.css">
@@ -1333,16 +1333,6 @@
                         bgCircle.style.fill = 'url(#widgetBgGradient)';
                         break;
 
-                    case 'image':
-                        if (settings.bgImageUrl && window.SecurityUtils &&
-                            (window.SecurityUtils.isValidURL(settings.bgImageUrl) || window.SecurityUtils.isValidDataURL(settings.bgImageUrl))) {
-                            bgImageContainer.style.display = 'block';
-                            bgImg.src = settings.bgImageUrl;
-                            bgOverlay.style.background = 'rgba(0, 0, 0, 0.3)';
-                            bgCircle.style.fill = 'rgba(0, 0, 0, 0.1)';
-                        }
-                        break;
-
                     case 'local':
                         if (settings.bgLocalImage && window.SecurityUtils &&
                             window.SecurityUtils.isValidDataURL(settings.bgLocalImage)) {
@@ -1367,7 +1357,7 @@
 
                     if (settings && Object.keys(settings).length > 0) {
                         // Виджет всегда прозрачный — картинки только на полноэкранном дисплее
-                        if (settings.bgMode === 'image' || settings.bgMode === 'local') {
+                        if (settings.bgMode === 'local') {
                             settings.bgMode = 'default';
                         }
 
@@ -1407,7 +1397,7 @@
                 this.displaySettingsUpdateHandler = (event, settings) => {
                     // Виджет всегда прозрачный — фоновые картинки только на полноэкранном дисплее
                     const widgetSettings = { ...settings };
-                    if (widgetSettings.bgMode === 'image' || widgetSettings.bgMode === 'local') {
+                    if (widgetSettings.bgMode === 'local') {
                         widgetSettings.bgMode = 'default';
                     }
                     this.applyBackground(widgetSettings);
