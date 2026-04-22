@@ -254,13 +254,13 @@ function createControlWindow() {
 
     // Default size of the control panel WITHOUT drawer (drawer adds 360px when opened).
     // Settings live in the drawer, so the panel itself can be narrow and short.
-    const windowWidth = Math.min(560, Math.max(460, screenWidth - 100));
+    const windowWidth = Math.min(420, Math.max(380, screenWidth - 100));
     const windowHeight = Math.min(720, Math.max(640, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        minWidth: 480,
+        minWidth: 360,
         minHeight: 640,
         maxWidth: 1280,  // 920 (panel max) + 360 (drawer) leaves room for resize
         maxHeight: 1100,
