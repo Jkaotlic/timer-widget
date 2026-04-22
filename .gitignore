@@ -12,7 +12,11 @@ _electron/.cache/
 # IDE / tools
 .vscode/
 .playwright-mcp/
-.claude/
+
+# Claude Code: commit shared settings/hooks/agents/skills, ignore personal/local state
+.claude/settings.local.json
+.claude/sessions/
+.claude/cache/
 
 # Test artifacts
 titlebar-test.png
