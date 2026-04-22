@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление Таймером</title>
     <link rel="stylesheet" href="styles.css">
@@ -3744,7 +3744,6 @@
                             <div class="bg-mode-tabs">
                                 <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
                                 <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
-                                <button class="bg-mode-btn" data-mode="image">По URL</button>
                                 <button class="bg-mode-btn" data-mode="local">Файл</button>
                             </div>
                             <div class="bg-controls active" id="bgSolidControls">
@@ -3755,9 +3754,6 @@
                                     <input type="color" class="color-picker" id="bgGrad1" value="#0f0c29" aria-label="Первый цвет градиента">
                                     <input type="color" class="color-picker" id="bgGrad2" value="#302b63" aria-label="Второй цвет градиента">
                                 </div>
-                            </div>
-                            <div class="bg-controls" id="bgImageControls">
-                                <input type="url" class="url-input" id="bgImageUrl" placeholder="https://example.com/image.jpg">
                             </div>
                             <div class="bg-controls" id="bgLocalControls">
                                 <div class="local-bg-section">
@@ -4884,9 +4880,6 @@
                     const el = document.getElementById(id);
                     if (el) el.addEventListener('input', debounce(() => this.pushDisplaySettings()));
                 });
-                const bgImageUrl = document.getElementById('bgImageUrl');
-                if (bgImageUrl) bgImageUrl.addEventListener('change', () => this.pushDisplaySettings());
-
                 // Сброс стиля
                 const resetStyleBtn = document.getElementById('resetStyleBtn');
                 if (resetStyleBtn) {
@@ -5246,10 +5239,10 @@
                 document.getElementById('bgSolidColor').value = ext.bgSolid || '#0f0c29';
                 document.getElementById('bgGrad1').value = ext.bgGrad1 || '#0f0c29';
                 document.getElementById('bgGrad2').value = ext.bgGrad2 || '#302b63';
-                document.getElementById('bgImageUrl').value = ext.bgImageUrl || '';
 
-                // Режим фона
-                const bgMode = ext.bgMode || 'solid';
+                // Режим фона (image-по-URL удалён — legacy-значения маппим в solid)
+                let bgMode = ext.bgMode || 'solid';
+                if (bgMode === 'image') { bgMode = 'solid'; }
                 this.currentBgMode = bgMode;
                 document.querySelectorAll('.bg-mode-btn').forEach(b => {
                     b.classList.toggle('active', b.dataset.mode === bgMode);
@@ -5367,7 +5360,6 @@
                     bgSolid: document.getElementById('bgSolidColor').value,
                     bgGrad1: document.getElementById('bgGrad1').value,
                     bgGrad2: document.getElementById('bgGrad2').value,
-                    bgImageUrl: document.getElementById('bgImageUrl').value,
                     // Текущее время
                     showCurrentTime: this.showCurrentTimeEl.checked,
                     // Настройки блоков времени
@@ -5407,7 +5399,6 @@
                     bgSolid: document.getElementById('bgSolidColor').value,
                     bgGrad1: document.getElementById('bgGrad1').value,
                     bgGrad2: document.getElementById('bgGrad2').value,
-                    bgImageUrl: document.getElementById('bgImageUrl').value,
                     // Локальный фон
                     bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
                     bgLocalFit: localBgSettings.fit || 'cover',
