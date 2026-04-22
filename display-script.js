@@ -999,10 +999,15 @@ class DisplayTimer {
         if (this.cache.lastSeconds === secs && !this.finished) {
             // FIX BUG-C: BUT статус проверяем ВСЕГДА (не зависит от кэша секунд)
             const status = this.getTimerStatusValue(secs);
-            if (this.cache.lastStatus !== status || this.cache.lastRunning !== this.isRunning) {
+            if (this.cache.lastStatus !== status
+                || this.cache.lastRunning !== this.isRunning
+                || this.cache.lastPaused !== this.isPaused
+                || this.cache.lastFinished !== this.finished) {
                 this.updateStatus(secs);
                 this.cache.lastStatus = status;
                 this.cache.lastRunning = this.isRunning;
+                this.cache.lastPaused = this.isPaused;
+                this.cache.lastFinished = this.finished;
             }
             return;
         }
@@ -1050,11 +1055,18 @@ class DisplayTimer {
         // Force overtime color on every tick (applyColors or cache may reset it)
         this._enforceOvertimeColors(secs);
 
-        // Статус меняется редко (normal → warning → danger → overtime)
+        // Статус-пилюля зависит от нескольких флагов, а getTimerStatusValue()
+        // смотрит только на секунды — нужно инвалидировать кэш по каждому из них.
         const status = this.getTimerStatusValue(secs);
-        if (this.cache.lastStatus !== status) {
+        if (this.cache.lastStatus !== status
+            || this.cache.lastRunning !== this.isRunning
+            || this.cache.lastPaused !== this.isPaused
+            || this.cache.lastFinished !== this.finished) {
             this.updateStatus(secs);
             this.cache.lastStatus = status;
+            this.cache.lastRunning = this.isRunning;
+            this.cache.lastPaused = this.isPaused;
+            this.cache.lastFinished = this.finished;
         }
 
         // Сохраняем последнее значение секунд
@@ -1848,19 +1860,16 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', () => {
         displayTimer = new DisplayTimer();
 
-        // Hint-strip: автоскрытие через 4 сек бездействия мыши
+        // Hint-strip: показываем первые 5 секунд, затем навсегда скрываем
+        // (без возврата на mousemove/keydown — чтобы не мешала в презентации)
         (function hintFade() {
             const hint = document.getElementById('controlsHint');
             if (!hint) { return; }
-            let timer;
-            const reset = () => {
-                hint.classList.remove('faded');
-                clearTimeout(timer);
-                timer = setTimeout(() => hint.classList.add('faded'), 4000);
-            };
-            document.addEventListener('mousemove', reset, { passive: true });
-            document.addEventListener('keydown', reset);
-            reset();
+            setTimeout(() => {
+                hint.classList.add('faded');
+                // После fade-анимации полностью убираем из потока, чтобы не ловить фокус/клики
+                setTimeout(() => { hint.style.display = 'none'; }, 500);
+            }, 5000);
         })();
     });
 

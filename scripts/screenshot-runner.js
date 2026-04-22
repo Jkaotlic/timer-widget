@@ -16,6 +16,15 @@ const STATES = [
 
 const WINDOWS = ['control', 'widget', 'clock', 'display'];
 
+// Minimum sizes advertised by BrowserWindow options — used to catch layout
+// overflow/clipping when the user resizes to the floor.
+const MIN_SIZES = {
+    control: { width: 360, height: 640 },
+    widget:  { width: 120, height: 140 },
+    clock:   { width: 120, height: 120 },
+    display: { width: 1280, height: 720 } // display doesn't resize, but keep consistent
+};
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitForLoad(win, timeoutMs = 6000) {
@@ -32,16 +41,25 @@ async function capture(win, filePath, log) {
         log.warn(`[screenshot] skip ${path.basename(filePath)} — window missing`);
         return;
     }
-    try {
-        // Transparent windows that were never shown don't allocate a compositor
-        // surface -> capturePage returns UnknownVizError. Showing offscreen first
-        // forces the surface to exist.
-        if (!win.isVisible()) { win.showInactive(); }
-        const img = await win.webContents.capturePage();
-        fs.writeFileSync(filePath, img.toPNG());
-        log.info(`[screenshot] ${path.basename(filePath)}`);
-    } catch (err) {
-        log.error(`[screenshot] ${path.basename(filePath)} failed: ${err.message}`);
+    // Transparent windows that were never shown don't allocate a compositor
+    // surface -> capturePage returns UnknownVizError. Showing offscreen first
+    // forces the surface to exist, but sometimes the first capture still races
+    // the surface handshake. Retry up to 3 times with a short back-off.
+    if (!win.isVisible()) { win.showInactive(); }
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const img = await win.webContents.capturePage();
+            fs.writeFileSync(filePath, img.toPNG());
+            log.info(`[screenshot] ${path.basename(filePath)}${attempt > 1 ? ` (retry ${attempt - 1})` : ''}`);
+            return;
+        } catch (err) {
+            if (attempt === maxAttempts) {
+                log.error(`[screenshot] ${path.basename(filePath)} failed after ${maxAttempts} attempts: ${err.message}`);
+                return;
+            }
+            await sleep(250 * attempt);
+        }
     }
 }
 
@@ -100,6 +118,36 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             for (const name of WINDOWS) {
                 await capture(windows[name], path.join(outDir, `${name}-${state.name}.png`), log);
             }
+        }
+
+        // Min-size sweep — resize each window to its advertised floor and grab
+        // one snapshot. Uses the 'running' state so progress ring + status chip
+        // are visible (worst case for cramped layouts).
+        log.info('[screenshot] minsize sweep');
+        try {
+            applyTimerState({
+                totalSeconds: 300, presetSeconds: 300, remainingSeconds: 183,
+                isRunning: true, isPaused: false, finished: false
+            });
+        } catch (e) {
+            log.warn(`[screenshot] minsize state set failed: ${e.message}`);
+        }
+        await sleep(200);
+
+        const windowsNow = ctx();
+        for (const name of WINDOWS) {
+            const w = windowsNow[name];
+            if (!w || w.isDestroyed()) { continue; }
+            const target = MIN_SIZES[name];
+            if (!target) { continue; }
+            try {
+                w.setMinimumSize(target.width, target.height);
+                w.setSize(target.width, target.height);
+            } catch (e) {
+                log.warn(`[screenshot] ${name} resize failed: ${e.message}`);
+            }
+            await sleep(350); // let responsive CSS settle
+            await capture(w, path.join(outDir, `${name}-minsize.png`), log);
         }
     } finally {
         clearTimeout(hardTimeout);
