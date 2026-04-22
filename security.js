@@ -14,23 +14,10 @@ function isValidDataURL(str) {
 }
 
 /**
- * Валидация HTTP/HTTPS URL
- * Проверяет что строка является валидным HTTP(S) URL
- */
-function isValidURL(str) {
-    if (!str || typeof str !== 'string') {return false;}
-
-    try {
-        const url = new URL(str);
-        return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-        return false;
-    }
-}
-
-/**
- * Валидация изображения из любого источника
- * @param {string} imageData - URL или data URL изображения
+ * Валидация изображения.
+ * Принимаются только локальные data URL — загрузка по http(s) намеренно
+ * запрещена, чтобы renderer не ходил в сеть за пользовательским контентом.
+ * @param {string} imageData - data URL изображения
  * @returns {Object} { valid: boolean, sanitized: string, error: string }
  */
 function validateImageSource(imageData) {
@@ -42,7 +29,6 @@ function validateImageSource(imageData) {
         };
     }
 
-    // Проверка data URL
     if (imageData.startsWith('data:')) {
         if (!isValidDataURL(imageData)) {
             return {
@@ -54,24 +40,10 @@ function validateImageSource(imageData) {
         return { valid: true, sanitized: imageData, error: null };
     }
 
-    // Проверка HTTP(S) URL
-    if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
-        if (!isValidURL(imageData)) {
-            return {
-                valid: false,
-                sanitized: '',
-                error: 'Некорректный URL'
-            };
-        }
-        // Экранируем специальные символы для безопасной вставки в CSS
-        const sanitized = imageData.replace(/["'()]/g, '\\$&');
-        return { valid: true, sanitized: sanitized, error: null };
-    }
-
     return {
         valid: false,
         sanitized: '',
-        error: 'URL должен начинаться с http://, https:// или data:'
+        error: 'Поддерживаются только локальные изображения (data: URL).'
     };
 }
 
@@ -174,7 +146,6 @@ function escapeHTML(str) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         isValidDataURL,
-        isValidURL,
         validateImageSource,
         safeSetBackgroundImage,
         safeJSONParse,
@@ -187,7 +158,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.SecurityUtils = {
         isValidDataURL,
-        isValidURL,
         validateImageSource,
         safeSetBackgroundImage,
         safeJSONParse,

@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
     isValidDataURL,
-    isValidURL,
     validateImageSource,
     safeJSONParse,
     isSafeColor,
@@ -32,23 +31,7 @@ test('isValidDataURL rejects invalid inputs', () => {
     assert.equal(isValidDataURL('javascript:alert(1)'), false);
 });
 
-// isValidURL
-test('isValidURL accepts HTTP and HTTPS URLs', () => {
-    assert.equal(isValidURL('https://example.com/image.jpg'), true);
-    assert.equal(isValidURL('http://example.com/image.png'), true);
-});
-
-test('isValidURL rejects dangerous protocols', () => {
-    assert.equal(isValidURL('javascript:alert(1)'), false);
-    assert.equal(isValidURL('file:///etc/passwd'), false);
-    assert.equal(isValidURL('data:text/html,<h1>hi</h1>'), false);
-    assert.equal(isValidURL('ftp://example.com'), false);
-    assert.equal(isValidURL(null), false);
-    assert.equal(isValidURL(''), false);
-    assert.equal(isValidURL('not-a-url'), false);
-});
-
-// validateImageSource
+// validateImageSource — data: URLs only (HTTP(S) loading removed)
 test('validateImageSource validates data URLs', () => {
     const valid = validateImageSource('data:image/png;base64,iVBOR');
     assert.equal(valid.valid, true);
@@ -58,14 +41,9 @@ test('validateImageSource validates data URLs', () => {
     assert.equal(invalid.valid, false);
 });
 
-test('validateImageSource validates HTTP URLs and sanitizes', () => {
-    const result = validateImageSource('https://example.com/img.jpg');
-    assert.equal(result.valid, true);
-    assert.ok(!result.sanitized.includes('('));
-
-    const withParens = validateImageSource("https://example.com/img(1).jpg");
-    assert.equal(withParens.valid, true);
-    assert.ok(withParens.sanitized.includes('\\('));
+test('validateImageSource rejects remote URLs', () => {
+    assert.equal(validateImageSource('https://example.com/img.jpg').valid, false);
+    assert.equal(validateImageSource('http://example.com/img.png').valid, false);
 });
 
 test('validateImageSource rejects invalid sources', () => {

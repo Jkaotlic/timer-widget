@@ -27,10 +27,10 @@ test('safeSetBackgroundImage sets valid data URL', () => {
     assert.ok(el.style.backgroundImage.includes(dataUrl));
 });
 
-test('safeSetBackgroundImage sets valid HTTP URL', () => {
+test('safeSetBackgroundImage rejects remote URLs', () => {
     const el = { style: { backgroundImage: '' } };
-    assert.equal(safeSetBackgroundImage(el, 'https://example.com/img.png'), true);
-    assert.ok(el.style.backgroundImage.includes('example.com'));
+    assert.equal(safeSetBackgroundImage(el, 'https://example.com/img.png'), false);
+    assert.equal(el.style.backgroundImage, '');
 });
 
 test('safeSetBackgroundImage rejects javascript: URL', () => {
@@ -63,5 +63,5 @@ test('safeSetBackgroundImage handles style setter throwing', () => {
             get backgroundImage() { return ''; }
         }
     };
-    assert.equal(safeSetBackgroundImage(el, 'https://example.com/img.png'), false);
+    assert.equal(safeSetBackgroundImage(el, 'data:image/png;base64,iVBORw0KGgo='), false);
 });

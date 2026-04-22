@@ -813,16 +813,6 @@ class DisplayTimer {
         return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(value);
     }
 
-    _isSafeUrl(value) {
-        if (typeof value !== 'string') { return false; }
-        try {
-            const url = new URL(value);
-            return url.protocol === 'https:' || url.protocol === 'http:';
-        } catch {
-            return false;
-        }
-    }
-
     applyBackground(settings) {
         const mode = settings.bgMode || 'gradient';
         let bg = '';
@@ -833,13 +823,6 @@ class DisplayTimer {
             const c1 = this._isSafeColor(settings.bgGrad1) ? settings.bgGrad1 : '#0f0c29';
             const c2 = this._isSafeColor(settings.bgGrad2) ? settings.bgGrad2 : '#302b63';
             bg = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
-        } else if (mode === 'image' && settings.bgImageUrl) {
-            const validation = window.SecurityUtils
-                ? window.SecurityUtils.validateImageSource(settings.bgImageUrl)
-                : null;
-            if (validation && validation.valid) {
-                bg = `url("${validation.sanitized.replace(/"/g, '\\"')}") center/cover no-repeat fixed, #000`;
-            }
         } else if (mode === 'local' && settings.bgLocalImage) {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';
