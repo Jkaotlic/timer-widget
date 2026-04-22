@@ -25,6 +25,16 @@ const MIN_SIZES = {
     display: { width: 1280, height: 720 } // display doesn't resize, but keep consistent
 };
 
+// Maximum sizes — control has a hard max (drawer + panel); widget/clock are
+// scalable via Ctrl+wheel with no ceiling, so we pick a "big screen" size a
+// user could realistically drag them to.
+const MAX_SIZES = {
+    control: { width: 1280, height: 1100 },
+    widget:  { width: 800,  height: 800 },
+    clock:   { width: 800,  height: 800 },
+    display: { width: 1920, height: 1080 }
+};
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function waitForLoad(win, timeoutMs = 6000) {
@@ -148,6 +158,25 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             }
             await sleep(350); // let responsive CSS settle
             await capture(w, path.join(outDir, `${name}-minsize.png`), log);
+        }
+
+        // Max-size sweep — stress-test the ceiling (control hard max, widget/clock
+        // big-screen scaling). Same 'running' state for visual parity with minsize.
+        log.info('[screenshot] maxsize sweep');
+        for (const name of WINDOWS) {
+            const w = windowsNow[name];
+            if (!w || w.isDestroyed()) { continue; }
+            const target = MAX_SIZES[name];
+            if (!target) { continue; }
+            try {
+                // Clear any minimum we just raised so the subsequent resize isn't blocked.
+                w.setMinimumSize(1, 1);
+                w.setSize(target.width, target.height);
+            } catch (e) {
+                log.warn(`[screenshot] ${name} resize(max) failed: ${e.message}`);
+            }
+            await sleep(400);
+            await capture(w, path.join(outDir, `${name}-maxsize.png`), log);
         }
     } finally {
         clearTimeout(hardTimeout);
