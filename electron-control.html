@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление Таймером</title>
     <link rel="stylesheet" href="styles.css">
@@ -492,6 +492,12 @@
         .status-dot.finished {
             background: var(--tw-red);
             animation: pulse-dot 0.5s infinite;
+        }
+
+        .status-dot.overtime {
+            background: var(--tw-red);
+            box-shadow: 0 0 8px rgba(255, 69, 58, 0.8);
+            animation: pulse-dot 0.6s infinite;
         }
 
         @keyframes pulse-dot {
@@ -5672,12 +5678,15 @@
                 }
                 
                 this.statusDot.className = 'status-dot';
-                if (this.wasFinished || (this.remainingSeconds <= 0 && this.totalSeconds > 0 && !this.isRunning)) {
+                if (this.remainingSeconds < 0 && this.isRunning) {
+                    this.statusDot.classList.add('overtime');
+                    this.statusText.textContent = 'Перерасход';
+                } else if (this.wasFinished || (this.remainingSeconds <= 0 && this.totalSeconds > 0 && !this.isRunning)) {
                     this.statusDot.classList.add('finished');
                     this.statusText.textContent = 'Завершено';
                 } else if (this.isRunning) {
                     this.statusDot.classList.add('running');
-                    this.statusText.textContent = this.remainingSeconds < 0 ? 'Перерасход' : 'Активен';
+                    this.statusText.textContent = 'Активен';
                 } else if (this.isPaused) {
                     this.statusDot.classList.add('paused');
                     this.statusText.textContent = 'Пауза';
