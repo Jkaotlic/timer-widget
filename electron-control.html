@@ -367,24 +367,36 @@
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.12);
             color: transparent;
-            font-size: 0;
+            font-family: -apple-system, 'SF Pro Text', 'Segoe UI', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: filter var(--tw-dur-fast) var(--tw-ease);
+            transition: filter var(--tw-dur-fast) var(--tw-ease),
+                        color var(--tw-dur-fast) var(--tw-ease);
             line-height: 1;
             padding: 0;
-            box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.15);
+            box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+        }
+        .custom-titlebar .win-btn::before {
+            content: attr(data-glyph);
+            display: block;
+            transform: translateY(-0.5px);
+        }
+        .custom-titlebar .window-controls:hover .win-btn {
+            color: rgba(0, 0, 0, 0.65);
         }
         .custom-titlebar .win-btn:hover {
-            color: rgba(0, 0, 0, 0.7);
-            font-size: 8px;
-            filter: brightness(1.1);
+            filter: brightness(1.08);
         }
-        .custom-titlebar .win-btn.close-btn { background: #ff5f57; }
-        .custom-titlebar .win-btn.close-btn:hover { background: #ff5f57; color: rgba(0, 0, 0, 0.55); }
+        .custom-titlebar .win-btn:active {
+            filter: brightness(0.92);
+        }
+        .custom-titlebar .win-btn.close-btn,
         .custom-titlebar .win-btn:nth-child(1) { background: #ff5f57; }
+        .custom-titlebar .win-btn.minimize-btn,
         .custom-titlebar .win-btn:nth-child(2) { background: #febc2e; }
         .custom-titlebar .win-btn:nth-child(3) { background: #28c840; }
 
@@ -3230,8 +3242,8 @@
         <!-- Кастомная панель заголовка (macOS style) -->
         <div class="custom-titlebar">
             <div class="window-controls">
-                <button class="win-btn close-btn" id="closeAppBtn" title="Закрыть" aria-label="Закрыть"></button>
-                <button class="win-btn minimize-btn" id="minimizeBtn" title="Свернуть" aria-label="Свернуть"></button>
+                <button class="win-btn close-btn" id="closeAppBtn" data-glyph="×" title="Закрыть" aria-label="Закрыть"></button>
+                <button class="win-btn minimize-btn" id="minimizeBtn" data-glyph="−" title="Свернуть" aria-label="Свернуть"></button>
             </div>
             <span class="title-text">⏱ ТАЙМЕР</span>
             <div class="titlebar-right">
@@ -3325,15 +3337,6 @@
 
                 <!-- Таб: Виджет -->
                 <div class="tab-content active" id="tab-timer">
-                    <div class="settings-group">
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="widgetShowTicks">Показывать деления</label>
-                            <label class="toggle-switch" title="Показывать деления на циферблате виджета">
-                                <input type="checkbox" id="widgetShowTicks">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🎨</span>
