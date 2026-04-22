@@ -47,6 +47,10 @@ process.on('unhandledRejection', (reason) => {
 // Test-mode guard — node:test stubs 'electron', we skip runtime side-effects.
 const __inTestMode = process.env.NODE_TEST_CONTEXT !== undefined;
 
+// Screenshot mode — scripted capture sequence (see scripts/screenshot-runner.js).
+// When active, all windows boot hidden/offscreen so the desktop isn't disturbed.
+const __screenshotMode = process.argv.includes('--screenshot');
+
 // Runtime memory monitor (dev only, not in tests)
 if (process.argv.includes('--dev') && !__inTestMode) {
     setInterval(() => {
@@ -274,11 +278,13 @@ function createControlWindow() {
         title: 'Управление Таймером',
         icon: path.join(__dirname, 'icon.ico'),
         frame: false,
-        resizable: true // Allow user to resize if needed
+        resizable: true, // Allow user to resize if needed
+        show: !__screenshotMode
     });
 
     controlWindow.loadFile('electron-control.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(controlWindow);
+    bindRenderConsole(controlWindow, 'control');
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
@@ -305,11 +311,12 @@ function createWidgetWindow() {
         minWidth: 120,
         minHeight: 140,
         // Remove explicit max constraints so user scaling isn't capped artificially
-        x: width - 270,
-        y: 20,
+        x: __screenshotMode ? -2500 : width - 270,
+        y: __screenshotMode ? -2500 : 20,
         frame: false,
-        transparent: true,
-        alwaysOnTop: true,
+        transparent: !__screenshotMode,
+        backgroundColor: __screenshotMode ? '#1c1c1e' : undefined,
+        alwaysOnTop: !__screenshotMode,
         skipTaskbar: true,
         resizable: true,
         webPreferences: {
@@ -321,10 +328,10 @@ function createWidgetWindow() {
         },
         hasShadow: false
     });
-
     widgetWindow.loadFile('electron-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(widgetWindow);
     bindRenderCrashHandler(widgetWindow, 'widget');
+    bindRenderConsole(widgetWindow, 'widget');
 
     widgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(widgetWindow);
@@ -350,11 +357,12 @@ function createClockWidgetWindow() {
         height: 220,
         minWidth: 120,
         minHeight: 120,
-        x: width - 240,
-        y: height - 260,
+        x: __screenshotMode ? -2800 : width - 240,
+        y: __screenshotMode ? -2500 : height - 260,
         frame: false,
-        transparent: true,
-        alwaysOnTop: true,
+        transparent: !__screenshotMode,
+        backgroundColor: __screenshotMode ? '#1c1c1e' : undefined,
+        alwaysOnTop: !__screenshotMode,
         skipTaskbar: true,
         resizable: true,
         webPreferences: {
@@ -366,10 +374,10 @@ function createClockWidgetWindow() {
         },
         hasShadow: false
     });
-
     clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(clockWidgetWindow);
     bindRenderCrashHandler(clockWidgetWindow, 'clock');
+    bindRenderConsole(clockWidgetWindow, 'clock');
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(clockWidgetWindow);
@@ -406,12 +414,13 @@ function createDisplayWindow(displayIndex) {
     const displayBounds = targetDisplay.bounds;
 
     displayWindow = new BrowserWindow({
-        width: displayBounds.width,
-        height: displayBounds.height,
-        x: displayBounds.x,
-        y: displayBounds.y,
-        fullscreen: true,
+        width: __screenshotMode ? 1280 : displayBounds.width,
+        height: __screenshotMode ? 720 : displayBounds.height,
+        x: __screenshotMode ? -2000 : displayBounds.x,
+        y: __screenshotMode ? -2000 : displayBounds.y,
+        fullscreen: !__screenshotMode,
         frame: false,
+        show: !__screenshotMode,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -424,6 +433,7 @@ function createDisplayWindow(displayIndex) {
     displayWindow.loadFile('display.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(displayWindow);
     bindRenderCrashHandler(displayWindow, 'display');
+    bindRenderConsole(displayWindow, 'display');
     blockZoom(displayWindow);
 
     displayWindow.once('ready-to-show', () => {
@@ -593,6 +603,28 @@ function bindRenderCrashHandler(win, label) {
     });
 }
 
+// Forward renderer console + preload + responsiveness events into electron-log.
+// Lets us see inline-script errors (which otherwise die silently) in the log file.
+function bindRenderConsole(win, label) {
+    if (!win || !win.webContents) { return; }
+    win.webContents.on('console-message', (e) => {
+        try {
+            const level = (e && e.level) || 'info';
+            const src = e && e.sourceId ? ` @ ${e.sourceId}:${e.lineNumber || '?'}` : '';
+            const msg = `[renderer:${label}] ${(e && e.message) || ''}${src}`;
+            if (level === 'error') { log.error(msg); }
+            else if (level === 'warning' || level === 'warn') { log.warn(msg); }
+            else if (level === 'debug' || level === 'verbose') { log.debug(msg); }
+            else { log.info(msg); }
+        } catch { /* best effort */ }
+    });
+    win.webContents.on('preload-error', (_e, preloadPath, error) => {
+        log.error(`[renderer:${label}] preload-error in ${preloadPath}: ${error && error.message}`);
+    });
+    win.on('unresponsive', () => log.warn(`[renderer:${label}] window unresponsive`));
+    win.on('responsive', () => log.info(`[renderer:${label}] window responsive again`));
+}
+
 app.on('before-quit', () => { isQuitting = true; clearSavedTimerState(); });
 
 app.whenReady().then(() => {
@@ -609,9 +641,32 @@ app.whenReady().then(() => {
     }
 
     createControlWindow();
+    bindRenderCrashHandler(controlWindow, 'control');
+
+    if (__screenshotMode) {
+        const runner = require('./scripts/screenshot-runner');
+        controlWindow.webContents.once('did-finish-load', () => {
+            runner.run({
+                app, log,
+                ctx: () => ({
+                    control: controlWindow, widget: widgetWindow,
+                    clock: clockWidgetWindow, display: displayWindow
+                }),
+                applyTimerState: (s) => emitTimerState(s),
+                openWidget: () => { if (!widgetWindow) { createWidgetWindow(); } },
+                openClock: () => { if (!clockWidgetWindow) { createClockWidgetWindow(); } },
+                openDisplay: () => { if (!displayWindow) { createDisplayWindow('auto'); } },
+                outDir: path.join(__dirname, 'screenshots')
+            }).catch((err) => {
+                log.error('[screenshot] sequence failed:', err);
+                app.exit(1);
+            });
+        });
+        return; // skip tray + normal activate hooks in screenshot mode
+    }
+
     createTray();
     bindTrayBehavior(controlWindow);
-    bindRenderCrashHandler(controlWindow, 'control');
 
     // F-005: broadcast recovery snapshot to control window once it has loaded.
     // Renderer may ignore it for now, but the channel is no longer dead code.

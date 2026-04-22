@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node scripts/run-electron.js",
     "dev": "node scripts/run-electron.js --dev",
+    "screenshot": "node scripts/run-electron.js --screenshot",
     "test": "node --test",
     "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
