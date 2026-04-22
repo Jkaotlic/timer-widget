@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Widget</title>
     <link rel="stylesheet" href="design-tokens.css">
@@ -1776,11 +1776,14 @@
             updateStatus(secs) {
                 this.statusBadge.classList.remove('running', 'paused', 'finished');
 
-                if (secs <= 0 && this.totalSeconds > 0 && !this.isRunning) {
+                if (secs < 0 && this.isRunning) {
+                    this.statusBadge.textContent = 'Перерасход';
+                    this.statusBadge.classList.add('running');
+                } else if (secs <= 0 && this.totalSeconds > 0 && !this.isRunning) {
                     this.statusBadge.textContent = 'Завершён';
                     this.statusBadge.classList.add('finished');
                 } else if (this.isRunning) {
-                    this.statusBadge.textContent = secs < 0 ? 'Перерасход' : 'Активен';
+                    this.statusBadge.textContent = 'Активен';
                     this.statusBadge.classList.add('running');
                 } else if (this.isPaused) {
                     this.statusBadge.textContent = 'Пауза';
