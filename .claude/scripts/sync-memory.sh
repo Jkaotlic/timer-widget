@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
-# Auto-sync Claude Code memory directory to its dedicated GitHub repo.
+# Auto-sync Claude Code memory directories to their GitHub repos.
 # Triggered by the Stop hook in .claude/settings.json after each Claude turn.
-# Silent on success, never blocks Claude (best-effort).
+# Silent on success, never blocks Claude (best-effort). Runs on any machine:
+# scans every memory/.git under ~/.claude/projects/ and syncs each independently.
 
-set -e
+set +e
 
-MEM="$HOME/.claude/projects/f--VScode-timer-widget/memory"
+shopt -s nullglob
 
-# Bail out if memory folder isn't a git repo on this machine
-[ -d "$MEM/.git" ] || exit 0
+for mem in "$HOME"/.claude/projects/*/memory; do
+    [ -d "$mem/.git" ] || continue
 
-cd "$MEM"
+    (
+        cd "$mem" || exit 0
 
-# Stage everything; if no changes, exit cleanly
-git add -A
-if git diff --cached --quiet; then
-    exit 0
-fi
+        git add -A >/dev/null 2>&1 || exit 0
 
-# Commit + push silently; tolerate network/auth failures
-git commit -m "auto: memory snapshot $(date +%Y-%m-%dT%H:%M)" >/dev/null 2>&1 || exit 0
-git push >/dev/null 2>&1 || exit 0
+        if git diff --cached --quiet; then
+            exit 0
+        fi
+
+        git commit -m "auto: memory snapshot $(date +%Y-%m-%dT%H:%M)" >/dev/null 2>&1 || exit 0
+        git push >/dev/null 2>&1 || exit 0
+    )
+done
+
+exit 0
