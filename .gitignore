@@ -17,6 +17,8 @@ _electron/.cache/
 .claude/settings.local.json
 .claude/sessions/
 .claude/cache/
+.claude/**/__pycache__/
+.claude/**/*.pyc
 
 # Test artifacts
 titlebar-test.png
