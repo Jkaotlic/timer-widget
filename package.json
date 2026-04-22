@@ -4,8 +4,8 @@
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
-    "start": "npx electron .",
-    "dev": "npx electron . --dev",
+    "start": "node scripts/run-electron.js",
+    "dev": "node scripts/run-electron.js --dev",
     "test": "node --test",
     "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
