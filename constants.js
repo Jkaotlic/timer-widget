@@ -29,9 +29,9 @@ const CONFIG = {
     CLOCK_WIDGET_MIN_SIZE: 100,
 
     // Control Window
-    CONTROL_WINDOW_WIDTH: 420,
+    CONTROL_WINDOW_WIDTH: 380,
     CONTROL_WINDOW_HEIGHT: 500,
-    CONTROL_WINDOW_MIN_WIDTH: 350,
+    CONTROL_WINDOW_MIN_WIDTH: 340,
     CONTROL_WINDOW_MIN_HEIGHT: 300,
 
     // ============================================

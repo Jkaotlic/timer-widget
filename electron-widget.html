@@ -220,12 +220,13 @@
             animation: time-pulse 1s ease-in-out infinite;
         }
 
-        /* Sign slot — фиксированная ширина, цифры остаются в центре кольца */
+        /* Sign slot — фиксированная ширина, цифры остаются в центре кольца.
+           0.25ch gap не даёт минусу слипаться с первой цифрой при тонком шрифте. */
         .time-display .tm-sign {
             display: inline-block;
-            width: 0.55ch;
+            width: 0.6ch;
             text-align: right;
-            margin-right: 0.05ch;
+            margin-right: 0.25ch;
         }
 
         @keyframes time-pulse {
@@ -410,6 +411,21 @@
             border-radius: 50%;
             background: linear-gradient(135deg, var(--tw-blue), var(--tw-green));
             box-shadow: 0 0 8px rgba(10, 132, 255, 0.6);
+        }
+        /* Status colors for separator dots — must override background, not color,
+           because the dots are painted by pseudo-elements. data-status is set by
+           updateFlipDisplay() alongside the per-card status. */
+        .widget-flip-separator[data-status="warning"]::before,
+        .widget-flip-separator[data-status="warning"]::after {
+            background: var(--tw-yellow);
+            box-shadow: 0 0 8px rgba(255, 193, 7, 0.55);
+        }
+        .widget-flip-separator[data-status="danger"]::before,
+        .widget-flip-separator[data-status="danger"]::after,
+        .widget-flip-separator[data-status="overtime"]::before,
+        .widget-flip-separator[data-status="overtime"]::after {
+            background: #ff4444;
+            box-shadow: 0 0 8px rgba(255, 68, 68, 0.6);
         }
 
         .widget-flip-minus {
@@ -1272,9 +1288,10 @@
                             el.style.color = timerColor;
                         }
                     });
-                    document.querySelectorAll('.widget-flip-separator').forEach(el => {
-                        el.style.color = timerColor;
-                    });
+                    // Separator dots are pseudo-elements with a fixed brand
+                    // gradient; user color themes don't apply to them. Status
+                    // overrides (warning/danger/overtime) are handled via CSS
+                    // rules keyed on data-status.
                 }
 
                 // Analog style
@@ -1688,14 +1705,14 @@
                     }
                 });
 
-                // Color separators to match digit status
+                // Separator dots are painted by ::before/::after backgrounds, so
+                // color/background on the element itself is ignored — we drive
+                // them through data-status and matching CSS rules instead.
                 document.querySelectorAll('.widget-flip-separator').forEach(el => {
-                    if (status === 'danger' || status === 'overtime') {
-                        el.style.color = '#ff4444';
-                    } else if (status === 'warning') {
-                        el.style.color = '#ffc107';
-                    } else if (this._baseTimerColor) {
-                        el.style.color = this._baseTimerColor;
+                    if (status === 'danger' || status === 'overtime' || status === 'warning') {
+                        el.dataset.status = status;
+                    } else if (el.dataset.status) {
+                        delete el.dataset.status;
                     }
                 });
             }

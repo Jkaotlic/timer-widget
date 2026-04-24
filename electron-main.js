@@ -44,6 +44,16 @@ process.on('unhandledRejection', (reason) => {
     try { saveTimerStateToFile(); } catch { /* best effort */ }
 });
 
+// Chromium phones home by default: Component Updater → update.googleapis.com /
+// redirector.gvt1.com (Widevine, Safe Browsing, CRLSet, …), Variations Service →
+// clientservices.googleapis.com, Optimization Hints → optimizationguide-pa.
+// Таймер-виджет не использует ни один из этих компонентов, поэтому глушим
+// фоновую сеть целиком — иначе отчёты security-аудита фиксируют исходящий
+// трафик на Google-инфраструктуру при чисто офлайновом приложении.
+// Switches должны быть применены до app ready, поэтому ставим на импорте.
+app.commandLine.appendSwitch('disable-component-update');
+app.commandLine.appendSwitch('disable-features', 'ChromeVariations,OptimizationHints');
+
 // Test-mode guard — node:test stubs 'electron', we skip runtime side-effects.
 const __inTestMode = process.env.NODE_TEST_CONTEXT !== undefined;
 
@@ -256,17 +266,17 @@ function createControlWindow() {
     // Get screen dimensions for adaptive sizing
     const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
-    // Default size of the control panel WITHOUT drawer (drawer adds 360px when opened).
+    // Default size of the control panel WITHOUT drawer (drawer adds ~320px when opened).
     // Settings live in the drawer, so the panel itself can be narrow and short.
-    const windowWidth = Math.min(420, Math.max(380, screenWidth - 100));
+    const windowWidth = Math.min(380, Math.max(340, screenWidth - 100));
     const windowHeight = Math.min(720, Math.max(640, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        minWidth: 360,
+        minWidth: 340,
         minHeight: 640,
-        maxWidth: 1280,  // 920 (panel max) + 360 (drawer) leaves room for resize
+        maxWidth: 1200,  // 880 (panel max) + 320 (drawer) leaves room for resize
         maxHeight: 1100,
         webPreferences: {
             nodeIntegration: false,
@@ -420,7 +430,18 @@ function createDisplayWindow(displayIndex) {
         y: __screenshotMode ? -2000 : displayBounds.y,
         fullscreen: !__screenshotMode,
         frame: false,
+        // `frame: false` на Windows по умолчанию оставляет WS_THICKFRAME —
+        // DWM рисует поверх содержимого тонкую светлую рамку по периметру
+        // (это и есть «белая обводка по краям» в полноэкранном режиме).
+        // Убираем стиль: resize-ручки не нужны — окно и так fullscreen.
+        thickFrame: false,
+        hasShadow: false,
         show: !__screenshotMode,
+        // Match the gradient's darkest stop so the underlying compositor
+        // surface never paints white on the sides when the body's gradient
+        // hasn't fully covered yet (initial paint, repaint glitches,
+        // sub-pixel rounding on fractional DPI).
+        backgroundColor: '#000000',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -778,24 +799,29 @@ ipcMain.on('get-timer-state', (event) => {
 });
 
 // Изменение размера окна управления
+// size.width / size.height опциональны: если поле не передано (или не Finite),
+// соответствующее измерение не меняется. Это нужно, чтобы drawer open/close
+// менял ТОЛЬКО ширину — иначе перезапись height=window.innerHeight округляется
+// при каждом setSize (HiDPI) и сбивает ручную высоту, которую выставил юзер.
 ipcMain.on('resize-control-window', (event, size) => {
-    if (controlWindow && size && typeof size === 'object') {
-        const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
-        const w = Number.isFinite(size.width) ? size.width : 700;
-        const h = Number.isFinite(size.height) ? size.height : 860;
-        const targetWidth = Math.max(600, Math.min(w, screenWidth - 50));
-        const targetHeight = Math.max(650, Math.min(h, screenHeight - 50));
-        
-        // Получаем текущую позицию окна
-        const [x, y] = controlWindow.getPosition();
-        
-        // Устанавливаем размер
-        controlWindow.setSize(targetWidth, targetHeight);
-        
-        // Проверяем, не выходит ли окно за экран
-        if (y + targetHeight > screenHeight) {
-            controlWindow.setPosition(x, Math.max(0, screenHeight - targetHeight - 20));
-        }
+    if (!controlWindow || !size || typeof size !== 'object') { return; }
+    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+    const [curW, curH] = controlWindow.getSize();
+    const w = Number.isFinite(size.width) ? size.width : curW;
+    const h = Number.isFinite(size.height) ? size.height : curH;
+    // Нижний clamp = BrowserWindow min (см. createControlWindow): 340×640.
+    const targetWidth = Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, Math.min(w, screenWidth - 50));
+    const targetHeight = Math.max(640, Math.min(h, screenHeight - 50));
+
+    // No-op если ничего не меняется — избегаем лишнего setSize (WM на Windows
+    // иногда округляет outer на 1px при каждом вызове, что даёт дрейф).
+    if (targetWidth === curW && targetHeight === curH) { return; }
+
+    const [x, y] = controlWindow.getPosition();
+    controlWindow.setSize(targetWidth, targetHeight);
+
+    if (y + targetHeight > screenHeight) {
+        controlWindow.setPosition(x, Math.max(0, screenHeight - targetHeight - 20));
     }
 });
 
