@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.2] - 2026-04-24
+
+### Fixed
+- **Критично: в packaged-релизе вся панель рендерилась как светлая тема.** В `package.json build.files` отсутствовал `design-tokens.css` → electron-builder не паковал его в `app.asar` → при запуске релиза все CSS custom properties (`--tw-bg-void`, `--tw-fg`, `--tw-bg-surface` и т.д.) были undefined → дефолтный белый BrowserWindow просвечивал через полупрозрачный `.control-panel` (`rgba(28,28,30,0.72)`). В dev (`npm start`) проблема не проявлялась — Electron читает файлы напрямую из рабочей папки, минуя `app.asar`. Затронуто v2.3.0 и v2.3.1
+- Защита-в-глубину: `backgroundColor: '#000000'` на control BrowserWindow + `html, body { background: #000 }` в `electron-control.html` — даже если какой-то токен не загрузится, белого фона больше не будет
+
+### Added
+- `tests/packaging.test.js` — guard-тест на CI: парсит все `<link href>` / `<script src>` в HTML-файлах и все `require('./...')` в main-process JS, проверяет что каждый referenced asset присутствует в `package.json build.files`. Падает до релиза, если файл забыли добавить
+
+### Tests
+- 126 → 128 (добавлены 2 packaging-проверки)
+
 ## [2.3.1] - 2026-04-24
 
 ### Changed

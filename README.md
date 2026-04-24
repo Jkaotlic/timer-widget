@@ -6,10 +6,10 @@
 
 **Прозрачный таймер-виджет для презентаций и рабочего стола**
 
-[![Version](https://img.shields.io/badge/v2.3.1-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.3.2-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_41-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
-[![Tests](https://img.shields.io/badge/tests-126%20passing-30d158?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/tests-128%20passing-30d158?style=flat-square)](tests/)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
 [![License](https://img.shields.io/badge/MIT-30d158?style=flat-square)](LICENSE)
 

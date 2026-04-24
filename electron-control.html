@@ -46,6 +46,12 @@
             color: var(--tw-fg);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            /* Solid dark base so the panel reads as dark glass even during the
+               brief gap before `.control-window` on <body> paints its gradient.
+               Without this, the white BrowserWindow surface shows through the
+               translucent .control-panel (`rgba(28,28,30,0.72)`) → the whole
+               UI looks like a light theme. Matches design-tokens --tw-bg-void. */
+            background: #000000;
         }
 
         /* Subtle noise texture for glass depth */

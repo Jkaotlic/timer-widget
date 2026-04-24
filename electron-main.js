@@ -278,6 +278,12 @@ function createControlWindow() {
         minHeight: 640,
         maxWidth: 1200,  // 880 (panel max) + 320 (drawer) leaves room for resize
         maxHeight: 1100,
+        // Control is opaque. Without `backgroundColor`, Electron paints the
+        // window white, and any translucent surface (.control-panel uses
+        // `rgba(28,28,30,0.72)` with backdrop-blur) shows that white through
+        // — the panel renders bright/washed-out instead of dark glass. Match
+        // the darkest stop so glass stays glass.
+        backgroundColor: '#000000',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
