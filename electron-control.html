@@ -95,7 +95,7 @@
             box-shadow: var(--tw-shadow-panel);
             min-width: 0;
             width: 100%;
-            max-width: 640px;
+            max-width: 560px;
             justify-self: center;
             align-self: center;
             margin: 8px;
@@ -105,26 +105,15 @@
             height: max-content;
             max-height: calc(100vh - 16px);
         }
-        /* Drawer is overlay on narrow windows; on wide windows the panel
-           shrinks so they sit side-by-side without overlap. */
+        /* When drawer is open, panel docks to the left so the two sit side-by-side.
+           Main guarantees the control window is wide enough (~716px) before opening
+           the drawer, so the old narrow-mode overlay + backdrop is unreachable. */
         .app-shell.drawer-open .control-panel {
             justify-self: start;
         }
-        @media (min-width: 760px) {
+        @media (min-width: 700px) {
             .app-shell.drawer-open .control-panel {
-                max-width: calc(100vw - clamp(320px, 38vw, 420px) - 24px);
-            }
-        }
-        /* Backdrop dim on narrow windows where drawer overlays the panel. */
-        @media (max-width: 759px) {
-            .app-shell.drawer-open::before {
-                content: '';
-                position: absolute;
-                inset: 0;
-                background: rgba(0, 0, 0, 0.45);
-                z-index: 40;
-                animation: fadeIn 200ms var(--tw-ease);
-                pointer-events: none;
+                max-width: calc(100vw - clamp(300px, 32vw, 360px) - 24px);
             }
         }
 
@@ -139,7 +128,7 @@
             top: 8px;
             right: 8px;
             bottom: 8px;
-            width: clamp(320px, 38vw, 420px);
+            width: clamp(300px, 32vw, 360px);
             max-width: calc(100vw - 16px);
             min-width: 0;
             background: rgba(22, 22, 28, 0.72);
@@ -283,6 +272,42 @@
             padding: 6px 8px;
             font-size: 11px;
             border-radius: 8px;
+        }
+
+        /* Inline hint card — explains display-only gestures (Alt-drag, Ctrl+wheel)
+           to users who are configuring from the control panel. */
+        .settings-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 8px 0;
+            padding: 9px 11px;
+            background: rgba(10, 132, 255, 0.07);
+            border: 1px solid rgba(10, 132, 255, 0.18);
+            border-radius: 10px;
+            font-size: 11.5px;
+            line-height: 1.45;
+            color: rgba(255, 255, 255, 0.78);
+        }
+        .settings-hint .hint-icon {
+            flex: 0 0 auto;
+            font-size: 13px;
+            line-height: 1.3;
+            opacity: 0.9;
+        }
+        .settings-hint .hint-text { flex: 1 1 auto; }
+        .settings-hint kbd {
+            display: inline-block;
+            padding: 1px 5px;
+            margin: 0 1px;
+            font-family: var(--tw-font-mono);
+            font-size: 10px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 4px;
+            box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
         }
 
         /* Scrollable content area — shrinks to content on tall windows so the
@@ -435,12 +460,14 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.5), var(--tw-glow-blue);
         }
         /* Fixed-width sign slot — keeps digits optically centered whether
-           the minus is visible (overtime) or not. */
+           the minus is visible (overtime) or not. The gap is deliberate: with
+           the thin display font a minus sitting directly next to a digit looks
+           glued — add ~0.25ch of breathing room. */
         .timer-display-main .tm-sign {
             display: inline-block;
-            width: 0.55ch;
+            width: 0.6ch;
             text-align: right;
-            margin-right: 0.05ch;
+            margin-right: 0.25ch;
         }
 
         .timer-display-main.danger {
@@ -1288,29 +1315,70 @@
             background: linear-gradient(135deg, var(--t1) 0%, var(--t2) 100%);
         }
 
-        /* Color Picker toggle */
+        /* Color Picker toggle — Apple-style soft donut with semantic system colors.
+           Inner hole (::after) makes it look like a ring rather than a filled
+           rainbow disc; softer hues replace raw RGB spectrum. */
         .color-picker-toggle {
-            width: 28px;
-            height: 28px;
-            border: 2.5px dashed rgba(255, 255, 255, 0.25);
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            color: var(--tw-fg-secondary);
+            position: relative;
+            border: none;
+            background: conic-gradient(
+                from 210deg,
+                #ff453a 0deg,
+                #ff9f0a 60deg,
+                #ffd60a 120deg,
+                #30d158 180deg,
+                #0a84ff 240deg,
+                #bf5af2 300deg,
+                #ff453a 360deg
+            );
+            box-shadow:
+                inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+                0 0 0 1px rgba(255, 255, 255, 0.08),
+                0 2px 6px rgba(0, 0, 0, 0.3);
+            opacity: 0.85;
             transition: opacity var(--tw-dur-base) var(--tw-ease),
                         transform var(--tw-dur-fast) var(--tw-ease),
-                        border-color var(--tw-dur-base) var(--tw-ease);
-            background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
-            opacity: 0.5;
+                        box-shadow var(--tw-dur-base) var(--tw-ease);
         }
-
+        .color-picker-toggle::after {
+            content: "";
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--tw-bg-base, #0d0d12);
+            box-shadow:
+                inset 0 0 0 0.5px rgba(255, 255, 255, 0.12),
+                0 0 4px rgba(0, 0, 0, 0.5);
+        }
         .color-picker-toggle:hover {
             opacity: 1;
-            transform: scale(1.18);
-            border-color: var(--tw-fg-muted);
+            transform: scale(1.12);
+            box-shadow:
+                inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.14),
+                0 3px 10px rgba(0, 0, 0, 0.45),
+                0 0 12px rgba(10, 132, 255, 0.35);
+        }
+        .color-picker-toggle:focus-visible {
+            outline: none;
+            box-shadow:
+                inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+                0 0 0 2px rgba(10, 132, 255, 0.5),
+                0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        .color-picker-toggle.active {
+            opacity: 1;
+            box-shadow:
+                inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+                0 0 0 2px rgba(10, 132, 255, 0.55),
+                0 3px 10px rgba(0, 0, 0, 0.45);
         }
 
         .color-picker-panel {
@@ -1373,8 +1441,12 @@
         }
 
         #tab-display .color-picker-toggle {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
+        }
+        #tab-display .color-picker-toggle::after {
+            width: 7px;
+            height: 7px;
         }
 
         /* =======================================================
@@ -3343,6 +3415,10 @@
 
                 <!-- Таб: Виджет -->
                 <div class="tab-content active" id="tab-timer">
+                    <div class="settings-hint" role="note">
+                        <span class="hint-icon" aria-hidden="true">💡</span>
+                        <span class="hint-text">На виджете: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>8</kbd> работают и здесь</span>
+                    </div>
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon">🎨</span>
@@ -3578,6 +3654,10 @@
                 <!-- Таб: Часы -->
                 <div class="tab-content" id="tab-clock">
                     <div class="settings-column">
+                        <div class="settings-hint" role="note">
+                            <span class="hint-icon" aria-hidden="true">💡</span>
+                            <span class="hint-text">На часах: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>8</kbd> работают и здесь</span>
+                        </div>
                         <div class="settings-group">
                             <div class="settings-group-title">
                                 <span class="icon">🎨</span>
@@ -3695,6 +3775,10 @@
                                     <input type="checkbox" id="showTimeBlocks">
                                     <span class="toggle-slider"></span>
                                 </label>
+                            </div>
+                            <div class="settings-hint" role="note">
+                                <span class="hint-icon" aria-hidden="true">💡</span>
+                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо — масштаб таймера · <kbd>Ctrl</kbd>+колесо над блоком — масштаб блока · <kbd>Alt</kbd>+перетащить блок — переместить</span>
                             </div>
                             <div id="timeBlocksSettings" style="display: none;">
                                 <div class="toggle-row">
@@ -4354,7 +4438,7 @@
                 this.drawerBodyEl = document.getElementById('drawerBody');
                 this.drawerCloseBtn = document.getElementById('drawerClose');
                 this._currentDrawerTab = null;
-                this._drawerExtraWidth = 376; // 360 drawer + 16 gap
+                this._drawerExtraWidth = 336; // 320 drawer + 16 gap
 
                 // Move tab-content elements from main panel into drawer body.
                 // Keep tabs-row buttons in their original spot for triggering.
@@ -4404,12 +4488,13 @@
 
                 if (!wasOpen) {
                     // Capture current outer width so close can restore exactly.
-                    // Don't trust CONFIG.CONTROL_WINDOW_WIDTH — it's a legacy 420
-                    // constant that doesn't match the actual spawn size (~750).
-                    this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || 720;
+                    const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                    this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || baseDefault;
+                    // Drawer-операция меняет только ширину — высоту main оставит
+                    // как есть (иначе ручная высота, выставленная юзером,
+                    // перезаписывалась innerHeight с HiDPI-дрейфом).
                     ipcRenderer.send('resize-control-window', {
-                        width: this._baseWidthBeforeDrawer + this._drawerExtraWidth,
-                        height: window.innerHeight
+                        width: this._baseWidthBeforeDrawer + this._drawerExtraWidth
                     });
                     const shell = document.querySelector('.app-shell');
                     requestAnimationFrame(() => {
@@ -4427,19 +4512,36 @@
                 if (!this.settingsDrawerEl.classList.contains('open')) { return; }
                 const shell = document.querySelector('.app-shell');
                 this.settingsDrawerEl.classList.remove('open');
-                if (shell) { shell.classList.remove('drawer-open'); }
                 this.settingsDrawerEl.setAttribute('aria-hidden', 'true');
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 this._currentDrawerTab = null;
 
-                // Wait for slide-out, then shrink window back to captured base.
-                const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || 720;
+                // ВАЖНО: НЕ снимаем shell.drawer-open сразу — иначе panel мгновенно
+                // перестраивается из left-docked (max 392) в centered (max 560) внутри
+                // ещё широкого 716px-окна, и получается двойной скачок panel:
+                // left-392 → center-560 → full-380. Снимаем класс ТОЛЬКО после того
+                // как окно физически сузилось — тогда визуальное положение panel
+                // не меняется (в узком окне start == center для 100% ширины).
+                const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || baseDefault;
                 setTimeout(() => {
                     if (this.settingsDrawerEl.classList.contains('open')) { return; }
-                    ipcRenderer.send('resize-control-window', {
-                        width: restoreWidth,
-                        height: window.innerHeight
-                    });
+                    const clearDrawerOpen = () => {
+                        if (this.settingsDrawerEl.classList.contains('open')) { return; }
+                        if (shell) { shell.classList.remove('drawer-open'); }
+                    };
+                    const onResize = () => {
+                        window.removeEventListener('resize', onResize);
+                        clearDrawerOpen();
+                    };
+                    window.addEventListener('resize', onResize, { once: true });
+                    ipcRenderer.send('resize-control-window', { width: restoreWidth });
+                    // Fallback: если окно уже нужной ширины, resize event не прилетит —
+                    // форсированно чистим класс через 150ms.
+                    setTimeout(() => {
+                        window.removeEventListener('resize', onResize);
+                        clearDrawerOpen();
+                    }, 150);
                 }, 260);
             }
 
@@ -5743,7 +5845,7 @@
                 }
 
                 ipcRenderer.send('resize-control-window', {
-                    width: (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 420,
+                    width: (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380,
                     height: neededHeight
                 });
             }

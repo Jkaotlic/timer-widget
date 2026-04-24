@@ -88,6 +88,7 @@ class DisplayTimer {
         } else {
             this._safeSetItem('displayHintShown', 'v2');
         }
+
     }
 
     // localStorage.setItem с защитой от QuotaExceeded и лимитом 1MB на значение
@@ -1577,8 +1578,18 @@ class DisplayTimer {
                     rafId = requestAnimationFrame(() => {
                         const dx = ev.screenX - startScreenX;
                         const dy = ev.screenY - startScreenY;
-                        block.style.left = (startLeft + dx) + 'px';
-                        block.style.top = (startTop + dy) + 'px';
+                        // Clamp so the block always keeps ~20px breathing room
+                        // from every viewport edge — a card flush against the
+                        // edge reads as a line on the side of the screen.
+                        const MARGIN = 20;
+                        const bw = block.offsetWidth || 0;
+                        const bh = block.offsetHeight || 0;
+                        const maxLeft = Math.max(MARGIN, window.innerWidth - bw - MARGIN);
+                        const maxTop  = Math.max(MARGIN, window.innerHeight - bh - MARGIN);
+                        const nextLeft = Math.min(maxLeft, Math.max(MARGIN, startLeft + dx));
+                        const nextTop  = Math.min(maxTop,  Math.max(MARGIN, startTop + dy));
+                        block.style.left = nextLeft + 'px';
+                        block.style.top  = nextTop  + 'px';
                     });
                 };
 
@@ -1684,9 +1695,16 @@ class DisplayTimer {
                 const pos = positions[key];
                 if (!pos || typeof pos !== 'object') { continue; }
                 if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) { continue; }
-                // Clamp to reasonable screen bounds (protects against corrupted data)
-                const left = Math.max(-5000, Math.min(5000, pos.left));
-                const top = Math.max(-5000, Math.min(5000, pos.top));
+                // Pull saved positions into the viewport with a 20px margin so
+                // old coordinates (from before the clamp was enforced) don't
+                // leave blocks flush against the screen edges.
+                const MARGIN = 20;
+                const bw = block.offsetWidth || 100;
+                const bh = block.offsetHeight || 100;
+                const maxLeft = Math.max(MARGIN, window.innerWidth - bw - MARGIN);
+                const maxTop  = Math.max(MARGIN, window.innerHeight - bh - MARGIN);
+                const left = Math.min(maxLeft, Math.max(MARGIN, pos.left));
+                const top  = Math.min(maxTop,  Math.max(MARGIN, pos.top));
                 block.classList.remove(
                     'top-left', 'top-center', 'top-right',
                     'bottom-left', 'bottom-center', 'bottom-right',

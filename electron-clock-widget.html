@@ -174,7 +174,10 @@
             margin-left: 0.12em;
             transform: translateY(-0.3em);
             letter-spacing: 0.02em;
-            color: var(--tw-fg-secondary);
+            /* Inherit user-selected timer color; opacity keeps the seconds
+               visually secondary without hardcoding a different hue. */
+            color: inherit;
+            opacity: 0.55;
             text-shadow: none;
         }
 
