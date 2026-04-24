@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.3.1] - 2026-04-24
+
+### Changed
+- **Новая иконка приложения** — неоновые песочные часы вместо предыдущего праздничного оформления. Применяется ко всем платформам (macOS `.icns`, Windows `.ico`, Linux PNG) через `build/icon.png` 1024×1024
+- **README**: полная актуализация под v2.3 — версия 2.3.1, 126 тестов вместо 70, drawer UI, HSV picker, новые горячие клавиши, расширенный раздел безопасности, обновлённая структура проекта
+- **README.en.md**: синхронизирован с русской версией
+
+## [2.3.0] - 2026-04-24
+
+### Added
+- **Design System v3** — VisionOS glassmorphism полностью переосмыслен через `design-tokens.css`: единые CSS custom properties для палитры, блюров, теней, таймингов и радиусов. Все окна (control, widget, clock, display) переведены на токены
+- **HSV color picker** — полноценный выбор цвета (hue slider + SV-область + hex input) вместо только пресетов. Независимые инстансы для вкладок Виджет / Часы / Полноэкранный
+- **Slide-out drawer** — панель управления стала компактной (380 px), настройки переехали в выдвижной drawer (macOS detail-pane pattern). Адаптивная высота окна под активную вкладку
+- **Ручной ввод времени** — поле в панели управления принимает `sec`, `min:sec` или `hr:min:sec` (до 99:59:59)
+- **Клик по проценту масштаба** — точный ввод значения, двойной клик — сброс к 100%
+- **Shift + колесо** на полноэкранном — отдельное масштабирование информационных блоков
+- **Альтернативная раскладка блоков** — третьи-точки (`top-left-third`, `bottom-right-third` и др.) для более тонкой компоновки на широких мониторах
+- **Dev harness**: `npm run screenshot` — 24 PNG для headless визуального ревью; `bindRenderConsole` пробрасывает логи рендереров в `electron-log`
+- `scripts/run-electron.js` — wrapper, сбрасывающий `ELECTRON_RUN_AS_NODE` перед запуском, чтобы не было крашей при наследовании переменной
+
+### Changed
+- **Тесты**: 128 → 126 (перетряхнули тест-сьют под новую архитектуру, убрали устаревшие кейсы)
+- **Контрольная панель**: 420×720 → 380×720 по умолчанию, минимум 340×640
+- **Shared CSS**: `components.css` + `design-tokens.css` подключаются во все HTML — больше не нужны инлайн-копии токенов
+- Виджет flip: отдельные статусы (warning/danger/overtime) применяются к точкам-разделителям через `data-status` (`::before/::after` игнорируют `.color`)
+- Часы digital: секунды наследуют цвет таймера с 0.55 opacity вместо жёстко заданного `--tw-fg-muted` — пользовательские темы теперь применяются к секундам
+
+### Fixed
+- **Windows 11 DWM белая обводка на полноэкранном** — корневая причина: `frame:false` оставляет `WS_THICKFRAME`, и DWM рисует 1px светлую кайму поверх рендерера. Фикс: `thickFrame:false` + `hasShadow:false` на display-окне
+- Display `backgroundColor:'#000'` + `html { background:#000 }` — защита от белых полос на фракционной DPI и при переключении `--bg`
+- Info-блоки на полноэкранном: `display:none` для скрытых (раньше `opacity:0` оставлял «призраки» в углах из-за специфичности селекторов), 20 px clamping от краёв экрана при Alt-drag — карточки не прилегают вплотную к границе
+- Overtime status корректно отображается во всех 3 окнах (widget/clock/display) — ветка `overtime` теперь вычисляется **до** `finished`
+- Кэш `updateStatus` в DisplayTimer инвалидируется при изменении `isRunning` / `isPaused` / `finished`, а не только `remainingSeconds`
+- Полноэкранный hint исчезает через 5 с без возврата на `mousemove` / `keydown`
+- `CSP frame-ancestors` удалён из `<meta>` (директива работает только в HTTP-заголовке)
+- Drawer-open + flex overflow: `min-height:0` на scrollable child, иначе содержимое вкладки «Звуки» обрезалось без скроллбара
+- Drawer close flicker: `.drawer-open` снимается только после фактического `resize`-события, не синхронно с IPC-вызовом
+- `resize-control-window` IPC: `width`/`height` теперь опциональны по отдельности — drawer не перезаписывает ручную высоту, субпиксельного дрейфа на HiDPI больше нет
+
+### Security
+- **`disable-component-update`** + **`disable-features=ChromeVariations,OptimizationHints`** — Chromium Component Updater полностью отключён (никаких обращений к `redirector.gvt1.com` / `clientservices.googleapis.com` / `optimizationguide-pa.googleapis.com`)
+- **HTTP(S) загрузка фоновых изображений удалена** — `isValidURL` вырезан, `validateImageSource` принимает только `data:` URL, CSP `img-src 'self' data:`, вкладка «Фон по URL» убрана из панели управления
+- `devTools:false` на всех 4 BrowserWindow — консоль разработчика недоступна в production
+- `build/after-pack.js` очищает `LICENSES.chromium.html` от внешнего политического контента в зависимостях (баннер Support Ukraine из acornjs), переписывает ссылку `github.com/acornjs/acorn` → `npmjs.com/package/acorn`
+- SVG окончательно исключён из whitelist data URL
+- Аудио upload: пустой `file.type` отклоняется, magic-bytes проверка для MP3/WAV/OGG/FLAC/WebM/AAC (≤5 MB)
+
+### Audit
+Сведённые рекомендации внешнего security-свипа v2.2.0 по 4 платформам (macOS ARM/x64, Ubuntu, Windows) — закрыто 7 из 7 actionable пунктов. Нерешённым остаётся обновление Electron 41 → 42+ (требует отдельного тестирования) и ужесточение AppArmor-профиля (только Ubuntu-отчёт).
+
 ## [2.2.4] - 2026-04-20
 
 ### Audit round 3 — 17 closed findings (full project-audit)
