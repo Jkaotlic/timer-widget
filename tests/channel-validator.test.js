@@ -4,14 +4,14 @@ const { isValidChannel, ALLOWED_CHANNELS } = require('../channel-validator');
 
 test('isValidChannel allows valid send channels', () => {
     assert.equal(isValidChannel('timer-command', 'send'), true);
-    assert.equal(isValidChannel('colors-update', 'send'), true);
+    assert.equal(isValidChannel('widget-colors-update', 'send'), true);
     assert.equal(isValidChannel('quit-app', 'send'), true);
     assert.equal(isValidChannel('get-timer-state', 'send'), true);
 });
 
 test('isValidChannel allows valid receive channels', () => {
     assert.equal(isValidChannel('timer-state', 'receive'), true);
-    assert.equal(isValidChannel('colors-update', 'receive'), true);
+    assert.equal(isValidChannel('widget-colors-update', 'receive'), true);
     assert.equal(isValidChannel('timer-reached-zero', 'receive'), true);
     assert.equal(isValidChannel('display-window-state', 'receive'), true);
 });

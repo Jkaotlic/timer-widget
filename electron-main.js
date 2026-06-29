@@ -17,9 +17,8 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, dialog, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor } = require('electron');
 const path = require('path');
-const fs = require('fs');
 const log = require('electron-log/main');
 const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
@@ -963,17 +962,6 @@ ipcMain.on('resize-control-window', (event, size) => {
     }
 });
 
-// Рассылка обновления цветов всем окнам
-ipcMain.on('colors-update', (event, colors) => {
-    safelySendToWindow(widgetWindow, 'colors-update', colors);
-    safelySendToWindow(displayWindow, 'colors-update', colors);
-
-    // Не отправляем обратно в controlWindow если событие пришло от него
-    if (controlWindow && event.sender !== controlWindow.webContents) {
-        safelySendToWindow(controlWindow, 'colors-update', colors);
-    }
-});
-
 // Per-window color updates (independent themes)
 ipcMain.on('widget-colors-update', (_event, colors) => {
     lastWidgetColors = colors;
@@ -1205,38 +1193,5 @@ ipcMain.on('timer-control', (_event, action) => {
         case 'start': handleTimerStart(); break;
         case 'pause': handleTimerPause(); break;
         case 'reset': handleTimerReset(); break;
-    }
-});
-
-// Autostart (open at login)
-ipcMain.on('set-autostart', (_event, enabled) => {
-    try {
-        app.setLoginItemSettings({ openAtLogin: !!enabled, openAsHidden: true });
-        log.info(`Autostart: ${enabled ? 'enabled' : 'disabled'}`);
-    } catch (err) {
-        log.error('set-autostart failed:', err);
-    }
-});
-ipcMain.handle('get-autostart', () => {
-    try { return app.getLoginItemSettings().openAtLogin; }
-    catch { return false; }
-});
-
-// Export logs for diagnostics
-ipcMain.handle('export-logs', async () => {
-    try {
-        const logPath = log.transports.file.getFile().path;
-        const stamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
-        const result = await dialog.showSaveDialog({
-            defaultPath: `timer-widget-logs-${stamp}.log`,
-            filters: [{ name: 'Log files', extensions: ['log'] }]
-        });
-        if (result.canceled || !result.filePath) { return { ok: false, canceled: true }; }
-        fs.copyFileSync(logPath, result.filePath);
-        log.info(`Logs exported to ${result.filePath}`);
-        return { ok: true, path: result.filePath };
-    } catch (err) {
-        log.error('export-logs failed:', err);
-        return { ok: false, error: String(err) };
     }
 });
