@@ -30,19 +30,30 @@
  */
 
 /**
- * Advance timer by one second.
+ * Advance the timer by `stepSeconds` whole seconds (default 1).
+ *
+ * The step is supplied by the caller, which derives it from wall-clock time
+ * (see electron-main `reconcileTimer`) instead of assuming exactly one second
+ * elapsed per interval fire. This keeps the countdown anchored to real time
+ * across event-loop jitter, CPU stalls, and OS sleep/resume. All boundary
+ * events use single prev-vs-next crossing checks, so each fires AT MOST ONCE
+ * per call regardless of how many seconds the step spans (no event spam after
+ * a long sleep, no missed zero crossing).
  *
  * @param {Object} state Current timer state
  * @param {Object} config Timer config
+ * @param {number} [stepSeconds=1] Whole seconds to advance (clamped to >= 1)
  * @returns {{state: Object, events: string[], finished: boolean}}
  *   - state: new state after tick
  *   - events: array of event names to fire
  *   - finished: true when the timer should stop (caller clears interval)
  */
-function tick(state, config = {}) {
+function tick(state, config = {}, stepSeconds = 1) {
     const events = [];
     const prevRemaining = state.remainingSeconds;
-    let nextRemaining = prevRemaining - 1;
+    let step = Math.floor(Number(stepSeconds));
+    if (!Number.isFinite(step) || step < 1) { step = 1; }
+    let nextRemaining = prevRemaining - step;
     let shouldFinish = false;
 
     const allowNegative = !!config.allowNegative;
@@ -105,7 +116,8 @@ function tick(state, config = {}) {
  * @returns {Object} new state
  */
 function adjust(state, deltaSeconds, allowNegative = false) {
-    const delta = Number(deltaSeconds) || 0;
+    const n = Number(deltaSeconds);
+    const delta = Number.isFinite(n) ? n : 0;
     const rawNext = state.remainingSeconds + delta;
     const nextRemaining = allowNegative ? rawNext : Math.max(0, rawNext);
     const nextTotal = Math.max(state.totalSeconds, nextRemaining);
@@ -144,7 +156,8 @@ function reset(state) {
  * @returns {Object} new state
  */
 function setPreset(state, seconds) {
-    const next = Math.max(0, Number(seconds) || 0);
+    const n = Number(seconds);
+    const next = Number.isFinite(n) ? Math.max(0, n) : 0;
     return {
         ...state,
         totalSeconds: next,
