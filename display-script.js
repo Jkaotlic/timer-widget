@@ -183,7 +183,8 @@ class DisplayTimer {
             // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
             if (e.code >= 'Digit1' && e.code <= 'Digit8') {
                 e.preventDefault();
-                const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                const presets = (window.CONFIG && window.CONFIG.PRESET_DURATIONS)
+                    || [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
                 const idx = parseInt(e.code.replace('Digit', '')) - 1;
                 if (this.ipcRenderer) {
                     this.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
@@ -388,7 +389,6 @@ class DisplayTimer {
 
         // Регистрируем обработчики
         this.ipcRenderer.on('timer-state', this.ipcHandlers.timerState);
-        this.ipcRenderer.on('colors-update', this.ipcHandlers.colorsUpdate);
         this.ipcRenderer.on('display-colors-update', this.ipcHandlers.colorsUpdate);
         this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
     }
@@ -1101,6 +1101,9 @@ class DisplayTimer {
 
     // Вспомогательная функция для определения статуса (для кэширования)
     getTimerStatusValue(secs) {
+        if (window.TimeUtils && window.TimeUtils.getTimerStatus) {
+            return window.TimeUtils.getTimerStatus(secs, this.totalSeconds);
+        }
         if (secs < 0) {return 'overtime';}
         if (secs === 0 && this.totalSeconds > 0) {return 'danger';}
         if (secs <= 60 && secs > 0) {return 'warning';}
@@ -1110,10 +1113,16 @@ class DisplayTimer {
     updateDigitalDisplay(secs, _formatted) {
         if (!this.digitalMinutes || !this.digitalSeconds) {return;}
 
-        const absSecs = Math.abs(secs);
-        const hours = Math.floor(absSecs / 3600);
-        const mins = Math.floor((absSecs % 3600) / 60);
-        const seconds = absSecs % 60;
+        const { hours, minutes: mins, seconds } = window.RendererShared
+            ? window.RendererShared.breakdown(secs)
+            : (() => {
+                const absSecs = Math.abs(secs);
+                return {
+                    hours: Math.floor(absSecs / 3600),
+                    minutes: Math.floor((absSecs % 3600) / 60),
+                    seconds: absSecs % 60
+                };
+            })();
 
         const prefix = secs < 0 ? '-' : '';
 
@@ -1163,10 +1172,28 @@ class DisplayTimer {
         if (!this.flipMin1 || !this.flipMin2 || !this.flipSec1 || !this.flipSec2) {return;}
 
         const isNegative = secs < 0;
-        const absSecs = Math.abs(secs);
-        const hours = Math.floor(absSecs / 3600);
-        const mins = Math.floor((absSecs % 3600) / 60);
-        const seconds = absSecs % 60;
+
+        // F-024/refactor: общая логика разбиения на цифры (renderer-shared.flipCells).
+        // Передаём preset (this.totalSeconds), чтобы правило показа часов осталось
+        // `hours > 0 || totalSeconds >= 3600`.
+        let cells;
+        if (window.RendererShared) {
+            cells = window.RendererShared.flipCells(secs, this.totalSeconds);
+        } else {
+            const absSecs = Math.abs(secs);
+            const hours = Math.floor(absSecs / 3600);
+            const mins = Math.floor((absSecs % 3600) / 60);
+            const seconds = absSecs % 60;
+            cells = {
+                h1: String(Math.floor(hours / 10) % 10),
+                h2: String(hours % 10),
+                m1: String(Math.floor(mins / 10) % 10),
+                m2: String(mins % 10),
+                s1: String(Math.floor(seconds / 10)),
+                s2: String(seconds % 10),
+                hasHours: hours > 0 || this.totalSeconds >= 3600
+            };
+        }
 
         // Показываем/скрываем знак минуса
         if (this.flipMinus) {
@@ -1174,20 +1201,20 @@ class DisplayTimer {
         }
 
         // Показываем/скрываем часы
-        const showHours = hours > 0 || this.totalSeconds >= 3600;
+        const showHours = cells.hasHours;
         if (this.flipHoursUnit && this.flipHoursSep) {
             this.flipHoursUnit.style.display = showHours ? '' : 'none';
             this.flipHoursSep.style.display = showHours ? '' : 'none';
             if (showHours && this.flipHr1 && this.flipHr2) {
-                this.updateFlipCard(this.flipHr1, String(Math.floor(hours / 10) % 10), 'hr1');
-                this.updateFlipCard(this.flipHr2, String(hours % 10), 'hr2');
+                this.updateFlipCard(this.flipHr1, cells.h1, 'hr1');
+                this.updateFlipCard(this.flipHr2, cells.h2, 'hr2');
             }
         }
 
-        const min1 = String(Math.floor(mins / 10) % 10);
-        const min2 = String(mins % 10);
-        const sec1 = String(Math.floor(seconds / 10));
-        const sec2 = String(seconds % 10);
+        const min1 = cells.m1;
+        const min2 = cells.m2;
+        const sec1 = cells.s1;
+        const sec2 = cells.s2;
 
         // Анимация перекидывания при изменении
         this.updateFlipCard(this.flipMin1, min1, 'min1');
@@ -1283,14 +1310,18 @@ class DisplayTimer {
 
         // Обновляем цифровое время под циферблатом
         if (this.analogDigitalTime) {
-            const hours = Math.floor(absSecs / 3600);
-            const mins = Math.floor((absSecs % 3600) / 60);
-            let timeStr;
-            if (hours > 0) {
-                timeStr = `${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            } else {
-                timeStr = `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            }
+            // absSecs >= 0, поэтому formatTimeShort не добавит знак — знак минуса
+            // рисуется отдельно через _setAnalogTimeContent. Вывод идентичен ручному
+            // `H:MM:SS` / `MM:SS`.
+            const timeStr = (window.TimeUtils && window.TimeUtils.formatTimeShort)
+                ? window.TimeUtils.formatTimeShort(absSecs)
+                : (() => {
+                    const hours = Math.floor(absSecs / 3600);
+                    const mins = Math.floor((absSecs % 3600) / 60);
+                    return hours > 0
+                        ? `${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+                        : `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                })();
             this._setAnalogTimeContent(timeStr, secs < 0);
         }
 
@@ -1495,9 +1526,12 @@ class DisplayTimer {
 
         // --- Ctrl+Wheel = scale (context-sensitive: hover over blocks → block scale, else → timer scale) ---
         // --- Shift+Wheel = block scale (explicit) ---
+        const clampScale = (window.RendererShared && window.RendererShared.clampScale)
+            ? window.RendererShared.clampScale
+            : (value, min, max) => Math.max(min, Math.min(max, value));
         const scaleTimer = (delta) => {
             const cur = this.timerScale || 100;
-            const newPct = Math.max(TIMER_MIN_SCALE, Math.min(TIMER_MAX_SCALE, cur + delta));
+            const newPct = clampScale(cur + delta, TIMER_MIN_SCALE, TIMER_MAX_SCALE);
             if (newPct !== cur) {
                 const scale = newPct / 100;
                 this.timerScale = newPct;
@@ -1513,7 +1547,7 @@ class DisplayTimer {
                 ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
                 : '1.2';
             const cur = Math.round(parseFloat(raw) * 100) || 120;
-            const newPct = Math.max(BLOCK_MIN_SCALE, Math.min(BLOCK_MAX_SCALE, cur + delta));
+            const newPct = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
             if (newPct !== cur) {
                 const scale = newPct / 100;
                 [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
@@ -1775,7 +1809,6 @@ class DisplayTimer {
                 this.ipcRenderer.removeListener('timer-state', this.ipcHandlers.timerState);
             }
             if (this.ipcHandlers.colorsUpdate) {
-                this.ipcRenderer.removeListener('colors-update', this.ipcHandlers.colorsUpdate);
                 this.ipcRenderer.removeListener('display-colors-update', this.ipcHandlers.colorsUpdate);
             }
             if (this.ipcHandlers.displaySettingsUpdate) {
