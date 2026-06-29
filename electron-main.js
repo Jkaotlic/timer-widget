@@ -23,6 +23,7 @@ const log = require('electron-log/main');
 const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
+const { createTimerController } = require('./timer-controller');
 const recovery = require('./recovery');
 
 // Logger setup
@@ -74,9 +75,13 @@ let displayWindow = null;
 let clockWidgetWindow = null;
 
 // Состояние таймера
-// FIX BUG-012: Используем монотонный счетчик вместо timestamp
-let timerUpdateCounter = 0;
-
+// The timer state machine lives in ./timer-controller.js (Electron-free, unit
+// tested with a fake clock). The controller OWNS timerState/timerConfig, the
+// monotonic update counter, and the wall-clock anchors. This process keeps the
+// real setInterval (timerInterval) and feeds the controller a real clock + the
+// IPC broadcast callbacks. `timerState` below is a read-only mirror kept in sync
+// via the onState callback so the rest of this file (tray, recovery, IPC reply,
+// window-open snapshots) can read it synchronously exactly as before.
 let timerState = {
     totalSeconds: 0,
     remainingSeconds: 0,
@@ -87,24 +92,25 @@ let timerState = {
     timestamp: Date.now(),
     updateCounter: 0  // Монотонный счетчик для надежной синхронизации
 };
-let timerConfig = {
-    allowNegative: false,
-    overrunLimitSeconds: 0,
-    overrunIntervalMinutes: 1
-};
 let timerInterval = null;
 
-// Wall-clock anchor for drift-free countdown. We never assume exactly one second
-// elapsed per interval fire; instead each fire computes how many whole seconds
-// SHOULD have passed since the anchor and advances the engine by that step. This
-// keeps the timer accurate across event-loop jitter and OS sleep/resume.
-let timerAnchorReal = 0;       // Date.now() captured when the run/anchor began
-let timerAnchorRemaining = 0;  // remainingSeconds at that anchor
-
-function reanchorTimer() {
-    timerAnchorReal = Date.now();
-    timerAnchorRemaining = timerState.remainingSeconds;
-}
+const timerController = createTimerController({
+    engine: timerEngine,
+    now: Date.now,
+    // FIX BUG-013: Безопасная отправка IPC сообщений
+    onState: (state) => {
+        timerState = state;
+        safelySendToWindow(widgetWindow, 'timer-state', state);
+        safelySendToWindow(displayWindow, 'timer-state', state);
+        safelySendToWindow(controlWindow, 'timer-state', state);
+        // F-022: cheap path on every tick — just update the tooltip.
+        // updateTrayMenu() handles Menu rebuild only when running state changes.
+        if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
+    },
+    onEvent: (eventName) => broadcastEvent(eventName)
+});
+// Keep the local mirror pointed at the controller's initial state.
+timerState = timerController.getState();
 
 // Сохраняем последние настройки дисплея для синхронизации
 let lastDisplaySettings = null;
@@ -194,26 +200,11 @@ function clearTimerInterval() {
     }
 }
 
+// Thin wrapper preserved so the screenshot-runner's applyTimerState and any
+// other caller keep working. Delegates to the controller's patch() (which owns
+// the counter bump + stamping + the onState broadcast above).
 function emitTimerState(partial = {}) {
-    // FIX BUG-012: Увеличиваем монотонный счетчик при каждом обновлении
-    timerUpdateCounter++;
-
-    timerState = {
-        ...timerState,
-        ...partial,
-        overrunLimitSeconds: timerConfig.overrunLimitSeconds,
-        allowNegative: timerConfig.allowNegative,
-        timestamp: Date.now(),
-        updateCounter: timerUpdateCounter  // Монотонный счетчик
-    };
-
-    // FIX BUG-013: Безопасная отправка IPC сообщений
-    safelySendToWindow(widgetWindow, 'timer-state', timerState);
-    safelySendToWindow(displayWindow, 'timer-state', timerState);
-    safelySendToWindow(controlWindow, 'timer-state', timerState);
-    // F-022: cheap path on every tick — just update the tooltip.
-    // updateTrayMenu() handles Menu rebuild only when running state actually changes.
-    if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
+    timerController.patch(partial);
 }
 
 // Broadcast window state to all windows
@@ -226,112 +217,43 @@ function broadcastWindowState(channel, data) {
     if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
 }
 
-function finishTimer(finalRemaining) {
-    clearTimerInterval();
-    const remaining = finalRemaining !== undefined
-        ? finalRemaining
-        : (timerConfig.allowNegative ? timerState.remainingSeconds : Math.max(0, timerState.remainingSeconds));
-    emitTimerState({
-        isRunning: false,
-        isPaused: false,
-        finished: true,
-        remainingSeconds: remaining
-    });
-}
-
 function broadcastEvent(eventName) {
     safelySendToWindow(controlWindow, eventName);
     safelySendToWindow(widgetWindow, eventName);
     safelySendToWindow(displayWindow, eventName);
 }
 
-function startTimer() {
-    // Защита от повторного запуска: проверяем и state, и наличие интервала
-    if (timerState.isRunning || timerInterval) {return;}
-
-    // Убедиться что предыдущий интервал полностью очищен
-    clearTimerInterval();
-
-    const started = timerEngine.start(timerState);
-    emitTimerState({
-        isRunning: started.isRunning,
-        isPaused: started.isPaused,
-        finished: started.finished
-    });
-
-    // Anchor the countdown to wall-clock time at the moment we start running.
-    reanchorTimer();
-
-    timerInterval = setInterval(reconcileTimer, CONFIG.TIMER_TICK_INTERVAL || 1000);
-}
-
 // Advance the timer to match real elapsed wall-clock time since the anchor.
-// Called every interval tick AND on powerMonitor 'resume' so the displayed
-// time snaps back to reality immediately after the machine wakes from sleep.
+// Called every interval tick AND on powerMonitor 'resume' so the displayed time
+// snaps back to reality immediately after the machine wakes from sleep. The
+// controller does the arithmetic + event/emit; here we just clear the real
+// interval when it reports the timer finished.
 function reconcileTimer() {
-    if (!timerState.isRunning) { return; }
-
-    const target = timerAnchorRemaining - Math.floor((Date.now() - timerAnchorReal) / 1000);
-    const step = timerState.remainingSeconds - target;
-    // Less than a whole second has elapsed since the last visible decrement.
-    if (step < 1) { return; }
-
-    const { state: nextState, events, finished } = timerEngine.tick(timerState, timerConfig, step);
-
-    // Broadcast events (timer-reached-zero / timer-minute / timer-overrun-minute).
-    // Each fires at most once per reconcile, even when the step spans many seconds.
-    for (const eventName of events) {
-        broadcastEvent(eventName);
-    }
-
-    if (finished) {
-        finishTimer(nextState.remainingSeconds);
-        return;
-    }
-
-    emitTimerState({
-        remainingSeconds: nextState.remainingSeconds,
-        finished: false
-    });
+    if (timerController.reconcile()) { clearTimerInterval(); }
 }
 
 // Единые функции управления таймером (используются из timer-command и timer-control)
 function handleTimerStart() {
-    if (timerState.remainingSeconds <= 0 && !timerConfig.allowNegative) {
-        finishTimer();
-        return;
+    // Mirrors the old handleTimerStart()/startTimer() split exactly. The
+    // remaining<=0 && !allowNegative → finish path runs INSIDE controller.start()
+    // before any state/interval guard (returns false in that case). The old
+    // `if (isRunning || timerInterval) return` double-run guard lives here: when
+    // a real interval is already counting, controller.start() returns false
+    // (state isRunning), so no second interval is created.
+    if (timerController.start()) {
+        clearTimerInterval(); // belt-and-suspenders: never leak a prior interval
+        timerInterval = setInterval(reconcileTimer, CONFIG.TIMER_TICK_INTERVAL || 1000);
     }
-    startTimer();
 }
 
 function handleTimerPause() {
     clearTimerInterval();
-    const paused = timerEngine.pause(timerState);
-    emitTimerState({
-        isRunning: paused.isRunning,
-        isPaused: paused.isPaused,
-        finished: paused.finished
-    });
+    timerController.pause();
 }
 
-// Race guard — prevent concurrent reset requests from overlapping
-let isResetting = false;
 function handleTimerReset() {
-    if (isResetting) { return; }
-    isResetting = true;
-    try {
-        clearTimerInterval();
-        const resetState = timerEngine.reset(timerState);
-        emitTimerState({
-            totalSeconds: resetState.totalSeconds,
-            remainingSeconds: resetState.remainingSeconds,
-            isRunning: resetState.isRunning,
-            isPaused: resetState.isPaused,
-            finished: resetState.finished
-        });
-    } finally {
-        setTimeout(() => { isResetting = false; }, 100);
-    }
+    clearTimerInterval();
+    timerController.reset();
 }
 
 function createControlWindow() {
@@ -788,9 +710,14 @@ app.whenReady().then(() => {
     const hasRecovery = recovery.isRecoveryValid(saved, Date.now());
     if (hasRecovery) {
         log.info(`Recovery candidate found (age ${Math.round((Date.now() - saved.savedAt) / 1000)}s)`);
-        timerState.presetSeconds = saved.presetSeconds;
-        if (Number.isFinite(saved.totalSeconds)) { timerState.totalSeconds = saved.totalSeconds; }
-        if (Number.isFinite(saved.remainingSeconds)) { timerState.remainingSeconds = saved.remainingSeconds; }
+        // Restore the snapshot into the controller (preset always, total/remaining
+        // only when finite). No emit/counter bump — nothing is listening yet.
+        timerController.restoreState({
+            presetSeconds: saved.presetSeconds,
+            totalSeconds: saved.totalSeconds,
+            remainingSeconds: saved.remainingSeconds
+        });
+        timerState = timerController.getState();
         // control window may also offer an explicit resume via timer-recovery-available
     }
 
@@ -847,62 +774,28 @@ app.on('window-all-closed', () => {
 
 // IPC обработчики для синхронизации
 ipcMain.on('timer-command', (_event, payload = {}) => {
-    const { type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes } = payload;
+    const { type, seconds, deltaSeconds } = payload;
 
-    // Обновляем конфиг до выполнения команды
-    let configChanged = false;
-
-    if (typeof allowNegative === 'boolean') {
-        if (timerConfig.allowNegative !== allowNegative) {
-            timerConfig = { ...timerConfig, allowNegative };
-            configChanged = true;
-        }
-    }
-    if (overrunLimitSeconds !== null && overrunLimitSeconds !== undefined) {
-        const limitNum = Number(overrunLimitSeconds);
-        const newLimit = Number.isFinite(limitNum) ? Math.max(0, limitNum) : 0;
-        if (timerConfig.overrunLimitSeconds !== newLimit) {
-            timerConfig = { ...timerConfig, overrunLimitSeconds: newLimit };
-            configChanged = true;
-        }
-    }
-    if (overrunIntervalMinutes !== null && overrunIntervalMinutes !== undefined) {
-        const intervalNum = Number(overrunIntervalMinutes);
-        const newVal = Number.isFinite(intervalNum) ? Math.max(1, intervalNum) : 1;
-        if (timerConfig.overrunIntervalMinutes !== newVal) {
-            timerConfig = { ...timerConfig, overrunIntervalMinutes: newVal };
-            configChanged = true;
-        }
-    }
+    // Обновляем конфиг до выполнения команды (Number.isFinite guards live in
+    // the controller's setConfig, which returns whether anything changed).
+    const configChanged = timerController.setConfig(payload);
 
     // Отслеживаем, сделал ли switch emit (чтобы не дублировать)
     let emittedByCommand = false;
 
     switch (type) {
         case 'set': {
-            if (timerState.isRunning) {break;}
-            const presetState = timerEngine.setPreset(timerState, seconds);
-            emitTimerState({
-                totalSeconds: presetState.totalSeconds,
-                remainingSeconds: presetState.remainingSeconds,
-                presetSeconds: presetState.presetSeconds,
-                isRunning: presetState.isRunning,
-                isPaused: presetState.isPaused,
-                finished: presetState.finished
-            });
-            emittedByCommand = true;
+            // setPreset() is a no-op while running (same guard as before); it
+            // reports whether it actually emitted so a config-only change still
+            // gets its own broadcast below.
+            emittedByCommand = timerController.setPreset(seconds);
             break;
         }
         case 'adjust': {
-            const adjustedState = timerEngine.adjust(timerState, deltaSeconds, timerConfig.allowNegative);
-            emitTimerState({
-                totalSeconds: adjustedState.totalSeconds,
-                remainingSeconds: adjustedState.remainingSeconds,
-                finished: adjustedState.finished
-            });
-            // Re-anchor so the wall-clock reconcile continues from the new value
-            // instead of "correcting" the on-the-fly adjustment away on the next tick.
-            if (timerState.isRunning) { reanchorTimer(); }
+            // Re-anchor (when running) is handled inside controller.adjust() so
+            // the wall-clock reconcile continues from the new value instead of
+            // "correcting" the on-the-fly adjustment away on the next tick.
+            timerController.adjust(deltaSeconds);
             emittedByCommand = true;
             break;
         }
