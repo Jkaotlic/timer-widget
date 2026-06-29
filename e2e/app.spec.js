@@ -25,7 +25,7 @@ test('app launches and control window loads', async () => {
 });
 
 test('control window has timer display', async () => {
-    const timerDisplay = await controlWindow.locator('#timerDisplay, .timer-display, [class*="timer"]').first();
+    const timerDisplay = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display, [class*="timer"]').first();
     await expect(timerDisplay).toBeVisible({ timeout: 5000 });
 });
 
@@ -45,7 +45,7 @@ test('clicking preset sets timer value', async () => {
         await preset5.click();
         // Timer display should show 05:00 or 5:00
         await controlWindow.waitForTimeout(500);
-        const display = await controlWindow.locator('#timerDisplay, .timer-display').first();
+        const display = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display').first();
         const text = await display.textContent();
         expect(text).toMatch(/5:00|05:00/);
     }
@@ -66,7 +66,7 @@ test('start/pause timer cycle', async () => {
         await controlWindow.waitForTimeout(1500);
 
         // Timer should be running — display should have changed
-        const display = await controlWindow.locator('#timerDisplay, .timer-display').first();
+        const display = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display').first();
         const text = await display.textContent();
         // Should show time less than 5:00
         expect(text).toMatch(/4:5[89]|04:5[89]/);

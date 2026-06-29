@@ -186,6 +186,12 @@
             transform: translate(-50%, -50%);
             text-align: center;
             pointer-events: none;
+            width: 72%;
+            height: 48%;
+            display: grid;
+            grid-template-rows: 1fr auto 1fr;
+            align-items: center;
+            justify-items: center;
         }
 
         .time-display {
@@ -204,6 +210,7 @@
             transition: color var(--tw-dur-base) var(--tw-ease),
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
+            grid-row: 2;
         }
 
         .time-display[data-status="warning"] {
@@ -224,8 +231,14 @@
            0.25ch gap не даёт минусу слипаться с первой цифрой при тонком шрифте. */
         .time-display .tm-sign {
             display: inline-block;
-            width: 0.6ch;
+            width: 0;
             text-align: right;
+            margin-right: 0;
+            overflow: hidden;
+        }
+
+        .time-display .tm-sign:not(:empty) {
+            width: 0.6ch;
             margin-right: 0.25ch;
         }
 
@@ -236,7 +249,9 @@
 
         /* Status chip — pill, backdrop-blur, 3 semantic tiers */
         .status-badge {
-            margin-top: clamp(4px, 2vh, 16px);
+            grid-row: 3;
+            align-self: start;
+            margin-top: clamp(6px, 2vh, 16px);
             padding: clamp(4px, 1.5vh, 10px) clamp(10px, 4vw, 24px);
             border-radius: var(--tw-r-pill);
             font-size: clamp(0.5rem, min(3vw, 3vh), 5rem);
@@ -410,7 +425,6 @@
             height: 6px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--tw-blue), var(--tw-green));
-            box-shadow: 0 0 8px rgba(10, 132, 255, 0.6);
         }
         /* Status colors for separator dots — must override background, not color,
            because the dots are painted by pseudo-elements. data-status is set by
@@ -418,14 +432,12 @@
         .widget-flip-separator[data-status="warning"]::before,
         .widget-flip-separator[data-status="warning"]::after {
             background: var(--tw-yellow);
-            box-shadow: 0 0 8px rgba(255, 193, 7, 0.55);
         }
         .widget-flip-separator[data-status="danger"]::before,
         .widget-flip-separator[data-status="danger"]::after,
         .widget-flip-separator[data-status="overtime"]::before,
         .widget-flip-separator[data-status="overtime"]::after {
             background: #ff4444;
-            box-shadow: 0 0 8px rgba(255, 68, 68, 0.6);
         }
 
         .widget-flip-minus {
@@ -1091,12 +1103,30 @@
                 this.progressBar.style.strokeDashoffset = this.circumference;
             }
 
+            isWindowDragTarget(target) {
+                return !!(
+                    target
+                    && typeof target.closest === 'function'
+                    && !target.closest('button, input, select, textarea, [role="button"], [tabindex]')
+                );
+            }
+
             setupEventListeners() {
                 // JS-based window drag (replaces -webkit-app-region: drag)
                 let isDragging = false;
                 let dragStartX = 0, dragStartY = 0;
 
                 this._handlers.onContainerMouseDown = (e) => {
+                    if (
+                        e.button !== 0
+                        || e.altKey
+                        || e.ctrlKey
+                        || e.metaKey
+                        || e.shiftKey
+                        || !this.isWindowDragTarget(e.target)
+                    ) {
+                        return;
+                    }
                     isDragging = true;
                     dragStartX = e.screenX;
                     dragStartY = e.screenY;
@@ -1299,15 +1329,18 @@
                 const clockCenter = document.getElementById('widgetClockCenter');
                 const analogDigital = document.getElementById('widgetAnalogDigital');
                 if (progressColor && secondHand) {
-                    secondHand.style.background =
+                    this._baseSecondHandBg =
                         `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
+                    secondHand.style.background = this._baseSecondHandBg;
                 }
                 if (timerColor && clockCenter) {
-                    clockCenter.style.background = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
+                    this._baseCenterBg = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
+                    clockCenter.style.background = this._baseCenterBg;
                     clockCenter.style.boxShadow = '';
                 }
                 if (timerColor && analogDigital) {
-                    analogDigital.style.color = `${timerColor}b3`;
+                    this._baseAnalogDigitalColor = `${timerColor}b3`;
+                    analogDigital.style.color = this._baseAnalogDigitalColor;
                     analogDigital.style.textShadow = `0 0 10px ${timerColor}4d`;
                 }
             }
@@ -1776,6 +1809,16 @@
                     }
                     if (this.widgetAnalogDigital) {
                         this.widgetAnalogDigital.style.color = 'rgba(255,69,58,0.7)';
+                    }
+                } else {
+                    if (this.widgetHandSecond) {
+                        this.widgetHandSecond.style.background = this._baseSecondHandBg || '';
+                    }
+                    if (this.widgetClockCenter) {
+                        this.widgetClockCenter.style.background = this._baseCenterBg || '';
+                    }
+                    if (this.widgetAnalogDigital) {
+                        this.widgetAnalogDigital.style.color = this._baseAnalogDigitalColor || '';
                     }
                 }
             }

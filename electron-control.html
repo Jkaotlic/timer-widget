@@ -46,12 +46,7 @@
             color: var(--tw-fg);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            /* Solid dark base so the panel reads as dark glass even during the
-               brief gap before `.control-window` on <body> paints its gradient.
-               Without this, the white BrowserWindow surface shows through the
-               translucent .control-panel (`rgba(28,28,30,0.72)`) → the whole
-               UI looks like a light theme. Matches design-tokens --tw-bg-void. */
-            background: #000000;
+            background: transparent;
         }
 
         /* Subtle noise texture for glass depth */
@@ -62,15 +57,14 @@
             z-index: 9999;
             pointer-events: none;
             opacity: 0.03;
+            border-radius: var(--tw-r-2xl);
+            clip-path: inset(0 round var(--tw-r-2xl));
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
             background-repeat: repeat;
         }
 
         .control-window {
-            background: var(--tw-bg-void);
-            background-image:
-                radial-gradient(ellipse at 30% 20%, rgba(88, 86, 214, 0.18) 0%, transparent 55%),
-                radial-gradient(ellipse at 70% 80%, rgba(0, 122, 255, 0.12) 0%, transparent 55%);
+            background: transparent;
             height: 100vh;
             padding: 0;
             overflow: hidden;
@@ -86,40 +80,70 @@
             display: grid;
             grid-template-columns: 1fr;
             grid-template-rows: 1fr;
+            --drawer-width: 336px;
+            --control-panel-width: 400px;
             min-height: 100vh;
             width: 100%;
             position: relative;
-            overflow: hidden;
+            overflow: visible;
+            padding: 0;
         }
-        .control-panel {
-            background: var(--tw-bg-surface);
+        .app-shell {
+            isolation: isolate;
+        }
+        .app-shell::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            border-radius: var(--tw-r-2xl);
+            background:
+                radial-gradient(ellipse at 30% 20%, rgba(88, 86, 214, 0.18) 0%, transparent 55%),
+                radial-gradient(ellipse at 70% 80%, rgba(0, 122, 255, 0.12) 0%, transparent 55%),
+                var(--tw-bg-surface-solid);
+            border: 1px solid var(--tw-border);
+            box-shadow: var(--tw-shadow-panel);
             backdrop-filter: var(--tw-blur);
             -webkit-backdrop-filter: var(--tw-blur);
+            pointer-events: none;
+        }
+        .control-panel {
+            background: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
             border-radius: var(--tw-r-2xl);
-            border: 1px solid var(--tw-border);
+            border: 0;
             padding: 0;
-            box-shadow: var(--tw-shadow-panel);
+            box-shadow: none;
             min-width: 0;
             width: 100%;
             max-width: 560px;
             justify-self: center;
             align-self: center;
-            margin: 8px;
+            margin: 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             height: max-content;
-            max-height: calc(100vh - 16px);
+            max-height: 100vh;
+            position: relative;
+            z-index: 1;
         }
         /* When drawer is open, panel docks to the left so the two sit side-by-side.
            Main guarantees the control window is wide enough (~716px) before opening
            the drawer, so the old narrow-mode overlay + backdrop is unreachable. */
         .app-shell.drawer-open .control-panel {
             justify-self: start;
+            margin: 0;
+            width: var(--control-panel-width);
+            max-width: var(--control-panel-width);
+            border-right: 1px solid var(--tw-divider);
+            border-radius: var(--tw-r-2xl) 0 0 var(--tw-r-2xl);
         }
         @media (min-width: 700px) {
             .app-shell.drawer-open .control-panel {
-                max-width: calc(100vw - clamp(300px, 32vw, 360px) - 24px);
+                width: var(--control-panel-width);
+                max-width: var(--control-panel-width);
             }
         }
 
@@ -134,30 +158,46 @@
             top: 8px;
             right: 8px;
             bottom: 8px;
-            width: clamp(300px, 32vw, 360px);
-            max-width: calc(100vw - 16px);
+            width: 0;
+            max-width: 0;
             min-width: 0;
             background: rgba(22, 22, 28, 0.72);
             backdrop-filter: blur(40px) saturate(180%);
             -webkit-backdrop-filter: blur(40px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid transparent;
             border-radius: 22px;
-            box-shadow:
-                0 0 0 0.5px rgba(255, 255, 255, 0.04),
-                0 24px 60px rgba(0, 0, 0, 0.55),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            box-shadow: none;
             display: flex;
             flex-direction: column;
             opacity: 0;
-            transform: translateX(calc(100% + 16px));
-            transition: opacity 200ms var(--tw-ease), transform 240ms var(--tw-ease-out);
+            visibility: hidden;
+            transform: translateX(8px);
+            transition:
+                opacity 200ms var(--tw-ease),
+                transform 240ms var(--tw-ease-out),
+                visibility 0s linear 240ms;
             pointer-events: none;
             overflow: hidden;
             z-index: 50;
         }
         .settings-drawer.open {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: var(--drawer-width);
+            max-width: var(--drawer-width);
+            background: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+            border: 0;
+            border-radius: 0 var(--tw-r-2xl) var(--tw-r-2xl) 0;
+            box-shadow: none;
             opacity: 1;
+            visibility: visible;
             transform: translateX(0);
+            transition:
+                opacity 200ms var(--tw-ease),
+                transform 240ms var(--tw-ease-out);
             pointer-events: auto;
         }
         .drawer-head {
@@ -336,8 +376,13 @@
         }
 
         /* Custom titlebar — traffic light style */
-        .custom-titlebar {
+        .custom-titlebar,
+        .timer-header {
+            app-region: drag;
             -webkit-app-region: drag;
+            user-select: none;
+        }
+        .custom-titlebar {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -351,6 +396,7 @@
         .custom-titlebar .titlebar-right {
             display: flex;
             gap: var(--tw-s-2);
+            app-region: no-drag;
             -webkit-app-region: no-drag;
             min-width: 52px;
             justify-content: flex-end;
@@ -389,6 +435,7 @@
         .custom-titlebar .window-controls {
             display: flex;
             gap: 7px;
+            app-region: no-drag;
             -webkit-app-region: no-drag;
         }
         .custom-titlebar .win-btn {
@@ -471,8 +518,14 @@
            glued — add ~0.25ch of breathing room. */
         .timer-display-main .tm-sign {
             display: inline-block;
-            width: 0.6ch;
+            width: 0;
             text-align: right;
+            margin-right: 0;
+            overflow: hidden;
+        }
+
+        .timer-display-main .tm-sign:not(:empty) {
+            width: 0.6ch;
             margin-right: 0.25ch;
         }
 
@@ -760,8 +813,8 @@
         .sound-item {
             display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 7px 8px;
+            gap: 5px;
+            padding: 7px;
             background: rgba(0, 0, 0, 0.28);
             border: 1px solid rgba(255, 255, 255, 0.04);
             border-radius: 10px;
@@ -770,8 +823,8 @@
         .sound-check {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            flex: 0 0 88px;
+            gap: 5px;
+            flex: 0 0 96px;
             min-width: 0;
             font-size: 12px;
             color: rgba(255, 255, 255, 0.88);
@@ -794,7 +847,7 @@
         }
         .sound-item .select-wrap { flex: 1 1 auto; min-width: 0; }
         .sound-item .sound-select {
-            padding: 7px 26px 7px 10px;
+            padding: 7px 22px 7px 9px;
             font-size: 12px;
             border-radius: 9px;
             width: 100%;
@@ -2412,7 +2465,7 @@
 
         .quick-windows {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
         }
 
@@ -2441,6 +2494,7 @@
             letter-spacing: 0.1px;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
             min-width: 0;
+            overflow: hidden;
         }
 
         .quick-window-btn .qw-icon {
@@ -2461,8 +2515,10 @@
         }
         .quick-window-btn .qw-label {
             font-size: var(--tw-t-caption);
+            min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .quick-window-btn.sound.muted {
@@ -2650,6 +2706,7 @@
             transition: background var(--tw-dur-base) var(--tw-ease);
             backdrop-filter: var(--tw-blur-xs);
             z-index: 100;
+            app-region: no-drag;
             -webkit-app-region: no-drag;
         }
 
@@ -3202,7 +3259,8 @@
         }
 
         @media (max-width: 380px) {
-            .control-panel { width: calc(100% - 8px); margin: 4px auto; }
+            .app-shell { padding: 0; }
+            .control-panel { width: 100%; margin: 0 auto; }
             .timer-header h1 { font-size: 10px; }
             .quick-preset { padding: 4px 6px; font-size: 10px; }
             .quick-window-btn { font-size: var(--tw-t-tiny); padding: 6px; }
@@ -3233,7 +3291,7 @@
         }
 
         @media (min-width: 500px) {
-            .control-panel { margin: 12px; }
+            .control-panel { margin: 0; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -3266,7 +3324,7 @@
         .timer-header { padding: 10px 14px 8px; }
         .timer-header h1 { margin: 0 0 4px 0; font-size: 10px; }
         .timer-display-main {
-            font-size: clamp(46px, 9.5vw, 60px);
+            font-size: 58px;
             margin-bottom: 6px;
         }
         .timer-status { padding: 3px 10px; font-size: 10px; letter-spacing: 0.6px; }
@@ -3302,8 +3360,8 @@
         .quick-window-btn {
             flex-direction: row;
             justify-content: center;
-            padding: 7px 8px;
-            gap: 6px;
+            padding: 7px 6px;
+            gap: 5px;
             font-size: 11px;
             min-height: 0;
         }
@@ -3312,7 +3370,7 @@
 
         .tab-btn { padding: 7px 6px; font-size: 11px; }
 
-        .footer-hints { padding: 5px 12px 3px; margin-top: 4px; font-size: 10px; }
+        .footer-hints { padding: 6px 12px 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
 
         /* Drawer — compact head & body padding for narrow drawer widths */
         .drawer-head { padding: 10px 14px 8px; }
@@ -3402,7 +3460,7 @@
             <div class="quick-windows">
                 <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)"><span class="qw-icon">⏱</span><span class="qw-label">Виджет</span></button>
                 <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)"><span class="qw-icon">🕐</span><span class="qw-label">Часы</span></button>
-                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon">🖥</span><span class="qw-label">Полноэкранный</span></button>
+                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon">🖥</span><span class="qw-label">Дисплей</span></button>
             </div>
         </div>
         <!-- Hidden sound toggle for JS compatibility -->
@@ -4142,6 +4200,7 @@
     <script src="constants.js"></script>
     <script src="security.js"></script>
     <script src="utils.js"></script>
+    <script src="renderer-storage.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -4496,13 +4555,17 @@
                     // Capture current outer width so close can restore exactly.
                     const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                     this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || baseDefault;
+                    const shell = document.querySelector('.app-shell');
+                    if (shell) {
+                        const panelWidth = Math.round(this._baseWidthBeforeDrawer || baseDefault);
+                        shell.style.setProperty('--control-panel-width', `${panelWidth}px`);
+                    }
                     // Drawer-операция меняет только ширину — высоту main оставит
                     // как есть (иначе ручная высота, выставленная юзером,
                     // перезаписывалась innerHeight с HiDPI-дрейфом).
                     ipcRenderer.send('resize-control-window', {
                         width: this._baseWidthBeforeDrawer + this._drawerExtraWidth
                     });
-                    const shell = document.querySelector('.app-shell');
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
                             if (shell) { shell.classList.add('drawer-open'); }
@@ -4534,7 +4597,10 @@
                     if (this.settingsDrawerEl.classList.contains('open')) { return; }
                     const clearDrawerOpen = () => {
                         if (this.settingsDrawerEl.classList.contains('open')) { return; }
-                        if (shell) { shell.classList.remove('drawer-open'); }
+                        if (shell) {
+                            shell.classList.remove('drawer-open');
+                            shell.style.removeProperty('--control-panel-width');
+                        }
                     };
                     const onResize = () => {
                         window.removeEventListener('resize', onResize);
@@ -4881,11 +4947,13 @@
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
                     this.updateClockAnalogNumbersVisibility();
+                    this.saveExtSettings();
                 });
-                
+
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
                     ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: parseInt(this.timerScaleEl.value), showTicks: this.widgetShowTicksEl?.checked ?? false });
+                    this.saveExtSettings();
                 });
 
                 // Display-specific style/scale (Полноэкранный tab)
@@ -4945,6 +5013,7 @@
                     30, 600, 100,
                     (val) => {
                         ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: val, showTicks: this.widgetShowTicksEl?.checked ?? false });
+                        this.saveExtSettings();
                     }
                 );
 
@@ -5370,9 +5439,9 @@
                 this.timeBlocksScaleEl.value = ext.timeBlocksScale || 100;
                 this.timeBlocksScaleValueEl.textContent = (ext.timeBlocksScale || 100) + '%';
                 
-                this.timerStyleEl.value = ext.timerStyle || 'circle';
-                this.timerScaleEl.value = ext.timerScale || 100;
-                this.timerScaleValueEl.textContent = (ext.timerScale || 100) + '%';
+                this.timerStyleEl.value = ext.widgetTimerStyle || ext.timerStyle || 'circle';
+                this.timerScaleEl.value = ext.widgetTimerScale || ext.timerScale || 100;
+                this.timerScaleValueEl.textContent = (ext.widgetTimerScale || ext.timerScale || 100) + '%';
 
                 // Display-specific style/scale (defaults to same as widget)
                 if (this.displayTimerStyleEl) {
@@ -5476,8 +5545,14 @@
                     eventTime: this.eventTimeInputEl.value,
                     endTime: this.endTimeInputEl.value,
                     timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
-                    timerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
-                    timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
+                    // Per-window style/scale (widget and display kept separate)
+                    widgetTimerStyle: this.timerStyleEl.value,
+                    widgetTimerScale: parseInt(this.timerScaleEl.value),
+                    displayTimerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
+                    displayTimerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
+                    // Legacy keys (backward read-compat) = widget values
+                    timerStyle: this.timerStyleEl.value,
+                    timerScale: parseInt(this.timerScaleEl.value),
                     // Настройки стиля часов
                     syncClockStyle: this.syncClockStyle,
                     clockStyle: this.clockStyleEl.value
@@ -5605,6 +5680,7 @@
 
                     const wasRunningBefore = this.isRunning;
                     const wasFinishedBefore = this.wasFinished;
+                    const wasPausedBefore = this.isPaused;
                     this.totalSeconds = state.totalSeconds;
                     this.remainingSeconds = state.remainingSeconds;
                     this.isRunning = state.isRunning;
@@ -5614,8 +5690,8 @@
                     this.updateDisplay();
                     this.updateControls();
 
-                    // Звук старта при запуске из другого окна
-                    if (!wasRunningBefore && state.isRunning) {
+                    // Звук старта при запуске из другого окна (только холодный старт, не возобновление из паузы)
+                    if (!wasRunningBefore && !wasPausedBefore && state.isRunning) {
                         if (this._localStartTriggered) {
                             this._localStartTriggered = false;
                         } else if (this.soundStartEl.checked) {
@@ -5708,7 +5784,8 @@
                 }
                 this._localStartTriggered = true;
                 this.sendCommand('start');
-                if (this.soundStartEl.checked) this.playSound('start');
+                // Не проигрываем звук старта при возобновлении из паузы (this.isPaused ещё отражает прежнее состояние)
+                if (!this.isPaused && this.soundStartEl.checked) this.playSound('start');
             }
 
             pause() {
@@ -5839,8 +5916,8 @@
 
                 const panel = document.querySelector('.control-panel');
                 const contentHeight = panel.scrollHeight;
-                const margin = 16; // margin: 8px auto (top + bottom)
-                const extra = 40; // заголовок окна Windows + запас
+                const margin = 0; // shell is edge-to-edge; no transparent safe-area card
+                const extra = 48; // titlebar/compositor breathing room
 
                 const neededHeight = Math.ceil(contentHeight + margin + extra);
 
@@ -6460,7 +6537,23 @@
                         ? customSounds.map(s => s.name === name ? { ...s, data: base64 } : s)
                         : [...customSounds, { name, data: base64 }];
 
-                    localStorage.setItem('customSounds', JSON.stringify(updated));
+                    const storageResult = window.RendererStorage.safeSetJSON(
+                        localStorage,
+                        'customSounds',
+                        updated,
+                        { limitBytes: 4 * 1024 * 1024 }
+                    );
+                    if (!storageResult.ok) {
+                        const message = storageResult.reason === 'too-large'
+                            ? 'Суммарный размер пользовательских звуков слишком большой'
+                            : 'Не удалось сохранить звук: хранилище переполнено';
+                        Toast.show(message, 'error');
+                        this.showSoundUploadError(
+                            'Не удалось сохранить звук',
+                            message
+                        );
+                        return;
+                    }
                     this.loadCustomSounds();
                 };
                 reader.onerror = () => {
@@ -6591,7 +6684,16 @@
             deleteCustomSound(name) {
                 const customSounds = safeJSONParse(localStorage.getItem('customSounds'), []);
                 const filtered = customSounds.filter(s => s.name !== name);
-                localStorage.setItem('customSounds', JSON.stringify(filtered));
+                const storageResult = window.RendererStorage.safeSetJSON(
+                    localStorage,
+                    'customSounds',
+                    filtered,
+                    { limitBytes: 4 * 1024 * 1024 }
+                );
+                if (!storageResult.ok) {
+                    Toast.show('Не удалось обновить список звуков', 'error');
+                    return;
+                }
                 this.loadCustomSounds();
             }
 
@@ -7186,6 +7288,12 @@
                 'background: rgba(0,0,0,0.7); display: flex; align-items: center;' +
                 'justify-content: center; z-index: 10000;';
 
+            // Centralized teardown: remove overlay AND its document keydown listener
+            const closeOverlay = () => {
+                overlay.remove();
+                document.removeEventListener('keydown', _onOverlayKey);
+            };
+
             const panel = document.createElement('div');
             panel.style.cssText = 'background: white; padding: 20px; border-radius: 10px; max-width: 400px;';
 
@@ -7222,17 +7330,16 @@
             closeBtn.setAttribute('aria-label', 'Закрыть');
             closeBtn.style.cssText = 'margin-top: 15px; padding: 8px 20px; background: #4CAF50;' +
                 'color: white; border: none; border-radius: 5px; cursor: pointer;';
-            closeBtn.addEventListener('click', () => overlay.remove());
+            closeBtn.addEventListener('click', () => closeOverlay());
             panel.appendChild(closeBtn);
 
             overlay.appendChild(panel);
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) { overlay.remove(); }
+                if (e.target === overlay) { closeOverlay(); }
             });
             const _onOverlayKey = (e) => {
                 if (e.key === 'Escape') {
-                    overlay.remove();
-                    document.removeEventListener('keydown', _onOverlayKey);
+                    closeOverlay();
                 }
             };
             document.addEventListener('keydown', _onOverlayKey);

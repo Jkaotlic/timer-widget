@@ -141,6 +141,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
+            width: 72%;
+            height: 72%;
             transform: translate(-50%, -50%);
             text-align: center;
             pointer-events: none;
@@ -162,6 +164,10 @@
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
             line-height: 1;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
         }
 
         /* Superscript seconds — kit recipe for circle style.
@@ -199,6 +205,15 @@
             border: 1px solid var(--tw-border);
             transition: background var(--tw-dur-slow) var(--tw-ease),
                         color var(--tw-dur-slow) var(--tw-ease);
+            white-space: nowrap;
+        }
+
+        .center-content > .date-badge {
+            position: absolute;
+            left: 50%;
+            top: calc(50% + clamp(22px, 10vh, 90px));
+            transform: translateX(-50%);
+            margin-top: 0;
         }
 
         /* Digital: LED-style date plate on dark enclosure */
@@ -242,6 +257,15 @@
             transition: background var(--tw-dur-slow) var(--tw-ease),
                         color var(--tw-dur-slow) var(--tw-ease);
             display: none;
+            white-space: nowrap;
+        }
+
+        .center-content > .timezone-badge {
+            position: absolute;
+            left: 50%;
+            top: calc(50% + clamp(44px, 15vh, 150px));
+            transform: translateX(-50%);
+            margin-top: 0;
         }
 
         .timezone-badge.visible {
@@ -281,6 +305,7 @@
             gap: clamp(6px, 2vw, 16px);
             opacity: 0;
             transition: opacity var(--tw-dur-base) var(--tw-ease);
+            app-region: no-drag;
             -webkit-app-region: no-drag;
             z-index: 100;
             pointer-events: none;
@@ -302,6 +327,7 @@
             backdrop-filter: var(--tw-blur-xs);
             color: var(--tw-fg);
             pointer-events: auto;
+            app-region: no-drag;
             -webkit-app-region: no-drag;
             font-size: clamp(10px, min(3vw, 3vh), 18px);
             cursor: pointer;
@@ -347,6 +373,7 @@
                         transform var(--tw-dur-base) var(--tw-ease);
             border: 1px solid var(--tw-border);
             z-index: 1000;
+            app-region: no-drag;
             -webkit-app-region: no-drag;
             box-shadow: var(--tw-shadow-inner-top);
         }
@@ -1436,12 +1463,30 @@
                 localStorage.setItem('clockColors', JSON.stringify(colors));
             }
 
+            isWindowDragTarget(target) {
+                return !!(
+                    target
+                    && typeof target.closest === 'function'
+                    && !target.closest('button, input, select, textarea, [role="button"], [tabindex], .controls-overlay, .settings-panel')
+                );
+            }
+
             setupEventListeners() {
                 // JS-based window drag (replaces -webkit-app-region: drag)
                 let isDragging = false;
                 let dragStartX = 0, dragStartY = 0;
 
                 this._handlers.onContainerMouseDown = (e) => {
+                    if (
+                        e.button !== 0
+                        || e.altKey
+                        || e.ctrlKey
+                        || e.metaKey
+                        || e.shiftKey
+                        || !this.isWindowDragTarget(e.target)
+                    ) {
+                        return;
+                    }
                     isDragging = true;
                     dragStartX = e.screenX;
                     dragStartY = e.screenY;

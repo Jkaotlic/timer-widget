@@ -50,6 +50,31 @@ function saveTimerStateToFile(userDataPath, timerState, logger) {
 }
 
 /**
+ * Write timer state to disk SYNCHRONOUSLY — for crash handlers
+ * (uncaughtException / unhandledRejection) where the process may terminate
+ * before an async write flushes. The periodic 10s save stays async (above).
+ *
+ * @param {string} userDataPath
+ * @param {object} timerState
+ * @param {object} [logger]
+ */
+function saveTimerStateToFileSync(userDataPath, timerState, logger) {
+    try {
+        const statePath = getRecoveryStatePath(userDataPath);
+        const data = JSON.stringify({
+            totalSeconds: timerState.totalSeconds,
+            remainingSeconds: timerState.remainingSeconds,
+            presetSeconds: timerState.presetSeconds,
+            isRunning: timerState.isRunning,
+            savedAt: Date.now()
+        });
+        fs.writeFileSync(statePath, data);
+    } catch (err) {
+        if (logger && logger.error) { logger.error('saveTimerStateToFileSync:', err); }
+    }
+}
+
+/**
  * Load saved timer state from disk (sync — runs once at startup).
  * Returns null if no file, stale, or unreadable. Deletes stale files.
  *
@@ -99,6 +124,7 @@ function isRecoveryValid(data, now) {
 module.exports = {
     getRecoveryStatePath,
     saveTimerStateToFile,
+    saveTimerStateToFileSync,
     loadSavedTimerState,
     clearSavedTimerState,
     isRecoveryValid,

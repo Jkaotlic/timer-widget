@@ -17,7 +17,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, dialog, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const log = require('electron-log/main');
@@ -37,11 +37,11 @@ log.info(`TimerWidget starting — version ${app.getVersion()}, platform ${proce
 // Crash handlers
 process.on('uncaughtException', (err) => {
     log.error('UNCAUGHT EXCEPTION:', err && err.stack ? err.stack : err);
-    try { saveTimerStateToFile(); } catch { /* best effort */ }
+    try { saveTimerStateToFileSync(); } catch { /* best effort */ }
 });
 process.on('unhandledRejection', (reason) => {
     log.error('UNHANDLED REJECTION:', reason);
-    try { saveTimerStateToFile(); } catch { /* best effort */ }
+    try { saveTimerStateToFileSync(); } catch { /* best effort */ }
 });
 
 // Chromium phones home by default: Component Updater → update.googleapis.com /
@@ -95,6 +95,18 @@ let timerConfig = {
 };
 let timerInterval = null;
 
+// Wall-clock anchor for drift-free countdown. We never assume exactly one second
+// elapsed per interval fire; instead each fire computes how many whole seconds
+// SHOULD have passed since the anchor and advances the engine by that step. This
+// keeps the timer accurate across event-loop jitter and OS sleep/resume.
+let timerAnchorReal = 0;       // Date.now() captured when the run/anchor began
+let timerAnchorRemaining = 0;  // remainingSeconds at that anchor
+
+function reanchorTimer() {
+    timerAnchorReal = Date.now();
+    timerAnchorRemaining = timerState.remainingSeconds;
+}
+
 // Сохраняем последние настройки дисплея для синхронизации
 let lastDisplaySettings = null;
 let lastDisplayIndex = 'auto';
@@ -120,14 +132,35 @@ function blockZoom(win) {
     win.webContents.setVisualZoomLevelLimits(1, 1);
 }
 
-// Защита от навигации и открытия новых окон
+// Защита от навигации и открытия новых окон.
+// will-navigate ловит обычную навигацию, will-redirect — серверные/meta редиректы,
+// will-frame-navigate — навигацию субфреймов; блокируем всё, что не file://.
 function hardenWindow(win) {
-    win.webContents.on('will-navigate', (event, url) => {
+    const blockNonFile = (event, url) => {
         if (!url.startsWith('file://')) {
             event.preventDefault();
         }
-    });
+    };
+    win.webContents.on('will-navigate', blockNonFile);
+    win.webContents.on('will-redirect', blockNonFile);
+    // will-frame-navigate передаёт WebFrameMain-событие, целевой URL в event.url
+    win.webContents.on('will-frame-navigate', (event) => blockNonFile(event, event.url));
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+}
+
+function isPayloadObject(payload) {
+    return payload !== null && typeof payload === 'object';
+}
+
+// Runtime app icon path. In dev it lives in build/icon.png (buildResources),
+// but build/ is NOT packed into app.asar — so in a packaged build the icon is
+// shipped via electron-builder `extraResources` and resolved from
+// process.resourcesPath. Using __dirname there would point inside the asar
+// where the file doesn't exist (blank tray/window icon).
+function getAppIconPath() {
+    return app.isPackaged
+        ? path.join(process.resourcesPath, 'icon.png')
+        : path.join(__dirname, 'build', 'icon.png');
 }
 
 function clearTimerInterval() {
@@ -202,24 +235,40 @@ function startTimer() {
         finished: started.finished
     });
 
-    timerInterval = setInterval(() => {
-        const { state: nextState, events, finished } = timerEngine.tick(timerState, timerConfig);
+    // Anchor the countdown to wall-clock time at the moment we start running.
+    reanchorTimer();
 
-        // Broadcast events (timer-reached-zero / timer-minute / timer-overrun-minute)
-        for (const eventName of events) {
-            broadcastEvent(eventName);
-        }
+    timerInterval = setInterval(reconcileTimer, CONFIG.TIMER_TICK_INTERVAL || 1000);
+}
 
-        if (finished) {
-            finishTimer(nextState.remainingSeconds);
-            return;
-        }
+// Advance the timer to match real elapsed wall-clock time since the anchor.
+// Called every interval tick AND on powerMonitor 'resume' so the displayed
+// time snaps back to reality immediately after the machine wakes from sleep.
+function reconcileTimer() {
+    if (!timerState.isRunning) { return; }
 
-        emitTimerState({
-            remainingSeconds: nextState.remainingSeconds,
-            finished: false
-        });
-    }, CONFIG.TIMER_TICK_INTERVAL || 1000);
+    const target = timerAnchorRemaining - Math.floor((Date.now() - timerAnchorReal) / 1000);
+    const step = timerState.remainingSeconds - target;
+    // Less than a whole second has elapsed since the last visible decrement.
+    if (step < 1) { return; }
+
+    const { state: nextState, events, finished } = timerEngine.tick(timerState, timerConfig, step);
+
+    // Broadcast events (timer-reached-zero / timer-minute / timer-overrun-minute).
+    // Each fires at most once per reconcile, even when the step spans many seconds.
+    for (const eventName of events) {
+        broadcastEvent(eventName);
+    }
+
+    if (finished) {
+        finishTimer(nextState.remainingSeconds);
+        return;
+    }
+
+    emitTimerState({
+        remainingSeconds: nextState.remainingSeconds,
+        finished: false
+    });
 }
 
 // Единые функции управления таймером (используются из timer-command и timer-control)
@@ -268,43 +317,48 @@ function createControlWindow() {
 
     // Default size of the control panel WITHOUT drawer (drawer adds ~320px when opened).
     // Settings live in the drawer, so the panel itself can be narrow and short.
-    const windowWidth = Math.min(380, Math.max(340, screenWidth - 100));
-    const windowHeight = Math.min(720, Math.max(640, screenHeight - 100));
+    const windowWidth = Math.min(CONFIG.CONTROL_WINDOW_WIDTH, Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, screenWidth - 100));
+    const windowHeight = Math.min(740, Math.max(660, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
-        minWidth: 340,
-        minHeight: 640,
+        minWidth: CONFIG.CONTROL_WINDOW_MIN_WIDTH,
+        minHeight: 660,
         maxWidth: 1200,  // 880 (panel max) + 320 (drawer) leaves room for resize
         maxHeight: 1100,
-        // Control is opaque. Without `backgroundColor`, Electron paints the
-        // window white, and any translucent surface (.control-panel uses
-        // `rgba(28,28,30,0.72)` with backdrop-blur) shows that white through
-        // — the panel renders bright/washed-out instead of dark glass. Match
-        // the darkest stop so glass stays glass.
-        backgroundColor: '#000000',
+        // Keep the control window visually rounded. The dark glass is painted
+        // by electron-control.html inside a rounded shell; the native
+        // BrowserWindow surface must stay transparent so the corners do not
+        // render as a square black rectangle.
+        transparent: !__screenshotMode,
+        backgroundColor: __screenshotMode ? '#000000' : '#00000000',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: true,
-            devTools: false
+            devTools: process.argv.includes('--dev') && !app.isPackaged
         },
         title: 'Управление Таймером',
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: getAppIconPath(),
         frame: false,
+        hasShadow: false,
         resizable: true, // Allow user to resize if needed
         show: !__screenshotMode
     });
 
     controlWindow.loadFile('electron-control.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(controlWindow);
+    bindRenderCrashHandler(controlWindow, 'control');
     bindRenderConsole(controlWindow, 'control');
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
         blockZoom(controlWindow);
+        if (process.argv.includes('--dev') && !app.isPackaged) {
+            controlWindow.webContents.openDevTools({ mode: 'detach' });
+        }
     });
 
     controlWindow.once('ready-to-show', () => {
@@ -340,7 +394,7 @@ function createWidgetWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: true,
-            devTools: false
+            devTools: process.argv.includes('--dev') && !app.isPackaged
         },
         hasShadow: false
     });
@@ -386,7 +440,7 @@ function createClockWidgetWindow() {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: true,
-            devTools: false
+            devTools: process.argv.includes('--dev') && !app.isPackaged
         },
         hasShadow: false
     });
@@ -453,7 +507,7 @@ function createDisplayWindow(displayIndex) {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: true,
-            devTools: false
+            devTools: process.argv.includes('--dev') && !app.isPackaged
         }
     });
 
@@ -469,11 +523,14 @@ function createDisplayWindow(displayIndex) {
 
     const thisWindow = displayWindow;
     displayWindow.on('closed', () => {
-        // Защита от race condition: не обнуляем если уже создано новое окно
+        // Защита от race condition при переключении монитора: если новое окно
+        // дисплея уже заменило это, НЕ обнуляем ref и НЕ шлём isOpen:false —
+        // иначе stale-broadcast перетрёт актуальный isOpen:true нового окна и
+        // рассинхронит тоггл/кнопку D в панели управления.
         if (displayWindow === thisWindow) {
             displayWindow = null;
+            broadcastWindowState('display-window-state', { isOpen: false });
         }
-        broadcastWindowState('display-window-state', { isOpen: false });
     });
 }
 
@@ -486,6 +543,12 @@ function saveTimerStateToFile() {
     return recovery.saveTimerStateToFile(app.getPath('userData'), timerState, log);
 }
 
+// Synchronous variant for crash handlers — guarantees the snapshot hits disk
+// before the handler returns (the async path may not flush before the process dies).
+function saveTimerStateToFileSync() {
+    recovery.saveTimerStateToFileSync(app.getPath('userData'), timerState, log);
+}
+
 function loadSavedTimerState() {
     return recovery.loadSavedTimerState(app.getPath('userData'), log);
 }
@@ -494,9 +557,16 @@ function clearSavedTimerState() {
     recovery.clearSavedTimerState(app.getPath('userData'));
 }
 
-// Persist state every 10 seconds while timer is running
+// Set early so the recovery interval and before-quit can both see it.
+let isQuitting = false;
+
+// Persist state every 10 seconds while timer is running.
+// Keep the id so we can stop it on quit — otherwise a fire during teardown can
+// re-create last-state.json after before-quit already unlinked it (phantom resume).
+let recoverySaveInterval = null;
 if (!__inTestMode) {
-    setInterval(() => {
+    recoverySaveInterval = setInterval(() => {
+        if (isQuitting) { return; }
         if (timerState.isRunning) { saveTimerStateToFile(); }
     }, 10000);
 }
@@ -505,7 +575,6 @@ if (!__inTestMode) {
 // System Tray
 // ============================================================================
 let tray = null;
-let isQuitting = false;
 
 // F-022: cache last-seen booleans; only rebuild Menu when they actually change.
 // Remaining-seconds updates every tick are routed through the tooltip only.
@@ -515,7 +584,7 @@ let _trayLastClockOpen = null;
 
 function createTray() {
     try {
-        const iconPath = path.join(__dirname, 'build', 'icon.png');
+        const iconPath = getAppIconPath();
         const icon = nativeImage.createFromPath(iconPath);
         const trayIcon = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 });
         tray = new Tray(trayIcon);
@@ -652,23 +721,67 @@ function bindRenderConsole(win, label) {
     win.on('responsive', () => log.info(`[renderer:${label}] window responsive again`));
 }
 
-app.on('before-quit', () => { isQuitting = true; clearSavedTimerState(); });
+app.on('before-quit', () => {
+    isQuitting = true;
+    // Stop the periodic save BEFORE unlinking, so an in-flight 10s tick can't
+    // re-create the recovery file after we delete it.
+    if (recoverySaveInterval) { clearInterval(recoverySaveInterval); recoverySaveInterval = null; }
+    clearSavedTimerState();
+});
+
+// Single-instance lock: a tray utility with autostart is easy to launch twice.
+// A duplicate instance would spawn a second tray + timer and race the shared
+// recovery file. Take the primary lock and focus the existing window instead.
+const __singleInstance = __inTestMode || __screenshotMode
+    || typeof app.requestSingleInstanceLock !== 'function'
+    || app.requestSingleInstanceLock();
+if (!__singleInstance) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (!controlWindow) { createControlWindow(); return; }
+        if (controlWindow.isMinimized()) { controlWindow.restore(); }
+        if (!controlWindow.isVisible()) { controlWindow.show(); }
+        controlWindow.focus();
+    });
+}
 
 app.whenReady().then(() => {
+    // Duplicate instance — we already called app.quit() above; do nothing.
+    if (!__singleInstance) { return; }
+
     // Remove default Electron menu (File, Edit, View, Help)
     Menu.setApplicationMenu(null);
 
-    // Recovery check before UI
+    // Snap the countdown back to real time the instant the machine wakes from
+    // sleep (setInterval doesn't fire while suspended). Safe no-op when stopped.
+    try { powerMonitor.on('resume', reconcileTimer); } catch (err) { log.warn('powerMonitor resume hook failed:', err); }
+
+    // Deny every renderer permission request (camera/mic/geo/notifications/…).
+    // This is a purely offline timer — it never needs any web/device permission.
+    // Defense-in-depth on top of sandbox/contextIsolation/CSP/will-navigate.
+    try {
+        const { session } = require('electron');
+        session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+        session.defaultSession.setPermissionCheckHandler(() => false);
+    } catch (err) {
+        log.warn('Permission handler setup failed:', err);
+    }
+
+    // Recovery check before UI. Restore the FULL snapshot (remaining/total/preset)
+    // so a crash mid-countdown comes back with the in-progress time intact. We never
+    // auto-start (isRunning stays false); the timer simply shows where it was paused.
     const saved = loadSavedTimerState();
     const hasRecovery = recovery.isRecoveryValid(saved, Date.now());
     if (hasRecovery) {
         log.info(`Recovery candidate found (age ${Math.round((Date.now() - saved.savedAt) / 1000)}s)`);
         timerState.presetSeconds = saved.presetSeconds;
-        // We don't auto-start — control window will offer resume via IPC timer-recovery-available
+        if (Number.isFinite(saved.totalSeconds)) { timerState.totalSeconds = saved.totalSeconds; }
+        if (Number.isFinite(saved.remainingSeconds)) { timerState.remainingSeconds = saved.remainingSeconds; }
+        // control window may also offer an explicit resume via timer-recovery-available
     }
 
     createControlWindow();
-    bindRenderCrashHandler(controlWindow, 'control');
 
     if (__screenshotMode) {
         const runner = require('./scripts/screenshot-runner');
@@ -733,14 +846,16 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
         }
     }
     if (overrunLimitSeconds !== null && overrunLimitSeconds !== undefined) {
-        const newLimit = Math.max(0, Number(overrunLimitSeconds) || 0);
+        const limitNum = Number(overrunLimitSeconds);
+        const newLimit = Number.isFinite(limitNum) ? Math.max(0, limitNum) : 0;
         if (timerConfig.overrunLimitSeconds !== newLimit) {
             timerConfig = { ...timerConfig, overrunLimitSeconds: newLimit };
             configChanged = true;
         }
     }
     if (overrunIntervalMinutes !== null && overrunIntervalMinutes !== undefined) {
-        const newVal = Math.max(1, Number(overrunIntervalMinutes) || 1);
+        const intervalNum = Number(overrunIntervalMinutes);
+        const newVal = Number.isFinite(intervalNum) ? Math.max(1, intervalNum) : 1;
         if (timerConfig.overrunIntervalMinutes !== newVal) {
             timerConfig = { ...timerConfig, overrunIntervalMinutes: newVal };
             configChanged = true;
@@ -772,6 +887,9 @@ ipcMain.on('timer-command', (_event, payload = {}) => {
                 remainingSeconds: adjustedState.remainingSeconds,
                 finished: adjustedState.finished
             });
+            // Re-anchor so the wall-clock reconcile continues from the new value
+            // instead of "correcting" the on-the-fly adjustment away on the next tick.
+            if (timerState.isRunning) { reanchorTimer(); }
             emittedByCommand = true;
             break;
         }
@@ -815,9 +933,9 @@ ipcMain.on('resize-control-window', (event, size) => {
     const [curW, curH] = controlWindow.getSize();
     const w = Number.isFinite(size.width) ? size.width : curW;
     const h = Number.isFinite(size.height) ? size.height : curH;
-    // Нижний clamp = BrowserWindow min (см. createControlWindow): 340×640.
+    // Нижний clamp = BrowserWindow min (см. createControlWindow).
     const targetWidth = Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, Math.min(w, screenWidth - 50));
-    const targetHeight = Math.max(640, Math.min(h, screenHeight - 50));
+    const targetHeight = Math.max(660, Math.min(h, screenHeight - 50));
 
     // No-op если ничего не меняется — избегаем лишнего setSize (WM на Windows
     // иногда округляет outer на 1px при каждом вызове, что даёт дрейф).
@@ -913,7 +1031,9 @@ ipcMain.on('minimize-window', (event) => {
     if (win) { win.minimize(); }
 });
 
-ipcMain.on('display-move', (_event, { deltaX, deltaY }) => {
+ipcMain.on('display-move', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { deltaX, deltaY } = payload;
     if (displayWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
         const [currentX, currentY] = displayWindow.getPosition();
         displayWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
@@ -979,7 +1099,9 @@ ipcMain.on('close-clock-widget', () => {
     }
 });
 
-ipcMain.on('clock-widget-resize', (_event, { width, height }) => {
+ipcMain.on('clock-widget-resize', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { width, height } = payload;
     if (clockWidgetWindow && !clockWidgetWindow.isDestroyed()) {
         const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
         const w = Math.max(100, Math.min(screenW, Number(width) || 220));
@@ -990,7 +1112,9 @@ ipcMain.on('clock-widget-resize', (_event, { width, height }) => {
 
 
 
-ipcMain.on('clock-widget-move', (_event, { deltaX, deltaY }) => {
+ipcMain.on('clock-widget-move', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { deltaX, deltaY } = payload;
     if (clockWidgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
         const [currentX, currentY] = clockWidgetWindow.getPosition();
         clockWidgetWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
@@ -1064,13 +1188,16 @@ ipcMain.on('widget-set-opacity', (event, opacity) => {
     }
 });
 
-ipcMain.on('widget-set-position', (event, { x, y }) => {
+ipcMain.on('widget-set-position', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { x, y } = payload;
     if (widgetWindow && Number.isFinite(x) && Number.isFinite(y)) {
         widgetWindow.setPosition(Math.round(x), Math.round(y));
     }
 });
 
 ipcMain.on('widget-resize', (_event, data) => {
+    if (!isPayloadObject(data)) { return; }
     if (widgetWindow && !widgetWindow.isDestroyed()) {
         const { width, height } = data;
         const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
@@ -1082,7 +1209,9 @@ ipcMain.on('widget-resize', (_event, data) => {
 
 
 
-ipcMain.on('widget-move', (event, { deltaX, deltaY }) => {
+ipcMain.on('widget-move', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { deltaX, deltaY } = payload;
     if (widgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
         const [currentX, currentY] = widgetWindow.getPosition();
         widgetWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);

@@ -86,6 +86,26 @@ test('every <link>/<script src> in HTML is listed in package.json build.files', 
     assert.deepStrictEqual(missing, [], missing.join('\n'));
 });
 
+test('runtime app icon (build/icon.png) ships via extraResources', () => {
+    // electron-main.js loads the icon at runtime from process.resourcesPath when
+    // packaged. That only works if electron-builder copies build/icon.png into the
+    // resources dir via `extraResources`. Guard against the icon silently
+    // disappearing from the packaged app (blank tray/window icon).
+    const mainSrc = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+    if (!/process\.resourcesPath/.test(mainSrc)) {
+        return; // icon not resolved from resources — nothing to guard here
+    }
+    const extra = (pkg.build && pkg.build.extraResources) || [];
+    const flat = extra.map((e) => (typeof e === 'string' ? e : (e && (e.from || e.filter)) || ''));
+    const covered = flat.some((p) => String(p).replace(/\\/g, '/').includes('build/icon.png') || String(p).includes('build'));
+    assert.ok(
+        covered,
+        'electron-main.js reads the icon from process.resourcesPath but build/icon.png is not in package.json build.extraResources'
+    );
+    // And the source file must actually exist to be copied.
+    assert.ok(fs.existsSync(path.join(repoRoot, 'build', 'icon.png')), 'build/icon.png missing on disk');
+});
+
 test('every local require() in main-process JS is listed in package.json build.files', () => {
     const mainJsFiles = [
         'electron-main.js',

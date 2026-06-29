@@ -705,7 +705,11 @@ class DisplayTimer {
             this._baseTimerColor = timerColor;
             this._baseTimerGlow = `0 0 20px ${timerColor}, 0 0 40px ${timerColor}, 0 0 80px ${timerColor}66`;
         }
-        if (timerColor && digitalTime && !digitalTime.classList.contains('danger')) {
+        // L7: also skip the 'warning' (yellow) band, not just 'danger', so a color
+        // update while paused in the warning band doesn't overwrite the yellow.
+        if (timerColor && digitalTime
+            && !digitalTime.classList.contains('danger')
+            && !digitalTime.classList.contains('warning')) {
             digitalTime.style.color = timerColor;
             digitalTime.style.textShadow = this._baseTimerGlow;
         }
@@ -719,14 +723,21 @@ class DisplayTimer {
             if (!this._cachedFlipSeparators) {
                 this._cachedFlipSeparators = document.querySelectorAll('.flip-separator');
             }
+            // L7: skip both 'danger' and 'warning' so a color update during the
+            // warning band doesn't overwrite the yellow on flip digits.
             this._cachedFlipDigits.forEach(el => {
-                if (!el.closest('.danger')) {
+                if (!el.closest('.danger') && !el.closest('.warning')) {
                     el.style.color = timerColor;
                 }
             });
-            this._cachedFlipSeparators.forEach(el => {
-                el.style.color = timerColor;
-            });
+            // L6: while in overtime the separators must stay red (only
+            // _enforceOvertimeColors / per-tick methods own that). Keep the cache
+            // populated above, but guard the actual recolor on overtime.
+            if (this.remainingSeconds >= 0) {
+                this._cachedFlipSeparators.forEach(el => {
+                    el.style.color = timerColor;
+                });
+            }
         }
 
         // Info blocks (time blocks) — inherit timer color
@@ -737,20 +748,26 @@ class DisplayTimer {
         }
 
         // Analog style
-        const secondHand = document.getElementById('analogHandSecond');
-        const clockCenter = document.querySelector('.clock-center');
-        const analogDigital = document.getElementById('analogDigitalTime');
-        if (progressColor && secondHand) {
-            secondHand.style.background =
-                `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
-            secondHand.style.boxShadow = `0 0 15px ${progressColor}80`;
-        }
-        if (timerColor && clockCenter) {
-            clockCenter.style.background = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
-            clockCenter.style.boxShadow = `0 0 15px ${timerColor}99`;
-        }
-        if (timerColor && analogDigital) {
-            analogDigital.style.color = `${timerColor}b3`;
+        // L6: while in overtime the second hand / center / analog-digital text must
+        // stay red (owned by _enforceOvertimeColors / per-tick methods). Skip the
+        // unconditional recolor on overtime so a control-panel color change doesn't
+        // revert them while paused in overtime.
+        if (this.remainingSeconds >= 0) {
+            const secondHand = document.getElementById('analogHandSecond');
+            const clockCenter = document.querySelector('.clock-center');
+            const analogDigital = document.getElementById('analogDigitalTime');
+            if (progressColor && secondHand) {
+                secondHand.style.background =
+                    `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
+                secondHand.style.boxShadow = `0 0 15px ${progressColor}80`;
+            }
+            if (timerColor && clockCenter) {
+                clockCenter.style.background = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
+                clockCenter.style.boxShadow = `0 0 15px ${timerColor}99`;
+            }
+            if (timerColor && analogDigital) {
+                analogDigital.style.color = `${timerColor}b3`;
+            }
         }
     }
 
@@ -993,6 +1010,10 @@ class DisplayTimer {
                 this.cache.lastPaused = this.isPaused;
                 this.cache.lastFinished = this.finished;
             }
+            // L6: applyColors (decoupled from ticks) can reset overtime red on
+            // flip separators / analog elements while paused in overtime. Re-enforce
+            // here too — _enforceOvertimeColors no-ops when secs >= 0.
+            this._enforceOvertimeColors(secs);
             return;
         }
 
@@ -1441,6 +1462,14 @@ class DisplayTimer {
 
     // ===== Block Controls: Ctrl+Scale, Alt+Drag =====
 
+    isWindowDragTarget(target) {
+        return !!(
+            target
+            && typeof target.closest === 'function'
+            && !target.closest('.window-controls, .info-block, button, input, select, textarea, [role="button"], [tabindex]')
+        );
+    }
+
     setupBlockControls() {
         const BLOCK_MIN_SCALE = 50;
         const BLOCK_MAX_SCALE = 600;
@@ -1614,8 +1643,8 @@ class DisplayTimer {
 
         this._handlers.windowDragMousedown = (e) => {
             // Only drag when not fullscreen, not Alt (block drag), not on controls/buttons
-            if (e.altKey || e.ctrlKey || e.shiftKey) { return; }
-            if (e.target.closest('.window-controls, .info-block, button')) { return; }
+            if (e.button !== 0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) { return; }
+            if (!this.isWindowDragTarget(e.target)) { return; }
             // Check if window is NOT fullscreen (body width === screen width as heuristic)
             if (window.innerWidth === screen.width && window.innerHeight === screen.height) { return; }
             isWindowDrag = true;
