@@ -974,6 +974,7 @@
     <script src="constants.js"></script>
     <script src="security.js"></script>
     <script src="utils.js"></script>
+    <script src="renderer-shared.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1055,7 +1056,7 @@
                 this.timerStyle = 'circle';
                 
                 // Устанавливаем стиль по умолчанию
-                if (this.circularWidget) this.circularWidget.classList.add('active');
+                if (this.circularWidget) {this.circularWidget.classList.add('active');}
                 
                 // Настраиваем масштабирование для digital и flip
                 this.updateScaling();
@@ -1214,7 +1215,7 @@
                     e.preventDefault();
                     const step = 10;
                     const delta = e.deltaY < 0 ? step : -step;
-                    const newPct = Math.max(WIDGET_MIN_SCALE, Math.min(WIDGET_MAX_SCALE, widgetScalePct + delta));
+                    const newPct = window.RendererShared.clampScale(widgetScalePct + delta, WIDGET_MIN_SCALE, WIDGET_MAX_SCALE);
                     if (newPct === widgetScalePct) { return; }
                     widgetScalePct = newPct;
                     const newSize = Math.round(WIDGET_BASE_SIZE * newPct / 100);
@@ -1269,7 +1270,7 @@
             }
 
             // FIX BUG-020: Removed checkColorChanges() - dead code
-            // Colors are updated via IPC 'colors-update' event, no need for polling
+            // Colors are updated via the per-window 'widget-colors-update' IPC event, no polling needed
 
             applyColors(colors = null) {
                 if (!colors) {
@@ -1351,7 +1352,7 @@
                 const bgImg = document.getElementById('widgetBgImg');
                 const bgOverlay = document.getElementById('widgetBgOverlay');
 
-                if (!bgCircle) return;
+                if (!bgCircle) {return;}
 
                 // Сбрасываем фоновое изображение
                 bgImageContainer.style.display = 'none';
@@ -1428,7 +1429,7 @@
                 this.timerStateHandler = (event, state) => {
                     // FIX: Use monotonic updateCounter instead of timestamp for dedup
                     const updateCounter = state.updateCounter || 0;
-                    if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) return;
+                    if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) {return;}
                     this.lastUpdateCounter = updateCounter;
                     this.lastTimestamp = state.timestamp || Date.now();
 
@@ -1476,7 +1477,6 @@
 
                 // Регистрируем обработчики
                 ipcRenderer.on('timer-state', this.timerStateHandler);
-                ipcRenderer.on('colors-update', this.colorsUpdateHandler);
                 ipcRenderer.on('widget-colors-update', this.colorsUpdateHandler);
                 ipcRenderer.on('display-settings-update', this.displaySettingsUpdateHandler);
                 ipcRenderer.on('widget-style-update', this.widgetStyleUpdateHandler);
@@ -1488,7 +1488,6 @@
                     ipcRenderer.removeListener('timer-state', this.timerStateHandler);
                 }
                 if (this.colorsUpdateHandler) {
-                    ipcRenderer.removeListener('colors-update', this.colorsUpdateHandler);
                     ipcRenderer.removeListener('widget-colors-update', this.colorsUpdateHandler);
                 }
                 if (this.displaySettingsUpdateHandler) {
@@ -1538,24 +1537,24 @@
                 this.timerStyle = style;
                 
                 // Скрываем все стили
-                if (this.circularWidget) this.circularWidget.classList.remove('active');
-                if (this.widgetDigital) this.widgetDigital.classList.remove('active');
-                if (this.widgetFlip) this.widgetFlip.classList.remove('active');
-                if (this.widgetAnalog) this.widgetAnalog.classList.remove('active');
+                if (this.circularWidget) {this.circularWidget.classList.remove('active');}
+                if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
+                if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
+                if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
                 
                 // Показываем выбранный
                 switch (style) {
                     case 'circle':
-                        if (this.circularWidget) this.circularWidget.classList.add('active');
+                        if (this.circularWidget) {this.circularWidget.classList.add('active');}
                         break;
                     case 'digital':
-                        if (this.widgetDigital) this.widgetDigital.classList.add('active');
+                        if (this.widgetDigital) {this.widgetDigital.classList.add('active');}
                         break;
                     case 'flip':
-                        if (this.widgetFlip) this.widgetFlip.classList.add('active');
+                        if (this.widgetFlip) {this.widgetFlip.classList.add('active');}
                         break;
                     case 'analog':
-                        if (this.widgetAnalog) this.widgetAnalog.classList.add('active');
+                        if (this.widgetAnalog) {this.widgetAnalog.classList.add('active');}
                         break;
                 }
                 
@@ -1659,49 +1658,40 @@
             }
             
             updateFlipDisplay(secs) {
-                if (!this.wFlipMin1 || !this.wFlipMin2 || !this.wFlipSec1 || !this.wFlipSec2) return;
+                if (!this.wFlipMin1 || !this.wFlipMin2 || !this.wFlipSec1 || !this.wFlipSec2) {return;}
                 
                 const isNegative = secs < 0;
                 const absSecs = Math.abs(secs);
-                const hours = Math.floor(absSecs / 3600);
-                const mins = Math.floor((absSecs % 3600) / 60);
-                const seconds = absSecs % 60;
-                
+                const cells = window.RendererShared.flipCells(absSecs, this.totalSeconds);
+
                 // Показываем/скрываем знак минуса
                 if (this.wFlipMinus) {
                     this.wFlipMinus.classList.toggle('visible', isNegative);
                 }
-                
+
                 // Показываем/скрываем часы в зависимости от общего времени
-                const showHours = this.totalSeconds >= 3600 || hours > 0;
-                
+                const showHours = cells.hasHours;
+
                 // Добавляем/удаляем класс для адаптивных размеров
                 if (this.widgetFlip) {
                     this.widgetFlip.classList.toggle('has-hours', showHours);
                 }
-                
+
                 if (this.wFlipHoursGroup && this.wFlipHoursSep) {
                     this.wFlipHoursGroup.style.display = showHours ? 'flex' : 'none';
                     this.wFlipHoursSep.style.display = showHours ? 'flex' : 'none';
-                    
+
                     if (showHours && this.wFlipHr1 && this.wFlipHr2) {
-                        const hr1 = String(Math.floor(hours / 10) % 10);
-                        const hr2 = String(hours % 10);
-                        this.wFlipHr1.querySelector('.widget-flip-digit').textContent = hr1;
-                        this.wFlipHr2.querySelector('.widget-flip-digit').textContent = hr2;
+                        this.wFlipHr1.querySelector('.widget-flip-digit').textContent = cells.h1;
+                        this.wFlipHr2.querySelector('.widget-flip-digit').textContent = cells.h2;
                     }
                 }
-                
-                const min1 = String(Math.floor(mins / 10) % 10);
-                const min2 = String(mins % 10);
-                const sec1 = String(Math.floor(seconds / 10));
-                const sec2 = String(seconds % 10);
-                
+
                 // Обновляем цифры
-                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = min1;
-                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = min2;
-                this.wFlipSec1.querySelector('.widget-flip-digit').textContent = sec1;
-                this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
+                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = cells.m1;
+                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = cells.m2;
+                this.wFlipSec1.querySelector('.widget-flip-digit').textContent = cells.s1;
+                this.wFlipSec2.querySelector('.widget-flip-digit').textContent = cells.s2;
                 
                 // Классы предупреждения
                 // FIX BUG-018: Use data attributes instead of classList
@@ -1751,7 +1741,7 @@
             }
 
             updateAnalogDisplay(secs) {
-                if (!this.widgetHandMinute || !this.widgetHandSecond) return;
+                if (!this.widgetHandMinute || !this.widgetHandSecond) {return;}
 
                 const absSecs = Math.abs(secs);
                 const totalMins = absSecs / 60;
@@ -1767,8 +1757,7 @@
 
                 // Обновляем цифровое время
                 if (this.widgetAnalogDigital) {
-                    const hours = Math.floor(absSecs / 3600);
-                    const mins = Math.floor((absSecs % 3600) / 60);
+                    const { hours, minutes: mins } = window.RendererShared.breakdown(absSecs);
                     const prefix = secs < 0 ? '-' : '';
                     if (hours > 0) {
                         this.widgetAnalogDigital.textContent = `${prefix}${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;

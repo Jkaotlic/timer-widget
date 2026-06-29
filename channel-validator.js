@@ -6,7 +6,6 @@ const ALLOWED_CHANNELS = {
         'get-displays',
         'timer-command',
         'timer-control',
-        'colors-update',
         'widget-colors-update',
         'clock-colors-update',
         'display-colors-update',
@@ -32,14 +31,10 @@ const ALLOWED_CHANNELS = {
         'toggle-fullscreen',
         'close-window',
         'quit-app',
-        'reset-and-relaunch',
-        'set-autostart',
-        'get-autostart',
-        'export-logs'
+        'reset-and-relaunch'
     ],
     receive: [
         'timer-state',
-        'colors-update',
         'widget-colors-update',
         'clock-colors-update',
         'display-colors-update',

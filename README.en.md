@@ -9,7 +9,7 @@
 [![Version](https://img.shields.io/badge/v2.3.2-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_42-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
-[![Tests](https://img.shields.io/badge/tests-160%20passing-30d158?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/tests-206%20passing-30d158?style=flat-square)](tests/)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
 [![License](https://img.shields.io/badge/MIT-30d158?style=flat-square)](LICENSE)
 
@@ -159,7 +159,7 @@ npm start
 |:--------|:------------|
 | `npm start` | Run the app |
 | `npm run dev` | Run with DevTools |
-| `npm test` | 160 tests (`node --test`) |
+| `npm test` | 206 tests (`node --test`) |
 | `npm run lint` | ESLint 9 (flat config) |
 | `npm run ci` | Lint + tests |
 | `npm run screenshot` | 24 PNG screenshots for headless visual review |
@@ -194,7 +194,7 @@ timer-widget/
 ├── scripts/
 │   ├── run-electron.js         # Wrapper: clears ELECTRON_RUN_AS_NODE
 │   └── screenshot-runner.js    # Headless harness for visual review
-└── tests/                      # 160 tests (10+ files)
+└── tests/                      # 206 tests (10+ files)
 ```
 
 ---
@@ -309,7 +309,7 @@ In v2.3 the panel became compact (380 px); settings moved into a **drawer** — 
 
 1. Fork the repository
 2. Create a branch (`git checkout -b feature/my-feature`)
-3. Make sure `npm run ci` passes (lint + 160 tests)
+3. Make sure `npm run ci` passes (lint + 206 tests)
 4. Open a Pull Request
 
 Bugs and feature requests — in [Issues](../../issues). Full change history — in [CHANGELOG.md](CHANGELOG.md).
@@ -318,7 +318,7 @@ Bugs and feature requests — in [Issues](../../issues). Full change history —
 
 <div align="center">
 
-**Electron 42.3.2** · **Chromium 148.0.7778.218** · **Node.js 24.15.0** · **Vanilla JS** · **Web Audio API** · **160 tests** · **GitHub Actions CI**
+**Electron 42.3.2** · **Chromium 148.0.7778.218** · **Node.js 24.15.0** · **Vanilla JS** · **Web Audio API** · **206 tests** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 

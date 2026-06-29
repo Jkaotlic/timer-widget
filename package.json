@@ -116,6 +116,7 @@
       "utils.js",
       "constants.js",
       "color-utils.js",
+      "renderer-shared.js",
       "electron-widget.html",
       "electron-control.html",
       "electron-clock-widget.html",

@@ -1260,6 +1260,7 @@
     <script src="constants.js"></script>
     <script src="security.js"></script>
     <script src="utils.js"></script>
+    <script src="renderer-shared.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1342,7 +1343,7 @@
                 this.analogTimezoneBadge = document.getElementById('analogTimezoneBadge');
                 
                 // Устанавливаем стиль по умолчанию
-                if (this.circularWidget) this.circularWidget.classList.add('active');
+                if (this.circularWidget) {this.circularWidget.classList.add('active');}
                 document.body.classList.add('style-circle');
                 
                 // Настраиваем масштабирование для digital и flip
@@ -1400,11 +1401,11 @@
             applyColors(colors = null) {
                 if (!colors) {
                     const saved = localStorage.getItem('clockColors');
-                    colors = saved ? JSON.parse(saved) : null;
+                    colors = saved ? window.SecurityUtils.safeJSONParse(saved, null) : null;
                 }
                 if (!colors) { return; }
 
-                const isSafeColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+                const isSafeColor = window.SecurityUtils.isSafeColor;
                 const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
                 const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
 
@@ -1579,7 +1580,7 @@
                     e.preventDefault();
                     const step = 10;
                     const delta = e.deltaY < 0 ? step : -step;
-                    const newPct = Math.max(CLOCK_MIN_SCALE, Math.min(CLOCK_MAX_SCALE, clockScalePct + delta));
+                    const newPct = window.RendererShared.clampScale(clockScalePct + delta, CLOCK_MIN_SCALE, CLOCK_MAX_SCALE);
                     if (newPct === clockScalePct) { return; }
                     clockScalePct = newPct;
                     const newSize = Math.round(CLOCK_BASE_SIZE * newPct / 100);
@@ -1620,24 +1621,24 @@
                 document.body.classList.add('style-' + style);
                 
                 // Скрываем все стили
-                if (this.circularWidget) this.circularWidget.classList.remove('active');
-                if (this.widgetDigital) this.widgetDigital.classList.remove('active');
-                if (this.widgetFlip) this.widgetFlip.classList.remove('active');
-                if (this.widgetAnalog) this.widgetAnalog.classList.remove('active');
+                if (this.circularWidget) {this.circularWidget.classList.remove('active');}
+                if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
+                if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
+                if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
                 
                 // Показываем выбранный
                 switch (style) {
                     case 'circle':
-                        if (this.circularWidget) this.circularWidget.classList.add('active');
+                        if (this.circularWidget) {this.circularWidget.classList.add('active');}
                         break;
                     case 'digital':
-                        if (this.widgetDigital) this.widgetDigital.classList.add('active');
+                        if (this.widgetDigital) {this.widgetDigital.classList.add('active');}
                         break;
                     case 'flip':
-                        if (this.widgetFlip) this.widgetFlip.classList.add('active');
+                        if (this.widgetFlip) {this.widgetFlip.classList.add('active');}
                         break;
                     case 'analog':
-                        if (this.widgetAnalog) this.widgetAnalog.classList.add('active');
+                        if (this.widgetAnalog) {this.widgetAnalog.classList.add('active');}
                         break;
                 }
                 
@@ -1826,11 +1827,10 @@
                 };
                 ipcRenderer.on('clock-settings', this._onClockSettings);
 
-                // Per-window color theme (+ backward compat with global colors-update)
+                // Per-window color theme
                 this._onColorsUpdate = (_event, colors) => {
                     this.applyColors(colors);
                 };
-                ipcRenderer.on('colors-update', this._onColorsUpdate);
                 ipcRenderer.on('clock-colors-update', this._onColorsUpdate);
             }
 
@@ -1847,11 +1847,10 @@
                     clearTimeout(this._scalingTimer);
                     this._scalingTimer = null;
                 }
-                if (this._onSetClockStyle) ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);
-                if (this._onDisplaySettingsUpdate) ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);
-                if (this._onClockSettings) ipcRenderer.removeListener('clock-settings', this._onClockSettings);
+                if (this._onSetClockStyle) {ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);}
+                if (this._onDisplaySettingsUpdate) {ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);}
+                if (this._onClockSettings) {ipcRenderer.removeListener('clock-settings', this._onClockSettings);}
                 if (this._onColorsUpdate) {
-                    ipcRenderer.removeListener('colors-update', this._onColorsUpdate);
                     ipcRenderer.removeListener('clock-colors-update', this._onColorsUpdate);
                 }
 
@@ -1942,7 +1941,7 @@
                     const options = { weekday: 'short', day: 'numeric', month: 'short' };
                     const dateStr = now.toLocaleDateString('ru-RU', options);
                     [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
-                        if (el) el.textContent = dateStr;
+                        if (el) {el.textContent = dateStr;}
                     });
                 }
                 
@@ -1950,13 +1949,13 @@
                 if (this.showTimezone) {
                     const tzStr = this.formatTimezoneString();
                     [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
-                        if (el) el.textContent = tzStr;
+                        if (el) {el.textContent = tzStr;}
                     });
                 }
             }
 
             updateAnalogClock(hours, minutes, seconds) {
-                if (!this.clockAnalogHour || !this.clockAnalogMinute || !this.clockAnalogSecond) return;
+                if (!this.clockAnalogHour || !this.clockAnalogMinute || !this.clockAnalogSecond) {return;}
 
                 // Часовая стрелка - полный оборот за 12 часов
                 // Плавное движение с учетом минут
@@ -1985,7 +1984,7 @@
             }
 
             updateFlipDisplay(hours, minutes, seconds) {
-                if (!this.wFlipHr1 || !this.wFlipMin1) return;
+                if (!this.wFlipHr1 || !this.wFlipMin1) {return;}
 
                 const hr1 = String(Math.floor(hours / 10) % 10);
                 const hr2 = String(hours % 10);
