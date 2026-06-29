@@ -1364,7 +1364,7 @@
                         bgCircle.style.fill = isSafeBgColor(settings.bgSolid) ? settings.bgSolid : '#1a1a2e';
                         break;
 
-                    case 'gradient':
+                    case 'gradient': {
                         // Создаем или обновляем градиент для фона
                         let bgGradient = document.getElementById('widgetBgGradient');
                         if (!bgGradient) {
@@ -1383,6 +1383,7 @@
                         stops[1].setAttribute('stop-color', isSafeBgColor(settings.bgGrad2) ? settings.bgGrad2 : '#16213e');
                         bgCircle.style.fill = 'url(#widgetBgGradient)';
                         break;
+                    }
 
                     case 'local':
                         if (settings.bgLocalImage && window.SecurityUtils &&
