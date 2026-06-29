@@ -21,7 +21,7 @@ const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, dialog, po
 const path = require('path');
 const fs = require('fs');
 const log = require('electron-log/main');
-const { safelySendToWindow } = require('./utils');
+const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
 const recovery = require('./recovery');
@@ -150,6 +150,31 @@ function hardenWindow(win) {
 
 function isPayloadObject(payload) {
     return payload !== null && typeof payload === 'object';
+}
+
+// Shared delta-move for a frameless window. Reads deltaX/deltaY from the payload
+// INSIDE the body (never destructured in the IPC handler params — see
+// tests/electron-main-source.test.js). Validates the payload object + finite deltas.
+function moveWindowBy(win, payload) {
+    if (!isPayloadObject(payload)) { return; }
+    const { deltaX, deltaY } = payload;
+    if (win && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
+        const [currentX, currentY] = win.getPosition();
+        win.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
+    }
+}
+
+// Shared clamped resize for a frameless window. Clamps width/height to
+// [100, workArea] with a 220px default when the field is missing/non-numeric.
+function resizeWindowClamped(win, payload) {
+    if (!isPayloadObject(payload)) { return; }
+    if (win && !win.isDestroyed()) {
+        const { width, height } = payload;
+        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+        const w = Math.max(100, Math.min(screenW, Number(width) || 220));
+        const h = Math.max(100, Math.min(screenH, Number(height) || 220));
+        win.setSize(w, h);
+    }
 }
 
 // Runtime app icon path. In dev it lives in build/icon.png (buildResources),
@@ -602,17 +627,6 @@ function createTray() {
     }
 }
 
-function formatTrayTime(secs) {
-    const neg = secs < 0;
-    const abs = Math.abs(secs);
-    const h = Math.floor(abs / 3600);
-    const m = Math.floor((abs % 3600) / 60);
-    const s = abs % 60;
-    const pad = (n) => String(n).padStart(2, '0');
-    const body = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-    return (neg ? '-' : '') + body;
-}
-
 // Full Menu rebuild — only when boolean state changes (isRunning / widget open / clock open).
 function rebuildTrayMenu() {
     if (!tray) { return; }
@@ -623,7 +637,7 @@ function rebuildTrayMenu() {
     _trayLastWidgetOpen = widgetOpen;
     _trayLastClockOpen = clockOpen;
 
-    const remaining = formatTrayTime(timerState.remainingSeconds || 0);
+    const remaining = formatTimeShort(timerState.remainingSeconds || 0);
     const menu = Menu.buildFromTemplate([
         { label: `⏱  ${remaining}`, enabled: false },
         { type: 'separator' },
@@ -658,7 +672,7 @@ function rebuildTrayMenu() {
 // Lightweight per-tick update — only touches the tooltip (no Menu rebuild).
 function updateTrayTime() {
     if (!tray) { return; }
-    const remaining = formatTrayTime(timerState.remainingSeconds || 0);
+    const remaining = formatTimeShort(timerState.remainingSeconds || 0);
     try { tray.setToolTip(`Timer Widget — ${remaining}`); } catch { /* tray destroyed */ }
 }
 
@@ -1032,12 +1046,7 @@ ipcMain.on('minimize-window', (event) => {
 });
 
 ipcMain.on('display-move', (_event, payload) => {
-    if (!isPayloadObject(payload)) { return; }
-    const { deltaX, deltaY } = payload;
-    if (displayWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
-        const [currentX, currentY] = displayWindow.getPosition();
-        displayWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
-    }
+    moveWindowBy(displayWindow, payload);
 });
 
 ipcMain.on('toggle-fullscreen', (event) => {
@@ -1100,25 +1109,11 @@ ipcMain.on('close-clock-widget', () => {
 });
 
 ipcMain.on('clock-widget-resize', (_event, payload) => {
-    if (!isPayloadObject(payload)) { return; }
-    const { width, height } = payload;
-    if (clockWidgetWindow && !clockWidgetWindow.isDestroyed()) {
-        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
-        const w = Math.max(100, Math.min(screenW, Number(width) || 220));
-        const h = Math.max(100, Math.min(screenH, Number(height) || 220));
-        clockWidgetWindow.setSize(w, h);
-    }
+    resizeWindowClamped(clockWidgetWindow, payload);
 });
 
-
-
 ipcMain.on('clock-widget-move', (_event, payload) => {
-    if (!isPayloadObject(payload)) { return; }
-    const { deltaX, deltaY } = payload;
-    if (clockWidgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
-        const [currentX, currentY] = clockWidgetWindow.getPosition();
-        clockWidgetWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
-    }
+    moveWindowBy(clockWidgetWindow, payload);
 });
 
 ipcMain.on('clock-widget-set-style', (event, style) => {
@@ -1196,26 +1191,12 @@ ipcMain.on('widget-set-position', (_event, payload) => {
     }
 });
 
-ipcMain.on('widget-resize', (_event, data) => {
-    if (!isPayloadObject(data)) { return; }
-    if (widgetWindow && !widgetWindow.isDestroyed()) {
-        const { width, height } = data;
-        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
-        const w = Math.max(100, Math.min(screenW, Number(width) || 220));
-        const h = Math.max(100, Math.min(screenH, Number(height) || 220));
-        widgetWindow.setSize(w, h);
-    }
+ipcMain.on('widget-resize', (_event, payload) => {
+    resizeWindowClamped(widgetWindow, payload);
 });
 
-
-
 ipcMain.on('widget-move', (_event, payload) => {
-    if (!isPayloadObject(payload)) { return; }
-    const { deltaX, deltaY } = payload;
-    if (widgetWindow && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
-        const [currentX, currentY] = widgetWindow.getPosition();
-        widgetWindow.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
-    }
+    moveWindowBy(widgetWindow, payload);
 });
 
 // Управление таймером через виджет (делегирует в единые функции)

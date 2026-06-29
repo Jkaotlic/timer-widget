@@ -35,3 +35,22 @@ test('CONFIG.STORAGE_KEYS is an object with string values', () => {
         assert.equal(typeof value, 'string');
     }
 });
+
+test('CONFIG.PRESET_DURATIONS holds the 8 keyboard-preset seconds', () => {
+    assert.deepEqual(CONFIG.PRESET_DURATIONS, [300, 600, 900, 1200, 1500, 1800, 2700, 3600]);
+});
+
+test('CONFIG.PRESET_DURATIONS is frozen (immutable)', () => {
+    assert.ok(Object.isFrozen(CONFIG.PRESET_DURATIONS));
+    const original = CONFIG.PRESET_DURATIONS[0];
+    CONFIG.PRESET_DURATIONS[0] = 999;
+    assert.equal(CONFIG.PRESET_DURATIONS[0], original, 'PRESET_DURATIONS should be frozen');
+});
+
+test('CONFIG no longer exposes removed dead constants', () => {
+    // MIN_SCALE/MAX_SCALE were unused and disagreed with renderer-enforced scale bounds
+    assert.ok(!('MIN_SCALE' in CONFIG));
+    assert.ok(!('MAX_SCALE' in CONFIG));
+    // IPC_CHANNELS was a dead third copy of the channel list (see channel-validator.js)
+    assert.ok(!('IPC_CHANNELS' in CONFIG));
+});

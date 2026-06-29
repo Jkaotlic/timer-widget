@@ -8,6 +8,7 @@
     "dev": "node scripts/run-electron.js --dev",
     "screenshot": "node scripts/run-electron.js --screenshot",
     "test": "node --test",
+    "coverage": "npx --yes c8 --reporter=text --reporter=html node --test",
     "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
     "test:e2e": "npx playwright test",
@@ -37,6 +38,7 @@
     "electron": "^42.3.2",
     "electron-builder": "^26.8.1",
     "eslint": "^10.2.1",
+    "eslint-plugin-html": "^8.1.4",
     "globals": "^17.4.0"
   },
   "build": {
@@ -113,6 +115,7 @@
       "renderer-storage.js",
       "utils.js",
       "constants.js",
+      "color-utils.js",
       "electron-widget.html",
       "electron-control.html",
       "electron-clock-widget.html",
