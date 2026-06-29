@@ -125,6 +125,61 @@ test('tick: timer-minute NOT fired when already below 60s', () => {
     assert.ok(!events.includes('timer-minute'));
 });
 
+// --- tick: wall-clock step (catch-up after jitter / sleep) ---
+
+test('tick: stepSeconds advances by N seconds in one call', () => {
+    const state = makeState({ remainingSeconds: 100 });
+    const { state: next, finished } = tick(state, { allowNegative: false }, 5);
+    assert.equal(next.remainingSeconds, 95);
+    assert.equal(finished, false);
+});
+
+test('tick: default stepSeconds is 1 (back-compat with single-second callers)', () => {
+    const state = makeState({ remainingSeconds: 100 });
+    const { state: next } = tick(state, { allowNegative: false });
+    assert.equal(next.remainingSeconds, 99);
+});
+
+test('tick: stepSeconds < 1 or non-finite is clamped to 1', () => {
+    const base = makeState({ remainingSeconds: 100 });
+    assert.equal(tick(base, {}, 0).state.remainingSeconds, 99);
+    assert.equal(tick(base, {}, -10).state.remainingSeconds, 99);
+    assert.equal(tick(base, {}, Infinity).state.remainingSeconds, 99);
+    assert.equal(tick(base, {}, NaN).state.remainingSeconds, 99);
+});
+
+test('tick: a large step that jumps past zero floors at 0 and finishes (no overrun)', () => {
+    const state = makeState({ remainingSeconds: 3 });
+    const { state: next, finished } = tick(state, { allowNegative: false }, 600);
+    assert.equal(next.remainingSeconds, 0);
+    assert.equal(finished, true);
+    assert.equal(next.finished, true);
+});
+
+test('tick: a large step crossing zero with allowNegative fires timer-reached-zero exactly once', () => {
+    const state = makeState({ remainingSeconds: 5 });
+    const { state: next, events } = tick(state, { allowNegative: true }, 20);
+    assert.equal(next.remainingSeconds, -15);
+    assert.equal(events.filter((e) => e === 'timer-reached-zero').length, 1);
+});
+
+test('tick: a huge overrun step (sleep) fires overrun-minute at most once, not per minute', () => {
+    // Wake from a ~10 minute sleep while already in overrun.
+    const state = makeState({ remainingSeconds: -30 });
+    const { state: next, events } = tick(state, { allowNegative: true, overrunIntervalMinutes: 1 }, 600);
+    assert.equal(next.remainingSeconds, -630);
+    // Single comparison crossing — never spams one event per skipped minute.
+    assert.equal(events.filter((e) => e === 'timer-overrun-minute').length, 1);
+});
+
+test('tick: a large step respects the overrun hard limit', () => {
+    const state = makeState({ remainingSeconds: -100, isRunning: true });
+    const { state: next, finished } = tick(state, { allowNegative: true, overrunLimitSeconds: 300 }, 1000);
+    assert.equal(next.remainingSeconds, -300);
+    assert.equal(finished, true);
+    assert.equal(next.isRunning, false);
+});
+
 // --- adjust ---
 
 test('adjust: +50 from remainingSeconds=100 → 150, totalSeconds grows if needed', () => {
@@ -158,6 +213,14 @@ test('adjust: presetSeconds is preserved through adjustments', () => {
     const state = makeState({ remainingSeconds: 100, presetSeconds: 200 });
     const next = adjust(state, 50, false);
     assert.equal(next.presetSeconds, 200);
+});
+
+test('adjust: non-finite delta (Infinity/NaN) is treated as 0 — no state poisoning', () => {
+    const state = makeState({ remainingSeconds: 100, totalSeconds: 100 });
+    assert.equal(adjust(state, Infinity, true).remainingSeconds, 100);
+    assert.equal(adjust(state, -Infinity, true).remainingSeconds, 100);
+    assert.equal(adjust(state, NaN, true).remainingSeconds, 100);
+    assert.equal(adjust(state, 'abc', true).remainingSeconds, 100);
 });
 
 // --- reset ---
@@ -209,6 +272,16 @@ test('setPreset: negative input clamped to 0', () => {
     assert.equal(next.totalSeconds, 0);
     assert.equal(next.remainingSeconds, 0);
     assert.equal(next.presetSeconds, 0);
+});
+
+test('setPreset: non-finite input (Infinity/NaN) becomes 0 — no Infinity poisoning', () => {
+    const state = makeState();
+    for (const bad of [Infinity, -Infinity, NaN, 'xyz']) {
+        const next = setPreset(state, bad);
+        assert.equal(next.totalSeconds, 0);
+        assert.equal(next.remainingSeconds, 0);
+        assert.equal(next.presetSeconds, 0);
+    }
 });
 
 test('setPreset: clears isRunning/isPaused/finished', () => {

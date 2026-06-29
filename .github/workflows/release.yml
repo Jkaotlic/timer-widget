@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
 
@@ -54,6 +57,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run lint
+        run: npm run lint
 
       - name: Run tests
         run: npm test
@@ -87,6 +93,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
 
@@ -116,6 +125,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run lint
+        run: npm run lint
 
       - name: Run tests
         run: npm test
@@ -213,7 +225,7 @@ jobs:
             Приложение работает **полностью оффлайн** — шрифты бандлятся локально, звуки синтезируются через Web Audio API, Chromium никуда не стучится.
 
             ---
-            Electron 41 · Node.js 22 · Vanilla JS · 126 тестов · полный [CHANGELOG](https://github.com/Jkaotlic/timer-widget/blob/main/CHANGELOG.md)
+            Electron 42.3.2 · Chromium 148.0.7778.218 · Node.js 24.15.0 · Vanilla JS · 160 тестов · полный [CHANGELOG](https://github.com/Jkaotlic/timer-widget/blob/main/CHANGELOG.md)
           draft: false
           prerelease: false
           files: |

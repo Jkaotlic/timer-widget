@@ -11,6 +11,7 @@
     "lint": "npx eslint .",
     "ci": "npm run lint && npm test",
     "test:e2e": "npx playwright test",
+    "visual:audit": "node scripts/visual-audit.js",
     "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5",
     "notice": "node scripts/generate-notice.js",
     "build": "npx --yes electron-builder",
@@ -33,7 +34,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
-    "electron": "^41.2.1",
+    "electron": "^42.3.2",
     "electron-builder": "^26.8.1",
     "eslint": "^10.2.1",
     "globals": "^17.4.0"
@@ -99,6 +100,9 @@
       "afterInstall": "build/linux-after-install.sh"
     },
     "publish": null,
+    "extraResources": [
+      "build/icon.png"
+    ],
     "files": [
       "electron-main.js",
       "timer-engine.js",
@@ -106,6 +110,7 @@
       "preload.js",
       "ipc-compat.js",
       "security.js",
+      "renderer-storage.js",
       "utils.js",
       "constants.js",
       "electron-widget.html",

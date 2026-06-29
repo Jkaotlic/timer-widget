@@ -55,7 +55,7 @@ node --test tests/perf.test.js
 | Метрика | Норма | Как замерить |
 |---|---|---|
 | Startup time (cold) | < 1000 ms | `[perf] app ready` в логе |
-| Heap main process | < 80 MB stable | DevTools Memory (временно включить `devTools: true`) |
+| Heap main process | < 80 MB stable | `npm run dev`, затем DevTools Memory |
 | Heap growth (1 час идл) | ≤ +5 MB | `process.memoryUsage()` в петле |
 | CPU (idle, все 4 окна) | < 0.5% | Task Manager / `ps -o pcpu` |
 | FPS анимаций (флип/аналог) | 60 FPS | DevTools Performance tab |
@@ -86,6 +86,6 @@ Measure-Command { Start-Process .\TimerWidget.exe -Wait }
 3. Сравни первую и последнюю цифры — должно быть < +5 MB
 
 **Профилирование:**
-1. Временно `devTools: true` в `electron-main.js`
+1. Запусти `npm run dev` (DevTools доступны только в dev-режиме)
 2. В control окне: Ctrl+Shift+I → Performance → Record 10 сек
 3. Смотри flame chart: `setInterval` в main не должен быть на топе
