@@ -22,3 +22,6 @@ jobs:
         run: npm run lint
       - name: Run tests
         run: npm test
+      - name: Coverage (non-blocking)
+        run: npm run coverage
+        continue-on-error: true

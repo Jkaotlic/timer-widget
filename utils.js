@@ -70,6 +70,41 @@ function parseTime(timeString) {
 }
 
 /**
+ * Умный парсинг ручного ввода времени.
+ * Голое число = секунды; X:Y = мин:сек; X:Y:Z = час:мин:сек.
+ * Ограничивает максимумом 99:59:59 (359999 секунд).
+ * @param {string} input - строка времени
+ * @returns {number|null} - количество секунд или null при невалидном вводе
+ */
+function parseManualTime(input) {
+    const trimmed = input.trim();
+    if (!trimmed) { return null; }
+    // Remove all non-digit and non-colon chars
+    const clean = trimmed.replace(/[^\d:]/g, '');
+    if (!clean) { return null; }
+
+    const parts = clean.split(':');
+    let seconds;
+
+    if (parts.length === 1) {
+        // Bare number = seconds
+        seconds = parseInt(parts[0]) || 0;
+    } else if (parts.length === 2) {
+        // MM:SS
+        seconds = ((parseInt(parts[0]) || 0) * 60) + (parseInt(parts[1]) || 0);
+    } else if (parts.length === 3) {
+        // HH:MM:SS
+        seconds = ((parseInt(parts[0]) || 0) * 3600) + ((parseInt(parts[1]) || 0) * 60) + (parseInt(parts[2]) || 0);
+    } else {
+        return null;
+    }
+
+    // Max 99:59:59
+    if (seconds > 359999 || seconds < 0) { return null; }
+    return seconds;
+}
+
+/**
  * Debounce функция
  * Откладывает выполнение функции до тех пор, пока не пройдет delay мс с последнего вызова
  * @param {Function} func - функция для debounce
@@ -160,6 +195,7 @@ if (typeof module !== 'undefined' && module.exports) {
         formatTime,
         formatTimeShort,
         parseTime,
+        parseManualTime,
         debounce,
         getTimerStatus,
         calculateProgress,
@@ -175,6 +211,7 @@ if (typeof window !== 'undefined') {
         formatTime,
         formatTimeShort,
         parseTime,
+        parseManualTime,
         getTimerStatus,
         calculateProgress,
         isValidNumber,
