@@ -39,8 +39,6 @@ const CONFIG = {
     // ============================================
     SCALE_STEP: 20,                         // Шаг масштабирования (пиксели)
     ZOOM_SCALE_FACTOR: 0.1,                 // Фактор масштабирования при Ctrl+Wheel
-    MIN_SCALE: 0.3,                         // Минимальный масштаб (30%)
-    MAX_SCALE: 5.0,                         // Максимальный масштаб (500%)
     DEFAULT_SCALE: 1.0,                     // Масштаб по умолчанию (100%)
 
     // ============================================
@@ -50,6 +48,12 @@ const CONFIG = {
     WARNING_PERCENTAGE: 25,                 // Показать warning при < 25% времени
     DANGER_PERCENTAGE: 10,                  // Показать danger при < 10% времени
     MINUTE_WARNING: 60,                     // Звук "осталась минута" при 60 секундах
+
+    // ============================================
+    // PRESET DURATIONS
+    // ============================================
+    // Длительности клавиатурных пресетов (клавиши 1-8): 5/10/15/20/25/30/45/60 минут
+    PRESET_DURATIONS: [300, 600, 900, 1200, 1500, 1800, 2700, 3600],
 
     // ============================================
     // FILE LIMITS
@@ -194,61 +198,6 @@ const CONFIG = {
     ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'],
 
     // ============================================
-    // IPC CHANNELS
-    // ============================================
-    IPC_CHANNELS: {
-        // Timer commands
-        TIMER_COMMAND: 'timer-command',
-        TIMER_CONTROL: 'timer-control',
-        TIMER_STATE: 'timer-state',
-        TIMER_MINUTE: 'timer-minute',
-        TIMER_REACHED_ZERO: 'timer-reached-zero',
-        TIMER_OVERRUN_MINUTE: 'timer-overrun-minute',
-        GET_TIMER_STATE: 'get-timer-state',
-
-        // Window management
-        OPEN_WIDGET: 'open-widget',
-        CLOSE_WIDGET: 'close-widget',
-        OPEN_DISPLAY: 'open-display',
-        CLOSE_DISPLAY: 'close-display',
-        OPEN_CLOCK_WIDGET: 'open-clock-widget',
-        CLOSE_CLOCK_WIDGET: 'close-clock-widget',
-        MINIMIZE_WINDOW: 'minimize-window',
-        CLOSE_WINDOW: 'close-window',
-        QUIT_APP: 'quit-app',
-
-        // Settings
-        COLORS_UPDATE: 'colors-update',
-        WIDGET_COLORS_UPDATE: 'widget-colors-update',
-        CLOCK_COLORS_UPDATE: 'clock-colors-update',
-        DISPLAY_COLORS_UPDATE: 'display-colors-update',
-        WIDGET_STYLE_UPDATE: 'widget-style-update',
-        DISPLAY_SETTINGS_UPDATE: 'display-settings-update',
-        CLOCK_SETTINGS: 'clock-settings',
-        SET_CLOCK_STYLE: 'set-clock-style',
-        CLOCK_WIDGET_RESIZE: 'clock-widget-resize',
-        CLOCK_WIDGET_MOVE: 'clock-widget-move',
-        CLOCK_WIDGET_SET_STYLE: 'clock-widget-set-style',
-        CLOCK_WIDGET_SETTINGS: 'clock-widget-settings',
-        RESIZE_CONTROL_WINDOW: 'resize-control-window',
-
-        // Widget controls
-        WIDGET_SET_POSITION: 'widget-set-position',
-        WIDGET_SET_OPACITY: 'widget-set-opacity',
-        WIDGET_RESIZE: 'widget-resize',
-        WIDGET_MOVE: 'widget-move',
-
-        // Window state notifications
-        DISPLAY_WINDOW_STATE: 'display-window-state',
-        WIDGET_WINDOW_STATE: 'widget-window-state',
-        CLOCK_WINDOW_STATE: 'clock-window-state',
-
-        // Display controls
-        GET_DISPLAYS: 'get-displays',
-        DISPLAYS_LIST: 'displays-list'
-    },
-
-    // ============================================
     // Z-INDEX LAYERS
     // ============================================
     Z_INDEX: {
@@ -272,10 +221,10 @@ Object.freeze(CONFIG.TIMER_STYLES);
 Object.freeze(CONFIG.TIMER_STATES);
 Object.freeze(CONFIG.TIMER_STATUS);
 Object.freeze(CONFIG.BACKGROUND_MODES);
-Object.freeze(CONFIG.IPC_CHANNELS);
 Object.freeze(CONFIG.Z_INDEX);
 if (CONFIG.ALLOWED_AUDIO_TYPES) { Object.freeze(CONFIG.ALLOWED_AUDIO_TYPES); }
 if (CONFIG.ALLOWED_IMAGE_TYPES) { Object.freeze(CONFIG.ALLOWED_IMAGE_TYPES); }
+if (CONFIG.PRESET_DURATIONS) { Object.freeze(CONFIG.PRESET_DURATIONS); }
 
 // Экспорт для Node.js (main process)
 if (typeof module !== 'undefined' && module.exports) {
