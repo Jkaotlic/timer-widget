@@ -5101,13 +5101,9 @@
 
             setupLocalBackground() {
                 const preview = document.getElementById('localBgPreview');
-                const placeholder = document.getElementById('localBgPlaceholder');
-                const image = document.getElementById('localBgImage');
                 const fileInput = document.getElementById('bgFileInput');
                 const changeBtn = document.getElementById('changeBgBtn');
                 const deleteBtn = document.getElementById('deleteBgBtn');
-                const fitOptions = document.getElementById('bgFitOptions');
-                const overlayRow = document.getElementById('bgOverlayRow');
                 const overlaySlider = document.getElementById('bgOverlaySlider');
                 const overlayValue = document.getElementById('bgOverlayValue');
 
@@ -5203,7 +5199,7 @@
                     if (!isValid) {
                         return { valid: false, error: 'Файл поврежден или не является изображением' };
                     }
-                } catch (error) {
+                } catch {
                     return { valid: false, error: 'Ошибка при проверке файла' };
                 }
 
@@ -5262,7 +5258,7 @@
 
                     reader.readAsDataURL(file);
                     event.target.value = ''; // Сбрасываем input
-                } catch (error) {
+                } catch {
                     Toast.show('Произошла ошибка при обработке файла', 'error');
                     LoadingIndicator.hide(loadingOverlay);
                     event.target.value = '';
@@ -5364,6 +5360,7 @@
                 this.allowNegativeEl.checked = !!ext.allowNegative;
                 document.getElementById('overrunRow').style.display = ext.allowNegative ? 'flex' : 'none';
                 
+                // eslint-disable-next-line eqeqeq -- null/undefined
                 if (ext.overrunLimitSeconds != null) {
                     const mm = String(Math.floor(ext.overrunLimitSeconds / 60)).padStart(2, '0');
                     const ss = String(ext.overrunLimitSeconds % 60).padStart(2, '0');
@@ -6894,7 +6891,7 @@
         window.timerController = new TimerController();
 
         // Widget picker
-        const widgetPicker = addPickerToggle('themesGrid', 'widgetColorPickerPanel', {
+        addPickerToggle('themesGrid', 'widgetColorPickerPanel', {
             sv: 'widgetCpSv', hue: 'widgetCpHue', hex: 'widgetCpHex', preview: 'widgetCpPreview',
             onChange: (hex) => {
                 document.querySelectorAll('#themesGrid .theme-btn').forEach(b => b.classList.remove('active'));
@@ -6905,7 +6902,7 @@
         });
 
         // Clock picker
-        const clockPicker = addPickerToggle('clockThemesGrid', 'clockColorPickerPanel', {
+        addPickerToggle('clockThemesGrid', 'clockColorPickerPanel', {
             sv: 'clockCpSv', hue: 'clockCpHue', hex: 'clockCpHex', preview: 'clockCpPreview',
             onChange: (hex) => {
                 document.querySelectorAll('#clockThemesGrid .theme-btn').forEach(b => b.classList.remove('active'));
@@ -6916,7 +6913,7 @@
         });
 
         // Display picker
-        const displayPicker = addPickerToggle('displayThemesGrid', 'displayColorPickerPanel', {
+        addPickerToggle('displayThemesGrid', 'displayColorPickerPanel', {
             sv: 'displayCpSv', hue: 'displayCpHue', hex: 'displayCpHex', preview: 'displayCpPreview',
             onChange: (hex) => {
                 document.querySelectorAll('#displayThemesGrid .theme-btn').forEach(b => b.classList.remove('active'));
@@ -7015,7 +7012,7 @@
             }
             const prev = _modalFocusReturnMap.get(modal);
             if (prev && typeof prev.focus === 'function') {
-                try { prev.focus(); } catch (_err) { /* ignore */ }
+                try { prev.focus(); } catch { /* ignore */ }
             }
         }
 
