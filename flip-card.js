@@ -26,6 +26,17 @@
 const FLIP_CLASS = 'flipping';
 const FLIP_DURATION_MS = 300; // должно совпадать с длительностью анимации в CSS
 
+// Незавершённые таймеры снятия класса. Модуль ведёт их САМ и вычёркивает каждый
+// по срабатыванию, поэтому набор всегда размером с число одновременно
+// перекидывающихся карточек (единицы), а не с числом прошедших секунд.
+//
+// Раньше учёт был снаружи: окна складывали id в свои массивы (_flipTimeouts /
+// _timeouts) и очищали их только при закрытии. Секунды тикают ежесекундно, так
+// что за час презентации в массиве оседало несколько тысяч уже сработавших id —
+// неограниченный рост, а в cleanup() потом впустую вызывался clearTimeout на
+// мёртвых идентификаторах.
+const _pending = new Set();
+
 /**
  * Ставит цифру в карточку и, если значение изменилось, запускает перекидывание.
  *
@@ -47,14 +58,29 @@ function flipCardTo(card, digitSelector, value, opts = {}) {
     card.classList.add(FLIP_CLASS);
 
     const id = setTimeout(() => {
+        _pending.delete(id);
         card.classList.remove(FLIP_CLASS);
     }, FLIP_DURATION_MS);
+    _pending.add(id);
 
     if (typeof opts.onTimeout === 'function') { opts.onTimeout(id); }
     return id;
 }
 
-const FlipCard = { flipCardTo, FLIP_CLASS, FLIP_DURATION_MS };
+/**
+ * Гасит все незавершённые таймеры снятия класса. Зовётся окном при закрытии
+ * (beforeunload → cleanup), чтобы не оставить висящих таймеров.
+ *
+ * @returns {number} сколько таймеров было погашено
+ */
+function cancelPending() {
+    const count = _pending.size;
+    for (const id of _pending) { clearTimeout(id); }
+    _pending.clear();
+    return count;
+}
+
+const FlipCard = { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS };
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FlipCard;

@@ -44,7 +44,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 | File | Owns |
 |------|------|
-| `control.css` | All panel styles (3388 lines, moved out of inline `<style>`). Must load AFTER `design-tokens.css`/`components.css` — it overrides them, the cascade order is load-bearing |
+| `control.css` | All panel styles (~3000 lines, moved out of inline `<style>`). Must load AFTER `design-tokens.css`/`components.css` — it overrides them, the cascade order is load-bearing |
 | `sound-bank.js` | 29 built-in sounds synthesised with oscillators. No DOM, no storage |
 | `custom-sounds.js` | User-uploaded sounds: file validation, list, playback, deletion. **Prototype mixin** |
 | `local-background.js` | Fullscreen background image: upload, MIME + magic-byte validation, preview, fit/overlay. **Prototype mixin** |
@@ -114,8 +114,8 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `open-display` / `close-display` | Toggle display window |
 | `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
 | `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
-| `widget-resize` / `widget-scale` / `widget-move` / `widget-set-position` / `widget-set-opacity` | Widget geometry/opacity |
-| `clock-widget-resize` / `clock-widget-scale` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
+| `widget-resize` / `widget-move` / `widget-set-position` / `widget-set-opacity` | Widget geometry/opacity |
+| `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
 | `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
 | `clock-widget-set-position` | `{ x, y }` — restore saved clock position (clamped to a live display) |
 | `display-move` | `{ deltaX, deltaY }` — move display window in windowed mode |
@@ -128,7 +128,6 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | Channel | Payload |
 |---------|---------|
 | `timer-state` | Full `timerState` object (see below) — broadcast every second |
-| `colors-update` | `{ timer, progress }` (legacy, unused) |
 | `widget-colors-update` | `{ timer, progress }` — per-window |
 | `clock-colors-update` | `{ timer, progress }` — per-window |
 | `display-colors-update` | `{ timer, progress }` — per-window |
@@ -159,8 +158,8 @@ Broadcast via `timer-state` channel every second:
 
 ## Testing
 
-256 tests using Node.js built-in test runner (`node --test`). Test files in `tests/`.
-Do NOT hardcode the count anywhere in code or CI — run `node --test` to get it.
+Tests use the Node.js built-in test runner (`node --test`). Test files in `tests/`.
+Do NOT hardcode the count anywhere — in code, in CI, or in this file. Run `node --test` to get it.
 
 Two flavours of test live here:
 
@@ -194,6 +193,19 @@ Two flavours of test live here:
 | `electron-main-source.test.js` | IPC payload hardening, DevTools gating, icon path |
 | `visual-source.test.js` | Layout/centering invariants, release-doc freshness |
 | `audit-2026-07-fixes.test.js` | Regressions from the July 2026 audit (sound, Esc, scales, geometry) |
+| `audit-2026-07-30-fixes.test.js` | Regressions from the 30 Jul 2026 pass (flip separator, finish flash, geometry persistence, modifier guard, flip timers, sound deletion, F1 overlay, scale input, display clock, clock style source, window-state snapshot) |
+| `storage-keys.test.js` | `CONFIG.STORAGE_KEYS` matches the keys the code actually uses — both directions — and no key is write-only or read-only |
+
+e2e specs (`npx playwright test`, `workers: 1`):
+
+| File | Covers |
+|------|--------|
+| `app.spec.js` | Boot, presets, start/pause/reset round trip |
+| `status-and-colors.spec.js` | Colour bands, status priority, Esc layering, overrun limit, module wiring |
+| `flip-animation.spec.js` | Flip animation fires in all three windows |
+| `flip-hours-layout.spec.js` | Flip separator stays dots (never a glyph) in H:MM:SS, measured |
+| `window-state-sync.spec.js` | A window loaded second knows which windows are already open |
+| `dial-ticks.spec.js` | Dial tick marks toggle reaches widget + clock and survives reopen |
 
 ## CI
 
@@ -202,9 +214,16 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 
 ## Gotchas
 
+- **Window state must be SNAPSHOT to each window on load, not only broadcast on change (CRITICAL)**: every window decides "open or close" for W/C/D — and the control panel for its window buttons — from a LOCAL flag that starts `false` and is only updated by `*-window-state` messages. Those used to be sent solely at the moment a window opened or closed, so a window that loaded *later* never learned about windows already open. Ordinary path to the bug: open the clock, then the widget, press C in the widget — the widget thinks the clock is closed, sends `open-clock-widget`, main just focuses the existing window and the toggle appears dead. Same after `bindRenderCrashHandler` reloads a renderer, and after the panel is recreated from the tray. `bindWindowStateSnapshot()` in the main process pushes all three states on `did-finish-load`; the listener is `on`, NOT `once`, precisely so a reload gets the snapshot again. Covered by `e2e/window-state-sync.spec.js`.
+- **The finish flash must be latched**: the fullscreen display's `triggerFinishEffect()` used to be guarded only by `finished && !flashInterval`. `flashInterval` clears itself when the ~3s flash sequence ends while `finished` stays latched in the engine until reset, so ANY later state emit restarted the strobe — pressing Start again at 00:00 (the controller answers with `finish()`), any overrun-config push from the panel, the `get-timer-state` reply to a freshly opened window. `_finishEffectShown` latches it; it is cleared in `updateDisplay()` whenever `finished` is false, *before* the cache early-return.
+- **Flip timers belong to `flip-card.js`**: the module keeps its own `Set` of pending class-removal timeouts and deletes each on fire; windows call `FlipCard.cancelPending()` in `cleanup()`. Do NOT reintroduce per-window arrays (`_flipTimeouts` / `_timeouts`) — seconds tick every second, so an externally tracked list grew unbounded for the lifetime of the window and then `clearTimeout`ed thousands of dead ids.
+- **`showTicks` drives TWO dials**: both the widget and the clock have a `.tick-marks` SVG group and a `.ticks-on` rule, so the single "Деления на циферблате" checkbox writes `widgetShowTicks` AND `clockShowTicks` and pushes to both windows unconditionally (not only when `syncClockStyle` is on). Each window restores its own key at init — without that, enabled ticks visibly blinked off until the panel's push arrived ~600ms after load. The whole feature was once unreachable: the checkbox was dropped from the markup in 9b70782 while every other layer stayed, and `getElementById` guards hid it. `e2e/dial-ticks.spec.js` keeps the chain measured.
+- **Geometry is saved on `resize`, not only from Ctrl+wheel**: the widget and clock persist `{scalePct, x, y}` on the window `resize` event, guarded by `pct !== this._{widget,clock}ScalePct`. The guard is load-bearing: `restoreGeometry()` itself triggers a resize at startup, and without it `saveGeometry()` would write the position *before* `*-set-position` lands and clobber the restored one. Without the resize hook, the panel's "Масштаб часов" slider (which only sends `clock-widget-resize`) was lost on reopen, and the panel restores that slider from `clockGeometry` because it has no value of its own in `displayExtSettings`.
+- **`CONFIG.STORAGE_KEYS` is a registry, not an access point**: renderers use string literals (no bundler, no wrapper module), so the map cannot break — it silently rots. It had 16 phantom keys and was missing 10 real ones. `tests/storage-keys.test.js` now checks it in BOTH directions and additionally fails on any key that is write-only (a setting going nowhere) or read-only (always the default) — both had really happened here.
+- **The display has no browser-mode fallback**: `display-script.js` used to branch on `window.ipcRenderer` and otherwise sync through a `timerState` localStorage key with 1s polling. Nothing in the project ever wrote that key, so the branch could not work at all; it is gone. `display.html` is only ever loaded by `loadFile()` inside Electron.
 - **IPC whitelist is duplicated**: `preload.js` inlines the whitelist from `channel-validator.js` (sandbox blocks `require()`). Both files MUST stay in sync — the test `channel-validator.test.js` verifies this.
 - **Adding new IPC channel**: Add to BOTH `send` and `receive` arrays in BOTH `preload.js` and `channel-validator.js`. Missing receive = widget silently ignores messages.
-- **Per-window colors**: Never use global `colors-update` broadcast. Use `widget-colors-update`, `clock-colors-update`, `display-colors-update` to avoid color bleeding between windows.
+- **Per-window colors**: there is deliberately NO global colour broadcast — a `colors-update` channel does not exist and must not be added. Use `widget-colors-update`, `clock-colors-update`, `display-colors-update` so colours cannot bleed between windows.
 - **`ipc-compat.js`**: All renderer HTML files use `ipcRenderer.on/send` which is shimmed to `electronAPI` via this compat layer. Don't use `electronAPI` directly in renderers.
 - **Global keyboard shortcuts**: Space (start/pause), R (reset), 1-8 (presets 5-60 min), W/C/D (toggle windows) work from ALL windows (widget, clock, display, control). Guarded with `if (e.ctrlKey || e.altKey) return` to avoid conflicts with scale/drag.
 - **Window state broadcast**: `broadcastWindowState()` in main process sends `*-window-state` to ALL windows (not just control). Required for W/C/D toggle shortcuts to know current state.
@@ -213,7 +232,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Inline styles in HTML**: Each HTML file has ~1000+ lines of inline CSS/JS. CSP requires `unsafe-inline`. No external CSS frameworks.
 - **Widget devTools**: Set to `false` in production. Change to `true` in `electron-main.js` for debugging.
 - **Design previews**: Always read real HTML structure first, replicate exact layout, then apply CSS-only improvements. Never generate new layouts from scratch.
-- **Sounds**: 30 built-in sounds synthesized via Web Audio API in `electron-control.html` `generateSound()`. No audio files — all oscillator-based.
+- **Sounds**: 29 built-in sounds synthesised with oscillators in `sound-bank.js` (`BUILT_IN_PRESETS` + one `switch` branch each). No audio files. `tests/sound-bank.test.js` keeps the list, the `switch` and the `<option>`s in the four sound selects in sync — they cannot drift apart silently.
 - **Control panel layout**: Titlebar → Timer (52px) → Start/Pause/Reset → Presets 8×1 → Adjust +/- → Manual time input → Overtime+Windows (merged row) → Tabs always visible (Виджет, Часы, Полноэкранный, Звуки). Settings in 2-column grid.
 - **syncClockStyle**: Defaults to **`false`** (`this.syncClockStyle = !!ext.syncClockStyle` in `loadSettings`) — the clock keeps its own style unless the user opts in. When true, clock style follows the widget style dropdown, and the `timerStyleEl` change handler must send both `widget-style-update` AND `clock-widget-set-style`. Changing the clock style directly from the Часы tab turns the sync back off.
 - **Widget/clock geometry persistence**: size (Ctrl+wheel) and position (drag) are stored per window in `localStorage` under `widgetGeometry` / `clockGeometry` as `{ scalePct, x, y }`, restored in `restoreGeometry()` on open. The main process clamps a restored position via `positionWindowClamped()` — a saved point can reference a monitor that is no longer attached.
@@ -225,6 +244,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **The clock's superscript seconds are the opposite case**: they are secondary, so they must NOT take layout width (`width: 0; overflow: visible`, offset via `transform`). Otherwise the whole block centres and the primary `HH:MM` sits 9.5px left of the ring centre — and toggling seconds in settings visibly jumps the time.
 - Both rules were settled by measuring in `e2e` (digit centre, inscription centre, gap in `em`), never by eye — eyeballing produced two wrong iterations in a row.
 - **Flip animation is shared** (`flip-card.js`): it once existed only on the display while the widget and clock swapped digits instantly. It fires ONLY when the digit actually changed — driving every card each tick turns the effect into flicker. The class is removed on a timer rather than on `animationend`, because switching styles mid-animation means the event never arrives and the card would keep the class forever. `FLIP_DURATION_MS` must match the CSS animation duration in all three windows; a test asserts it.
+- **The widget's flip separator is DOTS, not a glyph**: in `electron-widget.html` the `:` between digit groups is painted by `::before`/`::after` gradient dots, and the element's own text `:` is suppressed with `font-size: 0`. Anything that sets a font-size on `.widget-flip-separator` brings the glyph back ON TOP of the dots — that is exactly what the `has-hours` adaptive rule did, so every timer ≥ 1 h showed a colon *and* two dots. Scale the dots and the column height for the smaller 44×64 card instead; the font-size must stay 0. The clock and the display use real text separators, so this applies to the widget only. Measured by `e2e/flip-hours-layout.spec.js` (the screenshot suite never covered ≥ 1 h, which is why the defect survived).
 - **Colour bands live in ONE place too**: `RendererShared.timerColorBand(remaining, total)` returns `overtime | danger | warning | normal`. Zero is INSIDE the danger band — the old `percentLeft <= 10 && percentLeft > 0` guard pushed exactly 00:00 into the yellow warning band while the status chip next to it went red. Thresholds come from `CONFIG.DANGER_PERCENTAGE` / `WARNING_PERCENTAGE`; they used to be hardcoded as 10/25 in nine places and only the control panel read the config.
 - **One element, one colour system**: the display status pill briefly carried both the semantic classes (`running/paused/finished/overtime`) and a second "tone" layer (`is-success/is-attention`) declared lower in the CSS, so the tone layer won the cascade and painted «ВРЕМЯ ВЫШЛО!» green over a red pulse. Never add a parallel colour system to an element that already has one.
 - **Status palette is fixed across all three windows**: running green, paused orange, finished red (static), overtime red (pulsing). The pulse is the ONLY thing distinguishing the two red states — do not add an animation to `finished`.

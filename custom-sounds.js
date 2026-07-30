@@ -257,7 +257,32 @@ const CustomSoundsMixin = {
                 window.Toast.show('Не удалось обновить список звуков', 'error');
                 return;
             }
+
+            // Событие, у которого был выбран удаляемый звук, обязано вернуться к
+            // «— без звука —». Раньше опция просто исчезала из <select>: значение
+            // становилось пустым (selectedIndex = -1, поле показывало пустоту), а
+            // в displayExtSettings навсегда оставался мёртвый 'custom:<имя>' —
+            // после перезапуска поле снова было пустым, а playSound() уходил в
+            // SoundBank с несуществующим именем и молчал без всякого объяснения.
+            //
+            // Сброс делаем ДО loadCustomSounds(): она сохраняет текущий выбор
+            // каждого <select> и восстанавливает его после перестройки списка.
+            const dead = `custom:${name}`;
+            let resetCount = 0;
+            ['Start', 'End', 'Minute', 'Overrun'].forEach(type => {
+                const select = document.getElementById(`sound${type}Preset`);
+                if (select && select.value === dead) {
+                    select.value = 'none';
+                    resetCount++;
+                }
+            });
+
             this.loadCustomSounds();
+
+            if (resetCount > 0) {
+                if (typeof this.saveExtSettings === 'function') { this.saveExtSettings(); }
+                window.Toast.show('Звук удалён — событие переведено на «без звука»', 'warning', 2500);
+            }
     }
 };
 

@@ -43,7 +43,18 @@ function setupScaleValueEdit(spanEl, sliderEl, minVal, maxVal, defaultVal, onApp
             input.focus();
             input.select();
 
+            // Ввод закрывается ровно один раз — либо применением, либо отменой.
+            //
+            // Без этого флага Escape не был настоящей отменой: узел удалялся из
+            // DOM, а браузер в зависимости от движка мог дослать blur, и тогда
+            // applyValue применял отменённое значение (input.value читается и у
+            // отсоединённого узла). Тот же флаг защищает от двойного применения,
+            // когда blur приходит после Enter.
+            let settled = false;
+
             const applyValue = () => {
+                if (settled) { return; }
+                settled = true;
                 let val = parseInt(input.value);
                 if (isNaN(val)) { val = defaultVal; }
                 val = Math.max(minVal, Math.min(maxVal, val));
@@ -59,6 +70,7 @@ function setupScaleValueEdit(spanEl, sliderEl, minVal, maxVal, defaultVal, onApp
                 if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
                 if (ev.key === 'Escape') {
                     ev.preventDefault();
+                    settled = true;
                     spanEl.style.display = '';
                     if (input.parentNode) { input.remove(); }
                 }

@@ -355,25 +355,6 @@ body::after {
     box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
 }
 
-/* Scrollable content area — shrinks to content on tall windows so the
-   panel doesn't stretch into giant blank space; scrolls when needed. */
-.scrollable-content {
-    flex: 0 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.scrollable-content::-webkit-scrollbar { width: 4px; }
-.scrollable-content::-webkit-scrollbar-track { background: transparent; }
-.scrollable-content::-webkit-scrollbar-thumb {
-    background: var(--tw-overlay-medium);
-    border-radius: 2px;
-}
-.scrollable-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.22);
-}
-
 /* Custom titlebar — traffic light style */
 .custom-titlebar,
 .timer-header {
@@ -1078,70 +1059,10 @@ body::after {
     background: rgba(255, 255, 255, 0.22);
 }
 
-/* Position buttons */
-.pos-btn {
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-sm);
-    background: var(--tw-overlay-light);
-    color: var(--tw-fg-muted);
-    cursor: pointer;
-    font-size: 14px;
-    transition: background var(--tw-dur-base) var(--tw-ease),
-                color var(--tw-dur-base) var(--tw-ease),
-                border-color var(--tw-dur-base) var(--tw-ease);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.pos-btn:hover {
-    background: rgba(10, 132, 255, 0.2);
-    border-color: rgba(10, 132, 255, 0.4);
-    color: var(--tw-blue);
-}
-
-.pos-btn.active {
-    background: var(--tw-blue);
-    border-color: var(--tw-blue);
-    color: var(--tw-fg);
-}
-
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-
-/* Time presets (legacy — not used in current layout but kept for safety) */
-.time-presets {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-bottom: var(--tw-s-3);
-}
-
-.preset-btn {
-    padding: var(--tw-s-3) 6px;
-    font-size: var(--tw-t-label);
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-md);
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--tw-fg-secondary);
-    cursor: pointer;
-    font-weight: 500;
-    transition: background var(--tw-dur-base) var(--tw-ease),
-                color var(--tw-dur-base) var(--tw-ease),
-                border-color var(--tw-dur-base) var(--tw-ease);
-}
-
-.preset-btn:hover {
-    border-color: rgba(10, 132, 255, 0.4);
-    background: rgba(10, 132, 255, 0.15);
-    color: var(--tw-blue);
-}
-
-.preset-btn:active { transform: scale(0.96); }
 
 /* Time input */
 .time-input-group {
@@ -1176,50 +1097,6 @@ body::after {
     background: rgba(10, 132, 255, 0.08);
 }
 
-.time-separator {
-    font-size: 1.2em;
-    font-weight: 600;
-    color: var(--tw-fg-dim);
-}
-
-.set-time-btn {
-    padding: var(--tw-s-2) var(--tw-s-4);
-    background: var(--tw-blue);
-    color: var(--tw-fg);
-    border: none;
-    border-radius: var(--tw-r-sm);
-    font-weight: 600;
-    font-size: var(--tw-t-label);
-    cursor: pointer;
-    transition: filter var(--tw-dur-base) var(--tw-ease),
-                transform var(--tw-dur-fast) var(--tw-ease);
-}
-
-.set-time-btn:hover { filter: brightness(1.15); }
-
-/* Adjust section (legacy wrapper — kept for safety) */
-.adjust-section {
-    background: var(--tw-overlay-light);
-    border: 1px solid var(--tw-border);
-    padding: var(--tw-s-3);
-    border-radius: var(--tw-r-lg);
-}
-
-.adjust-title {
-    font-size: var(--tw-t-tiny);
-    color: var(--tw-fg-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: var(--tw-s-3);
-    font-weight: 600;
-}
-
-.adjust-btns {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
 .adjust-btn {
     flex: 1;
     min-width: 70px;
@@ -1248,13 +1125,6 @@ body::after {
     background: rgba(255, 69, 58, 0.15);
     color: var(--tw-red);
     border-color: rgba(255, 69, 58, 0.3);
-}
-
-/* Window buttons (legacy alias) */
-.window-btns {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--tw-s-2);
 }
 
 .window-btn {
@@ -1311,22 +1181,6 @@ body::after {
 .settings-group-title .icon {
     font-size: 1em;
     filter: brightness(1.3);
-}
-
-/* Colors */
-.color-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--tw-s-3);
-}
-
-.color-item { text-align: center; }
-
-.color-item label {
-    display: block;
-    font-size: var(--tw-t-tiny);
-    color: var(--tw-fg-secondary);
-    margin-bottom: 4px;
 }
 
 .color-picker {
@@ -1512,47 +1366,6 @@ body::after {
     height: 7px;
 }
 
-/* =======================================================
-   Sound tab — library-style redesign (kit: sound-tab.html)
-   ======================================================= */
-
-/* Group card — wraps each event (start/end/minute/overrun). */
-.sound-group {
-    background: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(255, 255, 255, 0.055);
-    border-radius: var(--tw-r-lg);
-    padding: var(--tw-s-3);
-    margin-bottom: var(--tw-s-2);
-}
-
-.sound-group:last-child { margin-bottom: 0; }
-
-.sound-group-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--tw-s-3);
-    margin-bottom: var(--tw-s-3);
-}
-
-.sound-group-head .meta {
-    flex: 1;
-    min-width: 0;
-}
-
-.sound-group-head .title {
-    font-size: var(--tw-t-label);
-    font-weight: 600;
-    color: var(--tw-fg);
-    letter-spacing: -0.1px;
-}
-
-.sound-group-head .sub {
-    font-size: var(--tw-t-caption);
-    color: var(--tw-fg-dim);
-    margin-top: 2px;
-}
-
 /* Disabled row/group — dim when the row's enabled checkbox is off. */
 .sound-row.disabled,
 .sound-group.disabled .sound-row { opacity: 0.4; pointer-events: none; }
@@ -1566,21 +1379,6 @@ body::after {
     border: 1px solid var(--tw-border);
     border-radius: var(--tw-r-md);
     margin-bottom: 0;
-}
-
-.sound-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 110px;
-    font-size: var(--tw-t-caption);
-    color: var(--tw-fg-secondary);
-}
-
-.sound-toggle input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    accent-color: var(--tw-blue);
 }
 
 /* Select wrapper — gives us space for custom chevron on the right. */
@@ -1673,13 +1471,6 @@ select optgroup,
 .sound-preview:focus-visible {
     outline: none;
     box-shadow: var(--tw-focus-ring);
-}
-
-/* Custom sounds library */
-.custom-sounds-section {
-    margin-top: var(--tw-s-3);
-    padding-top: var(--tw-s-3);
-    border-top: 1px solid var(--tw-divider);
 }
 
 .custom-sound-list {
@@ -2017,22 +1808,6 @@ select optgroup,
     gap: var(--tw-s-3);
 }
 
-.url-input {
-    width: 100%;
-    padding: var(--tw-s-3);
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-sm);
-    font-size: var(--tw-t-label);
-    background: var(--tw-overlay-light);
-    color: var(--tw-fg-secondary);
-}
-
-.url-input:focus {
-    outline: none;
-    border-color: var(--tw-blue);
-    background: rgba(10, 132, 255, 0.08);
-}
-
 /* Local background upload */
 .local-bg-section { margin-top: var(--tw-s-3); }
 
@@ -2286,11 +2061,6 @@ select optgroup,
     box-shadow: var(--tw-focus-ring);
 }
 
-/* =======================================================
-   Adjust row — gradient-divided steppers
-   ======================================================= */
-.adjust-main-section { margin-top: var(--tw-s-2); }
-
 .adjust-main-row {
     display: flex;
     align-items: center;
@@ -2327,13 +2097,6 @@ select optgroup,
 .adjust-main-btn:focus-visible {
     outline: none;
     box-shadow: var(--tw-focus-ring);
-}
-
-.time-input-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--tw-s-2);
 }
 
 .manual-time-row {
@@ -2451,30 +2214,6 @@ select optgroup,
     border-color: rgba(48, 209, 88, 0.5);
 }
 
-/* Overtime / windows combined row */
-.overtime-toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--tw-s-2) var(--tw-s-3);
-    background: var(--tw-overlay-light);
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-md);
-}
-
-.overtime-toggle-row .toggle-label {
-    font-size: var(--tw-t-label);
-    color: var(--tw-fg-secondary);
-}
-
-.overtime-windows-row {
-    display: flex;
-    gap: var(--tw-s-2);
-    align-items: center;
-}
-
-.overtime-windows-row .overtime-toggle-row { flex: 1; }
-
 .quick-windows {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2550,56 +2289,6 @@ select optgroup,
     flex-shrink: 0;
 }
 
-.adjust-sign {
-    font-size: 1.1em;
-    font-weight: 700;
-    align-self: center;
-    flex-shrink: 0;
-    line-height: 1;
-}
-
-.adjust-sign.minus { color: var(--tw-red); margin-right: 2px; }
-.adjust-sign.plus  { color: var(--tw-blue); margin-left: 2px; }
-
-.windows-sound-divider {
-    width: 1px;
-    background: var(--tw-border);
-    margin: 4px 2px;
-    align-self: stretch;
-    flex-shrink: 0;
-}
-
-/* Settings row bar */
-.settings-row-bar {
-    display: flex;
-    align-items: stretch;
-    flex-shrink: 0;
-}
-
-.settings-row-bar .settings-toggle {
-    flex: 1;
-    width: auto;
-}
-
-.faq-small {
-    width: 38px;
-    border: none;
-    background: var(--tw-overlay-light);
-    color: var(--tw-fg-dim);
-    font-size: var(--tw-t-label);
-    font-weight: 600;
-    cursor: pointer;
-    border-left: 1px solid var(--tw-divider);
-    transition: background var(--tw-dur-base) var(--tw-ease),
-                color var(--tw-dur-base) var(--tw-ease);
-    flex-shrink: 0;
-}
-
-.faq-small:hover {
-    background: var(--tw-overlay-medium);
-    color: var(--tw-fg-muted);
-}
-
 .quick-window-btn:hover {
     border-color: rgba(10, 132, 255, 0.35);
     background: linear-gradient(180deg,
@@ -2652,27 +2341,6 @@ select optgroup,
     box-shadow: var(--tw-focus-ring);
 }
 
-/* Settings toggle (legacy collapse trigger) */
-.settings-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--tw-s-2);
-    padding: var(--tw-s-3);
-    background: var(--tw-overlay-light);
-    border: none;
-    cursor: pointer;
-    width: 100%;
-    font-size: var(--tw-t-caption);
-    color: var(--tw-fg-secondary);
-    transition: background var(--tw-dur-base) var(--tw-ease);
-}
-
-.settings-toggle:hover { background: var(--tw-overlay-medium); }
-
-.settings-toggle .arrow { transition: transform var(--tw-dur-slow) var(--tw-ease); }
-.settings-toggle.open .arrow { transform: rotate(180deg); }
-
 /* Advanced settings — sized by content; the panel itself can shrink. */
 .advanced-settings {
     display: flex;
@@ -2697,32 +2365,6 @@ select optgroup,
     overflow-y: auto;
     overflow-x: hidden;
 }
-
-/* FAQ button (legacy absolute) */
-.faq-btn {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 1px solid var(--tw-border);
-    background: var(--tw-overlay-light);
-    color: var(--tw-fg-secondary);
-    font-size: var(--tw-t-caption);
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background var(--tw-dur-base) var(--tw-ease);
-    backdrop-filter: var(--tw-blur-xs);
-    z-index: 100;
-    app-region: no-drag;
-    -webkit-app-region: no-drag;
-}
-
-.faq-btn:hover { background: var(--tw-overlay-medium); color: var(--tw-fg); }
 
 /* =======================================================
    Exit / FAQ / Reset modals
@@ -3188,28 +2830,6 @@ select optgroup,
     position: relative;
 }
 
-/* Info banners */
-.info-banner {
-    background: rgba(10, 132, 255, 0.08);
-    border-left: 2px solid var(--tw-blue);
-    padding: var(--tw-s-2) var(--tw-s-3);
-    border-radius: var(--tw-r-xs);
-    margin-bottom: var(--tw-s-3);
-    font-size: var(--tw-t-caption);
-    line-height: 1.5;
-    color: var(--tw-fg-muted);
-}
-
-.info-banner.tip {
-    background: rgba(48, 209, 88, 0.08);
-    border-left-color: var(--tw-green);
-}
-
-.info-banner.warning {
-    background: rgba(255, 159, 10, 0.08);
-    border-left-color: var(--tw-orange);
-}
-
 /* Toast notifications */
 .toast-container {
     position: fixed;
@@ -3246,18 +2866,6 @@ select optgroup,
 .toast.warning { background: rgba(255, 159, 10, 0.9); border-color: rgba(255, 159, 10, 0.3); }
 .toast.success { background: rgba(48, 209, 88, 0.9);  border-color: rgba(48, 209, 88, 0.3); }
 
-.info-banner strong { color: var(--tw-fg); font-weight: 600; }
-
-.info-banner code {
-    background: rgba(10, 132, 255, 0.15);
-    padding: 2px 6px;
-    border-radius: var(--tw-r-xs);
-    font-family: var(--tw-font-mono);
-    font-size: 0.9em;
-    color: var(--tw-blue);
-    font-weight: 500;
-}
-
 /* Small-screen adaptations */
 @media (max-height: 600px) {
     .timer-header { padding: var(--tw-s-3) var(--tw-s-4) var(--tw-s-2); }
@@ -3267,7 +2875,6 @@ select optgroup,
     .main-btn.start { width: 50px !important; height: 50px !important; }
     .quick-presets { padding: 6px; }
     .quick-preset { padding: 5px var(--tw-s-2); font-size: var(--tw-t-tiny); }
-    .info-banner { padding: 5px var(--tw-s-2); font-size: var(--tw-t-tiny); margin-bottom: var(--tw-s-2); }
 }
 
 @media (max-width: 380px) {

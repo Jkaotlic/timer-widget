@@ -14,9 +14,18 @@
 
 // Show keyboard shortcuts help
 function showKeyboardShortcuts() {
-    // Prevent stacking multiple overlays
+    // Prevent stacking multiple overlays. Повторный F1 = закрыть.
+    //
+    // Раньше здесь стоял голый existing.remove(), и document-слушатель Escape
+    // этого оверлея оставался висеть: каждый цикл F1→F1 добавлял ещё один мёртвый
+    // слушатель, ссылающийся на уже удалённый узел. Убирались они только при
+    // следующем нажатии Escape (тогда каждый снимал сам себя).
     const existing = document.getElementById('keyboard-shortcuts-overlay');
-    if (existing) { existing.remove(); return; }
+    if (existing) {
+        if (typeof existing._closeOverlay === 'function') { existing._closeOverlay(); }
+        else { existing.remove(); }
+        return;
+    }
 
     const overlay = document.createElement('div');
     overlay.id = 'keyboard-shortcuts-overlay';
@@ -32,6 +41,9 @@ function showKeyboardShortcuts() {
         overlay.remove();
         document.removeEventListener('keydown', _onOverlayKey);
     };
+    // Отдаём закрытие наружу, чтобы повторный вызов showKeyboardShortcuts()
+    // (второй F1) снял и узел, и слушатель, а не только узел.
+    overlay._closeOverlay = closeOverlay;
 
     // Тёмное стекло в тон остальному приложению — раньше эта панель
     // была белой и била по глазам поверх тёмного UI.
