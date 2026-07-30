@@ -1065,16 +1065,6 @@ body::after {
 }
 
 /* Time input */
-.time-input-group {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    padding: 10px;
-    border-radius: 12px;
-    margin-bottom: 12px;
-}
 
 .time-input {
     flex: 1;
@@ -2760,17 +2750,6 @@ select optgroup,
     border-color: var(--tw-red) !important;
     background-color: rgba(255, 69, 58, 0.08) !important;
     animation: shake 0.3s;
-}
-
-.error-message {
-    color: var(--tw-red);
-    font-size: var(--tw-t-tiny);
-    margin-top: 4px;
-    display: none;
-    padding: 4px var(--tw-s-2);
-    background: rgba(255, 69, 58, 0.08);
-    border-radius: var(--tw-r-xs);
-    border-left: 2px solid var(--tw-red);
 }
 
 @keyframes shake {
