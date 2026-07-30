@@ -51,7 +51,7 @@ function themeLabel(theme) {
 function readTheme() {
     try {
         return normalizeTheme(window.localStorage.getItem(UI_THEME_STORAGE_KEY));
-    } catch (_e) {
+    } catch {
         return UI_THEME_DEFAULT;
     }
 }
@@ -61,7 +61,7 @@ function storeTheme(theme) {
     const t = normalizeTheme(theme);
     try {
         window.localStorage.setItem(UI_THEME_STORAGE_KEY, t);
-    } catch (_e) { /* переполненная квота не должна ломать переключение */ }
+    } catch { /* переполненная квота не должна ломать переключение */ }
     return t;
 }
 
