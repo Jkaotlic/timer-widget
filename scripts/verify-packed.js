@@ -83,17 +83,25 @@ function flatten(node, prefix, acc) {
 
 // Сверяет плоский список файлов пакета с объявленным build.files.
 // Чистая функция — её и гоняет tests/verify-packed.test.js.
-function checkPacked(packedList, declared, dirExists) {
+function checkPacked(packedList, declared, countRepoFiles) {
     const packed = new Set(packedList);
     const missing = [];
     const emptyGlobs = [];
 
     for (const entry of declared) {
         if (entry.includes('*')) {
-            // `sounds/**/*` → требуем хотя бы один файл под этим каталогом,
-            // но только если каталог вообще есть в репозитории.
+            // Шаблон вида `sounds/**/*` считается ПРОВАЛЕННЫМ только если файлы
+            // под этим каталогом в репозитории ЕСТЬ, а в пакет не попал ни один —
+            // ровно тот случай, когда ассет объявлен, лежит на месте и всё равно
+            // не доезжает до сборки (так в 2.3.2 потерялся design-tokens.css).
+            //
+            // Пустой каталог-заготовка — не ошибка: `sounds/` держится одним
+            // `.gitkeep` под будущие аудиофайлы (сейчас все 29 звуков синтезируются
+            // осцилляторами в sound-bank.js). Шаблон оставлен намеренно, чтобы
+            // добавленный позже файл поехал в пакет сам, без правки build.files.
+            // Точки-файлы (.gitkeep и подобные) за содержимое не считаем.
             const dir = entry.split('/')[0];
-            if (!dirExists(dir)) { continue; }
+            if (countRepoFiles(dir) === 0) { continue; }
             const hasAny = [...packed].some((p) => p.startsWith(`${dir}/`));
             if (!hasAny) { emptyGlobs.push(entry); }
             continue;
@@ -102,6 +110,28 @@ function checkPacked(packedList, declared, dirExists) {
     }
 
     return { missing, emptyGlobs, ok: missing.length === 0 && emptyGlobs.length === 0 };
+}
+
+// Сколько НЕ-точечных файлов лежит под каталогом в репозитории (рекурсивно).
+function countRepoFilesUnder(root, dir) {
+    const start = path.join(root, dir);
+    let total = 0;
+    const walk = (d) => {
+        let entries;
+        try {
+            entries = fs.readdirSync(d, { withFileTypes: true });
+        } catch {
+            return;
+        }
+        for (const e of entries) {
+            if (e.name.startsWith('.')) { continue; }
+            if (e.isSymbolicLink()) { continue; }
+            if (e.isDirectory()) { walk(path.join(d, e.name)); }
+            else { total++; }
+        }
+    };
+    walk(start);
+    return total;
 }
 
 function main() {
@@ -120,7 +150,7 @@ function main() {
     const { missing, emptyGlobs } = checkPacked(
         [...packed],
         declared,
-        (dir) => fs.existsSync(path.join(ROOT, dir))
+        (dir) => countRepoFilesUnder(ROOT, dir)
     );
 
     // Скрипты, которые главный процесс требует в рантайме по относительному пути.
@@ -142,7 +172,7 @@ function main() {
     }
 }
 
-module.exports = { readAsarHeader, flatten, checkPacked, findAsar };
+module.exports = { readAsarHeader, flatten, checkPacked, findAsar, countRepoFilesUnder };
 
 // Запуск как скрипт — но не при импорте из теста.
 if (require.main === module) {

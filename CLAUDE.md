@@ -211,8 +211,32 @@ e2e specs (`npx playwright test`, `workers: 1`):
 
 ## CI
 
-GitHub Actions (`.github/workflows/nodejs.yml`): Node 22, ubuntu-latest — runs `npm run ci` (lint + test).
+GitHub Actions (`.github/workflows/nodejs.yml`), Node 22, three jobs:
+
+| Job | Where | What |
+|-----|-------|------|
+| `build` | ubuntu-latest | `npm run ci` (lint + unit), then non-blocking `visual:check` under xvfb and `coverage` |
+| `e2e` | ubuntu + windows + macos | `npx playwright test` — the ONLY thing that exercises the real Electron runtime. Linux runs under `xvfb-run`; `fail-fast: false` so one platform failing doesn't hide the others; the Playwright report is uploaded per-OS on failure |
+| `pack` | ubuntu + windows | `electron-builder --dir`, then `node scripts/verify-packed.js` |
+
 Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
+
+- **The e2e matrix is what closes the cross-platform gap.** It used to not run in CI at
+  all — 35 runtime tests executed only by hand on macOS, while the entire JS window-drag
+  architecture exists *because of* Windows quirks with transparent frameless windows. The
+  untested platform was precisely the one the workaround was written for.
+- **`pack` catches what `tests/packaging.test.js` cannot.** The unit test only checks the
+  *list* in `package.json`; `verify-packed.js` opens the real `app.asar` produced by real
+  electron-builder and diffs its contents against `build.files`. That is how
+  `design-tokens.css` went missing in 2.3.2 — it was in the list.
+- **`verify-packed.js` parses the asar header by hand** (no dependency): four `uint32`
+  fields precede the JSON tree — outer pickle size, header buffer size, header payload
+  size, then the JSON string length at offset 12, with the JSON itself at offset 16.
+  `tests/verify-packed.test.js` validates this against the **real** `default_app.asar`
+  shipped inside `node_modules/electron`, not only against a synthetic archive: the first
+  version of that test built its fixture with the same wrong offsets as the parser and
+  passed green while CI failed on the real file. A hand-rolled fixture can only ever
+  confirm your own understanding of a format.
 
 ## Gotchas
 

@@ -138,28 +138,62 @@ test('пропавший ассет ловится', () => {
     const res = checkPacked(
         ['electron-main.js', 'utils.js'],
         ['electron-main.js', 'utils.js', 'design-tokens.css'],
-        () => true
+        () => 1   // предикат отдаёт ЧИСЛО файлов; шаблонов в этом наборе нет
     );
     assert.equal(res.ok, false);
     assert.deepEqual(res.missing, ['design-tokens.css']);
 });
 
-test('пустой шаблон ловится, но только если каталог есть в репозитории', () => {
-    // fonts/ есть, но в пакет не попал ни один файл — это регресс.
-    const withDir = checkPacked(['electron-main.js'], ['electron-main.js', 'fonts/**/*'], () => true);
-    assert.equal(withDir.ok, false);
-    assert.deepEqual(withDir.emptyGlobs, ['fonts/**/*']);
+test('шаблон провален, только если файлы в репозитории есть, а в пакете их нет', () => {
+    // 20 шрифтов в репозитории, в пакете ни одного — это ровно тот регресс,
+    // из-за которого в 2.3.2 потерялся design-tokens.css.
+    const lost = checkPacked(['electron-main.js'], ['electron-main.js', 'fonts/**/*'], () => 20);
+    assert.equal(lost.ok, false);
+    assert.deepEqual(lost.emptyGlobs, ['fonts/**/*']);
 
-    // Каталога нет вовсе — шаблон просто ни к чему не относится, это не ошибка.
-    const withoutDir = checkPacked(['electron-main.js'], ['electron-main.js', 'fonts/**/*'], () => false);
-    assert.equal(withoutDir.ok, true);
+    // Каталог-заготовка (только .gitkeep → 0 файлов) — не ошибка. Так живёт
+    // sounds/: шаблон оставлен под будущие аудиофайлы, звуки пока синтезируются.
+    const placeholder = checkPacked(['electron-main.js'], ['electron-main.js', 'sounds/**/*'], () => 0);
+    assert.equal(placeholder.ok, true, 'пустой каталог-заготовка не должен ронять проверку');
+    assert.deepEqual(placeholder.emptyGlobs, []);
+});
+
+test('countRepoFilesUnder не считает точечные файлы за содержимое', () => {
+    const { countRepoFilesUnder } = require('../scripts/verify-packed');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-count-'));
+    try {
+        fs.mkdirSync(path.join(root, 'sounds'));
+        fs.writeFileSync(path.join(root, 'sounds', '.gitkeep'), '# Sound files directory');
+        assert.equal(countRepoFilesUnder(root, 'sounds'), 0, 'только .gitkeep → содержимого нет');
+
+        fs.mkdirSync(path.join(root, 'sounds', 'nested'));
+        fs.writeFileSync(path.join(root, 'sounds', 'nested', 'a.wav'), 'x');
+        assert.equal(countRepoFilesUnder(root, 'sounds'), 1, 'вложенный файл обязан считаться');
+
+        assert.equal(countRepoFilesUnder(root, 'нет-такого'), 0, 'отсутствующий каталог → 0, без исключения');
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('sounds/ в этом репозитории — заготовка, и проверка это учитывает', () => {
+    // Зафиксировано намеренно: если однажды в sounds/ появятся настоящие файлы,
+    // тест не упадёт, а вот шаг в CI начнёт следить, что они попадают в пакет.
+    const { countRepoFilesUnder } = require('../scripts/verify-packed');
+    const root = path.join(__dirname, '..');
+    const n = countRepoFilesUnder(root, 'sounds');
+    assert.ok(n >= 0);
+    if (n === 0) {
+        const res = checkPacked(['electron-main.js'], ['sounds/**/*'], () => n);
+        assert.equal(res.ok, true);
+    }
 });
 
 test('полный пакет проходит', () => {
     const res = checkPacked(
         ['electron-main.js', 'control.css', 'fonts/a.woff2', 'sounds/b.wav'],
         ['electron-main.js', 'control.css', 'fonts/**/*', 'sounds/**/*'],
-        () => true
+        () => 1
     );
     assert.equal(res.ok, true);
     assert.deepEqual(res.missing, []);
