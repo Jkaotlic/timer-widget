@@ -88,8 +88,17 @@ function isRegression(result, opts = {}) {
  * @param {string} name — имя файла снимка
  * @returns {boolean}
  */
+// Снимки, которые содержат НАСТОЯЩЕЕ время и потому отличаются на каждом прогоне.
+// Сравнивать их попиксельно бессмысленно — регрессией будет считаться сама секунда.
+//
+//   clock-*              — виджет часов целиком показывает стенные часы;
+//   display-blocks-*     — на полноэкранном дисплее включён блок «Текущее время».
+//
+// Список обязан пополняться вместе с новыми состояниями в screenshot-runner.js:
+// снимок с живыми часами, не попавший сюда, роняет `visual:check` навсегда.
 function isTimeDependent(name) {
-    return /^clock-/.test(String(name || ''));
+    return /^clock-/.test(String(name || ''))
+        || /^display-blocks-/.test(String(name || ''));
 }
 
 module.exports = {

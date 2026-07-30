@@ -90,4 +90,10 @@ test('снимки часов исключены из сверки — они п
     assert.equal(isTimeDependent('display-overtime.png'), false);
     assert.equal(isTimeDependent(''), false);
     assert.equal(isTimeDependent(undefined), false);
+
+    // display-blocks-* показывают info-блок «Текущее время» — тоже живые часы.
+    // Снимок с живым временем, не попавший в исключения, роняет visual:check
+    // навсегда: регрессией начинает считаться сама секунда.
+    assert.equal(isTimeDependent('display-blocks-circle.png'), true);
+    assert.equal(isTimeDependent('display-blocks-analog.png'), true);
 });

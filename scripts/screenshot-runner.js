@@ -81,6 +81,26 @@ async function waitForLoad(win, timeoutMs = 6000) {
     });
 }
 
+// Ждём ФАКТИЧЕСКОЙ загрузки шрифтов, а не «на всякий случай столько-то мс».
+//
+// Все окна объявляют шрифты с `font-display: swap`: пока woff2 не загрузился,
+// текст рисуется запасным шрифтом, а потом подменяется. Если первый снимок
+// попадает в промежуток, он отличается от эталона на десятки тысяч пикселей —
+// и это не регрессия, а гонка. Ровно так `visual:check` периодически падал на
+// трёх снимках состояния idle (display-idle расходился на 2.43%), а повторный
+// прогон тут же давал 0 расхождений. Слепого sleep(1500) под нагрузкой не хватало.
+async function waitForFonts(win, timeoutMs = 5000) {
+    if (!win || win.isDestroyed()) { return; }
+    try {
+        await win.webContents.executeJavaScript(`
+            Promise.race([
+                document.fonts.ready.then(() => true),
+                new Promise((r) => setTimeout(() => r(false), ${timeoutMs}))
+            ])
+        `, true);
+    } catch { /* окно могло закрыться — снимок всё равно будет сделан */ }
+}
+
 async function capture(win, filePath, log) {
     if (!win || win.isDestroyed()) {
         log.warn(`[screenshot] skip ${path.basename(filePath)} — window missing`);
@@ -168,7 +188,11 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                 log.warn(`[screenshot] ${name} did-finish-load timeout: ${e.message}`);
             }
         }
-        await sleep(1500); // let CSS/fonts/glass blur settle
+        // Шрифты — по факту готовности, стекло и раскладка — коротким запасом.
+        for (const name of WINDOWS) {
+            await waitForFonts(ctx()[name]);
+        }
+        await sleep(600); // glass blur + первая раскладка
 
         // Заморозку ставим ДО первого снимка, иначе фаза пульсации попадает в кадр.
         await freezeAnimations(ctx, log);
@@ -322,6 +346,40 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             await sleep(400);
             await capture(w, path.join(outDir, `${name}-maxsize.png`), log);
         }
+
+        // Info-блоки полноэкранного дисплея («Текущее время» / «Начало» / «Конец»).
+        //
+        // Они выключены по умолчанию, поэтому НИ В ОДИН из предыдущих снимков не
+        // попадали — целая функция презентационного окна не имела визуального
+        // покрытия вообще. Именно поэтому нечитаемые подписи (контраст 2.15:1 во
+        // всех восьми темах) не могла поймать никакая сверка картинок.
+        //
+        // Идёт САМЫМ ПОСЛЕДНИМ намеренно: включение блоков меняет внутреннее
+        // состояние дисплея (_lastPreset, позиции), и делать это раньше означало бы
+        // подмешивать его во все предыдущие кадры. Снимаем два стиля: круг (базовая
+        // раскладка карточек) и аналог (там у блоков свой круглый вид с мини-часами).
+        log.info('[screenshot] info blocks');
+        for (const style of ['circle', 'analog']) {
+            const w = ctx();
+            if (!w.display || w.display.isDestroyed()) { break; }
+            try {
+                w.display.setSize(1280, 720);
+                w.display.webContents.send('display-settings-update', {
+                    timerStyle: style,
+                    showTimeBlocks: true,
+                    showCurrentTime: true,
+                    timeLayoutPreset: 'frame',
+                    eventTime: '10:00',
+                    endTime: '12:00'
+                });
+            } catch (e) {
+                log.warn(`[screenshot] info blocks (${style}) failed: ${e.message}`);
+                continue;
+            }
+            await sleep(600);
+            await capture(ctx().display, path.join(outDir, `display-blocks-${style}.png`), log);
+        }
+
         // Сверка с эталонами — только по запросу (--visual-check), чтобы обычный
         // прогон скриншотов оставался быстрым и не падал.
         if (process.argv.includes('--visual-check') && nativeImage) {
