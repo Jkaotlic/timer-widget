@@ -1,8 +1,23 @@
 #!/bin/bash
-# Ensure chrome-sandbox has safe 0755 permissions without SUID.
-# Electron falls back to user namespaces when SUID is absent.
+# Настройка песочницы Chromium после установки пакета.
+#
+# Песочнице нужен один из двух механизмов:
+#   1) вспомогательный бинарник chrome-sandbox с SUID-битом и владельцем root;
+#   2) непривилегированные user namespaces в ядре.
+#
+# Раньше здесь стоял `chmod 0755` (SUID снимался) с расчётом на второй путь, а в
+# сборку при этом уезжал ключ `--no-sandbox` — то есть песочница не работала ни
+# одним из двух способов, и заявленный во всех окнах `sandbox: true` не имел
+# смысла. Ключ убран из deb-сборки (остался только в AppImage, где установочного
+# шага нет), поэтому SUID теперь нужен по-настоящему: user namespaces отключены
+# на части систем — на жёстких ядрах, а с Ubuntu 24.04 их дополнительно
+# ограничивает профиль AppArmor.
+#
+# Владелец root задаётся явно: fpm может собирать пакет от обычного
+# пользователя, и тогда SUID-бит без смены владельца ничего не даёт.
 SANDBOX="/opt/TimerWidget/chrome-sandbox"
 if [ -e "$SANDBOX" ]; then
-    chmod 0755 "$SANDBOX" || true
+    chown root:root "$SANDBOX" || true
+    chmod 4755 "$SANDBOX" || true
 fi
 exit 0

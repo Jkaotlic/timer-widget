@@ -81,6 +81,57 @@ function flatten(node, prefix, acc) {
     return acc;
 }
 
+// Достаёт содержимое одного файла из asar по его записи в заголовке.
+// Данные лежат подряд после заголовка: offset у записи — смещение ОТ начала
+// области данных, то есть от 16 + размер JSON, выровненного пикклом до 4 байт.
+function readAsarFile(asarPath, header, relPath) {
+    const parts = relPath.split('/');
+    let node = header;
+    for (const part of parts) {
+        node = node.files && node.files[part];
+        if (!node) { return null; }
+    }
+    if (node.files || node.offset === undefined) { return null; }
+
+    const fd = fs.openSync(asarPath, 'r');
+    try {
+        const head = Buffer.alloc(16);
+        fs.readSync(fd, head, 0, 16, 0);
+        const jsonLen = head.readUInt32LE(12);
+        // Пиккл выравнивает полезную нагрузку до 4 байт.
+        const dataStart = 16 + jsonLen + ((4 - (jsonLen % 4)) % 4);
+        const buf = Buffer.alloc(Number(node.size));
+        fs.readSync(fd, buf, 0, buf.length, dataStart + Number(node.offset));
+        return buf.toString('utf8');
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+// Ворота релиза, проверяемые НА УПАКОВАННОМ артефакте, а не на исходниках.
+// Unit-тесты читают файлы репозитория; здесь проверяется то, что реально уехало
+// в сборку — между этими двумя состояниями стоит electron-builder со своими
+// заменами (см. build/after-pack.js), и доверять надо последнему слову.
+function checkHardening(source) {
+    const problems = [];
+    if (source === null) {
+        return ['electron-main.js не найден внутри app.asar'];
+    }
+    const windows = (source.match(/new BrowserWindow\(\{/g) || []).length;
+    const guards = (source.match(
+        /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
+    ) || []).length;
+    if (windows === 0) { problems.push('в упакованном main нет ни одного BrowserWindow'); }
+    if (guards < windows) {
+        problems.push(`окон ${windows}, гардов devTools ${guards} — в сборке остался режим разработчика`);
+    }
+    if (/sandbox:\s*false/.test(source)) { problems.push('в сборке окно с sandbox: false'); }
+    if (/nodeIntegration:\s*true/.test(source)) { problems.push('в сборке окно с nodeIntegration: true'); }
+    if (/contextIsolation:\s*false/.test(source)) { problems.push('в сборке окно с contextIsolation: false'); }
+    if (/autoUpdater/.test(source)) { problems.push('в сборке появился автообновлятель'); }
+    return problems;
+}
+
 // Сверяет плоский список файлов пакета с объявленным build.files.
 // Чистая функция — её и гоняет tests/verify-packed.test.js.
 function checkPacked(packedList, declared, countRepoFiles) {
@@ -143,8 +194,19 @@ function main() {
     }
     console.log(`[verify-packed] читаю ${path.relative(ROOT, asarPath)}`);
 
-    const packed = new Set(flatten(readAsarHeader(asarPath), '', []));
+    const header = readAsarHeader(asarPath);
+    const packed = new Set(flatten(header, '', []));
     console.log(`[verify-packed] файлов в пакете: ${packed.size}`);
+
+    // Ворота релиза на самом артефакте: режим разработчика закрыт, окна
+    // изолированы, самообновления нет.
+    const hardening = checkHardening(readAsarFile(asarPath, header, 'electron-main.js'));
+    if (hardening.length) {
+        console.error('\n[verify-packed] СБОРКА НЕ ПРОШЛА ВОРОТА');
+        for (const p of hardening) { console.error(`  ${p}`); }
+        process.exit(1);
+    }
+    console.log('[verify-packed] OK: режим разработчика закрыт, окна изолированы, автообновления нет');
 
     const declared = require(path.join(ROOT, 'package.json')).build.files;
     const { missing, emptyGlobs } = checkPacked(
@@ -172,7 +234,15 @@ function main() {
     }
 }
 
-module.exports = { readAsarHeader, flatten, checkPacked, findAsar, countRepoFilesUnder };
+module.exports = {
+    readAsarHeader,
+    readAsarFile,
+    flatten,
+    checkPacked,
+    checkHardening,
+    findAsar,
+    countRepoFilesUnder
+};
 
 // Запуск как скрипт — но не при импорте из теста.
 if (require.main === module) {

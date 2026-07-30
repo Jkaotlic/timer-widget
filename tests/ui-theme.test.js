@@ -1,0 +1,172 @@
+'use strict';
+
+/**
+ * Тема интерфейса: чистая логика + проводка во всех четырёх окнах.
+ *
+ * Предыстория. Блоки `[data-theme="dark"|"light"|"hc-dark"]` лежали в
+ * design-tokens.css с самого начала, но атрибут `data-theme` не выставлял НИКТО и
+ * `prefers-color-scheme` не использовался. Две темы из трёх были недостижимы, и
+ * именно поэтому их контраст никогда не настраивали — светлая давала 2.70:1 на
+ * подписях. В 2.4.0 светлая удалена, а высокий контраст подключён кнопкой.
+ *
+ * Тест держит цепочку целиком: модуль → <head> каждого окна → IPC-канал в ОБОИХ
+ * списках → рассылка в главном процессе → кнопка в панели. Разрыв в любом звене
+ * даёт тему, которая переключается в одном окне и не переключается в остальных —
+ * ровно тот класс дефекта, из-за которого в этом проекте появился
+ * bindWindowStateSnapshot.
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT = path.join(__dirname, '..');
+const UITheme = require(path.join(ROOT, 'ui-theme.js'));
+const CONFIG = require(path.join(ROOT, 'constants.js'));
+const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+
+const WINDOWS = [
+    'electron-control.html',
+    'electron-widget.html',
+    'electron-clock-widget.html',
+    'display.html'
+];
+
+test('normalizeTheme: неизвестное значение — это тема по умолчанию, а не ошибка', () => {
+    assert.equal(UITheme.normalizeTheme('hc-dark'), 'hc-dark');
+    assert.equal(UITheme.normalizeTheme('dark'), 'dark');
+    // В localStorage может лежать что угодно из прошлых версий, включая 'light'.
+    for (const junk of ['light', '', null, undefined, 0, 'HC-DARK', {}, []]) {
+        assert.equal(UITheme.normalizeTheme(junk), 'dark', `мусор ${JSON.stringify(junk)} обязан дать dark`);
+    }
+});
+
+test('nextTheme ходит по кругу и не залипает', () => {
+    assert.equal(UITheme.nextTheme('dark'), 'hc-dark');
+    assert.equal(UITheme.nextTheme('hc-dark'), 'dark');
+    assert.equal(UITheme.nextTheme('чепуха'), 'hc-dark', 'из мусора переключаемся в контрастную');
+    // Двойное переключение возвращает в исходную — иначе кнопка была бы односторонней.
+    assert.equal(UITheme.nextTheme(UITheme.nextTheme('dark')), 'dark');
+});
+
+test('themeLabel не пустой ни для одной темы', () => {
+    for (const t of UITheme.UI_THEMES) {
+        assert.match(UITheme.themeLabel(t), /\S/, `подпись для ${t} пустая`);
+    }
+    assert.notEqual(UITheme.themeLabel('dark'), UITheme.themeLabel('hc-dark'));
+});
+
+test('ключ хранения зарегистрирован в CONFIG.STORAGE_KEYS', () => {
+    assert.equal(
+        CONFIG.STORAGE_KEYS.UI_THEME,
+        UITheme.UI_THEME_STORAGE_KEY,
+        'ключ темы в реестре и в модуле расходятся'
+    );
+});
+
+test('темы модуля совпадают с блоками в design-tokens.css', () => {
+    const tokens = read('design-tokens.css');
+    assert.deepEqual(UITheme.UI_THEMES, ['dark', 'hc-dark'], 'состав тем изменился');
+    for (const theme of UITheme.UI_THEMES) {
+        assert.ok(
+            tokens.includes(`[data-theme="${theme}"]`),
+            `тема ${theme} объявлена в модуле, но её блока нет в токенах — переключатель приведёт в никуда`
+        );
+    }
+    // И обратное направление: блока без темы в модуле быть не должно. Смотрим
+    // КОД без комментариев — шапка файла намеренно объясняет, почему светлая
+    // тема удалена, и упоминает её селектор.
+    const code = tokens.replace(/\/\*[\s\S]*?\*\//g, '');
+    const declared = [...code.matchAll(/\[data-theme="([a-z-]+)"\]/g)].map((m) => m[1]);
+    for (const theme of new Set(declared)) {
+        assert.ok(
+            UITheme.UI_THEMES.includes(theme),
+            `в токенах есть блок ${theme}, до которого нельзя дойти из UI — так и появилась недостижимая светлая тема`
+        );
+    }
+});
+
+test('все четыре окна применяют тему до первого кадра', () => {
+    for (const file of WINDOWS) {
+        const html = read(file);
+        const headEnd = html.indexOf('</head>');
+        const scriptAt = html.indexOf('ui-theme.js');
+        assert.ok(scriptAt !== -1, `${file}: не подключён ui-theme.js`);
+        assert.ok(
+            scriptAt < headEnd,
+            `${file}: ui-theme.js подключён после </head> — окно мигнёт тёмной темой перед применением контрастной`
+        );
+        assert.match(html, /window\.UITheme\.initTheme\(\)/, `${file}: тема не применяется при загрузке`);
+        assert.match(
+            html,
+            /window\.UITheme\.bindThemeSync\(window\.ipcRenderer\)/,
+            `${file}: окно не слушает смену темы — переключение в панели его не догонит`
+        );
+    }
+});
+
+test('канал темы есть в обоих списках и в обе стороны', () => {
+    const validator = require(path.join(ROOT, 'channel-validator.js'));
+    assert.ok(validator.isValidChannel('ui-theme-update', 'send'), 'канал не разрешён на отправку');
+    assert.ok(validator.isValidChannel('ui-theme-update', 'receive'), 'канал не разрешён на приём');
+    // preload.js дублирует список руками (sandbox запрещает require) — оба обязаны совпадать.
+    const preload = read('preload.js');
+    assert.equal(
+        (preload.match(/'ui-theme-update'/g) || []).length,
+        2,
+        'в preload.js канал темы обязан быть и в send, и в receive'
+    );
+});
+
+test('главный процесс рассылает тему во все окна и проверяет значение', () => {
+    const main = read('electron-main.js');
+    const handler = /ipcMain\.on\('ui-theme-update'[\s\S]*?\n\}\);/.exec(main);
+    assert.ok(handler, 'в главном процессе нет обработчика ui-theme-update');
+    const body = handler[0];
+    assert.match(body, /isPayloadObject\(payload\)/, 'payload не проверяется на объект');
+    assert.match(body, /UI_THEME_VALUES\.has\(theme\)/, 'значение темы не проверяется по белому списку');
+    for (const win of ['controlWindow', 'widgetWindow', 'displayWindow', 'clockWidgetWindow']) {
+        assert.ok(body.includes(win), `рассылка не доходит до ${win}`);
+    }
+    assert.match(body, /safelySendToWindow\(/, 'отправка без safelySendToWindow — окно может быть уже разрушено');
+});
+
+test('кнопка переключения темы в панели: состояние и рассылка', () => {
+    const html = read('electron-control.html');
+    const btn = /<button[^>]*id="contrastToggle"[^>]*>/.exec(html);
+    assert.ok(btn, 'кнопки переключения темы нет в разметке');
+    assert.match(btn[0], /aria-pressed="false"/, 'кнопке-переключателю нужен aria-pressed');
+    assert.match(btn[0], /type="button"/, 'кнопка внутри титлбара обязана быть type="button"');
+    assert.match(btn[0], /aria-label=/, 'у кнопки нет доступного имени: её содержимое — глиф');
+
+    // Обработчик обязан делать все четыре вещи: применить, сохранить, обновить
+    // состояние кнопки и разослать остальным окнам.
+    assert.match(html, /window\.UITheme\.applyTheme\(theme\)/, 'тема не применяется локально');
+    assert.match(html, /window\.UITheme\.storeTheme\(theme\)/, 'тема не сохраняется');
+    assert.match(html, /setAttribute\('aria-pressed', String\(hc\)\)/, 'aria-pressed не обновляется');
+    assert.match(html, /send\('ui-theme-update', \{ theme \}\)/, 'смена темы не рассылается в другие окна');
+});
+
+test('высокий контраст гасит декорации, заданные литералами', () => {
+    // Токены делают поверхности чёрными, но декоративные слои (сиреневые
+    // градиенты подложки, шумовая текстура, неоновая тень цифр) заданы прямо в
+    // правилах — их приходится гасить адресно, иначе «высокий контраст» получает
+    // поверх чёрного те же полупрозрачные украшения.
+    const css = read('control.css');
+    for (const sel of ['.app-shell::before', 'body::after', '.settings-drawer', '.timer-display-main']) {
+        assert.ok(
+            new RegExp(`\\[data-theme="hc-dark"\\][^{]*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(css),
+            `в hc-теме не переопределён ${sel}`
+        );
+    }
+});
+
+test('в разметке панели не осталось инлайновых цветов', () => {
+    // Инлайн-стиль бьёт любую тему: пока цвет висел в style=, тема до него не
+    // доставала. Восемь таких атрибутов было, должно остаться ноль.
+    const html = read('electron-control.html');
+    const markup = html.slice(0, html.indexOf('<script src="ipc-compat.js"'));
+    const inline = markup.match(/style="[^"]*(?:rgba?\(|#[0-9a-fA-F]{3,6})[^"]*"/g) || [];
+    assert.deepEqual(inline, [], `инлайновые цвета вернулись в разметку: ${inline.join(' | ')}`);
+});

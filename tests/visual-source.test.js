@@ -61,7 +61,11 @@ test('control window keeps a reliable drag region after frameless shell changes'
     // сторожил правило, которое никогда ни к чему не применялось, и оно так и
     // лежало мёртвым в control.css. Проверяем то, от чего защита реально зависит —
     // что кнопка остаётся внутри no-drag-контейнера.
-    assert.match(controlHtml, /<div class="titlebar-right">\s*<button class="titlebar-help"/s);
+    // Между открытием контейнера и первой кнопкой может стоять комментарий, а
+    // кнопок теперь две (переключатель темы и справка) — проверяем, что ПЕРВЫЙ
+    // элемент внутри контейнера именно кнопка титлбара, а не что-то ещё.
+    assert.match(controlHtml, /<div class="titlebar-right">(?:\s*<!--[\s\S]*?-->)?\s*<button class="titlebar-help"/s);
+    assert.match(controlHtml, /id="contrastToggle"[^>]*>[\s\S]{0,200}?id="faqBtn"/s);
     assert.match(controlHtml, /\.custom-titlebar \.titlebar-help\s*\{/);
 });
 

@@ -29,6 +29,9 @@ const ALLOWED_CHANNELS = {
         'widget-move',
         'report-scale',
         'display-move',
+        // Тема интерфейса. Канал в ОБОИХ списках: панель отправляет смену,
+        // все окна её принимают (ui-theme.js).
+        'ui-theme-update',
         'minimize-window',
         'toggle-fullscreen',
         'close-window',
@@ -52,6 +55,7 @@ const ALLOWED_CHANNELS = {
         'widget-window-state',
         'clock-window-state',
         'scale-report',
+        'ui-theme-update',
         'timer-recovery-available'
     ]
 };

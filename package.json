@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.3.2",
+  "version": "2.4.0",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -95,10 +95,7 @@
       ],
       "category": "Utility",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "icon": "build/icon.png",
-      "executableArgs": [
-        "--no-sandbox"
-      ]
+      "icon": "build/icon.png"
     },
     "deb": {
       "fpm": [
@@ -124,6 +121,7 @@
       "constants.js",
       "color-utils.js",
       "renderer-shared.js",
+      "ui-theme.js",
       "flip-card.js",
       "sound-bank.js",
       "ui-feedback.js",
@@ -146,7 +144,13 @@
       "fonts/**/*",
       "NOTICE",
       "sbom.json"
-    ]
+    ],
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "executableArgs": [
+        "--no-sandbox"
+      ]
+    }
   },
   "dependencies": {
     "electron-log": "^5.4.4"

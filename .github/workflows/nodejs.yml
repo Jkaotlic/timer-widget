@@ -124,5 +124,34 @@ jobs:
         run: npm ci
       - name: Pack without installer
         run: npm run pack
+      # Проверяет и состав пакета, и ворота релиза на самом артефакте:
+      # закрытый режим разработчика, изоляцию окон, отсутствие автообновления.
       - name: Verify packed app contains every runtime asset
         run: node scripts/verify-packed.js
+
+  # ==========================================================================
+  # Песочница Chromium в Linux-пакетах. С macOS это не проверяется никак: deb
+  # и AppImage там не собираются, а содержимое postinst видно только в готовом
+  # пакете.
+  #
+  # Что здесь важно. Ключ `--no-sandbox` стоял на уровне `linux`, то есть уезжал
+  # во ВСЕ цели, включая deb, и отменял `sandbox: true`, заявленный во всех
+  # окнах. Теперь он только у AppImage (там нет шага установки, а user namespaces
+  # есть не на каждой системе), а deb получает нормальный SUID-помощник из
+  # postinst. Шаг разбирает собранные пакеты и проверяет ровно это.
+  # ==========================================================================
+  linux-sandbox:
+    name: linux sandbox (deb + AppImage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Linux packages
+        run: npx electron-builder --linux deb AppImage
+      - name: Verify sandbox setup in packages
+        run: node scripts/verify-linux-sandbox.js

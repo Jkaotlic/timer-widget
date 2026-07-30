@@ -132,8 +132,10 @@ test('ползунки масштаба совпадают по диапазон
     // Баг: слайдер дисплея допускал 30..600, а колесо и восстановление из
     // localStorage — только 30..300; блоки: слайдер 50..400 против 50..600.
     // Значение вне общего диапазона молча терялось при перезапуске.
-    assert.match(controlHtml, /id="displayTimerScale" min="30" max="300"/);
-    assert.match(controlHtml, /id="timeBlocksScale" min="50" max="600"/);
+    // Между id и границами диапазона могут стоять другие атрибуты (class
+    // появился, когда инлайновые style= переехали в CSS) — важен сам диапазон.
+    assert.match(controlHtml, /id="displayTimerScale"[^>]*min="30"[^>]*max="300"/);
+    assert.match(controlHtml, /id="timeBlocksScale"[^>]*min="50"[^>]*max="600"/);
     assert.match(controlHtml, /getElementById\('displayTimerScale'\),\s*\n\s*30, 300, 100,/);
     assert.match(controlHtml, /getElementById\('timeBlocksScale'\),\s*\n\s*50, 600, 100,/);
 
