@@ -1163,6 +1163,21 @@ ipcMain.on('report-scale', (_event, payload) => {
     safelySendToWindow(controlWindow, 'scale-report', { source, scalePct });
 });
 
+// Тема интерфейса. Переключается только из панели, но применяется во ВСЕХ окнах,
+// поэтому здесь именно рассылка, а не адресная отправка (в отличие от цветов,
+// которые у каждого окна свои и разослать их всем нельзя).
+// Отправителя не исключаем: применение темы ничего обратно не посылает, цикла
+// быть не может, а повторное применение того же значения идемпотентно.
+const UI_THEME_VALUES = new Set(['dark', 'hc-dark']);
+ipcMain.on('ui-theme-update', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const theme = payload.theme;
+    if (typeof theme !== 'string' || !UI_THEME_VALUES.has(theme)) { return; }
+    for (const win of [controlWindow, widgetWindow, displayWindow, clockWidgetWindow]) {
+        safelySendToWindow(win, 'ui-theme-update', { theme });
+    }
+});
+
 // Управление таймером через виджет (делегирует в единые функции)
 ipcMain.on('timer-control', (_event, action) => {
     switch (action) {

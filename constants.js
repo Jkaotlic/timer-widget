@@ -142,6 +142,8 @@ const CONFIG = {
         // Звук
         CUSTOM_SOUNDS: 'customSounds',
         SOUND_ENABLED: 'soundEnabled',
+        // Тема интерфейса ('dark' | 'hc-dark'), владелец — ui-theme.js
+        UI_THEME: 'uiTheme',
         // Однократные подсказки при первом открытии окна
         WIDGET_HINT_SHOWN: 'widgetHintShown',
         CLOCK_HINT_SHOWN: 'clockHintShown',

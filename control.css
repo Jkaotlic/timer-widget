@@ -403,6 +403,35 @@ body::after {
     background: var(--tw-overlay-medium);
     color: var(--tw-fg);
 }
+/* Нажатое состояние переключателя темы. Класс и aria-pressed ставит один и тот
+   же обработчик — расходиться им нечем. */
+.custom-titlebar .titlebar-help.active {
+    background: rgba(10, 132, 255, 0.22);
+    border-color: rgba(10, 132, 255, 0.55);
+    color: var(--tw-fg);
+}
+
+/* ============ Высокий контраст: убрать декорации ============
+   Токены сами делают поверхности чёрными и рамки белыми, но декоративные слои
+   заданы литералами прямо в правилах — их надо гасить адресно, иначе поверх
+   чистого чёрного остаются сиреневые градиенты и шум. */
+[data-theme="hc-dark"] .app-shell::before {
+    background: var(--tw-bg-surface-solid);
+    border-color: var(--tw-border);
+}
+[data-theme="hc-dark"] body::after { display: none; }         /* шумовая текстура */
+[data-theme="hc-dark"] .settings-drawer { background: var(--tw-bg-surface-solid); }
+[data-theme="hc-dark"] .timer-header,
+[data-theme="hc-dark"] .quick-window-btn,
+[data-theme="hc-dark"] .quick-window-btn:hover,
+[data-theme="hc-dark"] .quick-window-btn.active {
+    background: var(--tw-overlay-light);
+}
+[data-theme="hc-dark"] .timer-display-main,
+[data-theme="hc-dark"] .timer-display-main.danger,
+[data-theme="hc-dark"] .timer-display-main.warning {
+    text-shadow: none;   /* неоновое свечение съедает контур цифр */
+}
 
 .custom-titlebar .title-text {
     color: var(--tw-fg-muted);
@@ -456,7 +485,7 @@ body::after {
 .custom-titlebar .win-btn:nth-child(1) { background: #ff5f57; }
 .custom-titlebar .win-btn.minimize-btn,
 .custom-titlebar .win-btn:nth-child(2) { background: #febc2e; }
-.custom-titlebar .win-btn:nth-child(3) { background: #28c840; }
+/* Третьей кнопки (зелёной «развернуть») в титлбаре нет — правило для неё удалено. */
 
 /* =======================================================
    Timer hero — VisionOS signature
@@ -740,7 +769,6 @@ body::after {
     box-shadow: 0 2px 10px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.07);
 }
 .tab-btn:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
-.tab-btn .icon { display: none; }
 
 .tab-content { display: none; }
 
@@ -1064,84 +1092,11 @@ body::after {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Time input */
-
-.time-input {
-    flex: 1;
-    padding: 8px;
-    font-size: 15px;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.9);
-    font-family: 'Inter', -apple-system, system-ui, sans-serif;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-    transition: border-color 0.2s;
-}
-
-.time-input:focus {
-    outline: none;
-    border-color: #0a84ff;
-    background: rgba(10, 132, 255, 0.08);
-}
-
-.adjust-btn {
-    flex: 1;
-    min-width: 70px;
-    padding: 8px 6px;
-    font-size: var(--tw-t-label);
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-sm);
-    background: var(--tw-overlay-light);
-    color: var(--tw-fg-secondary);
-    cursor: pointer;
-    font-weight: 500;
-    transition: background var(--tw-dur-base) var(--tw-ease),
-                color var(--tw-dur-base) var(--tw-ease),
-                border-color var(--tw-dur-base) var(--tw-ease);
-}
-
-.adjust-btn:hover {
-    background: rgba(10, 132, 255, 0.18);
-    color: var(--tw-blue);
-    border-color: rgba(10, 132, 255, 0.3);
-}
-
-.adjust-btn.minus { color: var(--tw-red); }
-
-.adjust-btn.minus:hover {
-    background: rgba(255, 69, 58, 0.15);
-    color: var(--tw-red);
-    border-color: rgba(255, 69, 58, 0.3);
-}
-
-.window-btn {
-    padding: var(--tw-s-3);
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-md);
-    cursor: pointer;
-    font-weight: 500;
-    font-size: var(--tw-t-caption);
-    transition: background var(--tw-dur-base) var(--tw-ease),
-                color var(--tw-dur-base) var(--tw-ease),
-                border-color var(--tw-dur-base) var(--tw-ease);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    background: var(--tw-overlay-light);
-    color: var(--tw-fg-secondary);
-}
-
-.window-btn .icon { font-size: 1.4em; }
-
-.window-btn:hover {
-    background: var(--tw-overlay-medium);
-    border-color: var(--tw-border-strong);
-    color: var(--tw-fg);
-}
+/* Здесь были правила .time-input, .adjust-btn и .window-btn — три набора для
+   классов, которых в разметке нет: она использует .manual-time-input,
+   .adjust-main-btn и .quick-window-btn. Удалено при чтении файла глазами
+   (проход 6); программные проверки на «мёртвые классы» их не находили, потому
+   что имена похожи на живые. */
 
 /* =======================================================
    Settings card (replacement for legacy .settings-group)
@@ -1356,20 +1311,8 @@ body::after {
     height: 7px;
 }
 
-/* Disabled row/group — dim when the row's enabled checkbox is off. */
-.sound-row.disabled,
-.sound-group.disabled .sound-row { opacity: 0.4; pointer-events: none; }
-
-.sound-row {
-    display: flex;
-    align-items: center;
-    gap: var(--tw-s-2);
-    padding: var(--tw-s-2) var(--tw-s-3);
-    background: rgba(0, 0, 0, 0.28);
-    border: 1px solid var(--tw-border);
-    border-radius: var(--tw-r-md);
-    margin-bottom: 0;
-}
+/* Затемнение выключенной строки живёт на .sound-item.disabled ниже. Правила
+   .sound-row / .sound-group.disabled удалены: таких классов в разметке нет. */
 
 /* Select wrapper — gives us space for custom chevron on the right. */
 .select-wrap {
@@ -2159,6 +2102,58 @@ select optgroup,
     line-height: 1;
 }
 
+/* ============ Контролы, вынесенные из инлайновых style= ============
+   В разметке панели оставалось восемь атрибутов style= с захардкоженным белым
+   (`color: rgba(255,255,255,0.7)`, `border: 1px solid rgba(255,255,255,0.2)`).
+   Инлайн-стиль бьёт любую тему, поэтому при высоком контрасте эти подписи,
+   селекты и поля остались бы полупрозрачно-серыми на чёрном. Значения переведены
+   на токены; там, где старая альфа не совпадала с токеном (0.2 против 0.14 у
+   рамки селекта, 0.08 против 0.10 у подложки), взят токен — расхождение в один
+   шаг альфы намеренное, зато тема теперь достаёт до этих элементов. */
+.scale-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.scale-slider { width: 80px; }
+
+.settings-divider {
+    height: 1px;
+    background: var(--tw-divider);
+    margin: 6px 0;
+}
+
+.settings-select {
+    padding: 6px 10px;
+    border-radius: var(--tw-r-xs);
+    border: 1px solid var(--tw-border-strong);
+    background: var(--tw-overlay-light);
+    color: var(--tw-fg);
+    font-family: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+.settings-select.is-accent {
+    border-radius: var(--tw-r-sm);
+    border-color: var(--tw-border);
+    background: var(--tw-overlay-medium);
+    color: var(--tw-blue);
+    max-width: 140px;
+}
+.settings-select:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
+
+.settings-time-input {
+    padding: 4px 8px;
+    border-radius: var(--tw-r-xs);
+    border: 1px solid var(--tw-border-strong);
+    background: var(--tw-overlay-light);
+    color: var(--tw-fg);
+    font-family: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+.settings-time-input:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
+
 .scale-value-text {
     min-width: 40px;
     font-size: 0.85em;
@@ -2262,11 +2257,6 @@ select optgroup,
     white-space: nowrap;
 }
 
-.quick-window-btn.sound.muted {
-    background: rgba(255, 255, 255, 0.03);
-    color: var(--tw-fg-dim);
-}
-
 .quick-preset { min-width: 0; }
 
 /* Gradient divider between minus and plus */
@@ -2339,11 +2329,6 @@ select optgroup,
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
 }
 
 .advanced-settings .content-section {
@@ -2544,7 +2529,16 @@ select optgroup,
     border: 1px solid var(--tw-border);
 }
 
+/* Вопрос — настоящая <button>: аккордеон обязан открываться и с клавиатуры.
+   Раньше это был <div> с обработчиком клика: мышью работало, а Tab проходил
+   мимо, Enter не нажимал, и состояние (открыт / закрыт) ассистивным технологиям
+   не сообщалось вовсе. */
 .faq-question {
+    width: 100%;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    text-align: left;
     padding: var(--tw-s-3) var(--tw-s-4);
     color: var(--tw-fg);
     font-size: var(--tw-t-label);
@@ -2553,33 +2547,38 @@ select optgroup,
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--tw-s-2);
     transition: background var(--tw-dur-base) var(--tw-ease);
 }
 
-.faq-question:hover { background: var(--tw-overlay-light); }
+.faq-question:hover { background: var(--tw-overlay-medium); }
+.faq-question:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 
 .faq-question .arrow {
-    font-size: 0.8em;
+    flex: 0 0 auto;
+    font-size: 1em;
+    line-height: 1;
     transition: transform var(--tw-dur-slow) var(--tw-ease);
-    opacity: 0.4;
+    opacity: 0.45;
 }
 
 .faq-item.open .faq-question .arrow { transform: rotate(180deg); }
 
+/* Ответ скрыт через display, а НЕ через max-height: 0.
+   Прежняя схема (`max-height: 0` → `max-height: 500px` по классу
+   `.faq-item.open`) работала, но лимит в 500px — молчаливая ловушка: ответ
+   выше лимита обрезается без всякого признака, а `overflow: hidden` прячет
+   и полосу прокрутки. Проверять при каждой правке текста, не вырос ли ответ
+   за 500px, никто не будет. display не обрезает по построению. */
 .faq-answer {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height var(--tw-dur-slow) ease-out;
-    padding: 0 var(--tw-s-4);
+    display: none;
+    padding: 0 var(--tw-s-4) var(--tw-s-4);
     color: var(--tw-fg-muted);
     font-size: var(--tw-t-caption);
     line-height: 1.6;
 }
 
-.faq-item.open .faq-answer {
-    max-height: 500px;
-    padding: 0 var(--tw-s-4) var(--tw-s-4);
-}
+.faq-item.open .faq-answer { display: block; }
 
 .faq-answer ul {
     margin: var(--tw-s-2) 0;
@@ -2600,17 +2599,6 @@ select optgroup,
 }
 
 .faq-answer strong { color: var(--tw-fg); }
-
-.faq-shortcut {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--tw-overlay-light);
-    padding: 3px var(--tw-s-2);
-    border-radius: var(--tw-r-xs);
-    font-size: 0.9em;
-    margin: 2px;
-}
 
 .faq-shortcuts {
     display: flex;

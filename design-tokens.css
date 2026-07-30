@@ -1,7 +1,15 @@
 /* ============================================================
    TimerWidget — Design Tokens  v2
-   Dark (default) · Light · High-contrast · Reduced-motion
+   Dark (default) · High-contrast · Reduced-motion
    + semantic state colors with colorblind patterns
+
+   ДВЕ темы, а не три. Блок [data-theme="light"] удалён в 2.4.0: он был
+   недостижим (атрибут data-theme не выставлял никто), из-за чего его контраст
+   никогда не настраивали — подписи давали 2.70:1. Довести его до AA означало
+   бы токенизировать ~200 захардкоженных значений в одной только панели и
+   перерисовать стеклянные виджеты, которые лежат поверх чужого контента и
+   тёмными сделаны осознанно. Высококонтрастная тёмная тема даёт ту же пользу
+   по доступности гораздо дешевле — её и подключили.
 
    Fonts are loaded via local @font-face blocks in each HTML file
    (see electron-*.html / display.html) — not via Google Fonts CDN,
@@ -75,53 +83,12 @@
   color-scheme: dark;
 }
 
-/* ---------------- LIGHT ---------------- */
-[data-theme="light"] {
-  --tw-blue:   #007aff;
-  --tw-green:  #28a745;
-  --tw-red:    #ff3b30;
-  --tw-orange: #ff9500;
-  --tw-yellow: #f0a800;
-  --tw-pink:   #e04565;
-
-  --tw-ring:         linear-gradient(135deg, var(--tw-blue) 0%, var(--tw-green) 100%);
-  --tw-ring-warning: linear-gradient(135deg, #f0a800 0%, #f56500 100%);
-  --tw-ring-danger:  linear-gradient(135deg, #ff3b30 0%, #c0392b 100%);
-
-  --tw-bg-void:     #e9e9ef;
-  --tw-bg-dark:     #ffffff;
-  --tw-bg-surface:  rgba(255, 255, 255, 0.72);
-  --tw-bg-glass:    rgba(255, 255, 255, 0.94);
-  --tw-bg-timer:    rgba(248, 249, 252, 0.82);
-  --tw-bg-led:      rgba(20, 20, 25, 0.9);     /* LED panels stay dark — readable glow only works on dark */
-
-  --tw-bg-surface-solid: #ffffff;
-  --tw-bg-glass-solid:   #f6f6f8;
-
-  --tw-fg:            #111115;
-  --tw-fg-secondary:  rgba(20, 20, 25, 0.78);
-  --tw-fg-muted:      rgba(20, 20, 25, 0.58);
-  --tw-fg-dim:        rgba(20, 20, 25, 0.42);
-  --tw-fg-faint:      rgba(20, 20, 25, 0.1);
-
-  --tw-border:        rgba(0, 0, 0, 0.08);
-  --tw-border-strong: rgba(0, 0, 0, 0.14);
-  --tw-divider:       rgba(0, 0, 0, 0.06);
-
-  --tw-overlay:        rgba(0, 0, 0, 0.35);
-  --tw-overlay-light:  rgba(0, 0, 0, 0.04);
-  --tw-overlay-medium: rgba(0, 0, 0, 0.08);
-
-  --tw-led-green:  var(--tw-green);
-  --tw-led-warn:   #f0a800;
-  --tw-led-danger: var(--tw-red);
-
-  --tw-focus-ring:    0 0 0 2px rgba(255,255,255,0.9), 0 0 0 4px var(--tw-blue);
-
-  color-scheme: light;
-}
-
-/* ---------------- HIGH CONTRAST ---------------- */
+/* ---------------- HIGH CONTRAST ----------------
+   Включается кнопкой в титлбаре панели (ui-theme.js пишет data-theme на <html>
+   во всех четырёх окнах). До 2.4.0 блок был недостижим, поэтому здесь не были
+   заданы ни --tw-bg-dark, ни оверлеи, ни тени — они молча наследовались из
+   тёмной темы и оставляли полупрозрачные белые подложки поверх чёрного.
+   Контраст текстовых токенов проверяется tests/contrast.test.js на ОБЕИХ темах. */
 [data-theme="hc-dark"] {
   --tw-blue:   #4da3ff;
   --tw-green:  #4ae58a;
@@ -130,7 +97,13 @@
   --tw-yellow: #ffde3a;
   --tw-pink:   #ff7ea0;
 
+  /* Кольцо и полосы состояния — на осветлённых акцентах этой темы */
+  --tw-ring:         linear-gradient(135deg, var(--tw-blue) 0%, var(--tw-green) 100%);
+  --tw-ring-warning: linear-gradient(135deg, #ffde3a 0%, #ffb650 100%);
+  --tw-ring-danger:  linear-gradient(135deg, #ff6b61 0%, #ff2d20 100%);
+
   --tw-bg-void:     #000000;
+  --tw-bg-dark:     #000000;
   --tw-bg-surface:  #000000;       /* no transparency — solid */
   --tw-bg-glass:    #0a0a14;
   --tw-bg-timer:    #000000;
@@ -149,7 +122,24 @@
   --tw-border-strong: #ffffff;
   --tw-divider:       #606060;
 
+  /* Подложки заметно плотнее, чем в тёмной теме (0.05 / 0.10): на чистом чёрном
+     фоне пятипроцентная белая заливка не читается как отдельная поверхность. */
+  --tw-overlay:        rgba(0, 0, 0, 0.85);
+  --tw-overlay-light:  rgba(255, 255, 255, 0.14);
+  --tw-overlay-medium: rgba(255, 255, 255, 0.24);
+
+  /* LED-цифры: те же осветлённые акценты, иначе неон уезжает в тёмно-зелёный */
+  --tw-led-green:  var(--tw-green);
+  --tw-led-warn:   #ffde3a;
+  --tw-led-danger: var(--tw-red);
+
   --tw-focus-ring:    0 0 0 3px #000, 0 0 0 6px #ffde3a;
+
+  /* Панель обводится честной рамкой вместо мягкой тени и свечения */
+  --tw-shadow-panel: 0 0 0 1px #ffffff;
+  --tw-glow-blue:  none;
+  --tw-glow-green: none;
+  --tw-glow-red:   none;
 
   --tw-blur:    none;
   --tw-blur-sm: none;
@@ -174,13 +164,14 @@
   }
 }
 
-/* ---------------- NOTE: no OS auto-light ----------------
-   Dark is the canonical default. Light theme is opt-in via
-   `<html data-theme="light">` — never triggered by OS preference,
-   because the VisionOS glass recipes (LED glow, neon hero shadow,
-   inset-only borders on transparent widget/clock) are tuned for
-   dark surfaces and degrade visibly on light.
-   ---------------------------------------------------------- */
+/* ---------------- NOTE: тема только по выбору пользователя ----------------
+   Тёмная — канонический вариант по умолчанию. Высокий контраст включается
+   ЯВНО (кнопка в титлбаре → ui-theme.js → data-theme на <html>), а не по
+   `prefers-color-scheme` и не по системной настройке контраста: рецепты стекла
+   (свечение LED, неоновая тень героя, только внутренние рамки на прозрачных
+   виджетах) рассчитаны на тёмные поверхности, и переключать их за спиной
+   пользователя нельзя. Светлой темы больше нет — см. шапку файла.
+   ------------------------------------------------------------------------ */
 
 /* ---------------- SHARED (theme-independent) ---------------- */
 :root {

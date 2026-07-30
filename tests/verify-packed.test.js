@@ -27,7 +27,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { readAsarHeader, flatten, checkPacked } = require('../scripts/verify-packed');
+const {
+    readAsarHeader,
+    readAsarFile,
+    flatten,
+    checkPacked,
+    checkHardening
+} = require('../scripts/verify-packed');
 
 function buildAsar(header) {
     const json = Buffer.from(JSON.stringify(header), 'utf8');
@@ -208,4 +214,84 @@ test('реальный build.files из package.json разобран и неп�
     assert.ok(pkg.build.files.length > 10, 'подозрительно короткий build.files');
     assert.ok(pkg.build.files.includes('design-tokens.css'),
         'design-tokens.css терялся в 2.3.2 — он обязан быть в списке');
+});
+
+// ---------------------------------------------------------------------------
+// Ворота релиза на упакованном артефакте
+// ---------------------------------------------------------------------------
+
+test('содержимое файла достаётся из НАСТОЯЩЕГО asar, а не только из моей фикстуры', () => {
+    // Смещения данных в asar считаются вручную (16 + длина JSON + выравнивание
+    // до 4 байт). Проверять это на самодельном архиве бессмысленно: он был бы
+    // собран с тем же пониманием формата. Поэтому читаем package.json из
+    // default_app.asar, который положил сам Electron, и разбираем его как JSON —
+    // сдвиг на один байт сделает разбор невозможным.
+    const candidates = [
+        'node_modules/electron/dist/Electron.app/Contents/Resources/default_app.asar',
+        'node_modules/electron/dist/resources/default_app.asar'
+    ].map((p) => path.join(__dirname, '..', p));
+    const real = candidates.find((p) => fs.existsSync(p));
+    if (!real) {
+        console.log('  (electron не установлен — пропуск сверки с живым архивом)');
+        return;
+    }
+
+    const header = readAsarHeader(real);
+    const raw = readAsarFile(real, header, 'package.json');
+    assert.ok(raw, 'package.json не извлёкся из default_app.asar');
+    const parsed = JSON.parse(raw);
+    assert.equal(typeof parsed.name, 'string', 'извлечённый package.json разобрался, но без name');
+
+    assert.equal(readAsarFile(real, header, 'нет-такого-файла.js'), null, 'отсутствующий файл обязан дать null');
+});
+
+test('ворота релиза ловят открытый режим разработчика в упакованном main', () => {
+    const guarded = `
+        controlWindow = new BrowserWindow({
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: true,
+                devTools: process.argv.includes('--dev') && !app.isPackaged
+            }
+        });
+    `;
+    assert.deepEqual(checkHardening(guarded), [], 'корректный main обязан проходить ворота');
+
+    const unguarded = guarded.replace(
+        "devTools: process.argv.includes('--dev') && !app.isPackaged",
+        'devTools: true'
+    );
+    const problems = checkHardening(unguarded);
+    assert.equal(problems.length, 1, `ожидалась одна проблема, получено: ${problems.join('; ')}`);
+    assert.match(problems[0], /режим разработчика/);
+
+    // Ослабление изоляции — тоже стоп.
+    assert.ok(checkHardening(guarded.replace('sandbox: true', 'sandbox: false')).some((p) => /sandbox/.test(p)));
+    assert.ok(
+        checkHardening(guarded.replace('nodeIntegration: false', 'nodeIntegration: true'))
+            .some((p) => /nodeIntegration/.test(p))
+    );
+    assert.ok(
+        checkHardening(guarded.replace('contextIsolation: true', 'contextIsolation: false'))
+            .some((p) => /contextIsolation/.test(p))
+    );
+    assert.ok(checkHardening(guarded + '\nautoUpdater.checkForUpdates();').some((p) => /автообнов/.test(p)));
+
+    // Пропавший файл — тоже провал, а не «нечего проверять».
+    assert.equal(checkHardening(null).length, 1);
+});
+
+test('второе окно без гарда не проходит ворота (счёт, а не наличие)', () => {
+    // Именно этим была слаба прежняя проверка: она сравнивала число совпадений с
+    // константой, поэтому окно, добавленное БЕЗ гарда, оставляло счёт прежним.
+    const oneGuarded = `
+        a = new BrowserWindow({ webPreferences: { devTools: process.argv.includes('--dev') && !app.isPackaged } });
+        b = new BrowserWindow({ webPreferences: { } });
+    `;
+    const problems = checkHardening(oneGuarded);
+    assert.ok(
+        problems.some((p) => /окон 2, гардов devTools 1/.test(p)),
+        `ожидалось указание на нехватку гарда, получено: ${problems.join('; ')}`
+    );
 });

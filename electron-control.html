@@ -9,6 +9,11 @@
     <link rel="stylesheet" href="components.css">
     <link rel="stylesheet" href="design-tokens.css">
     <link rel="stylesheet" href="control.css">
+    <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
+         в конце <body> вместе с остальными: иначе при включённом высоком контрасте
+         окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
+    <script src="ui-theme.js"></script>
+    <script>window.UITheme.initTheme();</script>
 </head>
 <body class="control-window">
     <div class="app-shell">
@@ -21,6 +26,10 @@
             </div>
             <span class="title-text">⏱ ТАЙМЕР</span>
             <div class="titlebar-right">
+                <!-- Переключатель темы живёт в титлбаре, а не во вкладках настроек:
+                     вкладки настраивают КОНКРЕТНОЕ окно (виджет, часы, дисплей), а
+                     тема общая для всего приложения. -->
+                <button class="titlebar-help" id="contrastToggle" type="button" aria-pressed="false" title="Высокий контраст" aria-label="Высокий контраст">◐</button>
                 <button class="titlebar-help" id="faqBtn" title="Справка (F1)" aria-label="Справка">?</button>
             </div>
         </div>
@@ -75,10 +84,10 @@
                 <button class="manual-time-apply" id="manualTimeApply" title="Установить время (Enter)" aria-label="Установить время">✓</button>
             </div>
             <div class="timer-mode-row">
-                <span class="timer-mode-label">
+                <label class="timer-mode-label" for="allowNegative">
                     <span class="timer-mode-icon" aria-hidden="true">∞</span>
                     Считать ниже нуля
-                </span>
+                </label>
                 <label class="toggle-switch" title="Таймер продолжит отсчёт в минус после окончания">
                     <input type="checkbox" id="allowNegative">
                     <span class="toggle-slider"></span>
@@ -105,9 +114,6 @@
                 <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon">🖥</span><span class="qw-label">Дисплей</span></button>
             </div>
         </div>
-        <!-- Hidden sound toggle for JS compatibility -->
-        <button id="soundToggleBtn" style="display:none;"></button>
-
         <!-- Настройки (всегда видны) -->
         <div class="advanced-settings open" id="advancedSettings">
             <div class="content-section">
@@ -141,9 +147,9 @@
                         </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Масштаб</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="timerScale" min="30" max="600" value="100" style="width: 80px;" aria-label="Масштаб таймера">
-                                <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
+                            <div class="scale-control">
+                                <input type="range" id="timerScale" class="scale-slider" min="30" max="600" value="100" aria-label="Масштаб таймера">
+                                <span id="timerScaleValue" class="scale-value-text">100%</span>
                             </div>
                         </div>
                         <!-- Деления на круглом циферблате. Настройка общая для виджета
@@ -184,7 +190,7 @@
                             <span class="icon">🔊</span>
                             Звуки
                             <label class="toggle-switch" style="margin-left: auto;">
-                                <input type="checkbox" id="soundMasterEnabled" checked>
+                                <input type="checkbox" id="soundMasterEnabled" checked aria-label="Все звуки">
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -380,6 +386,20 @@
                                 <span class="icon">🎨</span>
                                 Стиль часов
                             </div>
+                            <!-- Чекбокс синхронизации ОБЯЗАН быть видимым. Логику
+                                 «assignment .value не порождает change» починили в
+                                 проходе 4 (см. CLAUDE.md), но сам контрол остался
+                                 в блоке display:none — то есть фича продолжала быть
+                                 недостижимой мышью, а e2e ставил .checked кодом и
+                                 поэтому был зелёным. Тест на логику не доказывает,
+                                 что до функции можно дотянуться. -->
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="syncClockStyle">Как у виджета</label>
+                                <label class="toggle-switch" title="Часы следуют за стилем виджета таймера">
+                                    <input type="checkbox" id="syncClockStyle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
                             <!-- id="clockStyleRow" обязан быть ЗДЕСЬ, на реальной строке с
                                  переключателем: панель скрывает эту строку, когда включена
                                  синхронизация со стилем виджета. Раньше этот id висел на
@@ -398,13 +418,13 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="range" id="clockScale" min="30" max="600" value="100" style="width: 80px;" aria-label="Масштаб часов">
-                                    <span id="clockScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
+                                <div class="scale-control">
+                                    <input type="range" id="clockScale" class="scale-slider" min="30" max="600" value="100" aria-label="Масштаб часов">
+                                    <span id="clockScaleValue" class="scale-value-text">100%</span>
                                 </div>
                             </div>
                             <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
-                                <span class="toggle-label">Цифры на циферблате</span>
+                                <label class="toggle-label" for="clockShowAnalogNumbers">Цифры на циферблате</label>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="clockShowAnalogNumbers">
                                     <span class="toggle-slider"></span>
@@ -433,19 +453,42 @@
                                 <span class="icon">📋</span>
                                 Отображение
                             </div>
+                            <!-- Все четыре настройки окно часов реально исполняет:
+                                 _onClockSettings применяет showSeconds/format24h/
+                                 showTimezone, бейджи есть во всех четырёх стилях, и
+                                 раскладка под них подстраивается. Контролов не было —
+                                 инпуты лежали в блоке display:none «kept for JS
+                                 compatibility». Обвязка при этом полная: listener →
+                                 pushClockSettings() → localStorage → окно. -->
                             <div class="toggle-row">
-                                <span class="toggle-label">Показывать дату</span>
-                                <label class="toggle-switch">
+                                <label class="toggle-label" for="clockShowSeconds">Секунды</label>
+                                <label class="toggle-switch" title="Показывать секунды">
+                                    <input type="checkbox" id="clockShowSeconds" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="clockFormat24h">24-часовой формат</label>
+                                <label class="toggle-switch" title="Выключено — 12 часов с AM/PM">
+                                    <input type="checkbox" id="clockFormat24h" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="clockShowDate">Дата</label>
+                                <label class="toggle-switch" title="Показывать дату под временем">
                                     <input type="checkbox" id="clockShowDate">
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="clockShowTimezone">Часовой пояс</label>
+                                <label class="toggle-switch" title="Показывать часовой пояс">
+                                    <input type="checkbox" id="clockShowTimezone">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
                         </div>
-                        <!-- Hidden elements kept for JS compatibility -->
-                        <input type="checkbox" id="syncClockStyle" style="display:none;">
-                        <input type="checkbox" id="clockShowTimezone" style="display:none;">
-                        <input type="checkbox" id="clockShowSeconds" checked style="display:none;">
-                        <input type="checkbox" id="clockFormat24h" checked style="display:none;">
                     </div>
                 </div>
 
@@ -468,20 +511,20 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="range" id="displayTimerScale" min="30" max="300" value="100" style="width: 80px;" aria-label="Масштаб таймера дисплея">
-                                    <span id="displayTimerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
+                                <div class="scale-control">
+                                    <input type="range" id="displayTimerScale" class="scale-slider" min="30" max="300" value="100" aria-label="Масштаб таймера дисплея">
+                                    <span id="displayTimerScaleValue" class="scale-value-text">100%</span>
                                 </div>
                             </div>
-                            <div style="height: 1px; background: rgba(255,255,255,0.06); margin: 6px 0;"></div>
+                            <div class="settings-divider"></div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Монитор</span>
-                                <select id="displaySelect" aria-label="Выбор монитора" style="padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08); color: #0a84ff; cursor: pointer; font-size: 0.85em; max-width: 140px;">
+                                <select id="displaySelect" class="settings-select is-accent" aria-label="Выбор монитора">
                                     <option value="auto">🖥️ Авто</option>
                                 </select>
                             </div>
                             <div class="toggle-row">
-                                <span class="toggle-label">Текущее время</span>
+                                <label class="toggle-label" for="showCurrentTime">Текущее время</label>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="showCurrentTime" checked>
                                     <span class="toggle-slider"></span>
@@ -494,7 +537,7 @@
                                 Блоки времени
                             </div>
                             <div class="toggle-row">
-                                <span class="toggle-label">Показывать блоки</span>
+                                <label class="toggle-label" for="showTimeBlocks">Показывать блоки</label>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="showTimeBlocks">
                                     <span class="toggle-slider"></span>
@@ -507,7 +550,7 @@
                             <div id="timeBlocksSettings" style="display: none;">
                                 <div class="toggle-row">
                                     <span class="toggle-label">Расположение</span>
-                                    <select id="timeLayoutPreset" aria-label="Пресет расположения блоков" style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.85em; cursor: pointer;">
+                                    <select id="timeLayoutPreset" class="settings-select" aria-label="Пресет расположения блоков">
                                         <option value="frame">Рамка</option>
                                         <option value="top-line">Сверху</option>
                                         <option value="bottom-line">Снизу</option>
@@ -516,18 +559,18 @@
                                 </div>
                                 <div class="toggle-row">
                                     <span class="toggle-label">Размер блоков</span>
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <input type="range" id="timeBlocksScale" min="50" max="600" value="100" style="width: 80px;" aria-label="Масштаб блоков времени">
-                                        <span id="timeBlocksScaleValue" style="min-width: 45px;">100%</span>
+                                    <div class="scale-control">
+                                        <input type="range" id="timeBlocksScale" class="scale-slider" min="50" max="600" value="100" aria-label="Масштаб блоков времени">
+                                        <span id="timeBlocksScaleValue" class="scale-value-text">100%</span>
                                     </div>
                                 </div>
                                 <div class="toggle-row">
                                     <span class="toggle-label">Начало</span>
-                                    <input type="time" id="eventTimeInput" value="10:00" aria-label="Время начала события" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
+                                    <input type="time" id="eventTimeInput" class="settings-time-input" value="10:00" aria-label="Время начала события">
                                 </div>
                                 <div class="toggle-row">
                                     <span class="toggle-label">Конец</span>
-                                    <input type="time" id="endTimeInput" value="12:00" aria-label="Время окончания события" style="padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-size: 0.85em; cursor: pointer;">
+                                    <input type="time" id="endTimeInput" class="settings-time-input" value="12:00" aria-label="Время окончания события">
                                 </div>
                             </div>
                         </div>
@@ -555,7 +598,7 @@
                                 <button class="bg-mode-btn" data-mode="local">Файл</button>
                             </div>
                             <div class="bg-controls active" id="bgSolidControls">
-                                <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" style="width: 100%;" aria-label="Цвет сплошной заливки фона">
+                                <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" aria-label="Цвет сплошной заливки фона">
                             </div>
                             <div class="bg-controls" id="bgGradientControls">
                                 <div class="gradient-row">
@@ -637,206 +680,229 @@
                 <button class="faq-close" id="faqClose" aria-label="Закрыть">&times;</button>
             </div>
             <div class="faq-body">
-                <!-- Основное управление -->
+                <!-- Содержимое сверено с реальным UI 30.07.2026. До этого справка
+                     описывала интерфейс, которого уже несколько версий не было:
+                     вкладки «Время» и «Фон», пресеты «1–5 → 1, 5, 10, 15, 30 мин»,
+                     режим фона «По URL», «три события» звуков, ползунки масштаба у
+                     виджета и часов, версия v2.1.1 при фактической 2.3.2.
+                     Расхождения жили долго, потому что в аккордеоне все ответы
+                     закрыты по умолчанию: чтобы наткнуться на устаревший текст,
+                     надо было раскрыть конкретный из шестнадцати. Тест
+                     tests/faq-and-hidden-controls.test.js теперь сверяет
+                     утверждения справки с разметкой панели. -->
                 <div class="faq-section">
                     <div class="faq-section-title">⏱️ Основное управление</div>
                     <div class="faq-item">
-                        <div class="faq-question">Как установить время?</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Как установить время?<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <ul>
-                                <li><strong>Пресеты</strong> — нажмите кнопку (5 мин, 10 мин, ... 1 час) для быстрой установки</li>
-                                <li><strong>Ручной ввод</strong> — введите минуты и секунды в поля <strong>мм:сс</strong> и нажмите <strong>✓</strong></li>
-                                <li><strong>Клавиши 1–5</strong> — мгновенная установка: 1 мин, 5 мин, 10 мин, 15 мин, 30 мин</li>
+                                <li><strong>Быстрый выбор</strong> — восемь кнопок: 5, 10, 15, 20, 25, 30, 45 мин и 1 час</li>
+                                <li><strong>Клавиши 1–8</strong> — те же восемь пресетов, работают из любого окна</li>
+                                <li><strong>Точное время</strong> — одно поле с умным разбором: <code>90</code> — это 90 секунд, <code>5:30</code> — 5 мин 30 с, <code>1:30:00</code> — 1 ч 30 мин. Максимум 99:59:59. Применить — <strong>Enter</strong> или <strong>✓</strong></li>
+                                <li><strong>± на ходу</strong> — кнопки −1 ч / −5 м / −1 м / +1 м / +5 м / +1 ч меняют время даже во время отсчёта</li>
                             </ul>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Управление таймером</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Управление таймером<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <ul>
-                                <li><strong>▶ Старт</strong> — запустить таймер</li>
-                                <li><strong>⏸ Пауза</strong> — приостановить (время сохраняется)</li>
-                                <li><strong>↺ Сброс</strong> — вернуть к начальному значению</li>
+                                <li><strong>▶ Старт</strong> — запустить (клавиша <strong>Space</strong>)</li>
+                                <li><strong>⏸ Пауза</strong> — приостановить, время сохраняется (<strong>Space</strong> или <strong>S</strong>)</li>
+                                <li><strong>↺ Сброс</strong> — вернуть к исходному значению (<strong>R</strong>)</li>
                             </ul>
-                            <p>Во вкладке <strong>Время → Корректировка на лету</strong> можно добавить или убавить время прямо во время работы таймера.</p>
+                            <p>Сброс возвращает к <strong>пресету</strong>, а не к тому, что осталось после правок на ходу: если вы поставили 10 мин, добавили 5 и нажали сброс — станет снова 10 мин.</p>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Считать ниже нуля</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Считать ниже нуля<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
-                            <p>Включается во вкладке <strong>Время</strong>. Таймер не остановится при 0, а продолжит отсчёт в минус (например, −00:15).</p>
+                            <p>Тумблер в разделе <strong>Точная настройка</strong>. Таймер не остановится на нуле, а продолжит отсчёт в минус (например, −00:15).</p>
                             <ul>
-                                <li>Звуковое уведомление всё равно сработает при достижении нуля</li>
-                                <li>Можно задать <strong>макс. перерасход</strong> — лимит времени после нуля (например, 05:00)</li>
+                                <li>Звук окончания срабатывает ровно на нуле, независимо от этого режима</li>
+                                <li>Когда режим включён, появляется поле <strong>Стоп на</strong> — жёсткий лимит перерасхода. <code>00:00</code> означает «без лимита»</li>
+                                <li>Перерасход во всех окнах красный и пульсирует — так он отличается от просто завершённого таймера</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                <!-- Окна -->
                 <div class="faq-section">
                     <div class="faq-section-title">🖥️ Окна приложения</div>
                     <div class="faq-item">
-                        <div class="faq-question">Виджет таймера</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Виджет таймера<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
-                            <p>Компактный прозрачный виджет поверх любого окна.</p>
+                            <p>Компактный прозрачный виджет поверх любого окна. Настраивается на вкладке <strong>Виджет</strong>.</p>
                             <ul>
-                                <li>Перетаскивается мышкой в любое место</li>
-                                <li>Кнопки управления появляются при наведении</li>
-                                <li>Слайдер внизу или <strong>Ctrl</strong>+колесо мыши — масштабирование (30–600%). Двойной клик на слайдере — сброс к 100%</li>
+                                <li>Перетаскивается мышью за любое место</li>
+                                <li><strong>Ctrl</strong> + колесо мыши — масштаб 30–600 %</li>
+                                <li>Размер и положение сохраняются до следующего запуска</li>
                                 <li>Горячая клавиша: <strong>W</strong> (открыть / закрыть)</li>
                             </ul>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Виджет часов</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Виджет часов<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
-                            <p>Показывает текущее время. Настраивается во вкладке <strong>Часы</strong>.</p>
+                            <p>Показывает текущее время. Настраивается на вкладке <strong>Часы</strong>.</p>
                             <ul>
-                                <li>4 стиля: круговой, цифровой LED, перекидные, аналоговые</li>
-                                <li>Опционально: дата, часовой пояс, секунды, 12/24ч формат</li>
-                                <li>Слайдер внизу или <strong>Ctrl</strong>+колесо мыши — масштабирование (30–600%). Двойной клик на слайдере — сброс к 100%</li>
-                                <li>Прозрачный, всегда поверх других окон</li>
-                                <li>Горячая клавиша: <strong>C</strong> (открыть / закрыть)</li>
+                                <li>Четыре стиля: круговой, LED, перекидной, аналоговый</li>
+                                <li>Переключатели: секунды, 24-часовой формат, дата, часовой пояс</li>
+                                <li><strong>Как у виджета</strong> — часы следуют за стилем виджета таймера. Выбор стиля часов вручную снова разъединяет их</li>
+                                <li><strong>Ctrl</strong> + колесо — масштаб 30–600 %, перетаскивание мышью — перемещение</li>
+                                <li>Горячая клавиша: <strong>C</strong></li>
                             </ul>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Полноэкранный дисплей</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Полноэкранный дисплей<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
-                            <p>Таймер на весь экран — для презентаций, стримов и мероприятий. Настраивается во вкладке <strong>Полноэкранный</strong>.</p>
+                            <p>Таймер на весь экран — для презентаций, стримов и мероприятий. Настраивается на вкладке <strong>Полноэкр.</strong></p>
                             <ul>
-                                <li>Выбор монитора (если их несколько)</li>
-                                <li>4 стиля таймера + настройка масштаба</li>
-                                <li>Блоки времени: текущее время начала/окончания мероприятия</li>
-                                <li>Настраиваемый фон: заливка, градиент, изображение (URL или файл)</li>
-                                <li>Горячая клавиша: <strong>D</strong> (открыть / закрыть), <strong>Esc</strong> (закрыть все)</li>
-                                <li>Масштаб: слайдер внизу или <strong>Ctrl</strong>+колесо — таймер, <strong>Shift</strong>+колесо — блоки. <strong>Alt</strong> + перетащить — переместить блоки.</li>
+                                <li>Выбор монитора, если их несколько</li>
+                                <li><strong>Ctrl</strong> + колесо — масштаб таймера 30–300 %; то же над информационным блоком — масштаб блока</li>
+                                <li><strong>Shift</strong> + колесо — масштаб блоков времени 50–600 %</li>
+                                <li><strong>Alt</strong> + перетаскивание — переместить блок куда угодно; позиции сохраняются</li>
+                                <li>Блоки времени: текущее время, начало и конец мероприятия</li>
+                                <li>Горячие клавиши: <strong>D</strong> — открыть / закрыть, <strong>Esc</strong> — закрыть все окна</li>
                             </ul>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" type="button" aria-expanded="false">Где работают горячие клавиши<span class="arrow" aria-hidden="true">⌄</span></button>
+                        <div class="faq-answer">
+                            <p>Во <strong>всех</strong> окнах приложения, а не только в панели управления: нажатие <strong>Space</strong> на виджете или в полноэкранном режиме запускает и останавливает таймер так же, как кнопка в панели.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Стили и оформление -->
                 <div class="faq-section">
                     <div class="faq-section-title">🎨 Стили и оформление</div>
                     <div class="faq-item">
-                        <div class="faq-question">Стили таймера</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Стили таймера<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <ul>
-                                <li><strong>⭕ Круговой</strong> — кольцевой индикатор прогресса</li>
-                                <li><strong>🔢 Цифровой LED</strong> — ретро-дисплей с неоновым свечением</li>
-                                <li><strong>🔄 Перекидные</strong> — механические flip-часы</li>
-                                <li><strong>🕐 Аналоговые</strong> — классический циферблат со стрелками</li>
+                                <li><strong>Круг</strong> — кольцевой индикатор прогресса</li>
+                                <li><strong>LED</strong> — цифровой дисплей с неоновым свечением</li>
+                                <li><strong>Флип</strong> — механические перекидные часы</li>
+                                <li><strong>Аналог</strong> — циферблат со стрелками</li>
                             </ul>
-                            <p>Стиль выбирается во вкладке <strong>Полноэкранный</strong>. Виджет часов может использовать тот же стиль или свой.</p>
+                            <p>Стиль выбирается отдельно для каждого окна: на вкладках <strong>Виджет</strong>, <strong>Часы</strong> и <strong>Полноэкр.</strong></p>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Фон дисплея</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Цвета<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
-                            <p>Во вкладке <strong>Фон</strong> доступны 4 режима:</p>
+                            <p>У виджета, часов и полноэкранного дисплея <strong>независимые</strong> цвета — на каждой вкладке своя палитра.</p>
                             <ul>
-                                <li><strong>Заливка</strong> — однотонный цвет</li>
-                                <li><strong>Градиент</strong> — два цвета с плавным переходом</li>
-                                <li><strong>По URL</strong> — изображение из интернета</li>
-                                <li><strong>Файл</strong> — загрузка с компьютера (JPG, PNG, GIF, WebP до 10 МБ)</li>
+                                <li>Готовые темы — кружки в палитре</li>
+                                <li><strong>Свой цвет</strong> — радужный кружок в конце палитры открывает выбор оттенка и ввод HEX</li>
                             </ul>
-                            <p>Для файла можно настроить масштабирование (заполнить, вписать, плитка) и затемнение.</p>
+                            <p>Когда времени остаётся мало, цвет переключается сам: жёлтый, затем красный. На нуле и в перерасходе — красный.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <button class="faq-question" type="button" aria-expanded="false">Фон полноэкранного дисплея<span class="arrow" aria-hidden="true">⌄</span></button>
+                        <div class="faq-answer">
+                            <p>Три режима на вкладке <strong>Полноэкр.</strong>:</p>
+                            <ul>
+                                <li><strong>Заливка</strong> — один цвет</li>
+                                <li><strong>Градиент</strong> — два цвета с плавным переходом</li>
+                                <li><strong>Файл</strong> — изображение с компьютера: JPG, PNG, GIF, WebP, BMP</li>
+                            </ul>
+                            <p>Для файла настраиваются вписывание (<strong>Заполнить</strong>, <strong>Вписать</strong>, <strong>Плитка</strong>) и затемнение поверх картинки, чтобы цифры читались.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Звуки -->
                 <div class="faq-section">
                     <div class="faq-section-title">🔔 Звуковые уведомления</div>
                     <div class="faq-item">
-                        <div class="faq-question">Типы звуковых событий</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Четыре события<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
-                            <p>Во вкладке <strong>Звук</strong> настраиваются три события:</p>
+                            <p>Вкладка <strong>Звуки</strong>, у каждого события свой переключатель и свой звук:</p>
                             <ul>
-                                <li><strong>При старте</strong> — сигнал при запуске таймера</li>
-                                <li><strong>При финише</strong> — сигнал при достижении нуля</li>
-                                <li><strong>Каждую минуту</strong> — периодический сигнал по ходу отсчёта</li>
+                                <li><strong>Старт</strong> — при запуске таймера</li>
+                                <li><strong>Окончание</strong> — при достижении нуля</li>
+                                <li><strong>Минута</strong> — когда остаётся одна минута</li>
+                                <li><strong>Перерасход</strong> — в режиме отсчёта ниже нуля, с выбором интервала повтора: 1, 2, 3, 5 или 10 минут</li>
                             </ul>
-                            <p>Для каждого можно выбрать звук из встроенных или загруженных, нажать <strong>▶</strong> для прослушивания.</p>
+                            <p>Тумблер в заголовке раздела глушит всё сразу. Пресет <strong>— без звука —</strong> отключает одно конкретное событие. <strong>▶</strong> — прослушать.</p>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Загрузка своих звуков</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Свои звуки<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <ul>
-                                <li>Нажмите <strong>➕ Загрузить звук</strong> внизу вкладки «Звук»</li>
-                                <li>Поддерживаемые форматы: MP3, WAV, OGG (до 5 МБ)</li>
-                                <li>Загруженные звуки появятся в выпадающих списках в категории «Ваши звуки»</li>
+                                <li>Перетащите файл в пунктирную рамку внизу вкладки <strong>Звуки</strong> или нажмите на неё</li>
+                                <li>Форматы: MP3, WAV, OGG, AAC, FLAC — до 5 МБ</li>
+                                <li>Загруженные появятся во всех четырёх списках в группе <strong>Ваши звуки</strong></li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                <!-- Горячие клавиши -->
                 <div class="faq-section">
                     <div class="faq-section-title">⌨️ Горячие клавиши</div>
                     <div class="faq-item">
-                        <div class="faq-question">Таймер</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Таймер<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
                                 <div class="shortcut"><span class="key">Space</span> <span class="shortcut-desc">Старт / Пауза</span></div>
-                                <div class="shortcut"><span class="key">R</span> <span class="shortcut-desc">Сброс к начальному значению</span></div>
-                                <div class="shortcut"><span class="key">S</span> <span class="shortcut-desc">Остановить таймер</span></div>
-                                <div class="shortcut"><span class="key">1</span>–<span class="key">5</span> <span class="shortcut-desc">Пресеты: 1, 5, 10, 15, 30 мин</span></div>
+                                <div class="shortcut"><span class="key">S</span> <span class="shortcut-desc">Пауза</span></div>
+                                <div class="shortcut"><span class="key">R</span> <span class="shortcut-desc">Сброс к исходному значению</span></div>
+                                <div class="shortcut"><span class="key">1</span>–<span class="key">8</span> <span class="shortcut-desc">Пресеты: 5, 10, 15, 20, 25, 30, 45, 60 мин</span></div>
                             </div>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Окна</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Окна<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
                                 <div class="shortcut"><span class="key">W</span> <span class="shortcut-desc">Виджет таймера (открыть / закрыть)</span></div>
                                 <div class="shortcut"><span class="key">C</span> <span class="shortcut-desc">Виджет часов (открыть / закрыть)</span></div>
                                 <div class="shortcut"><span class="key">D</span> <span class="shortcut-desc">Полноэкранный дисплей (открыть / закрыть)</span></div>
-                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть все виджеты</span></div>
-                                <div class="shortcut"><span class="key">F1</span> <span class="shortcut-desc">Подсказка по клавишам</span></div>
+                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть все окна</span></div>
+                                <div class="shortcut"><span class="key">F1</span> <span class="shortcut-desc">Шпаргалка по клавишам</span></div>
                             </div>
                         </div>
                     </div>
                     <div class="faq-item">
-                        <div class="faq-question">Масштабирование и перемещение</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Масштаб и перемещение<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
-                                <div class="shortcut">Слайдер / <span class="key">Ctrl</span> + колесо <span class="shortcut-desc">На виджете/часах — масштабирование (30–600%)</span></div>
-                                <div class="shortcut">Слайдер / <span class="key">Ctrl</span> + колесо <span class="shortcut-desc">В полноэкранном — масштаб таймера (30–300%)</span></div>
-                                <div class="shortcut"><span class="key">Shift</span> + колесо <span class="shortcut-desc">В полноэкранном — масштаб блоков (50–600%)</span></div>
-                                <div class="shortcut"><span class="key">Alt</span> + перетаскивание <span class="shortcut-desc">В полноэкранном — переместить блок времени</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> + колесо <span class="shortcut-desc">Виджет и часы — масштаб 30–600 %</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> + колесо <span class="shortcut-desc">Полноэкранный — масштаб таймера 30–300 %, над блоком — масштаб блока</span></div>
+                                <div class="shortcut"><span class="key">Shift</span> + колесо <span class="shortcut-desc">Полноэкранный — масштаб блоков 50–600 %</span></div>
+                                <div class="shortcut"><span class="key">Alt</span> + перетаскивание <span class="shortcut-desc">Полноэкранный — переместить блок времени</span></div>
                             </div>
+                            <p>Перетаскивание без модификаторов перемещает само окно виджета или часов.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Советы -->
                 <div class="faq-section">
                     <div class="faq-section-title">💡 Полезные советы</div>
                     <div class="faq-item">
-                        <div class="faq-question">Советы по работе</div>
+                        <button class="faq-question" type="button" aria-expanded="false">Мелочи, которые экономят время<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <ul>
-                                <li>💾 Все настройки сохраняются автоматически</li>
-                                <li>🔄 Все окна синхронизированы — изменения видны мгновенно</li>
-                                <li>⏱️ Виджет удобен для постоянного отслеживания времени</li>
-                                <li>🎥 Полноэкранный идеален для презентаций и трансляций</li>
-                                <li>❓ <strong>F1</strong> — шпаргалка по горячим клавишам в любой момент</li>
-                                <li>📐 Позиции блоков и масштаб в полноэкранном режиме сохраняются между сессиями</li>
-                                <li>📐 Масштаб виджета и часов также сохраняется</li>
-                                <li>⏱️ <strong>Ввод времени</strong>: введите <code>90</code> (секунды), <code>5:30</code> (мин:сек) или <code>1:30:00</code> (ч:мин:сек)</li>
-                                <li>🎨 <strong>Свой цвет</strong>: нажмите радужный кружок рядом с палитрой для выбора любого цвета</li>
-                                <li>📐 <strong>Масштаб</strong>: клик на проценты — ввести значение, двойной клик — сброс к 100%</li>
+                                <li>Настройки сохраняются сами — отдельной кнопки «Применить» нет</li>
+                                <li>Все окна синхронны: изменение видно мгновенно во всех</li>
+                                <li>Клик по проценту масштаба — ввести значение вручную, двойной клик — сброс к 100 %</li>
+                                <li>Настройки открываются в выдвижном ящике: нажмите вкладку — ящик выедет, <strong>Esc</strong> закроет его</li>
+                                <li>Сбросить всё разом — кнопка <strong>Сбросить настройки</strong> внизу этой справки. Приложение закроется, запустите его заново</li>
                             </ul>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="faq-footer">
-                <span>TimerWidget v2.1.1</span>
+                <!-- Версия обязана совпадать с package.json: тест
+                     tests/faq-help.test.js падает при расхождении. Здесь стояло
+                     v2.1.1 при фактических 2.3.2 — проверить это глазами было
+                     нельзя, подвал справки не открывался вместе с ней. -->
+                <span id="appVersion">TimerWidget v2.4.0</span>
                 <button class="reset-btn" id="resetSettingsBtn">Сбросить настройки</button>
             </div>
         </div>
@@ -1256,15 +1322,6 @@
                     }
                 });
 
-                // Мастер-переключатель звука (единый флаг — синхронизирует кнопку и чекбокс)
-                const soundToggleBtn = document.getElementById('soundToggleBtn');
-                this._soundToggleBtn = soundToggleBtn;
-                if (soundToggleBtn) {
-                    soundToggleBtn.addEventListener('click', () => {
-                        this.setSoundEnabled(!this.soundEnabled);
-                        if (this.soundMasterEl) { this.soundMasterEl.checked = this.soundEnabled; }
-                    });
-                }
                 // Стартовое состояние: localStorage — лишь подсказка, финальное
                 // значение выставит loadSettings() из soundMasterEnabled, чтобы
                 // чекбокс и флаг никогда не расходились.
@@ -1284,17 +1341,14 @@
             }
 
             // Единая точка правды для мастер-флага звука: держит вместе
-            // this.soundEnabled, localStorage и (скрытую) кнопку-тумблер.
-            // Раньше флаг и мастер-чекбокс жили отдельно, и звук мог залипнуть
-            // в выключенном состоянии без возможности включить его из UI.
+            // this.soundEnabled и localStorage. Раньше флаг и мастер-чекбокс жили
+            // отдельно, и звук мог залипнуть в выключенном состоянии без
+            // возможности включить его из UI. Скрытая кнопка-тумблер, которую этот
+            // метод раньше подкрашивал, удалена: после того как #soundMasterEnabled
+            // стал единственным источником правды, она была мёртвым кодом.
             setSoundEnabled(enabled) {
                 this.soundEnabled = !!enabled;
                 localStorage.setItem('soundEnabled', this.soundEnabled);
-                const btn = this._soundToggleBtn;
-                if (btn) {
-                    btn.classList.toggle('muted', !this.soundEnabled);
-                    btn.textContent = this.soundEnabled ? '🔊 Звук' : '🔇 Звук';
-                }
             }
 
             initThemes() {
@@ -2550,6 +2604,29 @@
         const faqClose = document.getElementById('faqClose');
         const faqQuestions = document.querySelectorAll('.faq-question');
 
+        // Переключатель темы. Панель — единственное место, откуда тема меняется,
+        // но применяется она во всех окнах: локально сразу, остальным — через IPC.
+        const contrastToggle = document.getElementById('contrastToggle');
+        if (contrastToggle) {
+            const syncThemeButton = (theme) => {
+                const hc = theme === 'hc-dark';
+                contrastToggle.setAttribute('aria-pressed', String(hc));
+                contrastToggle.classList.toggle('active', hc);
+                contrastToggle.title = window.UITheme.themeLabel(theme);
+                contrastToggle.setAttribute('aria-label', window.UITheme.themeLabel(theme));
+            };
+            syncThemeButton(window.UITheme.readTheme());
+            contrastToggle.addEventListener('click', () => {
+                const theme = window.UITheme.nextTheme(window.UITheme.readTheme());
+                window.UITheme.storeTheme(theme);
+                window.UITheme.applyTheme(theme);
+                syncThemeButton(theme);
+                if (window.ipcRenderer) {
+                    window.ipcRenderer.send('ui-theme-update', { theme });
+                }
+            });
+        }
+
         // Open FAQ modal
         faqBtn.addEventListener('click', () => {
             openModal(faqModal, faqClose);
@@ -2597,19 +2674,35 @@
             window.timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
         }
 
-        // Toggle FAQ items (accordion)
-        faqQuestions.forEach(question => {
+        // Аккордеон справки: в секции открыт максимум один ответ.
+        //
+        // Обработчик здесь ЕДИНСТВЕННЫЙ и обязан таким остаться. Второй, добавленный
+        // рядом, выглядит безобидно, но ломает раскрытие насмерть: первый ставит
+        // класс `open`, второй видит `wasOpen === true`, снимает класс со всей
+        // секции и обратно не возвращает — ответ мигает и остаётся закрытым.
+        //
+        // Состояние сообщается ассистивным технологиям здесь же, в одном месте с
+        // классом: раньше вопрос был <div> без роли, без фокуса и без
+        // aria-expanded — мышью работало, с клавиатуры нет.
+        faqQuestions.forEach((question, i) => {
+            const item = question.parentElement;
+            const answer = item.querySelector('.faq-answer');
+            if (answer && !answer.id) { answer.id = `faqAnswer${i}`; }
+            if (answer) { question.setAttribute('aria-controls', answer.id); }
+
             question.addEventListener('click', () => {
-                const item = question.parentElement;
                 const wasOpen = item.classList.contains('open');
-
-                // Close all items in the same section
                 const section = item.closest('.faq-section');
-                section.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
 
-                // Toggle clicked item
+                section.querySelectorAll('.faq-item').forEach(i2 => {
+                    i2.classList.remove('open');
+                    const q2 = i2.querySelector('.faq-question');
+                    if (q2) { q2.setAttribute('aria-expanded', 'false'); }
+                });
+
                 if (!wasOpen) {
                     item.classList.add('open');
+                    question.setAttribute('aria-expanded', 'true');
                 }
             });
         });
@@ -2752,5 +2845,7 @@
 
 
     </script>
+    <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
+    <script>window.UITheme.bindThemeSync(window.ipcRenderer);</script>
 </body>
 </html>

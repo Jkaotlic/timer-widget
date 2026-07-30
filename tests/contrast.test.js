@@ -58,12 +58,30 @@ function composite(layer, baseRgb) {
     return rgb.map((c, i) => Math.round(c * alpha + baseRgb[i] * (1 - alpha)));
 }
 
+// Границы блоков тем. Проверяются явно: раньше здесь стояло
+// `indexOf('[data-theme="light"]')` без проверки, и после удаления светлой темы
+// indexOf вернул бы −1, а slice(0, −1) — весь файл. Тест продолжил бы «работать»,
+// читая токены не той темы. Любое переименование блока теперь падает сразу.
+const HC_MARK = '[data-theme="hc-dark"]';
+const SHARED_MARK = '/* ---------------- REDUCED MOTION ---------------- */';
+assert.ok(TOKENS.includes(HC_MARK), 'блок высокого контраста не найден в design-tokens.css');
+assert.ok(TOKENS.includes(SHARED_MARK), 'граница блока тем не найдена в design-tokens.css');
+
+const DARK_BLOCK = TOKENS.slice(0, TOKENS.indexOf(HC_MARK));
+const HC_BLOCK = TOKENS.slice(TOKENS.indexOf(HC_MARK), TOKENS.indexOf(SHARED_MARK));
+
 // Достаёт значение токена из блока тёмной темы (`:root, [data-theme="dark"]`).
 function darkToken(name) {
-    const block = TOKENS.slice(0, TOKENS.indexOf('[data-theme="light"]'));
-    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(block);
+    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(DARK_BLOCK);
     assert.ok(m, `токен --${name} не найден в блоке тёмной темы`);
     return m[1].trim();
+}
+
+// То же для высокого контраста. Токен, который эта тема не переопределяет,
+// наследуется из тёмной — так и считаем, иначе проверка врёт.
+function hcToken(name) {
+    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(HC_BLOCK);
+    return m ? m[1].trim() : darkToken(name);
 }
 
 // Непрозрачные фоны, на которых реально лежит текст панели.
@@ -97,6 +115,70 @@ test('текстовые токены тёмной темы проходят WCA
         }
     }
     console.log('   ' + report.join('\n   '));
+});
+
+test('высокий контраст: текстовые токены проходят AAA, а не только AA', () => {
+    // Смысл темы — не «пройти порог», а дать запас. Порог AAA для обычного
+    // текста 7:1. Тема стала достижимой в 2.4.0 (кнопка в титлбаре пишет
+    // data-theme), до этого её контраст не проверялся вообще ни разу.
+    const AAA_NORMAL = 7.0;
+    const hcBase = parseColor(hcToken('tw-bg-dark')).rgb;
+    const hcSurface = composite(hcToken('tw-bg-surface'), hcBase);
+    const hcGlass = composite(hcToken('tw-bg-glass'), hcBase);
+    const report = [];
+    for (const token of TEXT_TOKENS) {
+        const value = hcToken(token);
+        for (const [bgName, bg] of [['surface', hcSurface], ['glass', hcGlass]]) {
+            const ratio = contrast(composite(value, bg), bg);
+            report.push(`--${token} на ${bgName}: ${ratio.toFixed(2)}:1`);
+            assert.ok(
+                ratio >= AAA_NORMAL,
+                `высокий контраст: --${token} (${value}) на ${bgName} даёт `
+                + `${ratio.toFixed(2)}:1, а тема обязана держать ${AAA_NORMAL}:1`
+            );
+        }
+    }
+    console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
+});
+
+test('высокий контраст: акценты не темнее тёмной темы', () => {
+    // Осветлённые акценты hc-темы обязаны быть контрастнее обычных, иначе
+    // «высокий контраст» — только название.
+    const hcBase = parseColor(hcToken('tw-bg-dark')).rgb;
+    const hcSurface = composite(hcToken('tw-bg-surface'), hcBase);
+    for (const token of ['tw-green', 'tw-red', 'tw-orange', 'tw-blue']) {
+        const hcRatio = contrast(composite(hcToken(token), hcSurface), hcSurface);
+        const darkRatio = contrast(composite(darkToken(token), SURFACE), SURFACE);
+        assert.ok(
+            hcRatio >= darkRatio,
+            `--${token}: в hc-теме ${hcRatio.toFixed(2)}:1, в тёмной ${darkRatio.toFixed(2)}:1 — `
+            + 'высокий контраст обязан быть не хуже обычного'
+        );
+        assert.ok(hcRatio >= AA_NORMAL, `--${token} в hc-теме: ${hcRatio.toFixed(2)}:1`);
+    }
+});
+
+test('высокий контраст: стекло и свечение выключены', () => {
+    // Размытие и неон — главные враги контраста. Тема обязана их снимать.
+    for (const token of ['tw-blur', 'tw-blur-sm', 'tw-blur-xs']) {
+        assert.equal(hcToken(token), 'none', `--${token} в hc-теме обязан быть none`);
+    }
+    for (const token of ['tw-glow-blue', 'tw-glow-green', 'tw-glow-red']) {
+        assert.equal(hcToken(token), 'none', `--${token} в hc-теме обязан быть none`);
+    }
+});
+
+test('светлой темы в токенах больше нет', () => {
+    // Блок был недостижим (data-theme не выставлял никто) и поэтому никогда не
+    // настраивался: подписи давали 2.70:1. Удалён вместе с упоминаниями.
+    // По КОДУ без комментариев: шапка файла объясняет, почему тема удалена, и
+    // не должна ронять тест сама по себе.
+    const code = TOKENS.replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.ok(!code.includes('[data-theme="light"]'), 'вернулся недостижимый блок светлой темы');
+    assert.ok(
+        !/color-scheme:\s*light/.test(code),
+        'вернулась светлая цветовая схема — её контраст никогда не проверялся'
+    );
 });
 
 test('семантические цвета статусов читаемы на стекле', () => {
