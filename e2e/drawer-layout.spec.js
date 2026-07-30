@@ -66,6 +66,31 @@ test('ящик настроек не накрывает панель ни при
 
     await closeDrawer(control);
 
+    // --- узкое, но допустимое окно ---
+    // Этот случай важнее предельного: именно он воспроизводит то, на чём упала
+    // первая версия правки. Она вычитала ящик из КОНСТАНТЫ потолка (1200 − 336 =
+    // 864) вместо фактической ширины, и при окне 800px колонка получалась 864 —
+    // шире, чем всё окно. На macOS с большим экраном это не проявлялось: окно
+    // расширялось до запрошенного. На Windows-раннере экран узкий, главный процесс
+    // обрезает ширину по `screenWidth - 50`, и наложение вылезло только в CI.
+    // Здесь оно ловится на любой машине.
+    await control.evaluate(() => {
+        window.ipcRenderer.send('resize-control-window', { width: 800, height: 700 });
+    });
+    await control.waitForTimeout(900);
+    await openDrawer(control, 'clock');
+    const narrow = await control.evaluate(measureColumns);
+
+    expect(narrow.panel.width, 'панель не должна схлопнуться').toBeGreaterThan(300);
+    expect(
+        narrow.panel.right,
+        `при окне ${narrow.innerWidth}px панель (правый край ${narrow.panel.right}) `
+        + `накрывается ящиком (левый край ${narrow.drawer.left}); `
+        + `--control-panel-width = ${narrow.panelWidthVar}`
+    ).toBeLessThanOrEqual(narrow.drawer.left + 1);
+
+    await closeDrawer(control);
+
     // --- предельная ширина ---
     // Просим у главного процесса заведомо больше потолка: он сам обрежет до
     // maxWidth (или до размеров экрана раннера — поэтому дальше считаем от

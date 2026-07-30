@@ -1156,22 +1156,32 @@
                     const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                     this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || baseDefault;
                     const shell = document.querySelector('.app-shell');
-                    if (shell) {
-                        // Колонка панели обязана уместиться РЯДОМ с ящиком внутри
-                        // потолка ширины окна. Раньше здесь стояла просто текущая
-                        // ширина: у окна, уже растянутого до предела, запрос
-                        // «текущая + 336» обрезался главным процессом, а колонка
-                        // оставалась во всю ширину — ящик (он absolute, right: 0)
-                        // ложился ПОВЕРХ пресетов и кнопок панели. Видно это стало
-                        // только когда открытый ящик попал в визуальную сверку.
-                        const maxWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_MAX_WIDTH) || 1200;
+                    // Ширина колонки панели выводится из ФАКТИЧЕСКОЙ ширины окна, а
+                    // не предсказывается.
+                    //
+                    // Здесь стояла просто текущая ширина окна, и у окна, растянутого
+                    // до предела, ящик накрывал панель: запрос «текущая + 336»
+                    // обрезался, окно не расширялось, а колонка оставалась во всю
+                    // ширину (ящик — absolute; right: 0). Первая попытка починки
+                    // вычитала ящик из КОНСТАНТЫ потолка — и падала на Windows, где
+                    // главный процесс обрезает ширину ещё и по размеру экрана
+                    // (`screenWidth - 50`): при окне 974px колонка получалась 864px,
+                    // то есть снова с наложением. Предсказать эффективный потолок из
+                    // рендерера нельзя, поэтому колонка считается от того, что
+                    // реально получилось, и пересчитывается на каждый resize, пока
+                    // ящик открыт — заодно это чинит ручное изменение размера окна
+                    // при открытом ящике.
+                    const syncColumn = () => {
+                        if (!shell) { return; }
                         const minWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_MIN_WIDTH) || 380;
-                        const panelWidth = Math.round(Math.max(
-                            minWidth,
-                            Math.min(this._baseWidthBeforeDrawer || baseDefault, maxWidth - this._drawerExtraWidth)
-                        ));
-                        shell.style.setProperty('--control-panel-width', `${panelWidth}px`);
-                    }
+                        const available = (window.innerWidth || baseDefault) - this._drawerExtraWidth;
+                        shell.style.setProperty(
+                            '--control-panel-width',
+                            `${Math.round(Math.max(minWidth, available))}px`
+                        );
+                    };
+                    this._syncDrawerColumn = syncColumn;
+                    window.addEventListener('resize', syncColumn);
                     // Drawer-операция меняет только ширину — высоту main оставит
                     // как есть (иначе ручная высота, выставленная юзером,
                     // перезаписывалась innerHeight с HiDPI-дрейфом).
@@ -1180,6 +1190,7 @@
                     });
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
+                            syncColumn();
                             if (shell) { shell.classList.add('drawer-open'); }
                             this.settingsDrawerEl.classList.add('open');
                             this.settingsDrawerEl.setAttribute('aria-hidden', 'false');
@@ -1236,6 +1247,14 @@
                 // не меняется (в узком окне start == center для 100% ширины).
                 const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                 const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || baseDefault;
+                // Снимаем пересчёт колонки: пока ящик открыт, он держал её равной
+                // «фактическая ширина минус ящик», но у закрытого ящика колонка не
+                // нужна вовсе — иначе слушатель продолжал бы писать переменную,
+                // которую clearDrawerOpen() тут же удаляет.
+                if (this._syncDrawerColumn) {
+                    window.removeEventListener('resize', this._syncDrawerColumn);
+                    this._syncDrawerColumn = null;
+                }
                 setTimeout(() => {
                     if (this.settingsDrawerEl.classList.contains('open')) { return; }
                     const clearDrawerOpen = () => {
