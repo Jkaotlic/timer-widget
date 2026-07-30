@@ -383,13 +383,19 @@
             animation: danger-pulse 1s infinite;
         }
 
-        /* OVERTIME — dashed orange ring, per SKILL overtime-storyboard */
-        .ring-progress.overtime {
-            stroke: url(#warningGradient);
-            stroke-dasharray: 4 6;
-            filter: drop-shadow(0 0 20px rgba(255, 159, 10, 0.7));
-            animation: danger-pulse 1s infinite;
-        }
+        /* ПЕРЕРАСХОД красится правилами .danger — отдельных .overtime здесь нет.
+           JS всегда навешивает эти классы ПАРОЙ (`classList.add('danger','overtime')`
+           в updateProgress / _enforceOvertimeColors / updateDigitalDisplay / …), а
+           палитра статусов у приложения одна на три окна: перерасход — КРАСНЫЙ с
+           пульсацией (см. CLAUDE.md). Раньше в дисплее рядом лежал ещё слой
+           .overtime от прежнего оранжевого дизайна — пять правил на кольцо, цифры
+           круга, LED, флип и аналог. Четыре из них были не видны, потому что JS
+           ставит красный ИНЛАЙНОМ, а пятое протекало: у `.time-text.overtime`
+           перебивался только color, а `--text-glow` оставался оранжевым — красные
+           цифры светились оранжевым. Плюс кольцо в перерасходе вообще не рисуется
+           (updateProgress зажимает ratio в 0, дуга нулевой длины), так что
+           оранжевый градиент и штриховка были заведомо мертвы.
+           Не возвращать: оранжевый разойдётся с виджетом, часами и статус-плашкой. */
 
         @keyframes danger-pulse {
             0%, 100% { opacity: 1; }
@@ -446,10 +452,6 @@
             color: #ff4444;
             --text-glow: rgba(255, 68, 68, 0.7);
             animation: time-pulse 0.5s infinite;
-        }
-        .time-text.overtime {
-            color: var(--tw-orange);
-            --text-glow: rgba(255, 159, 10, 0.7);
         }
 
         .time-minus,
@@ -670,14 +672,6 @@
                 0 0 80px rgba(255, 51, 51, 0.4);
             animation: led-danger-pulse 1s infinite;
         }
-        .digital-time.overtime {
-            color: var(--tw-orange);
-            text-shadow:
-                0 0 20px var(--tw-orange),
-                0 0 40px var(--tw-orange),
-                0 0 80px rgba(255, 159, 10, 0.4);
-            animation: led-danger-pulse 1s infinite;
-        }
 
         @keyframes led-danger-pulse {
             0%, 100% { opacity: 1; }
@@ -798,7 +792,6 @@
 
         .flip-card.warning .flip-digit { color: var(--tw-yellow); }
         .flip-card.danger .flip-digit  { color: #ff4444; }
-        .flip-card.overtime .flip-digit { color: var(--tw-orange); }
         .flip-card.danger {
             animation: flip-danger-pulse 1s infinite;
             box-shadow:
@@ -808,18 +801,6 @@
         @keyframes flip-danger-pulse {
             0%, 100% { box-shadow: inset 0 1px 0 rgba(255,68,68,0.15), 0 4px 20px rgba(255,68,68,0.2); }
             50%      { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3),  0 4px 30px rgba(255,68,68,0.4); }
-        }
-
-        .flip-label {
-            text-align: center;
-            margin-top: 15px;
-            font-family: var(--tw-font-sans);
-            font-size: var(--tw-t-caption);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--tw-fg-dim);
-            display: none;
         }
 
         .flip-card.flipping .flip-card-inner {
@@ -1011,10 +992,6 @@
         .analog-digital-time.warning { color: var(--tw-yellow); }
         .analog-digital-time.danger {
             color: #ff4444;
-            animation: time-pulse 0.5s infinite;
-        }
-        .analog-digital-time.overtime {
-            color: var(--tw-orange);
             animation: time-pulse 0.5s infinite;
         }
 
@@ -1353,7 +1330,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="flip-label">часы</div>
             </div>
             <div class="flip-separator" id="flipHoursSep" style="display:none">:</div>
             <div class="flip-unit">
@@ -1369,7 +1345,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="flip-label">минуты</div>
             </div>
             <div class="flip-separator">:</div>
             <div class="flip-unit">
@@ -1385,7 +1360,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="flip-label">секунды</div>
             </div>
         </div>
 

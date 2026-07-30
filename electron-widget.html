@@ -1748,7 +1748,10 @@
                 this.updateStatus(secs);
 
                 // Класс для контейнера
-                this.container.classList.toggle('timer-running', this.isRunning);
+                // Класс timer-running здесь больше не навешивается: ни одно правило
+                // CSS в этом окне его не использовало, то есть это была запись в DOM
+                // на каждом тике впустую. Статус виджета показывает .status-badge,
+                // цвета — data-status на самих элементах.
             }
             
             // Перекидывание одной карточки. Общая реализация — flip-card.js.
