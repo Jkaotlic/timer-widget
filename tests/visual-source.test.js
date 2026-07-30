@@ -48,6 +48,35 @@ test('opening settings keeps control scale stable', () => {
     assert.match(controlHtml, /shell\.style\.setProperty\('--control-panel-width', `\$\{panelWidth\}px`\)/);
 });
 
+test('колонка панели при открытом ящике считается от потолка ширины окна', () => {
+    // Баг: ширина колонки бралась равной ТЕКУЩЕЙ ширине окна. У окна, растянутого
+    // до maxWidth, запрос «текущая + 336» обрезался главным процессом, окно не
+    // расширялось, а колонка оставалась во всю ширину — ящик (absolute, right: 0)
+    // накрывал пресеты и кнопки. Замер в e2e/drawer-layout.spec.js: правый край
+    // панели 1200 против левого края ящика 864.
+    const controlHtml = read('electron-control.html');
+    const constants = read('constants.js');
+    const main = read('electron-main.js');
+
+    assert.match(constants, /CONTROL_WINDOW_MAX_WIDTH:\s*\d+/, 'потолок ширины не объявлен в CONFIG');
+    // Потолок обязан быть ОДИН на главный процесс и панель, иначе они разъедутся.
+    assert.match(
+        main,
+        /maxWidth:\s*CONFIG\.CONTROL_WINDOW_MAX_WIDTH/,
+        'главный процесс задаёт maxWidth литералом вместо константы'
+    );
+    assert.match(
+        controlHtml,
+        /CONFIG\.CONTROL_WINDOW_MAX_WIDTH/,
+        'панель не знает про потолок ширины и не вычитает из него ящик'
+    );
+    assert.match(
+        controlHtml,
+        /Math\.min\(this\._baseWidthBeforeDrawer \|\| baseDefault, maxWidth - this\._drawerExtraWidth\)/,
+        'колонка панели снова не ограничена «потолок минус ящик»'
+    );
+});
+
 test('control window keeps a reliable drag region after frameless shell changes', () => {
     const controlHtml = readControlSource();
 

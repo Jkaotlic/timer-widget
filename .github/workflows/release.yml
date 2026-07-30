@@ -12,10 +12,10 @@ jobs:
   build-macos-intel:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -36,7 +36,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-intel
           path: |
@@ -47,10 +47,10 @@ jobs:
   build-macos-arm:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -71,7 +71,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-arm
           path: |
@@ -82,10 +82,10 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -105,7 +105,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows
           path: |
@@ -115,10 +115,10 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -138,7 +138,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux
           path: |
@@ -150,82 +150,31 @@ jobs:
     needs: [build-macos-intel, build-macos-arm, build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
       - name: List artifacts
         run: find artifacts -type f | head -50
 
+      # Описание релиза собирается из CHANGELOG.md, а не пишется здесь руками.
+      # Раньше тело было захардкожено (~70 строк markdown) и к версии 2.4.0 врало:
+      # заголовок «Что нового в v2.3», обещание «Linux: chrome-sandbox без SUID,
+      # приложение с --no-sandbox» (стало наоборот) и устаревшая инструкция для
+      # macOS «правый клик → Открыть». Текст, живущий отдельно от кода, расходится
+      # с ним молча — тот же дефект, что была врущая справка внутри приложения.
+      - name: Build release notes from CHANGELOG
+        run: node scripts/release-notes.js "${{ github.ref_name }}" --out RELEASE_NOTES.md
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "TimerWidget ${{ github.ref_name }}"
           generate_release_notes: false
-          body: |
-            # TimerWidget ${{ github.ref_name }}
-
-            Прозрачный таймер-виджет для презентаций и рабочего стола — 4 окна, 4 стиля, полностью офлайн.
-
-            ## ✨ Что нового в v2.3
-
-            ### Design System v3 — VisionOS glass во всех окнах
-            - Единые дизайн-токены (`design-tokens.css`): палитра Apple, блюры, тени, тайминги
-            - **HSV color picker** — полноценный выбор цвета (hue + SV + hex) вместо пресетов, независимые инстансы для каждого окна
-            - **Slide-out drawer** — компактная панель управления 380 px с выдвижной боковой панелью настроек (macOS detail-pane pattern)
-            - Адаптивная высота панели под активную вкладку
-            - Новая иконка приложения — неоновые песочные часы
-
-            ### Управление
-            - **Ручной ввод времени** — `sec`, `min:sec` или `hr:min:sec` (до 99:59:59)
-            - **Клик по проценту масштаба** — точный ввод значения, двойной клик — сброс
-            - **Shift + колесо** на полноэкранном — отдельное масштабирование инфо-блоков
-            - Кнопки «свернуть / оконный режим / закрыть» на полноэкранном появляются при наведении
-
-            ### Безопасность (обработан security-свип v2.2.0)
-            - Удалена загрузка HTTP(S) фоновых изображений — только локальные `data:` URL
-            - Chromium Component Updater полностью отключён — приложение не обращается в сеть
-            - DevTools выключены во всех production-окнах
-            - `LICENSES.chromium.html` очищается от внешнего политического контента через electron-builder `afterPack`
-            - Linux: `chrome-sandbox` без SUID-бита (0755), приложение с `--no-sandbox`
-            - Валидация изображений и аудио через MIME + magic bytes (WebP RIFF, MP3/WAV/OGG/FLAC/WebM/AAC)
-
-            ### Исправления
-            - Windows 11: убрана белая кайма DWM вокруг полноэкранного режима (`thickFrame: false`)
-            - Полноэкранный: нет белых полос на ultrawide / фракционной DPI (`backgroundColor:#000`)
-            - Overtime-статус корректно показывается во всех 3 окнах (widget/clock/display)
-            - Инфо-блоки не прилегают вплотную к краям экрана (20 px clamping при Alt-drag)
-            - Drawer + высота панели: ручная высота больше не сбрасывается при открытии/закрытии drawer'а
-            - Масштаб таймера не сбрасывается при смене цвета/темы
-
-            ## 📦 Скачать
-
-            | Платформа | Файл | Описание |
-            |:----------|:-----|:---------|
-            | 🪟 Windows | `TimerWidget-Setup-*.exe` | Установщик (NSIS) |
-            | 🪟 Windows | `TimerWidget-Portable.exe` | Портативная версия |
-            | 🍎 macOS Apple Silicon | `*-arm64.dmg` | Для M1/M2/M3/M4 |
-            | 🍎 macOS Intel | `*-x64.dmg` | Для Intel Mac |
-            | 🐧 Linux | `*.deb` | Debian / Ubuntu |
-            | 🐧 Linux | `*.AppImage` | Универсальный |
-
-            > **macOS**: приложение не подписано Apple Developer сертификатом. При первом запуске: **правый клик** → **Открыть** → подтвердить. Или в терминале: `xattr -cr /Applications/TimerWidget.app`
-            >
-            > **Linux (.deb)**: `chrome-sandbox` ставится без SUID, приложение запускается с `--no-sandbox` — user namespaces не требуются.
-
-            ## 🛡️ Требования
-
-            - Windows 10/11 (x64)
-            - macOS 11+ (Intel или Apple Silicon)
-            - Linux (glibc 2.28+)
-
-            Приложение работает **полностью оффлайн** — шрифты бандлятся локально, звуки синтезируются через Web Audio API, Chromium никуда не стучится.
-
-            ---
-            Electron 43.2.0 · Vanilla JS · node --test · полный [CHANGELOG](https://github.com/Jkaotlic/timer-widget/blob/main/CHANGELOG.md)
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
           files: |

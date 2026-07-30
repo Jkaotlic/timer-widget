@@ -331,7 +331,9 @@ function createControlWindow() {
         height: windowHeight,
         minWidth: CONFIG.CONTROL_WINDOW_MIN_WIDTH,
         minHeight: 660,
-        maxWidth: 1200,  // 880 (panel max) + 320 (drawer) leaves room for resize
+        // Потолок один и тот же для главного процесса и для панели: панель
+        // вычитает из него ширину ящика, когда считает свою колонку.
+        maxWidth: CONFIG.CONTROL_WINDOW_MAX_WIDTH,
         maxHeight: 1100,
         // Keep the control window visually rounded. The dark glass is painted
         // by electron-control.html inside a rounded shell; the native

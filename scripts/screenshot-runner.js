@@ -380,6 +380,55 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             await capture(ctx().display, path.join(outDir, `display-blocks-${style}.png`), log);
         }
 
+        // Выдвижной ящик настроек.
+        //
+        // Он закрыт во всех предыдущих снимках, поэтому его содержимое — селекты,
+        // поля времени, переключатели вкладок «Часы» и «Полноэкр.» — визуального
+        // покрытия не имело вообще. Тот же случай, что был с info-блоками: пока
+        // элемент не попал ни в один кадр, никакая сверка картинок про него ничего
+        // сказать не может, и правки в нём приходится проверять на слово.
+        //
+        // Снимаем две вкладки: «Часы» (там четыре переключателя, вернувшиеся в UI)
+        // и «Полноэкр.» (там селект монитора, пресет раскладки и поля времени,
+        // переехавшие из инлайновых style= на токены).
+        //
+        // Идёт ПОСЛЕ info-блоков и последним в последовательности: открытие ящика
+        // расширяет окно управления примерно до 716 px через resize-control-window,
+        // и делать это раньше означало бы менять геометрию под всеми предыдущими
+        // кадрами.
+        log.info('[screenshot] settings drawer');
+        // Возвращаем окно к штатному размеру: перед этим шёл прогон «максимальный
+        // размер», и снимок ящика на растянутом окне показывал бы не то, что видит
+        // пользователь при обычной работе.
+        try {
+            const c = ctx().control;
+            if (c && !c.isDestroyed()) {
+                c.setSize(400, 700);
+                await sleep(400);
+            }
+        } catch (e) {
+            log.warn(`[screenshot] drawer resize failed: ${e.message}`);
+        }
+        for (const tab of ['clock', 'display']) {
+            const w = ctx();
+            if (!w.control || w.control.isDestroyed()) { break; }
+            try {
+                await w.control.webContents.executeJavaScript(`
+                    (() => {
+                        const btn = document.querySelector('.tab-btn[data-tab="${tab}"]');
+                        if (btn) { btn.click(); }
+                        return !!btn;
+                    })();
+                `);
+            } catch (e) {
+                log.warn(`[screenshot] drawer (${tab}) failed: ${e.message}`);
+                continue;
+            }
+            // Ящик выезжает 240 ms, плюс главный процесс меняет размер окна.
+            await sleep(900);
+            await capture(ctx().control, path.join(outDir, `control-drawer-${tab}.png`), log);
+        }
+
         // Сверка с эталонами — только по запросу (--visual-check), чтобы обычный
         // прогон скриншотов оставался быстрым и не падал.
         if (process.argv.includes('--visual-check') && nativeImage) {
