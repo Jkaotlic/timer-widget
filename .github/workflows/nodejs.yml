@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Install dependencies
@@ -28,17 +28,34 @@ jobs:
       # «ВРЕМЯ ВЫШЛО!», которые прожили в проекте месяцами.
       #
       # Эталоны (tests/visual-baseline/) в репозиторий не кладутся — это 8.6 МБ
-      # PNG, которые росли бы с каждой визуальной правкой. Без них шаг просто
-      # логирует «эталонов нет» и проходит: смысл его здесь — убедиться, что
-      # приложение вообще поднимается и снимает все окна под xvfb.
-      # Чтобы шаг реально сверял картинки, эталоны надо снимать на самом
-      # раннере (рендеринг ubuntu отличается от macOS) — тогда и убрать флаг.
+      # PNG, которые росли бы с каждой визуальной правкой. Без них шаг не сверяет
+      # картинки, а проверяет, что приложение вообще поднимается и снимает все
+      # окна под xvfb. Чтобы шаг сверял по-настоящему, эталоны надо снимать на
+      # самом раннере (рендеринг ubuntu отличается от macOS) — тогда и убрать
+      # continue-on-error.
+      #
+      # ВНИМАНИЕ: до 2.4.0 этот шаг не делал на ubuntu ни одного снимка. Electron
+      # падал с exit 133 ещё до первого кадра, а continue-on-error это прятал —
+      # то есть шаг месяцами не проверял ничего. Причина ниже.
+      #
+      # Песочница Chromium у ДЕВЕЛОПЕРСКОГО бинарника Electron из node_modules:
+      # npm не может выставить SUID-бит при установке, поэтому Chromium находит
+      # helper и отказывается запускаться совсем («The SUID sandbox helper binary
+      # was found, but is not configured correctly»). Из-за этого шаг сверки на
+      # ubuntu не делал НИ ОДНОГО снимка — падал с exit 133 до первого кадра, а
+      # continue-on-error это прятал. Запуск с отключённой песочницей здесь не
+      # подходит: сверка должна поднимать окна так же, как настоящее приложение.
+      - name: Fix dev Electron sandbox permissions
+        run: |
+          SANDBOX=node_modules/electron/dist/chrome-sandbox
+          sudo chown root:root "$SANDBOX"
+          sudo chmod 4755 "$SANDBOX"
       - name: Visual regression (non-blocking)
         run: xvfb-run --auto-servernum npm run visual:check
         continue-on-error: true
       - name: Upload visual diff artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots
           path: screenshots/
@@ -70,9 +87,9 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Install dependencies
@@ -90,7 +107,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.os }}
           path: |
@@ -115,9 +132,9 @@ jobs:
         os: [ubuntu-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Install dependencies
@@ -144,9 +161,9 @@ jobs:
     name: linux sandbox (deb + AppImage)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Install dependencies
