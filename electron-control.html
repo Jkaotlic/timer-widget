@@ -113,10 +113,10 @@
             <div class="content-section">
                 <div class="group-title">НАСТРОЙКИ</div>
                 <div class="tabs-row">
-                    <button class="tab-btn" data-tab="timer">Виджет</button>
-                    <button class="tab-btn" data-tab="clock">Часы</button>
-                    <button class="tab-btn" data-tab="display">Полноэкр.</button>
-                    <button class="tab-btn" data-tab="sound">Звуки</button>
+                    <button class="tab-btn" data-tab="timer" aria-controls="settingsDrawer" aria-expanded="false">Виджет</button>
+                    <button class="tab-btn" data-tab="clock" aria-controls="settingsDrawer" aria-expanded="false">Часы</button>
+                    <button class="tab-btn" data-tab="display" aria-controls="settingsDrawer" aria-expanded="false">Полноэкр.</button>
+                    <button class="tab-btn" data-tab="sound" aria-controls="settingsDrawer" aria-expanded="false">Звуки</button>
                 </div>
 
                 <!-- Таб: Виджет -->
@@ -600,7 +600,15 @@
         </div>
         <div class="footer-hints">Space — старт/пауза · R — сброс · 1-8 — пресеты</div>
     </div>
-    <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true" role="dialog" aria-label="Настройки">
+    <!-- role="region", а не "dialog": это раскрывающаяся панель, а не модальное
+         окно. Модальность подразумевает ловушку фокуса и блокировку остального
+         интерфейса — ящик ничего этого не делает и не должен: панель за ним
+         остаётся рабочей. Кнопки-табы связаны с ящиком через aria-controls и
+         сообщают своё состояние через aria-expanded (стандартный паттерн
+         disclosure). Содержимое закрытого ящика из обхода Tab исключает
+         `visibility: hidden` в control.css — проверено замером: 90 контролов
+         внутри, ни один не получает фокус, пока ящик закрыт. -->
+    <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true" role="region" aria-label="Настройки">
         <div class="drawer-head">
             <span class="drawer-title" id="drawerTitle">Настройки</span>
             <button class="drawer-close" id="drawerClose" type="button" title="Закрыть (Esc)" aria-label="Закрыть">×</button>
@@ -1061,11 +1069,21 @@
                 target.classList.add('active');
                 if (this.drawerTitleEl) { this.drawerTitleEl.textContent = TITLES[tabKey] || 'Настройки'; }
 
-                document.querySelectorAll('.tab-btn').forEach(b =>
-                    b.classList.toggle('active', b.dataset.tab === tabKey));
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    const on = b.dataset.tab === tabKey;
+                    b.classList.toggle('active', on);
+                    // Паттерн disclosure: кнопка сообщает, раскрыта ли связанная панель.
+                    b.setAttribute('aria-expanded', on ? 'true' : 'false');
+                });
 
                 const wasOpen = this.settingsDrawerEl.classList.contains('open');
                 this._currentDrawerTab = tabKey;
+
+                // Куда вернуть фокус при закрытии. Модалки это уже умеют
+                // (modal-manager.js), а ящик — нет: фокус оставался на кнопке-табе,
+                // и до только что открытых настроек надо было пройти Tab-ом всю
+                // панель, потому что ящик лежит в конце документа.
+                this._drawerFocusReturn = document.activeElement;
 
                 if (!wasOpen) {
                     // Capture current outer width so close can restore exactly.
@@ -1087,9 +1105,28 @@
                             if (shell) { shell.classList.add('drawer-open'); }
                             this.settingsDrawerEl.classList.add('open');
                             this.settingsDrawerEl.setAttribute('aria-hidden', 'false');
+                            this._focusFirstInDrawer();
                         });
                     });
+                } else {
+                    // Ящик уже открыт, сменили вкладку — фокус ведём к новому содержимому.
+                    this._focusFirstInDrawer();
                 }
+            }
+
+            // Уводит фокус на первый контрол активной вкладки ящика.
+            // Вызывается ПОСЛЕ снятия visibility: hidden — на скрытом поддереве
+            // focus() молча ничего не делает.
+            _focusFirstInDrawer() {
+                const active = this.drawerBodyEl && this.drawerBodyEl.querySelector('.tab-content.active');
+                const scope = active || this.settingsDrawerEl;
+                const first = scope.querySelector(
+                    'button:not([disabled]), input:not([disabled]), select:not([disabled]),'
+                    + ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                );
+                // Крестик закрытия — приемлемая цель, если внутри вкладки нечего фокусировать.
+                const target = first || this.drawerCloseBtn;
+                if (target) { setTimeout(() => target.focus(), 0); }
             }
 
             closeSettingsDrawer() {
@@ -1098,8 +1135,20 @@
                 const shell = document.querySelector('.app-shell');
                 this.settingsDrawerEl.classList.remove('open');
                 this.settingsDrawerEl.setAttribute('aria-hidden', 'true');
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-expanded', 'false');
+                });
                 this._currentDrawerTab = null;
+
+                // Возвращаем фокус туда, откуда ящик открыли. Без этого фокус
+                // оставался на элементе внутри уже скрытого ящика и «схлопывался»
+                // на body — дальнейший Tab начинался с начала документа.
+                const back = this._drawerFocusReturn;
+                this._drawerFocusReturn = null;
+                if (back && typeof back.focus === 'function' && back.isConnected) {
+                    try { back.focus(); } catch { /* элемент мог исчезнуть */ }
+                }
 
                 // ВАЖНО: НЕ снимаем shell.drawer-open сразу — иначе panel мгновенно
                 // перестраивается из left-docked (max 392) в centered (max 560) внутри
