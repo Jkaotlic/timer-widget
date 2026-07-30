@@ -129,6 +129,89 @@ test('faint используется только для заливок, но н
     );
 });
 
+// ---------------------------------------------------------------------------
+// Подписи info-блоков полноэкранного дисплея во всех встроенных темах
+// ---------------------------------------------------------------------------
+
+// Восемь встроенных тем панели управления: [имя, цвет таймера, фон].
+// Держится синхронно с массивом themes в electron-control.html — тест ниже
+// это проверяет, чтобы список не разъехался молча.
+const THEMES = [
+    ['Синий', '#667eea', '#0f0c29'],
+    ['Неон', '#39ff14', '#0b2b1d'],
+    ['Закат', '#ff9966', '#1a0a1a'],
+    ['Океан', '#36d1dc', '#0f2027'],
+    ['Мята', '#3cd3ad', '#134e5e'],
+    ['Лаванда', '#b993d6', '#190a33'],
+    ['Солнце', '#f6d365', '#3b1d0f'],
+    ['Норд', '#88c0d0', '#2e3440']
+];
+
+test('список тем в тесте совпадает с панелью управления', () => {
+    const control = fs.readFileSync(path.join(__dirname, '..', 'electron-control.html'), 'utf8');
+    const found = [...control.matchAll(/\{ name: '([^']+)', t1: '(#[0-9a-fA-F]{6})', t2: '#[0-9a-fA-F]{6}', bg: '(#[0-9a-fA-F]{6})' \}/g)]
+        .map((m) => [m[1], m[2], m[3]]);
+    assert.deepEqual(found, THEMES, 'темы в панели изменились — обнови список в тесте и перемерь контраст');
+});
+
+test('подписи info-блоков читаемы во всех темах (значение красится темой, подпись — нет)', () => {
+    // Подпись .info-label идёт 12px uppercase 600 → порог 4.5:1.
+    // Раньше она красилась в `${timerColor}80` и не проходила НИ В ОДНОЙ теме
+    // (2.15:1 у «Синего»). Теперь тема красит только значение, а подпись берёт
+    // нейтральный fallback своего стиля.
+    const LABEL_FALLBACK = {
+        'круг/аналог': darkToken('tw-fg-dim'),
+        'флип': darkToken('tw-fg-muted')
+    };
+
+    const report = [];
+    for (const [name, , themeBg] of THEMES) {
+        // Фон info-блока: --tw-bg-surface поверх фона темы.
+        const blockBg = composite(darkToken('tw-bg-surface'), parseColor(themeBg).rgb);
+        for (const [styleName, color] of Object.entries(LABEL_FALLBACK)) {
+            const r = contrast(composite(color, blockBg), blockBg);
+            report.push(`${name}/${styleName}: ${r.toFixed(2)}:1`);
+            assert.ok(
+                r >= AA_NORMAL,
+                `тема «${name}», стиль ${styleName}: подпись ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+            );
+        }
+    }
+    console.log('   ' + report.join('\n   '));
+});
+
+test('подпись LED-стиля читаема на своём тёмном фоне', () => {
+    // Отдельный fallback: зелёный по --tw-bg-led. При alpha 0.55 давал 3.57:1.
+    const display = fs.readFileSync(path.join(__dirname, '..', 'display.html'), 'utf8');
+    const m = /body\.style-digital \.info-label \{[\s\S]*?color: var\(--info-color-dim, (rgba\([^)]+\))\)/.exec(display);
+    assert.ok(m, 'не найден fallback подписи LED-стиля');
+
+    const ledBg = composite(darkToken('tw-bg-led'), [0, 0, 0]);
+    const r = contrast(composite(m[1], ledBg), ledBg);
+    assert.ok(
+        r >= AA_NORMAL,
+        `подпись LED (${m[1]}) на --tw-bg-led: ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+    );
+});
+
+test('тема красит ЗНАЧЕНИЕ info-блока, но не подпись', () => {
+    // Защита от возврата: если --info-color-dim снова начнут задавать из темы,
+    // подписи опять уедут ниже порога во всех темах разом.
+    const script = fs.readFileSync(path.join(__dirname, '..', 'display-script.js'), 'utf8');
+    const code = script.replace(/^[ \t]*\/\/.*$/gm, '');
+    assert.match(code, /setProperty\('--info-color', timerColor\)/, 'значение обязано брать цвет темы');
+    assert.match(
+        code,
+        /removeProperty\('--info-color-dim'\)/,
+        'подпись обязана отдаваться нейтральному fallback — иначе контраст падает до 2.15:1'
+    );
+    assert.doesNotMatch(
+        code,
+        /setProperty\('--info-color-dim'/,
+        '--info-color-dim снова красится из темы: подписи уйдут ниже WCAG AA'
+    );
+});
+
 test('расчёт контраста сверен с эталонными парами WCAG', () => {
     // Защита от ошибки в самой математике: без этих опор тест мог бы уверенно
     // «проверять» палитру неверной формулой.
