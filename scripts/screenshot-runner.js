@@ -56,6 +56,15 @@ const FREEZE_ANIMATIONS_CSS = `
     *, *::before, *::after {
         animation: none !important;
         transition: none !important;
+        /* Снимки обязаны не зависеть от того, где стоит курсор мыши.
+           Окна снимаются в обычной оконной системе, поэтому реальный курсор
+           попадал в кадр состоянием :hover: подсветка кнопки «+1 ч» давала
+           2044 px расхождения в control-maxsize, подсветка строки в ящике —
+           685 px в control-drawer-clock, причём стабильно между прогонами и
+           «случайно чисто», если мышь стояла в стороне. pointer-events: none
+           убирает hit-test целиком, поэтому :hover не срабатывает ни на чём;
+           программные .click() из последовательности при этом работают. */
+        pointer-events: none !important;
     }
     body.flash-mode { filter: none !important; }
 `;
@@ -171,11 +180,16 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
     fs.mkdirSync(outDir, { recursive: true });
 
     // Hard exit guard — kill the process if the sequence hangs for any reason.
+    // Это страховка от зависания, а не бюджет времени: последовательность выросла
+    // (часовые форматы, контрастная тема, ящик настроек), и 90 с стали впритык.
     const hardTimeout = setTimeout(() => {
-        log.error('[screenshot] hard timeout (90s) — forcing exit');
+        log.error('[screenshot] hard timeout (180s) — forcing exit');
         app.exit(2);
-    }, 90_000);
+    }, 180_000);
     hardTimeout.unref && hardTimeout.unref();
+
+    // Объявлено ДО try, потому что восстанавливается в finally.
+    const initialSizes = {};
 
     try {
         openWidget();
@@ -197,6 +211,47 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         // Заморозку ставим ДО первого снимка, иначе фаза пульсации попадает в кадр.
         await freezeAnimations(ctx, log);
         await sleep(200);
+
+        // КАНОНИЧЕСКИЕ размеры на входе — иначе прогон зависит от предыдущего.
+        //
+        // Виджет и часы сохраняют геометрию (см. CLAUDE.md), а последовательность их
+        // многократно ресайзит и меняет им стиль; после смены стиля окно ещё и
+        // доскейливается само через таймер. В итоге размер, с которым окно
+        // открывалось в следующий раз, зависел от того, чем кончился предыдущий
+        // прогон, и кадры расходились с эталонами НЕ по содержимому, а по размеру
+        // (diff показывал «0 px (100%)» — несовпадение размеров). Плюс процент в
+        // ползунке «Масштаб часов» в ящике настроек показывал сохранённое значение и
+        // тоже плыл. Восстановления в конце не хватало: авто-скейл срабатывал после
+        // него. Поэтому размеры задаются ЯВНО до первого снимка.
+        const CANONICAL_SIZES = {
+            control: [400, 700],
+            widget: [250, 250],
+            clock: [250, 250],
+            display: [1280, 720]
+        };
+        for (const [name, size] of Object.entries(CANONICAL_SIZES)) {
+            const w = ctx()[name];
+            if (!w || w.isDestroyed()) { continue; }
+            try { w.setSize(size[0], size[1]); } catch (e) {
+                log.warn(`[screenshot] канонический размер ${name}: ${e.message}`);
+            }
+        }
+        await sleep(600); // дать авто-скейлу отработать и записать геометрию
+
+        // Запоминаем размеры окон, чтобы вернуть их в конце.
+        //
+        // Виджет и часы СОХРАНЯЮТ геометрию на событие resize (см. CLAUDE.md), а
+        // последовательность их многократно ресайзит: прогоны минимального и
+        // максимального размера, часовые форматы, контрастная тема. Поэтому размер,
+        // с которым окно открылось в СЛЕДУЮЩИЙ раз, зависел от того, чем кончился
+        // предыдущий прогон — и снимки расходились с эталонами не по содержимому, а
+        // по размеру кадра (diff показывал «0 px (100%)», то есть несовпадение
+        // размеров). Возврат в finally делает последовательность идемпотентной.
+        for (const name of WINDOWS) {
+            const w = ctx()[name];
+            if (!w || w.isDestroyed()) { continue; }
+            try { initialSizes[name] = w.getSize(); } catch { /* окно могло исчезнуть */ }
+        }
 
         // Warm-up capture — first call on a freshly created window can throw
         // UnknownVizError while the compositor surface is being allocated.
@@ -347,6 +402,109 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             await capture(w, path.join(outDir, `${name}-maxsize.png`), log);
         }
 
+        // Часовые форматы (H:MM:SS).
+        //
+        // Все предыдущие снимки сняты на пресетах до часа, поэтому раскладка с
+        // часами не проверялась картинками ВООБЩЕ — а именно там жил дефект
+        // флип-разделителя в виджете (двоеточие-глиф поверх двух точек), который
+        // нашёлся замером, а не сверкой. Гоняем все четыре стиля на 1:02:03 и
+        // отдельно проверяем максимум 99:59:59, где ширина строки предельная.
+        //
+        // Размеры окон задаются ЯВНО: перед этим шли прогоны минимального и
+        // максимального размера, и без сброса кадры унаследовали бы их геометрию.
+        log.info('[screenshot] hour formats');
+        const HOUR_STATES = [
+            { name: 'h1', total: 7200, remaining: 3723 },      // 1:02:03
+            { name: 'hmax', total: 359999, remaining: 359999 } // 99:59:59
+        ];
+        for (const style of STYLES) {
+            const w = ctx();
+            try {
+                if (w.display && !w.display.isDestroyed()) {
+                    w.display.setSize(1280, 720);
+                    w.display.webContents.send('display-settings-update', { timerStyle: style });
+                }
+                if (w.widget && !w.widget.isDestroyed()) {
+                    w.widget.setSize(320, 260);
+                    w.widget.webContents.send('widget-style-update', { timerStyle: style });
+                }
+            } catch (e) {
+                log.warn(`[screenshot] hour formats: style ${style} failed: ${e.message}`);
+                continue;
+            }
+            await sleep(450);
+
+            for (const hs of HOUR_STATES) {
+                // Максимум снимаем только для digital и flip: там строка длиннее
+                // всего и есть чему не поместиться. Круг и аналог показывают то же
+                // время внутри фиксированного циферблата.
+                if (hs.name === 'hmax' && style !== 'digital' && style !== 'flip') { continue; }
+                try {
+                    applyTimerState({
+                        totalSeconds: hs.total, presetSeconds: hs.total,
+                        remainingSeconds: hs.remaining,
+                        isRunning: true, isPaused: false, finished: false
+                    });
+                } catch (e) {
+                    log.warn(`[screenshot] hour state ${hs.name} failed: ${e.message}`);
+                    continue;
+                }
+                await sleep(450);
+                const now = ctx();
+                await capture(now.widget, path.join(outDir, `hours-${hs.name}-${style}-widget.png`), log);
+                await capture(now.display, path.join(outDir, `hours-${hs.name}-${style}-display.png`), log);
+            }
+        }
+
+        // Высококонтрастная тема.
+        //
+        // Появилась в 2.4.0 и в сверке не покрыта: все остальные кадры — тёмная
+        // тема. Тема рассылается по IPC, а НЕ кликом по кнопке в титлбаре, и это
+        // важно: клик пишет выбор в localStorage, и следующий прогон снимал бы
+        // ВСЕ кадры в контрасте, разойдясь с эталонами. IPC только применяет.
+        log.info('[screenshot] high contrast theme');
+        const sendTheme = async (theme) => {
+            const w = ctx();
+            for (const name of WINDOWS) {
+                const win = w[name];
+                if (!win || win.isDestroyed()) { continue; }
+                try {
+                    win.webContents.send('ui-theme-update', { theme });
+                } catch (e) {
+                    log.warn(`[screenshot] тема ${theme} → ${name}: ${e.message}`);
+                }
+            }
+            await sleep(500);
+        };
+
+        try {
+            const w = ctx();
+            if (w.control && !w.control.isDestroyed()) { w.control.setSize(400, 700); }
+            if (w.widget && !w.widget.isDestroyed()) { w.widget.setSize(250, 250); }
+            if (w.clock && !w.clock.isDestroyed()) { w.clock.setSize(250, 250); }
+            if (w.display && !w.display.isDestroyed()) {
+                w.display.setSize(1280, 720);
+                w.display.webContents.send('display-settings-update', { timerStyle: 'circle' });
+            }
+            if (w.widget && !w.widget.isDestroyed()) {
+                w.widget.webContents.send('widget-style-update', { timerStyle: 'circle' });
+            }
+            applyTimerState({
+                totalSeconds: 300, presetSeconds: 300, remainingSeconds: 183,
+                isRunning: true, isPaused: false, finished: false
+            });
+        } catch (e) {
+            log.warn(`[screenshot] подготовка hc-темы: ${e.message}`);
+        }
+        await sleep(500);
+
+        await sendTheme('hc-dark');
+        for (const name of WINDOWS) {
+            await capture(ctx()[name], path.join(outDir, `hc-${name}.png`), log);
+        }
+        // ОБЯЗАТЕЛЬНО возвращаем тёмную: остальные кадры и эталоны — в ней.
+        await sendTheme('dark');
+
         // Info-блоки полноэкранного дисплея («Текущее время» / «Начало» / «Конец»).
         //
         // Они выключены по умолчанию, поэтому НИ В ОДИН из предыдущих снимков не
@@ -446,6 +604,15 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             }
         }
     } finally {
+        // Возвращаем исходные размеры: иначе виджет и часы запомнят последний
+        // ресайз последовательности, и следующий прогон снимет кадры другого
+        // размера — сверка провалится не из-за регрессии, а из-за нас.
+        for (const [name, size] of Object.entries(initialSizes)) {
+            const w = ctx()[name];
+            if (!w || w.isDestroyed() || !Array.isArray(size)) { continue; }
+            try { w.setSize(size[0], size[1]); } catch { /* окно уже закрыто */ }
+        }
+        await sleep(400); // дать окнам записать восстановленную геометрию
         clearTimeout(hardTimeout);
         log.info('[screenshot] done');
         app.quit();
