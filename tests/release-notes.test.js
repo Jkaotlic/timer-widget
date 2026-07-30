@@ -130,7 +130,13 @@ test('описание не повторяет устаревших обещан
 
 test('тесты и линт стоят перед сборкой каждой платформы', () => {
     // Релизная сборка не должна выпускать артефакт, не прогнав проверки.
-    const jobs = WORKFLOW.split(/\n {2}[a-z-]+:\n/).filter((j) => j.includes('electron-builder'));
+    // Переводы строк нормализуем: рабочее дерево держит LF через .gitattributes,
+    // но у клона, сделанного до его появления, файл может лежать с CRLF — и тогда
+    // разбиение по `\n  job:\n` находит один job вместо четырёх. Ровно на этом
+    // проверка упала в релизной сборке на Windows.
+    const jobs = WORKFLOW.replace(/\r\n/g, '\n')
+        .split(/\n {2}[a-z-]+:\n/)
+        .filter((j) => j.includes('electron-builder'));
     assert.ok(jobs.length >= 4, `сборочных job'ов найдено ${jobs.length}, ожидалось не меньше четырёх`);
     for (const job of jobs) {
         const lint = job.indexOf('npm run lint');
