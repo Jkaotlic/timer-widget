@@ -454,8 +454,10 @@
 
         .time-minus,
         .analog-time-minus {
+            /* Отрицательный margin-left вытаскивал минус за пределы потока, чтобы
+               удержать цифры по центру, — но вся надпись при этом съезжала влево
+               на 45px. Знак снова в потоке: центрируется надпись целиком. */
             display: inline-block;
-            margin-left: -0.7em;
             margin-right: 0.2em;
         }
 
@@ -540,35 +542,33 @@
             border-color: rgba(48, 209, 88, 0.32);
             box-shadow: 0 0 25px rgba(48, 209, 88, 0.2);
         }
-        /* Attention tier — OVERTIME, FINISHED */
+        /* Единая палитра статусов на все три окна (см. CLAUDE.md):
+           активен — зелёный, пауза — оранжевый, завершён — красный без анимации,
+           перерасход — красный С пульсацией. Пульсация — единственное, что
+           отличает «идёт перерасход» от «уже завершено» при одинаковом цвете. */
         .status-pill.overtime {
-            background: rgba(255, 159, 10, 0.2);
-            color: var(--tw-orange);
-            border-color: rgba(255, 159, 10, 0.38);
-            box-shadow: 0 0 25px rgba(255, 159, 10, 0.3);
+            background: rgba(255, 69, 58, 0.22);
+            color: var(--tw-red);
+            border-color: rgba(255, 69, 58, 0.38);
+            box-shadow: 0 0 25px rgba(255, 69, 58, 0.3);
             animation: overtime-pulse 0.8s infinite;
         }
         @keyframes overtime-pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 159, 10, 0.3); }
-            50%      { opacity: 0.85; box-shadow: 0 0 40px rgba(255, 159, 10, 0.5); }
+            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 69, 58, 0.3); }
+            50%      { opacity: 0.85; box-shadow: 0 0 40px rgba(255, 69, 58, 0.5); }
         }
-        /* Neutral tier — ПАУЗА */
+        /* Пауза — оранжевый */
         .status-pill.paused {
-            background: rgba(245, 87, 108, 0.16);
-            color: var(--tw-pink);
-            border-color: rgba(245, 87, 108, 0.3);
+            background: rgba(255, 159, 10, 0.18);
+            color: var(--tw-orange);
+            border-color: rgba(255, 159, 10, 0.32);
         }
         .status-pill.paused .status-dot { animation: none; }
-        /* Attention tier — ЗАВЕРШЁН */
+        /* Завершено — красный, статично */
         .status-pill.finished {
             background: rgba(255, 69, 58, 0.22);
             color: var(--tw-red);
             border-color: rgba(255, 69, 58, 0.38);
-            animation: finished-pulse 0.5s infinite;
-        }
-        @keyframes finished-pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 25px rgba(255, 69, 58, 0.3); }
-            50%      { opacity: 0.75; box-shadow: 0 0 40px rgba(255, 69, 58, 0.5); }
         }
 
         body.flash-mode { animation: flash-bg 0.3s; }
@@ -1178,16 +1178,11 @@
         }
 
         /* Chip semantic states (additive on top of existing status-pill tiers) */
-        .status-pill.is-success {
-            background: rgba(48,209,88,0.22);
-            color: var(--tw-green);
-            border-color: rgba(48,209,88,0.4);
-        }
-        .status-pill.is-attention {
-            background: rgba(255,69,58,0.22);
-            color: var(--tw-red);
-            border-color: rgba(255,69,58,0.4);
-        }
+        /* Классы is-success / is-attention удалены: это была ВТОРАЯ система
+           окраски плашки поверх семантической (.running / .paused / .finished /
+           .overtime). Объявленные ниже, они выигрывали каскад и перекрашивали
+           «ВРЕМЯ ВЫШЛО!» в зелёный поверх красной пульсации .finished. Цвет
+           плашки теперь принадлежит только семантическим классам. */
 
         /* Focus ring — mandatory keyboard a11y */
         button:focus-visible,
@@ -1514,6 +1509,7 @@
     <script src="utils.js"></script>
     <script src="constants.js"></script>
     <script src="renderer-shared.js"></script>
+    <script src="flip-card.js"></script>
     <script src="display-script.js"></script>
 </body>
 </html>

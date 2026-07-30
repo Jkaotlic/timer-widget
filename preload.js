@@ -29,6 +29,7 @@ const ALLOWED_CHANNELS = {
         'close-clock-widget',
         'clock-widget-resize',
         'clock-widget-move',
+        'clock-widget-set-position',
         'clock-widget-set-style',
         'clock-widget-settings',
         'resize-control-window',
@@ -36,6 +37,7 @@ const ALLOWED_CHANNELS = {
         'widget-set-position',
         'widget-resize',
         'widget-move',
+        'report-scale',
         'display-move',
         'minimize-window',
         'toggle-fullscreen',
@@ -59,6 +61,7 @@ const ALLOWED_CHANNELS = {
         'display-window-state',
         'widget-window-state',
         'clock-window-state',
+        'scale-report',
         'timer-recovery-available'
     ]
 };

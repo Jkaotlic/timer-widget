@@ -6,12 +6,19 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const { diffBitmaps, isRegression, isTimeDependent } = require('../visual-diff');
 
 const STATES = [
     { name: 'idle',     remaining: 300, total: 300, isRunning: false, finished: false },
     { name: 'running',  remaining: 183, total: 300, isRunning: true,  finished: false },
     { name: 'finished', remaining: 0,   total: 300, isRunning: false, finished: true  },
-    { name: 'overtime', remaining: -47, total: 300, isRunning: true,  finished: true  }
+    { name: 'overtime', remaining: -47, total: 300, isRunning: true,  finished: true  },
+    // ВАЖНО: идёт СРАЗУ после overtime и ловит «залипшие» цвета. Ветки danger и
+    // overtime выставляют инлайновые красные стили, которые побеждают CSS-классы;
+    // если ветка нормального времени их не снимает, время остаётся красным даже
+    // после установки нового пресета. Именно так выглядел баг, который нашёл
+    // пользователь. Порядок состояний тут — часть проверки, не переставлять.
+    { name: 'recovered', remaining: 300, total: 300, isRunning: false, finished: false }
 ];
 
 const WINDOWS = ['control', 'widget', 'clock', 'display'];
@@ -36,6 +43,34 @@ const MAX_SIZES = {
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Заморозка анимаций на время съёмки.
+//
+// Без неё снимки недетерминированы: пульсация статуса (overtime-pulse,
+// badge-pulse, pulse-dot) и вспышка завершения (body.flash-mode, brightness 1.5,
+// переключается по интервалу из JS) попадают в кадр в случайной фазе. Первый же
+// прогон сверки с эталоном показал 100% расхождения на display-overtime именно
+// из-за вспышки. Цвета и раскладка при заморозке остаются настоящими — застывает
+// только фаза анимации, поэтому регрессии всё так же видны.
+const FREEZE_ANIMATIONS_CSS = `
+    *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+    body.flash-mode { filter: none !important; }
+`;
+
+async function freezeAnimations(ctx, log) {
+    for (const name of WINDOWS) {
+        const w = ctx()[name];
+        if (!w || w.isDestroyed()) { continue; }
+        try {
+            await w.webContents.insertCSS(FREEZE_ANIMATIONS_CSS);
+        } catch (e) {
+            log.warn(`[screenshot] не смог заморозить анимации в ${name}: ${e.message}`);
+        }
+    }
+}
 
 async function waitForLoad(win, timeoutMs = 6000) {
     if (!win || win.isDestroyed()) { return; }
@@ -73,7 +108,45 @@ async function capture(win, filePath, log) {
     }
 }
 
-async function run({ app, log, ctx, applyTimerState, openWidget, openClock, openDisplay, outDir }) {
+// Сверяет снятые PNG с эталонами из tests/visual-baseline/.
+// Декодирование делает Electron (nativeImage), арифметику — чистый visual-diff.js.
+// Возвращает список регрессий; пустой список = всё совпало.
+function compareWithBaseline({ nativeImage, outDir, baselineDir, log }) {
+    if (!fs.existsSync(baselineDir)) {
+        log.info('[visual] эталонов нет — пропускаю сверку (npm run visual:baseline)');
+        return null;
+    }
+    const regressions = [];
+    let compared = 0;
+    let skipped = 0;
+
+    for (const name of fs.readdirSync(outDir).filter(f => f.endsWith('.png')).sort()) {
+        if (isTimeDependent(name)) { skipped++; continue; }
+        const basePath = path.join(baselineDir, name);
+        if (!fs.existsSync(basePath)) {
+            log.warn(`[visual] нет эталона для ${name} — новый снимок`);
+            continue;
+        }
+        try {
+            const actual = nativeImage.createFromPath(path.join(outDir, name)).toBitmap();
+            const expected = nativeImage.createFromPath(basePath).toBitmap();
+            const result = diffBitmaps(actual, expected);
+            compared++;
+            if (isRegression(result)) {
+                const pct = (result.ratio * 100).toFixed(2);
+                regressions.push({ name, ...result });
+                log.error(`[visual] РАСХОЖДЕНИЕ ${name}: ${result.diffPixels} px (${pct}%)`);
+            }
+        } catch (e) {
+            log.warn(`[visual] не смог сравнить ${name}: ${e.message}`);
+        }
+    }
+
+    log.info(`[visual] сверено ${compared}, пропущено по времени ${skipped}, расхождений ${regressions.length}`);
+    return regressions;
+}
+
+async function run({ app, log, ctx, applyTimerState, openWidget, openClock, openDisplay, outDir, nativeImage }) {
     log.info('[screenshot] starting capture sequence');
     fs.mkdirSync(outDir, { recursive: true });
 
@@ -96,6 +169,10 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             }
         }
         await sleep(1500); // let CSS/fonts/glass blur settle
+
+        // Заморозку ставим ДО первого снимка, иначе фаза пульсации попадает в кадр.
+        await freezeAnimations(ctx, log);
+        await sleep(200);
 
         // Warm-up capture — first call on a freshly created window can throw
         // UnknownVizError while the compositor surface is being allocated.
@@ -128,6 +205,73 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             for (const name of WINDOWS) {
                 await capture(windows[name], path.join(outDir, `${name}-${state.name}.png`), log);
             }
+        }
+
+        // Stuck-colour sweep across all 4 timer styles.
+        //
+        // The danger/overtime bands write INLINE colours (inline beats the CSS
+        // class), so every style needs a branch that clears them again. When one
+        // is missing the timer just stays red forever — including after a fresh
+        // preset is set. Circle is the default style and therefore the only one
+        // the state loop above exercises, so drive the other three explicitly:
+        // poison with overtime, then recover, then look.
+        log.info('[screenshot] style sweep (stuck-colour check)');
+        const STYLES = ['circle', 'digital', 'flip', 'analog'];
+        const poison = { totalSeconds: 300, presetSeconds: 300, remainingSeconds: -47,
+            isRunning: true, isPaused: false, finished: false };
+        const recover = { totalSeconds: 300, presetSeconds: 300, remainingSeconds: 300,
+            isRunning: false, isPaused: false, finished: false };
+
+        for (const style of STYLES) {
+            const w = ctx();
+            try {
+                if (w.display && !w.display.isDestroyed()) {
+                    w.display.webContents.send('display-settings-update', { timerStyle: style });
+                }
+                if (w.widget && !w.widget.isDestroyed()) {
+                    w.widget.webContents.send('widget-style-update', { timerStyle: style });
+                }
+            } catch (e) {
+                log.warn(`[screenshot] style ${style} switch failed: ${e.message}`);
+            }
+            await sleep(400);
+
+            try { applyTimerState(poison); } catch { /* best effort */ }
+            await sleep(450);
+            try { applyTimerState(recover); } catch { /* best effort */ }
+            await sleep(450);
+
+            const now = ctx();
+            await capture(now.display, path.join(outDir, `style-${style}-display-recovered.png`), log);
+            await capture(now.widget, path.join(outDir, `style-${style}-widget-recovered.png`), log);
+        }
+
+        // Overtime-limit row: it only renders when «Считать ниже нуля» is on, so
+        // flip the toggle from the outside and grab the control panel once.
+        log.info('[screenshot] overtime limit row');
+        try {
+            const c = ctx().control;
+            if (c && !c.isDestroyed()) {
+                await c.webContents.executeJavaScript(`
+                    (() => {
+                        const t = document.getElementById('allowNegative');
+                        if (t) { t.checked = true; t.dispatchEvent(new Event('change')); }
+                        const l = document.getElementById('overrunLimit');
+                        if (l) { l.value = '05:00'; l.dispatchEvent(new Event('input')); }
+                    })();
+                `);
+                await sleep(350);
+                await capture(c, path.join(outDir, 'control-overtime-limit.png'), log);
+                await c.webContents.executeJavaScript(`
+                    (() => {
+                        const t = document.getElementById('allowNegative');
+                        if (t) { t.checked = false; t.dispatchEvent(new Event('change')); }
+                    })();
+                `);
+                await sleep(200);
+            }
+        } catch (e) {
+            log.warn('[screenshot] overtime limit row failed: ' + e.message);
         }
 
         // Min-size sweep — resize each window to its advertised floor and grab
@@ -177,6 +321,22 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             }
             await sleep(400);
             await capture(w, path.join(outDir, `${name}-maxsize.png`), log);
+        }
+        // Сверка с эталонами — только по запросу (--visual-check), чтобы обычный
+        // прогон скриншотов оставался быстрым и не падал.
+        if (process.argv.includes('--visual-check') && nativeImage) {
+            const regressions = compareWithBaseline({
+                nativeImage,
+                outDir,
+                baselineDir: path.join(__dirname, '..', 'tests', 'visual-baseline'),
+                log
+            });
+            if (regressions && regressions.length > 0) {
+                log.error(`[visual] регрессий: ${regressions.length}`);
+                clearTimeout(hardTimeout);
+                app.exit(3);
+                return;
+            }
         }
     } finally {
         clearTimeout(hardTimeout);

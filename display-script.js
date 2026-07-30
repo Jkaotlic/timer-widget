@@ -477,11 +477,30 @@ class DisplayTimer {
             this.updateStaticMiniClock(this.endTimeBlock, settings.endTime);
         }
 
-        // Масштаб таймера — localStorage (от Ctrl+колесо) имеет приоритет над settings
+        // Масштаб таймера. Панель управления шлёт ВЕСЬ объект настроек при любом
+        // изменении (цвет, фон, блоки), поэтому применять timerScale безусловно
+        // нельзя — каждая правка цвета сбрасывала бы масштаб, выставленный
+        // Ctrl+колесом прямо на дисплее. И наоборот: раньше localStorage имел
+        // безусловный приоритет, из-за чего ползунок в панели становился мёртвым
+        // навсегда после первого же Ctrl+колеса.
+        // Решение — то же, что уже применено к timeLayoutPreset: применяем
+        // значение только когда оно РЕАЛЬНО изменилось с прошлой посылки, то
+        // есть когда пользователь действительно двигал ползунок.
         if (settings.timerScale !== undefined) {
-            const localScale = parseInt(localStorage.getItem('displayTimerScale'));
-            // Используем localStorage если он есть, иначе settings из control panel
-            this.timerScale = localScale || settings.timerScale;
+            const incoming = parseInt(settings.timerScale, 10);
+            if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
+                if (this._lastPushedTimerScale === undefined) {
+                    // Первая посылка после открытия окна — локальный масштаб,
+                    // уже восстановленный из localStorage, актуальнее.
+                    const localScale = parseInt(localStorage.getItem('displayTimerScale'), 10);
+                    this.timerScale = Number.isFinite(localScale) ? localScale : incoming;
+                } else {
+                    // Осознанное движение ползунка — оно главнее Ctrl+колеса.
+                    this.timerScale = incoming;
+                    this._safeSetItem('displayTimerScale', String(incoming));
+                }
+                this._lastPushedTimerScale = incoming;
+            }
         }
         // Всегда применяем текущий масштаб
         {
@@ -497,14 +516,24 @@ class DisplayTimer {
             this.clockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
         }
 
-        // Масштаб блоков времени (общий)
+        // Масштаб блоков времени — та же логика «применяем только при реальном
+        // изменении», что и для timerScale выше (см. комментарий там).
         if (settings.timeBlocksScale !== undefined) {
-            // localStorage (от Ctrl+колесо/Shift+колесо) имеет приоритет
-            const localBlockScale = parseInt(localStorage.getItem('displayBlockScale'));
-            const effectiveScale = (localBlockScale || settings.timeBlocksScale) / 100;
-            if (this.currentTimeBlock) {this.currentTimeBlock.style.setProperty('--info-scale', effectiveScale);}
-            if (this.eventTimeBlock) {this.eventTimeBlock.style.setProperty('--info-scale', effectiveScale);}
-            if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', effectiveScale);}
+            const incoming = parseInt(settings.timeBlocksScale, 10);
+            if (Number.isFinite(incoming) && incoming !== this._lastPushedBlockScale) {
+                let effectivePct = incoming;
+                if (this._lastPushedBlockScale === undefined) {
+                    const localBlockScale = parseInt(localStorage.getItem('displayBlockScale'), 10);
+                    if (Number.isFinite(localBlockScale)) { effectivePct = localBlockScale; }
+                } else {
+                    this._safeSetItem('displayBlockScale', String(incoming));
+                }
+                const effectiveScale = effectivePct / 100;
+                if (this.currentTimeBlock) {this.currentTimeBlock.style.setProperty('--info-scale', effectiveScale);}
+                if (this.eventTimeBlock) {this.eventTimeBlock.style.setProperty('--info-scale', effectiveScale);}
+                if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', effectiveScale);}
+                this._lastPushedBlockScale = incoming;
+            }
         }
     }
 
@@ -752,21 +781,38 @@ class DisplayTimer {
         // stay red (owned by _enforceOvertimeColors / per-tick methods). Skip the
         // unconditional recolor on overtime so a control-panel color change doesn't
         // revert them while paused in overtime.
+        // Базовые значения аналогового стиля запоминаем ВСЕГДА, даже в перерасходе:
+        // updateAnalogDisplay() обязан уметь вернуть стрелку и центр к теме, когда
+        // перерасход закончился. Раньше эти инлайновые стили ставила только ветка
+        // перерасхода, а снять их было нечем — красные стрелки залипали до
+        // следующей смены цвета в панели управления.
+        if (progressColor) {
+            this._baseSecondHandBg =
+                `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
+            this._baseSecondHandShadow = `0 0 15px ${progressColor}80`;
+        }
+        if (timerColor) {
+            this._baseCenterBg = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
+            this._baseCenterShadow = `0 0 15px ${timerColor}99`;
+            this._baseAnalogDigitalColor = `${timerColor}b3`;
+        }
+
+        // L6: пока идёт перерасход, стрелки/центр/цифры держит красными
+        // _enforceOvertimeColors и per-tick методы — не перебиваем их здесь.
         if (this.remainingSeconds >= 0) {
             const secondHand = document.getElementById('analogHandSecond');
             const clockCenter = document.querySelector('.clock-center');
             const analogDigital = document.getElementById('analogDigitalTime');
             if (progressColor && secondHand) {
-                secondHand.style.background =
-                    `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
-                secondHand.style.boxShadow = `0 0 15px ${progressColor}80`;
+                secondHand.style.background = this._baseSecondHandBg;
+                secondHand.style.boxShadow = this._baseSecondHandShadow;
             }
             if (timerColor && clockCenter) {
-                clockCenter.style.background = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
-                clockCenter.style.boxShadow = `0 0 15px ${timerColor}99`;
+                clockCenter.style.background = this._baseCenterBg;
+                clockCenter.style.boxShadow = this._baseCenterShadow;
             }
             if (timerColor && analogDigital) {
-                analogDigital.style.color = `${timerColor}b3`;
+                analogDigital.style.color = this._baseAnalogDigitalColor;
             }
         }
     }
@@ -1099,6 +1145,27 @@ class DisplayTimer {
         return Math.round((this.remainingSeconds / this.totalSeconds) * 1000) / 1000;
     }
 
+    // Цвет и свечение для «нормальной» полосы времени.
+    //
+    // КЛЮЧЕВОЙ МОМЕНТ. Раньше во всех местах восстановление было записано как
+    // `else if (this._baseTimerColor) { ...ставим цвет... }` — без завершающего
+    // else. Если пользователь не менял тему, `_baseTimerColor` не определён
+    // (applyColors вызывается только когда в localStorage есть timerColors либо
+    // пришло display-colors-update), и тогда ветка не срабатывала вообще, а
+    // инлайновый красный/жёлтый, выставленный полосой danger/warning, не снимался.
+    // Результат: время осталось красным навсегда — в том числе после установки
+    // нового пресета, когда до конца снова далеко.
+    //
+    // Пустая строка здесь принципиальна: она УДАЛЯЕТ инлайновый стиль и возвращает
+    // управление CSS-классу, а не «красит в чёрное».
+    // Полоса срочности — общая для всех окон (RendererShared.timerColorBand).
+    _colorBand(secs) {
+        return window.RendererShared.timerColorBand(secs, this.totalSeconds);
+    }
+
+    _normalColor() { return this._baseTimerColor || ''; }
+    _normalGlow() { return this._baseTimerColor ? (this._baseTimerGlow || '') : ''; }
+
     // Вспомогательная функция для определения статуса (для кэширования)
     getTimerStatusValue(secs) {
         if (window.TimeUtils && window.TimeUtils.getTimerStatus) {
@@ -1143,28 +1210,22 @@ class DisplayTimer {
 
         // Классы предупреждения + inline color override (applyColors sets inline style)
         this.digitalTime.classList.remove('warning', 'danger', 'overtime');
-        const isOvertime = secs < 0;
-        if (isOvertime) {
+        const band = this._colorBand(secs);
+        if (band === 'overtime') {
             this.digitalTime.classList.add('danger', 'overtime');
             this.digitalTime.style.color = '#ff3333';
             this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
-        } else if (this.totalSeconds > 0) {
-            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-            if (percentLeft <= 10 && percentLeft > 0) {
-                this.digitalTime.classList.add('danger');
-                this.digitalTime.style.color = '#ff3333';
-                this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
-            } else if (percentLeft <= 25) {
-                this.digitalTime.classList.add('warning');
-                this.digitalTime.style.color = '#ffc107';
-                this.digitalTime.style.textShadow = '0 0 20px #ffc107, 0 0 40px #ffc107, 0 0 80px #ffc10766';
-            } else if (this._baseTimerColor) {
-                this.digitalTime.style.color = this._baseTimerColor;
-                this.digitalTime.style.textShadow = this._baseTimerGlow || '';
-            }
-        } else if (this._baseTimerColor) {
-            this.digitalTime.style.color = this._baseTimerColor;
-            this.digitalTime.style.textShadow = this._baseTimerGlow || '';
+        } else if (band === 'danger') {
+            this.digitalTime.classList.add('danger');
+            this.digitalTime.style.color = '#ff3333';
+            this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
+        } else if (band === 'warning') {
+            this.digitalTime.classList.add('warning');
+            this.digitalTime.style.color = '#ffc107';
+            this.digitalTime.style.textShadow = '0 0 20px #ffc107, 0 0 40px #ffc107, 0 0 80px #ffc10766';
+        } else {
+            this.digitalTime.style.color = this._normalColor();
+            this.digitalTime.style.textShadow = this._normalGlow();
         }
     }
 
@@ -1231,65 +1292,36 @@ class DisplayTimer {
             card.classList.remove('warning', 'danger', 'overtime');
         });
 
-        const isOvertime = secs < 0;
+        const band = this._colorBand(secs);
         const flipSeparators = document.querySelectorAll('.flip-separator');
-        if (isOvertime) {
-            flipCards.forEach(card => {
-                card.classList.add('danger', 'overtime');
-                const digit = card.querySelector('.flip-digit');
-                if (digit) { digit.style.color = '#ff4444'; }
-            });
-            flipSeparators.forEach(el => { el.style.color = '#ff4444'; });
-        } else if (this.totalSeconds > 0) {
-            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-            flipCards.forEach(card => {
-                if (percentLeft <= 10 && percentLeft > 0) {
-                    card.classList.add('danger');
-                    const digit = card.querySelector('.flip-digit');
-                    if (digit) { digit.style.color = '#ff4444'; }
-                } else if (percentLeft <= 25) {
-                    card.classList.add('warning');
-                    const digit = card.querySelector('.flip-digit');
-                    if (digit) { digit.style.color = '#ffc107'; }
-                } else {
-                    const digit = card.querySelector('.flip-digit');
-                    if (digit && this._baseTimerColor) { digit.style.color = this._baseTimerColor; }
-                }
-            });
-            if (percentLeft <= 10 && percentLeft > 0) {
-                flipSeparators.forEach(el => { el.style.color = '#ff4444'; });
-            } else if (percentLeft <= 25) {
-                flipSeparators.forEach(el => { el.style.color = '#ffc107'; });
-            } else if (this._baseTimerColor) {
-                flipSeparators.forEach(el => { el.style.color = this._baseTimerColor; });
-            }
-        } else {
-            flipCards.forEach(card => {
-                const digit = card.querySelector('.flip-digit');
-                if (digit && this._baseTimerColor) { digit.style.color = this._baseTimerColor; }
-            });
-            if (this._baseTimerColor) {
-                flipSeparators.forEach(el => { el.style.color = this._baseTimerColor; });
-            }
+        // Цвет цифр и разделителей всегда задаётся ЯВНО для каждой полосы —
+        // включая normal, где пустая строка снимает инлайн и отдаёт цвет CSS.
+        const BAND_COLOR = { overtime: '#ff4444', danger: '#ff4444', warning: '#ffc107' };
+        const digitColor = BAND_COLOR[band] || this._normalColor();
+
+        if (band === 'overtime') {
+            flipCards.forEach(card => card.classList.add('danger', 'overtime'));
+        } else if (band === 'danger') {
+            flipCards.forEach(card => card.classList.add('danger'));
+        } else if (band === 'warning') {
+            flipCards.forEach(card => card.classList.add('warning'));
         }
+        flipCards.forEach(card => {
+            const digit = card.querySelector('.flip-digit');
+            if (digit) { digit.style.color = digitColor; }
+        });
+        flipSeparators.forEach(el => { el.style.color = digitColor; });
     }
 
+    // Перекидывание карточки. Реализация общая для всех трёх окон —
+    // flip-card.js: раньше она жила только здесь, а виджет и часы меняли цифру
+    // рывком. Таймер снятия класса кладём в общий список _timeouts, который
+    // чистится в cleanup().
     updateFlipCard(card, value, key) {
-        const digit = card.querySelector('.flip-digit');
-        if (digit.textContent !== value) {
-            // Запускаем анимацию
-            card.classList.add('flipping');
-            digit.textContent = value;
-            this.lastFlipValues[key] = value;
-
-            // F-024: трекинг setTimeout для cleanup
-            const flipTimeoutId = setTimeout(() => {
-                card.classList.remove('flipping');
-                const idx = this._timeouts.indexOf(flipTimeoutId);
-                if (idx !== -1) { this._timeouts.splice(idx, 1); }
-            }, 300);
-            this._timeouts.push(flipTimeoutId);
-        }
+        const id = window.FlipCard.flipCardTo(card, '.flip-digit', value, {
+            onTimeout: (timeoutId) => { this._timeouts.push(timeoutId); }
+        });
+        if (id !== null) { this.lastFlipValues[key] = value; }
     }
 
     updateAnalogDisplay(secs) {
@@ -1336,8 +1368,8 @@ class DisplayTimer {
             this.analogDigitalTime.classList.remove('warning', 'danger', 'overtime');
         }
 
-        const isOvertime = secs < 0;
-        if (isOvertime) {
+        const band = this._colorBand(secs);
+        if (band === 'overtime') {
             analogElements.forEach(el => {
                 if (el) {el.classList.add('danger', 'overtime');}
             });
@@ -1354,21 +1386,29 @@ class DisplayTimer {
                 clockCenter.style.background = 'linear-gradient(145deg, #ff4444, #cc0000)';
                 clockCenter.style.boxShadow = '0 0 15px rgba(255,68,68,0.6)';
             }
-        } else if (this.totalSeconds > 0) {
-            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-            if (percentLeft <= 10 && percentLeft > 0) {
+        } else {
+            // Снимаем ИНЛАЙНОВЫЕ красные стили, выставленные веткой перерасхода.
+            // Раньше эта ветка трогала только классы, а инлайн переживал выход из
+            // перерасхода и побеждал CSS — секундная стрелка, центр циферблата и
+            // цифры под ним оставались красными до следующей смены темы.
+            if (this.analogHandSecond) {
+                this.analogHandSecond.style.background = this._baseSecondHandBg || '';
+                this.analogHandSecond.style.boxShadow = this._baseSecondHandShadow || '';
+            }
+            if (clockCenter) {
+                clockCenter.style.background = this._baseCenterBg || '';
+                clockCenter.style.boxShadow = this._baseCenterShadow || '';
+            }
+            if (this.analogDigitalTime) {
+                this.analogDigitalTime.style.color = this._baseAnalogDigitalColor || '';
+            }
+
+            if (band === 'danger' || band === 'warning') {
                 analogElements.forEach(el => {
-                    if (el) {el.classList.add('danger');}
+                    if (el) {el.classList.add(band);}
                 });
                 if (this.analogDigitalTime) {
-                    this.analogDigitalTime.classList.add('danger');
-                }
-            } else if (percentLeft <= 25) {
-                analogElements.forEach(el => {
-                    if (el) {el.classList.add('warning');}
-                });
-                if (this.analogDigitalTime) {
-                    this.analogDigitalTime.classList.add('warning');
+                    this.analogDigitalTime.classList.add(band);
                 }
             }
         }
@@ -1385,85 +1425,103 @@ class DisplayTimer {
             this.progressRing.style.strokeDashoffset = offset;
 
             // Цветовые предупреждения
-            const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-            const isOvertime = this.remainingSeconds < 0;
+            const band = this._colorBand(Math.floor(this.remainingSeconds));
 
             this.progressRing.classList.remove('warning', 'danger', 'overtime');
             this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
 
-            if (isOvertime) {
+            if (band === 'overtime') {
                 this.progressRing.classList.add('danger', 'overtime');
                 this.timeDisplay.classList.add('danger', 'overtime');
                 // Force inline color override — CSS class alone may be insufficient
                 this.timeDisplay.style.color = '#ff4444';
-            } else if (percentLeft <= 10 && percentLeft > 0) {
+            } else if (band === 'danger') {
                 this.progressRing.classList.add('danger');
                 this.timeDisplay.classList.add('danger');
                 this.timeDisplay.style.color = '#ff4444';
-            } else if (percentLeft <= 25) {
+            } else if (band === 'warning') {
                 this.progressRing.classList.add('warning');
                 this.timeDisplay.classList.add('warning');
                 this.timeDisplay.style.color = '#ffc107';
             } else {
-                this.timeDisplay.style.color = '';
+                this.timeDisplay.style.color = this._normalColor();
             }
         } else {
             this.progressRing.style.strokeDashoffset = this.circumference;
+            // Без пресета (totalSeconds === 0) полос danger/warning быть не может,
+            // но раньше эта ветка не снимала ни классы, ни инлайновый цвет — после
+            // перерасхода круглый стиль оставался красным.
+            this.progressRing.classList.remove('warning', 'danger', 'overtime');
+            this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
+            this.timeDisplay.style.color = this._normalColor();
         }
     }
 
+    // ЕДИНЫЙ порядок приоритетов статуса для всех трёх окон (панель управления,
+    // виджет, полноэкранный режим). Раньше он расходился: здесь `finished`
+    // проверялся ПЕРВЫМ, а в панели и виджете первым шёл перерасход — из-за чего
+    // одно и то же состояние подписывалось по-разному в разных окнах.
+    //
+    // Пауза идёт первой намеренно: остановка в перерасходе — это пауза, а не
+    // «Время вышло». Раньше ветка isPaused была недостижима при secs <= 0, и
+    // пауза в перерасходе (обычное дело для докладчика, выбившегося из времени)
+    // подписывалась как «Время вышло!». Сам перерасход и так виден по красным цифрам.
     updateStatus(secs) {
+        const STATUS_TEXT = {
+            paused: 'На паузе',
+            overtime: 'Перерасход времени',
+            finished: 'Время вышло!',
+            running: 'Таймер активен',
+            idle: 'Готов к запуску'
+        };
+        const status = this._lifecycleStatus(secs);
+
         this.statusPill.classList.remove('running', 'paused', 'finished', 'overtime');
+        if (status !== 'idle') { this.statusPill.classList.add(status); }
+        this.statusText.textContent = STATUS_TEXT[status];
 
-        if (this.finished || (secs <= 0 && this.totalSeconds > 0 && !this.isRunning)) {
-            this.statusText.textContent = 'Время вышло!';
-            this.statusPill.classList.add('finished');
-        } else if (this.isRunning) {
-            if (secs < 0) {
-                this.statusText.textContent = 'Перерасход времени';
-                this.statusPill.classList.add('overtime');
-            } else {
-                this.statusText.textContent = 'Таймер активен';
-                this.statusPill.classList.add('running');
-            }
-        } else if (this.isPaused) {
-            this.statusText.textContent = 'На паузе';
-            this.statusPill.classList.add('paused');
-        } else {
-            this.statusText.textContent = 'Готов к запуску';
-        }
-
-        this.updateChipState({ finished: this.finished, remainingSeconds: secs, isRunning: this.isRunning, isPaused: this.isPaused });
+        this.updateChipState(status);
     }
 
-    updateChipState(state) {
+    _lifecycleStatus(secs) {
+        return window.RendererShared.timerLifecycleStatus({
+            remainingSeconds: secs,
+            totalSeconds: this.totalSeconds,
+            isRunning: this.isRunning,
+            isPaused: this.isPaused,
+            finished: this.finished
+        });
+    }
+
+    // Принимает уже вычисленный ключ статуса, а не сырое состояние: раньше здесь
+    // была ВТОРАЯ независимая копия условий, и она расходилась с updateStatus() —
+    // плашка красилась в зелёный is-success с подписью «Завершено», пока таймер
+    // показывал красный минус.
+    updateChipState(status) {
         const pill = this.statusPill;
         const label = document.getElementById('heroLabel');
         const glyphEl = pill && pill.querySelector('.status-glyph');
         if (!pill) { return; }
 
+        // ЦВЕТ плашки задают только семантические классы (running / paused /
+        // finished / overtime) из updateStatus(). Раньше сюда добавлялась ВТОРАЯ
+        // система классов — is-success / is-attention, — и они дрались с первой:
+        // объявленные в CSS ниже, они выигрывали каскад, из-за чего «ВРЕМЯ ВЫШЛО!»
+        // получало зелёный фон is-success поверх красной пульсации .finished, а
+        // оранжевый .overtime перекрашивался в красный .is-attention.
+        // Здесь остаются только подпись над таймером и глиф.
+        const CHIP = {
+            paused:   { label: 'Пауза',         glyph: '‖' },
+            overtime: { label: 'Сверх времени', glyph: '!' },
+            finished: { label: 'Завершено',     glyph: '✓' },
+            running:  { label: 'Осталось',      glyph: '▶' },
+            idle:     { label: 'Осталось',      glyph: '·' }
+        };
+        const chip = CHIP[status] || CHIP.idle;
+
         pill.classList.remove('is-success', 'is-attention');
-        let labelText = 'Осталось';
-        let glyph = '·';
-
-        if (state.finished) {
-            pill.classList.add('is-success');
-            labelText = 'Завершено';
-            glyph = '✓';
-        } else if (state.remainingSeconds < 0) {
-            pill.classList.add('is-attention');
-            labelText = 'Сверх времени';
-            glyph = '!';
-        } else if (state.isRunning && !state.isPaused) {
-            pill.classList.add('is-success');
-            glyph = '▶';
-        } else if (state.isPaused) {
-            labelText = 'Пауза';
-            glyph = '‖';
-        }
-
-        if (glyphEl) { glyphEl.textContent = glyph; }
-        if (label) { label.textContent = labelText; }
+        if (glyphEl) { glyphEl.textContent = chip.glyph; }
+        if (label) { label.textContent = chip.label; }
     }
 
     triggerFinishEffect() {
@@ -1540,6 +1598,12 @@ class DisplayTimer {
                 if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
                 if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
                 this._safeSetItem(STORAGE_TIMER_SCALE_KEY, String(newPct));
+                // Сообщаем панели управления — иначе её ползунок останется на
+                // старом значении, и два источника правды снова разойдутся.
+                this._lastPushedTimerScale = newPct;
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('report-scale', { source: 'display', scalePct: newPct });
+                }
             }
         };
         const scaleBlocks = (delta) => {
@@ -1554,6 +1618,10 @@ class DisplayTimer {
                     if (b) { b.style.setProperty('--info-scale', scale); }
                 });
                 this._safeSetItem(STORAGE_BLOCK_SCALE_KEY, String(newPct));
+                this._lastPushedBlockScale = newPct;
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('report-scale', { source: 'display-blocks', scalePct: newPct });
+                }
             }
         };
 

@@ -22,6 +22,28 @@ jobs:
         run: npm run lint
       - name: Run tests
         run: npm test
+      # Визуальная регрессия: поднимаем окна Electron в виртуальном дисплее и
+      # сверяем снимки с эталонами из tests/visual-baseline/. Ловит то, что
+      # юнит-тесты в принципе не видят — например «жёлтый ноль» и зелёную плашку
+      # «ВРЕМЯ ВЫШЛО!», которые прожили в проекте месяцами.
+      #
+      # Эталоны (tests/visual-baseline/) в репозиторий не кладутся — это 8.6 МБ
+      # PNG, которые росли бы с каждой визуальной правкой. Без них шаг просто
+      # логирует «эталонов нет» и проходит: смысл его здесь — убедиться, что
+      # приложение вообще поднимается и снимает все окна под xvfb.
+      # Чтобы шаг реально сверял картинки, эталоны надо снимать на самом
+      # раннере (рендеринг ubuntu отличается от macOS) — тогда и убрать флаг.
+      - name: Visual regression (non-blocking)
+        run: xvfb-run --auto-servernum npm run visual:check
+        continue-on-error: true
+      - name: Upload visual diff artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Coverage (non-blocking)
         run: npm run coverage
         continue-on-error: true

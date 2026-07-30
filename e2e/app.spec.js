@@ -1,16 +1,11 @@
 const { test, expect } = require('@playwright/test');
-const { _electron: electron } = require('playwright');
-const path = require('path');
+const { launchApp } = require('./launch');
 
 let electronApp;
 let controlWindow;
 
 test.beforeAll(async () => {
-    electronApp = await electron.launch({
-        args: [path.join(__dirname, '..', 'electron-main.js')],
-    });
-    controlWindow = await electronApp.firstWindow();
-    await controlWindow.waitForLoadState('domcontentloaded');
+    ({ app: electronApp, control: controlWindow } = await launchApp());
 });
 
 test.afterAll(async () => {
