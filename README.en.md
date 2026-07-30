@@ -7,7 +7,7 @@
 **Transparent timer widget for presentations and desktop**
 
 [![Version](https://img.shields.io/badge/v2.3.2-0a84ff?style=flat-square)](../../releases/latest)
-[![Electron](https://img.shields.io/badge/Electron_42-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron_43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
@@ -318,7 +318,7 @@ Bugs and feature requests — in [Issues](../../issues). Full change history —
 
 <div align="center">
 
-**Electron 42.3.2** · **Chromium 148.0.7778.218** · **Node.js 24.15.0** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
+**Electron 43.2.0** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 

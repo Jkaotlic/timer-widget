@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const {
     breakdown,
     flipCells,
-    clampScale
+    clampScale,
+    timerLifecycleStatus,
+    timerColorBand
 } = require('../renderer-shared');
 
 // ---------------------------------------------------------------------------
@@ -164,4 +166,115 @@ test('clampScale: swapped bounds are normalized', () => {
     assert.equal(clampScale(150, 600, 30), 150);
     assert.equal(clampScale(900, 600, 30), 600);
     assert.equal(clampScale(10, 600, 30), 30);
+});
+
+// ---------------------------------------------------------------------------
+// timerLifecycleStatus — единый порядок приоритетов статуса для трёх окон.
+// Раньше это условие было скопировано в панель управления, виджет и
+// полноэкранный режим, и копии разошлись (см. аудит 2026-07-29).
+// ---------------------------------------------------------------------------
+
+const st = (o) => timerLifecycleStatus(o);
+
+test('timerLifecycleStatus: свежий таймер без пресета — idle', () => {
+    assert.equal(st({ remainingSeconds: 0, totalSeconds: 0, isRunning: false, isPaused: false, finished: false }), 'idle');
+});
+
+test('timerLifecycleStatus: выставлен пресет, но не запущен — idle', () => {
+    assert.equal(st({ remainingSeconds: 300, totalSeconds: 300, isRunning: false, isPaused: false, finished: false }), 'idle');
+});
+
+test('timerLifecycleStatus: идёт отсчёт — running', () => {
+    assert.equal(st({ remainingSeconds: 183, totalSeconds: 300, isRunning: true, isPaused: false, finished: false }), 'running');
+});
+
+test('timerLifecycleStatus: досчитали до нуля — finished', () => {
+    assert.equal(st({ remainingSeconds: 0, totalSeconds: 300, isRunning: false, isPaused: false, finished: true }), 'finished');
+    // Даже без залатченного флага: ноль + пресет + не идёт = завершено.
+    assert.equal(st({ remainingSeconds: 0, totalSeconds: 300, isRunning: false, isPaused: false, finished: false }), 'finished');
+});
+
+test('timerLifecycleStatus: ушли ниже нуля — overtime', () => {
+    assert.equal(st({ remainingSeconds: -47, totalSeconds: 300, isRunning: true, isPaused: false, finished: false }), 'overtime');
+});
+
+test('timerLifecycleStatus: перерасход важнее залатченного finished', () => {
+    // Регрессия: полноэкранный режим проверял finished ПЕРВЫМ и показывал
+    // зелёное «Время вышло!» поверх красного минуса на таймере.
+    assert.equal(st({ remainingSeconds: -47, totalSeconds: 300, isRunning: true, isPaused: false, finished: true }), 'overtime');
+});
+
+test('timerLifecycleStatus: пауза в перерасходе — это пауза, а не «завершено»', () => {
+    // Регрессия: ветка isPaused была недостижима при remainingSeconds <= 0, и
+    // докладчик, выбившийся из времени и нажавший паузу, видел «Время вышло!».
+    assert.equal(st({ remainingSeconds: -47, totalSeconds: 300, isRunning: false, isPaused: true, finished: false }), 'paused');
+});
+
+test('timerLifecycleStatus: пауза ровно на нуле — тоже пауза', () => {
+    assert.equal(st({ remainingSeconds: 0, totalSeconds: 300, isRunning: false, isPaused: true, finished: false }), 'paused');
+});
+
+test('timerLifecycleStatus: обычная пауза', () => {
+    assert.equal(st({ remainingSeconds: 120, totalSeconds: 300, isRunning: false, isPaused: true, finished: false }), 'paused');
+});
+
+test('timerLifecycleStatus: мусорный и отсутствующий ввод не роняет', () => {
+    assert.equal(st(undefined), 'idle');
+    assert.equal(st({}), 'idle');
+    assert.equal(st({ remainingSeconds: NaN, totalSeconds: NaN }), 'idle');
+    assert.equal(st({ remainingSeconds: '-5', totalSeconds: '300' }), 'overtime');
+});
+
+
+// ---------------------------------------------------------------------------
+// timerColorBand — единая цветовая полоса для трёх окон.
+// Раньше лесенка была скопирована девять раз (см. аудит 2026-07-29).
+// ---------------------------------------------------------------------------
+
+const band = (r, t, th) => timerColorBand(r, t, th);
+
+test('timerColorBand: много времени — normal', () => {
+    assert.equal(band(300, 300), 'normal');
+    assert.equal(band(100, 300), 'normal');
+});
+
+test('timerColorBand: 25% и меньше — warning', () => {
+    assert.equal(band(75, 300), 'warning');
+    assert.equal(band(40, 300), 'warning');
+});
+
+test('timerColorBand: 10% и меньше — danger', () => {
+    assert.equal(band(30, 300), 'danger');
+    assert.equal(band(1, 300), 'danger');
+});
+
+test('timerColorBand: РОВНО ноль — danger, а не warning', () => {
+    // Регрессия: условие было `percentLeft <= 10 && percentLeft > 0`, поэтому 0%
+    // проваливался в warning и время на 00:00 показывалось ЖЁЛТЫМ, хотя рядом
+    // горел красный статус «Завершено», а utils.getTimerStatus() считал ноль за danger.
+    assert.equal(band(0, 300), 'danger');
+});
+
+test('timerColorBand: ниже нуля — overtime', () => {
+    assert.equal(band(-1, 300), 'overtime');
+    assert.equal(band(-47, 300), 'overtime');
+});
+
+test('timerColorBand: без пресета полос нет', () => {
+    assert.equal(band(0, 0), 'normal');
+    assert.equal(band(120, 0), 'normal');
+});
+
+test('timerColorBand: пороги настраиваются, а не захардкожены', () => {
+    // Раньше 10 и 25 были вбиты в девяти местах, и CONFIG читала только панель
+    // управления — правка конфига разъехала бы окна между собой.
+    assert.equal(band(150, 300, { danger: 60, warning: 80 }), 'danger');
+    assert.equal(band(210, 300, { danger: 60, warning: 80 }), 'warning');
+    assert.equal(band(290, 300, { danger: 60, warning: 80 }), 'normal');
+});
+
+test('timerColorBand: мусорный ввод не роняет', () => {
+    assert.equal(band(NaN, 300), 'danger');
+    assert.equal(band(100, NaN), 'normal');
+    assert.equal(band(undefined, undefined), 'normal');
 });

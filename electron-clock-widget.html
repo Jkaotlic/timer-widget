@@ -175,10 +175,19 @@
            clamp() on .time-display. ~0.33em = 18px at 56px base. */
         .time-display .clock-seconds {
             display: inline-block;
+            /* Нулевая ширина: секунды — вторичная информация и не должны двигать
+               главное время. Раньше они занимали ширину, поэтому «21:06» стояло
+               на ~9.5px левее центра кольца, а переключение секунд в настройках
+               дёргало время туда-сюда. Теперь HH:MM всегда ровно по центру, а
+               секунды свисают вправо.
+               Зазор и подъём даём transform-ом, а не margin-ом: transform не
+               участвует в раскладке. */
+            width: 0;
+            overflow: visible;
+            white-space: nowrap;
             font-size: 0.33em;
             font-weight: 300;
-            margin-left: 0.12em;
-            transform: translateY(-0.3em);
+            transform: translate(0.12em, -0.3em);
             letter-spacing: 0.02em;
             /* Inherit user-selected timer color; opacity keeps the seconds
                visually secondary without hardcoding a different hue. */
@@ -764,6 +773,22 @@
             z-index: 10;
         }
 
+
+        /* Перекидывание карточки. Раньше анимация была только в полноэкранном
+           режиме, а виджет и часы меняли цифру рывком — вернули везде.
+           Длительность обязана совпадать с FLIP_DURATION_MS в flip-card.js. */
+        .widget-flip-card.flipping .widget-flip-inner {
+            animation: widget-flip-animation 0.3s ease-in-out;
+        }
+        @keyframes widget-flip-animation {
+            0%   { transform: rotateX(0); }
+            50%  { transform: rotateX(-12deg); }
+            100% { transform: rotateX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .widget-flip-card.flipping .widget-flip-inner { animation: none; }
+        }
+
         .widget-flip-digit {
             position: absolute;
             top: 50%;
@@ -1261,6 +1286,7 @@
     <script src="security.js"></script>
     <script src="utils.js"></script>
     <script src="renderer-shared.js"></script>
+    <script src="flip-card.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1284,6 +1310,8 @@
                 this.clockStyle = 'circle';
                 // Stored handler refs for cleanup
                 this._handlers = {};
+                // Таймеры снятия класса перекидывания (см. _flip)
+                this._flipTimeouts = [];
 
                 this.initElements();
                 this.initProgress();
@@ -1508,6 +1536,7 @@
                 document.addEventListener('mousemove', this._handlers.onMouseMove);
 
                 this._handlers.onMouseUp = () => {
+                    if (isDragging) { this.saveGeometry(); }
                     isDragging = false;
                 };
                 document.addEventListener('mouseup', this._handlers.onMouseUp);
@@ -1585,6 +1614,10 @@
                     clockScalePct = newPct;
                     const newSize = Math.round(CLOCK_BASE_SIZE * newPct / 100);
                     ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                    // Без этого масштаб от Ctrl+колеса терялся при переоткрытии.
+                    this.saveGeometry(newPct);
+                    // И сообщаем панели управления, чтобы её ползунок не врал.
+                    ipcRenderer.send('report-scale', { source: 'clock', scalePct: newPct });
                 };
                 document.addEventListener('wheel', this._handlers.onWheel, { passive: false });
                 this._handlers.onResizeScalePct = () => {
@@ -1598,20 +1631,9 @@
                 // Ctrl+Wheel resize сохранён в setupEventListeners
             }
 
-            setSize(size) {
-                const sizes = {
-                    small: { width: 180, height: 180 },
-                    medium: { width: 250, height: 250 },
-                    large: { width: 350, height: 350 },
-                    xlarge: { width: 500, height: 500 }
-                };
-
-                const s = sizes[size];
-                if (s) {
-                    ipcRenderer.send('clock-widget-resize', s);
-                    localStorage.setItem('clockWidgetSize', size);
-                }
-            }
+            // setSize() с пресетами small/medium/large/xlarge удалён: единственным
+            // вызовом был loadSettings(), который теперь восстанавливает реальную
+            // геометрию, а UI для выбора пресета размера в приложении отсутствует.
 
             setClockStyle(style) {
                 this.clockStyle = style;
@@ -1647,12 +1669,17 @@
                     this.showNumbersRow.style.display = (style === 'analog') ? 'flex' : 'none';
                 }
 
-                // Принудительные форматы по стилю:
-                // Все стили: секунды включены, цифровой/перекидные: 24ч формат
-                this.showSeconds = true;
-                if (style === 'digital' || style === 'flip') {
-                    this.format24h = true;
-                }
+                // Раньше здесь стояло принудительное `this.showSeconds = true` и
+                // `this.format24h = true` для digital/flip — с последующим
+                // saveSettings(). То есть смена стиля МОЛЧА затирала выбор
+                // пользователя и сохраняла подмену: снял галочку «Секунды»,
+                // переключил стиль — секунды вернулись навсегда, а чекбокс в
+                // панели управления продолжал показывать «выключено».
+                //
+                // Ограничение осталось ровно одно и оно физическое: у расщеплённых
+                // карточек нет ячейки AM/PM, поэтому flip всегда 24-часовой. Но это
+                // теперь решение ВРЕМЕНИ ОТРИСОВКИ (_uses24h()), а не мутация
+                // сохранённой настройки.
                 this.updateSecondsVisibility();
 
                 // Обновляем масштабирование после смены стиля
@@ -1664,6 +1691,14 @@
 
                 this.saveSettings();
                 this.updateDisplay();
+            }
+
+            // 24-часовой формат для текущего стиля. Flip не имеет ячейки AM/PM,
+            // поэтому там всегда 24 часа — независимо от настройки, но и НЕ
+            // перезаписывая её: вернувшись на другой стиль, пользователь получит
+            // свой формат обратно.
+            _uses24h() {
+                return this.clockStyle === 'flip' ? true : this.format24h;
             }
 
             formatTimezoneString() {
@@ -1747,14 +1782,50 @@
                     }
                 }
 
-                // Размер
-                const savedSize = localStorage.getItem('clockWidgetSize') || 'medium';
-                this.setSize(savedSize);
-                
+                this.restoreGeometry();
+
                 // Обновляем видимость элементов
                 this.updateSecondsVisibility();
                 this.updateDateTimezoneVisibility();
                 this.updateScaling();
+            }
+
+            // Размер и позиция часов переживают перезапуск. Раньше здесь
+            // безусловно вызывался setSize('medium'), поэтому окно каждый раз
+            // возвращалось в правый нижний угол с размером по умолчанию, а
+            // масштаб от Ctrl+колеса и перетаскивание терялись.
+            restoreGeometry() {
+                const geo = safeJSONParse(localStorage.getItem('clockGeometry'), null);
+                if (!geo || typeof geo !== 'object') { return; }
+
+                const pct = Number(geo.scalePct);
+                if (Number.isFinite(pct) && pct >= 30 && pct <= 600) {
+                    this._clockScalePct = pct;
+                    const size = Math.round(220 * pct / 100);
+                    ipcRenderer.send('clock-widget-resize', { width: size, height: size });
+                }
+
+                // Главный процесс подожмёт точку в рабочую область, если монитор
+                // из прошлой сессии больше не подключён.
+                if (Number.isFinite(geo.x) && Number.isFinite(geo.y)) {
+                    ipcRenderer.send('clock-widget-set-position', { x: geo.x, y: geo.y });
+                }
+            }
+
+            saveGeometry(scalePct) {
+                // Без явного значения берём фактическую ширину окна: она учитывает
+                // и нативный ресайз за край, а не только Ctrl+колесо.
+                const pct = Number.isFinite(scalePct)
+                    ? scalePct
+                    : (Math.round(window.outerWidth / 220 * 100) || this._clockScalePct || 100);
+                this._clockScalePct = pct;
+                try {
+                    localStorage.setItem('clockGeometry', JSON.stringify({
+                        scalePct: pct,
+                        x: window.screenX,
+                        y: window.screenY
+                    }));
+                } catch { /* хранилище переполнено — геометрия не критична */ }
             }
 
             saveSettings() {
@@ -1767,7 +1838,11 @@
                     showNumbers: this.showNumbers,
                     clockStyle: this.clockStyle
                 };
-                localStorage.setItem('clockWidgetSettings', JSON.stringify(settings));
+                // СЛИЯНИЕ, а не перезапись — см. тот же комментарий в
+                // electron-control.html:pushClockSettings(). Оба окна пишут этот
+                // ключ разными наборами полей, и прямая запись теряла чужие.
+                const prev = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
+                localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prev, ...settings }));
             }
 
             setupIPC() {
@@ -1847,6 +1922,8 @@
                     clearTimeout(this._scalingTimer);
                     this._scalingTimer = null;
                 }
+                for (const id of this._flipTimeouts) { clearTimeout(id); }
+                this._flipTimeouts = [];
                 if (this._onSetClockStyle) {ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);}
                 if (this._onDisplaySettingsUpdate) {ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);}
                 if (this._onClockSettings) {ipcRenderer.removeListener('clock-settings', this._onClockSettings);}
@@ -1901,7 +1978,7 @@
                 let displayHours = hours;
                 let ampm = '';
                 
-                if (!this.format24h) {
+                if (!this._uses24h()) {
                     ampm = hours >= 12 ? ' PM' : ' AM';
                     displayHours = hours % 12 || 12;
                 }
@@ -1983,6 +2060,13 @@
                 }
             }
 
+            // Перекидывание одной карточки. Общая реализация — flip-card.js.
+            _flip(card, value) {
+                window.FlipCard.flipCardTo(card, '.widget-flip-digit', value, {
+                    onTimeout: (id) => { this._flipTimeouts.push(id); }
+                });
+            }
+
             updateFlipDisplay(hours, minutes, seconds) {
                 if (!this.wFlipHr1 || !this.wFlipMin1) {return;}
 
@@ -1993,15 +2077,16 @@
                 const sec1 = String(Math.floor(seconds / 10));
                 const sec2 = String(seconds % 10);
 
-                // Обновляем цифры
-                this.wFlipHr1.querySelector('.widget-flip-digit').textContent = hr1;
-                this.wFlipHr2.querySelector('.widget-flip-digit').textContent = hr2;
-                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = min1;
-                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = min2;
-                
+                // Обновляем цифры с перекидыванием (анимация — только там, где
+                // значение реально изменилось, иначе табло мельтешит каждую секунду)
+                this._flip(this.wFlipHr1, hr1);
+                this._flip(this.wFlipHr2, hr2);
+                this._flip(this.wFlipMin1, min1);
+                this._flip(this.wFlipMin2, min2);
+
                 if (this.showSeconds && this.wFlipSec1 && this.wFlipSec2) {
-                    this.wFlipSec1.querySelector('.widget-flip-digit').textContent = sec1;
-                    this.wFlipSec2.querySelector('.widget-flip-digit').textContent = sec2;
+                    this._flip(this.wFlipSec1, sec1);
+                    this._flip(this.wFlipSec2, sec2);
                 }
             }
         }

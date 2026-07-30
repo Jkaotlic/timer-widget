@@ -230,16 +230,34 @@
         /* Sign slot — фиксированная ширина, цифры остаются в центре кольца.
            0.25ch gap не даёт минусу слипаться с первой цифрой при тонком шрифте. */
         .time-display .tm-sign {
+            /* Знак УЧАСТВУЕТ в раскладке. Держать одновременно по центру и цифры, и всю
+               надпись математически невозможно, а глаз читает надпись целиком: при
+               переходе через ноль он видит центрированный блок и до, и после, поэтому
+               технический сдвиг цифр незаметен — его маскирует появление самого минуса.
+               Обратный вариант (нулевая ширина знака) держал цифры, но вся надпись
+               съезжала влево на 16-26px и минус выглядел висящим отдельно. */
             display: inline-block;
-            width: 0;
-            text-align: right;
-            margin-right: 0;
-            overflow: hidden;
-        }
+}
 
-        .time-display .tm-sign:not(:empty) {
-            width: 0.6ch;
-            margin-right: 0.25ch;
+.time-display .tm-sign:not(:empty) {
+            /* Только зазор до цифр; ширину задаёт сам глиф. */
+            margin-right: 0.2em;
+}
+
+
+        /* Перекидывание карточки. Раньше анимация была только в полноэкранном
+           режиме, а виджет и часы меняли цифру рывком — вернули везде.
+           Длительность обязана совпадать с FLIP_DURATION_MS в flip-card.js. */
+        .widget-flip-card.flipping .widget-flip-inner {
+            animation: widget-flip-animation 0.3s ease-in-out;
+        }
+        @keyframes widget-flip-animation {
+            0%   { transform: rotateX(0); }
+            50%  { transform: rotateX(-12deg); }
+            100% { transform: rotateX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .widget-flip-card.flipping .widget-flip-inner { animation: none; }
         }
 
         @keyframes time-pulse {
@@ -275,17 +293,29 @@
             border-color: rgba(48, 209, 88, 0.32);
         }
 
-        .status-badge.paused {
-            background: rgba(245, 87, 108, 0.2);
-            color: var(--tw-pink);
-            border-color: rgba(245, 87, 108, 0.32);
+        /* Перерасход раньше переиспользовал .running и красился в ЗЕЛЁНЫЙ, хотя
+           цифры в этот момент красные, а панель управления и полноэкранный режим
+           показывают красный статус. Свой класс убирает это расхождение. */
+        .status-badge.overtime {
+            background: rgba(255, 69, 58, 0.2);
+            color: var(--tw-red);
+            border-color: rgba(255, 69, 58, 0.32);
+            animation: badge-pulse 0.8s ease-in-out infinite;
         }
 
+        /* Единая палитра статусов на все три окна (см. CLAUDE.md). */
+        .status-badge.paused {
+            background: rgba(255, 159, 10, 0.2);
+            color: var(--tw-orange);
+            border-color: rgba(255, 159, 10, 0.32);
+        }
+
+        /* Завершено — красный БЕЗ пульсации: пульсирует только перерасход,
+           этим два красных состояния и различаются. */
         .status-badge.finished {
-            background: rgba(255, 193, 7, 0.2);
-            color: var(--tw-yellow);
-            border-color: rgba(255, 193, 7, 0.32);
-            animation: badge-pulse 0.8s ease-in-out infinite;
+            background: rgba(255, 69, 58, 0.2);
+            color: var(--tw-red);
+            border-color: rgba(255, 69, 58, 0.32);
         }
 
         @keyframes badge-pulse {
@@ -975,6 +1005,7 @@
     <script src="security.js"></script>
     <script src="utils.js"></script>
     <script src="renderer-shared.js"></script>
+    <script src="flip-card.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -999,6 +1030,8 @@
                 this._hasWidgetStyle = false;
                 // Stored handler refs for cleanup
                 this._handlers = {};
+                // Таймеры снятия класса перекидывания (см. _flip)
+                this._flipTimeouts = [];
 
                 this.initElements();
                 this.initProgress();
@@ -1148,6 +1181,7 @@
                 document.addEventListener('mousemove', this._handlers.onMouseMove);
 
                 this._handlers.onMouseUp = () => {
+                    if (isDragging) { this.saveGeometry(); }
                     isDragging = false;
                 };
                 document.addEventListener('mouseup', this._handlers.onMouseUp);
@@ -1220,6 +1254,11 @@
                     widgetScalePct = newPct;
                     const newSize = Math.round(WIDGET_BASE_SIZE * newPct / 100);
                     ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
+                    // Масштаб от Ctrl+колеса раньше нигде не сохранялся, поэтому
+                    // при следующем открытии виджет откатывался к 250px.
+                    this.saveGeometry(newPct);
+                    // И сообщаем панели управления, чтобы её ползунок не врал.
+                    ipcRenderer.send('report-scale', { source: 'widget', scalePct: newPct });
                 };
                 document.addEventListener('wheel', this._handlers.onWheel, { passive: false });
                 this._handlers.onResizeScalePct = () => {
@@ -1232,20 +1271,9 @@
                 // Настройки управляются из главного окна
             }
 
-            setSize(size) {
-                const sizes = {
-                    small: { width: 180, height: 180 },
-                    medium: { width: 250, height: 250 },
-                    large: { width: 350, height: 350 },
-                    xlarge: { width: 500, height: 500 }
-                };
-
-                const s = sizes[size];
-                if (s) {
-                    ipcRenderer.send('widget-resize', s);
-                    localStorage.setItem('widgetSize', size);
-                }
-            }
+            // setSize() с пресетами small/medium/large/xlarge удалён: единственным
+            // вызовом был loadSettings(), который теперь восстанавливает реальную
+            // геометрию, а UI для выбора пресета размера в приложении отсутствует.
 
             loadSettings() {
                 // Настройки виджета
@@ -1257,9 +1285,45 @@
                     }
                 }
 
-                // Размер
-                const savedSize = localStorage.getItem('widgetSize') || 'medium';
-                this.setSize(savedSize);
+                this.restoreGeometry();
+            }
+
+            // Размер и позиция виджета переживают перезапуск. Раньше здесь
+            // безусловно вызывался setSize('medium'), из-за чего окно каждый раз
+            // возвращалось к 250×250 в правый верхний угол, а масштаб от
+            // Ctrl+колеса и результат перетаскивания терялись.
+            restoreGeometry() {
+                const geo = safeJSONParse(localStorage.getItem('widgetGeometry'), null);
+                if (!geo || typeof geo !== 'object') { return; }
+
+                const pct = Number(geo.scalePct);
+                if (Number.isFinite(pct) && pct >= 30 && pct <= 600) {
+                    this._widgetScalePct = pct;
+                    const size = Math.round(250 * pct / 100);
+                    ipcRenderer.send('widget-resize', { width: size, height: size });
+                }
+
+                // Главный процесс сам проверит, что точка попадает на реальный
+                // монитор, и подожмёт её в рабочую область, если нет.
+                if (Number.isFinite(geo.x) && Number.isFinite(geo.y)) {
+                    ipcRenderer.send('widget-set-position', { x: geo.x, y: geo.y });
+                }
+            }
+
+            saveGeometry(scalePct) {
+                // Без явного значения берём фактическую ширину окна: она учитывает
+                // и нативный ресайз за край, а не только Ctrl+колесо.
+                const pct = Number.isFinite(scalePct)
+                    ? scalePct
+                    : (Math.round(window.outerWidth / 250 * 100) || this._widgetScalePct || 100);
+                this._widgetScalePct = pct;
+                try {
+                    localStorage.setItem('widgetGeometry', JSON.stringify({
+                        scalePct: pct,
+                        x: window.screenX,
+                        y: window.screenY
+                    }));
+                } catch { /* хранилище переполнено — геометрия не критична */ }
             }
 
             saveSettings() {
@@ -1438,6 +1502,10 @@
                     this.remainingSeconds = Number(state.remainingSeconds) || 0;
                     this.isRunning = !!state.isRunning;
                     this.isPaused = !!state.isPaused;
+                    // Виджет раньше вообще не читал `finished` из состояния и
+                    // выводил статус завершения по косвенному признаку — из-за
+                    // этого он мог расходиться с панелью управления.
+                    this.finished = !!state.finished;
 
                     this.updateDisplay();
                 };
@@ -1468,10 +1536,21 @@
                         this._hasWidgetStyle = true;
                         this.setTimerStyle(settings.timerStyle);
                     }
+                    // Панель управления повторно шлёт timerScale и при смене стиля,
+                    // и один раз при своей загрузке. Применяем только реальное
+                    // изменение ползунка — иначе эти «фоновые» посылки затирают
+                    // масштаб, восстановленный из widgetGeometry или выставленный
+                    // Ctrl+колесом прямо на виджете.
                     if (settings.timerScale !== undefined) {
-                        const scale = parseInt(settings.timerScale) || 100;
-                        const newSize = Math.round(250 * scale / 100);
-                        ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
+                        const incoming = parseInt(settings.timerScale, 10);
+                        if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
+                            if (this._lastPushedTimerScale !== undefined) {
+                                const newSize = Math.round(250 * incoming / 100);
+                                ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
+                                this.saveGeometry(incoming);
+                            }
+                            this._lastPushedTimerScale = incoming;
+                        }
                     }
                     applyShowTicks(settings?.showTicks ?? false);
                 };
@@ -1532,6 +1611,8 @@
                     clearTimeout(this._scalingTimer);
                     this._scalingTimer = null;
                 }
+                for (const id of this._flipTimeouts) { clearTimeout(id); }
+                this._flipTimeouts = [];
             }
             
             setTimerStyle(style) {
@@ -1602,18 +1683,8 @@
                 }
 
                 // Status detection — always runs, not gated by totalSeconds
-                const isOvertime = secs < 0;
-                let status = 'normal';
-                if (isOvertime) {
-                    status = 'overtime';
-                } else if (this.totalSeconds > 0) {
-                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    if (percentLeft <= 10 && percentLeft > 0) {
-                        status = 'danger';
-                    } else if (percentLeft <= 25) {
-                        status = 'warning';
-                    }
-                }
+                // Полоса срочности — общая для всех окон (RendererShared).
+                const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
 
                 // Apply status to all elements
                 this.progressBar.dataset.status = status;
@@ -1658,6 +1729,14 @@
                 this.container.classList.toggle('timer-running', this.isRunning);
             }
             
+            // Перекидывание одной карточки. Общая реализация — flip-card.js;
+            // таймеры снятия класса складываем в список, чтобы почистить при закрытии.
+            _flip(card, value) {
+                window.FlipCard.flipCardTo(card, '.widget-flip-digit', value, {
+                    onTimeout: (id) => { this._flipTimeouts.push(id); }
+                });
+            }
+
             updateFlipDisplay(secs) {
                 if (!this.wFlipMin1 || !this.wFlipMin2 || !this.wFlipSec1 || !this.wFlipSec2) {return;}
                 
@@ -1683,16 +1762,16 @@
                     this.wFlipHoursSep.style.display = showHours ? 'flex' : 'none';
 
                     if (showHours && this.wFlipHr1 && this.wFlipHr2) {
-                        this.wFlipHr1.querySelector('.widget-flip-digit').textContent = cells.h1;
-                        this.wFlipHr2.querySelector('.widget-flip-digit').textContent = cells.h2;
+                        this._flip(this.wFlipHr1, cells.h1);
+                        this._flip(this.wFlipHr2, cells.h2);
                     }
                 }
 
                 // Обновляем цифры
-                this.wFlipMin1.querySelector('.widget-flip-digit').textContent = cells.m1;
-                this.wFlipMin2.querySelector('.widget-flip-digit').textContent = cells.m2;
-                this.wFlipSec1.querySelector('.widget-flip-digit').textContent = cells.s1;
-                this.wFlipSec2.querySelector('.widget-flip-digit').textContent = cells.s2;
+                this._flip(this.wFlipMin1, cells.m1);
+                this._flip(this.wFlipMin2, cells.m2);
+                this._flip(this.wFlipSec1, cells.s1);
+                this._flip(this.wFlipSec2, cells.s2);
                 
                 // Классы предупреждения
                 // FIX BUG-018: Use data attributes instead of classList
@@ -1701,18 +1780,8 @@
                     flipCards.push(this.wFlipHr1, this.wFlipHr2);
                 }
 
-                const isOvertime = secs < 0;
-                let status = 'normal';
-                if (isOvertime) {
-                    status = 'overtime';
-                } else if (this.totalSeconds > 0) {
-                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    if (percentLeft <= 10 && percentLeft > 0) {
-                        status = 'danger';
-                    } else if (percentLeft <= 25) {
-                        status = 'warning';
-                    }
-                }
+                // Полоса срочности — общая для всех окон (RendererShared).
+                const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
 
                 flipCards.forEach(card => {
                     card.dataset.status = status;
@@ -1723,8 +1792,12 @@
                             digit.style.color = '#ff4444';
                         } else if (status === 'warning') {
                             digit.style.color = '#ffc107';
-                        } else if (this._baseTimerColor) {
-                            digit.style.color = this._baseTimerColor;
+                        } else {
+                            // Раньше здесь стояло `else if (this._baseTimerColor)`, и без
+                            // пользовательской темы инлайновый красный не снимался никогда —
+                            // цифры оставались красными даже после установки нового пресета.
+                            // Пустая строка удаляет инлайн и возвращает управление CSS.
+                            digit.style.color = this._baseTimerColor || '';
                         }
                     }
                 });
@@ -1770,18 +1843,8 @@
                 // FIX BUG-018: Use data attributes instead of classList
                 const analogElements = [this.widgetHandMinute, this.widgetHandSecond, this.widgetClockCenter, this.widgetAnalogDigital];
 
-                const isOvertime = secs < 0;
-                let status = 'normal';
-                if (isOvertime) {
-                    status = 'overtime';
-                } else if (this.totalSeconds > 0) {
-                    const percentLeft = (this.remainingSeconds / this.totalSeconds) * 100;
-                    if (percentLeft <= 10 && percentLeft > 0) {
-                        status = 'danger';
-                    } else if (percentLeft <= 25) {
-                        status = 'warning';
-                    }
-                }
+                // Полоса срочности — общая для всех окон (RendererShared).
+                const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
 
                 analogElements.forEach(el => {
                     if (el) { el.dataset.status = status; }
@@ -1813,24 +1876,27 @@
                 }
             }
 
+            // Приоритеты статуса — общие для всех трёх окон, живут в
+            // RendererShared.timerLifecycleStatus(). Здесь остаётся только
+            // раскладка ключа в подпись и CSS-класс этого окна.
             updateStatus(secs) {
-                this.statusBadge.classList.remove('running', 'paused', 'finished');
-
-                if (secs < 0 && this.isRunning) {
-                    this.statusBadge.textContent = 'Перерасход';
-                    this.statusBadge.classList.add('running');
-                } else if (secs <= 0 && this.totalSeconds > 0 && !this.isRunning) {
-                    this.statusBadge.textContent = 'Завершён';
-                    this.statusBadge.classList.add('finished');
-                } else if (this.isRunning) {
-                    this.statusBadge.textContent = 'Активен';
-                    this.statusBadge.classList.add('running');
-                } else if (this.isPaused) {
-                    this.statusBadge.textContent = 'Пауза';
-                    this.statusBadge.classList.add('paused');
-                } else {
-                    this.statusBadge.textContent = 'Готов';
-                }
+                const STATUS_TEXT = {
+                    paused: 'Пауза',
+                    overtime: 'Перерасход',
+                    finished: 'Завершён',
+                    running: 'Активен',
+                    idle: 'Готов'
+                };
+                const status = window.RendererShared.timerLifecycleStatus({
+                    remainingSeconds: secs,
+                    totalSeconds: this.totalSeconds,
+                    isRunning: this.isRunning,
+                    isPaused: this.isPaused,
+                    finished: this.finished
+                });
+                this.statusBadge.classList.remove('running', 'paused', 'finished', 'overtime');
+                if (status !== 'idle') { this.statusBadge.classList.add(status); }
+                this.statusBadge.textContent = STATUS_TEXT[status];
             }
 
             formatTime(seconds) {

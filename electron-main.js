@@ -182,6 +182,41 @@ function resizeWindowClamped(win, payload) {
     }
 }
 
+// Shared position restore for a frameless widget window. Reads x/y from the
+// payload INSIDE the body (never destructured in the IPC handler params — see
+// tests/electron-main-source.test.js).
+//
+// Positions are persisted by the renderers across sessions, so a saved point can
+// reference a monitor that is no longer attached (docked laptop, unplugged TV).
+// Restoring it verbatim would drop the widget somewhere invisible with no way to
+// drag it back, so we require the window to land on a real display and otherwise
+// clamp it into the primary work area.
+function positionWindowClamped(win, payload) {
+    if (!isPayloadObject(payload)) { return; }
+    const { x, y } = payload;
+    if (!win || win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) { return; }
+
+    const [w, h] = win.getSize();
+    const targetX = Math.round(x);
+    const targetY = Math.round(y);
+
+    // Visible if the window's top-left corner sits inside any display's bounds.
+    const onSomeDisplay = screen.getAllDisplays().some(({ bounds }) =>
+        targetX >= bounds.x && targetX < bounds.x + bounds.width
+        && targetY >= bounds.y && targetY < bounds.y + bounds.height);
+
+    if (onSomeDisplay) {
+        win.setPosition(targetX, targetY);
+        return;
+    }
+
+    const area = screen.getPrimaryDisplay().workArea;
+    win.setPosition(
+        Math.round(Math.max(area.x, Math.min(area.x + area.width - w, targetX))),
+        Math.round(Math.max(area.y, Math.min(area.y + area.height - h, targetY)))
+    );
+}
+
 // Runtime app icon path. In dev it lives in build/icon.png (buildResources),
 // but build/ is NOT packed into app.asar — so in a packaged build the icon is
 // shipped via electron-builder `extraResources` and resolved from
@@ -727,7 +762,7 @@ app.whenReady().then(() => {
         const runner = require('./scripts/screenshot-runner');
         controlWindow.webContents.once('did-finish-load', () => {
             runner.run({
-                app, log,
+                app, log, nativeImage,
                 ctx: () => ({
                     control: controlWindow, widget: widgetWindow,
                     clock: clockWidgetWindow, display: displayWindow
@@ -997,6 +1032,10 @@ ipcMain.on('clock-widget-move', (_event, payload) => {
     moveWindowBy(clockWidgetWindow, payload);
 });
 
+ipcMain.on('clock-widget-set-position', (_event, payload) => {
+    positionWindowClamped(clockWidgetWindow, payload);
+});
+
 ipcMain.on('clock-widget-set-style', (event, style) => {
     safelySendToWindow(clockWidgetWindow, 'set-clock-style', style);
 });
@@ -1065,11 +1104,7 @@ ipcMain.on('widget-set-opacity', (event, opacity) => {
 });
 
 ipcMain.on('widget-set-position', (_event, payload) => {
-    if (!isPayloadObject(payload)) { return; }
-    const { x, y } = payload;
-    if (widgetWindow && Number.isFinite(x) && Number.isFinite(y)) {
-        widgetWindow.setPosition(Math.round(x), Math.round(y));
-    }
+    positionWindowClamped(widgetWindow, payload);
 });
 
 ipcMain.on('widget-resize', (_event, payload) => {
@@ -1078,6 +1113,25 @@ ipcMain.on('widget-resize', (_event, payload) => {
 
 ipcMain.on('widget-move', (_event, payload) => {
     moveWindowBy(widgetWindow, payload);
+});
+
+// Обратный канал масштаба: окно → панель управления.
+//
+// Раньше поток был односторонним — панель диктовала масштаб, а Ctrl+колесо на
+// самом виджете/дисплее меняло его молча. Ползунок в панели после этого показывал
+// старое значение, то есть два источника правды расходились, и следующая посылка
+// настроек могла вернуть масштаб назад. Теперь окно сообщает о своём новом
+// масштабе, панель подтягивает ползунок — и расхождению неоткуда взяться.
+//
+// Пересылается ТОЛЬКО в панель: широковещание вернуло бы значение отправителю и
+// могло закольцеваться.
+const SCALE_REPORT_SOURCES = new Set(['widget', 'clock', 'display', 'display-blocks']);
+ipcMain.on('report-scale', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { source, scalePct } = payload;
+    if (!SCALE_REPORT_SOURCES.has(source)) { return; }
+    if (!Number.isFinite(scalePct)) { return; }
+    safelySendToWindow(controlWindow, 'scale-report', { source, scalePct });
 });
 
 // Управление таймером через виджет (делегирует в единые функции)

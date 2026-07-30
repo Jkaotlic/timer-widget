@@ -138,12 +138,116 @@ function clampScale(value, min, max) {
 }
 
 // ---------------------------------------------------------------------------
+// timerLifecycleStatus(state) → 'paused' | 'overtime' | 'finished' | 'running' | 'idle'
+// ---------------------------------------------------------------------------
+/**
+ * Решает, в каком состоянии ЖИЗНЕННОГО ЦИКЛА находится таймер, чтобы окно могло
+ * подписать статус-плашку. Три окна (панель управления, виджет, полноэкранный
+ * режим) раньше содержали три копии этого условия, и копии разошлись:
+ *
+ *   - виджет красил «Перерасход» классом `running`, то есть ЗЕЛЁНЫМ, при красных цифрах;
+ *   - полноэкранный режим проверял `finished` ПЕРВЫМ, а панель и виджет — перерасход,
+ *     из-за чего одно состояние подписывалось в разных окнах по-разному;
+ *   - ветка `isPaused` во всех трёх была недостижима при remainingSeconds <= 0,
+ *     поэтому пауза в перерасходе показывалась как «Завершено» / «Время вышло!».
+ *
+ * Порядок приоритетов здесь единственный на всё приложение:
+ *
+ *   1. paused   — пауза важнее всего: если пользователь остановил таймер, это пауза,
+ *                 даже в перерасходе (сам перерасход уже виден по красным цифрам);
+ *   2. overtime — ушли ниже нуля;
+ *   3. finished — досчитали до нуля (или флаг залатчен движком);
+ *   4. running  — идёт отсчёт;
+ *   5. idle     — всё остальное.
+ *
+ * Возвращается только КЛЮЧ. Подписи и CSS-классы остаются за каждым окном:
+ * тексты у них разные («Завершён» / «Завершено» / «Время вышло!»), и сводить их
+ * к одному — уже продуктовое решение, а не починка рассинхрона.
+ *
+ * @param {{remainingSeconds:number, totalSeconds:number, isRunning:boolean,
+ *          isPaused:boolean, finished:boolean}} state
+ * @returns {'paused'|'overtime'|'finished'|'running'|'idle'}
+ */
+function timerLifecycleStatus(state) {
+    const raw = Math.floor(Number((state && state.remainingSeconds) || 0));
+    const secs = Number.isFinite(raw) ? raw : 0;
+    const totalRaw = Number((state && state.totalSeconds) || 0);
+    const total = Number.isFinite(totalRaw) ? totalRaw : 0;
+    const isRunning = !!(state && state.isRunning);
+    const isPaused = !!(state && state.isPaused);
+    const finished = !!(state && state.finished);
+
+    if (isPaused) { return 'paused'; }
+    if (secs < 0) { return 'overtime'; }
+    if (finished || (secs <= 0 && total > 0 && !isRunning)) { return 'finished'; }
+    if (isRunning) { return 'running'; }
+    return 'idle';
+}
+
+// ---------------------------------------------------------------------------
+// timerColorBand(remainingSeconds, totalSeconds[, thresholds]) → цветовая полоса
+// ---------------------------------------------------------------------------
+/**
+ * Решает, каким ЦВЕТОМ показывать время: 'overtime' | 'danger' | 'warning' | 'normal'.
+ *
+ * Это НЕ то же самое, что timerLifecycleStatus(): та отвечает на вопрос «что с
+ * таймером» (для подписи статуса), а эта — «насколько всё срочно» (для окраски
+ * цифр, стрелок и кольца прогресса).
+ *
+ * Раньше эта лесенка была скопирована девять раз по трём окнам, и копии
+ * содержали два дефекта:
+ *
+ *   1. Условие danger было записано как `percentLeft <= 10 && percentLeft > 0`.
+ *      Ровно на 00:00 процент равен нулю, `> 0` не проходит, и значение
+ *      проваливалось в `<= 25` → время на нуле показывалось ЖЁЛТЫМ (warning),
+ *      хотя это самая срочная точка отсчёта. При этом utils.getTimerStatus()
+ *      всегда считал ноль за 'danger' — то есть общая утилита и рендереры
+ *      противоречили друг другу.
+ *   2. Пороги в CONFIG (DANGER_PERCENTAGE / WARNING_PERCENTAGE) читала только
+ *      панель управления, остальные окна держали 10 и 25 захардкоженными.
+ *      Правка конфига разъехала бы окна между собой.
+ *
+ * Пороги берутся из аргумента, иначе из window.CONFIG, иначе 10 / 25.
+ *
+ * @param {number} remainingSeconds
+ * @param {number} totalSeconds
+ * @param {{danger?:number, warning?:number}} [thresholds]
+ * @returns {'overtime'|'danger'|'warning'|'normal'}
+ */
+function timerColorBand(remainingSeconds, totalSeconds, thresholds) {
+    const rawSecs = Number(remainingSeconds);
+    const secs = Number.isFinite(rawSecs) ? rawSecs : 0;
+    if (secs < 0) { return 'overtime'; }
+
+    const rawTotal = Number(totalSeconds);
+    const total = Number.isFinite(rawTotal) ? rawTotal : 0;
+    if (total <= 0) { return 'normal'; }
+
+    const cfg = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : null;
+    const t = thresholds || {};
+    const dangerPct = Number.isFinite(Number(t.danger))
+        ? Number(t.danger)
+        : (cfg && Number.isFinite(Number(cfg.DANGER_PERCENTAGE)) ? Number(cfg.DANGER_PERCENTAGE) : 10);
+    const warningPct = Number.isFinite(Number(t.warning))
+        ? Number(t.warning)
+        : (cfg && Number.isFinite(Number(cfg.WARNING_PERCENTAGE)) ? Number(cfg.WARNING_PERCENTAGE) : 25);
+
+    const percentLeft = (secs / total) * 100;
+    // Ноль ВХОДИТ в danger — это конец отсчёта, а не «предупреждение».
+    if (percentLeft <= dangerPct) { return 'danger'; }
+    if (percentLeft <= warningPct) { return 'warning'; }
+    return 'normal';
+}
+
+// ---------------------------------------------------------------------------
 // Exports — dual pattern identical to utils.js
 // ---------------------------------------------------------------------------
 const RendererShared = {
     breakdown,
     flipCells,
-    clampScale
+    clampScale,
+    timerLifecycleStatus,
+    timerColorBand
 };
 
 // Node.js (tests / main process)

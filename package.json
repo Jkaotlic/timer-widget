@@ -13,6 +13,8 @@
     "ci": "npm run lint && npm test",
     "test:e2e": "npx playwright test",
     "visual:audit": "node scripts/visual-audit.js",
+    "visual:baseline": "node scripts/visual-baseline.js",
+    "visual:check": "node scripts/run-electron.js --screenshot --visual-check",
     "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5",
     "notice": "node scripts/generate-notice.js",
     "build": "npx --yes electron-builder",
@@ -32,14 +34,18 @@
     "email": "jkaotlic@users.noreply.github.com"
   },
   "license": "MIT",
+  "comment:overrides": "brace-expansion <=5.0.7 has two high-severity ReDoS/OOM advisories (GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg) and every 1.x/2.x/4.x line is affected — 5.0.8 is the only patched release. It reaches us purely through the electron-builder dev toolchain (glob/minimatch/rimraf/asar), never through app runtime code. 5.0.8 ships dual CJS+ESM exports, so the CJS consumers in that tree keep working.",
+  "overrides": {
+    "brace-expansion": "^5.0.8"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.58.2",
-    "electron": "^42.3.2",
-    "electron-builder": "^26.8.1",
-    "eslint": "^10.2.1",
+    "@playwright/test": "^1.62.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.8.0",
     "eslint-plugin-html": "^8.1.4",
-    "globals": "^17.4.0"
+    "globals": "^17.8.0"
   },
   "build": {
     "appId": "com.timer.widget",
@@ -118,12 +124,22 @@
       "constants.js",
       "color-utils.js",
       "renderer-shared.js",
+      "flip-card.js",
+      "sound-bank.js",
+      "ui-feedback.js",
+      "scale-input.js",
+      "color-picker.js",
+      "modal-manager.js",
+      "shortcuts-help.js",
+      "custom-sounds.js",
+      "local-background.js",
       "electron-widget.html",
       "electron-control.html",
       "electron-clock-widget.html",
       "styles.css",
       "components.css",
       "design-tokens.css",
+      "control.css",
       "display.html",
       "display-script.js",
       "sounds/**/*",
@@ -133,6 +149,6 @@
     ]
   },
   "dependencies": {
-    "electron-log": "^5.4.3"
+    "electron-log": "^5.4.4"
   }
 }
