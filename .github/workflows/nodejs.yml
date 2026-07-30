@@ -45,13 +45,20 @@ jobs:
       # ubuntu не делал НИ ОДНОГО снимка — падал с exit 133 до первого кадра, а
       # continue-on-error это прятал. Запуск с отключённой песочницей здесь не
       # подходит: сверка должна поднимать окна так же, как настоящее приложение.
-      - name: Fix dev Electron sandbox permissions
+      - name: Visual regression (non-blocking)
         run: |
           SANDBOX=node_modules/electron/dist/chrome-sandbox
-          sudo chown root:root "$SANDBOX"
-          sudo chmod 4755 "$SANDBOX"
-      - name: Visual regression (non-blocking)
-        run: xvfb-run --auto-servernum npm run visual:check
+          # Бинарник Electron скачивается ЛЕНИВО, при первом запуске: сразу после
+          # `npm ci` каталога dist/ ещё нет, и выставлять права не на чем — на
+          # этом первая версия шага и упала («chown: cannot access»). Поэтому
+          # сначала холостой запуск, только потом права.
+          npx electron --version >/dev/null 2>&1 || true
+          if [ -e "$SANDBOX" ]; then
+            sudo chown root:root "$SANDBOX" && sudo chmod 4755 "$SANDBOX"
+          else
+            echo "[ci] бинарник Electron не появился — права выставлять не на чем"
+          fi
+          xvfb-run --auto-servernum npm run visual:check
         continue-on-error: true
       - name: Upload visual diff artifacts
         if: always()
