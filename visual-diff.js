@@ -92,13 +92,18 @@ function isRegression(result, opts = {}) {
 // Сравнивать их попиксельно бессмысленно — регрессией будет считаться сама секунда.
 //
 //   clock-*              — виджет часов целиком показывает стенные часы;
-//   display-blocks-*     — на полноэкранном дисплее включён блок «Текущее время».
+//   display-blocks-*     — на полноэкранном дисплее включён блок «Текущее время»;
+//   hc-clock             — тот же виджет часов, снятый в высококонтрастной теме.
+//                          Имя не начинается с `clock-`, поэтому под общее правило
+//                          не попадает и нуждается в отдельной строке.
 //
 // Список обязан пополняться вместе с новыми состояниями в screenshot-runner.js:
 // снимок с живыми часами, не попавший сюда, роняет `visual:check` навсегда.
 function isTimeDependent(name) {
-    return /^clock-/.test(String(name || ''))
-        || /^display-blocks-/.test(String(name || ''));
+    const n = String(name || '');
+    return /^clock-/.test(n)
+        || /^display-blocks-/.test(n)
+        || /^hc-clock\b/.test(n);
 }
 
 module.exports = {

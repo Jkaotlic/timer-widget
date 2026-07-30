@@ -96,4 +96,16 @@ test('снимки часов исключены из сверки — они п
     // навсегда: регрессией начинает считаться сама секунда.
     assert.equal(isTimeDependent('display-blocks-circle.png'), true);
     assert.equal(isTimeDependent('display-blocks-analog.png'), true);
+
+    // hc-clock — тот же виджет часов, снятый в высококонтрастной теме. Имя не
+    // начинается с `clock-`, поэтому под общее правило не попадает: без отдельной
+    // строки снимок с живыми часами уехал бы в эталоны и ронял сверку навсегда.
+    assert.equal(isTimeDependent('hc-clock.png'), true);
+    // А остальные кадры контрастной темы живого времени не содержат и сравниваются.
+    assert.equal(isTimeDependent('hc-control.png'), false);
+    assert.equal(isTimeDependent('hc-widget.png'), false);
+    assert.equal(isTimeDependent('hc-display.png'), false);
+    // Часовые форматы — обычный отсчёт таймера, не стенные часы.
+    assert.equal(isTimeDependent('hours-h1-flip-widget.png'), false);
+    assert.equal(isTimeDependent('hours-hmax-digital-display.png'), false);
 });

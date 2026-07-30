@@ -158,52 +158,66 @@ test('в окне часов нет внутренних контролов — 
     }
 });
 
-test('минус в потоке: центрируется вся надпись, а не одни цифры', () => {
+test('минус вне потока: по центру стоят ЦИФРЫ', () => {
     // Держать по центру ОДНОВРЕМЕННО цифры и всю надпись математически нельзя:
-    // надпись = [минус][цифры], и если центр цифр совпал с центром кольца, то
-    // центр надписи неизбежно левее ровно на половину знака.
+    // надпись = [минус][цифры], и центры отличаются ровно на половину знака.
     //
-    // Две итерации, обе замерены в e2e:
-    //   1) знак резервировал ширину 0.6ch — цифры уезжали вправо на 15px (панель);
-    //   2) знак с width:0 и сдвигом через transform — цифры встали ровно, но вся
-    //      надпись съехала влево на 16-26px, и минус читался как висящий отдельно
-    //      (в полноэкранном режиме этот перекос доходил до 45px).
+    // Три итерации, все замерены в e2e:
+    //   1) знак резервировал ширину 0.6ch — цифры уезжали вправо на 15px;
+    //   2) знак в потоке, центрируется надпись — цифры уехали от центра КОЛЬЦА на
+    //      +26px (панель), +16px (виджет), +54px (полноэкранный). Пользователь
+    //      сообщил, что это «режет глаза», и был прав: внутри круга точка отсчёта
+    //      для глаза — центр кольца, а в панели — общая ось со плашкой статуса;
+    //   3) знак вне потока, по центру цифры — но полноразмерный минус с зазором
+    //      0.2em выглядел отдельным пятном и тянул композицию влево.
     //
-    // Итог: знак участвует в раскладке обычным образом, центрируется надпись
-    // целиком. Технический сдвиг цифр при переходе через ноль незаметен — глаз
-    // видит центрированный блок и до, и после, а появление самого минуса этот
-    // сдвиг маскирует. Замерено: центр надписи = 0 во всех трёх окнах.
+    // Итог: контейнер сжат по содержимому и центрирован (его левый край = левый
+    // край цифр), знак абсолютный от этого края, МЕЛЬЧЕ цифр и по их средней линии.
+    // Замерено: цифры 0px от опоры, знак 0–0.4px по вертикали, надпись −8.8…−29.9px,
+    // минус внутри кольца с запасом 43px (виджет) и 80.9px (дисплей).
+    // Живой замер держит e2e/overtime-centering.spec.js.
     const controlHtml = readControlSource();
     const widgetHtml = read('electron-widget.html');
     const displayHtml = read('display.html');
     const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
-    for (const [name, src, sel] of [
-        ['control', controlHtml, '\\.timer-display-main \\.tm-sign'],
-        ['widget', widgetHtml, '\\.time-display \\.tm-sign']
+    for (const [name, src, signSel, boxSel] of [
+        ['control', controlHtml, '\\.timer-display-main \\.tm-sign', '\\.timer-display-main'],
+        ['widget', widgetHtml, '\\.time-display \\.tm-sign', '\\.time-display']
     ]) {
-        const base = src.match(new RegExp(`${sel}\\s*\\{[^}]*\\}`, 's'));
-        assert.ok(base, `${name}: базовое правило .tm-sign не найдено`);
+        const base = src.match(new RegExp(`${signSel}\\s*\\{[^}]*\\}`, 's'));
+        assert.ok(base, `${name}: правило .tm-sign не найдено`);
         const baseCss = stripComments(base[0]);
-        // Никакой нулевой ширины и никаких transform-костылей: знак — обычный
-        // inline-block, его ширину задаёт сам глиф.
-        assert.match(baseCss, /display:\s*inline-block;/, `${name}: знак должен быть inline-block`);
-        assert.doesNotMatch(baseCss, /width:\s*0;/, `${name}: нулевая ширина уводит надпись из центра`);
-        assert.doesNotMatch(baseCss, /transform:/, `${name}: сдвиг глифа больше не нужен`);
+        assert.match(baseCss, /position:\s*absolute;/, `${name}: знак обязан быть вне потока`);
+        assert.match(baseCss, /right:\s*100%;/, `${name}: знак крепится к левому краю цифр`);
+        assert.match(baseCss, /top:\s*50%;/, `${name}: знак центрируется по вертикали`);
+        assert.match(baseCss, /translateY\(-50%\)/, `${name}: без сдвига знак висит надстрочно`);
+        assert.match(baseCss, /font-size:\s*0\.62em;/, `${name}: знак мельче цифр`);
+        // Возврат знака в поток — это возврат сдвига цифр.
+        assert.doesNotMatch(baseCss, /display:\s*inline-block;/, `${name}: знак снова в потоке`);
 
-        const filled = stripComments(
-            src.match(new RegExp(`${sel}:not\\(:empty\\)\\s*\\{[^}]*\\}`, 's'))[0]
-        );
-        assert.match(filled, /margin-right:\s*0\.2em;/, `${name}: зазор до цифр — 0.2em`);
-        assert.doesNotMatch(filled, /width:/, `${name}: ширину задаёт глиф, а не правило`);
+        // Контейнер обязан сжиматься по содержимому и центрироваться — иначе его
+        // левый край не совпадёт с левым краем цифр и right: 100% уедет.
+        const boxRules = [...src.matchAll(new RegExp(`${boxSel}\\s*\\{[^}]*\\}`, 'gs'))]
+            .map((m) => stripComments(m[0])).join('\n');
+        assert.match(boxRules, /width:\s*fit-content;/, `${name}: контейнер не сжат по содержимому`);
+        assert.match(boxRules, /position:\s*relative;/, `${name}: контейнеру нужен position: relative`);
+        assert.match(boxRules, /margin-left:\s*auto;/, `${name}: контейнер не центрирован`);
     }
 
-    // Полноэкранный режим: отрицательный вылет убран по той же причине.
+    // Полноэкранный режим — и круг, и аналоговый цифровой отсчёт.
     const displayRule = stripComments(
         displayHtml.match(/\.time-minus,\s*\n\s*\.analog-time-minus\s*\{[^}]*\}/s)[0]
     );
-    assert.doesNotMatch(displayRule, /margin-left:\s*-/, 'вылет влево уводил надпись из центра');
-    assert.match(displayRule, /margin-right:\s*0\.2em;/);
+    assert.match(displayRule, /position:\s*absolute;/);
+    assert.match(displayRule, /right:\s*100%;/);
+    assert.match(displayRule, /font-size:\s*0\.62em;/);
+    assert.doesNotMatch(displayRule, /margin-left:\s*-/, 'вылет влево — прежний костыль');
+    const displayBox = stripComments(
+        displayHtml.match(/\.time-text,\s*\n\s*\.analog-digital-time\s*\{[^}]*\}/s)[0]
+    );
+    assert.match(displayBox, /width:\s*fit-content;/);
+    assert.match(displayBox, /position:\s*relative;/);
 });
 
 test('circular widget centers the digits independently from the status chip', () => {
