@@ -7,11 +7,18 @@
  * это отдельный job. Здесь проверяется ЛОГИКА: разбор заголовка asar (формат
  * простой, но легко ошибиться в смещениях) и сверка списка с build.files.
  *
- * Архив собираем синтетически по документированному формату:
- *   [0..3]   uint32  размер следующего pickle (всегда 4)
- *   [4..7]   uint32  размер pickle заголовка
- *   [8..11]  uint32  длина JSON-строки
- *   [12..]           JSON с деревом файлов (+ выравнивание до 4 байт)
+ * ВАЖНО про синтетику: первая версия этих тестов собирала архив по тому же
+ * ошибочному раскладу, что и парсер (длина JSON со смещения 8 вместо 12), и
+ * поэтому зелёно проходила — а на настоящем app.asar в CI парсер падал на
+ * JSON.parse. Поэтому здесь ОБЯЗАТЕЛЬНО есть тест на живой архив из поставки
+ * Electron: синтетика проверяет краевые случаи, живой образец — сам формат.
+ *
+ * Формат (четыре uint32 перед JSON):
+ *   [0..3]   uint32  payload size внешнего pickle (всегда 4)
+ *   [4..7]   uint32  размер буфера pickle заголовка
+ *   [8..11]  uint32  payload size pickle заголовка (= предыдущее − 4)
+ *   [12..15] uint32  длина JSON-строки
+ *   [16..]           JSON с деревом файлов (+ выравнивание до 4 байт)
  */
 
 const test = require('node:test');
@@ -25,13 +32,16 @@ const { readAsarHeader, flatten, checkPacked } = require('../scripts/verify-pack
 function buildAsar(header) {
     const json = Buffer.from(JSON.stringify(header), 'utf8');
     const pad = (4 - (json.length % 4)) % 4;
-    const headerPickleSize = 4 + json.length + pad;
+    const stringFieldSize = 4 + json.length + pad; // uint32 длины + строка + выравнивание
+    const headerPayloadSize = stringFieldSize;
+    const headerBufSize = 4 + headerPayloadSize;
 
-    const out = Buffer.alloc(12 + json.length + pad);
+    const out = Buffer.alloc(16 + json.length + pad);
     out.writeUInt32LE(4, 0);
-    out.writeUInt32LE(headerPickleSize, 4);
-    out.writeUInt32LE(json.length, 8);
-    json.copy(out, 12);
+    out.writeUInt32LE(headerBufSize, 4);
+    out.writeUInt32LE(headerPayloadSize, 8);
+    out.writeUInt32LE(json.length, 12);
+    json.copy(out, 16);
     return out;
 }
 
@@ -84,14 +94,38 @@ test('заголовок с нечётной длиной JSON тоже чита
     assert.deepEqual(paths, ['a.js']);
 });
 
+test('НАСТОЯЩИЙ asar из поставки Electron читается', () => {
+    // Единственная защита от того, чтобы тест снова подтвердил ошибку парсера:
+    // архив собран реальным инструментом, а не по моему представлению о формате.
+    // Если Electron не установлен (голая проверка исходников) — тест пропускаем.
+    const candidates = [
+        'node_modules/electron/dist/Electron.app/Contents/Resources/default_app.asar',
+        'node_modules/electron/dist/resources/default_app.asar'
+    ].map((p) => path.join(__dirname, '..', p));
+    const real = candidates.find((p) => fs.existsSync(p));
+    if (!real) {
+        console.log('  (electron не установлен — пропуск сверки с живым архивом)');
+        return;
+    }
+
+    const header = readAsarHeader(real);
+    const files = flatten(header, '', []);
+    assert.ok(files.length > 0, 'в default_app.asar обязаны быть файлы');
+    assert.ok(
+        files.some((f) => f.endsWith('.js')),
+        `ожидались .js-файлы, получено: ${files.slice(0, 5).join(', ')}`
+    );
+});
+
 test('битый заголовок не проходит молча', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'asar-bad-'));
     const file = path.join(dir, 'app.asar');
-    // Правдоподобные первые 8 байт, но длина JSON заведомо абсурдная.
+    // Правдоподобные первые байты, но длина JSON заведомо абсурдная.
     const buf = Buffer.alloc(64);
     buf.writeUInt32LE(4, 0);
-    buf.writeUInt32LE(16, 4);
-    buf.writeUInt32LE(0xffffffff, 8);
+    buf.writeUInt32LE(20, 4);
+    buf.writeUInt32LE(16, 8);
+    buf.writeUInt32LE(0xffffffff, 12);
     fs.writeFileSync(file, buf);
     try {
         assert.throws(() => readAsarHeader(file), /неправдоподобная длина/);

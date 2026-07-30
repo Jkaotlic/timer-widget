@@ -15,11 +15,18 @@
  * Зависимостей нет намеренно: формат заголовка asar простой и стабильный, а
  * тянуть @electron/asar ради одного чтения в проект без бандлера незачем.
  *
- * Формат asar:
- *   [0..3]   uint32  размер следующего pickle (всегда 4)
- *   [4..7]   uint32  размер pickle заголовка
- *   [8..11]  uint32  длина JSON-строки внутри этого pickle
- *   [12..]           сам JSON с деревом файлов
+ * Формат asar — ЧЕТЫРЕ uint32 перед JSON, а не три:
+ *   [0..3]   uint32  payload size внешнего pickle (всегда 4)
+ *   [4..7]   uint32  размер буфера pickle заголовка (вместе с его собственным полем)
+ *   [8..11]  uint32  payload size pickle заголовка (= предыдущее − 4)
+ *   [12..15] uint32  длина JSON-строки
+ *   [16..]           сам JSON с деревом файлов (далее выравнивание до 4 байт)
+ *
+ * Смещения сверены с настоящим архивом (node_modules/electron/dist/…/
+ * default_app.asar): `04 00 00 00 | fc 0c 00 00 | f8 0c 00 00 | f4 0c 00 00 | {"files"…`.
+ * Тест читает этот же архив — синтетика одна, без живого образца, уже дала
+ * ложную уверенность: первая версия парсера брала длину со смещения 8, а тест
+ * собирал архив по тому же ошибочному раскладу и проходил.
  */
 
 const fs = require('fs');
@@ -50,14 +57,14 @@ function findAsar(dir) {
 function readAsarHeader(asarPath) {
     const fd = fs.openSync(asarPath, 'r');
     try {
-        const head = Buffer.alloc(12);
-        fs.readSync(fd, head, 0, 12, 0);
-        const jsonLen = head.readUInt32LE(8);
+        const head = Buffer.alloc(16);
+        fs.readSync(fd, head, 0, 16, 0);
+        const jsonLen = head.readUInt32LE(12);
         if (!Number.isFinite(jsonLen) || jsonLen <= 0 || jsonLen > 64 * 1024 * 1024) {
             throw new Error(`неправдоподобная длина заголовка: ${jsonLen}`);
         }
         const json = Buffer.alloc(jsonLen);
-        fs.readSync(fd, json, 0, jsonLen, 12);
+        fs.readSync(fd, json, 0, jsonLen, 16);
         return JSON.parse(json.toString('utf8'));
     } finally {
         fs.closeSync(fd);
