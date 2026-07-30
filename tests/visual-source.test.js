@@ -45,7 +45,10 @@ test('opening settings keeps control scale stable', () => {
     assert.match(controlHtml, /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*width:\s*var\(--control-panel-width\);[^}]*max-width:\s*var\(--control-panel-width\);/s);
     assert.match(controlHtml, /\.settings-drawer\.open\s*\{[^}]*width:\s*var\(--drawer-width\);[^}]*max-width:\s*var\(--drawer-width\);/s);
     assert.doesNotMatch(controlHtml, /\.timer-display-main\s*\{[^}]*vw/s);
-    assert.match(controlHtml, /shell\.style\.setProperty\('--control-panel-width', `\$\{panelWidth\}px`\)/);
+    // Переменную ширины колонки выставляет JS. Проверяем сам факт, а не форму
+    // выражения: значение теперь считается от фактической ширины окна и
+    // подставляется через Math.round прямо в шаблон (см. следующий тест).
+    assert.match(controlHtml, /shell\.style\.setProperty\(\s*'--control-panel-width'/);
 });
 
 test('колонка панели при открытом ящике считается от потолка ширины окна', () => {
@@ -65,15 +68,26 @@ test('колонка панели при открытом ящике счита�
         /maxWidth:\s*CONFIG\.CONTROL_WINDOW_MAX_WIDTH/,
         'главный процесс задаёт maxWidth литералом вместо константы'
     );
+
+    // Колонка считается от ФАКТИЧЕСКОЙ ширины окна, а не от константы потолка.
+    // Первая версия правки вычитала ящик из CONTROL_WINDOW_MAX_WIDTH и падала на
+    // Windows: там главный процесс обрезает ширину ещё и по размеру экрана
+    // (`screenWidth - 50`), поэтому эффективный потолок ниже константы, и колонка
+    // снова оказывалась шире доступного места. Предсказать это из рендерера нельзя.
     assert.match(
         controlHtml,
-        /CONFIG\.CONTROL_WINDOW_MAX_WIDTH/,
-        'панель не знает про потолок ширины и не вычитает из него ящик'
+        /const available = \(window\.innerWidth \|\| baseDefault\) - this\._drawerExtraWidth/,
+        'колонка панели снова считается не от фактической ширины окна'
     );
     assert.match(
         controlHtml,
-        /Math\.min\(this\._baseWidthBeforeDrawer \|\| baseDefault, maxWidth - this\._drawerExtraWidth\)/,
-        'колонка панели снова не ограничена «потолок минус ящик»'
+        /window\.addEventListener\('resize', syncColumn\)/,
+        'колонка не пересчитывается при изменении размера окна с открытым ящиком'
+    );
+    assert.match(
+        controlHtml,
+        /window\.removeEventListener\('resize', this\._syncDrawerColumn\)/,
+        'слушатель пересчёта колонки не снимается при закрытии ящика'
     );
 });
 
