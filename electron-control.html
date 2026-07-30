@@ -1188,13 +1188,22 @@
                     ipcRenderer.send('resize-control-window', {
                         width: this._baseWidthBeforeDrawer + this._drawerExtraWidth
                     });
+                    // Ящик раскрывается СРАЗУ, а в двойной кадр уходит только
+                    // стыковка панели.
+                    //
+                    // Раньше в rAF было всё вместе, и на медленном раннере CI ящик
+                    // не успевал открыться к моменту проверки: e2e видел
+                    // aria-expanded="true" при отсутствующем классе .open. Двойной
+                    // кадр здесь нужен ровно для одного — дать ширине окна приехать
+                    // до того, как панель станет левой колонкой, иначе виден скачок.
+                    // Само раскрытие и доступность от этого не зависят.
+                    this.settingsDrawerEl.classList.add('open');
+                    this.settingsDrawerEl.setAttribute('aria-hidden', 'false');
+                    this._focusFirstInDrawer();
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
                             syncColumn();
                             if (shell) { shell.classList.add('drawer-open'); }
-                            this.settingsDrawerEl.classList.add('open');
-                            this.settingsDrawerEl.setAttribute('aria-hidden', 'false');
-                            this._focusFirstInDrawer();
                         });
                     });
                 } else {
