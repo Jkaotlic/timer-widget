@@ -47,3 +47,82 @@ jobs:
       - name: Coverage (non-blocking)
         run: npm run coverage
         continue-on-error: true
+
+  # ==========================================================================
+  # e2e на ТРЁХ платформах — единственное, что проверяет настоящий рантайм.
+  #
+  # Раньше набор Playwright (создание окон, IPC, геометрия, горячие клавиши,
+  # цветовые полосы, раскладка flip, деления, синхронизация состояния окон,
+  # палитра перерасхода, углы стрелок) не запускался в CI ВООБЩЕ и прогонялся
+  # только вручную на macOS. При этом вся архитектура перетаскивания окон
+  # существует именно из-за квирков Windows с прозрачными frameless-окнами —
+  # то есть непроверенной оставалась платформа, под которую написан обходной путь.
+  #
+  # fail-fast: false — падение на одной платформе не должно скрывать результат
+  # остальных: нам нужно знать, где именно разошлось поведение.
+  # ==========================================================================
+  e2e:
+    name: e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+
+      # Electron не поднимет окно без дисплея — под Linux нужен виртуальный.
+      # На Windows и macOS у раннера есть сессия рабочего стола.
+      - name: Run e2e (Linux, xvfb)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npx playwright test
+
+      - name: Run e2e (Windows / macOS)
+        if: runner.os != 'Linux'
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ==========================================================================
+  # Сборка без установщика (`electron-builder --dir`) на платформах, которые
+  # нельзя проверить с macOS. Ловит поломки упаковки на настоящем инструменте:
+  # ассет, не попавший в `build.files` (так в 2.3.2 потерялся design-tokens.css),
+  # битый asar, недостижимый icon. Статический `tests/packaging.test.js` сверяет
+  # только СПИСОК файлов — здесь пакет собирается по-настоящему.
+  # ==========================================================================
+  pack:
+    name: pack --dir (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Pack without installer
+        run: npm run pack
+      - name: Verify packed app contains every runtime asset
+        run: node scripts/verify-packed.js
