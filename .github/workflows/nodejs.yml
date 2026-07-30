@@ -73,6 +73,37 @@ jobs:
         continue-on-error: true
 
   # ==========================================================================
+  # Unit-тесты на Windows и macOS.
+  #
+  # На ubuntu их гоняет job `build`, и до 2.4.0 этим всё и заканчивалось. Половина
+  # тестов здесь — source-level: они читают файл и матчат его текст регулярками,
+  # написанными под LF. На Windows Git разворачивает LF в CRLF, и такие проверки
+  # разваливаются. Обнаружилось это только в РЕЛИЗНОЙ сборке (она гоняет тесты на
+  # каждой платформе): пять падений, четыре из них жили в репозитории с прошлого
+  # прохода. Рабочее дерево теперь держит LF через .gitattributes, а этот job не
+  # даёт классу «ломается только не на Linux» снова спрятаться до самого релиза.
+  # ==========================================================================
+  unit-cross-platform:
+    name: unit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run lint
+        run: npm run lint
+      - name: Run tests
+        run: npm test
+
+  # ==========================================================================
   # e2e на ТРЁХ платформах — единственное, что проверяет настоящий рантайм.
   #
   # Раньше набор Playwright (создание окон, IPC, геометрия, горячие клавиши,
