@@ -258,6 +258,31 @@ function broadcastEvent(eventName) {
     safelySendToWindow(displayWindow, eventName);
 }
 
+// Полный СНИМОК состояния окон одному адресату — досылается каждому окну сразу
+// после загрузки его содержимого.
+//
+// Зачем: решение «открыть или закрыть» и в горячих клавишах W/C/D, и в кнопках
+// панели принимается по ЛОКАЛЬНОМУ флагу окна, а тот инициализируется в false и
+// обновляется только сообщениями `*-window-state`. Рассылались они лишь в момент
+// открытия/закрытия, поэтому окно, загрузившееся ПОЗЖЕ, о ранее открытых окнах не
+// узнавало никогда. Сценарий из обычной работы: открыть часы, потом виджет и
+// нажать в виджете C — виджет считает часы закрытыми и шлёт open-clock-widget,
+// главный процесс лишь фокусирует уже открытое окно, и тоггл не работает.
+// Тот же провал после перезагрузки рендерера краш-обработчиком
+// (bindRenderCrashHandler → win.reload()) и после повторного создания панели из трея.
+//
+// Слушатель именно `on`, а не `once`: перезагрузка окна обязана получить снимок заново.
+function sendWindowStatesTo(win) {
+    safelySendToWindow(win, 'widget-window-state', { isOpen: !!widgetWindow });
+    safelySendToWindow(win, 'clock-window-state', { isOpen: !!clockWidgetWindow });
+    safelySendToWindow(win, 'display-window-state', { isOpen: !!displayWindow });
+}
+
+function bindWindowStateSnapshot(win) {
+    if (!win || !win.webContents) { return; }
+    win.webContents.on('did-finish-load', () => sendWindowStatesTo(win));
+}
+
 // Advance the timer to match real elapsed wall-clock time since the anchor.
 // Called every interval tick AND on powerMonitor 'resume' so the displayed time
 // snaps back to reality immediately after the machine wakes from sleep. The
@@ -333,6 +358,7 @@ function createControlWindow() {
     hardenWindow(controlWindow);
     bindRenderCrashHandler(controlWindow, 'control');
     bindRenderConsole(controlWindow, 'control');
+    bindWindowStateSnapshot(controlWindow);
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
@@ -383,6 +409,7 @@ function createWidgetWindow() {
     hardenWindow(widgetWindow);
     bindRenderCrashHandler(widgetWindow, 'widget');
     bindRenderConsole(widgetWindow, 'widget');
+    bindWindowStateSnapshot(widgetWindow);
 
     widgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(widgetWindow);
@@ -429,6 +456,7 @@ function createClockWidgetWindow() {
     hardenWindow(clockWidgetWindow);
     bindRenderCrashHandler(clockWidgetWindow, 'clock');
     bindRenderConsole(clockWidgetWindow, 'clock');
+    bindWindowStateSnapshot(clockWidgetWindow);
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(clockWidgetWindow);
@@ -496,6 +524,7 @@ function createDisplayWindow(displayIndex) {
     hardenWindow(displayWindow);
     bindRenderCrashHandler(displayWindow, 'display');
     bindRenderConsole(displayWindow, 'display');
+    bindWindowStateSnapshot(displayWindow);
     blockZoom(displayWindow);
 
     displayWindow.once('ready-to-show', () => {

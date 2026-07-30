@@ -13,13 +13,22 @@ class DisplayTimer {
         this.lastUpdateCounter = -1;  // FIX BUG-012: Монотонный счетчик вместо timestamp
         this.flashCount = 0;
         this.flashInterval = null;
+        // Защёлка «вспышку завершения уже показали» — см. updateDisplay().
+        this._finishEffectShown = false;
 
-        // Массив для хранения ID всех интервалов
-        this.intervals = [];
+        // Самокорректирующийся таймер часов «Текущее время» (см. startCurrentTimeClock)
+        this._currentTimeTimeout = null;
 
-        // F-024: трекинг всех setTimeout / setInterval для cleanup
-        // (intervals[] уже существует для setInterval — дублируем сюда для единой очистки)
-        this._timeouts = [];
+        // F-024: трекинг setInterval для cleanup. Единственный владелец — сейчас
+        // это flashInterval из triggerFinishEffect.
+        //
+        // Раньше рядом жил ВТОРОЙ такой же массив (this.intervals) — он собирал
+        // поллинг браузерного режима и интервал часов текущего времени. Оба ушли
+        // (мёртвая ветка и переход на самокорректирующийся таймер), так что второй
+        // массив остался бы всегда пустым.
+        //
+        // Таймеры перекидывания карточек здесь НЕ учитываются: их ведёт flip-card.js
+        // и гасит FlipCard.cancelPending() — внешний список рос неограниченно.
         this._intervals = [];
 
         // Обработчики IPC для cleanup
@@ -63,18 +72,11 @@ class DisplayTimer {
         this.timerStyle = 'circle';
         this.lastFlipValues = { min1: '', min2: '', sec1: '', sec2: '' };
 
-        this.isElectron = !!window.ipcRenderer;
-
         this.initElements();
         this.initProgress();
         this.loadColors();
         this.initDefaultStyle();
-        this.detectElectronAndSetup();
-        // Polling синхронизация цветов только в браузерном режиме;
-        // в Electron цвета приходят через IPC
-        if (!this.isElectron) {
-            this.startColorSync();
-        }
+        this.setupIPCIfAvailable();
         this.startCurrentTimeClock();
         this.setupResizeHandler();
         this.setupKeyboardShortcuts();
@@ -269,8 +271,21 @@ class DisplayTimer {
             this.updateMiniClockHands(this.currentTimeBlock, now.getHours(), now.getMinutes(), now.getSeconds());
         };
         updateClock();
-        const intervalId = setInterval(updateClock, 1000);
-        this.intervals.push(intervalId);
+
+        // Самокорректирующийся тик по системным часам — тот же приём, что в
+        // виджете часов (_scheduleNextTick). Ровный setInterval(1000) отсчитывает
+        // от предыдущего СРАБАТЫВАНИЯ, а не от границы секунды: задержки event
+        // loop накапливаются, показ уползает от реального времени, и в какой-то
+        // момент секунда визуально «прыгает через одну». На презентационном
+        // экране, где рядом висит настоящее время, это заметно.
+        const scheduleNext = () => {
+            const msToNextSecond = 1000 - (Date.now() % 1000);
+            this._currentTimeTimeout = setTimeout(() => {
+                updateClock();
+                scheduleNext();
+            }, msToNextSecond);
+        };
+        scheduleNext();
     }
 
     updateMiniClockHands(block, hours, minutes, seconds = 0) {
@@ -316,15 +331,18 @@ class DisplayTimer {
         }
     }
 
-    detectElectronAndSetup() {
-        if (window.ipcRenderer) {
-            this.ipcRenderer = window.ipcRenderer;
-            this.setupIPC();
-            return;
-        }
-
-        // Браузерный режим - синхронизация через localStorage
-        this.startLocalStorageSync();
+    // Раньше здесь была развилка detectElectronAndSetup(): при отсутствии
+    // ipcRenderer окно уходило в «браузерный режим» и синхронизировалось через
+    // localStorage-ключ `timerState` с поллингом раз в секунду и слушателем
+    // storage-события. Ветка была НЕРАБОЧЕЙ: ключ `timerState` никто в проекте
+    // не пишет (главный процесс рассылает состояние только по IPC), поэтому
+    // читать его было бесполезно — окно навсегда осталось бы на нулях. Туда же
+    // относился поллинг цветов startColorSync/syncColors раз в 2 секунды.
+    // Развилка удалена вместе с обеими мёртвыми ветками.
+    setupIPCIfAvailable() {
+        if (!window.ipcRenderer) { return; }
+        this.ipcRenderer = window.ipcRenderer;
+        this.setupIPC();
     }
 
     setupIPC() {
@@ -594,79 +612,6 @@ class DisplayTimer {
         element.style.marginRight = '';
         // Добавляем новый класс позиции
         element.classList.add(position);
-    }
-
-    startLocalStorageSync() {
-        // FIX BUG-021: Используем storage event вместо polling для синхронизации состояния
-        const defaultState = {
-            totalSeconds: 0,
-            remainingSeconds: 0,
-            isRunning: false,
-            isPaused: false,
-            finished: false
-        };
-
-        // Обработчик обновления состояния из localStorage
-        const applyState = (stateStr) => {
-            if (!stateStr) {return;}
-            let state;
-            try { state = JSON.parse(stateStr); }
-            catch (e) { console.error('JSON parse error:', e.message); state = defaultState; }
-
-            this.totalSeconds = Number(state.totalSeconds) || 0;
-            this.remainingSeconds = Number(state.remainingSeconds) || 0;
-            this.isRunning = !!state.isRunning;
-            this.isPaused = !!state.isPaused;
-            this.finished = !!state.finished;
-            this.updateDisplay();
-        };
-
-        // Начальное чтение
-        applyState(localStorage.getItem('timerState'));
-
-        // Слушаем изменения через storage event (вместо 100ms polling)
-        this._handlers.storage = (e) => {
-            if (e.key === 'timerState' && e.newValue) {
-                applyState(e.newValue);
-            }
-            if (e.key === 'timerColors' && e.newValue) {
-                let colors;
-                try { colors = JSON.parse(e.newValue); }
-                catch (err) { console.error('JSON parse error:', err.message); colors = {}; }
-                if (colors) {
-                    this.applyColors(colors);
-                }
-            }
-        };
-        window.addEventListener('storage', this._handlers.storage);
-
-        // Fallback: редкий polling для случаев когда storage event не срабатывает
-        // (происходит в рамках того же окна)
-        const syncIntervalId = setInterval(() => {
-            applyState(localStorage.getItem('timerState'));
-        }, 1000); // 1с вместо 100мс
-        this.intervals.push(syncIntervalId);
-    }
-
-    startColorSync() {
-        // Периодическая проверка цветов (только цвета, не фон - фон управляется через IPC)
-        const colorSyncIntervalId = setInterval(() => {
-            this.syncColors();
-        }, 2000);
-        this.intervals.push(colorSyncIntervalId);
-    }
-
-    syncColors() {
-        // Только цвета таймера, БЕЗ фона
-        const saved = localStorage.getItem('timerColors');
-        if (saved) {
-            const colors = window.SecurityUtils
-                ? window.SecurityUtils.safeJSONParse(saved, null)
-                : null;
-            if (colors) {
-                this.applyColors(colors);
-            }
-        }
     }
 
     loadColors() {
@@ -1041,6 +986,11 @@ class DisplayTimer {
     updateDisplay() {
         const secs = Math.floor(this.remainingSeconds);
 
+        // Снимаем защёлку вспышки, как только состояние перестало быть
+        // «завершено» (сброс, новый пресет, старт) — следующее завершение снова
+        // имеет право мигнуть. Стоит ДО раннего выхода по кэшу намеренно.
+        if (!this.finished) { this._finishEffectShown = false; }
+
         // ОПТИМИЗАЦИЯ (FIX BUG-007): Проверка изменений перед обновлением
         // Если секунды не изменились, нечего обновлять
         if (this.cache.lastSeconds === secs && !this.finished) {
@@ -1123,8 +1073,17 @@ class DisplayTimer {
         // Сохраняем последнее значение секунд
         this.cache.lastSeconds = secs;
 
-        // Эффект завершения
-        if (this.finished && !this.flashInterval) {
+        // Эффект завершения — РОВНО ОДИН РАЗ на каждое завершение.
+        //
+        // Раньше условие было `finished && !flashInterval`, а flashInterval сам
+        // себя обнуляет, когда серия миганий доиграла (≈3 с). Флаг finished при
+        // этом залатчен движком до сброса, поэтому любое следующее обновление
+        // состояния запускало мигание заново — и так по кругу. Триггеров хватало:
+        // повторное нажатие Space/Start на 00:00 (контроллер отвечает finish()),
+        // любая посылка настроек перерасхода из панели (configChanged → emit),
+        // ответ на get-timer-state у только что открытого окна.
+        if (this.finished && !this._finishEffectShown && !this.flashInterval) {
+            this._finishEffectShown = true;
             this.triggerFinishEffect();
         }
     }
@@ -1315,12 +1274,10 @@ class DisplayTimer {
 
     // Перекидывание карточки. Реализация общая для всех трёх окон —
     // flip-card.js: раньше она жила только здесь, а виджет и часы меняли цифру
-    // рывком. Таймер снятия класса кладём в общий список _timeouts, который
-    // чистится в cleanup().
+    // рывком. Незавершённые таймеры снятия класса ведёт сам модуль, cleanup()
+    // гасит их одним FlipCard.cancelPending().
     updateFlipCard(card, value, key) {
-        const id = window.FlipCard.flipCardTo(card, '.flip-digit', value, {
-            onTimeout: (timeoutId) => { this._timeouts.push(timeoutId); }
-        });
+        const id = window.FlipCard.flipCardTo(card, '.flip-digit', value);
         if (id !== null) { this.lastFlipValues[key] = value; }
     }
 
@@ -1854,22 +1811,27 @@ class DisplayTimer {
     }
 
     cleanup() {
-        // Очищаем все интервалы
-        this.intervals.forEach(intervalId => clearInterval(intervalId));
-        this.intervals = [];
-
         // Очищаем flashInterval если он активен
         if (this.flashInterval) {
             clearInterval(this.flashInterval);
             this.flashInterval = null;
         }
 
-        // F-024: Очищаем все отслеживаемые setTimeout / setInterval, чтобы не было
-        // утечек таймеров при закрытии окна (flip-анимации, flashInterval и пр.)
-        for (const id of this._timeouts) { clearTimeout(id); }
+        // Самокорректирующийся таймер часов «Текущее время»
+        if (this._currentTimeTimeout) {
+            clearTimeout(this._currentTimeTimeout);
+            this._currentTimeTimeout = null;
+        }
+
+        // F-024: Очищаем отслеживаемые setInterval (flashInterval и пр.), чтобы не
+        // было утечек таймеров при закрытии окна.
         for (const id of this._intervals) { clearInterval(id); }
-        this._timeouts = [];
         this._intervals = [];
+
+        // Незавершённые таймеры перекидывания карточек.
+        if (window.FlipCard && window.FlipCard.cancelPending) {
+            window.FlipCard.cancelPending();
+        }
 
         // Удаляем IPC listeners если они есть
         if (this.ipcRenderer) {
@@ -1917,9 +1879,6 @@ class DisplayTimer {
         }
         if (this._handlers.windowDragMouseup) {
             document.removeEventListener('mouseup', this._handlers.windowDragMouseup);
-        }
-        if (this._handlers.storage) {
-            window.removeEventListener('storage', this._handlers.storage);
         }
         // Block mousedown handlers
         if (Array.isArray(this._handlers.blockMousedowns)) {

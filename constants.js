@@ -104,35 +104,48 @@ const CONFIG = {
     // ============================================
     // STORAGE KEYS
     // ============================================
+    // РЕЕСТР ключей localStorage. Рендереры обращаются к хранилищу строковыми
+    // литералами (модулей-обёрток нет, сборщика тоже), поэтому этот объект —
+    // документация, а не единственная точка доступа. Ровно поэтому он и разъехался
+    // с реальностью: 16 ключей здесь были фантомными (widgetStyle, timerSound,
+    // widgetPosition, clockSize, timerConfig и другие — ни одного обращения в коде),
+    // а 10 реально используемых, наоборот, отсутствовали (widgetGeometry,
+    // clockGeometry, displayBlockPositions, selectedDisplay и прочие).
+    //
+    // Синхронность реестра и кода теперь проверяется тестом в оба конца
+    // (tests/storage-keys.test.js): и лишний ключ здесь, и незарегистрированный
+    // ключ в коде роняют прогон.
     STORAGE_KEYS: {
+        // Цвета (по окну)
         TIMER_COLORS: 'timerColors',
         WIDGET_COLORS: 'widgetColors',
         CLOCK_COLORS: 'clockColors',
         DISPLAY_COLORS: 'displayColors',
-        WIDGET_STYLE: 'widgetStyle',
-        DISPLAY_SETTINGS: 'displaySettings',
-        TIMER_SOUND: 'timerSound',
-        MINUTE_SOUND: 'minuteSound',
-        TIMER_SOUND_ENABLED: 'timerSoundEnabled',
-        MINUTE_SOUND_ENABLED: 'minuteSoundEnabled',
-        BACKGROUND_IMAGE: 'backgroundImage',
-        CUSTOM_BACKGROUND_FILE: 'customBackgroundFile',
-        WIDGET_POSITION: 'widgetPosition',
-        WIDGET_SIZE: 'widgetSize',
-        WIDGET_OPACITY: 'widgetOpacity',
-        CLOCK_SETTINGS: 'clockSettings',
-        CLOCK_POSITION: 'clockPosition',
-        CLOCK_SIZE: 'clockSize',
+        // Настройки окон
+        WIDGET_SETTINGS: 'widgetSettings',
         CLOCK_WIDGET_SETTINGS: 'clockWidgetSettings',
+        DISPLAY_EXT_SETTINGS: 'displayExtSettings',
+        // Геометрия виджетов (размер + позиция), см. restoreGeometry/saveGeometry
+        WIDGET_GEOMETRY: 'widgetGeometry',
+        CLOCK_GEOMETRY: 'clockGeometry',
+        // Деления на круглом циферблате (общая настройка двух окон)
         WIDGET_SHOW_TICKS: 'widgetShowTicks',
         CLOCK_SHOW_TICKS: 'clockShowTicks',
-        TIMER_STATE: 'timerState',
-        TIMER_CONFIG: 'timerConfig',
-        DISPLAY_EXT_SETTINGS: 'displayExtSettings',
+        // Полноэкранный режим: масштабы и позиции info-блоков
+        DISPLAY_TIMER_SCALE: 'displayTimerScale',
+        DISPLAY_BLOCK_SCALE: 'displayBlockScale',
+        DISPLAY_BLOCK_POSITIONS: 'displayBlockPositions',
+        SELECTED_DISPLAY: 'selectedDisplay',
+        // Фон полноэкранного режима
         LOCAL_BG_IMAGE: 'localBgImage',
         LOCAL_BG_SETTINGS: 'localBgSettings',
+        // Звук
         CUSTOM_SOUNDS: 'customSounds',
-        SOUND_ENABLED: 'soundEnabled'
+        SOUND_ENABLED: 'soundEnabled',
+        // Однократные подсказки при первом открытии окна
+        WIDGET_HINT_SHOWN: 'widgetHintShown',
+        CLOCK_HINT_SHOWN: 'clockHintShown',
+        DISPLAY_HINT_SHOWN: 'displayHintShown'
     },
 
     // ============================================

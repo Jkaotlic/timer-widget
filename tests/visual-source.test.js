@@ -54,7 +54,15 @@ test('control window keeps a reliable drag region after frameless shell changes'
     assert.match(controlHtml, /\.custom-titlebar,\s*\n\s*\.timer-header\s*\{[^}]*app-region:\s*drag;[^}]*-webkit-app-region:\s*drag;[^}]*user-select:\s*none;/s);
     assert.match(controlHtml, /\.custom-titlebar \.titlebar-right\s*\{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
     assert.match(controlHtml, /\.custom-titlebar \.window-controls\s*\{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
-    assert.match(controlHtml, /\.faq-btn\s*\{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
+    // Кнопка справки лежит ВНУТРИ .titlebar-right, а его no-drag-прямоугольник
+    // вычитается из зоны перетаскивания вместе со всеми потомками — своего правила
+    // кнопке не нужно. Раньше здесь проверялось `.faq-btn { no-drag }`, но класса
+    // .faq-btn нет ни на одном элементе (у кнопки класс .titlebar-help): тест
+    // сторожил правило, которое никогда ни к чему не применялось, и оно так и
+    // лежало мёртвым в control.css. Проверяем то, от чего защита реально зависит —
+    // что кнопка остаётся внутри no-drag-контейнера.
+    assert.match(controlHtml, /<div class="titlebar-right">\s*<button class="titlebar-help"/s);
+    assert.match(controlHtml, /\.custom-titlebar \.titlebar-help\s*\{/);
 });
 
 test('widget windows only start JS drag from non-interactive surfaces', () => {
@@ -70,12 +78,37 @@ test('widget windows only start JS drag from non-interactive surfaces', () => {
     });
 });
 
-test('clock overlay controls opt out of Electron drag regions with standard and prefixed CSS', () => {
-    const clockHtml = read('electron-clock-widget.html');
+test('в окне часов нет внутренних контролов — ни разметки, ни стилей под них', () => {
+    // Раньше этот тест проверял, что оверлейные кнопки часов отказываются от
+    // drag-region (app-region: no-drag). Проверял он СТИЛИ ПОД ЭЛЕМЕНТЫ, КОТОРЫХ
+    // НЕТ: внутренние контролы уехали в панель управления ещё когда окно стало
+    // «только отображением», а ~290 строк CSS под них (.controls-overlay,
+    // .ctrl-btn, .settings-panel, .size-btn, .style-btn, .toggle-*, стилизация
+    // range-инпутов) остались висеть с комментарием «сохранено на будущее».
+    //
+    // Теперь тест держит инвариант, который реально важен: окно часов не содержит
+    // интерактивных элементов. Пока это так, вопрос drag-region к нему не
+    // относится вовсе, а мёртвый CSS не может вернуться незамеченным.
+    // Комментарии вырезаем: они намеренно называют удалённые селекторы, чтобы
+    // правка не вернулась «по незнанию», и без вырезания тест ловил бы сам себя.
+    const clockHtml = read('electron-clock-widget.html')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^[ \t]*\/\/.*$/gm, '');
 
-    assert.match(clockHtml, /\.controls-overlay\s*\{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
-    assert.match(clockHtml, /\.ctrl-btn\s*\{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
-    assert.match(clockHtml, /\.settings-panel\s*\{[^}]*app-region:\s*no-drag;[^}]*-webkit-app-region:\s*no-drag;/s);
+    for (const tag of ['<button', '<input', '<select', '<textarea']) {
+        assert.equal(
+            clockHtml.includes(tag), false,
+            `в окне часов появился ${tag} — вернись к вопросу drag-region и no-drag`
+        );
+    }
+
+    for (const cls of ['.controls-overlay', '.ctrl-btn', '.settings-panel', '.style-btn', '.size-btn']) {
+        assert.equal(
+            clockHtml.includes(cls), false,
+            `${cls}: стили внутренних контролов часов вернулись без самих контролов`
+        );
+    }
 });
 
 test('минус в потоке: центрируется вся надпись, а не одни цифры', () => {

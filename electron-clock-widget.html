@@ -302,293 +302,6 @@
         }
 
         /* ============================================
-           Кнопки управления (overlay — сохранено на будущее)
-           ============================================ */
-        .controls-overlay {
-            position: absolute;
-            top: clamp(8px, 5%, 30px);
-            right: clamp(8px, 5%, 30px);
-            display: flex;
-            justify-content: flex-end;
-            align-items: flex-start;
-            gap: clamp(6px, 2vw, 16px);
-            opacity: 0;
-            transition: opacity var(--tw-dur-base) var(--tw-ease);
-            app-region: no-drag;
-            -webkit-app-region: no-drag;
-            z-index: 100;
-            pointer-events: none;
-            box-sizing: border-box;
-        }
-
-        body.mouse-active .controls-overlay {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .ctrl-btn {
-            width: clamp(24px, min(8vw, 8vh), 44px);
-            height: clamp(24px, min(8vw, 8vh), 44px);
-            border-radius: 50%;
-            border: 1px solid var(--tw-border);
-            background: var(--tw-overlay-medium);
-            -webkit-backdrop-filter: var(--tw-blur-xs);
-            backdrop-filter: var(--tw-blur-xs);
-            color: var(--tw-fg);
-            pointer-events: auto;
-            app-region: no-drag;
-            -webkit-app-region: no-drag;
-            font-size: clamp(10px, min(3vw, 3vh), 18px);
-            cursor: pointer;
-            transition: background var(--tw-dur-base) var(--tw-ease),
-                        transform var(--tw-dur-fast) var(--tw-ease);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .ctrl-btn:hover {
-            background: var(--tw-overlay-medium);
-            transform: scale(1.08);
-        }
-
-        .ctrl-btn.close:hover {
-            background: rgba(255, 68, 68, 0.6);
-        }
-
-        .ctrl-btn:focus-visible {
-            outline: none;
-            box-shadow: var(--tw-focus-ring);
-        }
-
-        /* ============================================
-           Панель настроек (не отображается в этом окне, но стили сохранены)
-           ============================================ */
-        .settings-panel {
-            position: absolute;
-            top: 15%;
-            right: 10%;
-            background: var(--tw-bg-glass);
-            -webkit-backdrop-filter: var(--tw-blur);
-            backdrop-filter: var(--tw-blur);
-            border-radius: var(--tw-r-xl);
-            padding: clamp(10px, 4%, 20px);
-            min-width: min(180px, 70%);
-            max-width: 90%;
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-10px) scale(0.95);
-            transition: opacity var(--tw-dur-base) var(--tw-ease),
-                        transform var(--tw-dur-base) var(--tw-ease);
-            border: 1px solid var(--tw-border);
-            z-index: 1000;
-            app-region: no-drag;
-            -webkit-app-region: no-drag;
-            box-shadow: var(--tw-shadow-inner-top);
-        }
-
-        .settings-panel.visible {
-            opacity: 1;
-            pointer-events: auto !important;
-            transform: translateY(0) scale(1);
-        }
-
-        .settings-title {
-            color: var(--tw-fg);
-            font-size: 0.75em;
-            margin-bottom: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            opacity: 0.7;
-        }
-
-        .size-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .size-btn {
-            padding: 10px 6px;
-            font-size: 0.7em;
-            font-weight: 700;
-            border: 1px solid transparent;
-            border-radius: var(--tw-r-sm);
-            background: var(--tw-overlay-light);
-            color: var(--tw-fg-secondary);
-            cursor: pointer;
-            transition: background var(--tw-dur-base) var(--tw-ease),
-                        color var(--tw-dur-base) var(--tw-ease);
-        }
-
-        .size-btn:hover {
-            background: var(--tw-overlay-medium);
-            color: var(--tw-fg);
-        }
-
-        .size-btn.active {
-            background: var(--tw-ring);
-            color: var(--tw-fg);
-            border-color: rgba(10, 132, 255, 0.4);
-        }
-
-        .size-btn:focus-visible {
-            outline: none;
-            box-shadow: var(--tw-focus-ring);
-        }
-
-        .style-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .style-btn {
-            padding: 10px 6px;
-            font-size: 1em;
-            border: 1px solid transparent;
-            border-radius: var(--tw-r-sm);
-            background: var(--tw-overlay-light);
-            cursor: pointer;
-            transition: background var(--tw-dur-base) var(--tw-ease),
-                        transform var(--tw-dur-fast) var(--tw-ease);
-        }
-
-        .style-btn:hover {
-            background: var(--tw-overlay-medium);
-            transform: scale(1.05);
-        }
-
-        .style-btn.active {
-            background: var(--tw-ring);
-            border-color: rgba(10, 132, 255, 0.4);
-        }
-
-        .style-btn:focus-visible {
-            outline: none;
-            box-shadow: var(--tw-focus-ring);
-        }
-
-        .setting-row {
-            margin-bottom: 12px;
-        }
-
-        .setting-label {
-            color: var(--tw-fg-muted);
-            font-size: 0.7em;
-            margin-bottom: 6px;
-            display: block;
-        }
-
-        .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .toggle-label {
-            color: var(--tw-fg-secondary);
-            font-size: 0.7em;
-        }
-
-        .toggle-switch {
-            position: relative;
-            width: 36px;
-            height: 20px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--tw-overlay-medium);
-            transition: background-color var(--tw-dur-slow) var(--tw-ease);
-            border-radius: var(--tw-r-pill);
-        }
-
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 14px;
-            width: 14px;
-            left: 3px;
-            bottom: 3px;
-            background-color: var(--tw-fg);
-            transition: transform var(--tw-dur-slow) var(--tw-ease);
-            border-radius: 50%;
-        }
-
-        .toggle-switch input:checked + .toggle-slider {
-            background: var(--tw-ring);
-        }
-
-        .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(16px);
-        }
-
-        .toggle-switch input:focus-visible + .toggle-slider {
-            box-shadow: var(--tw-focus-ring);
-        }
-
-        .slider-container {
-            position: relative;
-            height: 24px;
-            display: flex;
-            align-items: center;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 4px;
-            background: var(--tw-overlay-medium);
-            border-radius: 2px;
-            outline: none;
-            appearance: none;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            background: var(--tw-ring);
-            cursor: pointer;
-            border-radius: 50%;
-            border: 1px solid var(--tw-border-strong);
-            transition: transform var(--tw-dur-base) var(--tw-ease);
-        }
-
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.15);
-        }
-
-        input[type="range"]:focus-visible {
-            box-shadow: var(--tw-focus-ring);
-            border-radius: var(--tw-r-pill);
-        }
-
-        .slider-value {
-            position: absolute;
-            right: 0;
-            top: -16px;
-            font-size: 0.65em;
-            color: var(--tw-fg-secondary);
-        }
-
-        /* ============================================
            СТИЛЬ: ЦИФРОВОЙ LED (Digital)
            ============================================ */
         .widget-digital {
@@ -891,14 +604,9 @@
             margin-left: -1px;
         }
 
-        .widget-analog-tick.major {
-            width: 3px;
-            height: 14px;
-            background: var(--tw-fg-secondary);
-            top: 10px;
-            margin-left: -1.5px;
-        }
-
+        /* Вариант .major удалён: на циферблате часов используются только
+           .quarter (12/3/6/9) и обычные деления — элемента с классом major
+           в разметке нет. В виджете таймера свой .widget-clock-tick.major жив. */
         .widget-analog-tick.quarter {
             width: 4px;
             height: 20px;
@@ -1310,13 +1018,14 @@
                 this.clockStyle = 'circle';
                 // Stored handler refs for cleanup
                 this._handlers = {};
-                // Таймеры снятия класса перекидывания (см. _flip)
-                this._flipTimeouts = [];
 
                 this.initElements();
                 this.initProgress();
                 this.loadSettings();
-                applyShowTicks(false);
+                // Как и в виджете таймера: восстанавливаем из хранилища, иначе
+                // включённые деления мигают отсутствием до первой посылки настроек
+                // из панели. Ключ пишет обработчик галочки в electron-control.html.
+                applyShowTicks(localStorage.getItem('clockShowTicks') === 'true');
                 this.setupEventListeners();
                 this.setupSettings();
                 this.setupIPC();
@@ -1496,7 +1205,12 @@
                 return !!(
                     target
                     && typeof target.closest === 'function'
-                    && !target.closest('button, input, select, textarea, [role="button"], [tabindex], .controls-overlay, .settings-panel')
+                    // .controls-overlay и .settings-panel убраны из перечня: внутренних
+                    // контролов в этом окне нет с тех пор, как управление переехало в
+                    // панель, а их стили удалены вместе с этой правкой. Общий список
+                    // интерактивных элементов оставлен как защита на будущее — он
+                    // совпадает с виджетом таймера.
+                    && !target.closest('button, input, select, textarea, [role="button"], [tabindex]')
                 );
             }
 
@@ -1622,6 +1336,20 @@
                 document.addEventListener('wheel', this._handlers.onWheel, { passive: false });
                 this._handlers.onResizeScalePct = () => {
                     clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
+                    // Окно могли отмасштабировать НЕ колесом: ползунком «Масштаб
+                    // часов» в панели управления (она шлёт clock-widget-resize и
+                    // сама ничего не сохраняет) либо потянув за край окна. Без
+                    // этой ветки clockGeometry оставался со старым scalePct, и
+                    // часы при следующем открытии откатывались к прежнему размеру,
+                    // а ползунок в панели показывал уже третье значение.
+                    //
+                    // Сравнение с _clockScalePct обязательно: restoreGeometry()
+                    // при старте сама вызывает resize, и без проверки saveGeometry
+                    // успела бы записать позицию ДО того, как её применит
+                    // clock-widget-set-position, затерев восстановленную.
+                    if (clockScalePct !== this._clockScalePct) {
+                        this.saveGeometry(clockScalePct);
+                    }
                 };
                 window.addEventListener('resize', this._handlers.onResizeScalePct);
             }
@@ -1849,10 +1577,9 @@
                 // Получаем стиль от панели управления
                 this._onSetClockStyle = (event, style) => {
                     this.setClockStyle(style);
-                    // Обновляем UI кнопок стиля
-                    document.querySelectorAll('.style-btn').forEach(btn => {
-                        btn.classList.toggle('active', btn.dataset.style === style);
-                    });
+                    // Здесь стоял цикл по '.style-btn' — подсветка кнопок выбора стиля
+                    // ВНУТРИ окна часов. Этих кнопок нет с тех пор, как управление
+                    // переехало в панель: цикл всегда обходил пустую выборку.
                 };
                 ipcRenderer.on('set-clock-style', this._onSetClockStyle);
                 
@@ -1861,10 +1588,15 @@
                     if (settings.showAnalogNumbers !== undefined && this.clockAnalogNumbers) {
                         this.clockAnalogNumbers.classList.toggle('visible', settings.showAnalogNumbers);
                     }
+                    // ТОЛЬКО clockStyle. Раньше рядом стоял fallback
+                    // `else if (settings.timerStyle) setClockStyle(settings.timerStyle)`,
+                    // но timerStyle в ЭТОМ сообщении — стиль ПОЛНОЭКРАННОГО режима
+                    // (см. pushDisplaySettings в electron-control.html), а не часов.
+                    // Сработав, он молча навязал бы часам чужой стиль в обход и
+                    // собственной настройки часов, и переключателя синхронизации
+                    // syncClockStyle, который по умолчанию выключен.
                     if (settings.clockStyle) {
                         this.setClockStyle(settings.clockStyle);
-                    } else if (settings.timerStyle) {
-                        this.setClockStyle(settings.timerStyle);
                     }
                 };
                 ipcRenderer.on('display-settings-update', this._onDisplaySettingsUpdate);
@@ -1922,8 +1654,7 @@
                     clearTimeout(this._scalingTimer);
                     this._scalingTimer = null;
                 }
-                for (const id of this._flipTimeouts) { clearTimeout(id); }
-                this._flipTimeouts = [];
+                window.FlipCard.cancelPending();
                 if (this._onSetClockStyle) {ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);}
                 if (this._onDisplaySettingsUpdate) {ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);}
                 if (this._onClockSettings) {ipcRenderer.removeListener('clock-settings', this._onClockSettings);}
@@ -2061,10 +1792,10 @@
             }
 
             // Перекидывание одной карточки. Общая реализация — flip-card.js.
+            // Незавершённые таймеры модуль ведёт сам, гасим их одним
+            // FlipCard.cancelPending() в cleanup().
             _flip(card, value) {
-                window.FlipCard.flipCardTo(card, '.widget-flip-digit', value, {
-                    onTimeout: (id) => { this._flipTimeouts.push(id); }
-                });
+                window.FlipCard.flipCardTo(card, '.widget-flip-digit', value);
             }
 
             updateFlipDisplay(hours, minutes, seconds) {

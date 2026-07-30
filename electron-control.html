@@ -146,6 +146,17 @@
                                 <span id="timerScaleValue" style="min-width: 40px; font-size: 0.85em; color: rgba(255, 255, 255, 0.7);">100%</span>
                             </div>
                         </div>
+                        <!-- Деления на круглом циферблате. Настройка общая для виджета
+                             таймера и виджета часов: SVG-группа .tick-marks и правило
+                             .ticks-on есть в обоих окнах, поэтому обработчик пишет и
+                             widgetShowTicks, и clockShowTicks. -->
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="widgetShowTicks">Деления на циферблате</label>
+                            <label class="toggle-switch" title="Показывать деления на круглом циферблате виджета и часов">
+                                <input type="checkbox" id="widgetShowTicks">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -963,9 +974,14 @@
                             timerScale: parseInt(this.timerScaleEl.value),
                             showTicks: val
                         });
-                        if (this.syncClockStyle) {
-                            this.pushClockSettings();
-                        }
+                        // Деления — общая настройка ДВУХ циферблатов: и виджет
+                        // таймера, и виджет часов имеют SVG-группу .tick-marks и
+                        // правило .ticks-on. Поэтому пушим часам всегда, а не
+                        // только при включённой синхронизации стиля: раньше с
+                        // выключенным syncClockStyle галочка меняла деления только
+                        // на виджете, а часы узнавали о ней случайно — при любой
+                        // следующей правке других настроек часов.
+                        this.pushClockSettings();
                     });
                 }
                 this.timerScaleEl = document.getElementById('timerScale');
@@ -1722,7 +1738,23 @@
                 this.syncClockStyleEl.checked = this.syncClockStyle;
                 this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
                 this.clockStyleEl.value = ext.clockStyle || ext.timerStyle || 'circle';
-                
+
+                // Ползунок «Масштаб часов». Единственный источник правды здесь —
+                // clockGeometry, который пишет САМО окно часов (localStorage общий
+                // для всех окон приложения). В displayExtSettings масштаба часов
+                // нет вообще, поэтому без этого чтения ползунок при каждом запуске
+                // показывал «100%» независимо от реального размера окна.
+                const clockGeo = safeJSONParse(localStorage.getItem('clockGeometry'), null);
+                const clockScaleSliderEl = document.getElementById('clockScale');
+                const clockScaleLabelEl = document.getElementById('clockScaleValue');
+                if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
+                    // Присваивание .value НЕ порождает 'input', поэтому обратной
+                    // отправки в окно часов не происходит и петля не замыкается.
+                    const pct = window.RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
+                    clockScaleSliderEl.value = pct;
+                    if (clockScaleLabelEl) { clockScaleLabelEl.textContent = pct + '%'; }
+                }
+
                 // Обновляем видимость опции цифр для часов
                 this.updateClockAnalogNumbersVisibility();
                 
@@ -2588,6 +2620,15 @@
                 return;
             }
 
+            // Модификаторы отсекаем ЦЕЛИКОМ и в одном месте — ровно так, как это
+            // делают виджет, часы и полноэкранный режим (`if (e.ctrlKey ||
+            // e.altKey || e.metaKey) return`). Раньше здесь ветка Space не
+            // проверяла модификаторы вообще, а остальные смотрели только
+            // ctrl/meta: Alt+D закрывал полноэкранный режим, Alt+W убивал виджет,
+            // а Ctrl+Space и Alt+Space (переключение раскладки и системное меню
+            // окна на Windows) заодно дёргали таймер.
+            if (event.ctrlKey || event.altKey || event.metaKey) { return; }
+
             // Space: Start/Pause timer
             if (event.code === 'Space') {
                 event.preventDefault();
@@ -2601,7 +2642,7 @@
             }
 
             // R: Reset timer
-            else if (event.code === 'KeyR' && !event.ctrlKey && !event.metaKey) {
+            else if (event.code === 'KeyR') {
                 event.preventDefault();
                 if (window.timerController) {
                     window.timerController.reset();
@@ -2609,7 +2650,7 @@
             }
 
             // S: Stop timer (pause)
-            else if (event.code === 'KeyS' && !event.ctrlKey && !event.metaKey) {
+            else if (event.code === 'KeyS') {
                 event.preventDefault();
                 if (window.timerController) {
                     window.timerController.pause();
@@ -2617,7 +2658,7 @@
             }
 
             // W: Toggle widget (open/close)
-            else if (event.code === 'KeyW' && !event.ctrlKey && !event.metaKey) {
+            else if (event.code === 'KeyW') {
                 event.preventDefault();
                 if (window.ipcRenderer) {
                     if (isWidgetOpen) {
@@ -2629,7 +2670,7 @@
             }
 
             // C: Toggle clock widget (open/close)
-            else if (event.code === 'KeyC' && !event.ctrlKey && !event.metaKey) {
+            else if (event.code === 'KeyC') {
                 event.preventDefault();
                 if (window.ipcRenderer) {
                     if (isClockOpen) {
@@ -2649,7 +2690,7 @@
             }
 
             // D: Toggle display (open/close fullscreen)
-            else if (event.code === 'KeyD' && !event.ctrlKey && !event.metaKey) {
+            else if (event.code === 'KeyD') {
                 event.preventDefault();
                 if (window.ipcRenderer) {
                     if (isDisplayOpen) {
@@ -2662,7 +2703,7 @@
             }
 
             // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
-            else if (event.code >= 'Digit1' && event.code <= 'Digit8' && !event.ctrlKey && !event.metaKey) {
+            else if (event.code >= 'Digit1' && event.code <= 'Digit8') {
                 event.preventDefault();
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
                 const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
