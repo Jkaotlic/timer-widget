@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { execFileSync } = require('node:child_process');
 const { launchApp } = require('./launch');
 
 /**
@@ -49,8 +50,23 @@ test('после падения время восстанавливается, �
     expect(before.remaining).toBeLessThan(PRESET);
 
     // --- 2. Убиваем процесс жёстко: before-quit не отработает ---
-    first.app.process().kill('SIGKILL');
-    await new Promise((r) => setTimeout(r, 2500));
+    //
+    // На Windows убивать один pid НЕЛЬЗЯ: Electron — это дерево процессов
+    // (главный, рендереры, GPU), сигналов в привычном смысле там нет, и после
+    // убийства одного главного остальные живут. Следующий запуск упирается в
+    // single-instance lock, мгновенно выходит, и Playwright видит
+    // «electron.launch: WebSocket error: read ECONNRESET» — ровно так этот тест
+    // и упал в CI. taskkill с /T гасит всё поддерево.
+    const pid = first.app.process().pid;
+    if (process.platform === 'win32') {
+        try {
+            execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+        } catch { /* процесс мог уже умереть — это не ошибка теста */ }
+    } else {
+        first.app.process().kill('SIGKILL');
+    }
+    // Даём операционной системе отпустить блокировку единственного экземпляра.
+    await new Promise((r) => setTimeout(r, 4000));
 
     // --- 3. Поднимаем заново: снимок обязан подхватиться ---
     const second = await launchApp();
