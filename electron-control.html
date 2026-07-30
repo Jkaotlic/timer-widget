@@ -132,7 +132,7 @@
                         </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Стиль таймера</span>
-                            <div class="segmented" id="timerStyle" role="tablist" aria-label="Стиль виджета" data-value="circle">
+                            <div class="segmented" id="timerStyle" role="radiogroup" aria-label="Стиль виджета" data-value="circle">
                                 <button type="button" data-val="circle" class="active">Круг</button>
                                 <button type="button" data-val="digital">LED</button>
                                 <button type="button" data-val="flip">Флип</button>
@@ -380,9 +380,16 @@
                                 <span class="icon">🎨</span>
                                 Стиль часов
                             </div>
-                            <div class="toggle-row">
+                            <!-- id="clockStyleRow" обязан быть ЗДЕСЬ, на реальной строке с
+                                 переключателем: панель скрывает эту строку, когда включена
+                                 синхронизация со стилем виджета. Раньше этот id висел на
+                                 пустом div внутри скрытого блока «removed from UI», поэтому
+                                 скрывать было нечего — пользователь ставил галочку
+                                 синхронизации и продолжал видеть активный выбор стиля часов,
+                                 а клик по нему молча снимал ту же галочку. -->
+                            <div class="toggle-row" id="clockStyleRow">
                                 <span class="toggle-label">Стиль</span>
-                                <div class="segmented" id="clockStyle" role="tablist" aria-label="Стиль часов" data-value="circle">
+                                <div class="segmented" id="clockStyle" role="radiogroup" aria-label="Стиль часов" data-value="circle">
                                     <button type="button" data-val="circle" class="active">Круг</button>
                                     <button type="button" data-val="digital">LED</button>
                                     <button type="button" data-val="flip">Флип</button>
@@ -452,7 +459,7 @@
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Стиль</span>
-                                <div class="segmented" id="displayTimerStyle" role="tablist" aria-label="Стиль таймера дисплея" data-value="circle">
+                                <div class="segmented" id="displayTimerStyle" role="radiogroup" aria-label="Стиль таймера дисплея" data-value="circle">
                                     <button type="button" data-val="circle" class="active">Круг</button>
                                     <button type="button" data-val="digital">LED</button>
                                     <button type="button" data-val="flip">Флип</button>
@@ -589,13 +596,6 @@
                     </div>
                 </div>
 
-                <!-- Hidden elements: removed from UI but needed by JS -->
-                <div style="display:none;">
-                    <input type="number" id="customMinutes" value="0" aria-label="Минуты">
-                    <input type="number" id="customSeconds" value="0" aria-label="Секунды">
-                    <button id="setCustomTime"></button>
-                    <div id="clockStyleRow"></div>
-                </div>
             </div>
         </div>
         <div class="footer-hints">Space — старт/пауза · R — сброс · 1-8 — пресеты</div>
@@ -939,9 +939,10 @@
                 this.startBtn = document.getElementById('startBtn');
                 this.pauseBtn = document.getElementById('pauseBtn');
                 this.resetBtn = document.getElementById('resetBtn');
-                this.customMinutes = document.getElementById('customMinutes');
-                this.customSeconds = document.getElementById('customSeconds');
-                
+                // customMinutes / customSeconds убраны вместе со старым вводом
+                // «минуты + секунды»: поля жили в блоке display:none и были
+                // недостижимы. Точное время задаётся через #manualTimeInput.
+
                 // Настройки
                 this.allowNegativeEl = document.getElementById('allowNegative');
                 this.soundMasterEl = document.getElementById('soundMasterEnabled');
@@ -1307,54 +1308,12 @@
             }
 
             attachEvents() {
-                // Установка времени вручную
-                document.getElementById('setCustomTime').addEventListener('click', () => {
-                    // FIX BUG-011: Валидация пользовательского ввода
-                    const minutesValue = this.customMinutes.value.trim();
-                    const secondsValue = this.customSeconds.value.trim();
-
-                    // Валидация минут
-                    const minutes = parseInt(minutesValue);
-                    if (isNaN(minutes) || minutes < 0) {
-                        this.showInputError(this.customMinutes, 'Введите корректное число минут (≥ 0)');
-                        return;
-                    }
-                    if (minutes > 999) {
-                        this.showInputError(this.customMinutes, 'Максимум 999 минут');
-                        return;
-                    }
-                    this.clearInputError(this.customMinutes);
-
-                    // Валидация секунд
-                    const seconds = parseInt(secondsValue);
-                    if (isNaN(seconds) || seconds < 0) {
-                        this.showInputError(this.customSeconds, 'Введите корректное число секунд (0-59)');
-                        return;
-                    }
-                    if (seconds > 59) {
-                        this.showInputError(this.customSeconds, 'Секунды должны быть от 0 до 59');
-                        return;
-                    }
-                    this.clearInputError(this.customSeconds);
-
-                    // Проверка что установлено хоть что-то
-                    const totalSeconds = minutes * 60 + seconds;
-                    if (totalSeconds === 0) {
-                        this.showInputError(this.customMinutes, 'Установите время больше 0');
-                        return;
-                    }
-
-                    this.setTime(totalSeconds);
-                });
-
-                // Enter для установки времени
-                [this.customMinutes, this.customSeconds].forEach(el => {
-                    el.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            document.getElementById('setCustomTime').click();
-                        }
-                    });
-                });
+                // Здесь жил обработчик #setCustomTime — старый ввод «минуты + секунды»
+                // с валидацией и всплывающими сообщениями об ошибке. Сами поля и кнопка
+                // лежали в блоке `display:none` («removed from UI but needed by JS»),
+                // то есть дотянуться до них было невозможно: ни ввести, ни нажать.
+                // Живая замена — поле точного времени (#manualTimeInput) с умным
+                // разбором TimeUtils.parseManualTime и подсветкой .input-error.
 
                 // Корректировка времени
                 document.querySelectorAll('.adjust-btn').forEach(btn => {
@@ -1913,8 +1872,40 @@
                 }
             }
 
+            // Адаптер: div.segmented притворяется форм-контролем с .value.
+            //
+            // КРИТИЧНО: присваивание .value НЕ порождает 'change' — ровно как у
+            // нативных <input>/<select>. Событие шлёт ТОЛЬКО клик пользователя.
+            //
+            // Раньше событие летело и на присваивание, и это ломало всю
+            // синхронизацию стиля часов. Цепочка: пользователь ставит галочку
+            // «синхронизировать со стилем виджета» → обработчик присваивает
+            // clockStyleEl.value = timerStyleEl.value → сеттер шлёт 'change' →
+            // обработчик clockStyleEl трактует это как РУЧНОЙ выбор стиля часов и
+            // тут же снимает галочку, а saveExtSettings() сохраняет
+            // syncClockStyle: false. То же происходило при загрузке панели, где
+            // loadSettings восстанавливает clockStyleEl.value: сохранённое «включено»
+            // уничтожалось на старте. Функция не работала никогда.
+            //
+            // Про ползунки в CLAUDE.md записано это же свойство с обратной стороны:
+            // «Присваивание slider.value НЕ порождает 'input', и это то, что не даёт
+            // петле замкнуться». Сегментированный адаптер нарушал тот же инвариант.
             _attachSegmented(el, defaultVal) {
                 if (!el || !el.classList || !el.classList.contains('segmented')) { return; }
+
+                // Обновление вида и ARIA без всякого события.
+                const apply = (v) => {
+                    el.dataset.value = v;
+                    el.querySelectorAll('button').forEach(b => {
+                        const on = b.dataset.val === v;
+                        b.classList.toggle('active', on);
+                        // Состояние обязано быть и в ARIA, а не только в классе:
+                        // без aria-checked скринридер видит группу одинаковых
+                        // кнопок и не может сказать, какая выбрана.
+                        b.setAttribute('aria-checked', on ? 'true' : 'false');
+                    });
+                };
+
                 if (!Object.getOwnPropertyDescriptor(el, 'value')) {
                     Object.defineProperty(el, 'value', {
                         get() {
@@ -1922,17 +1913,23 @@
                                 || (this.querySelector('button.active')?.dataset.val)
                                 || defaultVal || '';
                         },
-                        set(v) {
-                            this.dataset.value = v;
-                            this.querySelectorAll('button').forEach(b =>
-                                b.classList.toggle('active', b.dataset.val === v));
-                            this.dispatchEvent(new Event('change'));
-                        },
+                        set(v) { apply(v); },
                         configurable: true
                     });
                 }
+
                 el.querySelectorAll('button').forEach(btn => {
-                    btn.addEventListener('click', () => { el.value = btn.dataset.val; });
+                    // Контейнер объявлен role="radiogroup" — потомки обязаны быть radio.
+                    // Раньше контейнер был role="tablist" с обычными кнопками внутри:
+                    // структура невалидная, скринридер сообщал «список вкладок» без
+                    // единой вкладки. Это не табы — выбор одного значения из набора.
+                    btn.setAttribute('role', 'radio');
+                    btn.setAttribute('aria-checked', btn.classList.contains('active') ? 'true' : 'false');
+                    btn.addEventListener('click', () => {
+                        apply(btn.dataset.val);
+                        // Событие — признак действия ПОЛЬЗОВАТЕЛЯ, и только его.
+                        el.dispatchEvent(new Event('change'));
+                    });
                 });
             }
 
@@ -2173,40 +2170,6 @@
 
             reset() {
                 this.sendCommand('reset');
-            }
-
-            // FIX BUG-011: Методы для показа ошибок валидации
-            showInputError(inputElement, message) {
-                if (!inputElement) {return;}
-
-                // Добавляем класс ошибки к input
-                inputElement.classList.add('input-error');
-
-                // FIX: Insert error outside the flex container to avoid breaking layout
-                const container = inputElement.closest('.time-input-group') || inputElement.parentNode;
-                let errorDiv = container.querySelector('.error-message');
-                if (!errorDiv) {
-                    errorDiv = document.createElement('div');
-                    errorDiv.className = 'error-message';
-                    container.parentNode.insertBefore(errorDiv, container.nextSibling);
-                }
-                errorDiv.textContent = message;
-                errorDiv.style.display = 'block';
-
-                // Небольшая анимация shake
-                inputElement.style.animation = 'shake 0.3s';
-                setTimeout(() => inputElement.style.animation = '', 300);
-            }
-
-            clearInputError(inputElement) {
-                if (!inputElement) {return;}
-
-                inputElement.classList.remove('input-error');
-                const container = inputElement.closest('.time-input-group') || inputElement.parentNode;
-                const errorDiv = container.parentNode.querySelector('.error-message');
-                if (errorDiv) {
-                    errorDiv.style.display = 'none';
-                }
             }
 
             // Отображение
