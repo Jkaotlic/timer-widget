@@ -1488,9 +1488,9 @@
                 const settings = localStorage.getItem('clockWidgetSettings');
                 if (settings) {
                     const s = window.SecurityUtils.safeJSONParse(settings, {});
-                    if (s.opacity !== undefined) {
-                        this.container.style.opacity = s.opacity;
-                    }
+                    // Здесь читалась `s.opacity` — ключ, который никто и никогда не
+                    // записывал: контрола прозрачности нет ни в панели, ни в самих
+                    // часах. Чтение без записи всегда возвращало undefined.
                     if (s.showSeconds !== undefined) {
                         this.showSeconds = s.showSeconds;
                     }
