@@ -502,6 +502,34 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         for (const name of WINDOWS) {
             await capture(ctx()[name], path.join(outDir, `hc-${name}.png`), log);
         }
+
+        // Ящик настроек В КОНТРАСТНОЙ теме.
+        //
+        // Половина правил темы касается именно его содержимого — карточек
+        // настроек, списков звуков, переключателей, — а в сверке ящик снимался
+        // только в тёмной. То есть у самой насыщенной части темы визуального
+        // покрытия не было вообще: ровно та ситуация, из-за которой нечитаемые
+        // подписи info-блоков прожили в проекте месяцами.
+        try {
+            const w = ctx();
+            if (w.control && !w.control.isDestroyed()) {
+                await w.control.webContents.executeJavaScript(
+                    "document.querySelector('.tab-btn[data-tab=\"clock\"]').click()"
+                );
+                // Выезд ящика 240ms + смена размера окна главным процессом.
+                await sleep(900);
+                await capture(w.control, path.join(outDir, 'hc-drawer-clock.png'), log);
+                await w.control.webContents.executeJavaScript(
+                    "document.getElementById('drawerClose').click()"
+                );
+                await sleep(700);
+                w.control.setSize(400, 700);
+                await sleep(300);
+            }
+        } catch (e) {
+            log.warn(`[screenshot] ящик в контрастной теме: ${e.message}`);
+        }
+
         // ОБЯЗАТЕЛЬНО возвращаем тёмную: остальные кадры и эталоны — в ней.
         await sendTheme('dark');
 

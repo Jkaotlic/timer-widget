@@ -124,3 +124,54 @@ test('ящик настроек не накрывает панель ни при
 
     await app.close();
 });
+
+/**
+ * Панель не должна ПРЫГАТЬ при открытии ящика.
+ *
+ * Жалоба пользователя: «бывает, что прыгает при открытии боковой панели».
+ * Причина была ровно одна и видна в CSS: закрытый ящик — панель по центру окна
+ * (`justify-self: center`), открытый — правило переставляло её на
+ * `justify-self: start`. На окне шире панели это мгновенный скачок к левому
+ * краю: justify-self не анимируется в принципе. На окне ширины по умолчанию
+ * (400px) панель занимает всё окно, поэтому центр и край совпадают — оттого
+ * «бывает» и оттого этого не было видно ни в одном снимке.
+ *
+ * Меряем СМЕЩЕНИЕ левого края панели. Порог 24px — это заметный глазу скачок;
+ * при прежней вёрстке на окне 900px он составлял больше сотни пикселей.
+ */
+test('панель не прыгает горизонтально при открытии ящика', async () => {
+    const { app, control } = await launchApp();
+
+    // Растягиваем окно: на ширине по умолчанию дефекта не видно.
+    await control.evaluate(() => {
+        window.ipcRenderer.send('resize-control-window', { width: 900, height: 700 });
+    });
+    await control.waitForTimeout(900);
+
+    const panelLeft = () => control.evaluate(() => {
+        const r = document.querySelector('.control-panel').getBoundingClientRect();
+        return { left: Math.round(r.left), width: Math.round(r.width), win: window.innerWidth };
+    });
+
+    const before = await panelLeft();
+    await openDrawer(control, 'clock');
+    // Ждём конца перехода колонки (240ms) с запасом — меряем УСТАНОВИВШЕЕСЯ
+    // положение, а не кадр в середине анимации.
+    await control.waitForTimeout(600);
+    const after = await panelLeft();
+
+    const shift = Math.abs(after.left - before.left);
+    console.log(
+        `смещение панели при открытии ящика: ${shift}px `
+        + `(закрыт: left=${before.left}, ширина ${before.width}, окно ${before.win}; `
+        + `открыт: left=${after.left}, ширина ${after.width}, окно ${after.win})`
+    );
+    expect(
+        shift,
+        `панель сместилась на ${shift}px при открытии ящика `
+        + `(было left=${before.left} при окне ${before.win}px, стало left=${after.left} при окне ${after.win}px). `
+        + 'Место под ящик резервирует вторая колонка сетки, поэтому панель обязана остаться на месте.'
+    ).toBeLessThanOrEqual(24);
+
+    await app.close();
+});
