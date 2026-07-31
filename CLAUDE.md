@@ -220,7 +220,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
 | `sound-events.spec.js` | Every sound event fires EXACTLY once: minute warning, zero (with and without overrun), overrun interval, and the start sound from both a local click and another window. Counts real `playSound` calls over real time — the engine's unit tests know nothing about double-play |
 | `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s on purpose: the snapshot interval lives in the main process and faking it would test the fake |
-| `settings-roundtrip.spec.js` | 30 settings across all three storages survive a window reload. The key registry proves a key is read and written; only this proves the VALUE arrives |
+| `settings-roundtrip.spec.js` | 34 settings across all four storages survive a window reload, plus two separate tests: clock-style sync (incompatible with the main plan — enabling it overwrites the chosen clock style) and per-window theme colours (three windows get three DIFFERENT themes, so colour bleeding between windows fails it too). The key registry proves a key is read and written; only this proves the VALUE arrives |
 | `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the returned clock toggles actually change the clock window; style-sync hides the style row. Everything by CLICK on visible elements only |
 
 ## CI
