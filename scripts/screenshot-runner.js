@@ -498,9 +498,9 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         }
         await sleep(500);
 
-        await sendTheme('hc-dark');
+        await sendTheme('light');
         for (const name of WINDOWS) {
-            await capture(ctx()[name], path.join(outDir, `hc-${name}.png`), log);
+            await capture(ctx()[name], path.join(outDir, `light-${name}.png`), log);
         }
 
         // Ящик настроек В КОНТРАСТНОЙ теме.
@@ -518,7 +518,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                 );
                 // Выезд ящика 240ms + смена размера окна главным процессом.
                 await sleep(900);
-                await capture(w.control, path.join(outDir, 'hc-drawer-clock.png'), log);
+                await capture(w.control, path.join(outDir, 'light-drawer-clock.png'), log);
                 await w.control.webContents.executeJavaScript(
                     "document.getElementById('drawerClose').click()"
                 );

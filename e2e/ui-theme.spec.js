@@ -36,15 +36,15 @@ function probeTheme() {
     const cs = getComputedStyle(root);
     return {
         attr: root.getAttribute('data-theme'),
-        // В hc-теме размытие снято, в тёмной — есть. Токен читается из CSS, то
-        // есть проверяется вся цепочка «атрибут → селектор → переменная».
+        // Токены читаются из CSS, то есть проверяется вся цепочка
+        // «атрибут → селектор → переменная», а не только атрибут.
         blur: cs.getPropertyValue('--tw-blur').trim(),
         fgDim: cs.getPropertyValue('--tw-fg-dim').trim(),
         surface: cs.getPropertyValue('--tw-bg-surface').trim()
     };
 }
 
-test('высокий контраст включается во всех четырёх окнах и сохраняется', async () => {
+test('светлая тема включается во всех четырёх окнах и сохраняется', async () => {
     const { app, control } = await launchApp();
 
     // Кнопка обязана быть в разметке: недостижимая тема — это и был дефект.
@@ -78,11 +78,29 @@ test('высокий контраст включается во всех чет�
     await control.click('#contrastToggle');
     await control.waitForTimeout(800);
 
+    // Атрибут обязан доехать до ВСЕХ четырёх окон.
     for (const [name, w] of Object.entries(windows)) {
         const after = await w.evaluate(probeTheme);
-        expect(after.attr, `${name}: высокий контраст не доехал`).toBe('hc-dark');
-        expect(after.blur, `${name}: в hc-теме размытие обязано быть снято`).toBe('none');
-        expect(after.fgDim, `${name}: подписи в hc-теме обязаны стать непрозрачными`).toBe('#c0c0c0');
+        expect(after.attr, `${name}: светлая тема не доехала`).toBe('light');
+    }
+
+    // А вот ЗНАЧЕНИЯ различаются по окнам, и это осознанно. Панель и часы
+    // владеют своим фоном и становятся светлыми. Виджет и полноэкранный дисплей
+    // лежат на ПОЛЬЗОВАТЕЛЬСКОМ фоне (настройка «Фон» применяется инлайном,
+    // поверх любой темы, и по умолчанию тёмная), поэтому там палитра закреплена
+    // светлым по тёмному: иначе получались почти чёрные цифры на тёмно-синем —
+    // на проекторе время не читалось вовсе.
+    for (const name of ['control', 'clock']) {
+        const after = await windows[name].evaluate(probeTheme);
+        expect(after.fgDim, `${name}: подписи в светлой теме обязаны стать тёмными`).toBe('#575760');
+        expect(after.surface, `${name}: поверхность в светлой теме обязана стать белой`).toBe('#ffffff');
+    }
+    for (const name of ['widget', 'display']) {
+        const after = await windows[name].evaluate(probeTheme);
+        expect(
+            after.fgDim,
+            `${name}: окно лежит на пользовательском фоне — текст обязан остаться светлым`
+        ).toContain('255, 255, 255');
     }
 
     // Кнопка сообщает своё состояние, а не только красится.
@@ -94,7 +112,7 @@ test('высокий контраст включается во всех чет�
     await control.reload();
     await control.waitForLoadState('domcontentloaded');
     const afterReload = await control.evaluate(probeTheme);
-    expect(afterReload.attr, 'тема не сохранилась между загрузками').toBe('hc-dark');
+    expect(afterReload.attr, 'тема не сохранилась между загрузками').toBe('light');
     const pressedAfterReload = await control.getAttribute('#contrastToggle', 'aria-pressed');
     expect(pressedAfterReload, 'кнопка после перезагрузки не показывает включённую тему').toBe('true');
 
@@ -137,11 +155,11 @@ function contrastRatio(rgbA, rgbB) {
 }
 const parseRgb = (s) => (String(s).match(/\d+/g) || []).slice(0, 3).map(Number);
 
-test('высокий контраст перекрашивает сами контролы, а не только переменные', async () => {
+test('светлая тема перекрашивает сами контролы, а не только переменные', async () => {
     const { app, control } = await launchApp();
 
     await control.evaluate(() => {
-        window.UITheme.applyTheme('hc-dark');
+        window.UITheme.applyTheme('light');
         // Пресет делаем активным: именно у него заливка акцентом.
         document.querySelector('.quick-preset[data-minutes="5"]').click();
         document.querySelector('.tab-btn[data-tab="clock"]').click();
@@ -158,30 +176,44 @@ test('высокий контраст перекрашивает сами кон
             plainBg: plain ? css(plain).backgroundColor : null,
             plainBorder: plain ? css(plain).borderTopColor : null,
             activeBg: preset ? css(preset).backgroundColor : null,
+            // У активного пресета заливка — ГРАДИЕНТ, поэтому backgroundColor у
+            // него прозрачный, и сравнивать надпись с ним бессмысленно: первая
+            // версия этой проверки получала «21:1 на rgba(0,0,0,0)» и была
+            // зелёной, ничего не проверяя. Берём сами остановки градиента.
+            activeStops: preset
+                ? (css(preset).backgroundImage.match(/rgba?\([^)]+\)/g) || [])
+                : [],
             activeColor: preset ? css(preset).color : null,
             track: slider ? css(slider).backgroundColor : null,
             knob: slider ? css(slider, '::before').backgroundColor : null
         };
     });
-    console.log('контрастная тема, вычисленные цвета →', JSON.stringify(probe));
+    console.log('светлая тема, вычисленные цвета →', JSON.stringify(probe));
 
     // 1. Обычный контрол отделяется от фона окна собственной заливкой.
     const plain = parseRgb(probe.plainBg);
     expect(plain.length, 'заливка неактивного пресета не прочиталась').toBe(3);
     expect(
         plain.reduce((a, b) => a + b, 0),
-        `неактивный пресет заливается ${probe.plainBg} — на чёрном фоне это не поверхность, а дырка`
-    ).toBeGreaterThan(60);
+        `неактивный пресет заливается ${probe.plainBg} — на белом фоне он обязан быть заметно темнее`
+    ).toBeLessThan(720);
 
-    // 2. Надпись на заливке акцентом — тёмная, и контраст не ниже AAA.
-    const activeBg = parseRgb(probe.activeBg);
+    // 2. Надпись на заливке акцентом читается на ВС�ём градиенте, а не в среднем
+    //    по нему: если один край достаточно тёмный, а другой нет, надпись
+    //    пропадает на половине кнопки.
     const activeFg = parseRgb(probe.activeColor);
-    const ratio = contrastRatio(activeFg, activeBg);
-    console.log(`надпись активного пресета: ${probe.activeColor} на ${probe.activeBg} → ${ratio.toFixed(2)}:1`);
     expect(
-        ratio,
-        `надпись активного пресета даёт ${ratio.toFixed(2)}:1 на заливке акцентом`
-    ).toBeGreaterThanOrEqual(7);
+        probe.activeStops.length,
+        `у активного пресета не нашлось заливки акцентом (background-image пуст)`
+    ).toBeGreaterThanOrEqual(2);
+    for (const stop of probe.activeStops) {
+        const ratio = contrastRatio(activeFg, parseRgb(stop));
+        console.log(`надпись активного пресета: ${probe.activeColor} на ${stop} → ${ratio.toFixed(2)}:1`);
+        expect(
+            ratio,
+            `надпись активного пресета даёт ${ratio.toFixed(2)}:1 на остановке градиента ${stop}`
+        ).toBeGreaterThanOrEqual(7);
+    }
 
     // 3. Бегунок включённого переключателя — того же правила.
     const knobRatio = contrastRatio(parseRgb(probe.knob), parseRgb(probe.track));

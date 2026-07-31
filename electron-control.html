@@ -2654,9 +2654,9 @@
         const contrastToggle = document.getElementById('contrastToggle');
         if (contrastToggle) {
             const syncThemeButton = (theme) => {
-                const hc = theme === 'hc-dark';
-                contrastToggle.setAttribute('aria-pressed', String(hc));
-                contrastToggle.classList.toggle('active', hc);
+                const isLight = theme === 'light';
+                contrastToggle.setAttribute('aria-pressed', String(isLight));
+                contrastToggle.classList.toggle('active', isLight);
                 contrastToggle.title = window.UITheme.themeLabel(theme);
                 contrastToggle.setAttribute('aria-label', window.UITheme.themeLabel(theme));
             };
