@@ -11,10 +11,15 @@ const { launchApp } = require('./launch');
  * сохранённое: настройка вроде бы сохраняется, а после перезапуска возвращается к
  * дефолту. Поймать это можно только сравнив ДО и ПОСЛЕ.
  *
- * Настройки живут в ТРЁХ хранилищах, и тест обязан покрыть все:
+ * Настройки живут в ЧЕТЫРЁХ хранилищах, и тест обязан покрыть все:
  *   - `displayExtSettings` — звуки, фон, блоки времени, стили и масштабы;
  *   - `clockWidgetSettings` — секунды, 24 часа, дата, пояс, цифры циферблата;
- *   - отдельные ключи `widgetShowTicks` / `clockShowTicks` (одна галочка на два окна).
+ *   - отдельные ключи `widgetShowTicks` / `clockShowTicks` (одна галочка на два окна);
+ *   - `widgetColors` / `clockColors` / `displayColors` — по ключу на окно, общего
+ *     вещания цветов в проекте нет намеренно.
+ *
+ * Три теста, а не один: синхронизация стиля часов затирает выбранный стиль часов,
+ * а цвета читаются не из контролов, поэтому оба живут отдельно от общего плана.
  *
  * Значения выставляются программно с правильными событиями — здесь проверяется
  * ПЕРСИСТЕНТНОСТЬ, а достижимость мышью проверяет reachable-controls.spec.js.
@@ -40,6 +45,9 @@ const PLAN = [
     { id: 'clockFormat24h', kind: 'checkbox', value: false },
     { id: 'clockShowDate', kind: 'checkbox', value: true },
     { id: 'clockShowTimezone', kind: 'checkbox', value: true },
+    // Цифры циферблата видимы только у аналогового стиля, но пишутся и читаются
+    // всегда — скрытая строка не повод не проверять сохранение.
+    { id: 'clockShowAnalogNumbers', kind: 'checkbox', value: true },
 
     // --- вкладка «Полноэкранный» ---
     { id: 'displayTimerStyle', kind: 'segmented', value: 'analog' },
@@ -53,6 +61,9 @@ const PLAN = [
     { id: 'bgSolidColor', kind: 'color', value: '#123456' },
     { id: 'bgGrad1', kind: 'color', value: '#654321' },
     { id: 'bgGrad2', kind: 'color', value: '#abcdef' },
+    // Режим фона — не поле ввода, а три кнопки с .active. Ставится и читается по
+    // data-mode, поэтому у него собственный вид.
+    { id: 'bgMode', kind: 'bgmode', value: 'gradient' },
 
     // --- вкладка «Звуки» ---
     { id: 'soundStartEnabled', kind: 'checkbox', value: true },
@@ -64,9 +75,17 @@ const PLAN = [
     { id: 'soundMinutePreset', kind: 'select', value: 'tick' },
     { id: 'soundOverrunPreset', kind: 'select', value: 'siren' },
     { id: 'overrunIntervalMinutes', kind: 'select', value: '5' },
+    // Мастер-выключатель звука идёт ПОСЛЕДНИМ в своей группе: выключенный, он
+    // гасит pointer-events всего блока звуков, и клик по соседям стал бы
+    // невозможен. Он же — единственная настройка, чьё значение по умолчанию
+    // «включено», а сохранять надо «выключено».
+    { id: 'soundMasterEnabled', kind: 'checkbox', value: false },
 
     // --- главный экран ---
-    { id: 'allowNegative', kind: 'checkbox', value: true }
+    // Порядок обязателен: строка лимита показывается только при включённом
+    // «Считать ниже нуля».
+    { id: 'allowNegative', kind: 'checkbox', value: true },
+    { id: 'overrunLimit', kind: 'text', value: '05:30' }
 ];
 
 // Выставляет значение так, как это делает пользователь, и возвращает, что
@@ -74,6 +93,13 @@ const PLAN = [
 function applyPlan(plan) {
     const applied = {};
     for (const item of plan) {
+        // Режим фона живёт не в элементе с таким id, а в наборе кнопок.
+        if (item.kind === 'bgmode') {
+            const btn = document.querySelector(`.bg-mode-btn[data-mode="${item.value}"]`);
+            if (btn) { btn.click(); }
+            applied[item.id] = document.querySelector('.bg-mode-btn.active')?.dataset.mode || '__НЕТ КНОПКИ__';
+            continue;
+        }
         const el = document.getElementById(item.id);
         if (!el) { applied[item.id] = '__НЕТ ЭЛЕМЕНТА__'; continue; }
         switch (item.kind) {
@@ -116,10 +142,43 @@ function applyPlan(plan) {
     return applied;
 }
 
+// Ключи, которые этот файл трогает. Уборка обязана снести ВСЕ: настройки живут в
+// localStorage и переживают перезапуск приложения, а спеки идут по алфавиту в
+// одном воркере. Без уборки этот файл ронял status-and-colors.spec.js, который
+// ожидает строку лимита скрытой. Тест, портящий состояние соседям, хуже
+// отсутствующего — он даёт ложные падения не там, где сломано.
+const TOUCHED_KEYS = [
+    'displayExtSettings',
+    'clockWidgetSettings',
+    'widgetShowTicks',
+    'clockShowTicks',
+    // Мастер-выключатель звука пишет ещё и сюда; выключенным он заглушил бы
+    // sound-events.spec.js, который идёт следом.
+    'soundEnabled',
+    // Цвета окон — их выставляет тест тем.
+    'timerColors',
+    'widgetColors',
+    'clockColors',
+    'displayColors'
+];
+
+async function resetStorages(control) {
+    await control.evaluate((keys) => {
+        for (const key of keys) { localStorage.removeItem(key); }
+    }, TOUCHED_KEYS);
+    await control.reload();
+    await control.waitForLoadState('domcontentloaded');
+    await control.waitForTimeout(1200);
+}
+
 // Читает текущее состояние тех же контролов.
 function readPlan(plan) {
     const state = {};
     for (const item of plan) {
+        if (item.kind === 'bgmode') {
+            state[item.id] = document.querySelector('.bg-mode-btn.active')?.dataset.mode || '__НЕТ АКТИВНОЙ КНОПКИ__';
+            continue;
+        }
         const el = document.getElementById(item.id);
         if (!el) { state[item.id] = '__НЕТ ЭЛЕМЕНТА__'; continue; }
         if (item.kind === 'checkbox') { state[item.id] = el.checked; }
@@ -177,22 +236,156 @@ test('все настройки панели переживают перезаг
         + `clockWidgetSettings=${stored.clock ? 'есть' : 'НЕТ'}`
     ).toEqual([]);
 
-    // Возвращаем хранилища к состоянию по умолчанию.
-    //
-    // Настройки живут в localStorage и переживают перезапуск приложения, а спеки
-    // идут по алфавиту в одном воркере: этот файл выставляет 30 значений (включая
-    // «Считать ниже нуля») и без уборки ронял следующий за ним
-    // status-and-colors.spec.js, который ожидает строку лимита скрытой. Тест,
-    // портящий состояние соседям, хуже отсутствующего — он даёт ложные падения
-    // не там, где сломано.
+    // Возвращаем хранилища к состоянию по умолчанию (см. TOUCHED_KEYS).
+    await resetStorages(control);
+
+    await app.close();
+});
+
+/**
+ * Синхронизация стиля часов — отдельным тестом, потому что она НЕСОВМЕСТИМА с
+ * планом выше: включение синхронизации присваивает clockStyleEl значение стиля
+ * виджета, то есть затирает выбранный там 'digital'.
+ *
+ * Проверяется ровно тот дефект, который описан в CLAUDE.md: сохранённое
+ * «включено» уничтожалось на старте, потому что loadSettings восстанавливал
+ * clockStyleEl.value, сеттер сегментированного контрола слал 'change', а его
+ * обработчик трактовал это как ручной выбор стиля часов и снимал галочку.
+ * Спек clock-style-sync.spec.js проверяет только видимость строки в живом окне и
+ * перезагрузку не делает — то есть эту сторону не закрывает.
+ */
+test('синхронизация стиля часов переживает перезагрузку окна', async () => {
+    const { app, control } = await launchApp();
+
     await control.evaluate(() => {
-        for (const key of ['displayExtSettings', 'clockWidgetSettings', 'widgetShowTicks', 'clockShowTicks']) {
-            localStorage.removeItem(key);
-        }
+        // Сначала стиль виджета — именно он станет стилем часов.
+        document.querySelector('#timerStyle button[data-val="flip"]').click();
+        // Затем ручной выбор стиля часов: он гарантированно выключает синхронизацию,
+        // чтобы следующий шаг включал её с заведомо выключенного состояния.
+        document.querySelector('#clockStyle button[data-val="digital"]').click();
+        const sync = document.getElementById('syncClockStyle');
+        sync.checked = true;
+        sync.dispatchEvent(new Event('change'));
     });
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
     await control.waitForTimeout(1200);
 
+    const before = await control.evaluate(() => ({
+        sync: document.getElementById('syncClockStyle').checked,
+        clockStyle: document.getElementById('clockStyle').value,
+        rowVisible: document.getElementById('clockStyleRow').offsetParent !== null,
+        stored: localStorage.getItem('displayExtSettings')
+    }));
+
+    expect(before.sync, 'галочку не удалось включить — тест бы ничего не проверил').toBe(true);
+    expect(before.clockStyle, 'при включении синхронизации часы обязаны взять стиль виджета').toBe('flip');
+    expect(before.rowVisible, 'строка выбора стиля часов обязана скрыться').toBe(false);
+    expect(
+        JSON.parse(before.stored || '{}').syncClockStyle,
+        'syncClockStyle не записан в displayExtSettings'
+    ).toBe(true);
+
+    await control.reload();
+    await control.waitForLoadState('domcontentloaded');
+    await control.waitForTimeout(2000);
+
+    const after = await control.evaluate(() => ({
+        sync: document.getElementById('syncClockStyle').checked,
+        clockStyle: document.getElementById('clockStyle').value,
+        rowVisible: document.getElementById('clockStyleRow').offsetParent !== null,
+        stored: localStorage.getItem('displayExtSettings')
+    }));
+
+    expect(
+        after.sync,
+        `после перезагрузки синхронизация выключилась. В хранилище: ${after.stored}`
+    ).toBe(true);
+    expect(after.rowVisible, 'после перезагрузки строка стиля часов снова видна при включённой синхронизации').toBe(false);
+
+    await resetStorages(control);
+    await app.close();
+});
+
+/**
+ * Цвета — четвёртое хранилище, и в круговом рейсе его не было вовсе.
+ *
+ * Каждому окну свой ключ (`widgetColors` / `clockColors` / `displayColors`) —
+ * в проекте намеренно НЕТ общего вещания цветов, поэтому три окна получают три
+ * разные темы: так тест заодно ловит протечку цвета между окнами.
+ *
+ * Проверяется и то, что видно глазу: подсветка выбранной темы. Значение может
+ * лежать в localStorage и доезжать до окон, но если после перезапуска ни одна
+ * кнопка не подсвечена, пользователь не видит, какая тема выбрана.
+ */
+const THEME_PICKS = [
+    { grid: 'themesGrid', index: 1, key: 'widgetColors', state: 'currentColors', timer: '#39ff14', progress: '#00ffa3' },
+    { grid: 'clockThemesGrid', index: 3, key: 'clockColors', state: 'clockColors', timer: '#36d1dc', progress: '#5b86e5' },
+    { grid: 'displayThemesGrid', index: 5, key: 'displayColors', state: 'displayColors', timer: '#b993d6', progress: '#8ca6db' }
+];
+
+function readThemes(picks) {
+    const out = {};
+    for (const pick of picks) {
+        const grid = document.getElementById(pick.grid);
+        const buttons = grid ? Array.from(grid.querySelectorAll('.theme-btn')) : [];
+        const tc = window.timerController;
+        out[pick.grid] = {
+            activeIndex: buttons.findIndex((b) => b.classList.contains('active')),
+            stored: localStorage.getItem(pick.key),
+            state: tc ? tc[pick.state] : null
+        };
+    }
+    return out;
+}
+
+test('цвета тем переживают перезагрузку окна и не смешиваются между окнами', async () => {
+    const { app, control } = await launchApp();
+
+    await control.evaluate((picks) => {
+        for (const pick of picks) {
+            const grid = document.getElementById(pick.grid);
+            const buttons = grid ? Array.from(grid.querySelectorAll('.theme-btn')) : [];
+            if (buttons[pick.index]) { buttons[pick.index].click(); }
+        }
+    }, THEME_PICKS);
+    await control.waitForTimeout(1200);
+
+    const before = await control.evaluate(readThemes, THEME_PICKS);
+
+    // Санитарная проверка: клик действительно выбрал тему.
+    const notPicked = THEME_PICKS
+        .filter((p) => before[p.grid].activeIndex !== p.index)
+        .map((p) => `${p.grid}: ожидали активной кнопку #${p.index}, активна #${before[p.grid].activeIndex}`);
+    expect(notPicked, 'тему не удалось выбрать — тест бы ничего не проверил').toEqual([]);
+
+    await control.reload();
+    await control.waitForLoadState('domcontentloaded');
+    await control.waitForTimeout(2000);
+
+    const after = await control.evaluate(readThemes, THEME_PICKS);
+
+    // 1. Значение доехало до хранилища и до состояния панели.
+    const wrongValue = [];
+    for (const pick of THEME_PICKS) {
+        const stored = JSON.parse(after[pick.grid].stored || 'null');
+        const state = after[pick.grid].state;
+        if (!stored || stored.timer !== pick.timer || stored.progress !== pick.progress) {
+            wrongValue.push(`${pick.key}: ожидали ${pick.timer}/${pick.progress}, в хранилище ${after[pick.grid].stored}`);
+        }
+        if (!state || state.timer !== pick.timer || state.progress !== pick.progress) {
+            wrongValue.push(`${pick.state}: ожидали ${pick.timer}/${pick.progress}, в панели ${JSON.stringify(state)}`);
+        }
+    }
+    expect(wrongValue, `цвета не дожили до перезагрузки:\n  ${wrongValue.join('\n  ')}`).toEqual([]);
+
+    // 2. Выбранная тема видна глазу.
+    const notHighlighted = THEME_PICKS
+        .filter((p) => after[p.grid].activeIndex !== p.index)
+        .map((p) => `${p.grid}: после перезагрузки активна кнопка #${after[p.grid].activeIndex}, а выбрана была #${p.index}`);
+    expect(
+        notHighlighted,
+        `подсветка выбранной темы не пережила перезагрузку:\n  ${notHighlighted.join('\n  ')}`
+    ).toEqual([]);
+
+    await resetStorages(control);
     await app.close();
 });

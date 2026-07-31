@@ -1418,6 +1418,11 @@
                         btn.title = theme.name;
                         btn.style.setProperty('--t1', theme.t1);
                         btn.style.setProperty('--t2', theme.t2);
+                        // Цвета темы кладём в сам элемент: по ним highlightActiveThemes()
+                        // после перезапуска находит кнопку, соответствующую сохранённым
+                        // цветам окна. Читать их из CSS-переменных было бы гаданием.
+                        btn.dataset.timer = theme.t1;
+                        btn.dataset.progress = theme.t2;
                         btn.addEventListener('click', () => {
                             if (this[activeKey]) {
                                 this[activeKey].classList.remove('active');
@@ -1448,6 +1453,41 @@
                 buildThemeGrid('themesGrid', 'widget', 'activeThemeButton');
                 buildThemeGrid('clockThemesGrid', 'clock', 'activeClockThemeButton');
                 buildThemeGrid('displayThemesGrid', 'display', 'activeDisplayThemeButton');
+            }
+
+            // Подсветка выбранной темы после перезапуска.
+            //
+            // Цвета окон лежат в localStorage и исправно доезжают до самих окон, но
+            // подсветку ставил ТОЛЬКО обработчик клика — после перезагрузки панели ни
+            // одна кнопка ни в одной из трёх сеток не была активной, и пользователь не
+            // видел, какая тема выбрана. Соответствие ищем по цветам темы: если окно
+            // покрашено пипеткой, ни одна тема не совпадёт и подсветки не будет —
+            // это честно, произвольный цвет темой и не является.
+            highlightActiveThemes() {
+                const targets = [
+                    { gridId: 'themesGrid', colors: this.currentColors, activeKey: 'activeThemeButton' },
+                    { gridId: 'clockThemesGrid', colors: this.clockColors, activeKey: 'activeClockThemeButton' },
+                    { gridId: 'displayThemesGrid', colors: this.displayColors, activeKey: 'activeDisplayThemeButton' }
+                ];
+                const norm = (v) => String(v || '').trim().toLowerCase();
+
+                targets.forEach(({ gridId, colors, activeKey }) => {
+                    const grid = document.getElementById(gridId);
+                    if (!grid) { return; }
+                    if (this[activeKey]) {
+                        this[activeKey].classList.remove('active');
+                        this[activeKey] = null;
+                    }
+                    if (!colors) { return; }
+                    const match = Array.from(grid.querySelectorAll('.theme-btn')).find(btn =>
+                        norm(btn.dataset.timer) === norm(colors.timer)
+                        && norm(btn.dataset.progress) === norm(colors.progress)
+                    );
+                    if (match) {
+                        match.classList.add('active');
+                        this[activeKey] = match;
+                    }
+                });
             }
 
             attachEvents() {
@@ -1895,6 +1935,9 @@
                     this.displayColors = savedDisplayColors;
                     ipcRenderer.send('display-colors-update', savedDisplayColors);
                 }
+
+                // Цвета загружены — показать, какая тема им соответствует.
+                this.highlightActiveThemes();
             }
 
             saveColors(target = 'all') {
