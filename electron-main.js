@@ -1001,10 +1001,10 @@ ipcMain.on('toggle-fullscreen', (event) => {
     if (win) { win.setFullScreen(!win.isFullScreen()); }
 });
 
-ipcMain.on('close-window', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    if (win) { win.close(); }
-});
+// Здесь жил обработчик 'close-window' — «закрой окно отправителя». Его никто не
+// слал: окна закрываются адресными close-widget / close-clock-widget /
+// close-display, а панель — quit-app. Канал стоял в обоих белых списках, то есть
+// расширял поверхность IPC ради несуществующей команды.
 
 ipcMain.on('quit-app', () => {
     clearTimerInterval();
@@ -1128,12 +1128,11 @@ ipcMain.on('close-display', () => {
 });
 
 // Управление виджетом
-ipcMain.on('widget-set-opacity', (event, opacity) => {
-    if (widgetWindow && typeof opacity === 'number' && opacity >= 0 && opacity <= 1) {
-        widgetWindow.setOpacity(opacity);
-    }
-});
-
+//
+// Здесь жил обработчик 'widget-set-opacity'. Прозрачностью виджета не управляет
+// ничто: ни одного отправителя в проекте нет, контрола в панели нет, и виджет
+// сам её не трогает. Часы читали `opacity` из своих настроек, но записать её
+// тоже было некому — обе половины удалены вместе.
 ipcMain.on('widget-set-position', (_event, payload) => {
     positionWindowClamped(widgetWindow, payload);
 });

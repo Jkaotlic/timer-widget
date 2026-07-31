@@ -73,6 +73,18 @@ test('после падения время восстанавливается, �
     await second.control.waitForTimeout(1500);
     const restored = await readTimer(second.control);
 
+    // ...и пользователь должен об этом УЗНАТЬ. Главный процесс шлёт
+    // 'timer-recovery-available' после did-finish-load; слушателя у канала не было
+    // ни одного, поэтому на экране просто стояло время, взявшееся ниоткуда.
+    const toast = await second.control.evaluate(() => {
+        const el = document.querySelector('.toast-container .toast');
+        return el ? { text: el.textContent, cls: el.className } : null;
+    });
+    expect(toast, 'после восстановления панель обязана сказать, откуда взялось время').not.toBeNull();
+    expect(toast.text).toContain('восстановлено');
+    // В сообщении стоит само время — иначе оно не отличимо от «что-то случилось».
+    expect(toast.text).toMatch(/\d{2}:\d{2}/);
+
     expect(
         restored.total,
         `после падения ожидался пресет ${PRESET}, получено ${JSON.stringify(restored)}`

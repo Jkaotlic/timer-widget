@@ -23,7 +23,6 @@ const ALLOWED_CHANNELS = {
         'clock-widget-set-style',
         'clock-widget-settings',
         'resize-control-window',
-        'widget-set-opacity',
         'widget-set-position',
         'widget-resize',
         'widget-move',
@@ -34,7 +33,6 @@ const ALLOWED_CHANNELS = {
         'ui-theme-update',
         'minimize-window',
         'toggle-fullscreen',
-        'close-window',
         'quit-app',
         'reset-and-relaunch'
     ],

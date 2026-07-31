@@ -2201,6 +2201,27 @@
                     }
                 };
                 ipcRenderer.on('timer-overrun-minute', this._onTimerOverrun);
+
+                // Восстановление после падения. Главный процесс возвращает время в
+                // состояние таймера сам, а этим каналом СООБЩАЕТ об этом панели —
+                // без сообщения пользователь после сбоя видит на экране чужое на
+                // вид время и не знает, откуда оно взялось.
+                //
+                // Слушателя не было ни одного: канал стоял в обоих белых списках, в
+                // главном процессе стояла отправка, и комментарий рядом с ней гласил
+                // «канал больше не мёртвый код». Отправка без приёмника — ровно то же
+                // мёртвое место, только теперь в двух файлах.
+                this._onRecoveryAvailable = (event, saved) => {
+                    if (!saved || typeof saved !== 'object') { return; }
+                    const secs = Number(saved.remainingSeconds);
+                    if (!Number.isFinite(secs)) { return; }
+                    window.Toast.show(
+                        `Время восстановлено после сбоя: ${window.TimeUtils.formatTime(secs)}`,
+                        'warning',
+                        6000
+                    );
+                };
+                ipcRenderer.on('timer-recovery-available', this._onRecoveryAvailable);
             }
 
             cleanup() {
@@ -2210,6 +2231,7 @@
                 if (this._onTimerReachedZero) {ipcRenderer.removeListener('timer-reached-zero', this._onTimerReachedZero);}
                 if (this._onTimerOverrun) {ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);}
                 if (this._onScaleReport) {ipcRenderer.removeListener('scale-report', this._onScaleReport);}
+                if (this._onRecoveryAvailable) {ipcRenderer.removeListener('timer-recovery-available', this._onRecoveryAvailable);}
 
                 // Удаляем глобальные DOM и IPC handlers из _handlers
                 const h = this._handlers || {};

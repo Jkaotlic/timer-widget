@@ -117,7 +117,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `open-display` / `close-display` | Toggle display window |
 | `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
 | `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
-| `widget-resize` / `widget-move` / `widget-set-position` / `widget-set-opacity` | Widget geometry/opacity |
+| `widget-resize` / `widget-move` / `widget-set-position` | Widget geometry |
 | `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
 | `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
 | `clock-widget-set-position` | `{ x, y }` — restore saved clock position (clamped to a live display) |
@@ -125,7 +125,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `ui-theme-update` | `{ theme: 'dark' \| 'hc-dark' }` — sent by the panel only; main validates against a whitelist and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide) |
 | `toggle-fullscreen` | Toggle fullscreen on the sender's window |
 | `reset-and-relaunch` | Clear all storage and quit |
-| `minimize-window` / `close-window` / `quit-app` | Window management |
+| `minimize-window` / `quit-app` | Window management |
 
 ### Receive (main → renderer)
 
@@ -144,6 +144,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `set-clock-style` / `clock-settings` | Clock widget settings |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
 | `ui-theme-update` | `{ theme }` — applied by `UITheme.bindThemeSync()` in every window |
+| `timer-recovery-available` | The crash snapshot (`{ presetSeconds, totalSeconds, remainingSeconds, savedAt }`), sent to the control window once on `did-finish-load`. Main restores the time itself; this only tells the panel to say so (a toast) |
 
 ## Timer State Structure
 
@@ -184,6 +185,7 @@ Two flavours of test live here:
 | `validation-utils.test.js` | `isValidNumber`, `clamp` |
 | `debounce-send.test.js` | `debounce`, `safelySendToWindow` |
 | `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS`, preload/validator sync |
+| `ipc-liveness.test.js` | Every whitelisted channel has BOTH ends — a sender and a receiver. The whitelist is a permission, not proof of life |
 | `edge-cases.test.js` | Edge cases for all utils |
 | `constants.test.js` | CONFIG immutability and structure |
 | `timer-engine.test.js` | `tick`/`adjust`/`reset`/`setPreset` arithmetic + boundary events |
@@ -273,6 +275,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **`CONFIG.STORAGE_KEYS` is a registry, not an access point**: renderers use string literals (no bundler, no wrapper module), so the map cannot break — it silently rots. It had 16 phantom keys and was missing 10 real ones. `tests/storage-keys.test.js` now checks it in BOTH directions and additionally fails on any key that is write-only (a setting going nowhere) or read-only (always the default) — both had really happened here.
 - **The display has no browser-mode fallback**: `display-script.js` used to branch on `window.ipcRenderer` and otherwise sync through a `timerState` localStorage key with 1s polling. Nothing in the project ever wrote that key, so the branch could not work at all; it is gone. `display.html` is only ever loaded by `loadFile()` inside Electron.
 - **IPC whitelist is duplicated**: `preload.js` inlines the whitelist from `channel-validator.js` (sandbox blocks `require()`). Both files MUST stay in sync — the test `channel-validator.test.js` verifies this.
+- **A whitelisted channel is a permission, not a feature (CRITICAL)**: three channels were listed in both whitelists with only one end wired. `widget-set-opacity` and `close-window` had a handler in main and ZERO senders — widget opacity was unreachable and windows are closed by the addressed channels instead; the clock even read an `opacity` key from `clockWidgetSettings` that nothing ever wrote. `timer-recovery-available` was worse: main sent it after a crash and NO renderer listened, so the user saw a restored time with no explanation of where it came from — and the comment next to the send read "the channel is no longer dead code", which was true only of the send. `tests/ipc-liveness.test.js` now requires both ends for every whitelisted channel, resolving the indirect emitters (events go out through the `onEvent(name)` callback in `timer-controller.js`, the display list through `event.sender.send`, the theme through `bindThemeSync(ipc)`).
 - **Adding new IPC channel**: Add to BOTH `send` and `receive` arrays in BOTH `preload.js` and `channel-validator.js`. Missing receive = widget silently ignores messages.
 - **Per-window colors**: there is deliberately NO global colour broadcast — a `colors-update` channel does not exist and must not be added. Use `widget-colors-update`, `clock-colors-update`, `display-colors-update` so colours cannot bleed between windows.
 - **`ipc-compat.js`**: All renderer HTML files use `ipcRenderer.on/send` which is shimmed to `electronAPI` via this compat layer. Don't use `electronAPI` directly in renderers.
