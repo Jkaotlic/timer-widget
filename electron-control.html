@@ -928,6 +928,7 @@
     <script src="utils.js"></script>
     <script src="renderer-storage.js"></script>
     <script src="renderer-shared.js"></script>
+    <script src="settings-schema.js"></script>
     <script src="sound-bank.js"></script>
     <script src="ui-feedback.js"></script>
     <script src="scale-input.js"></script>
@@ -1803,9 +1804,16 @@
 
                 // Загрузка расширенных настроек
                 const ext = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
-                
-                this.allowNegativeEl.checked = !!ext.allowNegative;
-                document.getElementById('overrunRow').style.display = ext.allowNegative ? 'flex' : 'none';
+
+                // Значения раскладывает таблица (settings-schema.js): ключ, контрол
+                // и значение по умолчанию описаны там ОДИН раз — и для загрузки, и
+                // для сохранения. Здесь остаётся только то, что таблицей не
+                // выражается: собственный формат двух ключей, побочные эффекты
+                // (видимость строк, отправка в окна) и поля контроллера.
+                const applied = window.SettingsSchema.applyStoredSettings(ext, document);
+
+                // Лимит перерасхода: в хранилище секунды, в поле «MM:SS».
+                document.getElementById('overrunRow').style.display = applied.allowNegative ? 'flex' : 'none';
                 if (Number.isFinite(Number(ext.overrunLimitSeconds)) && Number(ext.overrunLimitSeconds) > 0) {
                     const secs = Number(ext.overrunLimitSeconds);
                     const mm = String(Math.floor(secs / 60)).padStart(2, '0');
@@ -1813,34 +1821,16 @@
                     document.getElementById('overrunLimit').value = `${mm}:${ss}`;
                 }
                 this.refreshOverrunLimitHint();
-                
-                this.soundMasterEl.checked = ext.soundMasterEnabled !== false;
+
                 // Чекбокс — авторитет: подтягиваем к нему внутренний флаг, иначе
                 // сохранённое soundEnabled=false молча глушит все звуки.
-                this.setSoundEnabled(this.soundMasterEl.checked);
-                // FIX: Apply initial visual state for sound master toggle
+                this.setSoundEnabled(applied.soundMasterEnabled);
                 const soundSettings = document.getElementById('soundSettings');
-                soundSettings.style.opacity = this.soundMasterEl.checked ? '1' : '0.5';
-                soundSettings.style.pointerEvents = this.soundMasterEl.checked ? 'auto' : 'none';
+                soundSettings.style.opacity = applied.soundMasterEnabled ? '1' : '0.5';
+                soundSettings.style.pointerEvents = applied.soundMasterEnabled ? 'auto' : 'none';
 
-                this.soundStartEl.checked = !!ext.soundStartEnabled;
-                this.soundEndEl.checked = ext.soundEndEnabled !== false;
-                this.soundMinuteEl.checked = !!ext.soundMinuteEnabled;
-                this.soundOverrunEl.checked = !!ext.soundOverrunEnabled;
-                if (ext.overrunIntervalMinutes) {
-                    this.overrunIntervalEl.value = ext.overrunIntervalMinutes;
-                }
-
-                document.getElementById('soundStartPreset').value = ext.soundStartPreset || 'none';
-                document.getElementById('soundEndPreset').value = ext.soundEndPreset || 'none';
-                document.getElementById('soundMinutePreset').value = ext.soundMinutePreset || 'none';
-                document.getElementById('soundOverrunPreset').value = ext.soundOverrunPreset || 'triple';
-
-                document.getElementById('bgSolidColor').value = ext.bgSolid || '#0f0c29';
-                document.getElementById('bgGrad1').value = ext.bgGrad1 || '#0f0c29';
-                document.getElementById('bgGrad2').value = ext.bgGrad2 || '#302b63';
-
-                // Режим фона (image-по-URL удалён — legacy-значения маппим в solid)
+                // Режим фона — не поле ввода, а три кнопки (image-по-URL удалён,
+                // legacy-значения маппим в solid).
                 let bgMode = ext.bgMode || 'solid';
                 if (bgMode === 'image') { bgMode = 'solid'; }
                 this.currentBgMode = bgMode;
@@ -1849,37 +1839,14 @@
                 });
                 document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
                 document.getElementById(`bg${this.capitalize(bgMode)}Controls`).classList.add('active');
-                
-                // Текущее время
-                this.showCurrentTimeEl.checked = ext.showCurrentTime !== false;
-                // Настройки блоков времени
-                this.showTimeBlocksEl.checked = !!ext.showTimeBlocks;
-                document.getElementById('timeBlocksSettings').style.display = ext.showTimeBlocks ? 'block' : 'none';
-                this.timeLayoutPreset = ext.timeLayoutPreset || 'frame';
-                this.timeLayoutPresetEl.value = this.timeLayoutPreset;
-                this.eventTimeInputEl.value = ext.eventTime || '10:00';
-                this.endTimeInputEl.value = ext.endTime || '12:00';
-                this.timeBlocksScaleEl.value = ext.timeBlocksScale || 100;
-                this.timeBlocksScaleValueEl.textContent = (ext.timeBlocksScale || 100) + '%';
-                
-                this.timerStyleEl.value = ext.widgetTimerStyle || ext.timerStyle || 'circle';
-                this.timerScaleEl.value = ext.widgetTimerScale || ext.timerScale || 100;
-                this.timerScaleValueEl.textContent = (ext.widgetTimerScale || ext.timerScale || 100) + '%';
 
-                // Display-specific style/scale (defaults to same as widget)
-                if (this.displayTimerStyleEl) {
-                    this.displayTimerStyleEl.value = ext.displayTimerStyle || ext.timerStyle || 'circle';
-                }
-                if (this.displayTimerScaleEl) {
-                    this.displayTimerScaleEl.value = ext.displayTimerScale || ext.timerScale || 100;
-                    this.displayTimerScaleValueEl.textContent = (ext.displayTimerScale || ext.timerScale || 100) + '%';
-                }
-                
-                // Синхронизация стиля часов
-                this.syncClockStyle = !!ext.syncClockStyle; // по умолчанию false
-                this.syncClockStyleEl.checked = this.syncClockStyle;
+                // Блоки времени: строка настроек видна только при включённых блоках.
+                document.getElementById('timeBlocksSettings').style.display = applied.showTimeBlocks ? 'block' : 'none';
+                this.timeLayoutPreset = applied.timeLayoutPreset;
+
+                // Синхронизация стиля часов прячет выбор стиля часов.
+                this.syncClockStyle = applied.syncClockStyle;
                 this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
-                this.clockStyleEl.value = ext.clockStyle || ext.timerStyle || 'circle';
 
                 // Ползунок «Масштаб часов». Единственный источник правды здесь —
                 // clockGeometry, который пишет САМО окно часов (localStorage общий
@@ -1960,46 +1927,19 @@
             }
 
             saveExtSettings() {
-                const overrunSecs = this.readOverrunLimit();
-
                 const settings = {
-                    allowNegative: this.allowNegativeEl.checked,
-                    overrunLimitSeconds: overrunSecs,
-                    soundMasterEnabled: this.soundMasterEl.checked,
-                    soundStartEnabled: this.soundStartEl.checked,
-                    soundEndEnabled: this.soundEndEl.checked,
-                    soundMinuteEnabled: this.soundMinuteEl.checked,
-                    soundStartPreset: document.getElementById('soundStartPreset').value,
-                    soundEndPreset: document.getElementById('soundEndPreset').value,
-                    soundMinutePreset: document.getElementById('soundMinutePreset').value,
-                    soundOverrunEnabled: this.soundOverrunEl.checked,
-                    soundOverrunPreset: document.getElementById('soundOverrunPreset').value,
-                    overrunIntervalMinutes: parseInt(this.overrunIntervalEl.value) || 1,
-                    bgMode: this.currentBgMode,
-                    bgSolid: document.getElementById('bgSolidColor').value,
-                    bgGrad1: document.getElementById('bgGrad1').value,
-                    bgGrad2: document.getElementById('bgGrad2').value,
-                    // Текущее время
-                    showCurrentTime: this.showCurrentTimeEl.checked,
-                    // Настройки блоков времени
-                    showTimeBlocks: this.showTimeBlocksEl.checked,
-                    timeLayoutPreset: this.timeLayoutPreset,
-                    eventTime: this.eventTimeInputEl.value,
-                    endTime: this.endTimeInputEl.value,
-                    timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
-                    // Per-window style/scale (widget and display kept separate)
-                    widgetTimerStyle: this.timerStyleEl.value,
-                    widgetTimerScale: parseInt(this.timerScaleEl.value),
-                    displayTimerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
-                    displayTimerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
-                    // Legacy keys (backward read-compat) = widget values
-                    timerStyle: this.timerStyleEl.value,
-                    timerScale: parseInt(this.timerScaleEl.value),
-                    // Настройки стиля часов
-                    syncClockStyle: this.syncClockStyle,
-                    clockStyle: this.clockStyleEl.value
+                    // Всё, что описано таблицей, собирается из контролов ею же —
+                    // включая устаревшие ключи timerStyle/timerScale, которые
+                    // продолжают писаться ради отката на предыдущую версию.
+                    ...window.SettingsSchema.collectSettings(document),
+                    // Своего формата: секунды из поля «MM:SS».
+                    overrunLimitSeconds: this.readOverrunLimit(),
+                    // Не поле ввода, а активная кнопка из трёх.
+                    bgMode: this.currentBgMode
                 };
 
+                // СЛИЯНИЕ, а не перезапись: ключ мог быть записан прежней версией
+                // приложения, и незнакомые панели поля переживают обновление.
                 const prev = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
             }

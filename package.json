@@ -121,6 +121,7 @@
       "constants.js",
       "color-utils.js",
       "renderer-shared.js",
+      "settings-schema.js",
       "ui-theme.js",
       "flip-card.js",
       "sound-bank.js",

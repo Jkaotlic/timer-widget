@@ -61,11 +61,15 @@ test('мастер-чекбокс звука ведёт за собой флаг
     assert.ok(masterHandler, 'обработчик мастер-чекбокса должен существовать');
     assert.match(masterHandler[0], /this\.setSoundEnabled\(this\.soundMasterEl\.checked\)/);
 
-    // loadSettings() тоже обязан синхронизировать флаг с чекбоксом.
-    assert.match(
-        controlHtml,
-        /this\.soundMasterEl\.checked = ext\.soundMasterEnabled !== false;[\s\S]{0,300}?this\.setSoundEnabled\(this\.soundMasterEl\.checked\)/
-    );
+    // loadSettings() тоже обязан синхронизировать флаг с чекбоксом. Само значение
+    // чекбокса с 2.4.1 раскладывает таблица настроек, поэтому гарантия состоит из
+    // двух половин: таблица объявляет «по умолчанию включено», а панель ведёт за
+    // разложенным значением флаг soundEnabled.
+    const master = require('../settings-schema.js')
+        .SETTINGS_DESCRIPTORS.find((d) => d.key === 'soundMasterEnabled');
+    assert.ok(master, 'soundMasterEnabled должен быть описан в таблице настроек');
+    assert.equal(master.def, true, 'звук по умолчанию включён');
+    assert.match(controlHtml, /this\.setSoundEnabled\(applied\.soundMasterEnabled\)/);
 });
 
 // ---------------------------------------------------------------------------
@@ -213,12 +217,16 @@ test('лимит перерасхода реально доходит до дв�
     // Раньше #overrunLimit лежал в display:none-блоке, а getConfig() и
     // saveExtSettings() жёстко подставляли 0 — пользователь мог задать лимит,
     // и ничего бы не произошло. Движок timer-engine поддерживал его всегда.
-    assert.doesNotMatch(controlHtml, /overrunLimitSeconds: 0/);
+    assert.doesNotMatch(controlHtml, /overrunLimitSeconds:\s*0[,\s}]/);
     assert.match(controlHtml, /overrunLimitSeconds: this\.readOverrunLimit\(\)/);
     assert.match(controlHtml, /readOverrunLimit\(\)\s*\{/);
-    // Значение сохраняется, а не обнуляется на каждом сохранении настроек.
-    assert.doesNotMatch(controlHtml, /const overrunSecs = 0;/);
-    assert.match(controlHtml, /const overrunSecs = this\.readOverrunLimit\(\);/);
+    // Ключ намеренно НЕ описан таблицей настроек: в хранилище секунды, а в поле
+    // «MM:SS», то есть у него собственное преобразование в обе стороны. Список
+    // ручных ключей — единственное место, где это записано.
+    assert.ok(
+        require('../settings-schema.js').MANUAL_KEYS.includes('overrunLimitSeconds'),
+        'overrunLimitSeconds должен быть в списке ключей, сохраняемых панелью вручную'
+    );
 
     // Поле видимое и живёт в строке, которая показывается вместе с минусом.
     assert.match(controlHtml, /<div class="manual-time-row" id="overrunRow"/);
