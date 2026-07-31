@@ -45,6 +45,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | File | Owns |
 |------|------|
 | `control.css` | All panel styles (~3000 lines, moved out of inline `<style>`). Must load AFTER `design-tokens.css`/`components.css` — it overrides them, the cascade order is load-bearing |
+| `settings-schema.js` | The table of panel settings (key → control → default) plus `applyStoredSettings()` / `collectSettings()`. Knows nothing about `timerController` or localStorage; DOM access is only `getElementById`, so it is unit-tested against a fake document |
 | `sound-bank.js` | 29 built-in sounds synthesised with oscillators. No DOM, no storage |
 | `custom-sounds.js` | User-uploaded sounds: file validation, list, playback, deletion. **Prototype mixin** |
 | `local-background.js` | Fullscreen background image: upload, MIME + magic-byte validation, preview, fit/overlay. **Prototype mixin** |
@@ -60,6 +61,7 @@ Rules when working here:
 - **Two of them are prototype mixins** (`Object.assign(TimerController.prototype, window.XMixin)`), not free functions. Their methods call each other and the controller's `this.beep()` / `this.pushDisplaySettings()`, and DOM handlers close over `this` — the mixin preserves `this` semantics exactly, which made the move verbatim and behaviour-preserving. If the `Object.assign` line is lost, nothing fails at load; it fails at the first click.
 - **Every new module must go into `package.json` `build.files`** or it silently vanishes from the packaged app (that is exactly how `design-tokens.css` was lost in 2.3.2). `tests/packaging.test.js` and `tests/control-decomposition.test.js` both guard this.
 - **When you touch a self-contained block still living inline, move it out** instead of editing it in place.
+- **A setting's key, control and default belong in `settings-schema.js` — in ONE row.** They used to be written twice: a ladder of `ext.foo !== false` / `ext.bar || 100` in `loadSettings()` and a mirror-image object literal in `saveExtSettings()`. Adding a key to one copy and not the other, or fixing a default in one, makes the setting silently revert after a restart — nothing but a roundtrip test can see that. `loadSettings()` keeps only what the table cannot express: the two keys with their own format (`overrunLimitSeconds` stores seconds behind an `MM:SS` field, `bgMode` is three buttons, both listed in `MANUAL_KEYS`) and the side effects (row visibility, IPC pushes, controller fields). `tests/settings-schema.test.js` fails if a ladder for a table-described key reappears in the panel.
 
 ### Shared Modules
 
@@ -190,6 +192,7 @@ Two flavours of test live here:
 | `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale` |
 | `renderer-storage.test.js` | Quota-safe localStorage helpers |
 | `color-utils.test.js` | HSV↔RGB↔HEX conversion |
+| `settings-schema.test.js` | The settings table: defaults, legacy-key fallbacks, collect/apply roundtrip, on a fake document |
 | `display-timer.test.js` | `validateBlockPositions`, `canSafelyStore` |
 | `perf.test.js` | Hot-path performance budgets |
 | `packaging.test.js` | Every runtime asset is listed in `build.files` |
