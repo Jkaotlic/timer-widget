@@ -141,6 +141,56 @@ test('высокий контраст: текстовые токены прох�
     console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
 });
 
+test('высокий контраст: лестница поверхностей держит AAA под белым текстом', () => {
+    // Три ступени (--tw-level-*) введены, чтобы у контрастной темы появилась
+    // структура: раньше окно, панели и контролы были одинаково чёрными, и тема
+    // читалась как плоское поле. Ступени сплошные, поэтому проверяются напрямую.
+    const AAA_NORMAL = 7.0;
+    const white = hcToken('tw-fg');
+    const report = [];
+    for (const level of ['tw-level-1', 'tw-level-2', 'tw-level-3']) {
+        const bg = parseColor(hcToken(level)).rgb;
+        const ratio = contrast(composite(white, bg), bg);
+        report.push(`${level}: ${ratio.toFixed(2)}:1`);
+        assert.ok(
+            ratio >= AAA_NORMAL,
+            `--${level} (${hcToken(level)}) под белым текстом даёт ${ratio.toFixed(2)}:1, нужно ${AAA_NORMAL}:1`
+        );
+    }
+    // Ступени обязаны РАЗЛИЧАТЬСЯ, иначе иерархии всё равно нет — ради этого всё
+    // и затевалось. Порог 0.6 — заметная глазу разница яркости соседних ступеней.
+    const lum = (name) => luminance(parseColor(hcToken(name)).rgb);
+    const l1 = lum('tw-level-1');
+    const l2 = lum('tw-level-2');
+    const l3 = lum('tw-level-3');
+    assert.ok(l2 / l1 >= 1.6 && l3 / l2 >= 1.6,
+        `ступени слишком близки: ${l1.toFixed(4)} → ${l2.toFixed(4)} → ${l3.toFixed(4)}`);
+    console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
+});
+
+test('высокий контраст: надпись на заливке акцентом читаема', () => {
+    // Кнопка старта и активный пресет заливаются акцентом. Белая надпись на
+    // осветлённом зелёном даёт 1.9:1 — это была нечитаемая главная кнопка темы,
+    // созданной ради читаемости. Отсюда --tw-on-accent: чёрный.
+    const onAccent = hcToken('tw-on-accent');
+    const report = [];
+    for (const token of ['tw-green', 'tw-blue']) {
+        const bg = parseColor(hcToken(token)).rgb;
+        const ratio = contrast(composite(onAccent, bg), bg);
+        const white = contrast(composite('#ffffff', bg), bg);
+        report.push(`${onAccent} на --${token}: ${ratio.toFixed(2)}:1 (белым было бы ${white.toFixed(2)}:1)`);
+        assert.ok(
+            ratio >= 7.0,
+            `--tw-on-accent (${onAccent}) на --${token}: ${ratio.toFixed(2)}:1, нужно 7:1`
+        );
+        assert.ok(
+            ratio > white,
+            `на --${token} белая надпись контрастнее выбранной — значит выбран не тот цвет`
+        );
+    }
+    console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
+});
+
 test('высокий контраст: акценты не темнее тёмной темы', () => {
     // Осветлённые акценты hc-темы обязаны быть контрастнее обычных, иначе
     // «высокий контраст» — только название.

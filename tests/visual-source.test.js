@@ -33,7 +33,12 @@ test('control settings use one outer shell instead of a nested window frame', ()
 
     assert.match(controlHtml, /\.app-shell::before\s*\{[^}]*background:[^}]*var\(--tw-bg-surface-solid\);[^}]*box-shadow:\s*var\(--tw-shadow-panel\);/s);
     assert.match(controlHtml, /\.control-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;/s);
-    assert.match(controlHtml, /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*border-right:\s*1px solid var\(--tw-divider\);/s);
+    // Разделитель между панелью и ящиком обязан существовать, но принадлежит он
+    // ЯЩИКУ: линия проходит по его левому краю. Раньше её рисовала панель через
+    // border-right — это работало, только пока панель была прижата к ящику. С
+    // центрированием панели в своей колонке такая линия висела бы посреди пустого
+    // места, поэтому граница переехала на сторону ящика.
+    assert.match(controlHtml, /\.app-shell\.drawer-open \.settings-drawer\.open\s*\{[^}]*border-left:\s*1px solid var\(--tw-divider\);/s);
     assert.match(controlHtml, /\.settings-drawer\.open\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;/s);
     assert.match(controlHtml, /@media \(min-width: 500px\)\s*\{[^}]*\.control-panel\s*\{\s*margin:\s*0;\s*\}/s);
 });
@@ -42,7 +47,11 @@ test('opening settings keeps control scale stable', () => {
     const controlHtml = readControlSource();
 
     assert.match(controlHtml, /\.app-shell\s*\{[^}]*--drawer-width:\s*336px;[^}]*--control-panel-width:\s*400px;/s);
-    assert.match(controlHtml, /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*width:\s*var\(--control-panel-width\);[^}]*max-width:\s*var\(--control-panel-width\);/s);
+    // Ширину колонки задаёт переменная, а предел — та же ширина контента, что и у
+    // закрытого ящика. Без второго условия панель при стыковке растягивалась с 640
+    // до всей колонки (замер: 640 → 864 на окне 1200px), её левый край уезжал на
+    // 130px, и это читалось как прыжок. Держит e2e/drawer-layout.spec.js.
+    assert.match(controlHtml, /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*width:\s*var\(--control-panel-width\);[^}]*max-width:\s*min\(var\(--control-panel-width\), 640px\);/s);
     assert.match(controlHtml, /\.settings-drawer\.open\s*\{[^}]*width:\s*var\(--drawer-width\);[^}]*max-width:\s*var\(--drawer-width\);/s);
     assert.doesNotMatch(controlHtml, /\.timer-display-main\s*\{[^}]*vw/s);
     // Переменную ширины колонки выставляет JS. Проверяем сам факт, а не форму

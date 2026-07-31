@@ -77,7 +77,16 @@ body::after {
    on narrow windows. */
 .app-shell {
     display: grid;
-    grid-template-columns: 1fr;
+    /* ДВЕ колонки, вторая — резерв под ящик настроек.
+       Раньше колонка была одна, панель стояла по центру окна, а с открытием
+       ящика правило переставляло её на justify-self: start. На окне шире
+       панели это давало РЫВОК: панель мгновенно перескакивала к левому краю,
+       потому что смена justify-self ничем не анимируется и анимироваться не
+       может. Теперь место под ящик резервируется колонкой, панель остаётся
+       по центру ОСТАВШЕГОСЯ места, а сама колонка меняет ширину плавно и в
+       такт с выездом ящика (240ms). Ящик позиционирован абсолютно и в потоке
+       сетки не участвует — колонка именно резервирует под него место. */
+    grid-template-columns: minmax(0, 1fr) 0px;
     grid-template-rows: 1fr;
     --drawer-width: 336px;
     --control-panel-width: 400px;
@@ -86,6 +95,10 @@ body::after {
     position: relative;
     overflow: visible;
     padding: 0;
+    transition: grid-template-columns 240ms var(--tw-ease-out);
+}
+.app-shell.drawer-open {
+    grid-template-columns: minmax(0, 1fr) var(--drawer-width);
 }
 .app-shell {
     isolation: isolate;
@@ -132,17 +145,53 @@ body::after {
    Main guarantees the control window is wide enough (~716px) before opening
    the drawer, so the old narrow-mode overlay + backdrop is unreachable. */
 .app-shell.drawer-open .control-panel {
-    justify-self: start;
+    /* По центру своей колонки, а не прижата к краю окна: при ширине окна
+       «панель + ящик» это ровно то же место, что и раньше, а на растянутом
+       окне панель больше не улетает в левый край. */
+    justify-self: center;
     margin: 0;
     width: var(--control-panel-width);
-    max-width: var(--control-panel-width);
-    border-right: 1px solid var(--tw-divider);
-    border-radius: var(--tw-r-2xl) 0 0 var(--tw-r-2xl);
+    /* Та же предельная ширина колонки контента, что и у закрытого ящика. Без
+       этого панель при стыковке РАСТЯГИВАЛАСЬ с 640 до всей ширины колонки
+       (замер: 640 → 864 на окне 1200px), и её левый край уезжал на 130px —
+       это и читалось как прыжок. Совпадение ширин оставляет от смещения
+       единицы пикселей. */
+    max-width: min(var(--control-panel-width), 640px);
 }
-@media (min-width: 700px) {
-    .app-shell.drawer-open .control-panel {
-        width: var(--control-panel-width);
-        max-width: var(--control-panel-width);
+/* Граница между панелью и ящиком принадлежит ЯЩИКУ: она проходит по его левому
+   краю. Раньше её рисовала панель своим border-right, и при центрированной
+   панели линия висела бы посреди пустого места. */
+.app-shell.drawer-open .settings-drawer.open {
+    border-left: 1px solid var(--tw-divider);
+}
+/* Здесь стоял @media (min-width: 700px), дословно повторявший ширину из правила
+   выше. Дубль был безобиден, пока значения совпадали, — но стоило ограничить
+   пристыкованную панель шириной колонки контента, как этот блок (он идёт ниже
+   по файлу) молча вернул прежнее `max-width: var(--control-panel-width)`, и
+   панель снова растягивалась. Правило одно, и оно выше. */
+
+/* ============ Растянутое окно ============
+   Панель нарисована прозрачной: фон, рамку и тень окна берёт на себя
+   .app-shell::before, растянутый на ВСЁ окно. При ширине окна по умолчанию
+   (400px) это одно и то же, и панель читается как само окно. Но стоит окно
+   растянуть — колонка контента остаётся узкой, а раскрашенное поле вокруг неё
+   разрастается, и вид становится такой, будто панель забыли доверстать:
+   горстка кнопок в середине пустого прямоугольника.
+
+   На широком окне панель становится настоящей карточкой: обретает собственную
+   подложку, рамку и тень, а поле вокруг превращается в осознанное поле. Колонка
+   при этом немного шире (640 против 560) — на 1200px окне пустоты вдвое меньше.
+   Порог 620px выбран так, чтобы при ширине по умолчанию не менялось НИЧЕГО.
+
+   Только для закрытого ящика: с открытым панель и ящик стоят рядом и делят одно
+   поле — карточка там разрезала бы пару пополам. */
+@media (min-width: 620px) {
+    .app-shell:not(.drawer-open) .control-panel {
+        max-width: 640px;
+        background: var(--tw-bg-glass);
+        border: 1px solid var(--tw-border);
+        border-radius: var(--tw-r-2xl);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
     }
 }
 
@@ -431,6 +480,172 @@ body::after {
 [data-theme="hc-dark"] .timer-display-main.danger,
 [data-theme="hc-dark"] .timer-display-main.warning {
     text-shadow: none;   /* неоновое свечение съедает контур цифр */
+}
+
+/* ---- Высокий контраст: поверхности и состояния ----------------------------
+   Токены сами по себе тему не вытягивают: заливки половины контролов заданы в
+   этом файле литералами вида rgba(255,255,255,0.04–0.06) и rgba(10,132,255,0.09).
+   На тёмно-синем стекле такой слой читается, а на ЧИСТОМ ЧЁРНОМ он даёт разницу
+   в 3–6 единиц яркости, то есть исчезает. Отсюда и вид «тёмная тема, из которой
+   слили цвет»: фон чёрный, а кнопки от него не отделяются ничем.
+
+   Здесь эти литералы адресно заменяются ступенями лестницы (--tw-level-*).
+   Правила действуют ТОЛЬКО в контрастной теме, поэтому вид темы по умолчанию не
+   меняется ни на пиксель — это проверяется сверкой снимков.
+
+   Второе правило блока: на заливке акцентом надпись ЧЁРНАЯ (--tw-on-accent).
+   Белое на осветлённом зелёном — 1.9:1; это была нечитаемая главная кнопка. */
+
+/* Контейнеры */
+[data-theme="hc-dark"] .settings-group,
+[data-theme="hc-dark"] .sound-item,
+[data-theme="hc-dark"] .sound-empty,
+[data-theme="hc-dark"] .settings-hint {
+    background: var(--tw-level-1);
+    border: 1px solid var(--tw-border);
+}
+[data-theme="hc-dark"] .sound-sub-item {
+    background: transparent;
+    border: 0;
+}
+
+/* Контролы в покое */
+[data-theme="hc-dark"] .quick-preset,
+[data-theme="hc-dark"] .manual-time-input,
+[data-theme="hc-dark"] .sound-item .sound-select,
+[data-theme="hc-dark"] .main-btn,
+[data-theme="hc-dark"] .timer-status,
+[data-theme="hc-dark"] .quick-window-btn {
+    background: var(--tw-level-2);
+    border: 1px solid var(--tw-border);
+    color: var(--tw-fg);
+}
+[data-theme="hc-dark"] .tabs-row,
+[data-theme="hc-dark"] .segmented {
+    background: var(--tw-level-1);
+    border: 1px solid var(--tw-border);
+}
+
+/* Наведение — ступень вверх, а не подкрашивание прозрачностью */
+[data-theme="hc-dark"] .quick-preset:hover,
+[data-theme="hc-dark"] .main-btn:hover:not(:disabled),
+[data-theme="hc-dark"] .main-btn.reset:hover:not(:disabled),
+[data-theme="hc-dark"] .quick-window-btn:hover,
+[data-theme="hc-dark"] .adjust-main-btn.plus:hover,
+[data-theme="hc-dark"] .adjust-main-btn.minus:hover {
+    background: var(--tw-level-3);
+    border-color: var(--tw-border-strong);
+    color: var(--tw-fg);
+}
+
+/* Выбранное состояние: заливка акцентом + ЧЁРНАЯ надпись.
+   Инверсия — самый однозначный способ показать выбор в контрастной теме: она
+   работает и при полной потере цветоразличения. */
+[data-theme="hc-dark"] .quick-preset.active {
+    background: var(--tw-green);
+    border-color: var(--tw-border-strong);
+    color: var(--tw-on-accent);
+    box-shadow: none;
+}
+[data-theme="hc-dark"] .main-btn.start {
+    background: var(--tw-green);
+    color: var(--tw-on-accent);
+    box-shadow: none;
+}
+[data-theme="hc-dark"] .main-btn.start:hover:not(:disabled) {
+    background: #7bf0ab;
+    box-shadow: none;
+}
+[data-theme="hc-dark"] .manual-time-apply {
+    background: var(--tw-green);
+    border-color: var(--tw-border-strong);
+    color: var(--tw-on-accent);
+}
+[data-theme="hc-dark"] .manual-time-apply:hover {
+    background: #7bf0ab;
+    border-color: var(--tw-border-strong);
+}
+[data-theme="hc-dark"] .tab-btn.active,
+[data-theme="hc-dark"] .segmented button.active {
+    background: var(--tw-fg);
+    color: var(--tw-on-accent);
+    box-shadow: none;
+}
+[data-theme="hc-dark"] .quick-window-btn.active {
+    background: var(--tw-blue);
+    border-color: var(--tw-border-strong);
+    color: var(--tw-on-accent);
+    box-shadow: none;
+}
+[data-theme="hc-dark"] .quick-window-btn.active .qw-icon,
+[data-theme="hc-dark"] .quick-window-btn .qw-icon {
+    background: transparent;
+    color: inherit;
+}
+
+/* Ввод в фокусе — рамка белая, а не полупрозрачно-синяя */
+[data-theme="hc-dark"] .manual-time-input:focus-visible {
+    background: var(--tw-level-3);
+    border-color: var(--tw-border-strong);
+}
+
+/* Переключатели: выключенное состояние обязано ЧИТАТЬСЯ, а не быть «просто
+   темнее». В покое — ступень 3 с рамкой, включённый — зелёный. */
+[data-theme="hc-dark"] .toggle-slider {
+    background: var(--tw-level-3);
+    border: 1px solid var(--tw-border);
+}
+[data-theme="hc-dark"] input:checked + .toggle-slider {
+    background: var(--tw-green);
+    border-color: var(--tw-border-strong);
+}
+[data-theme="hc-dark"] .toggle-slider:before {
+    background: var(--tw-fg);
+}
+[data-theme="hc-dark"] input:checked + .toggle-slider:before {
+    background: var(--tw-on-accent);
+}
+
+/* Мелочи, которые иначе остаются от тёмной темы */
+[data-theme="hc-dark"] .sound-item .sound-preview {
+    background: var(--tw-blue);
+    color: var(--tw-on-accent);
+    box-shadow: none;
+}
+[data-theme="hc-dark"] .drawer-body #tab-sound .add-sound-btn {
+    background: var(--tw-level-1);
+    border: 1.5px dashed var(--tw-border);
+}
+[data-theme="hc-dark"] .drawer-body #tab-sound .add-sound-btn .drop-icon {
+    background: var(--tw-blue);
+    color: var(--tw-on-accent);
+}
+[data-theme="hc-dark"] .custom-titlebar .titlebar-help.active {
+    background: var(--tw-blue);
+    border-color: var(--tw-border-strong);
+    color: var(--tw-on-accent);
+}
+[data-theme="hc-dark"] .drawer-body::-webkit-scrollbar-thumb,
+[data-theme="hc-dark"] .tab-content.active::-webkit-scrollbar-thumb {
+    background: var(--tw-border);
+}
+
+/* Недоступное состояние. В тёмной теме оно сделано как `opacity: 0.4` плюс
+   обесцвечивание — поверх стекла это читается. На чистом чёрном сорок процентов
+   от тёмной заливки — это почти фон: кнопка не выглядит недоступной, она
+   пропадает. Здесь недоступность показывается тем же способом, что и всё
+   остальное в этой теме, — ступенью и рамкой, а надпись остаётся читаемой.
+   Идёт ПОСЛЕ правил .start / .active: специфичность равная, решает порядок. */
+[data-theme="hc-dark"] .main-btn:disabled,
+[data-theme="hc-dark"] .main-btn.start:disabled,
+[data-theme="hc-dark"] .quick-preset:disabled,
+[data-theme="hc-dark"] .adjust-main-btn:disabled {
+    opacity: 1;
+    filter: none;
+    background: var(--tw-level-1);
+    border: 1px solid var(--tw-divider);
+    color: var(--tw-fg-dim);
+    box-shadow: none;
 }
 
 .custom-titlebar .title-text {

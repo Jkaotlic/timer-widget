@@ -109,3 +109,87 @@ test('высокий контраст включается во всех чет�
 
     await app.close();
 });
+
+/**
+ * Высокий контраст обязан доезжать до САМИХ КОНТРОЛОВ, а не только до токенов.
+ *
+ * Тест выше проверяет, что `data-theme` и значения переменных доехали во все
+ * окна. Этого мало: половина заливок панели задана в control.css литералами
+ * (rgba(255,255,255,0.04–0.06)), которые тема не переопределяет в принципе. На
+ * тёмно-синем стекле такой слой виден, на чистом чёрном — исчезает, и тема
+ * выглядела как «тёмная, из которой слили цвет»: фон чёрный, кнопки от него не
+ * отделяются. Правила темы адресно возвращают им заливку, и проверять надо
+ * ВЫЧИСЛЕННЫЙ цвет элемента — объявленный токен ничего не доказывает.
+ *
+ * Отдельно проверяется правило «на заливке акцентом надпись чёрная»: белым по
+ * осветлённому зелёному выходит 1.9:1, то есть нечитаемая главная кнопка в теме,
+ * сделанной ради читаемости.
+ */
+function contrastRatio(rgbA, rgbB) {
+    const lin = (c) => {
+        const v = c / 255;
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    const a = lum(rgbA);
+    const b = lum(rgbB);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+const parseRgb = (s) => (String(s).match(/\d+/g) || []).slice(0, 3).map(Number);
+
+test('высокий контраст перекрашивает сами контролы, а не только переменные', async () => {
+    const { app, control } = await launchApp();
+
+    await control.evaluate(() => {
+        window.UITheme.applyTheme('hc-dark');
+        // Пресет делаем активным: именно у него заливка акцентом.
+        document.querySelector('.quick-preset[data-minutes="5"]').click();
+        document.querySelector('.tab-btn[data-tab="clock"]').click();
+    });
+    await control.waitForTimeout(900);
+
+    const probe = await control.evaluate(() => {
+        const css = (el, pseudo) => (el ? getComputedStyle(el, pseudo || null) : null);
+        const preset = document.querySelector('.quick-preset.active');
+        const plain = document.querySelector('.quick-preset:not(.active)');
+        const seconds = document.getElementById('clockShowSeconds');
+        const slider = seconds ? seconds.nextElementSibling : null;
+        return {
+            plainBg: plain ? css(plain).backgroundColor : null,
+            plainBorder: plain ? css(plain).borderTopColor : null,
+            activeBg: preset ? css(preset).backgroundColor : null,
+            activeColor: preset ? css(preset).color : null,
+            track: slider ? css(slider).backgroundColor : null,
+            knob: slider ? css(slider, '::before').backgroundColor : null
+        };
+    });
+    console.log('контрастная тема, вычисленные цвета →', JSON.stringify(probe));
+
+    // 1. Обычный контрол отделяется от фона окна собственной заливкой.
+    const plain = parseRgb(probe.plainBg);
+    expect(plain.length, 'заливка неактивного пресета не прочиталась').toBe(3);
+    expect(
+        plain.reduce((a, b) => a + b, 0),
+        `неактивный пресет заливается ${probe.plainBg} — на чёрном фоне это не поверхность, а дырка`
+    ).toBeGreaterThan(60);
+
+    // 2. Надпись на заливке акцентом — тёмная, и контраст не ниже AAA.
+    const activeBg = parseRgb(probe.activeBg);
+    const activeFg = parseRgb(probe.activeColor);
+    const ratio = contrastRatio(activeFg, activeBg);
+    console.log(`надпись активного пресета: ${probe.activeColor} на ${probe.activeBg} → ${ratio.toFixed(2)}:1`);
+    expect(
+        ratio,
+        `надпись активного пресета даёт ${ratio.toFixed(2)}:1 на заливке акцентом`
+    ).toBeGreaterThanOrEqual(7);
+
+    // 3. Бегунок включённого переключателя — того же правила.
+    const knobRatio = contrastRatio(parseRgb(probe.knob), parseRgb(probe.track));
+    console.log(`бегунок: ${probe.knob} на ${probe.track} → ${knobRatio.toFixed(2)}:1`);
+    expect(
+        knobRatio,
+        `бегунок ${probe.knob} на дорожке ${probe.track} даёт ${knobRatio.toFixed(2)}:1`
+    ).toBeGreaterThanOrEqual(7);
+
+    await app.close();
+});
