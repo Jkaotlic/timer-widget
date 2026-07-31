@@ -14,9 +14,10 @@
  * «чистому» цвету без смешивания, результат завышается в свою пользу и тест
  * становится бесполезным.
  *
- * Проверяется ТОЛЬКО тёмная тема: `[data-theme="light"]` и `[data-theme="hc-dark"]`
- * в приложении недостижимы — атрибут `data-theme` не выставляет никто, а
- * `prefers-color-scheme` в проекте не используется вовсе.
+ * Проверяются ОБЕ темы приложения: `dark` и `light`. Светлая — вторая тема с
+ * 2.4.1; она заменила высококонтрастную и держится на тех же порогах, потому что
+ * порог задаёт не название темы, а кегль подписей: 11–12px, то есть полный AA, а
+ * для основных текстовых токенов — AAA.
  */
 
 const test = require('node:test');
@@ -62,9 +63,9 @@ function composite(layer, baseRgb) {
 // `indexOf('[data-theme="light"]')` без проверки, и после удаления светлой темы
 // indexOf вернул бы −1, а slice(0, −1) — весь файл. Тест продолжил бы «работать»,
 // читая токены не той темы. Любое переименование блока теперь падает сразу.
-const HC_MARK = '[data-theme="hc-dark"]';
+const HC_MARK = '[data-theme="light"]';
 const SHARED_MARK = '/* ---------------- REDUCED MOTION ---------------- */';
-assert.ok(TOKENS.includes(HC_MARK), 'блок высокого контраста не найден в design-tokens.css');
+assert.ok(TOKENS.includes(HC_MARK), 'блок светлой темы не найден в design-tokens.css');
 assert.ok(TOKENS.includes(SHARED_MARK), 'граница блока тем не найдена в design-tokens.css');
 
 const DARK_BLOCK = TOKENS.slice(0, TOKENS.indexOf(HC_MARK));
@@ -77,7 +78,7 @@ function darkToken(name) {
     return m[1].trim();
 }
 
-// То же для высокого контраста. Токен, который эта тема не переопределяет,
+// То же для светлой темы. Токен, который эта тема не переопределяет,
 // наследуется из тёмной — так и считаем, иначе проверка врёт.
 function hcToken(name) {
     const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(HC_BLOCK);
@@ -117,10 +118,11 @@ test('текстовые токены тёмной темы проходят WCA
     console.log('   ' + report.join('\n   '));
 });
 
-test('высокий контраст: текстовые токены проходят AAA, а не только AA', () => {
-    // Смысл темы — не «пройти порог», а дать запас. Порог AAA для обычного
-    // текста 7:1. Тема стала достижимой в 2.4.0 (кнопка в титлбаре пишет
-    // data-theme), до этого её контраст не проверялся вообще ни разу.
+test('светлая тема: текстовые токены проходят AAA, а не только AA', () => {
+    // Смысл проверки — не «пройти порог», а дать запас: порог AAA 7:1. Светлая
+    // тема в этом проекте уже была и была удалена как недостижимая — её контраст
+    // никогда не настраивали, подписи давали 2.70:1. Возвращена она вместе с этой
+    // проверкой, чтобы история не повторилась.
     const AAA_NORMAL = 7.0;
     const hcBase = parseColor(hcToken('tw-bg-dark')).rgb;
     const hcSurface = composite(hcToken('tw-bg-surface'), hcBase);
@@ -133,7 +135,7 @@ test('высокий контраст: текстовые токены прох�
             report.push(`--${token} на ${bgName}: ${ratio.toFixed(2)}:1`);
             assert.ok(
                 ratio >= AAA_NORMAL,
-                `высокий контраст: --${token} (${value}) на ${bgName} даёт `
+                `светлая тема: --${token} (${value}) на ${bgName} даёт `
                 + `${ratio.toFixed(2)}:1, а тема обязана держать ${AAA_NORMAL}:1`
             );
         }
@@ -141,94 +143,100 @@ test('высокий контраст: текстовые токены прох�
     console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
 });
 
-test('высокий контраст: лестница поверхностей держит AAA под белым текстом', () => {
+test('светлая тема: лестница поверхностей держит AAA под основным текстом', () => {
     // Три ступени (--tw-level-*) введены, чтобы у контрастной темы появилась
     // структура: раньше окно, панели и контролы были одинаково чёрными, и тема
     // читалась как плоское поле. Ступени сплошные, поэтому проверяются напрямую.
     const AAA_NORMAL = 7.0;
-    const white = hcToken('tw-fg');
+    const fg = hcToken('tw-fg');
     const report = [];
     for (const level of ['tw-level-1', 'tw-level-2', 'tw-level-3']) {
         const bg = parseColor(hcToken(level)).rgb;
-        const ratio = contrast(composite(white, bg), bg);
+        const ratio = contrast(composite(fg, bg), bg);
         report.push(`${level}: ${ratio.toFixed(2)}:1`);
         assert.ok(
             ratio >= AAA_NORMAL,
-            `--${level} (${hcToken(level)}) под белым текстом даёт ${ratio.toFixed(2)}:1, нужно ${AAA_NORMAL}:1`
+            `--${level} (${hcToken(level)}) под основным текстом даёт ${ratio.toFixed(2)}:1, нужно ${AAA_NORMAL}:1`
         );
     }
     // Ступени обязаны РАЗЛИЧАТЬСЯ, иначе иерархии всё равно нет — ради этого всё
-    // и затевалось. Порог 0.6 — заметная глазу разница яркости соседних ступеней.
-    const lum = (name) => luminance(parseColor(hcToken(name)).rgb);
-    const l1 = lum('tw-level-1');
-    const l2 = lum('tw-level-2');
-    const l3 = lum('tw-level-3');
-    assert.ok(l2 / l1 >= 1.6 && l3 / l2 >= 1.6,
-        `ступени слишком близки: ${l1.toFixed(4)} → ${l2.toFixed(4)} → ${l3.toFixed(4)}`);
-    console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
+    // и затевалось. Считаем КОНТРАСТ соседних ступеней, а не отношение яркостей:
+    // в тёмной теме лестница идёт вверх, в светлой вниз, и отношение яркостей
+    // осмысленно только в одну сторону.
+    const step = (a, b) => contrast(parseColor(hcToken(a)).rgb, parseColor(hcToken(b)).rgb);
+    const s12 = step('tw-level-1', 'tw-level-2');
+    const s23 = step('tw-level-2', 'tw-level-3');
+    assert.ok(s12 >= 1.1 && s23 >= 1.1,
+        `ступени слишком близки: 1→2 ${s12.toFixed(3)}:1, 2→3 ${s23.toFixed(3)}:1`);
+    report.push(`шаг ступеней: 1→2 ${s12.toFixed(3)}:1, 2→3 ${s23.toFixed(3)}:1`);
+    console.log('   [light] ' + report.join('\n   [light] '));
 });
 
-test('высокий контраст: надпись на заливке акцентом читаема', () => {
-    // Кнопка старта и активный пресет заливаются акцентом. Белая надпись на
-    // осветлённом зелёном даёт 1.9:1 — это была нечитаемая главная кнопка темы,
-    // созданной ради читаемости. Отсюда --tw-on-accent: чёрный.
+test('светлая тема: надпись на заливке акцентом читаема', () => {
+    // Кнопка старта, активный пресет и кнопка подтверждения времени заливаются
+    // акцентом. Акценты Apple рассчитаны на тёмный фон: на белом #30d158 даёт
+    // 1.9:1, поэтому в светлой теме они затемнены, а надпись на них белая.
     const onAccent = hcToken('tw-on-accent');
     const report = [];
     for (const token of ['tw-green', 'tw-blue']) {
         const bg = parseColor(hcToken(token)).rgb;
         const ratio = contrast(composite(onAccent, bg), bg);
-        const white = contrast(composite('#ffffff', bg), bg);
-        report.push(`${onAccent} на --${token}: ${ratio.toFixed(2)}:1 (белым было бы ${white.toFixed(2)}:1)`);
+        const black = contrast(composite('#000000', bg), bg);
+        report.push(`${onAccent} на --${token}: ${ratio.toFixed(2)}:1 (чёрным было бы ${black.toFixed(2)}:1)`);
         assert.ok(
             ratio >= 7.0,
             `--tw-on-accent (${onAccent}) на --${token}: ${ratio.toFixed(2)}:1, нужно 7:1`
         );
         assert.ok(
-            ratio > white,
-            `на --${token} белая надпись контрастнее выбранной — значит выбран не тот цвет`
+            ratio >= contrast(composite('#000000', bg), bg),
+            `на --${token} чёрная надпись контрастнее выбранной — значит выбран не тот цвет`
         );
     }
-    console.log('   [hc-dark] ' + report.join('\n   [hc-dark] '));
+    console.log('   [light] ' + report.join('\n   [light] '));
 });
 
-test('высокий контраст: акценты не темнее тёмной темы', () => {
-    // Осветлённые акценты hc-темы обязаны быть контрастнее обычных, иначе
-    // «высокий контраст» — только название.
-    const hcBase = parseColor(hcToken('tw-bg-dark')).rgb;
-    const hcSurface = composite(hcToken('tw-bg-surface'), hcBase);
-    for (const token of ['tw-green', 'tw-red', 'tw-orange', 'tw-blue']) {
-        const hcRatio = contrast(composite(hcToken(token), hcSurface), hcSurface);
-        const darkRatio = contrast(composite(darkToken(token), SURFACE), SURFACE);
+test('светлая тема: акценты пересчитаны под белый фон, а не унаследованы', () => {
+    // Палитра Apple рассчитана на тёмный фон: #30d158 на белом даёт 1.9:1,
+    // #ff9f0a — 2.0:1. Унаследовать их в светлой теме значило бы получить
+    // нечитаемые подписи «+1 м» и невидимые точки статуса. Проверяем ОБА
+    // свойства: значения свои (не равны тёмным) и проходят порог на белом.
+    const lightBase = parseColor(hcToken('tw-bg-dark')).rgb;
+    const lightSurface = composite(hcToken('tw-bg-surface'), lightBase);
+    const report = [];
+    for (const token of ['tw-green', 'tw-red', 'tw-orange', 'tw-yellow', 'tw-blue']) {
+        const value = hcToken(token);
+        assert.notEqual(
+            value, darkToken(token),
+            `--${token} в светлой теме не переопределён — унаследован тёмный акцент`
+        );
+        const ratio = contrast(composite(value, lightSurface), lightSurface);
+        report.push(`--${token} (${value}): ${ratio.toFixed(2)}:1`);
         assert.ok(
-            hcRatio >= darkRatio,
-            `--${token}: в hc-теме ${hcRatio.toFixed(2)}:1, в тёмной ${darkRatio.toFixed(2)}:1 — `
-            + 'высокий контраст обязан быть не хуже обычного'
+            ratio >= AA_NORMAL,
+            `--${token} (${value}) на светлой поверхности: ${ratio.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
         );
-        assert.ok(hcRatio >= AA_NORMAL, `--${token} в hc-теме: ${hcRatio.toFixed(2)}:1`);
     }
+    console.log('   [light] ' + report.join('\n   [light] '));
 });
 
-test('высокий контраст: стекло и свечение выключены', () => {
-    // Размытие и неон — главные враги контраста. Тема обязана их снимать.
-    for (const token of ['tw-blur', 'tw-blur-sm', 'tw-blur-xs']) {
-        assert.equal(hcToken(token), 'none', `--${token} в hc-теме обязан быть none`);
-    }
+test('светлая тема: свечение снято, стекло оставлено', () => {
+    // Неоновое свечение по белому читается как грязь и режет контраст цифр,
+    // поэтому гасится. А матовое стекло на светлом уместно — это не враг
+    // контраста, в отличие от свечения, и снимать его незачем.
     for (const token of ['tw-glow-blue', 'tw-glow-green', 'tw-glow-red']) {
-        assert.equal(hcToken(token), 'none', `--${token} в hc-теме обязан быть none`);
+        assert.equal(hcToken(token), 'none', `--${token} в светлой теме обязан быть none`);
+    }
+    for (const token of ['tw-blur', 'tw-blur-sm', 'tw-blur-xs']) {
+        assert.match(hcToken(token), /^blur\(/, `--${token} в светлой теме обязан остаться размытием`);
     }
 });
 
-test('светлой темы в токенах больше нет', () => {
-    // Блок был недостижим (data-theme не выставлял никто) и поэтому никогда не
-    // настраивался: подписи давали 2.70:1. Удалён вместе с упоминаниями.
-    // По КОДУ без комментариев: шапка файла объясняет, почему тема удалена, и
-    // не должна ронять тест сама по себе.
+test('высококонтрастной темы в токенах больше нет', () => {
+    // Тема hc-dark была второй до 2.4.1 и заменена светлой. Блока быть не должно:
+    // недостижимый блок — это блок, контраст которого никто не настраивает, и
+    // ровно так в этом проекте уже завелась светлая тема с подписями 2.70:1.
     const code = TOKENS.replace(/\/\*[\s\S]*?\*\//g, '');
-    assert.ok(!code.includes('[data-theme="light"]'), 'вернулся недостижимый блок светлой темы');
-    assert.ok(
-        !/color-scheme:\s*light/.test(code),
-        'вернулась светлая цветовая схема — её контраст никогда не проверялся'
-    );
+    assert.ok(!code.includes('[data-theme="hc-dark"]'), 'остался блок высококонтрастной темы');
 });
 
 test('семантические цвета статусов читаемы на стекле', () => {

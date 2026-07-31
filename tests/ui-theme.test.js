@@ -34,18 +34,19 @@ const WINDOWS = [
 ];
 
 test('normalizeTheme: неизвестное значение — это тема по умолчанию, а не ошибка', () => {
-    assert.equal(UITheme.normalizeTheme('hc-dark'), 'hc-dark');
+    assert.equal(UITheme.normalizeTheme('light'), 'light');
     assert.equal(UITheme.normalizeTheme('dark'), 'dark');
-    // В localStorage может лежать что угодно из прошлых версий, включая 'light'.
-    for (const junk of ['light', '', null, undefined, 0, 'HC-DARK', {}, []]) {
+    // В localStorage может лежать что угодно из прошлых версий — в том числе
+    // 'hc-dark' от высококонтрастной темы, которая была второй до 2.4.1.
+    for (const junk of ['hc-dark', '', null, undefined, 0, 'LIGHT', {}, []]) {
         assert.equal(UITheme.normalizeTheme(junk), 'dark', `мусор ${JSON.stringify(junk)} обязан дать dark`);
     }
 });
 
 test('nextTheme ходит по кругу и не залипает', () => {
-    assert.equal(UITheme.nextTheme('dark'), 'hc-dark');
-    assert.equal(UITheme.nextTheme('hc-dark'), 'dark');
-    assert.equal(UITheme.nextTheme('чепуха'), 'hc-dark', 'из мусора переключаемся в контрастную');
+    assert.equal(UITheme.nextTheme('dark'), 'light');
+    assert.equal(UITheme.nextTheme('light'), 'dark');
+    assert.equal(UITheme.nextTheme('чепуха'), 'light', 'из мусора переключаемся в светлую');
     // Двойное переключение возвращает в исходную — иначе кнопка была бы односторонней.
     assert.equal(UITheme.nextTheme(UITheme.nextTheme('dark')), 'dark');
 });
@@ -54,7 +55,7 @@ test('themeLabel не пустой ни для одной темы', () => {
     for (const t of UITheme.UI_THEMES) {
         assert.match(UITheme.themeLabel(t), /\S/, `подпись для ${t} пустая`);
     }
-    assert.notEqual(UITheme.themeLabel('dark'), UITheme.themeLabel('hc-dark'));
+    assert.notEqual(UITheme.themeLabel('dark'), UITheme.themeLabel('light'));
 });
 
 test('ключ хранения зарегистрирован в CONFIG.STORAGE_KEYS', () => {
@@ -67,7 +68,7 @@ test('ключ хранения зарегистрирован в CONFIG.STORAGE
 
 test('темы модуля совпадают с блоками в design-tokens.css', () => {
     const tokens = read('design-tokens.css');
-    assert.deepEqual(UITheme.UI_THEMES, ['dark', 'hc-dark'], 'состав тем изменился');
+    assert.deepEqual(UITheme.UI_THEMES, ['dark', 'light'], 'состав тем изменился');
     for (const theme of UITheme.UI_THEMES) {
         assert.ok(
             tokens.includes(`[data-theme="${theme}"]`),
@@ -144,22 +145,43 @@ test('кнопка переключения темы в панели: состо
     // состояние кнопки и разослать остальным окнам.
     assert.match(html, /window\.UITheme\.applyTheme\(theme\)/, 'тема не применяется локально');
     assert.match(html, /window\.UITheme\.storeTheme\(theme\)/, 'тема не сохраняется');
-    assert.match(html, /setAttribute\('aria-pressed', String\(hc\)\)/, 'aria-pressed не обновляется');
+    assert.match(html, /setAttribute\('aria-pressed', String\(isLight\)\)/, 'aria-pressed не обновляется');
     assert.match(html, /send\('ui-theme-update', \{ theme \}\)/, 'смена темы не рассылается в другие окна');
 });
 
-test('высокий контраст гасит декорации, заданные литералами', () => {
-    // Токены делают поверхности чёрными, но декоративные слои (сиреневые
-    // градиенты подложки, шумовая текстура, неоновая тень цифр) заданы прямо в
-    // правилах — их приходится гасить адресно, иначе «высокий контраст» получает
-    // поверх чёрного те же полупрозрачные украшения.
+test('светлая тема гасит декорации, заданные литералами', () => {
+    // Токены задают палитру, но декоративные слои (сиреневые градиенты подложки,
+    // шумовая текстура, неоновая тень цифр) заданы прямо в правилах — их
+    // приходится гасить адресно, иначе на белом остаются тёмные украшения от
+    // темы по умолчанию.
     const css = read('control.css');
     for (const sel of ['.app-shell::before', 'body::after', '.settings-drawer', '.timer-display-main']) {
         assert.ok(
-            new RegExp(`\\[data-theme="hc-dark"\\][^{]*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(css),
-            `в hc-теме не переопределён ${sel}`
+            new RegExp(`\\[data-theme="light"\\][^{]*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(css),
+            `в светлой теме не переопределён ${sel}`
         );
     }
+});
+
+test('окна с пользовательским фоном не отдают текст светлой теме', () => {
+    // Виджет и полноэкранный дисплей красит настройка фона из вкладки
+    // «Полноэкранный», и применяется она ИНЛАЙНОМ, то есть поверх любой темы;
+    // значение по умолчанию тёмное. Когда светлая тема переворачивала здесь
+    // текстовые токены, получались почти чёрные цифры на тёмно-синем фоне — на
+    // проекторе время не читалось вовсе. Эти два окна остаются светлым по
+    // тёмному в обеих темах; окно часов владеет своим фоном и за темой следует.
+    for (const file of ['electron-widget.html', 'display.html']) {
+        const html = read(file);
+        const block = /\[data-theme="light"\]\s*\{[\s\S]*?\}/.exec(html);
+        assert.ok(block, `${file}: нет блока, закрепляющего палитру в светлой теме`);
+        assert.match(block[0], /--tw-fg:\s*#ffffff/, `${file}: текст в светлой теме обязан остаться светлым`);
+    }
+    // А часы такого блока НЕ имеют — иначе светлая тема до них не дойдёт.
+    assert.doesNotMatch(
+        read('electron-clock-widget.html'),
+        /\[data-theme="light"\]\s*\{[^}]*--tw-fg:\s*#ffffff/,
+        'окно часов владеет своим фоном и обязано следовать теме'
+    );
 });
 
 test('в разметке панели не осталось инлайновых цветов', () => {

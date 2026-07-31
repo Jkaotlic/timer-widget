@@ -460,186 +460,209 @@ body::after {
     color: var(--tw-fg);
 }
 
-/* ============ Высокий контраст: убрать декорации ============
-   Токены сами делают поверхности чёрными и рамки белыми, но декоративные слои
-   заданы литералами прямо в правилах — их надо гасить адресно, иначе поверх
-   чистого чёрного остаются сиреневые градиенты и шум. */
-[data-theme="hc-dark"] .app-shell::before {
+/* ============ Светлая тема ============
+   Токены задают палитру, но половина заливок и ВЕСЬ декор панели заданы в этом
+   файле литералами: сиреневые радиальные градиенты, шумовая текстура, белый
+   текст `rgba(255,255,255,0.42–0.95)` у ящика и списка звуков. На тёмном стекле
+   это и есть дизайн, на белом фоне — грязь и невидимые подписи. Поэтому светлая
+   тема доводится адресно, ровно как это делалось для контрастной.
+
+   Все правила ниже — под [data-theme="light"], поэтому тёмная тема не меняется
+   ни на пиксель; это проверяется сверкой снимков.
+
+   Роли ступеней те же, что в тёмной: 1 — крупные блоки, 2 — контролы,
+   3 — наведение. На светлом «выше» значит темнее. */
+[data-theme="light"] .app-shell::before {
     background: var(--tw-bg-surface-solid);
     border-color: var(--tw-border);
 }
-[data-theme="hc-dark"] body::after { display: none; }         /* шумовая текстура */
-[data-theme="hc-dark"] .settings-drawer { background: var(--tw-bg-surface-solid); }
-[data-theme="hc-dark"] .timer-header,
-[data-theme="hc-dark"] .quick-window-btn,
-[data-theme="hc-dark"] .quick-window-btn:hover,
-[data-theme="hc-dark"] .quick-window-btn.active {
-    background: var(--tw-overlay-light);
+[data-theme="light"] body::after { display: none; }         /* шумовая текстура */
+[data-theme="light"] .settings-drawer { background: var(--tw-bg-surface-solid); }
+/* Панель — белый «лист» на сером фоне окна, ящик — серый с белыми карточками.
+   Это раскладка светлых системных интерфейсов: фон приложения серый, содержимое
+   белое. Обратный порядок (серая панель с ещё более серыми кнопками) читался
+   вяло: контрол отличался от подложки на три единицы яркости. */
+[data-theme="light"] .control-panel,
+[data-theme="light"] .timer-header {
+    background: var(--tw-bg-glass);
 }
-[data-theme="hc-dark"] .timer-display-main,
-[data-theme="hc-dark"] .timer-display-main.danger,
-[data-theme="hc-dark"] .timer-display-main.warning {
-    text-shadow: none;   /* неоновое свечение съедает контур цифр */
+[data-theme="light"] .timer-display-main,
+[data-theme="light"] .timer-display-main.danger,
+[data-theme="light"] .timer-display-main.warning {
+    /* Тёмная тема кладёт под цифры чёрную тень и неоновое свечение. На белом это
+       выглядит замыленным пятном, а контур цифр только теряется. */
+    text-shadow: none;
 }
 
-/* ---- Высокий контраст: поверхности и состояния ----------------------------
-   Токены сами по себе тему не вытягивают: заливки половины контролов заданы в
-   этом файле литералами вида rgba(255,255,255,0.04–0.06) и rgba(10,132,255,0.09).
-   На тёмно-синем стекле такой слой читается, а на ЧИСТОМ ЧЁРНОМ он даёт разницу
-   в 3–6 единиц яркости, то есть исчезает. Отсюда и вид «тёмная тема, из которой
-   слили цвет»: фон чёрный, а кнопки от него не отделяются ничем.
-
-   Здесь эти литералы адресно заменяются ступенями лестницы (--tw-level-*).
-   Правила действуют ТОЛЬКО в контрастной теме, поэтому вид темы по умолчанию не
-   меняется ни на пиксель — это проверяется сверкой снимков.
-
-   Второе правило блока: на заливке акцентом надпись ЧЁРНАЯ (--tw-on-accent).
-   Белое на осветлённом зелёном — 1.9:1; это была нечитаемая главная кнопка. */
-
-/* Контейнеры */
-[data-theme="hc-dark"] .settings-group,
-[data-theme="hc-dark"] .sound-item,
-[data-theme="hc-dark"] .sound-empty,
-[data-theme="hc-dark"] .settings-hint {
-    background: var(--tw-level-1);
+/* --- Контейнеры --- */
+/* Карточки в ящике — БЕЛЫЕ на сером фоне ящика; внутри них контролы серые.
+   Ступень 1 (#f5f5f7) на сером ящике (#f2f2f7) отличалась бы на три единицы
+   яркости, то есть карточкой не читалась бы вовсе. */
+[data-theme="light"] .settings-group,
+[data-theme="light"] .sound-item,
+[data-theme="light"] .sound-empty {
+    background: var(--tw-bg-glass);
     border: 1px solid var(--tw-border);
 }
-[data-theme="hc-dark"] .sound-sub-item {
+[data-theme="light"] .sound-sub-item {
     background: transparent;
     border: 0;
 }
+[data-theme="light"] .settings-hint {
+    background: rgba(0, 83, 174, 0.06);
+    border: 1px solid rgba(0, 83, 174, 0.22);
+    color: var(--tw-fg-secondary);
+}
+[data-theme="light"] .settings-hint kbd {
+    color: var(--tw-fg);
+    background: var(--tw-level-2);
+    border: 1px solid var(--tw-border);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.10);
+}
 
-/* Контролы в покое */
-[data-theme="hc-dark"] .quick-preset,
-[data-theme="hc-dark"] .manual-time-input,
-[data-theme="hc-dark"] .sound-item .sound-select,
-[data-theme="hc-dark"] .main-btn,
-[data-theme="hc-dark"] .timer-status,
-[data-theme="hc-dark"] .quick-window-btn {
+/* --- Белый текст, зашитый литералами. На белом фоне он попросту исчезает --- */
+[data-theme="light"] .drawer-head::before,
+[data-theme="light"] .drawer-body .settings-group-title,
+[data-theme="light"] .sound-formats,
+[data-theme="light"] .sound-empty,
+[data-theme="light"] .sound-empty::before {
+    color: var(--tw-fg-dim);
+}
+[data-theme="light"] .drawer-close,
+[data-theme="light"] .drawer-body .toggle-label,
+[data-theme="light"] .sound-check {
+    color: var(--tw-fg-secondary);
+}
+
+/* --- Контролы в покое --- */
+[data-theme="light"] .quick-preset,
+[data-theme="light"] .manual-time-input,
+[data-theme="light"] .sound-item .sound-select,
+[data-theme="light"] .main-btn,
+[data-theme="light"] .timer-status,
+[data-theme="light"] .quick-window-btn {
     background: var(--tw-level-2);
     border: 1px solid var(--tw-border);
     color: var(--tw-fg);
 }
-[data-theme="hc-dark"] .tabs-row,
-[data-theme="hc-dark"] .segmented {
+[data-theme="light"] .tabs-row,
+[data-theme="light"] .segmented {
     background: var(--tw-level-1);
     border: 1px solid var(--tw-border);
 }
 
-/* Наведение — ступень вверх, а не подкрашивание прозрачностью */
-[data-theme="hc-dark"] .quick-preset:hover,
-[data-theme="hc-dark"] .main-btn:hover:not(:disabled),
-[data-theme="hc-dark"] .main-btn.reset:hover:not(:disabled),
-[data-theme="hc-dark"] .quick-window-btn:hover,
-[data-theme="hc-dark"] .adjust-main-btn.plus:hover,
-[data-theme="hc-dark"] .adjust-main-btn.minus:hover {
+/* --- Наведение: ступень вниз по светлоте --- */
+[data-theme="light"] .quick-preset:hover,
+[data-theme="light"] .main-btn:hover:not(:disabled),
+[data-theme="light"] .main-btn.reset:hover:not(:disabled),
+[data-theme="light"] .quick-window-btn:hover,
+[data-theme="light"] .adjust-main-btn.plus:hover,
+[data-theme="light"] .adjust-main-btn.minus:hover {
     background: var(--tw-level-3);
     border-color: var(--tw-border-strong);
     color: var(--tw-fg);
 }
 
-/* Выбранное состояние: заливка акцентом + ЧЁРНАЯ надпись.
-   Инверсия — самый однозначный способ показать выбор в контрастной теме: она
-   работает и при полной потере цветоразличения. */
-[data-theme="hc-dark"] .quick-preset.active {
-    background: var(--tw-green);
-    border-color: var(--tw-border-strong);
+/* --- Выбранное состояние: заливка акцентом, надпись белая --- */
+[data-theme="light"] .quick-preset.active {
+    background: var(--tw-ring);
+    border-color: transparent;
     color: var(--tw-on-accent);
-    box-shadow: none;
+    box-shadow: 0 2px 8px rgba(0, 83, 174, 0.28);
 }
-[data-theme="hc-dark"] .main-btn.start {
+[data-theme="light"] .main-btn.start {
     background: var(--tw-green);
     color: var(--tw-on-accent);
-    box-shadow: none;
+    box-shadow: 0 2px 10px rgba(22, 128, 60, 0.30);
 }
-[data-theme="hc-dark"] .main-btn.start:hover:not(:disabled) {
-    background: #7bf0ab;
-    box-shadow: none;
+[data-theme="light"] .main-btn.start:hover:not(:disabled) {
+    background: #14722f;
+    box-shadow: 0 4px 14px rgba(22, 128, 60, 0.38);
 }
-[data-theme="hc-dark"] .manual-time-apply {
+[data-theme="light"] .manual-time-apply {
     background: var(--tw-green);
-    border-color: var(--tw-border-strong);
+    border-color: transparent;
     color: var(--tw-on-accent);
 }
-[data-theme="hc-dark"] .manual-time-apply:hover {
-    background: #7bf0ab;
-    border-color: var(--tw-border-strong);
+[data-theme="light"] .manual-time-apply:hover {
+    background: #14722f;
+    border-color: transparent;
 }
-[data-theme="hc-dark"] .tab-btn.active,
-[data-theme="hc-dark"] .segmented button.active {
-    background: var(--tw-fg);
-    color: var(--tw-on-accent);
-    box-shadow: none;
+/* Вкладки и сегменты: выбранный элемент — БЕЛАЯ приподнятая пилюля на сером
+   треке. Инверсия (тёмная заливка), уместная в контрастной теме, на светлом
+   выглядит тяжёлой кляксой и спорит с акцентом. */
+[data-theme="light"] .tab-btn.active,
+[data-theme="light"] .segmented button.active {
+    background: #ffffff;
+    color: var(--tw-fg);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
-[data-theme="hc-dark"] .quick-window-btn.active {
+[data-theme="light"] .quick-window-btn.active {
     background: var(--tw-blue);
-    border-color: var(--tw-border-strong);
+    border-color: transparent;
     color: var(--tw-on-accent);
-    box-shadow: none;
+    box-shadow: 0 2px 10px rgba(0, 83, 174, 0.28);
 }
-[data-theme="hc-dark"] .quick-window-btn.active .qw-icon,
-[data-theme="hc-dark"] .quick-window-btn .qw-icon {
-    background: transparent;
-    color: inherit;
+[data-theme="light"] .quick-window-btn.active .qw-icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: var(--tw-on-accent);
 }
 
-/* Ввод в фокусе — рамка белая, а не полупрозрачно-синяя */
-[data-theme="hc-dark"] .manual-time-input:focus-visible {
+[data-theme="light"] .manual-time-input:focus-visible {
+    background: #ffffff;
+    border-color: var(--tw-blue);
+}
+
+/* --- Переключатели --- */
+/* Выключенный переключатель обязан отличаться от включённого не только цветом
+   дорожки: белый бегунок на светло-сером — 1.2:1, то есть его почти не видно.
+   Дорожке в покое дана рамка, а бегунку — контур и тень. */
+[data-theme="light"] .toggle-slider {
     background: var(--tw-level-3);
-    border-color: var(--tw-border-strong);
+    border: 1px solid var(--tw-border-strong);
 }
-
-/* Переключатели: выключенное состояние обязано ЧИТАТЬСЯ, а не быть «просто
-   темнее». В покое — ступень 3 с рамкой, включённый — зелёный. */
-[data-theme="hc-dark"] .toggle-slider {
-    background: var(--tw-level-3);
-    border: 1px solid var(--tw-border);
-}
-[data-theme="hc-dark"] input:checked + .toggle-slider {
+[data-theme="light"] input:checked + .toggle-slider {
     background: var(--tw-green);
-    border-color: var(--tw-border-strong);
+    border-color: transparent;
 }
-[data-theme="hc-dark"] .toggle-slider:before {
-    background: var(--tw-fg);
-}
-[data-theme="hc-dark"] input:checked + .toggle-slider:before {
-    background: var(--tw-on-accent);
+[data-theme="light"] .toggle-slider:before {
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28), 0 0 0 0.5px rgba(0, 0, 0, 0.16);
 }
 
-/* Мелочи, которые иначе остаются от тёмной темы */
-[data-theme="hc-dark"] .sound-item .sound-preview {
+/* --- Мелочи, которые иначе остаются от тёмной темы --- */
+[data-theme="light"] .sound-item .sound-preview {
     background: var(--tw-blue);
     color: var(--tw-on-accent);
-    box-shadow: none;
+    box-shadow: 0 2px 6px rgba(0, 83, 174, 0.25);
 }
-[data-theme="hc-dark"] .drawer-body #tab-sound .add-sound-btn {
-    background: var(--tw-level-1);
-    border: 1.5px dashed var(--tw-border);
+[data-theme="light"] .drawer-body #tab-sound .add-sound-btn {
+    background: rgba(0, 83, 174, 0.05);
+    border: 1.5px dashed rgba(0, 83, 174, 0.35);
 }
-[data-theme="hc-dark"] .drawer-body #tab-sound .add-sound-btn .drop-icon {
+[data-theme="light"] .drawer-body #tab-sound .add-sound-btn .drop-icon {
     background: var(--tw-blue);
     color: var(--tw-on-accent);
 }
-[data-theme="hc-dark"] .custom-titlebar .titlebar-help.active {
+[data-theme="light"] .custom-titlebar .titlebar-help.active {
     background: var(--tw-blue);
-    border-color: var(--tw-border-strong);
+    border-color: transparent;
     color: var(--tw-on-accent);
 }
-[data-theme="hc-dark"] .drawer-body::-webkit-scrollbar-thumb,
-[data-theme="hc-dark"] .tab-content.active::-webkit-scrollbar-thumb {
-    background: var(--tw-border);
+[data-theme="light"] .drawer-body::-webkit-scrollbar-thumb,
+[data-theme="light"] .tab-content.active::-webkit-scrollbar-thumb {
+    background: var(--tw-border-strong);
 }
 
-/* Недоступное состояние. В тёмной теме оно сделано как `opacity: 0.4` плюс
-   обесцвечивание — поверх стекла это читается. На чистом чёрном сорок процентов
-   от тёмной заливки — это почти фон: кнопка не выглядит недоступной, она
-   пропадает. Здесь недоступность показывается тем же способом, что и всё
-   остальное в этой теме, — ступенью и рамкой, а надпись остаётся читаемой.
-   Идёт ПОСЛЕ правил .start / .active: специфичность равная, решает порядок. */
-[data-theme="hc-dark"] .main-btn:disabled,
-[data-theme="hc-dark"] .main-btn.start:disabled,
-[data-theme="hc-dark"] .quick-preset:disabled,
-[data-theme="hc-dark"] .adjust-main-btn:disabled {
+/* Недоступное состояние. В тёмной теме это `opacity: 0.4` плюс обесцвечивание —
+   поверх стекла читается. На светлом сорок процентов от светлой заливки почти
+   сливаются с фоном, поэтому недоступность показывается ступенью и рамкой, а
+   надпись остаётся читаемой. Идёт ПОСЛЕ правил .start / .active: специфичность
+   равная, решает порядок. */
+[data-theme="light"] .main-btn:disabled,
+[data-theme="light"] .main-btn.start:disabled,
+[data-theme="light"] .quick-preset:disabled,
+[data-theme="light"] .adjust-main-btn:disabled {
     opacity: 1;
     filter: none;
     background: var(--tw-level-1);

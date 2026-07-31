@@ -12,6 +12,38 @@
     <script src="ui-theme.js"></script>
     <script>window.UITheme.initTheme();</script>
     <style>
+        /* ============ Светлая тема сюда НЕ приходит — и это осознанно ============
+           Фон этого окна красит ПОЛЬЗОВАТЕЛЬ: режим «Заливка / Градиент / Файл»
+           из вкладки «Полноэкранный» применяется инлайном, то есть поверх любой
+           темы. Значение по умолчанию тёмное (#0f0c29).
+
+           Когда светлая тема переворачивала здесь текстовые токены, получалось
+           ровно то, ради чего темы и делаются наоборот: почти чёрные цифры на
+           тёмно-синем фоне. На панели это некрасиво, а на проекторе — время
+           нечитаемо вообще.
+
+           Поэтому окно, не владеющее своим фоном, оставляет палитру «светлое по
+           тёмному» в обеих темах. Окно часов фон держит само, поэтому оно за
+           темой следует и в светлой становится белым. */
+        [data-theme="light"] {
+            --tw-fg:            #ffffff;
+            --tw-fg-secondary:  rgba(255, 255, 255, 0.78);
+            --tw-fg-muted:      rgba(255, 255, 255, 0.58);
+            --tw-fg-dim:        rgba(255, 255, 255, 0.48);
+            --tw-fg-faint:      rgba(255, 255, 255, 0.1);
+            --tw-border:        rgba(255, 255, 255, 0.08);
+            --tw-border-strong: rgba(255, 255, 255, 0.14);
+            --tw-divider:       rgba(255, 255, 255, 0.06);
+            --tw-bg-timer:      rgba(15, 15, 25, 0.7);
+            --tw-bg-led:        rgba(10, 10, 15, 0.75);
+            --tw-bg-surface:    rgba(28, 28, 30, 0.72);
+            --tw-bg-glass:      rgba(20, 20, 35, 0.95);
+            --tw-overlay-light:  rgba(255, 255, 255, 0.05);
+            --tw-overlay-medium: rgba(255, 255, 255, 0.10);
+            --tw-on-accent:     #ffffff;
+            color-scheme: dark;
+        }
+
         /* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
         @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-latin-200-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
         @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-200-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }

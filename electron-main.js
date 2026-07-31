@@ -1169,7 +1169,7 @@ ipcMain.on('report-scale', (_event, payload) => {
 // которые у каждого окна свои и разослать их всем нельзя).
 // Отправителя не исключаем: применение темы ничего обратно не посылает, цикла
 // быть не может, а повторное применение того же значения идемпотентно.
-const UI_THEME_VALUES = new Set(['dark', 'hc-dark']);
+const UI_THEME_VALUES = new Set(['dark', 'light']);
 ipcMain.on('ui-theme-update', (_event, payload) => {
     if (!isPayloadObject(payload)) { return; }
     const theme = payload.theme;

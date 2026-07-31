@@ -14,7 +14,7 @@
 // намеренно: первые тестируются в node без окружения браузера.
 
 // Порядок важен: это же порядок перебора кнопкой-переключателем.
-const UI_THEMES = ['dark', 'hc-dark'];
+const UI_THEMES = ['dark', 'light'];
 const UI_THEME_DEFAULT = 'dark';
 // Ключ обязан быть в CONFIG.STORAGE_KEYS.UI_THEME — tests/storage-keys.test.js
 // проверяет реестр в обе стороны и падает на ключе, которого там нет.
@@ -24,7 +24,7 @@ const UI_THEME_STORAGE_KEY = 'uiTheme';
  * Приводит любое значение к известной теме. Неизвестное — не ошибка, а «тема по
  * умолчанию»: в localStorage может лежать что угодно из прошлых версий.
  * @param {*} value
- * @returns {'dark'|'hc-dark'}
+ * @returns {'dark'|'light'}
  */
 function normalizeTheme(value) {
     return UI_THEMES.indexOf(String(value)) === -1 ? UI_THEME_DEFAULT : String(value);
@@ -33,7 +33,7 @@ function normalizeTheme(value) {
 /**
  * Следующая тема по кругу — поведение кнопки-переключателя.
  * @param {*} current
- * @returns {'dark'|'hc-dark'}
+ * @returns {'dark'|'light'}
  */
 function nextTheme(current) {
     const i = UI_THEMES.indexOf(normalizeTheme(current));
@@ -42,7 +42,7 @@ function nextTheme(current) {
 
 /** Человеческая подпись для title/aria-label кнопки. */
 function themeLabel(theme) {
-    return normalizeTheme(theme) === 'hc-dark' ? 'Высокий контраст' : 'Обычная тема';
+    return normalizeTheme(theme) === 'light' ? 'Светлая тема' : 'Тёмная тема';
 }
 
 // --- Всё ниже трогает DOM/localStorage и в тестах не вызывается ---
