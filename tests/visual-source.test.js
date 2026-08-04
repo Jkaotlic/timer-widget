@@ -47,11 +47,37 @@ test('opening settings keeps control scale stable', () => {
     const controlHtml = readControlSource();
 
     assert.match(controlHtml, /\.app-shell\s*\{[^}]*--drawer-width:\s*336px;[^}]*--control-panel-width:\s*400px;/s);
-    // Ширину колонки задаёт переменная, а предел — та же ширина контента, что и у
-    // закрытого ящика. Без второго условия панель при стыковке растягивалась с 640
-    // до всей колонки (замер: 640 → 864 на окне 1200px), её левый край уезжал на
-    // 130px, и это читалось как прыжок. Держит e2e/drawer-layout.spec.js.
-    assert.match(controlHtml, /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*width:\s*var\(--control-panel-width\);[^}]*max-width:\s*min\(var\(--control-panel-width\), 640px\);/s);
+    // Колонку под ящик задаёт ФИКСИРОВАННАЯ первая дорожка, которую ведёт JS.
+    // Пока она была minmax(0, 1fr), переход стартовал от значения, которое
+    // пересчитывается по ширине окна, — а окно растёт мгновенно. Панель успевала
+    // перецентроваться во всю новую ширину: замер по кадрам давал бросок ВПРАВО
+    // на 150px (потолок 1200) и 37px (потолок 974) с последующим возвратом влево.
+    assert.match(
+        controlHtml,
+        /\.app-shell\.drawer-open\s*\{[^}]*grid-template-columns:\s*var\(--control-panel-width\) var\(--drawer-reserve, var\(--drawer-width\)\);/s,
+        'колонка под ящик снова не фиксированная — панель будет ехать за ростом окна'
+    );
+    // Резерв под ящик схлопывается ОТДЕЛЬНО от снятия класса — иначе на закрытии
+    // 1fr считается от ещё не схлопнутой второй дорожки (замер: отскок 64px).
+    assert.match(
+        controlHtml,
+        /shell\.style\.setProperty\('--drawer-reserve', '0px'\)/,
+        'резерв под ящик больше не схлопывается заранее — панель отскочит при закрытии'
+    );
+    // Ширина панели больше НЕ дублируется отдельным свойством: при фиксированной
+    // колонке `width: var(...)` менялся бы мгновенно, пока колонка едет 240ms.
+    // Проверка ОТСУТСТВИЯ идёт по копии без комментариев — пояснение к этой самой
+    // правке содержит ту строку, которую мы здесь запрещаем.
+    const cssCode = controlHtml.replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.doesNotMatch(
+        cssCode,
+        /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*width:\s*var\(--control-panel-width\);/s,
+        'ширина панели снова задана переменной вместо 100% колонки'
+    );
+    assert.match(
+        controlHtml,
+        /\.app-shell\.drawer-open \.control-panel\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*640px;/s
+    );
     assert.match(controlHtml, /\.settings-drawer\.open\s*\{[^}]*width:\s*var\(--drawer-width\);[^}]*max-width:\s*var\(--drawer-width\);/s);
     assert.doesNotMatch(controlHtml, /\.timer-display-main\s*\{[^}]*vw/s);
     // Переменную ширины колонки выставляет JS. Проверяем сам факт, а не форму

@@ -1183,30 +1183,55 @@
                     };
                     this._syncDrawerColumn = syncColumn;
                     window.addEventListener('resize', syncColumn);
+
+                    // ПИН колонки к текущей ширине окна — ДО роста окна.
+                    // Окно растёт мгновенно, колонка едет 240ms; пока колонка была
+                    // 1fr, в этот зазор она успевала стать во всю новую ширину и
+                    // панель перецентровывалась в неё — замер по кадрам давал бросок
+                    // ВПРАВО (150px при потолке 1200, 37px при 974) и возврат влево.
+                    // Пин обязан встать БЕЗ перехода: иначе переход стартует от 1fr,
+                    // а это значение пересчитывается по новой ширине и тащит панель
+                    // за собой (замер: колонка `974px 0px` при уже выставленных 638).
+                    // Гасим переход, коммитим рефлоу, возвращаем переход.
+                    this._baseInnerBeforeDrawer = window.innerWidth || baseDefault;
+                    if (shell) {
+                        shell.style.setProperty(
+                            '--control-panel-width',
+                            `${Math.round(this._baseInnerBeforeDrawer)}px`
+                        );
+                        shell.style.transition = 'none';
+                        shell.classList.add('drawer-open');
+                        void shell.offsetWidth;
+                        shell.style.transition = '';
+                    }
+
                     // Drawer-операция меняет только ширину — высоту main оставит
                     // как есть (иначе ручная высота, выставленная юзером,
                     // перезаписывалась innerHeight с HiDPI-дрейфом).
                     ipcRenderer.send('resize-control-window', {
                         width: this._baseWidthBeforeDrawer + this._drawerExtraWidth
                     });
-                    // Ящик раскрывается СРАЗУ, а в двойной кадр уходит только
-                    // стыковка панели.
-                    //
-                    // Раньше в rAF было всё вместе, и на медленном раннере CI ящик
-                    // не успевал открыться к моменту проверки: e2e видел
-                    // aria-expanded="true" при отсутствующем классе .open. Двойной
-                    // кадр здесь нужен ровно для одного — дать ширине окна приехать
-                    // до того, как панель станет левой колонкой, иначе виден скачок.
-                    // Само раскрытие и доступность от этого не зависят.
+                    // Ящик раскрывается СРАЗУ: когда раскрытие лежало в отложенном
+                    // кадре, на медленном раннере e2e видел aria-expanded="true"
+                    // при ещё отсутствующем классе .open.
                     this.settingsDrawerEl.classList.add('open');
                     this.settingsDrawerEl.setAttribute('aria-hidden', 'false');
                     this._focusFirstInDrawer();
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
+                    // Колонку пересчитываем, когда ширина окна УЖЕ приехала: раньше —
+                    // значит по ещё не выросшему окну, панель уедет влево и вернётся
+                    // вправо (тот же дёрганый ход наоборот). Если окно упёрлось в
+                    // потолок, resize не придёт — тогда сработает сторож по времени.
+                    const startWidth = window.innerWidth;
+                    const settleStartedAt = performance.now();
+                    const settleColumn = () => {
+                        if (!this.settingsDrawerEl.classList.contains('open')) { return; }
+                        if (window.innerWidth !== startWidth || performance.now() - settleStartedAt > 400) {
                             syncColumn();
-                            if (shell) { shell.classList.add('drawer-open'); }
-                        });
-                    });
+                            return;
+                        }
+                        requestAnimationFrame(settleColumn);
+                    };
+                    requestAnimationFrame(settleColumn);
                 } else {
                     // Ящик уже открыт, сменили вкладку — фокус ведём к новому содержимому.
                     this._focusFirstInDrawer();
@@ -1265,28 +1290,38 @@
                     window.removeEventListener('resize', this._syncDrawerColumn);
                     this._syncDrawerColumn = null;
                 }
-                setTimeout(() => {
+                // Зеркало пина. Колонку возвращаем к ширине окна ДО открытия, а
+                // резерв под ящик схлопываем ОТДЕЛЬНОЙ ручкой — обе дорожки едут
+                // те же 240ms, что и уезжающий ящик. Резерв обязан обнулиться
+                // ЗАРАНЕЕ: снятие drawer-open возвращает первую дорожку к 1fr, а
+                // 1fr = окно минус вторая дорожка. Пока резерв схлопывался вместе
+                // с классом, панель в этот кадр отскакивала назад на 64px (замер).
+                const baseInner = this._baseInnerBeforeDrawer;
+                if (shell && baseInner) {
+                    shell.style.setProperty('--control-panel-width', `${Math.round(baseInner)}px`);
+                    shell.style.setProperty('--drawer-reserve', '0px');
+                }
+                ipcRenderer.send('resize-control-window', { width: restoreWidth });
+                // Класс снимаем, когда ширина окна вернулась И анимация дорожек
+                // отыграла: в этот момент 1fr уже равен пину, поэтому снятие
+                // визуально ничего не меняет. Сторож по времени — на случай, если
+                // окно и так было нужной ширины и resize не придёт вовсе.
+                const closeStartedAt = performance.now();
+                const finishClose = () => {
                     if (this.settingsDrawerEl.classList.contains('open')) { return; }
-                    const clearDrawerOpen = () => {
-                        if (this.settingsDrawerEl.classList.contains('open')) { return; }
+                    const elapsed = performance.now() - closeStartedAt;
+                    const widthBack = !baseInner || Math.abs(window.innerWidth - baseInner) <= 4;
+                    if ((widthBack && elapsed > 260) || elapsed > 700) {
                         if (shell) {
                             shell.classList.remove('drawer-open');
                             shell.style.removeProperty('--control-panel-width');
+                            shell.style.removeProperty('--drawer-reserve');
                         }
-                    };
-                    const onResize = () => {
-                        window.removeEventListener('resize', onResize);
-                        clearDrawerOpen();
-                    };
-                    window.addEventListener('resize', onResize, { once: true });
-                    ipcRenderer.send('resize-control-window', { width: restoreWidth });
-                    // Fallback: если окно уже нужной ширины, resize event не прилетит —
-                    // форсированно чистим класс через 150ms.
-                    setTimeout(() => {
-                        window.removeEventListener('resize', onResize);
-                        clearDrawerOpen();
-                    }, 150);
-                }, 260);
+                        return;
+                    }
+                    requestAnimationFrame(finishClose);
+                };
+                requestAnimationFrame(finishClose);
             }
 
             toggleSettingsDrawer(tabKey) {

@@ -136,42 +136,164 @@ test('ящик настроек не накрывает панель ни при
  * (400px) панель занимает всё окно, поэтому центр и край совпадают — оттого
  * «бывает» и оттого этого не было видно ни в одном снимке.
  *
- * Меряем СМЕЩЕНИЕ левого края панели. Порог 24px — это заметный глазу скачок;
- * при прежней вёрстке на окне 900px он составлял больше сотни пикселей.
+ * Первая версия этого теста мерила ТОЛЬКО концы: положение до открытия и после,
+ * порог 24px. Она была зелёной на широком экране и красной в CI — и оба вердикта
+ * были неверны, потому что мерили не ту величину. Замер по кадрам показал, что
+ * панель едет не по прямой:
+ *
+ *   потолок 1200 (широкий экран): 130 → 280 → 112  — рывок ВПРАВО на 150px
+ *   потолок  974 (раннер CI):     130 → 167 →   0  — рывок ВПРАВО на 37px
+ *
+ * То есть на широком экране рывок БОЛЬШЕ, а тест по концам его не видел
+ * (130 → 112 = 18px, порог пройден). Причина: окно растёт МГНОВЕННО, а колонка
+ * под ящик резервируется с переходом 240ms. В промежутке между этими двумя
+ * событиями панель успевает перецентроваться во всю новую ширину окна — отсюда
+ * бросок вправо, а затем плавный возврат влево.
+ *
+ * Итоговое смещение экраном НЕ определяется свободно: на узком экране окну некуда
+ * расти (главный процесс режет по `screenWidth - 50`), и панель обязана
+ * подвинуться — 130 → 0 там физически вынуждено. Поэтому порог по концам
+ * непереносим между машинами в принципе.
+ *
+ * Переносимый инвариант — МОНОТОННОСТЬ: куда бы панель ни ехала, она не должна
+ * ехать в противоположную сторону, чтобы потом вернуться. Он не зависит ни от
+ * ширины экрана, ни от потолка окна, и ловит рывок на любой машине.
  */
 test('панель не прыгает горизонтально при открытии ящика', async () => {
     const { app, control } = await launchApp();
 
-    // Растягиваем окно: на ширине по умолчанию дефекта не видно.
+    // Растягиваем окно: на ширине по умолчанию дефекта не видно (панель занимает
+    // всё окно, центр и край совпадают).
     await control.evaluate(() => {
         window.ipcRenderer.send('resize-control-window', { width: 900, height: 700 });
     });
     await control.waitForTimeout(900);
 
-    const panelLeft = () => control.evaluate(() => {
-        const r = document.querySelector('.control-panel').getBoundingClientRect();
-        return { left: Math.round(r.left), width: Math.round(r.width), win: window.innerWidth };
+    // Пишем траекторию левого края покадрово, а не два её конца.
+    await control.evaluate(() => {
+        window.__panelTrack = [];
+        const panel = document.querySelector('.control-panel');
+        const t0 = performance.now();
+        const tick = () => {
+            const r = panel.getBoundingClientRect();
+            window.__panelTrack.push({
+                t: Math.round(performance.now() - t0),
+                left: Math.round(r.left * 10) / 10,
+                width: Math.round(r.width * 10) / 10,
+                win: window.innerWidth
+            });
+            if (performance.now() - t0 < 1100) { requestAnimationFrame(tick); }
+        };
+        requestAnimationFrame(tick);
     });
 
-    const before = await panelLeft();
-    await openDrawer(control, 'clock');
-    // Ждём конца перехода колонки (240ms) с запасом — меряем УСТАНОВИВШЕЕСЯ
-    // положение, а не кадр в середине анимации.
-    await control.waitForTimeout(600);
-    const after = await panelLeft();
+    await control.click('.tab-btn[data-tab="clock"]');
+    await control.waitForTimeout(1300);
 
-    const shift = Math.abs(after.left - before.left);
+    const track = await control.evaluate(() => window.__panelTrack);
+    expect(track.length, 'траектория открытия не записалась').toBeGreaterThan(10);
+
+    const first = track[0];
+    const last = track[track.length - 1];
+    const net = last.left - first.left;
+
+    // «Откат» — суммарное движение против итогового направления. У честной
+    // анимации он нулевой: панель едет в одну сторону и останавливается.
+    let backtrack = 0;
+    let peak = first.left;
+    for (let i = 1; i < track.length; i++) {
+        const step = track[i].left - track[i - 1].left;
+        // Направление считаем от знака итогового перемещения. Если панель никуда
+        // не уехала (net ≈ 0), любой ход в сторону — уже откат.
+        const against = net === 0
+            ? Math.abs(step)
+            : (Math.sign(step) === Math.sign(net) ? 0 : Math.abs(step));
+        backtrack += against;
+        if (Math.abs(track[i].left - first.left) > Math.abs(peak - first.left)) { peak = track[i].left; }
+    }
+
     console.log(
-        `смещение панели при открытии ящика: ${shift}px `
-        + `(закрыт: left=${before.left}, ширина ${before.width}, окно ${before.win}; `
-        + `открыт: left=${after.left}, ширина ${after.width}, окно ${after.win})`
+        `траектория панели: left ${first.left} → ${last.left} (итого ${Math.round(net)}px), `
+        + `максимальный выброс ${peak}, откат ${Math.round(backtrack)}px, `
+        + `окно ${first.win} → ${last.win}, кадров ${track.length}`
     );
+
     expect(
-        shift,
-        `панель сместилась на ${shift}px при открытии ящика `
-        + `(было left=${before.left} при окне ${before.win}px, стало left=${after.left} при окне ${after.win}px). `
-        + 'Место под ящик резервирует вторая колонка сетки, поэтому панель обязана остаться на месте.'
-    ).toBeLessThanOrEqual(24);
+        Math.round(backtrack),
+        `панель дёрнулась: уехала до ${peak}px и вернулась на ${last.left}px `
+        + `(итоговое перемещение ${Math.round(net)}px, суммарный откат ${Math.round(backtrack)}px). `
+        + 'Окно растёт мгновенно, колонка под ящик — за 240ms; между этими событиями панель '
+        + 'не должна успевать перецентроваться во всю новую ширину окна.'
+    ).toBeLessThanOrEqual(4);
+
+    // Итоговое положение обязано совпадать с тем, что вынуждает раскладка:
+    // колонка = ширина окна минус ящик, панель по центру колонки, но не шире 640.
+    const expected = await control.evaluate(() => {
+        const shell = document.querySelector('.app-shell');
+        const drawer = parseInt(getComputedStyle(shell).getPropertyValue('--drawer-width'), 10) || 336;
+        const minW = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_MIN_WIDTH) || 380;
+        const col = Math.max(minW, window.innerWidth - drawer);
+        return Math.max(0, Math.round((col - Math.min(col, 640)) / 2));
+    });
+    expect(
+        Math.abs(last.left - expected),
+        `панель встала на ${last.left}px, а раскладка требует ${expected}px`
+    ).toBeLessThanOrEqual(2);
+
+    // --- ЗАКРЫТИЕ проверяется тем же инвариантом ---
+    // Оно ломалось СВОИМ образом: снятие drawer-open возвращает первую дорожку к
+    // 1fr, а 1fr = окно минус вторая дорожка. Пока резерв под ящик схлопывался
+    // только вместе с классом, в этот кадр дорожка получалась не 900, а 771 —
+    // панель отскакивала назад на 64px и ехала обратно (замер).
+    await control.evaluate(() => {
+        window.__panelTrack = [];
+        const panel = document.querySelector('.control-panel');
+        const t0 = performance.now();
+        const tick = () => {
+            const r = panel.getBoundingClientRect();
+            window.__panelTrack.push({
+                t: Math.round(performance.now() - t0),
+                left: Math.round(r.left * 10) / 10,
+                win: window.innerWidth
+            });
+            if (performance.now() - t0 < 1100) { requestAnimationFrame(tick); }
+        };
+        requestAnimationFrame(tick);
+    });
+
+    await control.click('#drawerClose');
+    await control.waitForTimeout(1300);
+
+    const closeTrack = await control.evaluate(() => window.__panelTrack);
+    expect(closeTrack.length, 'траектория закрытия не записалась').toBeGreaterThan(10);
+
+    const cFirst = closeTrack[0];
+    const cLast = closeTrack[closeTrack.length - 1];
+    const cNet = cLast.left - cFirst.left;
+    let cBack = 0;
+    let cPeak = cFirst.left;
+    for (let i = 1; i < closeTrack.length; i++) {
+        const step = closeTrack[i].left - closeTrack[i - 1].left;
+        cBack += cNet === 0
+            ? Math.abs(step)
+            : (Math.sign(step) === Math.sign(cNet) ? 0 : Math.abs(step));
+        if (Math.abs(closeTrack[i].left - cFirst.left) > Math.abs(cPeak - cFirst.left)) {
+            cPeak = closeTrack[i].left;
+        }
+    }
+
+    console.log(
+        `траектория при закрытии: left ${cFirst.left} → ${cLast.left} (итого ${Math.round(cNet)}px), `
+        + `максимальный выброс ${cPeak}, откат ${Math.round(cBack)}px, окно ${cFirst.win} → ${cLast.win}`
+    );
+
+    expect(
+        Math.round(cBack),
+        `панель дёрнулась при ЗАКРЫТИИ: уехала до ${cPeak}px и вернулась на ${cLast.left}px `
+        + `(итоговое перемещение ${Math.round(cNet)}px, суммарный откат ${Math.round(cBack)}px). `
+        + 'Резерв под ящик обязан схлопнуться ДО снятия drawer-open, иначе 1fr считается '
+        + 'от ещё не схлопнутой второй дорожки.'
+    ).toBeLessThanOrEqual(4);
 
     await app.close();
 });
