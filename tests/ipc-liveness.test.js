@@ -47,6 +47,7 @@ const RENDERER_FILES = [
     'shortcuts-help.js',
     'ui-theme.js',
     'flip-card.js',
+    'window-geometry.js',
     'settings-schema.js',
     'ipc-compat.js'
 ];
@@ -74,7 +75,19 @@ test('у каждого разрешённого send-канала есть от
     // рендереров других `.send(` не содержат.
     const orphans = ALLOWED_CHANNELS.send.filter((channel) => {
         const re = new RegExp(`\\.send\\(\\s*['"\`]${channel}['"\`]`);
-        return !re.test(rendererCode);
+        if (re.test(rendererCode)) { return false; }
+        // Вторая законная форма — имя канала в настройках window-geometry.js:
+        // окно передаёт модулю пару `resize`/`position`, а шлёт их сам модуль
+        // (`send(channels.resize, …)`). Литерал при этом остаётся в разметке
+        // окна, поэтому канал по-прежнему прослеживается глазами, но вызов
+        // `.send('литерал')` рядом с ним не стоит.
+        //
+        // Признаём такую форму ТОЛЬКО если модуль действительно шлёт по этому
+        // полю: иначе проверка выродилась бы в «имя канала где-то написано».
+        const asConfig = new RegExp(`\\b(move|resize|position):\\s*['"\`]${channel}['"\`]`);
+        const m = rendererCode.match(asConfig);
+        if (!m) { return true; }
+        return !new RegExp(`send\\(\\s*channels\\.${m[1]}\\b`).test(rendererCode);
     });
 
     assert.deepEqual(
@@ -157,4 +170,30 @@ test('панель показывает, что время восстановл�
 test('прозрачность часов больше не читается из ключа, которого никто не пишет', () => {
     const clock = codeOnly(read('electron-clock-widget.html'));
     assert.doesNotMatch(clock, /s\.opacity/, 'чтение без записи всегда возвращает undefined');
+});
+
+test('двусторонний IPC не открыт, пока принимающей стороны не существует', () => {
+    // Тот же принцип, что и для каналов: разрешение — не функция.
+    //
+    // `preload.js` выставлял наружу `invoke` (двусторонний запрос-ответ), при
+    // том что `ipcMain.handle` в проекте нет НИ ОДНОГО. То есть это была не
+    // просто неиспользуемая обёртка, а нерабочая по построению: любой вызов
+    // повис бы без ответа. Расширять поверхность моста ради несуществующей
+    // возможности нельзя — мост и так единственное окно из песочницы наружу.
+    //
+    // Инвариант двусторонний: если `ipcMain.handle` когда-нибудь появится,
+    // `invoke` придётся вернуть — и тест об этом скажет.
+    const main = codeOnly(read('electron-main.js'));
+    const preload = codeOnly(read('preload.js'));
+
+    const hasHandlers = /ipcMain\.handle\(/.test(main);
+    const exposesInvoke = /\binvoke:\s*\(/.test(preload);
+
+    assert.equal(
+        exposesInvoke,
+        hasHandlers,
+        hasHandlers
+            ? 'в главном процессе есть ipcMain.handle — preload обязан выставить invoke'
+            : 'preload выставляет invoke, но ipcMain.handle нет ни одного: канал в один конец'
+    );
 });

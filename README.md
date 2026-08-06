@@ -185,8 +185,9 @@ timer-widget/
 ├── constants.js                # Константы, IPC каналы, ключи storage
 ├── utils.js                    # formatTime, parseTime, debounce, safelySendToWindow
 ├── security.js                 # Валидация: data URL, изображения, escapeHTML
+├── fonts.css                   # @font-face локальных шрифтов — один на все окна
 ├── design-tokens.css           # CSS custom properties (палитра, тени, блюры, тайминги)
-├── components.css              # Shared компонентные стили
+├── control.css                 # Стили окна управления
 ├── build/
 │   ├── icon.png                # Иконка приложения (1024×1024)
 │   ├── after-pack.js           # electron-builder hook

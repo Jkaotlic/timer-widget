@@ -8,15 +8,27 @@ const path = require('node:path');
 const repoRoot = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
 
+// Утверждение о НАЛИЧИИ обязано смотреть на код, а не на текст о коде:
+// закомментированная строка удовлетворяет assert.match ровно так же, как живая,
+// и тест остаётся зелёным на вырезанной вёрстке. Проверено мутацией. Обратные
+// утверждения («старое сломанное ушло») от той же уборки только выигрывают —
+// CLAUDE.md требует их ровно в таком виде, — поэтому все ИСХОДНИКИ читаются
+// очищенными. Документация (.md) читается как есть: там комментариев в смысле
+// кода нет, а утверждения о ней — про текст, а не про поведение.
+//
+// Реализация ОДНА на весь набор тестов: копий было три, и они разошлись.
+const { codeOnly } = require('./helpers/source-scan');
+const readCode = (file) => codeOnly(read(file));
+
 // Стили окна управления живут в отдельном control.css (вынесены из inline-<style>),
 // но проверки ниже описывают ОДНО окно как оно поставляется. Поэтому склеиваем
 // разметку с её стилями: так утверждения остаются про поведение окна, а не про
 // то, в каком файле физически лежит правило.
-const readControlSource = () => read('electron-control.html') + '\n' + read('control.css');
+const readControlSource = () => readCode('electron-control.html') + '\n' + readCode('control.css');
 
 
 test('control window keeps enough breathing room for rounded glass panel', () => {
-    const constants = read('constants.js');
+    const constants = readCode('constants.js');
     const controlHtml = readControlSource();
 
     assert.match(constants, /CONTROL_WINDOW_WIDTH:\s*400/);
@@ -92,9 +104,9 @@ test('колонка панели при открытом ящике счита�
     // расширялось, а колонка оставалась во всю ширину — ящик (absolute, right: 0)
     // накрывал пресеты и кнопки. Замер в e2e/drawer-layout.spec.js: правый край
     // панели 1200 против левого края ящика 864.
-    const controlHtml = read('electron-control.html');
-    const constants = read('constants.js');
-    const main = read('electron-main.js');
+    const controlHtml = readCode('electron-control.html');
+    const constants = readCode('constants.js');
+    const main = readCode('electron-main.js');
 
     assert.match(constants, /CONTROL_WINDOW_MAX_WIDTH:\s*\d+/, 'потолок ширины не объявлен в CONFIG');
     // Потолок обязан быть ОДИН на главный процесс и панель, иначе они разъедутся.
@@ -147,17 +159,28 @@ test('control window keeps a reliable drag region after frameless shell changes'
     assert.match(controlHtml, /\.custom-titlebar \.titlebar-help\s*\{/);
 });
 
-test('widget windows only start JS drag from non-interactive surfaces', () => {
-    const widgetHtml = read('electron-widget.html');
-    const clockHtml = read('electron-clock-widget.html');
-    const displayScript = read('display-script.js');
+test('перетаскивание окна начинается только с неинтерактивной поверхности', () => {
+    // Виджет и часы делят общий механизм (window-geometry.js) — там же и гард.
+    // Полноэкранный дисплей сюда НЕ входит намеренно: его перетаскивание
+    // отличается по существу (нет preventDefault, есть эвристика полноэкранного
+    // режима, геометрия не хранится), поэтому у него свой экземпляр гарда.
+    const shared = readCode('window-geometry.js');
+    const displayScript = readCode('display-script.js');
 
-    [widgetHtml, clockHtml, displayScript].forEach(source => {
+    [shared, displayScript].forEach(source => {
         assert.match(source, /isWindowDragTarget\(target\)\s*\{[^}]*typeof target\.closest === 'function'/s);
         assert.match(source, /button, input, select, textarea, \[role="button"\], \[tabindex\]/);
         assert.match(source, /e\.button !== 0[^;]+e\.altKey[^;]+e\.ctrlKey[^;]+e\.metaKey[^;]+e\.shiftKey/s);
-        assert.match(source, /!\s*this\.isWindowDragTarget\(e\.target\)/);
     });
+
+    // Оба окна обязаны брать механизм из модуля, а не заводить свой заново:
+    // это были два дословных клона, различавшихся ОДНОЙ строкой — именем канала.
+    for (const file of ['electron-widget.html', 'electron-clock-widget.html']) {
+        const src = readCode(file);
+        assert.match(src, /WindowGeometry\.bindWindowDrag\(\{/, `${file}: перетаскивание должно идти через модуль`);
+        assert.doesNotMatch(src, /isWindowDragTarget\(target\)\s*\{/, `${file}: копия гарда вернулась`);
+        assert.doesNotMatch(src, /let isDragging = false/, `${file}: копия механики вернулась`);
+    }
 });
 
 test('в окне часов нет внутренних контролов — ни разметки, ни стилей под них', () => {
@@ -173,7 +196,7 @@ test('в окне часов нет внутренних контролов — 
     // относится вовсе, а мёртвый CSS не может вернуться незамеченным.
     // Комментарии вырезаем: они намеренно называют удалённые селекторы, чтобы
     // правка не вернулась «по незнанию», и без вырезания тест ловил бы сам себя.
-    const clockHtml = read('electron-clock-widget.html')
+    const clockHtml = readCode('electron-clock-widget.html')
         .replace(/<!--[\s\S]*?-->/g, '')
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^[ \t]*\/\/.*$/gm, '');
@@ -212,8 +235,8 @@ test('минус вне потока: по центру стоят ЦИФРЫ', 
     // минус внутри кольца с запасом 43px (виджет) и 80.9px (дисплей).
     // Живой замер держит e2e/overtime-centering.spec.js.
     const controlHtml = readControlSource();
-    const widgetHtml = read('electron-widget.html');
-    const displayHtml = read('display.html');
+    const widgetHtml = readCode('electron-widget.html');
+    const displayHtml = readCode('display.html');
     const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
     for (const [name, src, signSel, boxSel] of [
@@ -256,7 +279,7 @@ test('минус вне потока: по центру стоят ЦИФРЫ', 
 });
 
 test('circular widget centers the digits independently from the status chip', () => {
-    const widgetHtml = read('electron-widget.html');
+    const widgetHtml = readCode('electron-widget.html');
 
     assert.match(widgetHtml, /\.center-content\s*\{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*1fr auto 1fr;/s);
     assert.match(widgetHtml, /\.center-content\s*\{[^}]*width:\s*72%;/s);
@@ -265,12 +288,50 @@ test('circular widget centers the digits independently from the status chip', ()
 });
 
 test('circular clock keeps the time fixed at the ring center', () => {
-    const clockHtml = read('electron-clock-widget.html');
+    const clockHtml = readCode('electron-clock-widget.html');
 
     assert.match(clockHtml, /\.center-content\s*\{[^}]*width:\s*72%;[^}]*height:\s*72%;/s);
     assert.match(clockHtml, /\.time-display\s*\{[^}]*position:\s*absolute;[^}]*left:\s*50%;[^}]*top:\s*50%;[^}]*transform:\s*translate\(-50%, -50%\);/s);
-    assert.match(clockHtml, /\.center-content > \.date-badge\s*\{[^}]*position:\s*absolute;[^}]*transform:\s*translateX\(-50%\);/s);
-    assert.match(clockHtml, /\.center-content > \.timezone-badge\s*\{[^}]*position:\s*absolute;[^}]*transform:\s*translateX\(-50%\);/s);
+    // Шильдики висят абсолютно — ОДНОЙ колонкой — и потому не двигают время.
+    assert.match(clockHtml, /\.center-badges\s*\{[^}]*position:\s*absolute;[^}]*transform:\s*translateX\(-50%\);/s);
+});
+
+test('дата и часовой пояс круглых часов разложены потоком, а не двумя смещениями', () => {
+    // Раньше каждый шильдик имел собственное `top: calc(50% + clamp(...))`:
+    // расстояние между ними росло как 5vh, а высота даты — как ~8.4vh
+    // (font-size 4.5vh × line-height, padding 1.5vh сверху и снизу, рамка).
+    // Высота обгоняла зазор, и дата наезжала на пояс — впритык уже на дефолтных
+    // 220px и −15px на 400px. Замерено в e2e/clock-badges-layout.spec.js.
+    // Снимками не ловилось: `clock-*` исключены из визуальной сверки.
+    const clockHtml = readCode('electron-clock-widget.html');
+    // Комментарии вырезаем: пояснение к правилу само описывает прежнюю
+    // раскладку и иначе роняет проверки на её отсутствие.
+    const CSS_CODE = clockHtml.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    const column = CSS_CODE.match(/\.center-badges\s*\{[^}]*\}/s);
+    assert.ok(column, 'правило .center-badges не найдено');
+    assert.match(column[0], /flex-direction:\s*column;/, 'шильдики должны идти колонкой');
+    assert.match(column[0], /gap:/, 'расстояние задаёт gap, а не второе абсолютное смещение');
+
+    // Прежняя раскладка не должна вернуться ни для одного из двух шильдиков.
+    assert.doesNotMatch(CSS_CODE, /\.center-content\s*>\s*\.date-badge/);
+    assert.doesNotMatch(CSS_CODE, /\.center-content\s*>\s*\.timezone-badge/);
+});
+
+test('стиль часов приводится к белому списку перед подстановкой в класс', () => {
+    // `classList.add('style-' + style)` роняет DOMException на строке с пробелом
+    // или на пустой. Обработчик обрывался ПОСЛЕ снятия прежних классов, поэтому
+    // body оставался вообще без `style-*`. Значение приходит из localStorage и
+    // из `clock-widget-set-style`, который главный процесс ретранслирует без
+    // проверки. Замерено в e2e/clock-style-hardening.spec.js.
+    const clockHtml = readCode('electron-clock-widget.html');
+    const JS_CODE = clockHtml.replace(/\/\/[^\n]*/g, '');
+
+    assert.match(JS_CODE, /const safeStyle = \['circle', 'digital', 'flip', 'analog'\]\.includes\(style\)/);
+    assert.match(JS_CODE, /classList\.add\('style-' \+ safeStyle\)/);
+    // Сырое значение больше не должно доходить ни до класса, ни до поля.
+    assert.doesNotMatch(JS_CODE, /classList\.add\('style-' \+ style\)/);
+    assert.doesNotMatch(JS_CODE, /this\.clockStyle = style;/);
 });
 
 test('вторичные секунды не сдвигают главное время круглых часов', () => {
@@ -278,7 +339,7 @@ test('вторичные секунды не сдвигают главное в�
     // центрировался ВЕСЬ блок, а само «21:06» стояло на ~9.5px левее центра
     // кольца — и переключение секунд в настройках дёргало время туда-сюда.
     // Замерено в e2e: было hhmm_dx = -9.5, стало 0.
-    const clockHtml = read('electron-clock-widget.html');
+    const clockHtml = readCode('electron-clock-widget.html');
     const found = clockHtml.match(/\.time-display \.clock-seconds\s*\{[^}]*\}/s);
     assert.ok(found, 'правило .clock-seconds не найдено');
     // Комментарии вырезаем: пояснение внутри правила само упоминает margin,

@@ -89,16 +89,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
 
-    /**
-     * Invoke IPC handler (two-way request-response)
-     */
-    invoke: (channel, data) => {
-        if (isValidChannel(channel, 'send')) {
-            return ipcRenderer.invoke(channel, data);
-        }
-        console.error(`Blocked attempt to invoke unauthorized channel: ${channel}`);
-        return Promise.reject(new Error(`Invalid channel: ${channel}`));
-    },
+    // Двустороннего `invoke` здесь намеренно НЕТ: `ipcMain.handle` в проекте
+    // нет ни одного, поэтому вызов повис бы без ответа. Мост — единственное
+    // окно из песочницы наружу, и держать в нём нерабочую возможность значит
+    // расширять поверхность впустую. Появится обработчик — вернуть обёртку;
+    // за этим следит tests/ipc-liveness.test.js, проверяя обе стороны сразу.
 
     /**
      * Register IPC event listener

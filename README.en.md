@@ -185,8 +185,9 @@ timer-widget/
 ├── constants.js                # Constants, IPC channels, storage keys
 ├── utils.js                    # formatTime, parseTime, debounce, safelySendToWindow
 ├── security.js                 # Validation: data URL, images, escapeHTML
+├── fonts.css                   # Local @font-face declarations — one copy for all windows
 ├── design-tokens.css           # CSS custom properties (palette, shadows, blurs, timings)
-├── components.css              # Shared component styles
+├── control.css                 # Control panel styles
 ├── build/
 │   ├── icon.png                # App icon (1024×1024)
 │   ├── after-pack.js           # electron-builder hook

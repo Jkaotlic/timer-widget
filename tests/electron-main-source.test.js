@@ -31,12 +31,19 @@ test('IPC handlers do not destructure renderer payloads in parameters', () => {
 });
 
 test('BrowserWindow DevTools are enabled only in unpackaged --dev runs', () => {
-    const devToolsMatches = source.match(/devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g) || [];
+    // Считались СОВПАДЕНИЯ и сравнивались с четвёркой. Пятое окно, добавленное
+    // без гарда, оставляет счётчик равным четырём — тест проходит на злом окне
+    // (воспроизведено мутацией). Поэтому сравниваются две величины, растущие
+    // вместе с кодом: гардов обязано быть не меньше, чем конструкторов окон.
+    const windows = (source.match(/new BrowserWindow\(/g) || []).length;
+    const guards = (source.match(
+        /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
+    ) || []).length;
 
-    assert.equal(
-        devToolsMatches.length,
-        4,
-        'all BrowserWindow instances should keep DevTools disabled in packaged releases'
+    assert.ok(windows >= 4, `окон найдено ${windows}, ожидалось не меньше четырёх`);
+    assert.ok(
+        guards >= windows,
+        `окон ${windows}, гардов devTools ${guards}: в сборке останется режим разработчика`
     );
 });
 

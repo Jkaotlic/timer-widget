@@ -13,9 +13,18 @@
    (tests/contrast.test.js), поэтому селектор темы не должен появляться в
    комментариях ВЫШЕ своего блока — иначе тест прочитает не ту тему.
 
-   Fonts are loaded via local @font-face blocks in each HTML file
-   (see electron-*.html / display.html) — not via Google Fonts CDN,
-   since CSP `font-src 'self' data:` blocks external font sources.
+   Шрифты объявлены локально в fonts.css (подключается первым в каждом окне), а
+   не через Google Fonts: CSP `font-src 'self' data:` внешний источник запретит,
+   да и работать без сети приложение обязано.
+
+   В файле только ТОКЕНЫ. Ниже них когда-то лежали «семантические рецепты»
+   (.tw-timer-hero, .tw-led, .tw-chip, .tw-interactive, .tw-spin и прочие ~135
+   строк) — ни один не встречался ни в разметке, ни в classList четырёх окон, и
+   удаление всех 24 правил дало НОЛЬ различий computed style во всех окнах.
+   Опасны они были не весом: .tw-chip.is-success/.is-attention — это ровно та
+   «вторая цветовая система» на одном элементе, которая уже красила «ВРЕМЯ
+   ВЫШЛО!» зелёным. Не добавляйте сюда правила: место для них — control.css и
+   inline-<style> окна, которому они нужны.
    ============================================================ */
 
 /* ---------------- DARK (default) ---------------- */
@@ -265,140 +274,10 @@
   }
 }
 
-/* ============================================================
-   Semantic type recipes
-   ============================================================ */
-.tw-timer-hero {
-  font-family: var(--tw-font-display);
-  font-weight: 200;
-  font-size: var(--tw-t-timer-hero);
-  letter-spacing: 0.05em;
-  font-variant-numeric: tabular-nums;
-  color: var(--tw-fg);
-  text-shadow: 0 2px 4px rgba(0,0,0,0.5), var(--tw-glow-blue);
-  white-space: nowrap;
-  line-height: 1;
-}
-.tw-timer-panel {
-  font-family: var(--tw-font-display);
-  font-weight: 200;
-  font-size: var(--tw-t-timer-panel);
-  letter-spacing: -1px;
-  font-variant-numeric: tabular-nums;
-  color: var(--tw-fg);
-  line-height: 1;
-}
-.tw-led {
-  font-family: var(--tw-font-mono);
-  font-weight: 700;
-  color: var(--tw-led-green);
-  text-shadow:
-    0 0 10px currentColor,
-    0 0 20px currentColor,
-    0 0 40px color-mix(in srgb, currentColor 40%, transparent);
-  letter-spacing: 0.02em;
-}
-
-h1, .tw-h1 { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-h1); letter-spacing: -0.3px; color: var(--tw-fg); }
-h2, .tw-h2 { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-h2); letter-spacing: -0.2px; color: var(--tw-fg); }
-.tw-body    { font-family: var(--tw-font-sans); font-weight: 400; font-size: var(--tw-t-body); color: var(--tw-fg-secondary); line-height: 1.45; }
-.tw-label   { font-family: var(--tw-font-sans); font-weight: 500; font-size: var(--tw-t-label); color: var(--tw-fg-muted); }
-.tw-caption { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-caption); color: var(--tw-fg-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-.tw-mono    { font-family: var(--tw-font-mono); font-variant-numeric: tabular-nums; }
-
-/* ============================================================
-   Building blocks
-   ============================================================ */
-.tw-panel {
-  background: var(--tw-bg-surface);
-  -webkit-backdrop-filter: var(--tw-blur);
-  backdrop-filter: var(--tw-blur);
-  border: 1px solid var(--tw-border);
-  border-radius: var(--tw-r-2xl);
-  box-shadow: var(--tw-shadow-panel);
-}
-
-/* Chips — NORMALIZED: only 3 semantic tiers */
-.tw-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px;
-  background: var(--tw-overlay-medium);
-  border-radius: var(--tw-r-pill);
-  font-family: var(--tw-font-sans);
-  font-size: var(--tw-t-caption);
-  font-weight: 600;
-  color: var(--tw-fg-secondary);
-  backdrop-filter: var(--tw-blur-xs);
-  border: 1px solid transparent;
-}
-.tw-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.tw-chip.is-neutral   { /* default · Готов / Пауза / Завершён */ }
-.tw-chip.is-success   { background: rgba(48,209,88,0.18); color: var(--tw-green); border-color: rgba(48,209,88,0.32); }
-.tw-chip.is-attention { background: rgba(255,69,58,0.20); color: var(--tw-red);   border-color: rgba(255,69,58,0.35); }
-
-/* ============================================================
-   STATES — focus / disabled / loading / error
-   ============================================================ */
-.tw-interactive {
-  transition: background var(--tw-dur-base) var(--tw-ease),
-              color var(--tw-dur-base) var(--tw-ease),
-              border-color var(--tw-dur-base) var(--tw-ease),
-              transform var(--tw-dur-fast) var(--tw-ease),
-              box-shadow var(--tw-dur-base) var(--tw-ease);
-}
-.tw-interactive:focus { outline: none; }
-.tw-interactive:focus-visible {
-  outline: none;
-  box-shadow: var(--tw-focus-ring);
-}
-.tw-interactive:active:not(:disabled) { transform: scale(0.98); }
-.tw-interactive:disabled,
-.tw-interactive[aria-disabled="true"] {
-  opacity: 0.4;
-  cursor: not-allowed !important;
-  pointer-events: none;
-  filter: grayscale(0.6);
-}
-
-/* Loading spinner — neutral, reused across buttons / rows */
-.tw-spin {
-  display: inline-block;
-  width: 14px; height: 14px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: tw-spin 800ms linear infinite;
-  vertical-align: -2px;
-}
-@keyframes tw-spin { to { transform: rotate(360deg); } }
-
-/* Error field */
-.tw-error-msg {
-  display: flex; align-items: center; gap: 6px;
-  color: var(--tw-red);
-  font-size: var(--tw-t-caption);
-  font-weight: 500;
-  margin-top: 6px;
-}
-.tw-error-msg::before { content: "!"; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: var(--tw-red); color: #fff; font-size: 10px; font-weight: 700; }
-
-/* ============================================================
-   Colorblind-safe pattern helpers
-   Every status also carries a GLYPH + shape, not color only.
-   See SKILL.md → "Status vocabulary" for the contract.
-   ============================================================ */
-.tw-status-glyph { font-family: var(--tw-font-mono); font-weight: 700; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 3px; background: currentColor; color: #000; }
-
-/* ============================================================
-   Overtime pulse — only when prefers-reduced-motion is OFF
-   ============================================================ */
-@keyframes tw-pulse-danger {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
-}
-@keyframes tw-breath {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.03); }
-}
-.tw-is-overtime { animation: tw-pulse-danger 1s ease-in-out infinite; }
-.tw-is-breathing { animation: tw-breath 2.4s ease-in-out infinite; }
+/* Единственные правила в файле — и они не рецепты, а базовая типографика для
+   ЭЛЕМЕНТОВ. Замер: снятие обоих даёт разницу в панели (#faqModalTitle теряет
+   letter-spacing -0.2px и разъезжается на 4.4px), поэтому они остаются.
+   Классы-синонимы .tw-h1/.tw-h2 из селекторов убраны — ими никто не пользуется,
+   а с ними правило выглядело рецептом и тянуло за собой все остальные. */
+h1 { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-h1); letter-spacing: -0.3px; color: var(--tw-fg); }
+h2 { font-family: var(--tw-font-sans); font-weight: 600; font-size: var(--tw-t-h2); letter-spacing: -0.2px; color: var(--tw-fg); }

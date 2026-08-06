@@ -270,6 +270,134 @@ test('faint используется только для заливок, но н
 });
 
 // ---------------------------------------------------------------------------
+// Окна, не владеющие своим фоном: виджет и полноэкранный дисплей
+// ---------------------------------------------------------------------------
+
+/*
+ * Эти два окна фон себе НЕ красят — его красит настройка «Фон» вкладки
+ * «Полноэкранный», причём ИНЛАЙНОМ, то есть поверх любой темы, и по умолчанию
+ * тёмным (#0f0c29). Поэтому оба прибивают светлую палитру назад в тёмную блоком
+ * `[data-theme="light"]` внутри собственного <style>.
+ *
+ * Пин — перечисление, и в 2.4.1 он перечислял только ТЕКСТОВЫЕ токены. Акценты
+ * приходили из design-tokens.css, где светлая тема специально затемняет их под
+ * БЕЛЫЙ фон (--tw-green: #12652f), и ложились на прибитый тёмный: статус «идёт»
+ * в LED-стиле давал 2.73:1 вместо 9.69:1 — на проекторе не читается вообще.
+ *
+ * Проверка считает КАЖДЫЙ акцент, реально используемый в файле, на КАЖДОЙ
+ * подложке из его же пина. Список используемых токенов берётся из самого файла,
+ * поэтому новое `var(--tw-...)` без пина роняет тест, а не тихо чернеет.
+ */
+
+// Дефолт настройки «Фон» — то, что лежит под полупрозрачными подложками пина.
+const USER_BG = parseColor('#0f0c29').rgb;
+
+// Акценты: всё, чем красятся цифры, статусы, стрелки и точки-разделители.
+const ACCENT_NAMES = [
+    'tw-blue', 'tw-green', 'tw-red', 'tw-orange', 'tw-yellow', 'tw-pink',
+    'tw-led-green', 'tw-led-warn', 'tw-led-danger',
+    'tw-ring', 'tw-ring-warning', 'tw-ring-danger'
+];
+
+// Подложки, объявленные в самом пине: SVG-круг, LED-панель, карточки блоков.
+const PINNED_BACKDROPS = ['tw-bg-timer', 'tw-bg-led', 'tw-bg-surface'];
+
+function readWindowCss(file) {
+    // Комментарии снимаем до разбора: в шапке пина прозой перечислено, чего в
+    // нём не хватало, и без чистки эти слова попали бы в список «использованных».
+    return fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+// Токены прибитого блока окна. Отсутствие блока — само по себе провал: без него
+// светлая тема переворачивает текст и цифры становятся чёрными по тёмно-синему.
+function readPin(css, file) {
+    const m = /\[data-theme="light"\]\s*\{([\s\S]*?)\n\s*\}/.exec(css);
+    assert.ok(m, `${file}: блок [data-theme="light"] не найден`);
+    const pin = new Map();
+    for (const decl of m[1].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
+        pin.set(decl[1], decl[2].trim());
+    }
+    return pin;
+}
+
+// Значение токена так, как его вычислит браузер В ЭТОМ окне: пин перекрывает
+// design-tokens.css, непокрытое наследуется оттуда, а var(--x) внутри значения
+// подставляется из ТОЙ ЖЕ области — именно поэтому --tw-led-green: var(--tw-green)
+// чинится пином зелёного и отдельного пина не требует.
+function makeResolver(base) {
+    return function resolve(name, seen = new Set()) {
+        assert.ok(!seen.has(name), `циклическая ссылка на --${name}`);
+        seen.add(name);
+        const value = base(name);
+        return value.replace(/var\(--([a-z0-9-]+)\)/g, (_, dep) => resolve(dep, new Set(seen)));
+    };
+}
+
+// Градиент проверяется по остановкам: у кольца и точек-разделителей нет одного
+// «своего» цвета, а нечитаемым его делает любая из них.
+function colorStops(value) {
+    return value.startsWith('linear-gradient')
+        ? [...value.matchAll(/#[0-9a-fA-F]{6}|rgba?\([^)]+\)/g)].map((m) => m[0])
+        : [value];
+}
+
+const OWNS_NO_BACKGROUND = ['electron-widget.html', 'display.html'];
+
+test('виджет и дисплей: акценты читаемы на своей прибитой подложке в светлой теме', () => {
+    const report = [];
+    for (const file of OWNS_NO_BACKGROUND) {
+        const css = readWindowCss(file);
+        const pin = readPin(css, file);
+        const resolve = makeResolver((name) => (pin.has(name) ? pin.get(name) : hcToken(name)));
+
+        // Подложки берутся из пина и кладутся на пользовательский фон: считать
+        // акцент на белом было бы враньём — белого в этом окне нет.
+        const backdrops = PINNED_BACKDROPS
+            .filter((name) => pin.has(name))
+            .map((name) => [name, composite(pin.get(name), USER_BG)]);
+        assert.ok(backdrops.length, `${file}: в пине нет ни одной подложки`);
+
+        const used = ACCENT_NAMES.filter((name) => css.includes(`var(--${name})`));
+        assert.ok(used.length, `${file}: не найдено ни одного акцента — регулярка разошлась с разметкой`);
+
+        for (const token of used) {
+            for (const stop of colorStops(resolve(token))) {
+                for (const [bgName, bg] of backdrops) {
+                    const ratio = contrast(composite(stop, bg), bg);
+                    report.push(`${file} --${token} (${stop}) на --${bgName}: ${ratio.toFixed(2)}:1`);
+                    assert.ok(
+                        ratio >= AA_NORMAL,
+                        `${file}: --${token} (${stop}) на --${bgName} даёт ${ratio.toFixed(2)}:1, `
+                        + `нужно ${AA_NORMAL}:1. Окно не владеет фоном — акцент обязан быть прибит `
+                        + `к тёмному значению внутри [data-theme="light"] этого файла`
+                    );
+                }
+            }
+        }
+    }
+    console.log('   ' + report.join('\n   '));
+});
+
+test('виджет и дисплей: прибитая палитра совпадает с тёмной, а не изобретена заново', () => {
+    // Контраст можно вытянуть и третьей палитрой — и тогда одно и то же
+    // состояние таймера будет разного цвета в разных темах. Инвариант жёстче:
+    // окно, не владеющее фоном, живёт в тёмной палитре В ОБЕИХ темах.
+    const dark = makeResolver(darkToken);
+    for (const file of OWNS_NO_BACKGROUND) {
+        const css = readWindowCss(file);
+        const pin = readPin(css, file);
+        const light = makeResolver((name) => (pin.has(name) ? pin.get(name) : hcToken(name)));
+        for (const token of ACCENT_NAMES.filter((name) => css.includes(`var(--${name})`))) {
+            assert.equal(
+                light(token), dark(token),
+                `${file}: --${token} в светлой теме разошёлся с тёмной`
+            );
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
 // Подписи info-блоков полноэкранного дисплея во всех встроенных темах
 // ---------------------------------------------------------------------------
 

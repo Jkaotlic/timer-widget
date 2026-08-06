@@ -16,7 +16,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repoRoot = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+const readRaw = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+
+// Все исходники читаются БЕЗ комментариев. Утверждение о наличии, пущенное по
+// сырому тексту, доказывает лишь то, что нужные слова где-то написаны:
+// закомментированная строка удовлетворяет assert.match ровно так же, как живая.
+// Проверено мутацией — `// this.finished = !!state.finished;` проходил проверку
+// «виджет читает finished из состояния», то есть тест сторожил вырезанное
+// поведение. Утверждения об ОТСУТСТВИИ от той же уборки только выигрывают: они
+// и раньше должны были идти по коду, а не по пояснениям к нему.
+// Реализация ОДНА на весь набор тестов: копий было три, и они разошлись —
+// две вырезали <!-- -->, третья нет.
+const { codeOnly } = require('./helpers/source-scan');
+const read = (file) => codeOnly(readRaw(file));
 
 // Стили окна управления живут в отдельном control.css (вынесены из inline-<style>),
 // но проверки ниже описывают ОДНО окно как оно поставляется. Поэтому склеиваем
@@ -102,11 +114,33 @@ test('справка по F1 описывает реальные пресеты 
     assert.doesNotMatch(help, /'1-5', 'Быстрые пресеты/);
     assert.match(help, /\['1—8', 'Пресеты: 5, 10, 15, 20, 25, 30, 45, 60 мин'\]/);
 
-    // Набор пресетов в справке обязан совпадать с обработчиком.
-    const handlerPresets = controlHtml.match(
-        /const presets = \[300, 600, 900, 1200, 1500, 1800, 2700, 3600\]/
+    // Набор пресетов в справке обязан совпадать с тем, что реально раскладывает
+    // обработчик. Раньше здесь цементировался ЛИТЕРАЛ в панели — то есть тест
+    // требовал держать таблицу копией, при существующем реестре
+    // CONFIG.PRESET_DURATIONS. Сверяем справку с реестром, а окна — с ним же
+    // (тест «пресеты объявлены один раз» ниже).
+    const CONFIG = require('../constants');
+    const minutes = CONFIG.PRESET_DURATIONS.map((s) => s / 60).join(', ');
+    assert.ok(
+        help.includes(`Пресеты: ${minutes} мин`),
+        `справка обещает не те пресеты: в реестре ${minutes}`
     );
-    assert.ok(handlerPresets, 'обработчик Digit1..8 должен раскладывать 8 пресетов');
+});
+
+test('таблица пресетов объявлена один раз — в реестре', () => {
+    // Она жила четырьмя литералами: в панели, виджете, часах и как «запасной
+    // вариант» в дисплее. Реестр при этом существовал, и читал его только
+    // дисплей. Четыре копии одной таблицы — это четыре места, где её забудут
+    // поправить.
+    for (const file of ['electron-control.html', 'electron-widget.html', 'electron-clock-widget.html', 'display-script.js']) {
+        const src = read(file);
+        assert.match(src, /CONFIG\.PRESET_DURATIONS/, `${file}: пресеты должны браться из реестра`);
+        assert.doesNotMatch(
+            src,
+            /\[\s*300,\s*600,\s*900,\s*1200,\s*1500,\s*1800,\s*2700,\s*3600\s*\]/,
+            `${file}: копия таблицы пресетов вернулась`
+        );
+    }
 });
 
 test('оверлей справки нарисован в тёмной теме приложения', () => {
@@ -167,25 +201,61 @@ test('масштаб дисплея применяется только при �
 // Геометрия виджетов
 // ---------------------------------------------------------------------------
 
-test('виджет таймера запоминает масштаб и позицию между запусками', () => {
-    // Баг: Ctrl+колесо нигде не сохранялось, а loadSettings() безусловно звал
-    // setSize('medium') — окно каждый раз возвращалось к 250×250 в угол экрана.
-    assert.match(widgetHtml, /restoreGeometry\(\)\s*\{/);
-    assert.match(widgetHtml, /saveGeometry\(scalePct\)\s*\{/);
-    assert.match(widgetHtml, /localStorage\.setItem\('widgetGeometry'/);
-    assert.match(widgetHtml, /ipcRenderer\.send\('widget-set-position', \{ x: geo\.x, y: geo\.y \}\)/);
-    // Мёртвый пресетный setSize() убран вместе с его localStorage-ключом.
-    assert.doesNotMatch(widgetHtml, /this\.setSize\(savedSize\)/);
-    assert.doesNotMatch(widgetHtml, /localStorage\.setItem\('widgetSize'/);
-});
+// Сама механика геометрии вынесена в window-geometry.js и проверяется там
+// ПОВЕДЕНИЕМ (tests/window-geometry.test.js): запись, восстановление, границы
+// масштаба, переполненное хранилище. Здесь остаётся то, что модуль проверить не
+// может, — что каждое окно действительно им пользуется и передаёт СВОИ четыре
+// значения. Перепутать их местами модуль не мешает, а окно откроется чужого
+// размера и запишет чужой ключ.
+const GEOMETRY_WIRING = [
+    {
+        what: 'виджет таймера', src: () => widgetHtml,
+        storageKey: 'widgetGeometry', base: 'WIDGET_BASE_SIZE',
+        channels: ['widget-move', 'widget-resize', 'widget-set-position'],
+        deadKey: 'widgetSize'
+    },
+    {
+        what: 'виджет часов', src: () => clockHtml,
+        storageKey: 'clockGeometry', base: 'CLOCK_BASE_SIZE',
+        channels: ['clock-widget-move', 'clock-widget-resize', 'clock-widget-set-position'],
+        deadKey: 'clockWidgetSize'
+    }
+];
 
-test('виджет часов запоминает масштаб и позицию между запусками', () => {
-    assert.match(clockHtml, /restoreGeometry\(\)\s*\{/);
-    assert.match(clockHtml, /saveGeometry\(scalePct\)\s*\{/);
-    assert.match(clockHtml, /localStorage\.setItem\('clockGeometry'/);
-    assert.match(clockHtml, /ipcRenderer\.send\('clock-widget-set-position', \{ x: geo\.x, y: geo\.y \}\)/);
-    assert.doesNotMatch(clockHtml, /this\.setSize\(savedSize\)/);
-    assert.doesNotMatch(clockHtml, /localStorage\.setItem\('clockWidgetSize'/);
+for (const w of GEOMETRY_WIRING) {
+    test(`${w.what} запоминает масштаб и позицию между запусками`, () => {
+        // Баг: Ctrl+колесо нигде не сохранялось, а loadSettings() безусловно звал
+        // setSize('medium') — окно каждый раз возвращалось к размеру по умолчанию
+        // в угол экрана.
+        const src = w.src();
+
+        assert.match(src, /createWindowGeometry\(\{/, 'окно должно пользоваться общим модулем геометрии');
+        assert.match(src, new RegExp(`storageKey:\\s*'${w.storageKey}'`));
+        assert.match(src, new RegExp(`baseSize:\\s*${w.base}`));
+        for (const channel of w.channels) {
+            assert.match(src, new RegExp(`'${channel}'`), `${w.what}: канал ${channel} не передан модулю`);
+        }
+        assert.match(src, /restoreGeometry\(\)\s*\{/);
+        assert.match(src, /saveGeometry\(scalePct\)\s*\{/);
+
+        // Мёртвый пресетный setSize() убран вместе с его localStorage-ключом.
+        assert.doesNotMatch(src, /this\.setSize\(savedSize\)/);
+        assert.doesNotMatch(src, new RegExp(`localStorage\\.setItem\\('${w.deadKey}'`));
+        // И копия механики не должна вернуться в окно: она жила тут двумя
+        // дословными клонами, различавшимися четырьмя значениями.
+        assert.doesNotMatch(src, /localStorage\.setItem\('(?:widget|clock)Geometry'/);
+    });
+}
+
+test('базовый размер окна объявлен один раз', () => {
+    // Раньше он существовал в двух местах: константой в setupEventListeners и
+    // литералом в restoreGeometry/saveGeometry. Правка одной цифры из двух
+    // давала окно, которое открывается одного размера, а сохраняет другой.
+    for (const [src, base, size] of [[widgetHtml, 'WIDGET_BASE_SIZE', '250'], [clockHtml, 'CLOCK_BASE_SIZE', '220']]) {
+        const declarations = src.match(new RegExp(`const ${base}\\s*=`, 'g')) || [];
+        assert.equal(declarations.length, 1, `${base} объявлен ${declarations.length} раз(а)`);
+        assert.doesNotMatch(src, new RegExp(`window\\.outerWidth / ${size} \\* 100`), 'база просочилась литералом');
+    }
 });
 
 test('сохранённая позиция восстанавливается только на реально подключённый монитор', () => {
@@ -352,7 +422,9 @@ test('ноль на таймере попадает в красную полос
         assert.doesNotMatch(src, /percentLeft <= \w+ && percentLeft > 0/);
         assert.doesNotMatch(src, /percentLeft <= 10 && percentLeft > 0/);
     }
-    assert.match(read('renderer-shared.js'), /Ноль ВХОДИТ в danger/);
+    // Единственное место, где нужен именно СЫРОЙ текст: проверяется наличие
+    // пояснения к правилу, а не кода.
+    assert.match(readRaw('renderer-shared.js'), /Ноль ВХОДИТ в danger/);
 });
 
 test('цветовая полоса считается в одном месте для всех окон', () => {

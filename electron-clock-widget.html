@@ -5,37 +5,14 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clock Widget</title>
+    <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
-    <link rel="stylesheet" href="components.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
     <script src="ui-theme.js"></script>
     <script>window.UITheme.initTheme();</script>
     <style>
-        /* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
-        @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-latin-200-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-200-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        /* JetBrains Mono: latin + cyrillic, weights 300/400/500/700 */
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-
         * {
             margin: 0;
             padding: 0;
@@ -222,11 +199,29 @@
             white-space: nowrap;
         }
 
-        .center-content > .date-badge {
+        /* Круговой стиль: дата и часовой пояс — ОДНА колонка, а не два
+           независимых абсолютных смещения от центра. Раньше дата стояла на
+           `calc(50% + clamp(22px, 10vh, 90px))`, пояс на `calc(50% + clamp(44px,
+           15vh, 150px))`, то есть расстояние между ними росло как 5vh, а высота
+           даты — как ~8.4vh (font-size 4.5vh × line-height, плюс padding 1.5vh
+           сверху и снизу, плюс рамка). Высота обгоняла зазор, и дата наезжала на
+           пояс: впритык уже на дефолтных 220px и −15px на 400px (замерено).
+           В потоке такое невозможно by construction — расстояние задаёт gap.
+           Снимками это не ловилось: `clock-*` исключены из визуальной сверки как
+           зависящие от живого времени. */
+        .center-badges {
             position: absolute;
             left: 50%;
             top: calc(50% + clamp(22px, 10vh, 90px));
             transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: clamp(2px, 1vh, 8px);
+        }
+
+        .center-badges > .date-badge,
+        .center-badges > .timezone-badge {
             margin-top: 0;
         }
 
@@ -272,14 +267,6 @@
                         color var(--tw-dur-slow) var(--tw-ease);
             display: none;
             white-space: nowrap;
-        }
-
-        .center-content > .timezone-badge {
-            position: absolute;
-            left: 50%;
-            top: calc(50% + clamp(44px, 15vh, 150px));
-            transform: translateX(-50%);
-            margin-top: 0;
         }
 
         .timezone-badge.visible {
@@ -490,7 +477,6 @@
             background: rgba(0, 0, 0, 0.85);
             z-index: 10;
         }
-
 
         /* Перекидывание карточки. Раньше анимация была только в полноэкранном
            режиме, а виджет и часы меняли цифру рывком — вернули везде.
@@ -872,8 +858,11 @@
             <!-- Центральный контент -->
             <div class="center-content">
                 <div class="time-display" id="timeDisplay">00:00</div>
-                <div class="date-badge" id="dateBadge" style="display: none;"></div>
-                <div class="timezone-badge" id="timezoneBadge"></div>
+                <!-- Оба шильдика в одной колонке — см. .center-badges в стилях -->
+                <div class="center-badges">
+                    <div class="date-badge" id="dateBadge" style="display: none;"></div>
+                    <div class="timezone-badge" id="timezoneBadge"></div>
+                </div>
             </div>
         </div>
 
@@ -1000,6 +989,7 @@
     <script src="utils.js"></script>
     <script src="renderer-shared.js"></script>
     <script src="flip-card.js"></script>
+    <script src="window-geometry.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1008,6 +998,11 @@
             const el = document.querySelector('.widget-container') || document.body;
             el.classList.toggle('ticks-on', !!showTicks);
         }
+
+        // Размер окна при масштабе 100%. Раньше жил внутри setupEventListeners,
+        // а восстановление геометрии считало от той же цифры, вписанной
+        // отдельным литералом — то есть база существовала в двух местах.
+        const CLOCK_BASE_SIZE = 220;
 
         class ClockWidget {
             constructor() {
@@ -1023,6 +1018,24 @@
                 this.clockStyle = 'circle';
                 // Stored handler refs for cleanup
                 this._handlers = {};
+
+                // Размер и позиция окна — общий механизм с виджетом таймера.
+                // Различий ровно четыре, и все они здесь: ключ хранилища,
+                // базовый размер и пара каналов (см. window-geometry.js).
+                this._geometry = window.WindowGeometry.createWindowGeometry({
+                    storageKey: 'clockGeometry',
+                    baseSize: CLOCK_BASE_SIZE,
+                    channels: {
+                        move: 'clock-widget-move',
+                        resize: 'clock-widget-resize',
+                        position: 'clock-widget-set-position'
+                    },
+                    send: (channel, payload) => ipcRenderer.send(channel, payload),
+                    parseJSON: safeJSONParse,
+                    storage: localStorage,
+                    getOuterWidth: () => window.outerWidth,
+                    getScreenPosition: () => ({ x: window.screenX, y: window.screenY })
+                });
 
                 this.initElements();
                 this.initProgress();
@@ -1206,59 +1219,19 @@
                 localStorage.setItem('clockColors', JSON.stringify(colors));
             }
 
-            isWindowDragTarget(target) {
-                return !!(
-                    target
-                    && typeof target.closest === 'function'
-                    // .controls-overlay и .settings-panel убраны из перечня: внутренних
-                    // контролов в этом окне нет с тех пор, как управление переехало в
-                    // панель, а их стили удалены вместе с этой правкой. Общий список
-                    // интерактивных элементов оставлен как защита на будущее — он
-                    // совпадает с виджетом таймера.
-                    && !target.closest('button, input, select, textarea, [role="button"], [tabindex]')
-                );
-            }
-
             setupEventListeners() {
-                // JS-based window drag (replaces -webkit-app-region: drag)
-                let isDragging = false;
-                let dragStartX = 0, dragStartY = 0;
-
-                this._handlers.onContainerMouseDown = (e) => {
-                    if (
-                        e.button !== 0
-                        || e.altKey
-                        || e.ctrlKey
-                        || e.metaKey
-                        || e.shiftKey
-                        || !this.isWindowDragTarget(e.target)
-                    ) {
-                        return;
-                    }
-                    isDragging = true;
-                    dragStartX = e.screenX;
-                    dragStartY = e.screenY;
-                    e.preventDefault();
-                };
-                this.container.addEventListener('mousedown', this._handlers.onContainerMouseDown);
-
-                this._handlers.onMouseMove = (e) => {
-                    if (!isDragging) { return; }
-                    const dx = e.screenX - dragStartX;
-                    const dy = e.screenY - dragStartY;
-                    if (dx !== 0 || dy !== 0) {
-                        ipcRenderer.send('clock-widget-move', { deltaX: dx, deltaY: dy });
-                        dragStartX = e.screenX;
-                        dragStartY = e.screenY;
-                    }
-                };
-                document.addEventListener('mousemove', this._handlers.onMouseMove);
-
-                this._handlers.onMouseUp = () => {
-                    if (isDragging) { this.saveGeometry(); }
-                    isDragging = false;
-                };
-                document.addEventListener('mouseup', this._handlers.onMouseUp);
+                // Перетаскивание окна на JS вместо `-webkit-app-region: drag` —
+                // общий механизм с виджетом таймера, см. window-geometry.js.
+                // Перечень интерактивных элементов там же: внутренних контролов
+                // в этом окне нет с тех пор, как управление переехало в панель,
+                // но список оставлен защитой на будущее.
+                window.WindowGeometry.bindWindowDrag({
+                    container: this.container,
+                    doc: document,
+                    onMove: (delta) => ipcRenderer.send('clock-widget-move', delta),
+                    onDrop: () => this.saveGeometry(),
+                    handlers: this._handlers
+                });
 
                 // Track timer and window states for keyboard shortcuts
                 let _timerIsRunning = false;
@@ -1311,7 +1284,7 @@
                     // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
                     if (e.code >= 'Digit1' && e.code <= 'Digit8') {
                         e.preventDefault();
-                        const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                        const presets = window.CONFIG.PRESET_DURATIONS;
                         const idx = parseInt(e.code.replace('Digit', '')) - 1;
                         ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
                     }
@@ -1319,9 +1292,8 @@
                 document.addEventListener('keydown', this._handlers.onKeyDown);
 
                 // Ctrl+Wheel scaling — resize clock by 10% per scroll tick
-                const CLOCK_BASE_SIZE = 220;
-                const CLOCK_MIN_SCALE = 30;
-                const CLOCK_MAX_SCALE = 600;
+                const CLOCK_MIN_SCALE = window.WindowGeometry.MIN_SCALE_PCT;
+                const CLOCK_MAX_SCALE = window.WindowGeometry.MAX_SCALE_PCT;
                 let clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
                 this._handlers.onWheel = (e) => {
                     if (!e.ctrlKey) { return; }
@@ -1348,11 +1320,11 @@
                     // часы при следующем открытии откатывались к прежнему размеру,
                     // а ползунок в панели показывал уже третье значение.
                     //
-                    // Сравнение с _clockScalePct обязательно: restoreGeometry()
+                    // Сравнение с текущим масштабом обязательно: restoreGeometry()
                     // при старте сама вызывает resize, и без проверки saveGeometry
                     // успела бы записать позицию ДО того, как её применит
                     // clock-widget-set-position, затерев восстановленную.
-                    if (clockScalePct !== this._clockScalePct) {
+                    if (clockScalePct !== this._geometry.scalePct) {
                         this.saveGeometry(clockScalePct);
                     }
                 };
@@ -1369,20 +1341,32 @@
             // геометрию, а UI для выбора пресета размера в приложении отсутствует.
 
             setClockStyle(style) {
-                this.clockStyle = style;
-                
+                // Белый список. Значение приходит ДВУМЯ путями, и оба без
+                // проверки: из localStorage при старте и по каналу
+                // `clock-widget-set-style`, который главный процесс просто
+                // ретранслирует. Класс собирается конкатенацией, а
+                // `classList.add` роняет DOMException на строке с пробелом или
+                // на пустой — обработчик обрывается ПОСЛЕ снятия прежних
+                // классов, и body остаётся вообще без `style-*`, то есть
+                // раскладка выбранного стиля разваливается целиком (замерено).
+                // Виджет и дисплей кладут литералы в ветках switch и такой
+                // дырки не имеют. Мусор нельзя и запоминать: this.clockStyle
+                // уезжает обратно в localStorage при сохранении настроек.
+                const safeStyle = ['circle', 'digital', 'flip', 'analog'].includes(style) ? style : 'circle';
+                this.clockStyle = safeStyle;
+
                 // Применяем класс стиля к body
                 document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
-                document.body.classList.add('style-' + style);
-                
+                document.body.classList.add('style-' + safeStyle);
+
                 // Скрываем все стили
                 if (this.circularWidget) {this.circularWidget.classList.remove('active');}
                 if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
                 if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
                 if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
-                
+
                 // Показываем выбранный
-                switch (style) {
+                switch (safeStyle) {
                     case 'circle':
                         if (this.circularWidget) {this.circularWidget.classList.add('active');}
                         break;
@@ -1399,7 +1383,7 @@
                 
                 // Показываем/скрываем опцию "Цифры на циферблате" только для analog
                 if (this.showNumbersRow) {
-                    this.showNumbersRow.style.display = (style === 'analog') ? 'flex' : 'none';
+                    this.showNumbersRow.style.display = (safeStyle === 'analog') ? 'flex' : 'none';
                 }
 
                 // Раньше здесь стояло принудительное `this.showSeconds = true` и
@@ -1528,37 +1512,11 @@
             // возвращалось в правый нижний угол с размером по умолчанию, а
             // масштаб от Ctrl+колеса и перетаскивание терялись.
             restoreGeometry() {
-                const geo = safeJSONParse(localStorage.getItem('clockGeometry'), null);
-                if (!geo || typeof geo !== 'object') { return; }
-
-                const pct = Number(geo.scalePct);
-                if (Number.isFinite(pct) && pct >= 30 && pct <= 600) {
-                    this._clockScalePct = pct;
-                    const size = Math.round(220 * pct / 100);
-                    ipcRenderer.send('clock-widget-resize', { width: size, height: size });
-                }
-
-                // Главный процесс подожмёт точку в рабочую область, если монитор
-                // из прошлой сессии больше не подключён.
-                if (Number.isFinite(geo.x) && Number.isFinite(geo.y)) {
-                    ipcRenderer.send('clock-widget-set-position', { x: geo.x, y: geo.y });
-                }
+                this._geometry.restore();
             }
 
             saveGeometry(scalePct) {
-                // Без явного значения берём фактическую ширину окна: она учитывает
-                // и нативный ресайз за край, а не только Ctrl+колесо.
-                const pct = Number.isFinite(scalePct)
-                    ? scalePct
-                    : (Math.round(window.outerWidth / 220 * 100) || this._clockScalePct || 100);
-                this._clockScalePct = pct;
-                try {
-                    localStorage.setItem('clockGeometry', JSON.stringify({
-                        scalePct: pct,
-                        x: window.screenX,
-                        y: window.screenY
-                    }));
-                } catch { /* хранилище переполнено — геометрия не критична */ }
+                this._geometry.save(scalePct);
             }
 
             saveSettings() {
