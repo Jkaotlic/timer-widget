@@ -117,18 +117,29 @@ function checkHardening(source) {
     if (source === null) {
         return ['electron-main.js не найден внутри app.asar'];
     }
-    const windows = (source.match(/new BrowserWindow\(\{/g) || []).length;
-    const guards = (source.match(
+    // Комментарии снимаем: пояснение «nodeIntegration: true здесь запрещён»
+    // уронило бы сборку на тексте, объясняющем запрет. Та же уборка, что в
+    // tests/helpers/source-scan.js — здесь она повторена локально, потому что
+    // скрипт намеренно не имеет зависимостей и запускается из CI на артефакте.
+    const code = source
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // Считаем `new BrowserWindow(` БЕЗ следующей фигурной скобки: форма
+    // `new BrowserWindow(opts)` — с настройками в переменной — иначе не
+    // попадала бы в счёт вовсе, и сравнение guards >= windows проходило бы
+    // при окне без гарда.
+    const windows = (code.match(/new BrowserWindow\(/g) || []).length;
+    const guards = (code.match(
         /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
     ) || []).length;
     if (windows === 0) { problems.push('в упакованном main нет ни одного BrowserWindow'); }
     if (guards < windows) {
         problems.push(`окон ${windows}, гардов devTools ${guards} — в сборке остался режим разработчика`);
     }
-    if (/sandbox:\s*false/.test(source)) { problems.push('в сборке окно с sandbox: false'); }
-    if (/nodeIntegration:\s*true/.test(source)) { problems.push('в сборке окно с nodeIntegration: true'); }
-    if (/contextIsolation:\s*false/.test(source)) { problems.push('в сборке окно с contextIsolation: false'); }
-    if (/autoUpdater/.test(source)) { problems.push('в сборке появился автообновлятель'); }
+    if (/sandbox:\s*false/.test(code)) { problems.push('в сборке окно с sandbox: false'); }
+    if (/nodeIntegration:\s*true/.test(code)) { problems.push('в сборке окно с nodeIntegration: true'); }
+    if (/contextIsolation:\s*false/.test(code)) { problems.push('в сборке окно с contextIsolation: false'); }
+    if (/autoUpdater/.test(code)) { problems.push('в сборке появился автообновлятель'); }
     return problems;
 }
 

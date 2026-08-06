@@ -2,40 +2,29 @@
  *
  * Вынесены из inline-<style> в electron-control.html: 3378 строк CSS внутри
  * HTML-файла делали его нечитаемым и прятали разметку и логику друг от друга.
- * Порядок подключения важен: этот файл идёт ПОСЛЕ design-tokens.css и
- * components.css, потому что переопределяет их переменные и компонентные
- * правила. Внутри порядок сохранён ровно как был — каскад тут значимый
- * (например, статус-плашки и .app-shell.drawer-open зависят от позиции правил).
+ * Порядок подключения важен: этот файл идёт ПОСЛЕ design-tokens.css, потому что
+ * переопределяет его токены. Внутри порядок сохранён ровно как был — каскад тут
+ * значимый (например, статус-плашки и .app-shell.drawer-open зависят от позиции
+ * правил).
+ *
+ * Раньше перед этим файлом подключались ещё styles.css и components.css —
+ * остатки первой версии приложения. Панель брала оттуда РОВНО две вещи, обе
+ * перенесены сюда (см. ниже); всё прочее было погашено правилами этого файла
+ * при равной специфичности, то есть держалось только порядком <link> — и
+ * достаточно было переставить строчки в <head>, чтобы вернулась вёрстка 2021
+ * года. Оба файла удалены.
  */
-
-/* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
-@font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-latin-200-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-200-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-/* JetBrains Mono: latin + cyrillic, weights 300/400/500/700 */
-@font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
 
 /* =============================================
    TimerWidget — Control Panel · VisionOS v2
    Dark glass · tokens from design-tokens.css
    ============================================= */
-* { box-sizing: border-box; }
+/* Сброс полей и отступов приехал из styles.css и он ЖИВОЙ: замер (снятие файла
+   с diff по computed style) показал 47 затронутых элементов — кнопки транспорта
+   получали 1px/6px UA-паддинга, чекбоксы и ползунки — 2-3px UA-полей, пункты
+   выпадающих списков — свои. Браузерные умолчания для li/p/h1 панель гасит
+   собственными правилами, но новая разметка на это рассчитывать не должна. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
     margin: 0;
@@ -69,6 +58,13 @@ body::after {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* Вторая половина наследства styles.css: центрирование содержимого окна.
+       Оно тут единственное, что этот файл НЕ задавал сам, — замер показал
+       center → normal по обеим осям при снятии styles.css. Третье свойство
+       оттуда, min-height: 100vh, не перенесено намеренно: height уже 100vh и
+       безусловна, так что минимум ничего не добавляет. */
+    justify-content: center;
+    align-items: center;
     color: var(--tw-fg-secondary);
 }
 

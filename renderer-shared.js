@@ -12,11 +12,14 @@
 // the renderers — they adopt these as drop-in replacements, no new behavior is
 // invented.
 //
-// NOTE: a generic drag helper and a status→color helper were prototyped here
-// too, but each renderer's drag (preventDefault / window-blur differences) and
-// color-band logic (percent- vs status-based thresholds) diverge enough that
-// unifying them would change behavior, so they stayed per-renderer and were
-// dropped from this module to avoid dead exports.
+// NOTE: a status→color helper was prototyped here too, but the color-band logic
+// (percent- vs status-based thresholds) diverged enough between renderers that
+// unifying it would change behavior; it was dropped to avoid a dead export.
+// The window drag DID turn out to be unifiable — for the widget and the clock,
+// whose blocks were verbatim clones differing in one line — and lives in
+// window-geometry.js. The display keeps its own: no preventDefault, a fullscreen
+// heuristic, no geometry. "Diverges enough" is a claim that has to be re-measured,
+// not inherited.
 
 // ---------------------------------------------------------------------------
 // breakdown(totalAbsSeconds) → { hours, minutes, seconds, hasHours }
@@ -240,6 +243,34 @@ function timerColorBand(remainingSeconds, totalSeconds, thresholds) {
 }
 
 // ---------------------------------------------------------------------------
+// pickOwnSetting(settings, ownKey, sharedKey) → значение или undefined
+// ---------------------------------------------------------------------------
+/**
+ * Выбирает значение настройки, у которой ДВА имени: собственное (принадлежит
+ * конкретному окну) и общее (осталось от версий, где окно было одно).
+ *
+ * Зачем это отдельная функция, а не `a || b` на месте вызова: общее имя в этом
+ * проекте ДВУСМЫСЛЕННО. В `displayExtSettings` поле `timerStyle` — стиль
+ * ВИДЖЕТА (settings-schema.js пишет его туда через `alsoWrite`, чтобы откат на
+ * предыдущую версию приложения не потерял настройку), а в IPC-пакете
+ * `display-settings-update` под тем же именем панель шлёт стиль ДИСПЛЕЯ. Оба
+ * набора приходят в одну и ту же функцию окна, поэтому окно обязано спрашивать
+ * СВОЁ имя первым, а общее держать запасным.
+ *
+ * Сравнение именно с undefined: `0` и пустая строка — это присланные значения,
+ * а не молчание, и проваливаться в запасное имя они не должны.
+ *
+ * @param {unknown} settings
+ * @param {string} ownKey — имя, принадлежащее этому окну
+ * @param {string} sharedKey — общее имя прежних версий
+ * @returns {unknown|undefined}
+ */
+function pickOwnSetting(settings, ownKey, sharedKey) {
+    if (!settings || typeof settings !== 'object') { return undefined; }
+    return settings[ownKey] !== undefined ? settings[ownKey] : settings[sharedKey];
+}
+
+// ---------------------------------------------------------------------------
 // Exports — dual pattern identical to utils.js
 // ---------------------------------------------------------------------------
 const RendererShared = {
@@ -247,7 +278,8 @@ const RendererShared = {
     flipCells,
     clampScale,
     timerLifecycleStatus,
-    timerColorBand
+    timerColorBand,
+    pickOwnSetting
 };
 
 // Node.js (tests / main process)

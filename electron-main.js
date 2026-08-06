@@ -283,6 +283,27 @@ function bindWindowStateSnapshot(win) {
     win.webContents.on('did-finish-load', () => sendWindowStatesTo(win));
 }
 
+// Обратная сторона снимка: остальные окна узнают, что появилось новое, а само
+// новое окно получает накопленное состояние.
+//
+// Живёт здесь, а НЕ в обработчике `ipcMain.on('open-*')`, потому что у события
+// «окно открылось» должен быть один владелец — функция создания окна. Пункты
+// трея зовут create-функции напрямую, и всё, что лежало в обработчике канала,
+// мимо них проходило: панель не подсвечивала кнопку, горячая клавиша W/C
+// считала окно закрытым и слала `open-*`, а главный процесс лишь фокусировал
+// уже живое окно — переключатель выглядел мёртвым.
+//
+// Слушатель `on`, а не `once`, по той же причине, что и у снимка: рендерер,
+// перезагруженный краш-обработчиком, обязан получить данные заново.
+function announceWindowOpened(win, stateChannel, hydrate) {
+    if (!win || !win.webContents) { return; }
+    win.webContents.on('did-finish-load', () => {
+        if (win.isDestroyed()) { return; }
+        hydrate(win);
+    });
+    broadcastWindowState(stateChannel, { isOpen: true });
+}
+
 // Advance the timer to match real elapsed wall-clock time since the anchor.
 // Called every interval tick AND on powerMonitor 'resume' so the displayed time
 // snaps back to reality immediately after the machine wakes from sleep. The
@@ -361,6 +382,11 @@ function createControlWindow() {
     bindRenderCrashHandler(controlWindow, 'control');
     bindRenderConsole(controlWindow, 'control');
     bindWindowStateSnapshot(controlWindow);
+    // Привязка живёт здесь, а не в whenReady: панель пересоздаётся из трея, из
+    // second-instance и по 'activate'. Вызванная один раз при старте, привязка
+    // доставалась только самому первому экземпляру окна, и пересозданная панель
+    // теряла поведение «закрытие = скрытие в трей» — она просто закрывалась.
+    bindTrayBehavior(controlWindow);
 
     // Enable Ctrl+Wheel window resizing
     controlWindow.webContents.once('did-finish-load', () => {
@@ -412,6 +438,20 @@ function createWidgetWindow() {
     bindRenderCrashHandler(widgetWindow, 'widget');
     bindRenderConsole(widgetWindow, 'widget');
     bindWindowStateSnapshot(widgetWindow);
+    announceWindowOpened(widgetWindow, 'widget-window-state', (win) => {
+        safelySendToWindow(win, 'timer-state', timerState);
+        // Сохранённые настройки дисплея (виджет берёт оттуда фон)
+        if (lastDisplaySettings) {
+            safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
+        }
+        // Цвета и стиль — только свои, адресными каналами
+        if (lastWidgetColors) {
+            safelySendToWindow(win, 'widget-colors-update', lastWidgetColors);
+        }
+        if (lastWidgetStyle) {
+            safelySendToWindow(win, 'widget-style-update', lastWidgetStyle);
+        }
+    });
 
     widgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(widgetWindow);
@@ -459,6 +499,15 @@ function createClockWidgetWindow() {
     bindRenderCrashHandler(clockWidgetWindow, 'clock');
     bindRenderConsole(clockWidgetWindow, 'clock');
     bindWindowStateSnapshot(clockWidgetWindow);
+    announceWindowOpened(clockWidgetWindow, 'clock-window-state', (win) => {
+        // Настройки дисплея несут стиль часов (clockStyle) и цифры циферблата
+        if (lastDisplaySettings) {
+            safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
+        }
+        if (lastClockColors) {
+            safelySendToWindow(win, 'clock-colors-update', lastClockColors);
+        }
+    });
 
     clockWidgetWindow.webContents.once('did-finish-load', () => {
         blockZoom(clockWidgetWindow);
@@ -528,6 +577,20 @@ function createDisplayWindow(displayIndex) {
     bindRenderConsole(displayWindow, 'display');
     bindWindowStateSnapshot(displayWindow);
     blockZoom(displayWindow);
+
+    // Монитор запоминается здесь же: обработчик `open-display` сверяет его,
+    // чтобы отличить «тот же экран — просто сфокусировать» от «другой экран —
+    // пересоздать окно».
+    displayWindow._displayIndex = displayIndex;
+    announceWindowOpened(displayWindow, 'display-window-state', (win) => {
+        safelySendToWindow(win, 'timer-state', timerState);
+        if (lastDisplaySettings) {
+            safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
+        }
+        if (lastDisplayColors) {
+            safelySendToWindow(win, 'display-colors-update', lastDisplayColors);
+        }
+    });
 
     displayWindow.once('ready-to-show', () => {
         log.info(`[perf] display window ready in ${Date.now() - __displayT0}ms`);
@@ -812,7 +875,8 @@ app.whenReady().then(() => {
     }
 
     createTray();
-    bindTrayBehavior(controlWindow);
+    // bindTrayBehavior вызывается внутри createControlWindow — здесь повторять
+    // нельзя: второй обработчик 'close' навесился бы на то же окно.
 
     // F-005: broadcast recovery snapshot to control window once it has loaded.
     // Renderer may ignore it for now, but the channel is no longer dead code.
@@ -839,8 +903,11 @@ app.on('window-all-closed', () => {
 });
 
 // IPC обработчики для синхронизации
-ipcMain.on('timer-command', (_event, payload = {}) => {
-    const { type, seconds, deltaSeconds } = payload;
+ipcMain.on('timer-command', (_event, payload) => {
+    // `payload = {}` спасал только от undefined — явный null доходил до
+    // деструктуризации и ронял обработчик. Нормализуем к пустому объекту:
+    // поведение при отсутствующем payload остаётся прежним (все поля undefined).
+    const { type, seconds, deltaSeconds } = isPayloadObject(payload) ? payload : {};
 
     // Обновляем конфиг до выполнения команды (Number.isFinite guards live in
     // the controller's setConfig, which returns whether anything changed).
@@ -953,27 +1020,11 @@ ipcMain.on('display-settings-update', (event, settings) => {
     safelySendToWindow(clockWidgetWindow, 'display-settings-update', settings);
 });
 
+// Обработчик намеренно тонкий: рассылка состояния и досылка настроек живут в
+// createWidgetWindow, потому что окно открывают ещё и из трея — мимо этого канала.
 ipcMain.on('open-widget', () => {
     if (!widgetWindow) {
         createWidgetWindow();
-        if (widgetWindow) {
-            widgetWindow.webContents.on('did-finish-load', () => {
-                safelySendToWindow(widgetWindow, 'timer-state', timerState);
-                // Отправляем сохранённые настройки дисплея (включая стиль)
-                if (lastDisplaySettings) {
-                    safelySendToWindow(widgetWindow, 'display-settings-update', lastDisplaySettings);
-                }
-                // Per-window colors and style
-                if (lastWidgetColors) {
-                    safelySendToWindow(widgetWindow, 'widget-colors-update', lastWidgetColors);
-                }
-                if (lastWidgetStyle) {
-                    safelySendToWindow(widgetWindow, 'widget-style-update', lastWidgetStyle);
-                }
-            });
-            // Уведомляем окно управления что виджет открыт
-            broadcastWindowState('widget-window-state', { isOpen: true });
-        }
     } else {
         widgetWindow.focus();
     }
@@ -1026,23 +1077,10 @@ ipcMain.on('reset-and-relaunch', async () => {
 });
 
 // Виджет часов
+// Тонкий обработчик — см. комментарий у open-widget.
 ipcMain.on('open-clock-widget', () => {
     if (!clockWidgetWindow) {
         createClockWidgetWindow();
-        if (clockWidgetWindow) {
-            clockWidgetWindow.webContents.on('did-finish-load', () => {
-                // Отправляем сохранённые настройки дисплея (включая стиль часов)
-                if (lastDisplaySettings) {
-                    safelySendToWindow(clockWidgetWindow, 'display-settings-update', lastDisplaySettings);
-                }
-                // Per-window colors
-                if (lastClockColors) {
-                    safelySendToWindow(clockWidgetWindow, 'clock-colors-update', lastClockColors);
-                }
-            });
-            // Уведомляем окно управления что виджет часов открыт
-            broadcastWindowState('clock-window-state', { isOpen: true });
-        }
     } else {
         clockWidgetWindow.focus();
     }
@@ -1082,9 +1120,15 @@ ipcMain.on('get-displays', (event) => {
     event.sender.send('displays-list', displays);
 });
 
-ipcMain.on('open-display', (event, options = {}) => {
+ipcMain.on('open-display', (event, options) => {
+    // Payload здесь НЕОБЯЗАТЕЛЕН: виджет и часы по клавише D шлют канал без
+    // аргументов, и это значит «взять последний выбранный монитор». Поэтому
+    // мусор нормализуем к пустому объекту, а не отбрасываем сообщение целиком —
+    // ранний выход убил бы клавишу D. Значение по умолчанию `= {}` спасало
+    // только от undefined: явный null доходил до чтения поля и ронял обработчик.
+    const opts = isPayloadObject(options) ? options : {};
     // Use provided displayIndex, or fall back to last used
-    const displayIndex = options.displayIndex !== undefined ? options.displayIndex : lastDisplayIndex;
+    const displayIndex = opts.displayIndex !== undefined ? opts.displayIndex : lastDisplayIndex;
     lastDisplayIndex = displayIndex;
 
     // Если дисплей уже открыт и запрос на тот же монитор - просто фокус
@@ -1099,25 +1143,9 @@ ipcMain.on('open-display', (event, options = {}) => {
         displayWindow = null;
     }
 
+    // Индекс монитора, рассылка состояния и досылка настроек — внутри
+    // createDisplayWindow (см. комментарий у open-widget).
     createDisplayWindow(displayIndex);
-    if (displayWindow) {
-        // Сохраняем индекс монитора для проверки
-        displayWindow._displayIndex = displayIndex;
-
-        displayWindow.webContents.on('did-finish-load', () => {
-            safelySendToWindow(displayWindow, 'timer-state', timerState);
-            // Отправляем сохранённые настройки дисплея (включая стиль)
-            if (lastDisplaySettings) {
-                safelySendToWindow(displayWindow, 'display-settings-update', lastDisplaySettings);
-            }
-            // Per-window colors
-            if (lastDisplayColors) {
-                safelySendToWindow(displayWindow, 'display-colors-update', lastDisplayColors);
-            }
-        });
-        // Уведомляем окно управления что дисплей открыт
-        broadcastWindowState('display-window-state', { isOpen: true });
-    }
 });
 
 ipcMain.on('close-display', () => {

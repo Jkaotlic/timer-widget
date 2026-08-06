@@ -74,8 +74,13 @@ class DisplayTimer {
 
         this.initElements();
         this.initProgress();
-        this.loadColors();
+        // initDefaultStyle идёт ДО loadColors: он безусловно вешает style-circle
+        // и .active на кольцо, ничего не снимая, а loadColors через
+        // loadBackgroundSettings уже применяет сохранённый стиль. В прежнем
+        // порядке при не-круговом стиле на body оказывались ДВА класса стиля и
+        // две активные панели — до следующего пуша от панели управления.
         this.initDefaultStyle();
+        this.loadColors();
         this.setupIPCIfAvailable();
         this.startCurrentTimeClock();
         this.setupResizeHandler();
@@ -185,8 +190,7 @@ class DisplayTimer {
             // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
             if (e.code >= 'Digit1' && e.code <= 'Digit8') {
                 e.preventDefault();
-                const presets = (window.CONFIG && window.CONFIG.PRESET_DURATIONS)
-                    || [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                const presets = window.CONFIG.PRESET_DURATIONS;
                 const idx = parseInt(e.code.replace('Digit', '')) - 1;
                 if (this.ipcRenderer) {
                     this.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
@@ -412,9 +416,12 @@ class DisplayTimer {
     }
 
     applyDisplaySettings(settings) {
-        // Стиль таймера
-        if (settings.timerStyle) {
-            this.setTimerStyle(settings.timerStyle);
+        // Стиль таймера — только свой. Общее имя `timerStyle` в этом наборе
+        // может означать стиль ВИДЖЕТА (когда набор пришёл из localStorage),
+        // см. RendererShared.pickOwnSetting.
+        const style = window.RendererShared.pickOwnSetting(settings, 'displayTimerStyle', 'timerStyle');
+        if (style) {
+            this.setTimerStyle(style);
         }
 
         // Пресет расположения блоков времени
@@ -504,8 +511,12 @@ class DisplayTimer {
         // Решение — то же, что уже применено к timeLayoutPreset: применяем
         // значение только когда оно РЕАЛЬНО изменилось с прошлой посылки, то
         // есть когда пользователь действительно двигал ползунок.
-        if (settings.timerScale !== undefined) {
-            const incoming = parseInt(settings.timerScale, 10);
+        // Имя `timerScale` в наборе из localStorage — масштаб ВИДЖЕТА; из-за
+        // этого _lastPushedTimerScale засевался чужим значением, и первый же
+        // пуш панели уходил в ветку «осознанное движение ползунка».
+        const incomingScale = window.RendererShared.pickOwnSetting(settings, 'displayTimerScale', 'timerScale');
+        if (incomingScale !== undefined) {
+            const incoming = parseInt(incomingScale, 10);
             if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
                 if (this._lastPushedTimerScale === undefined) {
                     // Первая посылка после открытия окна — локальный масштаб,
@@ -838,7 +849,10 @@ class DisplayTimer {
     }
 
     _isSafeColor(value) {
-        return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(value);
+        // Тот же валидатор, что у остальных окон: своя регулярка принимала
+        // любой набор цифр в скобках, а значение попадает и в style.color, и в
+        // строку linear-gradient().
+        return window.SecurityUtils.isSafeColor(value);
     }
 
     applyBackground(settings) {

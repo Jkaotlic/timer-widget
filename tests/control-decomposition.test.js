@@ -31,7 +31,8 @@ const EXTRACTED = [
     'modal-manager.js',
     'shortcuts-help.js',
     'custom-sounds.js',
-    'local-background.js'
+    'local-background.js',
+    'clock-settings-schema.js'
 ];
 
 test('окно управления больше не god-файл', () => {
@@ -66,10 +67,29 @@ test('inline-скрипт панели не разрастается', () => {
 test('стили вынесены в отдельный файл, инлайнового <style> не осталось', () => {
     assert.doesNotMatch(controlHtml, /<style>/);
     assert.match(controlHtml, /<link rel="stylesheet" href="control\.css">/);
-    // Порядок важен: control.css переопределяет токены и компоненты.
-    const tokens = controlHtml.indexOf('design-tokens.css');
-    const control = controlHtml.indexOf('control.css');
-    assert.ok(tokens > -1 && control > tokens, 'control.css должен идти после design-tokens.css');
+});
+
+test('таблицы стилей панели подключены в правильном порядке', () => {
+    // Этот тест сторожил «control.css после design-tokens.css». Проверка была
+    // верной по букве и пустой по смыслу: нагружен порядок был не этой парой, а
+    // теми двумя файлами первой версии (styles.css / components.css), которые
+    // стояли ПЕРЕД токенами и при равной специфичности проигрывали control.css
+    // только позицией <link>. Их больше нет, и вместе с ними ушла возможность
+    // сломать панель перестановкой строк в <head>.
+    //
+    // Осталось ДВА порядковых требования, и оба настоящие:
+    //   1. fonts.css первым — @font-face обязан существовать до правил, которые
+    //      этим шрифтом что-то рисуют; иначе первый кадр уйдёт в запасной шрифт;
+    //   2. control.css последним — он единственный переопределяет значения
+    //      токенов и тему (в нём живут блоки [data-theme="light"] .control-panel
+    //      для литералов, до которых токены не достают).
+    const order = [...controlHtml.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)]
+        .map((m) => m[1]);
+    assert.deepEqual(
+        order,
+        ['fonts.css', 'design-tokens.css', 'control.css'],
+        'порядок таблиц стилей панели изменился — проверьте, что понимаете, зачем'
+    );
 });
 
 test('каждый вынесенный модуль подключён в разметке', () => {

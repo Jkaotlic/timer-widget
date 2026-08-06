@@ -87,7 +87,7 @@ test('часы: изменение размера окна сохраняет г
     assert.ok(handler, 'обработчик resize в часах не найден');
     assert.match(
         handler[1],
-        /if \(clockScalePct !== this\._clockScalePct\) \{\s*this\.saveGeometry\(clockScalePct\);/s,
+        /if \(clockScalePct !== this\._geometry\.scalePct\) \{\s*this\.saveGeometry\(clockScalePct\);/s,
         'resize обязан сохранять геометрию — иначе масштаб из панели терялся при переоткрытии'
     );
 });
@@ -98,7 +98,7 @@ test('виджет: изменение размера окна тоже сохр
     assert.ok(handler, 'обработчик resize в виджете не найден');
     assert.match(
         handler[1],
-        /if \(widgetScalePct !== this\._widgetScalePct\) \{\s*this\.saveGeometry\(widgetScalePct\);/s,
+        /if \(widgetScalePct !== this\._geometry\.scalePct\) \{\s*this\.saveGeometry\(widgetScalePct\);/s,
         'нативный ресайз за край окна не сохранялся'
     );
 });

@@ -67,6 +67,14 @@ const FREEZE_ANIMATIONS_CSS = `
         pointer-events: none !important;
     }
     body.flash-mode { filter: none !important; }
+    /* Подсказки управления живут по ТАЙМЕРУ: показываются при первом открытии
+       окна и гаснут через 5 секунд, а скрываются сразу только если флаг
+       (displayHintShown / widgetHintShown / clockHintShown) уже записан. То есть
+       попадут они в кадр или нет — зависит от того, есть ли флаг в профиле и
+       успел ли пройти таймер: полоса подсказки на дисплее — это 1280×30 px,
+       3.66% кадра, ровно тот же класс недетерминизма, что курсор и анимации.
+       Снимаем их из кадра всегда. */
+    #controlsHint, #widgetHint, #clockHint { display: none !important; }
 `;
 
 async function freezeAnimations(ctx, log) {
@@ -165,13 +173,21 @@ function compareWithBaseline({ nativeImage, outDir, baselineDir, log }) {
                 const pct = (result.ratio * 100).toFixed(2);
                 regressions.push({ name, ...result });
                 log.error(`[visual] РАСХОЖДЕНИЕ ${name}: ${result.diffPixels} px (${pct}%)`);
+                // Дублируем на консоль: результат сверки уходил ТОЛЬКО в файл
+                // лога, поэтому `npm run visual:check` со стороны выглядел
+                // молчаливым — приходилось знать, где лежит лог, чтобы узнать
+                // итог. Проверка, итог которой не видно, обесценивается: её
+                // перестают читать (см. CLAUDE.md про шаг, падавший вхолостую).
+                console.error(`[visual] РАСХОЖДЕНИЕ ${name}: ${result.diffPixels} px (${pct}%)`);
             }
         } catch (e) {
             log.warn(`[visual] не смог сравнить ${name}: ${e.message}`);
         }
     }
 
-    log.info(`[visual] сверено ${compared}, пропущено по времени ${skipped}, расхождений ${regressions.length}`);
+    const summary = `[visual] сверено ${compared}, пропущено по времени ${skipped}, расхождений ${regressions.length}`;
+    log.info(summary);
+    console.log(summary);
     return regressions;
 }
 
@@ -264,6 +280,36 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             } catch { /* ignore — actual captures are in the state loop below */ }
         }
         await sleep(500);
+
+        // Перечитать фон, когда панель уже отработала.
+        //
+        // Фон виджета и дисплея живёт в `displayExtSettings`, который пишет
+        // панель. В режиме съёмки все четыре окна поднимаются ОДНОВРЕМЕННО,
+        // поэтому окно успевает прочитать localStorage раньше, чем панель туда
+        // пишет: `loadBackgroundSettings()` не находит ключа и уходит молча, а
+        // `applyBackground()` так и не вызывается. Круг виджета остаётся с
+        // CSS-дефолтом `rgba(15, 15, 25, 0.7)`, и поверх НЕПРОЗРАЧНОГО фона окна
+        // режима съёмки (#1c1c1e) это даёт серый вместо `#0f0c29` — кадр
+        // расходился с эталоном на половину площади при полностью исправном
+        // приложении (в живом окне fill = rgb(15, 12, 41) сразу и стабильно).
+        //
+        // У пользователя гонки нет: окна открываются позже панели и читают уже
+        // записанные настройки. Поэтому чиним съёмку, а не приложение —
+        // повторяем ровно то, что делает штатное открытие окна.
+        const REREAD_BACKGROUND = {
+            widget: 'widgetTimer.loadBackgroundSettings()',
+            display: 'displayTimer.loadBackgroundSettings()'
+        };
+        for (const [name, expr] of Object.entries(REREAD_BACKGROUND)) {
+            const w = ctx()[name];
+            if (!w || w.isDestroyed()) { continue; }
+            try {
+                await w.webContents.executeJavaScript(`(() => { ${expr}; return true; })()`);
+            } catch (e) {
+                log.warn(`[screenshot] перечитать фон (${name}): ${e.message}`);
+            }
+        }
+        await sleep(400);
 
         for (const state of STATES) {
             try {

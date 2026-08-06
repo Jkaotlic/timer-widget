@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Widget</title>
+    <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
@@ -41,31 +42,26 @@
             --tw-overlay-light:  rgba(255, 255, 255, 0.05);
             --tw-overlay-medium: rgba(255, 255, 255, 0.10);
             --tw-on-accent:     #ffffff;
+
+            /* Акценты прибиваются по той же причине, и это ровно тот случай,
+               когда «перечисление» подвело: до 2.4.2 здесь стояли только
+               текстовые токены, а акценты приходили из design-tokens.css, где
+               светлая тема специально ЗАТЕМНЯЕТ их под белый фон
+               (--tw-green: #12652f). Тёмный акцент на прибитом тёмном фоне —
+               статус «идёт» в LED-стиле 2.73:1 вместо 9.69:1, «пауза» 2.86:1.
+               Значения скопированы из :root, поэтому обе темы здесь совпадают.
+               --tw-led-green и --tw-ring не перечислены намеренно: они
+               объявлены через var(--tw-green)/var(--tw-blue) и чинятся вместе
+               с ними. */
+            --tw-blue:          #0a84ff;
+            --tw-green:         #30d158;
+            --tw-red:           #ff453a;
+            --tw-orange:        #ff9f0a;
+            --tw-yellow:        #ffc107;
+            --tw-led-warn:      #ffcc00;
+            --tw-led-danger:    #ff3333;
             color-scheme: dark;
         }
-
-        /* Inter: latin + cyrillic, weights 200/300/400/500/600/700 */
-        @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-latin-200-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 200; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-200-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-600-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'Inter'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/inter-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        /* JetBrains Mono: latin + cyrillic, weights 300/400/500/700 */
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-300-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 300; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-300-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-400-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-500-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-        @font-face { font-family: 'JetBrains Mono'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/jetbrains-mono-cyrillic-700-normal.woff2') format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
 
         * {
             margin: 0;
@@ -290,7 +286,6 @@
         font-size: 0.62em;
         margin-right: 0.1em;
         }
-
 
         /* Перекидывание карточки. Раньше анимация была только в полноэкранном
            режиме, а виджет и часы меняли цифру рывком — вернули везде.
@@ -1067,6 +1062,7 @@
     <script src="utils.js"></script>
     <script src="renderer-shared.js"></script>
     <script src="flip-card.js"></script>
+    <script src="window-geometry.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1077,6 +1073,11 @@
             const el = document.querySelector('.widget-container') || document.body;
             el.classList.toggle('ticks-on', !!showTicks);
         }
+
+        // Размер окна при масштабе 100%. Раньше жил внутри setupEventListeners,
+        // а восстановление геометрии считало от той же цифры, вписанной
+        // отдельным литералом — то есть база существовала в двух местах.
+        const WIDGET_BASE_SIZE = 250;
 
         class WidgetTimer {
             constructor() {
@@ -1091,6 +1092,24 @@
                 this._hasWidgetStyle = false;
                 // Stored handler refs for cleanup
                 this._handlers = {};
+
+                // Размер и позиция окна — общий механизм с часами. Различий
+                // ровно четыре, и все они здесь: ключ хранилища, базовый размер
+                // и пара каналов (см. window-geometry.js).
+                this._geometry = window.WindowGeometry.createWindowGeometry({
+                    storageKey: 'widgetGeometry',
+                    baseSize: WIDGET_BASE_SIZE,
+                    channels: {
+                        move: 'widget-move',
+                        resize: 'widget-resize',
+                        position: 'widget-set-position'
+                    },
+                    send: (channel, payload) => ipcRenderer.send(channel, payload),
+                    parseJSON: safeJSONParse,
+                    storage: localStorage,
+                    getOuterWidth: () => window.outerWidth,
+                    getScreenPosition: () => ({ x: window.screenX, y: window.screenY })
+                });
 
                 this.initElements();
                 this.initProgress();
@@ -1199,54 +1218,17 @@
                 this.progressBar.style.strokeDashoffset = this.circumference;
             }
 
-            isWindowDragTarget(target) {
-                return !!(
-                    target
-                    && typeof target.closest === 'function'
-                    && !target.closest('button, input, select, textarea, [role="button"], [tabindex]')
-                );
-            }
-
             setupEventListeners() {
-                // JS-based window drag (replaces -webkit-app-region: drag)
-                let isDragging = false;
-                let dragStartX = 0, dragStartY = 0;
-
-                this._handlers.onContainerMouseDown = (e) => {
-                    if (
-                        e.button !== 0
-                        || e.altKey
-                        || e.ctrlKey
-                        || e.metaKey
-                        || e.shiftKey
-                        || !this.isWindowDragTarget(e.target)
-                    ) {
-                        return;
-                    }
-                    isDragging = true;
-                    dragStartX = e.screenX;
-                    dragStartY = e.screenY;
-                    e.preventDefault();
-                };
-                this.container.addEventListener('mousedown', this._handlers.onContainerMouseDown);
-
-                this._handlers.onMouseMove = (e) => {
-                    if (!isDragging) { return; }
-                    const dx = e.screenX - dragStartX;
-                    const dy = e.screenY - dragStartY;
-                    if (dx !== 0 || dy !== 0) {
-                        ipcRenderer.send('widget-move', { deltaX: dx, deltaY: dy });
-                        dragStartX = e.screenX;
-                        dragStartY = e.screenY;
-                    }
-                };
-                document.addEventListener('mousemove', this._handlers.onMouseMove);
-
-                this._handlers.onMouseUp = () => {
-                    if (isDragging) { this.saveGeometry(); }
-                    isDragging = false;
-                };
-                document.addEventListener('mouseup', this._handlers.onMouseUp);
+                // Перетаскивание окна на JS вместо `-webkit-app-region: drag` —
+                // общий механизм с окном часов, см. window-geometry.js (там же
+                // объяснено, почему на Windows иначе нельзя).
+                window.WindowGeometry.bindWindowDrag({
+                    container: this.container,
+                    doc: document,
+                    onMove: (delta) => ipcRenderer.send('widget-move', delta),
+                    onDrop: () => this.saveGeometry(),
+                    handlers: this._handlers
+                });
 
                 // Track window states for keyboard toggle shortcuts
                 let _displayIsOpen = false;
@@ -1294,7 +1276,7 @@
                     // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
                     if (e.code >= 'Digit1' && e.code <= 'Digit8') {
                         e.preventDefault();
-                        const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                        const presets = window.CONFIG.PRESET_DURATIONS;
                         const idx = parseInt(e.code.replace('Digit', '')) - 1;
                         ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
                     }
@@ -1302,9 +1284,8 @@
                 document.addEventListener('keydown', this._handlers.onKeyDown);
 
                 // Ctrl+Wheel scaling — resize widget by 10% per scroll tick
-                const WIDGET_BASE_SIZE = 250;
-                const WIDGET_MIN_SCALE = 30;
-                const WIDGET_MAX_SCALE = 600;
+                const WIDGET_MIN_SCALE = window.WindowGeometry.MIN_SCALE_PCT;
+                const WIDGET_MAX_SCALE = window.WindowGeometry.MAX_SCALE_PCT;
                 let widgetScalePct = Math.round(window.outerWidth / WIDGET_BASE_SIZE * 100);
                 this._handlers.onWheel = (e) => {
                     if (!e.ctrlKey) { return; }
@@ -1328,9 +1309,9 @@
                     // Тот же случай, что и у часов: размер могли изменить не
                     // колесом, а потянув за край окна — тогда saveGeometry никто
                     // не вызывал и размер терялся при переоткрытии. Сравнение с
-                    // _widgetScalePct гасит эхо от restoreGeometry() и от посылки
-                    // масштаба панелью (там saveGeometry уже вызвана явно).
-                    if (widgetScalePct !== this._widgetScalePct) {
+                    // текущим масштабом гасит эхо от restoreGeometry() и от
+                    // посылки масштаба панелью (там saveGeometry уже вызвана явно).
+                    if (widgetScalePct !== this._geometry.scalePct) {
                         this.saveGeometry(widgetScalePct);
                     }
                 };
@@ -1362,38 +1343,16 @@
             // безусловно вызывался setSize('medium'), из-за чего окно каждый раз
             // возвращалось к 250×250 в правый верхний угол, а масштаб от
             // Ctrl+колеса и результат перетаскивания терялись.
+            //
+            // Сама механика общая с окном часов — window-geometry.js. Здесь
+            // остаются только ЧЕТЫРЕ различия между окнами: ключ хранилища,
+            // базовый размер и пара каналов.
             restoreGeometry() {
-                const geo = safeJSONParse(localStorage.getItem('widgetGeometry'), null);
-                if (!geo || typeof geo !== 'object') { return; }
-
-                const pct = Number(geo.scalePct);
-                if (Number.isFinite(pct) && pct >= 30 && pct <= 600) {
-                    this._widgetScalePct = pct;
-                    const size = Math.round(250 * pct / 100);
-                    ipcRenderer.send('widget-resize', { width: size, height: size });
-                }
-
-                // Главный процесс сам проверит, что точка попадает на реальный
-                // монитор, и подожмёт её в рабочую область, если нет.
-                if (Number.isFinite(geo.x) && Number.isFinite(geo.y)) {
-                    ipcRenderer.send('widget-set-position', { x: geo.x, y: geo.y });
-                }
+                this._geometry.restore();
             }
 
             saveGeometry(scalePct) {
-                // Без явного значения берём фактическую ширину окна: она учитывает
-                // и нативный ресайз за край, а не только Ctrl+колесо.
-                const pct = Number.isFinite(scalePct)
-                    ? scalePct
-                    : (Math.round(window.outerWidth / 250 * 100) || this._widgetScalePct || 100);
-                this._widgetScalePct = pct;
-                try {
-                    localStorage.setItem('widgetGeometry', JSON.stringify({
-                        scalePct: pct,
-                        x: window.screenX,
-                        y: window.screenY
-                    }));
-                } catch { /* хранилище переполнено — геометрия не критична */ }
+                this._geometry.save(scalePct);
             }
 
             saveSettings() {
@@ -1419,7 +1378,11 @@
                 }
 
                 // Валидация цветов
-                const isSafeColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+                // Проверка цвета одна на всё приложение: своя регулярка
+                // `rgba?\([\d,.\s%]+\)` принимала любой набор цифр и запятых —
+                // rgb(999,999,999) и rgba(1,2,3,77) проходили как безопасные,
+                // а значение уходит прямо в style.color.
+                const isSafeColor = window.SecurityUtils.isSafeColor;
                 const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
                 const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
 
@@ -1491,7 +1454,7 @@
                 // Сбрасываем фоновое изображение
                 bgImageContainer.style.display = 'none';
 
-                const isSafeBgColor = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$|^rgba?\([\d,.\s%]+\)$/.test(v);
+                const isSafeBgColor = window.SecurityUtils.isSafeColor;
 
                 switch (settings.bgMode) {
                     case 'solid':
@@ -1549,9 +1512,15 @@
 
                         this.applyBackground(settings);
 
-                        // Применяем стиль таймера
-                        if (settings.timerStyle) {
-                            this.setTimerStyle(settings.timerStyle);
+                        // Стиль виджета — под СВОИМ именем. Общее `timerStyle`
+                        // в этом наборе тоже принадлежит виджету (его пишет
+                        // alsoWrite ради отката версии), но то же самое имя в
+                        // IPC-пакете display-settings-update означает уже стиль
+                        // ПОЛНОЭКРАННОГО режима. Спрашиваем своё имя первым,
+                        // общее держим запасным — см. RendererShared.pickOwnSetting.
+                        const ownStyle = window.RendererShared.pickOwnSetting(settings, 'widgetTimerStyle', 'timerStyle');
+                        if (ownStyle) {
+                            this.setTimerStyle(ownStyle);
                         }
                     }
                 }
@@ -1591,10 +1560,14 @@
                         widgetSettings.bgMode = 'default';
                     }
                     this.applyBackground(widgetSettings);
-                    // Применяем стиль из display-settings только если нет отдельного widget-style
-                    if (settings.timerStyle && !this._hasWidgetStyle) {
-                        this.setTimerStyle(settings.timerStyle);
-                    }
+                    // Стиль отсюда НЕ берём. `timerStyle` в этом сообщении —
+                    // стиль ПОЛНОЭКРАННОГО режима (см. pushDisplaySettings в
+                    // electron-control.html), а не виджета. Прежний fallback
+                    // срабатывал, пока не пришёл widget-style-update, и молча
+                    // навязывал виджету чужой стиль — у окна, открытого из трея,
+                    // флаг _hasWidgetStyle оставался false, и любая правка во
+                    // вкладке «Полноэкранный» перерисовывала виджет.
+                    // Ровно эту же ветку уже убрали в часах (electron-clock-widget.html).
                     // Показ цифр на аналоговом циферблате
                     if (settings.showAnalogNumbers !== undefined && this.widgetClockNumbers) {
                         this.widgetClockNumbers.classList.toggle('visible', settings.showAnalogNumbers);

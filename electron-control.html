@@ -5,8 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление Таймером</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="components.css">
+    <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
     <link rel="stylesheet" href="control.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
@@ -929,6 +928,7 @@
     <script src="renderer-storage.js"></script>
     <script src="renderer-shared.js"></script>
     <script src="settings-schema.js"></script>
+    <script src="clock-settings-schema.js"></script>
     <script src="sound-bank.js"></script>
     <script src="ui-feedback.js"></script>
     <script src="scale-input.js"></script>
@@ -1534,12 +1534,11 @@
                 // Живая замена — поле точного времени (#manualTimeInput) с умным
                 // разбором TimeUtils.parseManualTime и подсветкой .input-error.
 
-                // Корректировка времени
-                document.querySelectorAll('.adjust-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        this.adjustTime(parseInt(btn.dataset.seconds));
-                    });
-                });
+                // Здесь же висел обработчик на .adjust-btn с data-seconds — вторая
+                // половина того же трупа: класс не встречается в разметке ни разу
+                // (замер querySelectorAll в живом окне: 0 элементов), а стили к нему
+                // лежали в удалённом components.css. Живые кнопки корректировки —
+                // .adjust-main-btn с data-adjust, они подключаются выше.
 
                 // Главные кнопки
                 this.startBtn.addEventListener('click', () => this.start());
@@ -2018,6 +2017,15 @@
                     eventTime: this.eventTimeInputEl.value,
                     endTime: this.endTimeInputEl.value,
                     timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
+                    // Стиль и масштаб полноэкранного режима идут ПОД СВОИМИ
+                    // именами. Общие `timerStyle`/`timerScale` остаются рядом:
+                    // на них опирается откат на предыдущую версию приложения и
+                    // существующие e2e-спеки, которые шлют голое общее имя.
+                    // В localStorage под общим именем лежит стиль ВИДЖЕТА
+                    // (settings-schema.js, alsoWrite), поэтому дисплей выбирает
+                    // своё имя первым — см. pickDisplaySetting в display-script.js.
+                    displayTimerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
+                    displayTimerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
                     timerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
                     timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value)
                 };
@@ -2095,36 +2103,31 @@
             }
 
             pushClockSettings() {
-                const settings = {
-                    showDate: this.clockShowDateEl.checked,
-                    showTimezone: this.clockShowTimezoneEl.checked,
-                    showSeconds: this.clockShowSecondsEl.checked,
-                    format24h: this.clockFormat24hEl.checked,
-                    showNumbers: this.clockShowAnalogNumbersEl.checked,
-                    showTicks: this.widgetShowTicksEl?.checked ?? false
-                };
-                
-                // СЛИЯНИЕ, а не перезапись. Ключ 'clockWidgetSettings' пишут двое:
-                // эта панель и сам виджет часов (его saveSettings хранит ещё
-                // opacity и clockStyle). Прямая перезапись стирала чужие поля —
-                // панель убивала сохранённый стиль часов, а часы убивали showTicks.
+                // Ключ, контрол и умолчание описаны ОДНОЙ строкой таблицы в
+                // clock-settings-schema.js. Здесь остаётся то, что таблица
+                // выразить не может: деления циферблата и запись в хранилище.
+                const persisted = window.ClockSettingsSchema.collectClockSettings(this);
+
+                // Деления — настройка ОБЩАЯ с виджетом, у неё свои ключи, и
+                // восстанавливают её сами окна. Поэтому в хранилище часов она не
+                // идёт (вторая копия настройки рано или поздно разойдётся), а по
+                // IPC идёт: там её ждут прямо сейчас.
+                const settings = { ...persisted, showTicks: this.widgetShowTicksEl?.checked ?? false };
+
+                // СЛИЯНИЕ, а не перезапись: ключ пишут двое — эта панель и сам
+                // виджет часов (у него там ещё clockStyle). Прямая перезапись
+                // стирала чужие поля.
                 const prevClock = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
-                localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prevClock, ...settings }));
-                
-                // Отправляем в виджет часов
+                localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prevClock, ...persisted }));
+
                 ipcRenderer.send('clock-widget-settings', settings);
             }
 
             loadClockSettings() {
-                const settings = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
-                
-                this.clockShowDateEl.checked = !!settings.showDate;
-                this.clockShowTimezoneEl.checked = !!settings.showTimezone;
-                this.clockShowSecondsEl.checked = settings.showSeconds !== false;
-                this.clockFormat24hEl.checked = settings.format24h !== false;
-                this.clockShowAnalogNumbersEl.checked = !!settings.showNumbers;
-                
-                // Обновляем видимость опции цифр
+                window.ClockSettingsSchema.applyClockSettings(
+                    this,
+                    safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
+                );
                 this.updateClockAnalogNumbersVisibility();
             }
 
@@ -2891,7 +2894,7 @@
             else if (event.code >= 'Digit1' && event.code <= 'Digit8') {
                 event.preventDefault();
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
-                const presets = [300, 600, 900, 1200, 1500, 1800, 2700, 3600];
+                const presets = window.CONFIG.PRESET_DURATIONS;
                 if (window.timerController) {
                     window.timerController.setTime(presets[presetIndex]);
                 }

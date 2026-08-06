@@ -2,6 +2,9 @@ const { defineConfig } = require('@playwright/test');
 
 module.exports = defineConfig({
     testDir: './e2e',
+    // Сносит и создаёт заново каталог профиля (см. e2e/global-setup.js): тесты
+    // делят один профиль внутри прогона, но не должны наследовать предыдущий.
+    globalSetup: require.resolve('./e2e/global-setup.js'),
     timeout: 30000,
     retries: 0,
     // ОДИН воркер обязателен: приложение держит single-instance lock

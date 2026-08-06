@@ -33,10 +33,16 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { codeOnly } = require('./helpers/source-scan');
+
 const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const PKG = JSON.parse(read('package.json'));
 const MAIN = read('electron-main.js');
+// Проверки ОТСУТСТВИЯ обязаны идти по коду: пояснение вида
+// «nodeIntegration: true здесь запрещён» уронило бы ворота релиза на самом
+// комментарии, который объясняет запрет (CLAUDE.md, Gotchas).
+const MAIN_CODE = codeOnly(MAIN);
 
 const WINDOW_HTML = [
     'electron-control.html',
@@ -48,17 +54,81 @@ const WINDOW_HTML = [
 // Файлы, которые реально попадают в сборку (без каталогов и шаблонов).
 const SHIPPED = PKG.build.files.filter((f) => !f.includes('*'));
 
+// Пропускает строковый литерал; возвращает индекс закрывающей кавычки или -1.
+function skipString(source, start) {
+    const quote = source[start];
+    for (let i = start + 1; i < source.length; i++) {
+        const ch = source[i];
+        if (ch === '\\') { i++; continue; }
+        if (ch === quote) { return i; }
+        // Перевод строки внутри обычной кавычки — признак того, что за строку
+        // принято что-то другое; лучше упасть, чем молча съесть полфайла.
+        if (ch === '\n' && quote !== '`') { return -1; }
+    }
+    return -1;
+}
+
+// Индекс скобки, закрывающей ту, что стоит на позиции open.
+function matchingBrace(source, open) {
+    let depth = 0;
+    for (let i = open; i < source.length; i++) {
+        const ch = source[i];
+        const next = source[i + 1];
+        if (ch === '/' && next === '/') {
+            const eol = source.indexOf('\n', i);
+            if (eol === -1) { return -1; }
+            i = eol;
+            continue;
+        }
+        if (ch === '/' && next === '*') {
+            const close = source.indexOf('*/', i + 2);
+            if (close === -1) { return -1; }
+            i = close + 1;
+            continue;
+        }
+        if (ch === '\'' || ch === '"' || ch === '`') {
+            const end = skipString(source, i);
+            if (end === -1) { return -1; }
+            i = end;
+            continue;
+        }
+        if (ch === '{') { depth++; continue; }
+        if (ch === '}') {
+            depth--;
+            if (depth === 0) { return i; }
+        }
+    }
+    return -1;
+}
+
 // Разбивает electron-main.js на блоки настроек окон: от `new BrowserWindow({`
-// до закрывающей строки `});` на том же отступе.
+// до скобки, которая этот объект ЗАКРЫВАЕТ.
+//
+// Границу задаёт баланс скобок, а не отступ. Прежняя версия искала конец как
+// литерал `\n    });`, то есть считала, что каждый конструктор стоит на верхнем
+// уровне функции. Все четыре существующих окна там и стоят, поэтому парсер
+// «работал». Пятое окно, объявленное внутри `if (...) {` на восьми пробелах,
+// своей закрывающей строки не имеет: поиск уезжал к концу СЛЕДУЮЩЕГО блока, оба
+// окна склеивались в один кусок текста, и злое окно наследовало чужие гарды.
+// Воспроизведено мутацией: окно с nodeIntegration: true, contextIsolation: false,
+// sandbox: false и devTools: true проходило все ворота зелёным.
+//
+// Скобки внутри строк и комментариев не считаются: в блоках есть и текстовые
+// литералы ('Управление Таймером'), и поясняющие комментарии. Литералы
+// регулярных выражений парсер не разбирает — в объявлениях окон их нет, а если
+// разбор всё-таки уедет, это заметит самопроверка: за закрывающей скобкой
+// объекта обязана идти скобка вызова.
 function browserWindowBlocks(source) {
     const blocks = [];
-    const re = /new BrowserWindow\(\{/g;
+    const re = /new BrowserWindow\(\s*\{/g;
     let m;
     while ((m = re.exec(source)) !== null) {
-        const start = m.index;
-        const end = source.indexOf('\n    });', start);
-        assert.ok(end !== -1, 'не найден конец блока new BrowserWindow');
-        blocks.push(source.slice(start, end));
+        const open = source.indexOf('{', m.index);
+        const close = matchingBrace(source, open);
+        assert.ok(close !== -1, 'не найден конец блока new BrowserWindow');
+        const tail = source.slice(close + 1).match(/^\s*\)/);
+        assert.ok(tail, 'разбор блока new BrowserWindow уехал: за объектом нет закрывающей скобки вызова');
+        blocks.push(source.slice(m.index, close + 1));
     }
     return blocks;
 }
@@ -83,6 +153,31 @@ test('окна изолированы: sandbox, contextIsolation, без nodeInt
         assert.match(block, /sandbox:\s*true/, `окно №${i + 1}: sandbox не включён`);
         assert.match(block, /preload:\s*path\.join\(__dirname, 'preload\.js'\)/, `окно №${i + 1}: нет preload`);
     });
+});
+
+test('во ВСЁМ главном процессе нет ослабленных настроек окна', () => {
+    // Вторая линия обороны, намеренно дублирующая поблочные проверки выше.
+    // Проверка ОТСУТСТВИЯ по целому файлу строго сильнее поблочной: она не
+    // пользуется границами блоков вовсе, поэтому любая будущая ошибка разбора
+    // (окно в незнакомой форме, конструктор внутри выражения) её не обходит.
+    // Тот же приём уже работает на упакованном артефакте — checkHardening()
+    // в scripts/verify-packed.js.
+    assert.doesNotMatch(MAIN_CODE, /nodeIntegration:\s*true/, 'где-то в главном процессе окно с nodeIntegration: true');
+    assert.doesNotMatch(MAIN_CODE, /contextIsolation:\s*false/, 'где-то в главном процессе окно с contextIsolation: false');
+    assert.doesNotMatch(MAIN_CODE, /sandbox:\s*false/, 'где-то в главном процессе окно с sandbox: false');
+
+    // Гардов DevTools обязано быть не меньше, чем конструкторов окон. Сравнение
+    // с ЧИСЛОМ (было `=== 4`) пропускает пятое окно без гарда: счётчик остаётся
+    // четвёркой. Сравниваются две величины, обе растущие вместе с кодом.
+    const windows = (MAIN_CODE.match(/new BrowserWindow\(/g) || []).length;
+    const guards = (MAIN_CODE.match(
+        /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
+    ) || []).length;
+    assert.ok(windows > 0, 'в главном процессе не найдено ни одного BrowserWindow — проверка ослепла');
+    assert.ok(
+        guards >= windows,
+        `окон ${windows}, гардов devTools ${guards} — окно осталось с режимом разработчика`
+    );
 });
 
 test('DevTools не открываются программно вне того же гарда', () => {
@@ -139,15 +234,33 @@ test('в поставляемых файлах нет внешних сетев�
 });
 
 test('шрифты подключены локально, а не из внешнего источника', () => {
-    const withFonts = ['control.css', ...WINDOW_HTML];
+    // Раньше список был ['control.css', ...WINDOW_HTML] с `continue` на файлах
+    // без @font-face. После переезда объявлений в fonts.css такая проверка стала
+    // бы ПУСТОЙ и зелёной: ни в одном из перечисленных файлов @font-face больше
+    // нет, цикл бы весь вышел через continue. Поэтому объявления считаются, и
+    // ноль объявлений — это падение.
+    const withFonts = ['fonts.css', 'control.css', ...WINDOW_HTML];
+    let declared = 0;
     for (const file of withFonts) {
         const text = read(file);
         if (!text.includes('@font-face')) { continue; }
         const sources = [...text.matchAll(/src:\s*url\((['"]?)([^)'"]+)\1\)/g)].map((m) => m[2]);
         assert.ok(sources.length > 0, `${file}: объявлен @font-face без src`);
+        declared += sources.length;
         for (const src of sources) {
             assert.match(src, /^fonts\//, `${file}: шрифт грузится не из локальной папки: ${src}`);
         }
+    }
+    assert.ok(declared >= 20, `найдено ${declared} объявлений @font-face — проверка смотрит не туда`);
+
+    // И объявления обязаны доезжать до КАЖДОГО окна: файл, который никто не
+    // подключил, — это тот же запасной шрифт, только незаметнее.
+    for (const file of WINDOW_HTML) {
+        assert.match(
+            read(file),
+            /<link rel="stylesheet" href="fonts\.css">/,
+            `${file}: не подключает fonts.css — окно отрисуется системным шрифтом`
+        );
     }
     // Файлы шрифтов существуют — иначе останется молчаливый запасной шрифт.
     const woff = fs.readdirSync(path.join(ROOT, 'fonts')).filter((f) => f.endsWith('.woff2'));
