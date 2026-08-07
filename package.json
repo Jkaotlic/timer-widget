@@ -126,6 +126,7 @@
       "ui-theme.js",
       "flip-card.js",
       "window-geometry.js",
+      "digits-style.js",
       "sound-bank.js",
       "ui-feedback.js",
       "scale-input.js",
