@@ -48,3 +48,6 @@ coverage/
 
 # Superpowers brainstorm sessions
 .superpowers/
+
+# Изолированные рабочие каталоги (git worktree) — сюда SDD уводит исполнение плана
+.claude/worktrees/
