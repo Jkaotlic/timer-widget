@@ -99,9 +99,13 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Soft radial glow layers — blue + green, the brand gesture.
-           Only present when --bg was NOT overridden with a user image/solid.
-           We use ::before regardless; it sits above bg and under content. */
+        /* Мягкие радиальные свечения — синее и зелёное, фирменный жест.
+           Раньше комментарий тут утверждал, что слой «присутствует только
+           когда --bg не переопределён пользователем». Это было неправдой: слой
+           рисовался ВСЕГДА и поверх фона, поэтому режим «Заливка» заливки не
+           давал — выбранный цвет всегда оставался подкрашен двумя пятнами.
+           Теперь applyBackground вешает на body класс custom-bg в режимах
+           «Заливка» и «Файл» и снимает его в «Градиенте». */
         body::before {
             content: "";
             position: absolute;
@@ -113,6 +117,8 @@
             pointer-events: none;
             z-index: 0;
         }
+
+        body.custom-bg::before { display: none; }
 
         .display-container {
             text-align: center;
@@ -1599,7 +1605,7 @@
     <div class="status-container">
         <div class="status-pill" id="statusPill" role="status" aria-live="polite">
             <span class="status-dot"></span>
-            <span class="status-glyph" aria-hidden="true">·</span>
+            <span class="status-glyph" aria-hidden="true"></span>
             <span id="statusText">Готов к запуску</span>
         </div>
     </div>

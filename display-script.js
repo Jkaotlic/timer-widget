@@ -862,9 +862,15 @@ class DisplayTimer {
         const mode = settings.bgMode || 'gradient';
         let bg = '';
 
+        // Три радиальных свечения из body::before рисуются ПОВЕРХ фона, а не
+        // под ним, поэтому режим «Заливка» заливки не давал: выбранный цвет
+        // всегда оставался подкрашен синим и зелёным пятнами. Комментарий над
+        // правилом при этом утверждал обратное.
         if (mode === 'solid' && settings.bgSolid && this._isSafeColor(settings.bgSolid)) {
             bg = settings.bgSolid;
+            document.body.classList.add('custom-bg');
         } else if (mode === 'gradient') {
+            document.body.classList.remove('custom-bg');
             const c1 = this._isSafeColor(settings.bgGrad1) ? settings.bgGrad1 : '#0f0c29';
             const c2 = this._isSafeColor(settings.bgGrad2) ? settings.bgGrad2 : '#302b63';
             bg = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
@@ -875,6 +881,7 @@ class DisplayTimer {
 
             // Создаём или обновляем оверлей
             this.applyLocalBackground(settings.bgLocalImage, fit, overlay);
+            document.body.classList.add('custom-bg');
             return; // Не применяем стандартный фон
         }
 
@@ -1216,8 +1223,11 @@ class DisplayTimer {
             this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
         } else if (band === 'warning') {
             this.digitalTime.classList.add('warning');
-            this.digitalTime.style.color = '#ffc107';
-            this.digitalTime.style.textShadow = '0 0 20px #ffc107, 0 0 40px #ffc107, 0 0 80px #ffc10766';
+            // Было #ffc107 против --tw-led-warn = #ffcc00 в собственном CSS
+            // этого же окна: правило .digital-time.warning не применялось
+            // НИКОГДА, потому что инлайн всегда бьёт класс.
+            this.digitalTime.style.color = '#ffcc00';
+            this.digitalTime.style.textShadow = '0 0 20px #ffcc00, 0 0 40px #ffcc00, 0 0 80px #ffcc0066';
         } else {
             this.digitalTime.style.color = this._normalColor();
             this.digitalTime.style.textShadow = this._normalGlow();
@@ -1508,7 +1518,6 @@ class DisplayTimer {
     updateChipState(status) {
         const pill = this.statusPill;
         const label = document.getElementById('heroLabel');
-        const glyphEl = pill && pill.querySelector('.status-glyph');
         if (!pill) { return; }
 
         // ЦВЕТ плашки задают только семантические классы (running / paused /
@@ -1519,16 +1528,23 @@ class DisplayTimer {
         // оранжевый .overtime перекрашивался в красный .is-attention.
         // Здесь остаются только подпись над таймером и глиф.
         const CHIP = {
-            paused:   { label: 'Пауза',         glyph: '‖' },
-            overtime: { label: 'Сверх времени', glyph: '!' },
-            finished: { label: 'Завершено',     glyph: '✓' },
-            running:  { label: 'Осталось',      glyph: '▶' },
-            idle:     { label: 'Осталось',      glyph: '·' }
+            // Поля glyph здесь не было бы смысла: CSS гасит текст элемента
+            // (font-size: 0) и рисует свой символ через ::before, поэтому
+            // присвоение из JS было мертво — а списки при этом разошлись
+            // содержимым (finished: JS писал '✓', CSS рисует '×').
+            // Владельцем оставлен CSS: он и виден. Обратный вариант потребовал
+            // бы снять font-size: 0 и удалить пять правил ::before, то есть
+            // заменить видимые сегодня глифы на другой набор — это уже
+            // дизайнерское решение, а не устранение дублирования.
+            paused:   { label: 'Пауза' },
+            overtime: { label: 'Сверх времени' },
+            finished: { label: 'Завершено' },
+            running:  { label: 'Осталось' },
+            idle:     { label: 'Осталось' }
         };
         const chip = CHIP[status] || CHIP.idle;
 
         pill.classList.remove('is-success', 'is-attention');
-        if (glyphEl) { glyphEl.textContent = chip.glyph; }
         if (label) { label.textContent = chip.label; }
     }
 
