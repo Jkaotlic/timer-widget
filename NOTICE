@@ -2067,16 +2067,17 @@ Homepage: https://sindresorhus.com
 BUNDLED FONTS
 
 The following fonts are embedded in fonts/ and are not npm dependencies.
+Full license text (same for all 6): fonts/OFL.txt — SIL Open Font License 1.1.
 
 === Inter ===
 License: SIL Open Font License 1.1
 Copyright (c) 2016 The Inter Project Authors
-Files: inter-latin-300-normal.woff2
+Files: inter-cyrillic-200-normal.woff2, inter-cyrillic-300-normal.woff2, inter-cyrillic-400-normal.woff2, inter-cyrillic-500-normal.woff2, inter-cyrillic-600-normal.woff2, inter-cyrillic-700-normal.woff2, inter-latin-200-normal.woff2, inter-latin-300-normal.woff2, inter-latin-400-normal.woff2, inter-latin-500-normal.woff2, inter-latin-600-normal.woff2, inter-latin-700-normal.woff2
 
 === JetBrains Mono ===
 License: SIL Open Font License 1.1
 Copyright (c) 2020 The JetBrains Mono Project Authors
-Files: jetbrains-mono-latin-400-normal.woff2
+Files: jetbrains-mono-cyrillic-300-normal.woff2, jetbrains-mono-cyrillic-400-normal.woff2, jetbrains-mono-cyrillic-500-normal.woff2, jetbrains-mono-cyrillic-700-normal.woff2, jetbrains-mono-latin-300-normal.woff2, jetbrains-mono-latin-400-normal.woff2, jetbrains-mono-latin-500-normal.woff2, jetbrains-mono-latin-700-normal.woff2
 
 === Bebas Neue ===
 License: SIL Open Font License 1.1
