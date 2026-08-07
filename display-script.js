@@ -120,14 +120,14 @@ class DisplayTimer {
         // Пересчитываем размеры при изменении окна с debounce
         const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
             ? window.TimeUtils.debounce(() => {
-                this.updateRingSize();
+                this.applyTimerScale();
             }, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
-            : () => this.updateRingSize();
+            : () => this.applyTimerScale();
 
         this._handlers.windowResize = debouncedResize;
         window.addEventListener('resize', this._handlers.windowResize);
         // Начальный расчёт
-        this.updateRingSize();
+        this.applyTimerScale();
     }
 
     setupKeyboardShortcuts() {
@@ -200,11 +200,20 @@ class DisplayTimer {
         document.addEventListener('keydown', this._handlers.shortcutsKeydown);
     }
 
-    updateRingSize() {
-        if (this.timerRing) {
-            const scale = this.timerScale / 100;
-            // Используем transform для масштабирования всего таймера (круг + текст)
-            this.timerRing.style.transform = `scale(${scale})`;
+    /**
+     * Применить this.timerScale ко ВСЕМ блокам стилей.
+     *
+     * Раньше эти четыре строки были написаны трижды — в applyDisplaySettings,
+     * в обработчике Ctrl+колеса и в восстановлении из localStorage, — а метод
+     * был назван по кольцу и масштабировал ОДНО кольцо: остальные три
+     * блока каждый раз масштабировал вызывающий. Добавление стиля означало
+     * пятую строку в трёх местах, и пропуск в одном из них не виден ничем.
+     */
+    applyTimerScale() {
+        const scale = (this.timerScale || 100) / 100;
+        const blocks = [this.timerRing, this.timerDigital, this.timerFlip, this.timerAnalog];
+        for (const block of blocks) {
+            if (block) { block.style.transform = `scale(${scale})`; }
         }
     }
 
@@ -532,13 +541,7 @@ class DisplayTimer {
             }
         }
         // Всегда применяем текущий масштаб
-        {
-            const scale = (this.timerScale || 100) / 100;
-            this.updateRingSize();
-            if (this.timerDigital) {this.timerDigital.style.transform = `scale(${scale})`;}
-            if (this.timerFlip) {this.timerFlip.style.transform = `scale(${scale})`;}
-            if (this.timerAnalog) {this.timerAnalog.style.transform = `scale(${scale})`;}
-        }
+        this.applyTimerScale();
 
         // Показ цифр на аналоговом циферблате
         if (settings.showAnalogNumbers !== undefined && this.clockNumbers) {
@@ -1615,12 +1618,8 @@ class DisplayTimer {
             const cur = this.timerScale || 100;
             const newPct = clampScale(cur + delta, TIMER_MIN_SCALE, TIMER_MAX_SCALE);
             if (newPct !== cur) {
-                const scale = newPct / 100;
                 this.timerScale = newPct;
-                this.updateRingSize();
-                if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
-                if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
-                if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
+                this.applyTimerScale();
                 this._safeSetItem(STORAGE_TIMER_SCALE_KEY, String(newPct));
                 // Сообщаем панели управления — иначе её ползунок останется на
                 // старом значении, и два источника правды снова разойдутся.
@@ -1813,11 +1812,7 @@ class DisplayTimer {
                 const pct = parseInt(savedTimerScale);
                 if (pct >= 30 && pct <= 300) {
                     this.timerScale = pct;
-                    const scale = pct / 100;
-                    this.updateRingSize();
-                    if (this.timerDigital) { this.timerDigital.style.transform = `scale(${scale})`; }
-                    if (this.timerFlip) { this.timerFlip.style.transform = `scale(${scale})`; }
-                    if (this.timerAnalog) { this.timerAnalog.style.transform = `scale(${scale})`; }
+                    this.applyTimerScale();
                 }
             }
         } catch { /* ok */ }
