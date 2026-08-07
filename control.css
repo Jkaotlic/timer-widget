@@ -378,10 +378,7 @@ body::after {
     color: var(--tw-fg-dim);
     margin: 6px 0 2px;
 }
-.drawer-body .settings-group-title .icon {
-    font-size: 12px;
-    opacity: 0.8;
-}
+
 .drawer-body .toggle-row {
     padding: 6px 2px;
 }
@@ -1478,9 +1475,25 @@ body::after {
     gap: 6px;
 }
 
-.settings-group-title .icon {
-    font-size: 1em;
-    filter: brightness(1.3);
+/* Значок группы — штриховой SVG: красится currentColor и живёт в обеих темах.
+   Эмодзи не наследовали цвет, не участвовали ни в одной теме и рисовались
+   по-разному на трёх платформах; brightness(1.3) поднимал яркость именно им,
+   штриху подсветка не нужна. */
+.settings-group-title .icon,
+.drawer-body .settings-group-title .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 13px;
+    height: 13px;
+    filter: none;
+    opacity: 0.75;
+}
+
+.settings-group-title .icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 .color-picker {

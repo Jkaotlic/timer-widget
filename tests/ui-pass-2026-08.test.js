@@ -172,3 +172,33 @@ test('зона попадания кнопок окна расширена пс�
     );
     assert.match(CSS_CODE, /\.custom-titlebar \.win-btn::after \{[^}]*inset:\s*-6px/);
 });
+
+/* ─────────────────────────────── ящик настроек ───────────────────────────── */
+
+test('значки групп — inline SVG, а не эмодзи', () => {
+    // Эмодзи рисуются системным emoji-шрифтом: не наследуют currentColor, не
+    // участвуют ни в одной теме и выглядят по-разному на macOS, Windows и
+    // Linux. В светлой теме ✨ у «ЦВЕТА ЧАСОВ» — почти невидимый бледно-жёлтый
+    // глиф на белой карточке.
+    // Плюс у .icon не было aria-hidden (в отличие от .hint-icon рядом), поэтому
+    // скринридер зачитывал НАЗВАНИЯ эмодзи прямо внутри заголовка группы.
+    const icons = PANEL_CODE.match(/<span class="icon"[^>]*>[\s\S]*?<\/span>/g) || [];
+    assert.ok(icons.length >= 9, `значков ${icons.length}, ожидалось ≥9`);
+    for (const icon of icons) {
+        assert.match(icon, /aria-hidden="true"/, `значок без aria-hidden: ${icon.slice(0, 50)}`);
+        assert.match(icon, /<svg/, `значок остался эмодзи: ${icon.slice(0, 50)}`);
+        assert.match(icon, /stroke="currentColor"/, `значок не наследует цвет: ${icon.slice(0, 50)}`);
+    }
+    assert.ok(
+        !/[\u{1F300}-\u{1FAFF}]/u.test(icons.join('')),
+        'в значках остались эмодзи'
+    );
+});
+
+test('подсветка эмодзи снята — штриховому значку она не нужна', () => {
+    assert.ok(
+        !/\.settings-group-title \.icon \{[^}]*filter:\s*brightness/.test(CSS_CODE),
+        'brightness(1.3) вернулся'
+    );
+    assert.match(CSS_CODE, /\.settings-group-title \.icon[^{]*\{[^}]*width:\s*13px/);
+});
