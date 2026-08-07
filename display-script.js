@@ -768,7 +768,11 @@ class DisplayTimer {
         if (timerColor) {
             this._baseCenterBg = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
             this._baseCenterShadow = `0 0 15px ${timerColor}99`;
-            this._baseAnalogDigitalColor = `${timerColor}b3`;
+            // Было b3 (0.7): выбор темы приглушал отсчёт ВТОРОЙ раз поверх
+            // токена, который и так вторичен. Инвариант сброса не задет —
+            // это база восстановления после перерасхода, она и должна быть
+            // непустой, а красные полосы ставятся и снимаются своими ветками.
+            this._baseAnalogDigitalColor = `${timerColor}e6`;
         }
 
         // L6: пока идёт перерасход, стрелки/центр/цифры держит красными
