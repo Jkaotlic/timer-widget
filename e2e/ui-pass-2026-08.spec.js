@@ -112,6 +112,13 @@ test('в светлой теме часы читаемы: стрелки, циф
     expect(seen.flipDigit).toMatch(/255,\s*255,\s*255/);
     expect(Number(seen.seconds)).toBeCloseTo(0.62, 2);
 
+    // Тема живёт в localStorage, а профиль e2e ОДИН на весь прогон (иначе
+    // crash-recovery.spec.js не увидел бы свой снимок после SIGKILL). Не
+    // вернув тему, этот тест оставлял бы её включённой для всех последующих
+    // спеков — ui-theme.spec.js падал с «тема должна стартовать как dark».
+    await control.click('#contrastToggle');
+    await control.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+
     await app.close();
 });
 
@@ -130,8 +137,13 @@ test('кольцо дисплея стоит в центре окна, чип н
         return {
             ringCenterY: r.top + r.height / 2,
             windowCenterY: window.innerHeight / 2,
+            windowH: window.innerHeight,
             pillBottom: pill.bottom,
-            hintTop: hint.top
+            hintTop: hint.top,
+            // Подсказка гаснет сама через несколько секунд, и её прямоугольник
+            // схлопывается в ноль. В одиночном прогоне тест успевал застать её
+            // живой, в полном — нет, и сравнение шло с hintTop: 0.
+            hintVisible: hint.height > 0
         };
     });
 
@@ -140,8 +152,13 @@ test('кольцо дисплея стоит в центре окна, чип н
     // 384px при центре окна 360px.
     expect(Math.abs(m.ringCenterY - m.windowCenterY)).toBeLessThan(3);
     // Чип растёт вместе с экраном и на 720p при bottom: 36px наезжал на
-    // .controls-hint (fixed, bottom: 12px, высота до 30px).
-    expect(m.pillBottom).toBeLessThan(m.hintTop);
+    // .controls-hint (fixed, bottom: 12px, высота до 30px). Полоса подсказки
+    // занимает нижние ~42px, поэтому её место резервируем всегда — даже когда
+    // сама подсказка уже погасла и померить её нечем.
+    expect(m.pillBottom).toBeLessThan(m.windowH - 42);
+    if (m.hintVisible) {
+        expect(m.pillBottom).toBeLessThan(m.hintTop);
+    }
 
     await app.close();
 });

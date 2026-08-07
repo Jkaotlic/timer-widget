@@ -641,7 +641,10 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         } catch (e) {
             log.warn(`[screenshot] drawer resize failed: ${e.message}`);
         }
-        for (const tab of ['clock', 'display']) {
+        // Из четырёх вкладок ящика снимались только две: «Виджет» и «Звуки»
+        // не попадали ни в один кадр — а там живут самая длинная карточка
+        // приложения (список звуков с селектами) и вторая сетка свотчей.
+        for (const tab of ['timer', 'clock', 'display', 'sound']) {
             const w = ctx();
             if (!w.control || w.control.isDestroyed()) { break; }
             try {
