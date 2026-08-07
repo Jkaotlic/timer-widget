@@ -74,3 +74,43 @@ test('деления циферблата виджета стоят на одн�
 
     await app.close();
 });
+
+test('в светлой теме часы читаемы: стрелки, цифры флипа, шильдики', async () => {
+    // Кадры clock-* исключены из visual:check как зависящие от живого времени,
+    // поэтому картинкой это не проверить в принципе — только замером.
+    const { app, control } = await launchApp();
+    await control.click('#openClockBtn');
+    const clock = await app.waitForEvent('window');
+    await clock.waitForLoadState('domcontentloaded');
+
+    await control.click('#contrastToggle');          // тёмная → светлая
+    await clock.waitForTimeout(400);
+
+    const seen = await clock.evaluate(() => {
+        const cs = (sel) => {
+            const el = document.querySelector(sel);
+            return el ? getComputedStyle(el) : null;
+        };
+        return {
+            theme: document.documentElement.dataset.theme,
+            hand: cs('.widget-analog-hour')?.backgroundImage || '',
+            track: cs('.seconds-track')?.stroke || '',
+            shadow: cs('.time-display')?.textShadow || '',
+            flipDigit: cs('.widget-flip-digit')?.color || '',
+            seconds: cs('.time-display .clock-seconds')?.opacity || ''
+        };
+    });
+
+    expect(seen.theme).toBe('light');
+    // Стрелки были залиты жёстко белым градиентом — на белом циферблате их нет.
+    expect(seen.hand).not.toMatch(/255,\s*255,\s*255/);
+    // Трек брался из --tw-border, то есть из токена для РАМОК: 1.52:1 на белом.
+    expect(seen.track).toMatch(/148,\s*148,\s*153/);
+    // Жёсткая чёрная тень под почти чёрным текстом — грязное тиснение.
+    expect(seen.shadow === 'none' || seen.shadow === '').toBe(true);
+    // Цифры флипа брали --tw-fg = #1d1d1f на тёмной карточке: чёрное по чёрному.
+    expect(seen.flipDigit).toMatch(/255,\s*255,\s*255/);
+    expect(Number(seen.seconds)).toBeCloseTo(0.62, 2);
+
+    await app.close();
+});
