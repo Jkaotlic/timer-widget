@@ -83,3 +83,92 @@ test('подзаголовки внутри карточки не заданы �
     );
     assert.match(CSS_CODE, /\.settings-subtitle \{/);
 });
+
+/* ────────────────────────── панель: состояния и мишени ───────────────────── */
+
+test('«пуск» во время работы недоступен, а не сломан', () => {
+    // Общее .main-btn:disabled даёт opacity .4 + grayscale .6 — зелёный круг
+    // превращался в мутно-оливковый и читался как поломка, а не как «пуск
+    // сейчас недоступен».
+    assert.match(CSS_CODE, /\.main-btn\.start:disabled \{[^}]*filter:\s*none/);
+    assert.match(CSS_CODE, /\.main-btn\.start:disabled \{[^}]*opacity:\s*1/);
+});
+
+test('плашка статуса панели красится состоянием, но БЕЗ анимации', () => {
+    // Панель несла состояние одной 8-пиксельной точкой, тогда как полноэкранное
+    // окно заливает плашку целиком: одно состояние в двух окнах показано
+    // принципиально по-разному.
+    for (const state of ['running', 'paused', 'finished', 'overtime']) {
+        assert.match(
+            CSS_CODE,
+            new RegExp(`\\.timer-status:has\\(\\.status-dot\\.${state}\\)`),
+            `нет заливки для состояния ${state}`
+        );
+    }
+    // Пульсация точки — ЕДИНСТВЕННОЕ, что отличает «идёт перерасход» от «уже
+    // завершено» при одном красном цвете. Анимация на самой плашке это
+    // различие уничтожит.
+    const rules = CSS_CODE.match(/\.timer-status:has\([^)]+\)[^{]*\{[^}]*\}/g) || [];
+    assert.ok(rules.length > 0, 'правила заливки не найдены');
+    for (const rule of rules) {
+        assert.ok(!/animation/.test(rule), `анимация на плашке статуса: ${rule.slice(0, 80)}`);
+    }
+});
+
+test('минус и плюс равнозначны — ни красного, ни синего в ряду', () => {
+    // Минусы были покрашены --tw-red, то есть цветом перерасхода: уменьшение
+    // времени читалось как опасное действие. Красить минус нейтральным, а плюс
+    // синим — та же ошибка с другой стороны: «добавить» становится действием по
+    // умолчанию. Направление несёт знак ±.
+    assert.ok(
+        !/\.adjust-main-btn\.minus \{[^}]*var\(--tw-red\)/.test(CSS_CODE),
+        'минус снова покрашен цветом перерасхода'
+    );
+    assert.match(
+        CSS_CODE,
+        /\.adjust-main-btn\.minus,\s*\.adjust-main-btn\.plus \{[^}]*var\(--tw-fg-secondary\)/
+    );
+});
+
+test('разделитель ряда — волосяная линия, а не синяя каретка', () => {
+    const rule = CSS_CODE.match(/\.adjust-divider \{[^}]*\}/)[0];
+    assert.ok(!/var\(--tw-blue\)|linear-gradient/.test(rule), 'вернулась синяя черта');
+    assert.match(rule, /width:\s*1px/);
+    assert.match(rule, /var\(--tw-border-strong\)/);
+});
+
+test('кружок под значком окна имеет габарит', () => {
+    // Компактный блок обнулял width/height, оставляя фон и border-radius: 50%:
+    // вместо кружка рисовалось тесное пятно по размеру глифа, и заливка
+    // активного состояния почти не читалась.
+    assert.ok(
+        !/\.quick-window-btn \.qw-icon \{[^}]*width:\s*auto/.test(CSS_CODE),
+        'габарит подложки значка снова обнулён'
+    );
+    assert.match(CSS_CODE, /\.quick-window-btn \.qw-icon \{[^}]*width:\s*18px/);
+});
+
+test('закрытое окно в ряду ОКНА не выглядит открытым', () => {
+    // И покой, и активность были залиты синим одного семейства, различие несла
+    // в основном альфа. Состояние должны нести только .active и индикатор.
+    const idx = CSS_CODE.indexOf('.quick-window-btn {');
+    const rule = CSS_CODE.slice(idx, CSS_CODE.indexOf('}', idx));
+    assert.ok(!/var\(--tw-blue\)/.test(rule), 'покой снова залит акцентом');
+});
+
+test('мишени панели используют собственный токен проекта', () => {
+    // --tw-hit-min: 32px объявлен в design-tokens.css и не был использован ни разу.
+    const uses = CSS_CODE.match(/var\(--tw-hit-min\)/g) || [];
+    assert.ok(uses.length >= 5, `--tw-hit-min использован ${uses.length} раз, ожидалось ≥5`);
+});
+
+test('зона попадания кнопок окна расширена псевдоэлементом, а не габаритом', () => {
+    // Вариант с width: 24px + padding + background-clip: content-box рисует
+    // скруглённые КВАДРАТЫ: border-radius: 50% считается по border-боксу 24px,
+    // а заливка обрезается по контент-боксу 12×12. Проверено на превью.
+    assert.ok(
+        !/\.custom-titlebar \.win-btn \{[^}]*background-clip:\s*content-box/.test(CSS_CODE),
+        'вернулся background-clip, рисующий квадраты'
+    );
+    assert.match(CSS_CODE, /\.custom-titlebar \.win-btn::after \{[^}]*inset:\s*-6px/);
+});

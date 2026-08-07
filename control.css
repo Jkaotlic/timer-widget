@@ -745,6 +745,24 @@ body::after {
     padding: 0;
     box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
 }
+/* Зона попадания расширяется ПСЕВДОЭЛЕМЕНТОМ, а не габаритом кнопки.
+   Вариант с width: 24px + padding + background-clip: content-box рисует
+   скруглённые КВАДРАТЫ вместо кружков: border-radius: 50% считается по
+   border-боксу 24px, а заливка обрезается по контент-боксу 12×12. Проверено
+   на превью, до попадания в код.
+   Остаётся расхождение: центры по-прежнему в 19px, то есть исключение SC 2.5.8
+   по расстоянию (24px между центрами) не выполнено. Разводить светофор шире не
+   стали — у самого macOS 12px при 8px зазора, то есть 20px; это осознанное
+   отступление в пользу платформенной привычки. */
+.custom-titlebar .win-btn { position: relative; }
+
+.custom-titlebar .win-btn::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+}
+
 .custom-titlebar .win-btn::before {
     content: attr(data-glyph);
     display: block;
@@ -899,6 +917,30 @@ body::after {
     animation: pulse-dot 0.6s infinite;
 }
 
+/* Плашка статуса красится состоянием — как в полноэкранном окне.
+   Панель несла состояние одной 8-пиксельной точкой, тогда как дисплей заливает
+   плашку целиком: одно и то же состояние показано в двух окнах принципиально
+   по-разному.
+   Палитра из CLAUDE.md соблюдена: активен зелёный, пауза оранжевый, завершено
+   и перерасход красные. Цвет ТЕКСТА не меняется. Анимацию плашке добавлять
+   НЕЛЬЗЯ: пульсация точки — единственное, что отличает «идёт перерасход» от
+   «уже завершено» при одном красном. */
+.timer-status:has(.status-dot.running) {
+    background: rgba(48, 209, 88, 0.16);
+    border-color: rgba(48, 209, 88, 0.34);
+}
+
+.timer-status:has(.status-dot.paused) {
+    background: rgba(255, 159, 10, 0.16);
+    border-color: rgba(255, 159, 10, 0.34);
+}
+
+.timer-status:has(.status-dot.finished),
+.timer-status:has(.status-dot.overtime) {
+    background: rgba(255, 69, 58, 0.18);
+    border-color: rgba(255, 69, 58, 0.40);
+}
+
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; transform: scale(1); }
     50%      { opacity: 0.55; transform: scale(1.25); }
@@ -963,6 +1005,20 @@ body::after {
     opacity: 0.4;
     cursor: not-allowed;
     filter: grayscale(0.6);
+}
+
+/* Пока таймер идёт, кнопка пуска отключена. Общее .main-btn:disabled выше
+   даёт opacity .4 + grayscale .6, и зелёный круг превращался в мутно-оливковый:
+   он читался как «кнопка сломалась», а не как «пуск сейчас недоступен».
+   Специфичность (0,3,0) бьёт .main-btn.start (0,2,0) и .main-btn:disabled
+   (0,2,0), но проигрывает светлому правилу (0,3,1) — светлая тема не меняется.
+   Общее правило для .pause/.reset не трогаем: там серый и уместен. */
+.main-btn.start:disabled {
+    opacity: 1;
+    filter: none;
+    background: var(--tw-overlay-medium);
+    color: var(--tw-fg-dim);
+    box-shadow: none;
 }
 
 .main-btn:focus-visible {
@@ -2320,11 +2376,26 @@ select optgroup,
     text-align: center;
 }
 
-.adjust-main-btn.plus { color: var(--tw-blue); }
-.adjust-main-btn.plus:hover { background: rgba(10, 132, 255, 0.15); }
+/* Шесть равнозначных контролов выглядят равнозначно.
+   Минусы были покрашены --tw-red — цветом, которым в этом приложении
+   обозначаются перерасход и завершение: уменьшение времени читалось как
+   опасное действие. Красить минус нейтральным, а плюс синим — та же ошибка с
+   другой стороны: «добавить время» становится действием по умолчанию, хотя
+   ничем не важнее. Направление уже несёт знак ±, цвет для этого не нужен.
+   Побочно закрывается контраст плюс-кнопок, причём в ОБЕИХ темах сразу:
+   --tw-fg-secondary это 0.78 белого в тёмной и #313136 в светлой. Правило,
+   скоупнутое на тёмную тему, для этого больше не нужно — а в светлой оно
+   увело бы кнопки на 3.24:1, ниже AA.
+   Правило светлой темы на :595-596 имеет специфичность (0,4,0) против (0,3,0)
+   и продолжает выигрывать — его менять не нужно. */
+.adjust-main-btn.minus,
+.adjust-main-btn.plus { color: var(--tw-fg-secondary); }
 
-.adjust-main-btn.minus { color: var(--tw-red); }
-.adjust-main-btn.minus:hover { background: rgba(255, 69, 58, 0.15); }
+.adjust-main-btn.minus:hover,
+.adjust-main-btn.plus:hover {
+    background: var(--tw-overlay-medium);
+    color: var(--tw-fg);
+}
 
 .adjust-main-btn:focus-visible {
     outline: none;
@@ -2352,7 +2423,14 @@ select optgroup,
     letter-spacing: 0.1px;
 }
 .manual-time-input {
-    flex: 1 1 auto;
+    /* Поле вмещает максимум «99:59:59», а тянулось на всю строку: ~230px при
+       окне 400px и ~470px на растянутой карточке — с центрированным «0:00»
+       посередине этой пустоты.
+       margin-right: auto выталкивает вправо соседа (.manual-time-hint у ряда
+       «Стоп на», который носит этот же класс) — то есть ровно туда, где
+       подсказка стоит и сейчас. */
+    flex: 0 1 160px;
+    margin-right: auto;
     min-width: 0;
     padding: 8px 12px;
     border: 1px solid var(--tw-border);
@@ -2511,7 +2589,7 @@ select optgroup,
 
 .quick-window-btn {
     padding: 10px 8px;
-    border: 1px solid rgba(10, 132, 255, 0.18);
+    border: 1px solid var(--tw-border);
     border-radius: var(--tw-r-lg);
     font-size: var(--tw-t-caption);
     font-weight: 600;
@@ -2527,10 +2605,12 @@ select optgroup,
                 box-shadow var(--tw-dur-base) var(--tw-ease),
                 transform var(--tw-dur-fast) var(--tw-ease);
     white-space: nowrap;
-    background: linear-gradient(180deg,
-        rgba(10, 132, 255, 0.09),
-        rgba(10, 132, 255, 0.04));
-    color: var(--tw-fg);
+    /* Покой и активность были залиты синим одного семейства, различие несла в
+       основном альфа: закрытое окно выглядело открытым. Теперь состояние несут
+       только .active и точка-индикатор; синий остаётся у наведения — там он и
+       уместен. */
+    background: var(--tw-overlay-light);
+    color: var(--tw-fg-secondary);
     letter-spacing: 0.1px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     min-width: 0;
@@ -2564,10 +2644,12 @@ select optgroup,
 .quick-preset { min-width: 0; }
 
 /* Gradient divider between minus and plus */
+/* Синяя вертикальная черта 2px в ряду, стилизованном под поле ввода, читалась
+   как текстовая каретка, а не как разделитель групп. */
 .adjust-divider {
-    width: 2px;
-    height: 20px;
-    background: linear-gradient(180deg, transparent, var(--tw-blue), transparent);
+    width: 1px;
+    height: 16px;
+    background: var(--tw-border-strong);
     align-self: center;
     margin: 0 4px;
     flex-shrink: 0;
@@ -3228,21 +3310,24 @@ textarea:focus-visible,
 .group-title { margin: 4px 0 6px; font-size: 10px; letter-spacing: 1px; font-weight: 700; color: var(--tw-fg-dim); }
 
 .quick-presets { gap: 6px; }
-.quick-preset { padding: 7px 4px !important; font-size: 12px !important; min-height: 0; }
+.quick-preset { padding: 7px 4px !important; font-size: 12px !important; min-height: var(--tw-hit-min); }
 
 .adjust-main-row { padding: 4px; gap: 4px; }
-.adjust-main-btn { padding: 5px 4px !important; font-size: 12px !important; min-height: 26px; }
-.adjust-divider { margin: 0 2px; }
+.adjust-main-btn { padding: 5px 4px !important; font-size: 12px !important; min-height: var(--tw-hit-min); }
+.adjust-divider { margin: 0 6px; }
 
 .manual-time-row { padding: 6px 4px 2px; gap: 6px; margin-top: 2px; }
-.manual-time-input { padding: 5px 8px !important; font-size: 13px !important; height: 30px; }
-.manual-time-apply { padding: 5px 10px !important; height: 30px; min-width: 36px; }
+.manual-time-input { padding: 5px 8px !important; font-size: 13px !important; height: var(--tw-hit-min); }
+.manual-time-apply { padding: 5px 10px !important; height: var(--tw-hit-min); min-width: 36px; }
 .manual-time-label { font-size: 11px; }
 
 .timer-mode-row { padding: 6px 4px 2px; margin-top: 2px; }
 .timer-mode-label { font-size: 12px; }
-.timer-mode-row .toggle-switch { width: 36px; height: 20px; }
-.timer-mode-row .toggle-slider { border-radius: 10px; }
+/* Мишень 36×32 при НЕТРОНУТОМ треке 36×20. Писать `inset: 6px 0` нельзя:
+   slider лежит внутри бокса 36×20, трек схлопнется до 8px, а ручка 16px
+   вылезет наружу — это видно на превью. Растим бокс, трек пиннуем полосой. */
+.timer-mode-row .toggle-switch { width: 36px; height: 32px; }
+.timer-mode-row .toggle-slider { top: 6px; bottom: 6px; border-radius: 10px; }
 .timer-mode-row .toggle-slider::before { width: 16px; height: 16px; left: 2px; bottom: 2px; }
 .timer-mode-row input:checked + .toggle-slider::before { transform: translateX(16px); }
 
@@ -3255,10 +3340,10 @@ textarea:focus-visible,
     font-size: 11px;
     min-height: 0;
 }
-.quick-window-btn .qw-icon { font-size: 1em; width: auto; height: auto; }
+.quick-window-btn .qw-icon { font-size: 1em; width: 18px; height: 18px; }
 .quick-window-btn .qw-label { font-weight: 500; }
 
-.tab-btn { padding: 7px 6px; font-size: 11px; }
+.tab-btn { padding: 7px 6px; font-size: 11px; min-height: var(--tw-hit-min); }
 
 .footer-hints { padding: 6px var(--panel-inset) 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
 
