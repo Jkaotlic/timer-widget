@@ -500,3 +500,263 @@ test('масштаб виджета действует и на стиль «Ци
         await app.close();
     }
 });
+
+// ---------------------------------------------------------------------------
+// Часы
+// ---------------------------------------------------------------------------
+
+// Тот же приём, что для дисплея/виджета выше.
+async function tagClockWindow(app) {
+    await app.evaluate(({ BrowserWindow }) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+            if (win.webContents.getURL().includes('electron-clock-widget.html')) { win.__ref = 'clockWindow'; }
+        }
+    });
+}
+
+async function resizeClockWindow(app, size) {
+    await app.evaluate(({ BrowserWindow }, { width, height }) => {
+        const win = BrowserWindow.getAllWindows().find((w) => w.__ref === 'clockWindow');
+        if (!win) { throw new Error('clockWindow не помечено — забыт вызов tagClockWindow()'); }
+        win.setSize(width, height);
+    }, size);
+}
+
+// Опознаём окно часов по паре элементов, которых нет в других трёх окнах.
+// `wFlipHr1` тоже есть в виджете, поэтому дискриминатор — `clockAnalogHour`
+// (у виджета аналоговая стрелка называется `widgetHandHour`).
+const IS_CLOCK = () => !!document.getElementById('clockDigits') && !!document.getElementById('clockAnalogHour');
+
+function measureClockDigits() {
+    const time = document.getElementById('clockDigitsTime');
+    const value = document.getElementById('clockDigitsValue');
+    const block = document.getElementById('clockDigits');
+    if (!time || !value || !block) { return null; }
+    const v = value.getBoundingClientRect();
+    const b = block.getBoundingClientRect();
+    const cs = getComputedStyle(time);
+
+    // Знака у часов нет вообще (Step 1 брифа) — ни .clock-digits-sign, ни
+    // абсолютного позиционирования, поэтому, в отличие от measureDigits()/
+    // measureWidgetDigits() выше, нет смысла отдельно мерить «надпись целиком»
+    // Range'ом: #clockDigitsTime и есть вся надпись. Зато есть смысл сравнить
+    // ширину значения с шириной блока — именно эта пара ловит переполнение,
+    // если эталон замера («88:88»/«8:88:88» из digits-style.js) окажется уже
+    // реального времени (например, 12-часовой формат добавляет « AM»/« PM»,
+    // которых ни один из двух эталонов не содержит).
+    return {
+        active: block.classList.contains('active'),
+        fontFamily: cs.fontFamily,
+        fontSize: parseFloat(cs.fontSize),
+        text: value.textContent,
+        valueWidth: v.width,
+        blockWidth: b.width
+    };
+}
+
+// Стиль часов хранится в ДВУХ местах: `displayExtSettings.clockStyle` (его
+// восстанавливает ПАНЕЛЬ через settings-schema.js на своей загрузке) и
+// `clockWidgetSettings.clockStyle` (его пишет и читает САМО окно часов через
+// свои loadSettings()/saveSettings()). Клик по сегменту в панели пишет ОБА —
+// сбрасывать нужно тоже оба, иначе соседний спек в этом же прогоне унаследует
+// либо чужой выбор в панели, либо чужой выбор в самом окне.
+async function resetClockStyle(page) {
+    if (!page || page.isClosed()) { return; }
+    await page.evaluate(() => {
+        try {
+            const prevExt = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+            prevExt.clockStyle = 'circle';
+            localStorage.setItem('displayExtSettings', JSON.stringify(prevExt));
+            const prevClock = JSON.parse(localStorage.getItem('clockWidgetSettings') || '{}');
+            prevClock.clockStyle = 'circle';
+            localStorage.setItem('clockWidgetSettings', JSON.stringify(prevClock));
+        } catch { /* профиль грязный, но не по вине этого блока — не маскируем ошибку теста */ }
+    }).catch(() => {});
+}
+
+async function snapshotClockGeometry(page) {
+    if (!page || page.isClosed()) { return null; }
+    return page.evaluate(() => localStorage.getItem('clockGeometry')).catch(() => null);
+}
+
+async function restoreClockGeometry(page, raw) {
+    if (!page || page.isClosed()) { return; }
+    await page.evaluate((value) => {
+        try {
+            if (value) { localStorage.setItem('clockGeometry', value); }
+            else { localStorage.removeItem('clockGeometry'); }
+        } catch { /* см. resetClockStyle выше */ }
+    }, raw).catch(() => {});
+}
+
+test('стиль «Цифры» доходит до часов кликом, и кегль реально подгоняется под окно', async () => {
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
+    let clock = null;
+    let geometryBefore = null;
+    try {
+        await control.waitForLoadState('domcontentloaded');
+
+        // Достижимость — только кликом: открыть часы кнопкой на панели, затем
+        // переключить стиль сегментом на вкладке «Часы». Открытие ждём
+        // событием, а не findWindow() сразу после клика — окно ещё не
+        // существует в момент возврата из click().
+        await control.click('#openClockBtn');
+        clock = await app.waitForEvent('window');
+        await clock.waitForLoadState('domcontentloaded');
+        expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
+
+        geometryBefore = await snapshotClockGeometry(clock);
+
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#clockStyle button[data-val="digits"]');
+        await control.waitForTimeout(500);
+
+        const m = await clock.evaluate(measureClockDigits);
+        expect(m, 'блок #clockDigits должен существовать в разметке').not.toBeNull();
+        expect(m.active, 'блок «Цифры» должен стать активным').toBe(true);
+        expect(m.fontSize, 'кегль должен быть подобран под окно').toBeGreaterThan(10);
+
+        // ГЛАВНАЯ проверка, тем же приёмом, что и для виджета/дисплея выше (см.
+        // комментарии там). `.clock-digits-time` объявляет
+        // `font-size: var(--digits-font-size, 40px)` — CSS-фоллбэк 40px тоже
+        // проходит порог «> 10», поэтому одного значения кегля недостаточно:
+        // нужно доказать, что переменная РЕАЛЬНО выставлена, а не что кегль
+        // просто не нулевой, и что она меняется на РЕАЛЬНО разных размерах
+        // ОКНА.
+        const varBeforeResize = await clock.evaluate(
+            () => document.getElementById('clockDigitsTime').style.getPropertyValue('--digits-font-size').trim()
+        );
+        expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
+
+        await tagClockWindow(app);
+        await resizeClockWindow(app, { width: 500, height: 420 });
+        await clock.waitForTimeout(500);
+        const wide = await clock.evaluate(measureClockDigits);
+
+        await resizeClockWindow(app, { width: 220, height: 180 });
+        await clock.waitForTimeout(500);
+        const narrow = await clock.evaluate(measureClockDigits);
+
+        expect(wide.fontSize, 'кегль на широком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
+        expect(narrow.fontSize, 'кегль на узком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
+        expect(
+            narrow.fontSize,
+            `кегль обязан меняться вместе с окном: широкое окно дало ${wide.fontSize}px, узкое — `
+            + `${narrow.fontSize}px. Если оба совпадают, значит рисуется CSS-фоллбэк 40px, а не `
+            + 'настоящая подгонка по эталону.'
+        ).toBeLessThan(wide.fontSize);
+    } finally {
+        await resetClockStyle(control);
+        await restoreClockGeometry(clock, geometryBefore);
+        await app.close();
+    }
+});
+
+test('часы «Цифры» не обрезаются в 12-часовом формате с секундами (AM/PM)', async () => {
+    // Эталон замера в digits-style.js — «88:88» / «8:88:88» — смоделирован под
+    // ТАЙМЕР (MM:SS / H:MM:SS) и ничего не знает про суффикс « AM»/« PM»: этот
+    // суффикс существует только у часов. updateScaling() в часах передаёт
+    // третьим аргументом measureDigits() showSeconds (ближайший по форме
+    // аналог из двух готовых эталонов), но при 12-часовом формате реальная
+    // строка («11:59:59 PM», 12 символов) заведомо шире обоих эталонов — риск
+    // в том, что подобранный кегль отрежет часть текста за краем блока.
+    // Не полагаемся на аналогию с виджетом/дисплеем (у них AM/PM не бывает
+    // вообще) — меряем.
+    const { app, control } = await launchApp();
+    let clock = null;
+    let geometryBefore = null;
+    try {
+        await control.waitForLoadState('domcontentloaded');
+
+        await control.click('#openClockBtn');
+        clock = await app.waitForEvent('window');
+        await clock.waitForLoadState('domcontentloaded');
+        expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
+
+        geometryBefore = await snapshotClockGeometry(clock);
+
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+
+        // Секунды включены по умолчанию (showSeconds: true). 24-часовой формат
+        // выключаем кликом по подписи — сам чекбокс визуально нулевого
+        // размера (`.toggle-switch input { opacity: 0; width: 0; height: 0 }`),
+        // клик по нему висит в ожидании actionability. `label[for="clockFormat24h"]`
+        // — тот же путь достижимости, что уже используют reachable-controls.spec.js
+        // и e2e/clock-style-sync.spec.js для однотипных тумблеров.
+        const format24hChecked = await control.evaluate(
+            () => document.getElementById('clockFormat24h').checked
+        );
+        if (format24hChecked) {
+            await control.click('label[for="clockFormat24h"]');
+        }
+        await control.waitForTimeout(400);
+
+        await control.click('#clockStyle button[data-val="digits"]');
+        await control.waitForTimeout(500);
+
+        // Небольшое окно — как и для основного теста, сжимаем: переполнение на
+        // узком окне заметнее всего.
+        await tagClockWindow(app);
+        await resizeClockWindow(app, { width: 320, height: 260 });
+        await clock.waitForTimeout(500);
+
+        const m = await clock.evaluate(measureClockDigits);
+        console.log('12h+секунды →', JSON.stringify(m));
+
+        expect(m.active, 'блок «Цифры» должен быть активен').toBe(true);
+        expect(m.text, 'должен присутствовать суффикс AM/PM').toMatch(/[AP]M$/);
+        expect(
+            m.valueWidth,
+            `значение (${m.valueWidth}px, "${m.text}") не должно вылезать за блок (${m.blockWidth}px)`
+        ).toBeLessThanOrEqual(m.blockWidth + 1);
+    } finally {
+        // Возвращаем 24-часовой формат.
+        await control.evaluate(() => {
+            const el = document.getElementById('clockFormat24h');
+            if (el && !el.checked) { el.click(); }
+        });
+        await control.waitForTimeout(300);
+        await resetClockStyle(control);
+        await restoreClockGeometry(clock, geometryBefore);
+        await app.close();
+    }
+});
+
+test('выбор «Цифры» для часов не включает синхронизацию со стилем виджета', async () => {
+    // Отдельное требование брифа: смена стиля ЧАСОВ (в отличие от смены стиля
+    // ВИДЖЕТА при включённой синхронизации) не должна включать
+    // #syncClockStyle. Существующий обработчик clockStyleEl уже гасит
+    // синхронизацию при РУЧНОМ выборе, но никогда её не включает — проверяем
+    // это поведение конкретно для нового пятого значения 'digits', а не
+    // полагаемся на то, что оно «наверное» работает как остальные четыре.
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForLoadState('domcontentloaded');
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+
+        const before = await control.evaluate(() => document.getElementById('syncClockStyle').checked);
+        expect(before, 'синхронизация обязана быть выключена по умолчанию').toBe(false);
+
+        await control.click('#clockStyle button[data-val="digits"]');
+        await control.waitForTimeout(400);
+
+        const after = await control.evaluate(() => ({
+            syncChecked: document.getElementById('syncClockStyle').checked,
+            clockStyleValue: document.getElementById('clockStyle').value,
+            rowVisible: document.getElementById('clockStyleRow').offsetParent !== null
+        }));
+        console.log('после выбора «Цифры» →', JSON.stringify(after));
+
+        expect(after.syncChecked, '«Цифры» в часах не должны включать синхронизацию со стилем виджета').toBe(false);
+        expect(after.clockStyleValue).toBe('digits');
+        expect(after.rowVisible, 'строка выбора стиля часов должна остаться видимой').toBe(true);
+    } finally {
+        await resetClockStyle(control);
+        await app.close();
+    }
+});
