@@ -795,6 +795,14 @@
                 transition-duration: 1ms !important;
                 scroll-behavior: auto !important;
             }
+            /* Сплошное animation-duration: 1ms убивает не движение, а
+               ИНФОРМАЦИЮ: hintFade идёт с forwards, поэтому подсказка
+               мгновенно доезжает до последнего кадра (opacity 0 + display none)
+               и не появляется вовсе. Движения в ней и нет — анимируется только
+               opacity, а «reduce» требует убрать движение, не кросс-фейд.
+               Селектор класса (0,1,0) выигрывает у `*` (0,0,0) при равном
+               !important, порядок внутри @media значения не имеет. */
+            .widget-hint { animation-duration: 4s !important; }
         }
 
         /* Focus-visible fallback — tokens-driven ring */

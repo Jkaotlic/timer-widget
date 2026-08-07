@@ -309,3 +309,55 @@ test('дефолтный цвет таймера — один на все окн
     // держала overtime: '#ff6b35', то есть запрещённый в проекте оранжевый.
     assert.equal(CONFIG.DEFAULT_COLORS, undefined, 'мёртвая палитра вернулась');
 });
+
+/* ────────────────────────────────── виджет ───────────────────────────────── */
+
+const WIDGET = read('electron-widget.html');
+const WIDGET_CODE = codeOnly(WIDGET);
+
+test('трек кольца виджета — шкала, а не намёк', () => {
+    // Было rgba(255,255,255,0.08) → ≈1.2:1 на циферблате: у прогресса не было
+    // опорной шкалы, дуга висела в пустоте. Замер на измеренном фоне
+    // rgb(22,20,44): 0.35 даёт rgb(104,102,118) → 3.18:1. 0.32 давало бы
+    // 2.85:1 и порога не брало — компенсировать альфой ниже нельзя, только
+    // толщиной.
+    const rule = WIDGET_CODE.match(/^\s*\.progress-track \{[^}]*\}/m)[0];
+    assert.ok(!/0\.08/.test(rule), 'вернулась невидимая альфа 0.08');
+    assert.match(rule, /stroke:\s*var\(--tw-track\)/);
+    // Окно светлую тему не принимает, поэтому токен обязан быть ПРИБИТ в его
+    // собственном блоке — иначе он приедет из design-tokens.css со светлым
+    // значением #949499 на тёмном циферблате.
+    assert.match(WIDGET_CODE, /\[data-theme="light"\][^}]*--tw-track:\s*rgba\(255, 255, 255, 0\.35\)/);
+});
+
+test('карточки флипа — полупрозрачные, без внешних теней и без backdrop-filter', () => {
+    // Якорим на НАЧАЛО правила: без этого регулярка цепляет составной селектор
+    // `.widget-flip-card.flipping .widget-flip-inner { animation: … }` и
+    // проверяет не то правило. Та же ловушка, что и с .theme-btn.active.
+    const rule = WIDGET_CODE.match(/^\s*\.widget-flip-inner \{[^}]*\}/m)[0];
+    assert.match(rule, /rgba\(42,\s*42,\s*53,\s*0\.85\)/);
+    // Окно transparent + hasShadow: false — внешняя тень даёт видимый тёмный
+    // прямоугольник вокруг окна.
+    // \s+, а не \s*: при \s* регулярка отступает на ноль пробелов, проверяет
+    // (?!inset) на самом пробеле — и матчит `box-shadow: inset …`, то есть
+    // ровно то, что должна была пропустить.
+    assert.ok(!/box-shadow:\s+(?!inset)[^;]*;/.test(rule), 'внешняя тень на прозрачном окне');
+    // Родитель .widget-flip-card.flipping крутится по rotateX, а backdrop-filter
+    // заводит собственный контекст композитинга и на 3D ведёт себя по-разному
+    // на платформах: риск там, где нечего выигрывать.
+    assert.ok(!/backdrop-filter/.test(rule), 'backdrop-filter на анимируемой карточке');
+});
+
+test('reduced-motion гасит движение, а не информацию', () => {
+    // Сплошное animation-duration: 1ms убивало подсказку целиком: hintFade идёт
+    // с forwards, поэтому мгновенно доезжала до последнего кадра (opacity 0 +
+    // display none) и не появлялась вовсе. Движения в ней нет — анимируется
+    // только opacity, а «reduce» требует убрать движение, не кросс-фейд.
+    for (const [file, src] of [['виджет', WIDGET_CODE], ['часы', codeOnly(read('electron-clock-widget.html'))]]) {
+        assert.match(
+            src,
+            /prefers-reduced-motion[\s\S]{0,800}\.widget-hint \{\s*animation-duration:\s*4s/,
+            `${file}: подсказка снова гасится под reduced-motion`
+        );
+    }
+});

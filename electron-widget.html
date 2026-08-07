@@ -171,7 +171,12 @@
         /* Progress track (background) */
         .progress-track {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.08);
+            /* Было 0.08 → ≈1.2:1 на циферблате: у прогресса не было опорной
+               шкалы, дуга висела в пустоте. Замер на измеренном фоне
+               rgb(22,20,44): 0.35 даёт rgb(104,102,118) → 3.18:1, порог для
+               нетекстовой графики взят. 0.32 давало бы 2.85:1 — компенсировать
+               альфой ниже 0.35 нельзя, только толщиной. */
+            stroke: var(--tw-track);
             stroke-width: 6;
         }
 
@@ -317,13 +322,17 @@
             grid-row: 3;
             align-self: start;
             margin-top: clamp(6px, 2vh, 16px);
-            padding: clamp(4px, 1.5vh, 10px) clamp(10px, 4vw, 24px);
+            /* Нижняя граница clamp срабатывала уже на ШТАТНОМ окне 250px:
+               подпись печаталась 8px (высота прописных ≈6px) при цифрах 27px —
+               разрыв 4.5×. Поднятая нижняя граница даёт 10px, а уменьшенный
+               вертикальный padding компенсирует прирост высоты пилюли. */
+            padding: clamp(3px, 1.2vh, 9px) clamp(8px, 3.4vw, 20px);
             border-radius: var(--tw-r-pill);
-            font-size: clamp(0.5rem, min(3vw, 3vh), 5rem);
+            font-size: clamp(0.625rem, min(3.4vw, 3.4vh), 5rem);
             font-weight: 600;
             font-family: var(--tw-font-sans);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.4px;
             background: var(--tw-overlay-medium);
             color: var(--tw-fg-secondary);
             -webkit-backdrop-filter: var(--tw-blur-xs);
@@ -555,14 +564,22 @@
             position: relative;
             width: 100%;
             height: 100%;
+            /* Была единственная НЕПРОЗРАЧНАЯ поверхность в стеклянном окне:
+               плоские тёмные прямоугольники рядом со стеклянной LED-панелью и
+               циферблатом. Образец взят у окна часов один в один.
+               backdrop-filter сюда НЕ добавлять: у карточек часов его нет, а
+               родитель .widget-flip-card.flipping крутится по rotateX —
+               backdrop-filter заводит собственный контекст композитинга и на
+               3D ведёт себя по-разному на платформах.
+               Все тени только inset: окно transparent + hasShadow: false. */
             background: linear-gradient(180deg,
-                #2a2a35 0%,
-                #1a1a25 50%,
-                #151520 50%,
-                #0a0a15 100%);
+                rgba(42, 42, 53, 0.85) 0%,
+                rgba(26, 26, 37, 0.85) 49.9%,
+                rgba(10, 10, 15, 0.90) 50%,
+                rgba(21, 21, 32, 0.85) 100%);
             border-radius: var(--tw-r-sm);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--tw-border-strong);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
             overflow: hidden;
         }
 
@@ -881,6 +898,14 @@
                 transition-duration: 1ms !important;
                 scroll-behavior: auto !important;
             }
+            /* Сплошное animation-duration: 1ms убивает не движение, а
+               ИНФОРМАЦИЮ: hintFade идёт с forwards, поэтому подсказка
+               мгновенно доезжает до последнего кадра (opacity 0 + display none)
+               и не появляется вовсе. Движения в ней и нет — анимируется только
+               opacity, а «reduce» требует убрать движение, не кросс-фейд.
+               Селектор класса (0,1,0) выигрывает у `*` (0,0,0) при равном
+               !important, порядок внутри @media значения не имеет. */
+            .widget-hint { animation-duration: 4s !important; }
         }
     </style>
 </head>
