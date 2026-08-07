@@ -194,21 +194,35 @@ function clearProbeCache() {
 }
 
 /**
- * Размеры эталона для пары (шрифт, формат) на базовом кегле.
+ * Размеры эталона для пары (шрифт, эталонный текст) на базовом кегле.
  *
  * ВАЖНО: звать только после `document.fonts.ready`. С `font-display: swap`
  * замер до загрузки woff2 меряет запасное начертание и кэширует чужие цифры.
  * В этом проекте такая ошибка уже стоила фантомной регрессии 2.43% в
  * визуальной сверке.
  *
+ * Эталонный текст передаётся ЯВНО, а не булевым `hasHours`. У таймера
+ * (виджет, дисплей) форм ровно две — `PROBE_MINUTES` / `PROBE_HOURS` — и
+ * булев переключатель их различал. У часов появляется третья форма: суффикс
+ * `« AM»`/`« PM»`, которого у таймера не бывает вообще, и «часы есть / часов
+ * нет» её не выражает. Часы сперва обходили это ОТДЕЛЬНЫМ инлайновым замером
+ * мимо этого модуля — `getBoundingClientRect()` на КАЖДЫЙ вызов
+ * `updateScaling()` (висит на `resize` окна без троттлинга) без кэша вообще,
+ * да ещё и расходящимся с этой функцией, если сюда когда-нибудь добавится,
+ * например, учёт `letter-spacing`. Кэш различает эталоны по САМОМУ ТЕКСТУ
+ * (см. ключ ниже), поэтому разные окна зовут с разными строками одного
+ * шрифта без коллизий, и часам кэш достаётся тем же путём, что виджету и
+ * дисплею.
+ *
  * @param {HTMLElement} probeEl — скрытый span, живущий в том же окне
  * @param {string} fontId
- * @param {boolean} hasHours
+ * @param {string} [probeText] — эталонная строка; по умолчанию `PROBE_MINUTES`
  * @returns {{width: number, height: number, signWidth: number}|null}
  */
-function measureDigits(probeEl, fontId, hasHours) {
+function measureDigits(probeEl, fontId, probeText) {
     const font = resolveFont(fontId);
-    const key = font.id + '|' + (hasHours ? 'h' : 'm');
+    const text = (typeof probeText === 'string' && probeText) ? probeText : PROBE_MINUTES;
+    const key = font.id + '|' + text;
     const cached = probeCache.get(key);
     if (cached) { return cached; }
 
@@ -218,7 +232,7 @@ function measureDigits(probeEl, fontId, hasHours) {
     probeEl.style.fontWeight = String(font.weight);
     probeEl.style.fontSize = PROBE_FONT_SIZE + 'px';
 
-    probeEl.textContent = hasHours ? PROBE_HOURS : PROBE_MINUTES;
+    probeEl.textContent = text;
     const digitsRect = probeEl.getBoundingClientRect();
 
     probeEl.textContent = PROBE_SIGN;

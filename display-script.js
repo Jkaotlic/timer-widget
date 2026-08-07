@@ -1558,7 +1558,10 @@ class DisplayTimer {
         if (!this.timerDigits || !this.digitsTime || !this._digitsFontsReady) { return; }
 
         const hasHours = Math.abs(Math.floor(this.remainingSeconds)) >= 3600;
-        const probe = window.DigitsStyle.measureDigits(this.digitsProbe, this.digitsFont, hasHours);
+        // measureDigits() принимает ЯВНУЮ эталонную строку, не булев hasHours —
+        // выбор строки остаётся здесь, у потребителя.
+        const probeText = hasHours ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
+        const probe = window.DigitsStyle.measureDigits(this.digitsProbe, this.digitsFont, probeText);
         if (!probe) { return; }
 
         const box = this.timerDigits.getBoundingClientRect();
