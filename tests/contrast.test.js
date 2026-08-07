@@ -437,7 +437,11 @@ test('подписи info-блоков читаемы во всех темах (
     const report = [];
     for (const [name, , themeBg] of THEMES) {
         // Фон info-блока: --tw-bg-surface поверх фона темы.
-        const blockBg = composite(darkToken('tw-bg-surface'), parseColor(themeBg).rgb);
+        // Подложка блока — --tw-bg-timer, а не --tw-bg-surface: в UI-проходе
+        // 07.08.2026 инфо-блок переведён на неё, чтобы перестать гасить синеву
+        // фона. Модель обязана следовать за CSS, иначе тест меряет
+        // несуществующую поверхность и его зелёный цвет ничего не значит.
+        const blockBg = composite(darkToken('tw-bg-timer'), parseColor(themeBg).rgb);
         for (const [styleName, color] of Object.entries(LABEL_FALLBACK)) {
             const r = contrast(composite(color, blockBg), blockBg);
             report.push(`${name}/${styleName}: ${r.toFixed(2)}:1`);
