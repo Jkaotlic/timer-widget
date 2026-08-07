@@ -85,6 +85,10 @@ body::after {
     grid-template-columns: minmax(0, 1fr) 0px;
     grid-template-rows: 1fr;
     --drawer-width: 336px;
+    /* Левый край панели был набран тремя значениями (12 / 14 / 16px) в шести
+       правилах: заголовок «НАСТРОЙКИ» и полоса вкладок стояли на 2px правее
+       всей панели, футер — на 2px левее. Одна ручка на все шесть. */
+    --panel-inset: 14px;
     --control-panel-width: 400px;
     min-height: 100vh;
     width: 100%;
@@ -358,6 +362,21 @@ body::after {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* Третий уровень заголовка: подзаголовок ВНУТРИ карточки.
+   Был написан тем же классом, что и заголовок самой карточки, а разница
+   задавалась инлайновым style="font-size:10px;margin-top:2px" — то есть
+   значением, которое бьёт любую тему и переживает любую правку CSS.
+   Три уровня выглядели одинаково: капслок 10px --tw-fg-dim, и родитель
+   отличался от детей только значком. */
+.settings-subtitle {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--tw-fg-dim);
+    margin: 6px 0 2px;
 }
 .drawer-body .settings-group-title .icon {
     font-size: 12px;
@@ -699,6 +718,10 @@ body::after {
 .custom-titlebar .window-controls {
     display: flex;
     gap: 7px;
+    /* Левый кластер 31px, правый принудительно 52px, а space-between центрирует
+       надпись в ОСТАТКЕ — «ТАЙМЕР» стоял на 10.5px левее центральной оси,
+       общей со статусом и кнопками транспорта. */
+    min-width: 52px;
     app-region: no-drag;
     -webkit-app-region: no-drag;
 }
@@ -746,7 +769,12 @@ body::after {
    Timer hero — VisionOS signature
    ======================================================= */
 .timer-header {
-    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+    /* Было rgba(255,255,255,0.02) → transparent: 2% белого поверх #1e1e22 даёт
+       +4.5/255 в верхней точке и уходит в ноль. Это НИЖЕ порога 8/255, который
+       visual-diff.js вообще считает изменением, — правило существовало, эффекта
+       не было. Только inset-тень: внешних в этом проекте нет нигде. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.015) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     padding: 24px 16px 14px;
     text-align: center;
     position: relative;
@@ -2309,7 +2337,12 @@ select optgroup,
     gap: var(--tw-s-2);
     margin-top: var(--tw-s-2);
     padding: var(--tw-s-2) var(--tw-s-1) 0;
-    border-top: 1px solid var(--tw-divider);
+    /* border-top снят намеренно: тот же --tw-divider разделял и СЕКЦИИ, и
+       строки ВНУТРИ секции, поэтому «Точное время» читалось как отдельный
+       раздел. Строки внутри секции разводятся пробелом, линия остаётся
+       признаком границы секции.
+       Подставлять сюда литерал вроде rgba(255,255,255,0.03) нельзя: в светлой
+       теме белое на белом исчезает совсем. */
 }
 .manual-time-label {
     flex: 0 0 auto;
@@ -2348,7 +2381,7 @@ select optgroup,
     gap: var(--tw-s-2);
     margin-top: var(--tw-s-2);
     padding: var(--tw-s-2) var(--tw-s-1) 0;
-    border-top: 1px solid var(--tw-divider);
+    /* border-top снят по той же причине, что и у .manual-time-row выше. */
 }
 .timer-mode-label {
     display: inline-flex;
@@ -2603,7 +2636,7 @@ select optgroup,
 }
 
 .advanced-settings .content-section {
-    padding: 0 var(--tw-s-4) var(--tw-s-3);
+    padding: var(--tw-s-1) var(--panel-inset) var(--tw-s-3);
     background: transparent;
     border-radius: 0 0 var(--tw-r-2xl) var(--tw-r-2xl);
     flex: 0 1 auto;
@@ -3176,23 +3209,23 @@ textarea:focus-visible,
    panel only carries timer + transport + presets + adjust + windows.
    Tightened to fit ~480×600 minimum and scale up cleanly.
    ============================================================ */
-.custom-titlebar { padding: 5px 12px; min-height: 30px; }
+.custom-titlebar { padding: 5px var(--panel-inset); min-height: 30px; }
 
-.timer-header { padding: 10px 14px 8px; }
-.timer-header h1 { margin: 0 0 4px 0; font-size: 10px; }
+.timer-header { padding: 10px var(--panel-inset) 8px; }
+.timer-header h1 { margin: 0 0 6px 0; font-size: 11px; letter-spacing: 1.6px; color: var(--tw-fg-muted); }
 .timer-display-main {
     font-size: 58px;
     margin-bottom: 6px;
 }
 .timer-status { padding: 3px 10px; font-size: 10px; letter-spacing: 0.6px; }
 
-.main-controls { padding: 6px 14px 8px; gap: 12px; }
+.main-controls { padding: 6px var(--panel-inset) 8px; gap: 12px; }
 .main-btn { width: 40px; height: 40px; font-size: 15px; }
 .main-btn.start { width: 48px; height: 48px; font-size: 18px; }
 
-.compact-section { padding: 8px 14px; }
+.compact-section { padding: 8px var(--panel-inset); }
 .compact-section + .compact-section { padding-top: 4px; }
-.group-title { margin: 4px 0 6px; font-size: 10px; }
+.group-title { margin: 4px 0 6px; font-size: 10px; letter-spacing: 1px; font-weight: 700; color: var(--tw-fg-dim); }
 
 .quick-presets { gap: 6px; }
 .quick-preset { padding: 7px 4px !important; font-size: 12px !important; min-height: 0; }
@@ -3201,12 +3234,12 @@ textarea:focus-visible,
 .adjust-main-btn { padding: 5px 4px !important; font-size: 12px !important; min-height: 26px; }
 .adjust-divider { margin: 0 2px; }
 
-.manual-time-row { padding: 4px 6px; gap: 6px; margin-top: 6px; }
+.manual-time-row { padding: 6px 4px 2px; gap: 6px; margin-top: 2px; }
 .manual-time-input { padding: 5px 8px !important; font-size: 13px !important; height: 30px; }
 .manual-time-apply { padding: 5px 10px !important; height: 30px; min-width: 36px; }
 .manual-time-label { font-size: 11px; }
 
-.timer-mode-row { padding: 4px 2px; margin-top: 4px; }
+.timer-mode-row { padding: 6px 4px 2px; margin-top: 2px; }
 .timer-mode-label { font-size: 12px; }
 .timer-mode-row .toggle-switch { width: 36px; height: 20px; }
 .timer-mode-row .toggle-slider { border-radius: 10px; }
@@ -3227,7 +3260,7 @@ textarea:focus-visible,
 
 .tab-btn { padding: 7px 6px; font-size: 11px; }
 
-.footer-hints { padding: 6px 12px 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
+.footer-hints { padding: 6px var(--panel-inset) 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
 
 /* Drawer — compact head & body padding for narrow drawer widths */
 .drawer-head { padding: 10px 14px 8px; }
