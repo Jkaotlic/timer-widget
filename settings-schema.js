@@ -118,7 +118,14 @@ const SETTINGS_DESCRIPTORS = [
 
     // --- часы ---
     { key: 'syncClockStyle', el: 'syncClockStyle', kind: 'checkbox', def: false },
-    { key: 'clockStyle', el: 'clockStyle', kind: 'value', def: 'circle', legacy: ['timerStyle'] }
+    { key: 'clockStyle', el: 'clockStyle', kind: 'value', def: 'circle', legacy: ['timerStyle'] },
+
+    // Шрифт стиля «Цифры». Три РАЗНЫХ имени с самого начала: общее имя
+    // `timerStyle` в этом проекте уже означало разные окна в разных наборах
+    // и стоило отдельного бага, где дисплей рисовал стиль виджета.
+    { key: 'widgetDigitsFont', el: 'widgetDigitsFont', kind: 'value', def: 'inter' },
+    { key: 'displayDigitsFont', el: 'displayDigitsFont', kind: 'value', def: 'inter' },
+    { key: 'clockDigitsFont', el: 'clockDigitsFont', kind: 'value', def: 'inter' }
 ];
 
 // Ключи, которые панель пишет в `displayExtSettings` МИМО таблицы. Держим списком,
