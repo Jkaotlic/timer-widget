@@ -1286,35 +1286,36 @@
                 
                 this.container.style.setProperty('--analog-scale', analogScale);
 
-                // Цифры: кегль по замеру ЭТАЛОНА (digits-style.js, Task 1) —
-                // fitFontSize() и applyFont() оттуда, signWidth: 0, потому что
-                // часы не бывают отрицательными и знака у них нет вообще (в
-                // отличие от таймера).
+                // Цифры: кегль по замеру ЭТАЛОНА через measureDigits()/
+                // fitFontSize() (digits-style.js) — тем же путём (и тем же
+                // кэшу по паре «шрифт, эталон»), что у виджета и дисплея.
+                // signWidth: 0, потому что часы не бывают отрицательными и
+                // знака у них нет вообще (в отличие от таймера).
                 //
-                // Замер НЕ через measureDigits(): его два готовых эталона
-                // («88:88» / «8:88:88») смоделированы под ТАЙМЕР и ничего не
-                // знают про суффикс « AM»/« PM» — он существует только у часов,
-                // в 12-часовом формате. Замерено e2e (`часы «Цифры» не
+                // Эталон — СВОЯ строка, не PROBE_MINUTES/PROBE_HOURS: те два
+                // смоделированы под ТАЙМЕР и ничего не знают про суффикс
+                // « AM»/« PM», который существует только у часов, в
+                // 12-часовом формате. Замерено e2e (`часы «Цифры» не
                 // обрезаются…`): при 12ч + секундах реальная строка
-                // «07:29:58 PM» рисовалась 496px против эталонных 74px, кегль
-                // выходил в 1.5 раза крупнее нужного, и текст резался о край
-                // окна (320px блок). Поэтому эталон строится из РЕАЛЬНОЙ формы
-                // текущего форматирования (showSeconds и _uses24h() — те же
-                // источники, что уже определяют timeStr в updateDisplay()), а
-                // не берётся из фиксированной пары строк общего модуля.
+                // «07:29:58 PM» рисовалась 496px против эталонных 74px по
+                // PROBE_HOURS, кегль выходил в 1.5 раза крупнее нужного, и
+                // текст резался о край окна (320px блок). Эталон строится из
+                // РЕАЛЬНОЙ формы текущего форматирования (showSeconds и
+                // _uses24h() — те же источники, что уже определяют timeStr в
+                // updateDisplay()), но измерение — measureDigits(), не
+                // отдельный инлайновый DOM-замер: тот раньше не кэшировался
+                // (getBoundingClientRect() на КАЖДЫЙ resize) и молча
+                // расходился бы с этой функцией при любой будущей правке
+                // самого модуля (например, letter-spacing).
                 if (this.clockDigitsTime && this.clockDigitsProbe && this._digitsFontsReady) {
-                    window.DigitsStyle.applyFont(this.clockDigitsProbe, this.digitsFont);
-                    this.clockDigitsProbe.style.fontSize = window.DigitsStyle.PROBE_FONT_SIZE + 'px';
                     const sample = (showSeconds ? '88:88:88' : '88:88') + (this._uses24h() ? '' : ' PM');
-                    this.clockDigitsProbe.textContent = sample;
-                    const probeRect = this.clockDigitsProbe.getBoundingClientRect();
-                    this.clockDigitsProbe.textContent = '';
-                    if (probeRect.width > 0 && probeRect.height > 0) {
+                    const probe = window.DigitsStyle.measureDigits(this.clockDigitsProbe, this.digitsFont, sample);
+                    if (probe) {
                         const size = window.DigitsStyle.fitFontSize({
                             availableWidth: containerWidth * 0.9,
                             availableHeight: containerHeight * 0.9,
-                            probeWidth: probeRect.width,
-                            probeHeight: probeRect.height,
+                            probeWidth: probe.width,
+                            probeHeight: probe.height,
                             signWidth: 0
                         });
                         if (size > 0) {

@@ -1337,8 +1337,12 @@
                 // «Цифры» врёт от 0.42 до 0.78 em — поэтому здесь меряем.
                 if (this.widgetDigitsTime && this._digitsFontsReady) {
                     const hasDigitsHours = Math.abs(Math.floor(this.remainingSeconds)) >= 3600;
+                    // measureDigits() принимает ЯВНУЮ эталонную строку, не булев
+                    // hasHours — выбор строки остаётся здесь, у потребителя.
+                    const probeText = hasDigitsHours
+                        ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
                     const probe = window.DigitsStyle.measureDigits(
-                        this.widgetDigitsProbe, this.digitsFont, hasDigitsHours
+                        this.widgetDigitsProbe, this.digitsFont, probeText
                     );
                     if (probe) {
                         const size = window.DigitsStyle.fitFontSize({

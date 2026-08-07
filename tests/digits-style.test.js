@@ -10,7 +10,9 @@ const {
     PROBE_HOURS,
     resolveFont,
     fitScale,
-    fitFontSize
+    fitFontSize,
+    measureDigits,
+    clearProbeCache
 } = require('../digits-style');
 
 const ROOT = path.join(__dirname, '..');
@@ -115,4 +117,109 @@ test('эталонные строки: минуты и часы — самые �
     // а восьмёрка в цифровых начертаниях — почти всегда.
     assert.equal(PROBE_MINUTES, '88:88');
     assert.equal(PROBE_HOURS, '8:88:88');
+});
+
+// ---------------------------------------------------------------------------
+// measureDigits: замер (DOM), сигнатура и кэш
+// ---------------------------------------------------------------------------
+/**
+ * Фальшивый DOM-элемент. Node не рисует layout, поэтому геометрия здесь
+ * ДЕТЕРМИНИРОВАННАЯ и завязана на текущий `textContent`/`fontSize` в момент
+ * вызова `getBoundingClientRect()`: этого достаточно, чтобы отличить
+ * «замерили заново» от «отдали из кэша» и «замерили НЕ ТУ строку» — не нужен
+ * настоящий layout, нужна только воспроизводимая связь текст → ширина.
+ * `rectCalls` считает обращения к DOM, чтобы доказывать кэш-попадания без
+ * подглядывания во внутренний Map модуля.
+ */
+function makeFakeProbe() {
+    let text = '';
+    let rectCalls = 0;
+    return {
+        style: {},
+        get textContent() { return text; },
+        set textContent(v) { text = v; },
+        get rectCalls() { return rectCalls; },
+        getBoundingClientRect() {
+            rectCalls += 1;
+            const fontSize = parseFloat(this.style.fontSize) || 0;
+            return { width: text.length * fontSize * 0.5, height: fontSize };
+        }
+    };
+}
+
+test('measureDigits: явная эталонная строка определяет ширину замера', () => {
+    // Часы (Task 6) передают ЯВНЫЙ эталонный текст третьим аргументом, а не
+    // булев hasHours — таймерные окна (виджет/дисплей) выбирают между
+    // PROBE_MINUTES/PROBE_HOURS сами и передают ту же строку.
+    clearProbeCache();
+    const short = measureDigits(makeFakeProbe(), 'mono', '88:88');
+    clearProbeCache();
+    const long = measureDigits(makeFakeProbe(), 'mono', '88:88:88 PM');
+
+    assert.ok(short.width > 0 && long.width > 0, 'оба замера обязаны дать положительную ширину');
+    assert.ok(long.width > short.width, 'более длинный эталон обязан замеряться шире');
+});
+
+test('measureDigits: без эталонной строки — тот же результат, что PROBE_MINUTES явно', () => {
+    clearProbeCache();
+    const withDefault = measureDigits(makeFakeProbe(), 'mono');
+    clearProbeCache();
+    const withExplicit = measureDigits(makeFakeProbe(), 'mono', PROBE_MINUTES);
+    assert.deepEqual(withDefault, withExplicit);
+});
+
+test('measureDigits: повторный вызов с тем же (шрифт, эталон) берётся из кэша, а не мерит заново', () => {
+    clearProbeCache();
+    const probe = makeFakeProbe();
+
+    measureDigits(probe, 'mono', '88:88');
+    const callsAfterFirst = probe.rectCalls;
+    assert.ok(callsAfterFirst > 0, 'первый вызов обязан измерить DOM хотя бы раз');
+
+    measureDigits(probe, 'mono', '88:88');
+    assert.equal(
+        probe.rectCalls, callsAfterFirst,
+        'повторный вызов с тем же (шрифт, эталон) не должен трогать DOM — обязан быть кэш-хит'
+    );
+});
+
+test('measureDigits: кэш различает эталоны по ТЕКСТУ, а не только по шрифту (CRITICAL)', () => {
+    // Ключ кэша обязан включать саму эталонную строку, не только font.id.
+    // Ровно это было находкой ревью Task 6: до обобщения сигнатуры часы были
+    // вынуждены обходить этот модуль отдельным инлайновым замером МИМО кэша,
+    // потому что PROBE_MINUTES/PROBE_HOURS не знают про суффикс « AM»/« PM».
+    // Если бы ключ строился только по шрифту, второй вызов с ДРУГИМ текстом
+    // того же шрифта тихо вернул бы результат замера ПЕРВОГО текста.
+    clearProbeCache();
+    const probe = makeFakeProbe();
+
+    const shortText = '88:88';
+    const longText = '88:88:88 PM';
+    const first = measureDigits(probe, 'mono', shortText);
+    const second = measureDigits(probe, 'mono', longText);
+
+    assert.notEqual(first.width, second.width, 'разные эталонные строки обязаны давать разную ширину');
+    // Доказываем, что second посчитан ПО ВТОРОМУ тексту, а не выдан по ошибке
+    // из кэша первого: геометрия фальшивого probe детерминированно завязана
+    // на длину текста в момент замера, поэтому неверный кэш-хит дал бы здесь
+    // ширину shortText, а не longText.
+    assert.equal(second.width, longText.length * PROBE_FONT_SIZE * 0.5);
+});
+
+test('measureDigits: разные шрифты не делят кэш даже с одинаковым эталоном', () => {
+    clearProbeCache();
+    const probeMono = makeFakeProbe();
+    const probeBebas = makeFakeProbe();
+
+    measureDigits(probeMono, 'mono', '88:88');
+    measureDigits(probeBebas, 'bebas', '88:88');
+
+    assert.equal(probeMono.rectCalls, 2, 'первый шрифт обязан замерить DOM (цифры + знак)');
+    assert.equal(probeBebas.rectCalls, 2, 'второй шрифт — другой ключ кэша, тоже обязан замерить DOM');
+});
+
+test('measureDigits: неживой probeEl без getBoundingClientRect не роняет вызов', () => {
+    clearProbeCache();
+    assert.equal(measureDigits(null, 'mono', '88:88'), null);
+    assert.equal(measureDigits({}, 'mono', '88:88'), null);
 });
