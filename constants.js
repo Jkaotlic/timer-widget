@@ -143,9 +143,6 @@ const CONFIG = {
         DISPLAY_BLOCK_SCALE: 'displayBlockScale',
         DISPLAY_BLOCK_POSITIONS: 'displayBlockPositions',
         SELECTED_DISPLAY: 'selectedDisplay',
-        // Шрифт стиля «Цифры» на дисплее — свой ключ, как displayTimerScale,
-        // а не внутри displayExtSettings (см. display-script.js)
-        DISPLAY_DIGITS_FONT: 'displayDigitsFont',
         // Фон полноэкранного режима
         LOCAL_BG_IMAGE: 'localBgImage',
         LOCAL_BG_SETTINGS: 'localBgSettings',

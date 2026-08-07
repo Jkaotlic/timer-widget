@@ -20,6 +20,28 @@ async function findWindow(app, probe) {
     return null;
 }
 
+// Помечаем окно дисплея в ГЛАВНОМ процессе (тот же приём, что в
+// e2e/window-drag-geometry.spec.js), чтобы дальше найти его через
+// BrowserWindow.getAllWindows() и по-настоящему поменять размер РЕАЛЬНОГО окна —
+// а не CSS-масштаб внутри него. Открывается оно в fullscreen (см.
+// createDisplayWindow), поэтому сначала снимаем fullscreen, потом задаём размер.
+async function tagDisplayWindow(app) {
+    await app.evaluate(({ BrowserWindow }) => {
+        for (const win of BrowserWindow.getAllWindows()) {
+            if (win.webContents.getURL().includes('display.html')) { win.__ref = 'displayWindow'; }
+        }
+    });
+}
+
+async function resizeDisplayWindow(app, size) {
+    await app.evaluate(({ BrowserWindow }, { width, height }) => {
+        const win = BrowserWindow.getAllWindows().find((w) => w.__ref === 'displayWindow');
+        if (!win) { throw new Error('displayWindow не помечено — забыт вызов tagDisplayWindow()'); }
+        if (win.isFullScreen()) { win.setFullScreen(false); }
+        win.setSize(width, height);
+    }, size);
+}
+
 const IS_DISPLAY = () => !!document.getElementById('timerDigits') && !!document.getElementById('timerRing');
 
 function measureDigits() {
@@ -74,7 +96,7 @@ async function resetDisplayStyle(page) {
     }).catch(() => {});
 }
 
-test('стиль «Цифры» доходит до полноэкранного окна кликом', async () => {
+test('стиль «Цифры» доходит до полноэкранного окна кликом, и кегль реально подгоняется под окно', async () => {
     // launchApp() возвращает { app, control } — так её зовут все живые спеки
     // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
     const { app, control } = await launchApp();
@@ -103,6 +125,42 @@ test('стиль «Цифры» доходит до полноэкранного
             () => document.getElementById('timerRing').classList.contains('active')
         );
         expect(ringVisible, 'кольцо в стиле «Цифры» показываться не должно').toBe(false);
+
+        // ГЛАВНАЯ проверка. `m.fontSize > 40` сама по себе ловит только явные
+        // провалы (0px), а не подмену подгонки CSS-фоллбэком: `.digits-time`
+        // объявляет `font-size: var(--digits-font-size, 120px)`, и 120px тоже
+        // проходит порог >40. Ровно это и было настоящим багом: `case 'digits':`
+        // в setTimerStyle() не звал updateDigitsScale(), а обе точки, которые
+        // звали его сами (document.fonts.ready, смена формата ЧЧ), почти всегда
+        // срабатывают ДО того, как пользователь включит стиль, — так что
+        // `--digits-font-size` оставалась НЕВЫСТАВЛЕННОЙ, и рисовался жёсткий
+        // фоллбэк 120px независимо от окна. Три независимых утверждения ниже
+        // ловят именно это: свойство обязано быть реально выставлено (не
+        // пустая строка), а при РЕАЛЬНОМ изменении размера ОКНА (не CSS-масштаба
+        // внутри него — это отдельно проверяет следующий test()) кегль обязан
+        // меняться вместе с ним.
+        const varBeforeResize = await display.evaluate(
+            () => document.getElementById('digitsTime').style.getPropertyValue('--digits-font-size').trim()
+        );
+        expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
+
+        await tagDisplayWindow(app);
+        await resizeDisplayWindow(app, { width: 700, height: 520 });
+        await display.waitForTimeout(700);
+        const wide = await display.evaluate(measureDigits);
+
+        await resizeDisplayWindow(app, { width: 420, height: 340 });
+        await display.waitForTimeout(700);
+        const narrow = await display.evaluate(measureDigits);
+
+        expect(wide.fontSize, 'кегль на широком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
+        expect(narrow.fontSize, 'кегль на узком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
+        expect(
+            narrow.fontSize,
+            `кегль обязан меняться вместе с окном: широкое окно дало ${wide.fontSize}px, узкое — `
+            + `${narrow.fontSize}px. Если оба совпадают (например, оба 120), значит рисуется `
+            + 'CSS-фоллбэк, а не настоящая подгонка по эталону.'
+        ).toBeLessThan(wide.fontSize);
     } finally {
         await resetDisplayStyle(control);
         await app.close();

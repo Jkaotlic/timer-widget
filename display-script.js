@@ -117,17 +117,26 @@ class DisplayTimer {
     }
 
     setupResizeHandler() {
-        // Пересчитываем размеры при изменении окна с debounce
+        // Пересчитываем размеры при изменении окна с debounce.
+        //
+        // Стиль «Цифры» кладёт кегль НЕ в масштаб (applyTimerScale двигает CSS
+        // transform: scale, а не font-size), а в --digits-font-size — свою
+        // отдельную величину, подобранную под фактические px окна. Изменение
+        // размера окна меняет доступный прямоугольник ровно так же, как первое
+        // включение стиля, поэтому без отдельного вызова кегль остаётся
+        // прежним после ресайза, пока пользователь не пересечёт границу часов.
+        const recalc = () => {
+            this.applyTimerScale();
+            this.updateDigitsScale();
+        };
         const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
-            ? window.TimeUtils.debounce(() => {
-                this.applyTimerScale();
-            }, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
-            : () => this.applyTimerScale();
+            ? window.TimeUtils.debounce(recalc, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
+            : recalc;
 
         this._handlers.windowResize = debouncedResize;
         window.addEventListener('resize', this._handlers.windowResize);
         // Начальный расчёт
-        this.applyTimerScale();
+        recalc();
     }
 
     setupKeyboardShortcuts() {
@@ -456,11 +465,18 @@ class DisplayTimer {
 
         // Шрифт стиля «Цифры». Имя СВОЁ: общее имя в этом проекте уже означало
         // разные окна в разных наборах и стоило отдельного бага.
+        //
+        // Своего ключа в localStorage у настройки НЕТ (в отличие от
+        // displayTimerScale): у масштаба есть локальный источник изменений —
+        // Ctrl+колесо прямо на дисплее, и его обязательно персистить самому
+        // окну. У шрифта локального источника нет вообще, его выставляет
+        // только панель — значит и хранит его только она, полем внутри
+        // displayExtSettings, тем же путём, что и displayTimerStyle. Здесь
+        // шрифт только ПРИМЕНЯЕТСЯ, ничего никуда не пишет.
         if (settings.displayDigitsFont !== undefined) {
             const font = window.DigitsStyle.applyFont(this.digitsTime, settings.displayDigitsFont);
             if (font.id !== this.digitsFont) {
                 this.digitsFont = font.id;
-                this._safeSetItem('displayDigitsFont', font.id);
                 this.updateDigitsScale();
             }
         }
@@ -639,6 +655,14 @@ class DisplayTimer {
             case 'digits':
                 if (this.timerDigits) {this.timerDigits.classList.add('active');}
                 document.body.classList.add('style-digits');
+                // Пока стиль неактивен, #timerDigits лежит в display:none и
+                // getBoundingClientRect() отдаёт 0×0 — обе точки, которые сами
+                // зовут updateDigitsScale() (document.fonts.ready и смена
+                // формата ЧЧ в updateDigitsDisplay), почти всегда срабатывают
+                // ДО того, как пользователь включит этот стиль, и замер
+                // проходит вхолостую. Пересчитываем явно ЗДЕСЬ, когда блок уже
+                // получил .active и есть реальные размеры.
+                this.updateDigitsScale();
                 break;
         }
 
@@ -703,13 +727,6 @@ class DisplayTimer {
                     }
                 }
 
-                // Шрифт стиля «Цифры» хранится под СВОИМ ключом (как displayTimerScale),
-                // а не внутри displayExtSettings — примешиваем его в тот же пакет
-                // настроек, чтобы применить ЧЕРЕЗ applyDisplaySettings, а не отдельным
-                // путём, который бы пришлось держать в синхроне с IPC-веткой.
-                const savedDigitsFont = localStorage.getItem('displayDigitsFont');
-                if (savedDigitsFont) { settings.displayDigitsFont = savedDigitsFont; }
-
                 this.applyBackground(settings);
                 this.applyDisplaySettings(settings);
             }
@@ -743,6 +760,17 @@ class DisplayTimer {
             && !digitalTime.classList.contains('warning')) {
             digitalTime.style.color = timerColor;
             digitalTime.style.textShadow = this._baseTimerGlow;
+        }
+
+        // Digits style — save base color, apply only if not in danger/overtime.
+        // Без этого блока `display-colors-update`, пришедший, пока дисплей стоит
+        // на паузе в стиле «Цифры», не менял цвет вообще: единственный ладдер,
+        // который красит digitsTime, живёт в updateDisplay() и защёлкнут кэшем
+        // «секунды не изменились» — перекраска ждала бы следующего реального тика.
+        if (timerColor && this.digitsTime
+            && !this.digitsTime.classList.contains('danger')
+            && !this.digitsTime.classList.contains('warning')) {
+            this.digitsTime.style.color = timerColor;
         }
 
         // Flip style — save base color, apply only if not in danger/overtime
@@ -1152,10 +1180,21 @@ class DisplayTimer {
         // покраситься на каждое реальное изменение секунд, а не только когда
         // сменился формат ЧЧ (то, чем гейтится updateDigitsDisplay выше).
         if (this.digitsTime) {
+            // Снимаем классы на каждый реальный тик — как в updateDigitalDisplay/
+            // updateFlipDisplay. Без remove() здесь danger/overtime, добавленные
+            // _enforceOvertimeColors(), никогда не снимались бы: сейчас это
+            // безвредно (ни одно правило CSS на .digits-time не завязано на эти
+            // классы), но остаётся ловушкой для того, кто такое правило добавит.
+            this.digitsTime.classList.remove('warning', 'danger', 'overtime');
             const band = this._colorBand(secs);
-            if (band === 'danger' || band === 'overtime') {
+            if (band === 'overtime') {
+                this.digitsTime.classList.add('danger', 'overtime');
+                this.digitsTime.style.color = '#ff4444';
+            } else if (band === 'danger') {
+                this.digitsTime.classList.add('danger');
                 this.digitsTime.style.color = '#ff4444';
             } else if (band === 'warning') {
+                this.digitsTime.classList.add('warning');
                 this.digitsTime.style.color = '#ffc107';
             } else {
                 // Пустая строка СНИМАЕТ инлайн и возвращает цвет CSS. Ветка
