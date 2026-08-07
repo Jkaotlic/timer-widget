@@ -120,7 +120,16 @@
             z-index: 1;
             width: 100%;
             max-width: 1200px;
+            /* Лейбл «ОСТАЛОСЬ» — обычный ребёнок центрируемой колонки, поэтому
+               он смещал центр кольца ВНИЗ ровно на половину своей высоты, и
+               величина смещения зависела от активного стиля. Замер на 1280×720:
+               центр кольца 384px при центре окна 360px.
+               Выносить лейбл в position: fixed нельзя — это сломало бы все
+               четыре стиля разом. Вместо этого делаем колонку симметричной:
+               снизу добавляем ровно ту высоту, которую лейбл занимает сверху. */
+            --hero-block: calc(clamp(18px, 2.2vmin, 44px) * 1.2 + clamp(16px, 2.5vh, 48px));
             padding: var(--tw-s-10);
+            padding-bottom: calc(var(--tw-s-10) + var(--hero-block));
             margin: 0 auto;
             display: flex;
             flex-direction: column;
@@ -374,12 +383,15 @@
            CIRCLE TIMER — the hero ring
            ============================================================ */
         .timer-ring {
-            --ring-size: min(60vw, 55vh, 800px);
+            /* Диаметр был зажат 800px ТРИЖДЫ: третьим аргументом min() и ещё
+               двумя дублирующими max-*. На 4K герой занимал ~37% высоты вместо
+               55%. Доли вьюпорта НЕ трогаем: на 720p/1080p/1440p вычисленный
+               размер остаётся байт в байт прежним — потолок начинает работать
+               только выше 2909px, — поэтому эталоны сверки не переписываются. */
+            --ring-size: min(60vw, 55vh, 1600px);
             position: relative;
             width: var(--ring-size);
             height: var(--ring-size);
-            max-width: 800px;
-            max-height: 800px;
             margin: 0 auto;
         }
 
@@ -537,7 +549,13 @@
            ============================================================ */
         .status-container {
             position: fixed;
-            bottom: 40px;
+            /* Нижняя граница 48px, а не 24px, как считал аудит: плашка теперь
+               растёт вместе с экраном, и на 720p при bottom: 36px она наезжала
+               на .controls-hint (fixed, bottom: 12px, высота до 30px) — это
+               видно на первом же кадре превью, расчёт по старой высоте плашки
+               давал другой ответ. При 48px плашка занимает 48…94, подсказка
+               12…42, зазор 6px. */
+            bottom: clamp(48px, 5.5vh, 100px);
             left: 0;
             right: 0;
             display: flex;
@@ -548,8 +566,11 @@
         .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            padding: 12px 26px;
+            /* Та же причина, что и у лейбла: плашка была набрана фиксированными
+               величинами и не росла с экраном. Отступы и зазор — в em, чтобы
+               форма пилюли держалась при любом кегле. */
+            gap: 0.55em;
+            padding: 0.7em 1.6em;
             border-radius: var(--tw-r-pill);
             background: var(--tw-overlay-medium);
             -webkit-backdrop-filter: var(--tw-blur-xs);
@@ -557,10 +578,10 @@
             border: 1px solid var(--tw-border);
             color: var(--tw-fg-secondary);
             font-family: var(--tw-font-sans);
-            font-size: 1.1em;
+            font-size: clamp(15px, 1.8vmin, 34px);
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 0.12em;
             transition: background var(--tw-dur-base) var(--tw-ease),
                         color var(--tw-dur-base) var(--tw-ease),
                         border-color var(--tw-dur-base) var(--tw-ease),
@@ -900,7 +921,7 @@
            ANALOG STYLE
            ============================================================ */
         .timer-analog {
-            --analog-size: min(55vw, 50vh, 700px);
+            --analog-size: min(55vw, 50vh, 1400px);
             display: none;
             align-items: center;
             justify-content: center;
@@ -1218,12 +1239,17 @@
 
         /* Hero label — «Осталось» above the timer */
         .hero-label {
-            font-size: 22px;
+            /* Кегль, трекинг и отступ были зашиты в пиксели, тогда как цифры
+               привязаны к --ring-size: на 4K лейбл оставался одним из самых
+               мелких элементов кадра — на окне, которое смотрят из зала.
+               Трекинг обязан переехать в em: 4px разрядки на 4K схлопнулись бы
+               относительно кегля. */
+            font-size: clamp(18px, 2.2vmin, 44px);
             font-weight: 600;
             color: rgba(255,255,255,0.6);
             text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-bottom: 24px;
+            letter-spacing: 0.22em;
+            margin-bottom: clamp(16px, 2.5vh, 48px);
             text-align: center;
         }
 
