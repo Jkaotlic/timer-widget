@@ -1371,16 +1371,19 @@
             // Colors are updated via the per-window 'widget-colors-update' IPC event, no polling needed
 
             applyColors(colors = null) {
+                // Владельцем дефолта остаётся CSS — ровно так уже работают часы
+                // (electron-clock-widget.html:1168-1173) и полноэкранное окно.
+                // Раньше здесь подставлялся захардкоженный #0a84ff, и он бил
+                // инлайном ЛЮБОЕ правило CSS: обещанный зелёный --tw-led-green
+                // у LED-цифр не срабатывал никогда, флип-цифры были синими
+                // вместо --tw-fg, а секундная стрелка аналога — сине-зелёной
+                // вместо своей красной. Три стиля из четырёх выглядели не так,
+                // как описаны, и виджет расходился с двумя другими окнами.
                 if (!colors) {
                     const saved = localStorage.getItem('timerColors');
-                    colors = saved ? safeJSONParse(saved, {
-                        timer: '#0a84ff',
-                        progress: '#30d158'
-                    }) : {
-                        timer: '#0a84ff',
-                        progress: '#30d158'
-                    };
+                    colors = saved ? safeJSONParse(saved, null) : null;
                 }
+                if (!colors) { return; }
 
                 // Валидация цветов
                 // Проверка цвета одна на всё приложение: своя регулярка

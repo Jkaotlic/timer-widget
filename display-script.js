@@ -626,16 +626,15 @@ class DisplayTimer {
     }
 
     loadColors() {
-        // При первой загрузке - применяем всё
+        // Дефолта здесь нет намеренно: на чистом профиле владельцем остаётся
+        // CSS. Так же ведут себя часы и — после этого прохода — виджет,
+        // который раньше подставлял захардкоженный #0a84ff и потому
+        // расходился с остальными на всех четырёх стилях.
         const saved = localStorage.getItem('timerColors');
-        if (saved) {
-            const colors = window.SecurityUtils
-                ? window.SecurityUtils.safeJSONParse(saved, null)
-                : null;
-            if (colors) {
-                this.applyColors(colors);
-            }
-        }
+        const colors = saved && window.SecurityUtils
+            ? window.SecurityUtils.safeJSONParse(saved, null)
+            : null;
+        if (colors) { this.applyColors(colors); }
 
         // Фон - загружаем один раз и из правильного источника
         this.loadBackgroundSettings();

@@ -980,10 +980,14 @@
                 // FIX BUG-023: Track active theme button to avoid querySelectorAll
                 this.activeThemeButton = null;
 
-                // Текущие цвета (по умолчанию - первая тема)
+                // Стартовые цвета панели. Здесь стояла пара #667eea/#764ba2 —
+                // фиолетовая, которой нет в наборе токенов вообще: наследство
+                // первой версии. Именно она уходила в widgetColors при первом
+                // же изменении настроек, то есть окна красились цветом, не
+                // принадлежащим палитре приложения.
                 this.currentColors = {
-                    timer: '#667eea',
-                    progress: '#764ba2',
+                    timer: window.CONFIG.DEFAULT_TIMER_COLORS.timer,
+                    progress: window.CONFIG.DEFAULT_TIMER_COLORS.progress,
                     bg: '#0f0c29'
                 };
 
