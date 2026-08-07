@@ -114,3 +114,34 @@ test('в светлой теме часы читаемы: стрелки, циф
 
     await app.close();
 });
+
+test('кольцо дисплея стоит в центре окна, чип не наезжает на подсказку', async () => {
+    const { app, control } = await launchApp();
+    await control.click('#openDisplayBtn');
+    const display = await app.waitForEvent('window');
+    await display.waitForLoadState('domcontentloaded');
+    await display.waitForSelector('.timer-ring');
+    await display.waitForTimeout(500);
+
+    const m = await display.evaluate(() => {
+        const r = document.querySelector('.timer-ring').getBoundingClientRect();
+        const pill = document.querySelector('.status-pill').getBoundingClientRect();
+        const hint = document.querySelector('.controls-hint').getBoundingClientRect();
+        return {
+            ringCenterY: r.top + r.height / 2,
+            windowCenterY: window.innerHeight / 2,
+            pillBottom: pill.bottom,
+            hintTop: hint.top
+        };
+    });
+
+    // Лейбл «ОСТАЛОСЬ» — обычный ребёнок центрируемой колонки, поэтому смещал
+    // центр кольца вниз на половину своей высоты. Замер до правки на 1280×720:
+    // 384px при центре окна 360px.
+    expect(Math.abs(m.ringCenterY - m.windowCenterY)).toBeLessThan(3);
+    // Чип растёт вместе с экраном и на 720p при bottom: 36px наезжал на
+    // .controls-hint (fixed, bottom: 12px, высота до 30px).
+    expect(m.pillBottom).toBeLessThan(m.hintTop);
+
+    await app.close();
+});
