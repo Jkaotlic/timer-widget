@@ -670,9 +670,10 @@ async function findDisplay(app) {
 }
 
 test('масштаб дисплея применяется ко всем блокам стилей', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -1098,9 +1099,10 @@ function measureDigits() {
 }
 
 test('стиль «Цифры» доходит до полноэкранного окна кликом', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -1131,9 +1133,10 @@ test('стиль «Цифры» доходит до полноэкранного
 });
 
 test('масштаб дисплея действует и на стиль «Цифры» — ползунком и колесом', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         await control.waitForTimeout(1500);
@@ -1175,9 +1178,10 @@ test('масштаб дисплея действует и на стиль «Ци
 });
 
 test('в перерасходе ЦИФРЫ остаются на оси окна, а надпись — нет', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         await control.waitForTimeout(1500);
