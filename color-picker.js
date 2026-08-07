@@ -193,27 +193,31 @@ class ColorPicker {
 function addPickerToggle(gridId, pickerId, pickerConfig) {
     const grid = document.getElementById(gridId);
     if (!grid) { return null; }
-    const toggle = document.createElement('div');
+    // Настоящая <button>, а не <div role="button"> среди настоящих кнопок:
+    // роль и tabindex приходилось подделывать вручную, а Enter/Space —
+    // обрабатывать отдельным слушателем.
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
     toggle.className = 'color-picker-toggle';
     toggle.title = 'Выбрать свой цвет';
-    toggle.setAttribute('role', 'button');
-    toggle.setAttribute('tabindex', '0');
     toggle.setAttribute('aria-label', 'Выбрать свой цвет');
+    // Кнопка открывает панель и обязана об этом сообщать. Правило
+    // .color-picker-toggle.active в CSS есть, но класс на неё не вешал никто —
+    // состояние было описано и мертво.
+    toggle.setAttribute('aria-expanded', 'false');
     grid.appendChild(toggle);
 
     const picker = new ColorPicker(
         pickerConfig.sv, pickerConfig.hue, pickerConfig.hex,
         pickerConfig.preview, pickerId, pickerConfig.onChange
     );
-    toggle.addEventListener('click', () => picker.toggle());
-    // У элемента role="button" + tabindex="0", то есть он получает фокус
-    // с клавиатуры — но без этого обработчика Enter/Space по нему ничего
-    // не делали, и палитра была недоступна без мыши.
-    toggle.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-            e.preventDefault();
-            picker.toggle();
-        }
+    // Enter/Space обрабатывать вручную больше не нужно: нативная <button>
+    // делает это сама.
+    toggle.addEventListener('click', () => {
+        picker.toggle();
+        const open = picker.panel.classList.contains('open');
+        toggle.classList.toggle('active', open);
+        toggle.setAttribute('aria-expanded', String(open));
     });
     return picker;
 }

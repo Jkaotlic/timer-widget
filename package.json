@@ -134,6 +134,7 @@
       "shortcuts-help.js",
       "custom-sounds.js",
       "local-background.js",
+    "theme-grid.js",
       "electron-widget.html",
       "electron-control.html",
       "electron-clock-widget.html",

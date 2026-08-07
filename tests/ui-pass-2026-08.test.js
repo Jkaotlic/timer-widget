@@ -202,3 +202,67 @@ test('подсветка эмодзи снята — штриховому зна
     );
     assert.match(CSS_CODE, /\.settings-group-title \.icon[^{]*\{[^}]*width:\s*13px/);
 });
+
+test('свотчи цвета — группа радиокнопок, а не восемь безымянных кнопок', () => {
+    // Состояние жило ТОЛЬКО в CSS-классе: скринридер видел восемь одинаковых
+    // кнопок без текста и не мог сказать, какая выбрана. Правильный паттерн
+    // (radiogroup / radio / aria-checked) уже применён в этом же файле у
+    // сегментированных контролов.
+    //
+    // Режем именно buildThemeGrid, а не ищем по всему файлу: role="radio"
+    // есть у сегментированных контролов (_attachSegmented), и проверка по
+    // файлу прошла бы вхолостую, ничего не доказав про свотчи.
+    // Блок уехал из inline-скрипта панели в theme-grid.js — страж
+    // control-decomposition держит объём кода внутри HTML под 2000 строк и
+    // сработал ровно на этом добавлении.
+    const grid = codeOnly(read('theme-grid.js'));
+    assert.match(grid, /setAttribute\('role',\s*'radio'\)/);
+    assert.match(grid, /setAttribute\('aria-checked'/);
+    assert.match(grid, /setAttribute\('aria-label',\s*theme\.name\)/);
+    assert.match(grid, /setAttribute\('role',\s*'radiogroup'\)/);
+});
+
+test('пипетка — настоящая кнопка с состоянием', () => {
+    // Была <div role="button"> среди настоящих <button>, открывала панель и
+    // никогда не сообщала об этом: ни aria-expanded, ни визуального «нажата».
+    // Правило .color-picker-toggle.active в CSS есть, а класс на неё не вешал
+    // никто — состояние было описано и мертво.
+    const code = codeOnly(read('color-picker.js'));
+    assert.ok(!/createElement\('div'\)/.test(code), 'пипетка снова div');
+    assert.match(code, /aria-expanded/);
+    assert.match(code, /classList\.toggle\('active'/);
+});
+
+test('светлая тема доехала до шапки ящика', () => {
+    // Крестик описан белыми литералами, а светлая тема перекрывала у него
+    // только цвет текста: подложка и рамка исчезали целиком, оставался голый
+    // символ без границ мишени.
+    assert.match(CSS_CODE, /\[data-theme="light"\] \.drawer-close \{[^}]*var\(--tw-level-2\)/);
+    assert.match(CSS_CODE, /\[data-theme="light"\] \.drawer-head \{[^}]*border-bottom-color/);
+});
+
+test('выбранный свотч выглядит выбраннее наведённого', () => {
+    // Масштаб активного (1.1) был МЕНЬШЕ масштаба при наведении (1.18).
+    const scale = (s) => Number((s.match(/scale\(([\d.]+)\)/) || [0, 0])[1]);
+    // Якорим на начало строки: иначе `[data-theme="light"] .theme-btn.active`
+    // выше по файлу перехватывает совпадение, и сравнивались бы не те правила.
+    const hover = CSS_CODE.match(/^\.theme-btn:hover \{[^}]*\}/m)[0];
+    const active = CSS_CODE.match(/^\.theme-btn\.active \{[^}]*\}/m)[0];
+    assert.ok(
+        scale(active) >= scale(hover),
+        `активный ${scale(active)} меньше наведённого ${scale(hover)}`
+    );
+    // Белый ореол выбора на белой карточке светлой темы не существует.
+    assert.match(CSS_CODE, /\[data-theme="light"\] \.theme-btn\.active \{[^}]*rgba\(0, 0, 0/);
+});
+
+test('геометрия ящика объявлена один раз и симметрично', () => {
+    // Правила в начале файла были переобъявлены в конце без медиазапроса:
+    // правка первых не давала эффекта, а читатель видел там мёртвые значения.
+    const decls = CSS_CODE.match(/\.drawer-body \{[^}]*padding:[^;]+;/g) || [];
+    assert.equal(decls.length, 1, `.drawer-body с padding объявлен ${decls.length} раз`);
+    assert.ok(
+        !/padding:\s*10px 10px 12px 14px/.test(CSS_CODE),
+        'вернулся несимметричный отступ тела ящика'
+    );
+});

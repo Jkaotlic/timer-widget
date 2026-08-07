@@ -234,7 +234,6 @@ body::after {
     backdrop-filter: blur(40px) saturate(180%);
     -webkit-backdrop-filter: blur(40px) saturate(180%);
     border: 1px solid transparent;
-    border-radius: 22px;
     box-shadow: none;
     display: flex;
     flex-direction: column;
@@ -270,7 +269,11 @@ body::after {
     pointer-events: auto;
 }
 .drawer-head {
-    padding: 16px 18px 12px;
+    /* Геометрия ящика объявлена ЗДЕСЬ и только здесь. Раньше те же три
+       свойства переобъявлялись в конце файла без медиазапроса: жили хвостовые
+       значения, а правка этих строк не давала ничего — читатель видел тут
+       мёртвые 16/18/12px и 17px. */
+    padding: 10px 14px 8px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -282,13 +285,15 @@ body::after {
     content: "НАСТРОЙКИ /";
     font-size: 10.5px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.42);
+    /* Была литеральная альфа 0.42 — ровно то значение, которое проект отверг
+       для --tw-fg-dim как непроходящее AA: на 10.5px выходило 4.05:1. */
+    color: var(--tw-fg-dim);
     text-transform: uppercase;
     letter-spacing: 0.6px;
     flex: 0 0 auto;
 }
 .drawer-title {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--tw-fg);
     letter-spacing: -0.2px;
@@ -323,7 +328,9 @@ body::after {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 14px 14px 14px 16px;
+    /* Отступ симметричный: было слева 14px, справа 10px, из-за чего карточки
+       стояли не по центру ящика. */
+    padding: 10px 12px 12px;
 }
 .drawer-body::-webkit-scrollbar { width: 6px; }
 .drawer-body::-webkit-scrollbar-track { background: transparent; }
@@ -435,6 +442,12 @@ body::after {
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 4px;
     box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+    /* inline-block с вертикальным паддингом и рамкой делал строки подсказки с
+       клавишами выше строк без них: межстрочный шаг скакал внутри одного
+       абзаца. */
+    line-height: 1;
+    padding-block: 1px;
+    vertical-align: baseline;
 }
 
 /* Custom titlebar — traffic light style */
@@ -561,6 +574,30 @@ body::after {
 [data-theme="light"] .sound-empty::before {
     color: var(--tw-fg-dim);
 }
+/* Крестик описан белыми литералами, а светлая тема перекрывала у него ТОЛЬКО
+   цвет текста: подложка и рамка исчезали целиком, оставался голый символ без
+   границ мишени. Там же пропадал разделитель шапки — белый 5% на светлом фоне
+   не существует. Чиним точечно, а не подменой литерала на токен: подмена
+   сдвинула бы тёмную тему с 5% на 8% и переписала эталоны. */
+[data-theme="light"] .drawer-close {
+    background: var(--tw-level-2);
+    border-color: var(--tw-border);
+}
+
+[data-theme="light"] .drawer-close:hover {
+    background: var(--tw-level-3);
+    border-color: var(--tw-border-strong);
+    color: var(--tw-fg);
+}
+
+[data-theme="light"] .drawer-head {
+    border-bottom-color: var(--tw-border);
+}
+
+[data-theme="light"] .theme-btn.active {
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
 [data-theme="light"] .drawer-close,
 [data-theme="light"] .drawer-body .toggle-label,
 [data-theme="light"] .sound-check {
@@ -1418,7 +1455,24 @@ body::after {
 #tab-display .local-bg-preview { height: 80px; }
 #tab-display .bg-mode-tabs { margin-bottom: 6px; }
 #tab-display .bg-mode-btn { padding: 5px 4px; font-size: 10px; }
-#tab-display .reset-btn { padding: 6px; font-size: var(--tw-t-tiny); margin-top: 4px; }
+/* «Сбросить фон по умолчанию» шла во всю ширину карточки — того же веса, что и
+   сам контрол фона, который она сбрасывает: в блоке «ФОН» подряд стояли четыре
+   полноширинные полосы. Hover красил её в красный, то есть выглядела она
+   опаснее, чем есть. */
+#tab-display .reset-btn {
+    width: auto;
+    margin: 4px 0 0 auto;
+    padding: 6px 12px;
+    font-size: var(--tw-t-tiny);
+    color: var(--tw-fg-dim);
+    background: transparent;
+    border: 1px solid var(--tw-border);
+}
+#tab-display .reset-btn:hover {
+    color: var(--tw-fg);
+    background: var(--tw-overlay-light);
+    border-color: var(--tw-border-strong);
+}
 #tab-display .theme-btn { width: 24px; height: 24px; }
 
 .settings-column {
@@ -1526,8 +1580,10 @@ body::after {
     background-clip: padding-box;
 }
 
+/* Масштаб активного (1.1) был МЕНЬШЕ масштаба при наведении (1.18):
+   наведённый свотч выглядел «выбраннее» выбранного. */
 .theme-btn:hover {
-    transform: scale(1.18);
+    transform: scale(1.08);
     border-color: var(--tw-border-strong);
 }
 
@@ -2549,7 +2605,11 @@ select optgroup,
 }
 .settings-time-input:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 
+/* min-width: 40px был, а text-align: right — нет: короткая строка прижималась
+   влево внутри переразмеренного бокса и ездила при смене значения. Соседний
+   такой же индикатор (.bg-overlay-value) выровнен правильно. */
 .scale-value-text {
+    text-align: right;
     min-width: 40px;
     font-size: 0.85em;
     color: var(--tw-fg-secondary);
@@ -3044,6 +3104,13 @@ select optgroup,
 .faq-footer a { color: var(--tw-blue); text-decoration: none; }
 .faq-footer a:hover { text-decoration: underline; }
 
+/* Таб «Полноэкранный» писался, когда настройки лежали внутри 400px-панели, и
+   остался мельче остальных табов того же ящика: при переключении прыгала и
+   плотность, и правая ось. В ящике теснота больше ничем не оправдана. */
+.drawer-body #tab-display .settings-group { padding: 12px; }
+.drawer-body #tab-display .toggle-row { padding: 6px 2px; }
+.drawer-body #tab-display .settings-group-title { font-size: var(--tw-t-tiny); }
+
 /* Compact reset button inside FAQ footer */
 .faq-footer .reset-btn {
     width: auto;
@@ -3360,7 +3427,3 @@ textarea:focus-visible,
 
 .footer-hints { padding: 6px var(--panel-inset) 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
 
-/* Drawer — compact head & body padding for narrow drawer widths */
-.drawer-head { padding: 10px 14px 8px; }
-.drawer-title { font-size: 15px; }
-.drawer-body { padding: 10px 10px 12px 14px; }
