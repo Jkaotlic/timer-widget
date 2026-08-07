@@ -152,6 +152,18 @@
             transform: translate(-50%, -50%);
         }
 
+        /* Тень гасится ЯВНО, а не побочным эффектом.
+           text-shadow выше — СПИСОК, и вторым элементом в нём стоит
+           var(--tw-glow-blue). В светлой теме этот токен равен `none`, а `none`
+           внутри списка теней — невалидное значение: подстановка сделала бы всё
+           объявление invalid at computed-value time и сняла тень целиком.
+           Результат нужный, механизм — случайный, поэтому пишем правило.
+           По существу: жёсткая чёрная тень под почти чёрным текстом на белом
+           читается как грязное тиснение. */
+        [data-theme="light"] .time-display {
+            text-shadow: none;
+        }
+
         /* Superscript seconds — kit recipe for circle style.
            Sized relative to parent so it harmonises with the responsive
            clamp() on .time-display. ~0.33em = 18px at 56px base. */
