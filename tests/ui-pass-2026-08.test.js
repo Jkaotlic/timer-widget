@@ -277,3 +277,35 @@ test('полноэкранное окно называется одинаков�
     assert.match(PANEL_CODE, /display:\s*'Дисплей'/);
     assert.ok(!/>Полноэкр\.</.test(PANEL_CODE), 'вкладка снова называется «Полноэкр.»');
 });
+
+/* ─────────────────────── один владелец дефолтного цвета ──────────────────── */
+
+test('дефолтный цвет таймера — один на все окна', () => {
+    // Их было ТРИ: панель держала #667eea/#764ba2 (фиолетовая пара, которой нет
+    // в токенах вообще), виджет #0a84ff/#30d158, а дисплей не применял ничего и
+    // оставался на CSS-зелёном. Поэтому один и тот же стиль LED выглядел
+    // зелёным на дисплее и синим в виджете — расхождение было не в CSS,
+    // а в данных.
+    const CONFIG = require(path.join(ROOT, 'constants.js'));
+    assert.deepEqual(CONFIG.DEFAULT_TIMER_COLORS, { timer: '#0a84ff', progress: '#30d158' });
+    assert.ok(Object.isFrozen(CONFIG.DEFAULT_TIMER_COLORS));
+
+    // Токен читает ПАНЕЛЬ: он задаёт её стартовое состояние вместо
+    // фиолетовой пары #667eea/#764ba2, которой нет в наборе токенов.
+    assert.match(PANEL_CODE, /DEFAULT_TIMER_COLORS\.timer/);
+    assert.ok(!/timer:\s*'#667eea'/.test(PANEL_CODE), 'фиолетовая пара вернулась в панель');
+
+    // А ОКНА дефолт не подставляют: владельцем остаётся CSS, и каждый стиль
+    // выглядит так, как описан. Виджет раньше писал #0a84ff инлайном, и это
+    // било любое правило: зелёный --tw-led-green не срабатывал никогда.
+    const widget = codeOnly(read('electron-widget.html'));
+    assert.ok(!/timer:\s*'#0a84ff'/.test(widget), 'в виджете остался захардкоженный дефолт');
+    assert.match(widget, /if \(!colors\) \{ return; \}/);
+
+    const display = codeOnly(read('display-script.js'));
+    assert.ok(!/DEFAULT_TIMER_COLORS/.test(display), 'дисплей снова подставляет дефолт');
+
+    // Пятая палитра CONFIG.DEFAULT_COLORS была мертва — её не читал никто, — и
+    // держала overtime: '#ff6b35', то есть запрещённый в проекте оранжевый.
+    assert.equal(CONFIG.DEFAULT_COLORS, undefined, 'мёртвая палитра вернулась');
+});

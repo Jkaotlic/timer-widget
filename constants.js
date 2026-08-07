@@ -160,15 +160,24 @@ const CONFIG = {
     // ============================================
     // DEFAULT COLORS
     // ============================================
-    DEFAULT_COLORS: {
-        primary: '#4a90e2',
-        secondary: '#7cb3e9',
-        warning: '#f5a623',
-        danger: '#d0021b',
-        overtime: '#ff6b35',
-        text: '#ffffff',
-        textSecondary: '#cccccc',
-        background: '#1a1a1a'
+    /**
+     * Дефолтные цвета таймера — ОДИН владелец на четыре окна.
+     *
+     * Их было три, и они разъехались: панель держала #667eea/#764ba2 —
+     * фиолетовую пару, которой нет в токенах вообще; виджет подставлял
+     * #0a84ff/#30d158; дисплей не применял НИЧЕГО и оставался на CSS-зелёном.
+     * Поэтому один и тот же стиль LED выглядел зелёным на полноэкранном окне и
+     * синим в виджете: расхождение было не в CSS, а в данных.
+     *
+     * Здесь стояла ещё и пятая палитра DEFAULT_COLORS (primary/secondary/
+     * warning/danger/overtime/text/…). Её не читал НИКТО — ни одного
+     * обращения по всему репозиторию, — а держала она overtime: '#ff6b35',
+     * то есть оранжевый перерасход, который в этом проекте запрещён и был
+     * вычищен из всех живых мест. Удалена.
+     */
+    DEFAULT_TIMER_COLORS: {
+        timer: '#0a84ff',
+        progress: '#30d158'
     },
 
     // ============================================
@@ -238,7 +247,7 @@ const CONFIG = {
 // Freeze объект чтобы предотвратить изменения
 Object.freeze(CONFIG);
 Object.freeze(CONFIG.STORAGE_KEYS);
-Object.freeze(CONFIG.DEFAULT_COLORS);
+Object.freeze(CONFIG.DEFAULT_TIMER_COLORS);
 Object.freeze(CONFIG.TIMER_STYLES);
 Object.freeze(CONFIG.TIMER_STATES);
 Object.freeze(CONFIG.TIMER_STATUS);
