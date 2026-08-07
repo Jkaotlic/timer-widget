@@ -760,3 +760,211 @@ test('выбор «Цифры» для часов не включает синх
         await app.close();
     }
 });
+
+// ---------------------------------------------------------------------------
+// Шрифт стиля «Цифры» (Task 7)
+// ---------------------------------------------------------------------------
+
+// Возвращает три шрифта к умолчанию 'inter' напрямую в localStorage — тот же
+// приём, что resetWidgetStyle/resetClockStyle/resetDisplayStyle выше:
+// профиль e2e ОДИН на весь прогон, и клик после теста был бы лишним источником
+// гонок с уже закрывающимися окнами.
+async function resetDigitsFonts(page) {
+    if (!page || page.isClosed()) { return; }
+    await page.evaluate(() => {
+        try {
+            const ext = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+            ext.widgetDigitsFont = 'inter';
+            ext.displayDigitsFont = 'inter';
+            ext.clockDigitsFont = 'inter';
+            localStorage.setItem('displayExtSettings', JSON.stringify(ext));
+            const clock = JSON.parse(localStorage.getItem('clockWidgetSettings') || '{}');
+            clock.clockDigitsFont = 'inter';
+            localStorage.setItem('clockWidgetSettings', JSON.stringify(clock));
+        } catch { /* профиль грязный, но не по вине этого блока — не маскируем ошибку теста */ }
+    }).catch(() => {});
+}
+
+test('font-select: присваивание .value молчит, событие шлёт только клик', async () => {
+    // Прямая проверка инварианта из font-select.js/attachFontSelect (тот же,
+    // что у _attachSegmented — см. подробный разбор в CLAUDE.md про
+    // синхронизацию стиля часов). У сегментированного контрола инвариант
+    // проверяется КОСВЕННО, через побочный эффект (синхронизация не гаснет
+    // при restore). У font-select такого естественного побочного эффекта нет
+    // — эта проверка прямая: слушатель считает события, присваивание не
+    // должно его дёрнуть, клик — обязан.
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForLoadState('domcontentloaded');
+
+        const result = await control.evaluate(() => {
+            const el = document.getElementById('widgetDigitsFont');
+            let changes = 0;
+            const onChange = () => { changes += 1; };
+            el.addEventListener('change', onChange);
+
+            el.value = 'oswald';
+            const afterAssign = { changes, value: el.value };
+
+            const opt = el.querySelector('.font-option[data-val="mono"]');
+            opt.click();
+            const afterClick = { changes, value: el.value };
+
+            el.removeEventListener('change', onChange);
+            return { afterAssign, afterClick };
+        });
+
+        expect(result.afterAssign.value, 'присваивание обязано долететь до .value').toBe('oswald');
+        expect(result.afterAssign.changes, 'присваивание .value НЕ должно слать change').toBe(0);
+        expect(result.afterClick.value, 'клик обязан долететь до .value').toBe('mono');
+        expect(result.afterClick.changes, 'клик обязан прислать РОВНО одно change').toBe(1);
+    } finally {
+        await resetDigitsFonts(control);
+        await app.close();
+    }
+});
+
+test('строка выбора шрифта видна только при стиле «Цифры» — во всех трёх вкладках', async () => {
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForLoadState('domcontentloaded');
+
+        const cases = [
+            { tab: 'timer', styleSel: '#timerStyle', row: '#widgetDigitsFontRow' },
+            { tab: 'clock', styleSel: '#clockStyle', row: '#clockDigitsFontRow' },
+            { tab: 'display', styleSel: '#displayTimerStyle', row: '#displayDigitsFontRow' }
+        ];
+
+        for (const c of cases) {
+            await control.click(`.tab-btn[data-tab="${c.tab}"]`);
+            await control.waitForSelector('#settingsDrawer.open');
+
+            await expect(control.locator(c.row), `${c.row}: при circle обязана быть скрыта`).toBeHidden();
+
+            await control.click(`${c.styleSel} button[data-val="digits"]`);
+            await expect(control.locator(c.row), `${c.row}: при digits обязана стать видимой`).toBeVisible();
+
+            await control.click(`${c.styleSel} button[data-val="circle"]`);
+            await expect(control.locator(c.row), `${c.row}: возврат на circle обязан снова её скрыть`).toBeHidden();
+        }
+    } finally {
+        await resetWidgetStyle(control);
+        await resetClockStyle(control);
+        await resetDisplayStyle(control);
+        await app.close();
+    }
+});
+
+test('выбор шрифта доходит до СВОЕГО окна кликом и не задевает два других', async () => {
+    // Требование ревью прошлых задач: проводка шрифта (панель → IPC → реальное
+    // начертание в окне) не была покрыта НИ ОДНИМ тестом. Здесь измеряется
+    // getComputedStyle(...).fontFamily В ОКНЕ — не в панели — для ВСЕХ ТРЁХ
+    // окон на каждом шаге, чтобы заодно доказать независимость: смена шрифта
+    // в одной вкладке не переносится в два других открытых окна.
+    const { app, control } = await launchApp();
+    let widget = null;
+    let clock = null;
+    let widgetGeometryBefore = null;
+    let clockGeometryBefore = null;
+    try {
+        await control.waitForLoadState('domcontentloaded');
+
+        // Открыть виджет и часы кнопками панели (достижимость — только кликом).
+        await control.click('#openWidgetBtn');
+        widget = await app.waitForEvent('window');
+        await widget.waitForLoadState('domcontentloaded');
+        expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
+        widgetGeometryBefore = await snapshotWidgetGeometry(widget);
+
+        await control.click('#openClockBtn');
+        clock = await app.waitForEvent('window');
+        await clock.waitForLoadState('domcontentloaded');
+        expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
+        clockGeometryBefore = await snapshotClockGeometry(clock);
+
+        // Дисплей открывается по IPC, как и в остальных тестах этого файла.
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await control.waitForTimeout(1500);
+        const display = await findWindow(app, IS_DISPLAY);
+        expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
+
+        // Панель шлёт свой начальный widget-style-update ~600мс после загрузки
+        // (см. loadSettings) — даём этой гонке отгреметь до первого замера.
+        await control.waitForTimeout(900);
+
+        const fontFamilyOf = (win, elId) => win.evaluate(
+            (id) => getComputedStyle(document.getElementById(id)).fontFamily, elId
+        );
+
+        const baseline = {
+            widget: await fontFamilyOf(widget, 'widgetDigitsTime'),
+            clock: await fontFamilyOf(clock, 'clockDigitsTime'),
+            display: await fontFamilyOf(display, 'digitsTime')
+        };
+
+        // --- Виджет: «Цифры» → Bebas Neue ---
+        await control.click('.tab-btn[data-tab="timer"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#timerStyle button[data-val="digits"]');
+        await expect(control.locator('#widgetDigitsFontRow')).toBeVisible();
+        await control.click('#widgetDigitsFont .font-option[data-val="bebas"]');
+        await widget.waitForTimeout(400);
+
+        const afterWidget = {
+            widget: await fontFamilyOf(widget, 'widgetDigitsTime'),
+            clock: await fontFamilyOf(clock, 'clockDigitsTime'),
+            display: await fontFamilyOf(display, 'digitsTime')
+        };
+        expect(afterWidget.widget, 'виджет обязан получить выбранный шрифт').toContain('Bebas Neue');
+        expect(afterWidget.clock, 'часы не должны увидеть шрифт виджета').toBe(baseline.clock);
+        expect(afterWidget.display, 'дисплей не должен увидеть шрифт виджета').toBe(baseline.display);
+
+        // --- Часы: «Цифры» → Oswald ---
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#clockStyle button[data-val="digits"]');
+        await expect(control.locator('#clockDigitsFontRow')).toBeVisible();
+        await control.click('#clockDigitsFont .font-option[data-val="oswald"]');
+        await clock.waitForTimeout(400);
+
+        const afterClock = {
+            widget: await fontFamilyOf(widget, 'widgetDigitsTime'),
+            clock: await fontFamilyOf(clock, 'clockDigitsTime'),
+            display: await fontFamilyOf(display, 'digitsTime')
+        };
+        expect(afterClock.clock, 'часы обязаны получить выбранный шрифт').toContain('Oswald');
+        expect(afterClock.widget, 'шрифт виджета не должен был отъехать').toContain('Bebas Neue');
+        expect(afterClock.display, 'дисплей не должен увидеть шрифт часов').toBe(baseline.display);
+
+        // --- Дисплей: «Цифры» → Orbitron ---
+        await control.click('.tab-btn[data-tab="display"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#displayTimerStyle button[data-val="digits"]');
+        await expect(control.locator('#displayDigitsFontRow')).toBeVisible();
+        await control.click('#displayDigitsFont .font-option[data-val="orbitron"]');
+        await display.waitForTimeout(400);
+
+        const afterDisplay = {
+            widget: await fontFamilyOf(widget, 'widgetDigitsTime'),
+            clock: await fontFamilyOf(clock, 'clockDigitsTime'),
+            display: await fontFamilyOf(display, 'digitsTime')
+        };
+        expect(afterDisplay.display, 'дисплей обязан получить выбранный шрифт').toContain('Orbitron');
+        expect(afterDisplay.widget, 'шрифт виджета не должен был отъехать').toContain('Bebas Neue');
+        expect(afterDisplay.clock, 'шрифт часов не должен был отъехать').toContain('Oswald');
+
+        // Санитарная проверка: три конечных значения действительно различны —
+        // иначе «не задело другие окна» было бы доказано вырожденно.
+        expect(new Set([afterDisplay.widget, afterDisplay.clock, afterDisplay.display]).size).toBe(3);
+    } finally {
+        await resetDigitsFonts(control);
+        await resetWidgetStyle(control);
+        await resetClockStyle(control);
+        await resetDisplayStyle(control);
+        await restoreWidgetGeometry(widget, widgetGeometryBefore);
+        await restoreClockGeometry(clock, clockGeometryBefore);
+        await app.close();
+    }
+});
