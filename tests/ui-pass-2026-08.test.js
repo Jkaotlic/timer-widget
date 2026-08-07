@@ -361,3 +361,45 @@ test('reduced-motion гасит движение, а не информацию',
         );
     }
 });
+
+/* ────────────────────── дисплей: три мёртвых правила ─────────────────────── */
+
+const DISPLAY_JS = codeOnly(read('display-script.js'));
+const DISPLAY_HTML = codeOnly(read('display.html'));
+
+test('LED-«внимание» на дисплее совпадает с собственным CSS дисплея', () => {
+    // JS писал #ffc107 инлайном, CSS говорил --tw-led-warn = #ffcc00: правило
+    // .digital-time.warning не применялось НИКОГДА, потому что инлайн бьёт
+    // класс. Проверено, что тест на '#ffc107' в audit-2026-07-fixes пришит к
+    // ВИДЖЕТУ, а не сюда, поэтому правка его не касается.
+    // Проверяем ТОЛЬКО ветку LED. Остальные два вхождения #ffc107 в файле —
+    // круговой и флип-стили, и там оно ВЕРНО: их CSS говорит var(--tw-yellow),
+    // а это ровно #ffc107. Широкая проверка «нигде нет #ffc107» потребовала бы
+    // сломать два правильных места ради одного неправильного.
+    // Якоримся на СИГНАТУРЫ методов, а не на имена: имя встречается и в
+    // вызове выше по файлу, и срез по нему захватил бы шесть строк без цветов —
+    // проверка прошла бы вхолостую.
+    const from = DISPLAY_JS.indexOf('updateDigitalDisplay(secs, _formatted) {');
+    const to = DISPLAY_JS.indexOf('updateFlipDisplay(secs) {');
+    assert.ok(from > 0 && to > from, 'ветка LED не найдена');
+    const led = DISPLAY_JS.slice(from, to);
+    assert.ok(!/#ffc107/.test(led), 'в LED вернулся #ffc107');
+    assert.match(led, /#ffcc00/);
+});
+
+test('глиф статуса имеет ОДНОГО владельца', () => {
+    // CSS гасит текст элемента font-size: 0 и рисует свой символ через
+    // ::before, то есть присвоение textContent из JS было мертво — а списки
+    // при этом разошлись содержимым (finished: JS '✓', CSS '×').
+    assert.ok(!/glyph:\s*'/.test(DISPLAY_JS), 'поле glyph вернулось в объект CHIP');
+    assert.ok(!/glyphEl/.test(DISPLAY_JS), 'JS снова пишет глиф');
+    assert.match(DISPLAY_HTML, /class="status-glyph"[^>]*aria-hidden="true"><\/span>/);
+});
+
+test('режим «Заливка» действительно заливает', () => {
+    // Три радиальных свечения из body::before рисовались ПОВЕРХ любого
+    // пользовательского фона, а комментарий над правилом утверждал обратное.
+    assert.match(DISPLAY_JS, /classList\.add\('custom-bg'\)/);
+    assert.match(DISPLAY_JS, /classList\.remove\('custom-bg'\)/);
+    assert.match(DISPLAY_HTML, /body\.custom-bg::before \{[^}]*display:\s*none/);
+});
