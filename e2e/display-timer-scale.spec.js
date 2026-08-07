@@ -32,7 +32,7 @@ const { launchApp } = require('./launch');
  * читавшим лишь факт записи в localStorage.
  */
 
-const BLOCK_IDS = ['timerRing', 'timerDigital', 'timerFlip', 'timerAnalog'];
+const BLOCK_IDS = ['timerRing', 'timerDigital', 'timerFlip', 'timerAnalog', 'timerDigits'];
 const RESTORE_SCALE_PCT = 200;
 const DEFAULT_SCALE_PCT = 100;
 
