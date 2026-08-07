@@ -192,3 +192,45 @@ test('в разметке панели не осталось инлайновы�
     const inline = markup.match(/style="[^"]*(?:rgba?\(|#[0-9a-fA-F]{3,6})[^"]*"/g) || [];
     assert.deepEqual(inline, [], `инлайновые цвета вернулись в разметку: ${inline.join(' | ')}`);
 });
+
+test('отмена неона в светлой теме достижима: общий :root не переобъявляет её токены', () => {
+    // Специфичность [data-theme="light"] и :root ОДИНАКОВА (0,1,0) — оба
+    // селектора весят как один класс. При равной специфичности побеждает то,
+    // что стоит НИЖЕ. Общий блок лежал в конце файла и возвращал --tw-glow-*
+    // и --tw-shadow-panel к тёмным значениям, то есть вся отмена неона в
+    // светлой теме была мертва: на белом рисовалось синее свечение 30px.
+    // Комментарий рядом с ней («глубина на светлом даётся тенью, а не
+    // свечением: неон по белому выглядит грязью») описывал намерение, которое
+    // ни разу не сработало.
+    const css = read('design-tokens.css');
+    const lightAt = css.indexOf('[data-theme="light"] {');
+    const sharedAt = css.indexOf('/* ---------------- SHARED (theme-independent) ---------------- */');
+    assert.ok(lightAt > 0, 'блок светлой темы не найден');
+    assert.ok(sharedAt > lightAt, 'общий блок должен идти ниже светлой темы');
+
+    const shared = css.slice(sharedAt);
+    for (const token of ['--tw-shadow-panel', '--tw-glow-blue', '--tw-glow-green', '--tw-glow-red']) {
+        assert.ok(
+            !new RegExp(`^\\s*${token}\\s*:`, 'm').test(shared),
+            `${token} объявлен в общем блоке НИЖЕ светлой темы и убивает её значение`
+        );
+    }
+});
+
+test('лестница поверхностей и шкала объявлены в ОБЕИХ темах', () => {
+    // --tw-level-1/2/3 существовали ТОЛЬКО для светлой темы, поэтому в тёмной
+    // все заливки панели написаны литералами — 33 разных значения альфы в одном
+    // control.css. Иерархию было нечем выразить.
+    // --tw-track: треки колец брались из --tw-border, то есть из токена для
+    // РАМОК, и давали 1.23:1 на тёмном, 1.52:1 на белом.
+    const css = read('design-tokens.css');
+    const dark = css.slice(css.indexOf(':root,'), css.indexOf('[data-theme="light"] {'));
+    const light = css.slice(
+        css.indexOf('[data-theme="light"] {'),
+        css.indexOf('/* ---------------- REDUCED MOTION ---------------- */')
+    );
+    for (const token of ['--tw-level-1', '--tw-level-2', '--tw-level-3', '--tw-track']) {
+        assert.match(dark, new RegExp(`${token}\\s*:`), `${token} нет в тёмной теме`);
+        assert.match(light, new RegExp(`${token}\\s*:`), `${token} нет в светлой теме`);
+    }
+});
