@@ -152,14 +152,24 @@ test('оверлей справки нарисован в тёмной теме 
 });
 
 test('переключатель палитры доступен с клавиатуры', () => {
-    // У элемента role="button" + tabindex="0", но обработчика keydown не было —
-    // сфокусироваться можно, активировать нельзя.
+    // История. Сначала это был <div> вообще без role и tabindex. Потом ему
+    // выдали role="button" + tabindex="0" — сфокусироваться стало можно, а
+    // активировать нельзя, потому что обработчика keydown не было; его
+    // добавили третьим шагом.
+    // В UI-проходе 07.08.2026 обходной путь снят целиком: это НАСТОЯЩАЯ
+    // <button>, и клавиатурная активация у неё по построению — подделывать
+    // роль, tabindex и Enter/Space больше не нужно. Проверка сменила предмет:
+    // теперь она следит, чтобы обходной путь не вернулся.
     // addPickerToggle переехал в color-picker.js при декомпозиции панели.
     const addToggle = read('color-picker.js').match(/function addPickerToggle\([\s\S]*?\n\}/);
     assert.ok(addToggle, 'addPickerToggle() должен существовать');
-    assert.match(addToggle[0], /toggle\.setAttribute\('role', 'button'\)/);
-    assert.match(addToggle[0], /toggle\.addEventListener\('keydown'/);
-    assert.match(addToggle[0], /e\.key === 'Enter' \|\| e\.key === ' '/);
+    assert.match(addToggle[0], /createElement\('button'\)/);
+    assert.doesNotMatch(addToggle[0], /setAttribute\('role', 'button'\)/);
+    assert.doesNotMatch(addToggle[0], /setAttribute\('tabindex'/);
+    // Кнопка открывает панель и обязана сообщать об этом состоянии: правило
+    // .color-picker-toggle.active в CSS есть и до этого не вешалось никем.
+    assert.match(addToggle[0], /aria-expanded/);
+    assert.match(addToggle[0], /classList\.toggle\('active'/);
 });
 
 // ---------------------------------------------------------------------------

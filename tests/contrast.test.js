@@ -416,7 +416,9 @@ const THEMES = [
 ];
 
 test('список тем в тесте совпадает с панелью управления', () => {
-    const control = fs.readFileSync(path.join(__dirname, '..', 'electron-control.html'), 'utf8');
+    // Сетки свотчей уехали из inline-скрипта панели в theme-grid.js: страж
+    // control-decomposition сработал на объёме кода внутри HTML.
+    const control = fs.readFileSync(path.join(__dirname, '..', 'theme-grid.js'), 'utf8');
     const found = [...control.matchAll(/\{ name: '([^']+)', t1: '(#[0-9a-fA-F]{6})', t2: '#[0-9a-fA-F]{6}', bg: '(#[0-9a-fA-F]{6})' \}/g)]
         .map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(found, THEMES, 'темы в панели изменились — обнови список в тесте и перемерь контраст');
