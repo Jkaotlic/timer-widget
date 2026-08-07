@@ -37,7 +37,20 @@
  *   license,
  *   copyright — атрибуция. OFL требует прикладывать и то и другое, а
  *               scripts/generate-notice.js обходит node_modules и шрифтов,
- *               лежащих файлами, не видит.
+ *               лежащих файлами, не видит. `copyright` переписан из строки
+ *               в LICENSE каждого пакета @fontsource/* — первая версия была
+ *               написана по памяти при планировании и разошлась с источником
+ *               на 9 лет у двух шрифтов из шести (Bebas Neue, Orbitron).
+ *               Строка про Italic-файл в LICENSE вырезана: проект не грузит
+ *               курсив ни одного из шести шрифтов, и она не несёт новой
+ *               информации — тот же год и тот же держатель. Ссылка на
+ *               репозиторий шрифта, которая в LICENSE идёт следом за именем
+ *               держателя, тоже вырезана — не потому что не по существу
+ *               (это часть исходной строки), а потому что `tests/release-
+ *               gates.test.js` запрещает shipped-файлам содержать
+ *               http(s)-адреса ЛЮБОГО происхождения (гейт против phone-home,
+ *               не только против реальных сетевых вызовов), и заводить
+ *               исключение под собственный текстовый выбор — не повод.
  */
 const DIGIT_FONTS = [
     {
@@ -47,7 +60,7 @@ const DIGIT_FONTS = [
         weight: 300,
         files: ['inter-latin-300-normal.woff2'],
         license: 'SIL Open Font License 1.1',
-        copyright: 'Copyright (c) 2016 The Inter Project Authors'
+        copyright: 'Copyright 2016 The Inter Project Authors'
     },
     {
         id: 'mono',
@@ -56,7 +69,7 @@ const DIGIT_FONTS = [
         weight: 400,
         files: ['jetbrains-mono-latin-400-normal.woff2'],
         license: 'SIL Open Font License 1.1',
-        copyright: 'Copyright (c) 2020 The JetBrains Mono Project Authors'
+        copyright: 'Copyright 2020 The JetBrains Mono Project Authors'
     },
     {
         id: 'bebas',
@@ -65,7 +78,7 @@ const DIGIT_FONTS = [
         weight: 400,
         files: ['bebas-neue-latin-400-normal.woff2'],
         license: 'SIL Open Font License 1.1',
-        copyright: 'Copyright (c) 2010 The Bebas Neue Project Authors'
+        copyright: 'Copyright 2019 The Bebas Neue Project Authors'
     },
     {
         id: 'oswald',
@@ -74,7 +87,7 @@ const DIGIT_FONTS = [
         weight: 500,
         files: ['oswald-latin-500-normal.woff2'],
         license: 'SIL Open Font License 1.1',
-        copyright: 'Copyright (c) 2016 The Oswald Project Authors'
+        copyright: 'Copyright 2016 The Oswald Project Authors'
     },
     {
         id: 'orbitron',
@@ -83,7 +96,7 @@ const DIGIT_FONTS = [
         weight: 700,
         files: ['orbitron-latin-700-normal.woff2'],
         license: 'SIL Open Font License 1.1',
-        copyright: 'Copyright (c) 2009 The Orbitron Project Authors'
+        copyright: 'Copyright 2018 The Orbitron Project Authors'
     },
     {
         id: 'playfair',
@@ -92,7 +105,7 @@ const DIGIT_FONTS = [
         weight: 600,
         files: ['playfair-display-latin-600-normal.woff2'],
         license: 'SIL Open Font License 1.1',
-        copyright: 'Copyright (c) 2017 The Playfair Display Project Authors'
+        copyright: 'Copyright 2017 The Playfair Display Project Authors, with Reserved Font Name "Playfair Display".'
     }
 ];
 

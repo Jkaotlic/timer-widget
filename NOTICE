@@ -2071,30 +2071,30 @@ Full license text (same for all 6): fonts/OFL.txt — SIL Open Font License 1.1.
 
 === Inter ===
 License: SIL Open Font License 1.1
-Copyright (c) 2016 The Inter Project Authors
+Copyright 2016 The Inter Project Authors
 Files: inter-cyrillic-200-normal.woff2, inter-cyrillic-300-normal.woff2, inter-cyrillic-400-normal.woff2, inter-cyrillic-500-normal.woff2, inter-cyrillic-600-normal.woff2, inter-cyrillic-700-normal.woff2, inter-latin-200-normal.woff2, inter-latin-300-normal.woff2, inter-latin-400-normal.woff2, inter-latin-500-normal.woff2, inter-latin-600-normal.woff2, inter-latin-700-normal.woff2
 
 === JetBrains Mono ===
 License: SIL Open Font License 1.1
-Copyright (c) 2020 The JetBrains Mono Project Authors
+Copyright 2020 The JetBrains Mono Project Authors
 Files: jetbrains-mono-cyrillic-300-normal.woff2, jetbrains-mono-cyrillic-400-normal.woff2, jetbrains-mono-cyrillic-500-normal.woff2, jetbrains-mono-cyrillic-700-normal.woff2, jetbrains-mono-latin-300-normal.woff2, jetbrains-mono-latin-400-normal.woff2, jetbrains-mono-latin-500-normal.woff2, jetbrains-mono-latin-700-normal.woff2
 
 === Bebas Neue ===
 License: SIL Open Font License 1.1
-Copyright (c) 2010 The Bebas Neue Project Authors
+Copyright 2019 The Bebas Neue Project Authors
 Files: bebas-neue-latin-400-normal.woff2
 
 === Oswald ===
 License: SIL Open Font License 1.1
-Copyright (c) 2016 The Oswald Project Authors
+Copyright 2016 The Oswald Project Authors
 Files: oswald-latin-500-normal.woff2
 
 === Orbitron ===
 License: SIL Open Font License 1.1
-Copyright (c) 2009 The Orbitron Project Authors
+Copyright 2018 The Orbitron Project Authors
 Files: orbitron-latin-700-normal.woff2
 
 === Playfair Display ===
 License: SIL Open Font License 1.1
-Copyright (c) 2017 The Playfair Display Project Authors
+Copyright 2017 The Playfair Display Project Authors, with Reserved Font Name "Playfair Display".
 Files: playfair-display-latin-600-normal.woff2
