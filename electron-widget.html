@@ -721,18 +721,21 @@
             border-radius: 1px;
         }
 
+        /* Индивидуального top у классов больше нет: он сдвигал точку вращения,
+           и деления на 3 и 9 часах висели ВЫШЕ горизонтальной оси циферблата
+           (замер: 23.5px на кадре 800px). При едином top: 8% и общей
+           transform-origin все двенадцать делений вращаются вокруг настоящего
+           центра, а растут только внутрь — за счёт высоты. */
         .widget-clock-tick.major {
             width: 2px;
             height: 10px;
             background: rgba(255, 255, 255, 0.6);
-            top: 6%;
         }
 
         .widget-clock-tick.quarter {
             width: 3px;
             height: 14px;
             background: var(--tw-ring);
-            top: 4%;
         }
 
         /* Hands */
@@ -744,10 +747,25 @@
             border-radius: 2px;
         }
 
+        /* Часовой стрелки не было ВООБЩЕ: таймер на 1:30 и таймер на 30 минут
+           показывали одинаковое положение стрелок. На таймерах короче часа это
+           выглядело правдоподобно — 0 часов и есть 12, — поэтому дефект и жил.
+           Разметка, стиль и формула взяты у полноэкранного окна, где это
+           работает: ((absSecs / 3600) % 12) * 30 градусов. */
+        .widget-hand-hour {
+            width: 4px;
+            height: 32px;
+            background: linear-gradient(180deg, var(--tw-fg) 0%, var(--tw-fg-secondary) 100%);
+            margin-left: -2px;
+            z-index: 2;
+        }
+
         .widget-hand-minute {
             width: 3px;
             height: 48px;
-            background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
+            /* Была залита фирменным сине-зелёным, тогда как на дисплее и в
+               часах минутная белая: расходился ровно этот один элемент. */
+            background: linear-gradient(180deg, #ffffff 0%, #dddddd 100%);
             margin-left: -1.5px;
             z-index: 3;
         }
@@ -1050,13 +1068,13 @@
             <div class="widget-analog-content">
                 <div class="widget-analog-clock">
                     <!-- Деления -->
-                    <div class="widget-clock-tick" style="transform: rotate(0deg);"></div>
+                    <div class="widget-clock-tick quarter" style="transform: rotate(0deg);"></div>
                     <div class="widget-clock-tick" style="transform: rotate(30deg);"></div>
                     <div class="widget-clock-tick" style="transform: rotate(60deg);"></div>
                     <div class="widget-clock-tick quarter" style="transform: rotate(90deg);"></div>
                     <div class="widget-clock-tick" style="transform: rotate(120deg);"></div>
                     <div class="widget-clock-tick" style="transform: rotate(150deg);"></div>
-                    <div class="widget-clock-tick major" style="transform: rotate(180deg);"></div>
+                    <div class="widget-clock-tick quarter" style="transform: rotate(180deg);"></div>
                     <div class="widget-clock-tick" style="transform: rotate(210deg);"></div>
                     <div class="widget-clock-tick" style="transform: rotate(240deg);"></div>
                     <div class="widget-clock-tick quarter" style="transform: rotate(270deg);"></div>
@@ -1075,6 +1093,7 @@
                     <div class="widget-analog-digital" id="widgetAnalogDigital">00:00</div>
                     
                     <!-- Стрелки -->
+                    <div class="widget-clock-hand widget-hand-hour" id="widgetHandHour"></div>
                     <div class="widget-clock-hand widget-hand-minute" id="widgetHandMinute"></div>
                     <div class="widget-clock-hand widget-hand-second" id="widgetHandSecond"></div>
                     
@@ -1179,6 +1198,7 @@
                 this.widgetFlipContent = document.getElementById('widgetFlipContent');
                 
                 // Аналоговые элементы
+                this.widgetHandHour = document.getElementById('widgetHandHour');
                 this.widgetHandMinute = document.getElementById('widgetHandMinute');
                 this.widgetHandSecond = document.getElementById('widgetHandSecond');
                 this.widgetClockCenter = document.getElementById('widgetClockCenter');
@@ -1459,18 +1479,24 @@
                 const secondHand = document.getElementById('widgetHandSecond');
                 const clockCenter = document.getElementById('widgetClockCenter');
                 const analogDigital = document.getElementById('widgetAnalogDigital');
-                if (progressColor && secondHand) {
-                    this._baseSecondHandBg =
-                        `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
-                    secondHand.style.background = this._baseSecondHandBg;
-                }
+                // Секундная стрелка отдана CSS. Раньше она красилась ТЕМ ЖЕ
+                // градиентом, что и минутная: две стрелки становились
+                // неразличимы по цвету, а CSS-правило с красной секундной было
+                // мертво. Ветка сброса ниже пишет `this._baseSecondHandBg || ''`,
+                // поэтому пустая строка корректно снимает инлайн и возвращает
+                // управление CSS — инвариант сброса не нарушается.
+                this._baseSecondHandBg = '';
+                if (secondHand) { secondHand.style.background = ''; }
                 if (timerColor && clockCenter) {
                     this._baseCenterBg = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
                     clockCenter.style.background = this._baseCenterBg;
                     clockCenter.style.boxShadow = '';
                 }
                 if (timerColor && analogDigital) {
-                    this._baseAnalogDigitalColor = `${timerColor}b3`;
+                    // Альфа b3 давала 2.95:1 при кегле 14px. Цвет и так
+                    // вторичен по кеглю и положению — приглушать его ещё и
+                    // прозрачностью незачем.
+                    this._baseAnalogDigitalColor = timerColor;
                     analogDigital.style.color = this._baseAnalogDigitalColor;
                     analogDigital.style.textShadow = `0 0 10px ${timerColor}4d`;
                 }
@@ -1906,6 +1932,15 @@
                 const secondDeg = (seconds / 60) * 360;
                 this.widgetHandSecond.style.transform = `rotate(${secondDeg}deg)`;
 
+                // Часовая — полный оборот за 12 часов. Формула строго как в
+                // display-script.js, где она уже работает. Проверка на null
+                // отдельная: расширять ранний выход выше нельзя, иначе старый
+                // профиль без этого элемента заблокировал бы весь аналоговый
+                // рендер.
+                if (this.widgetHandHour) {
+                    this.widgetHandHour.style.transform = `rotate(${((absSecs / 3600) % 12) * 30}deg)`;
+                }
+
                 // Обновляем цифровое время
                 if (this.widgetAnalogDigital) {
                     const { hours, minutes: mins } = window.RendererShared.breakdown(absSecs);
@@ -1918,7 +1953,7 @@
                 }
 
                 // FIX BUG-018: Use data attributes instead of classList
-                const analogElements = [this.widgetHandMinute, this.widgetHandSecond, this.widgetClockCenter, this.widgetAnalogDigital];
+                const analogElements = [this.widgetHandHour, this.widgetHandMinute, this.widgetHandSecond, this.widgetClockCenter, this.widgetAnalogDigital];
 
                 // Полоса срочности — общая для всех окон (RendererShared).
                 const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
