@@ -64,6 +64,19 @@ const duplicated = [...claimCounts].filter(([, count]) => count > 1).map(([file]
 if (duplicated.length > 0) {
     throw new Error(`generate-notice: файл fonts/ привязан к нескольким шрифтам сразу — ${duplicated.join(', ')}`);
 }
+// Третье направление: пустой список файлов у шрифта реестра раньше проходил
+// молча — генератор выходил с кодом 0 и писал `Files: ` пустой строкой в
+// юридическое уведомление. Ловится не только руками удалённым файлом: тот
+// же эффект даёт правка `label`, после которой слаг перестаёт совпадать с
+// префиксом файла на диске — раскладка разваливается тихо, а NOTICE
+// продолжает собираться как ни в чём не бывало.
+const empty = filesByFont.filter((entry) => entry.files.length === 0);
+if (empty.length > 0) {
+    const detail = empty
+        .map((entry) => `${entry.font.label} (ожидался префикс "${entry.font.label.toLowerCase().replace(/\s+/g, '-')}-")`)
+        .join(', ');
+    throw new Error(`generate-notice: у шрифта реестра нет ни одного файла в fonts/ — ${detail}`);
+}
 
 // Одна ссылка на лицензию для всей секции, а не по строке на шрифт — но
 // только если у всех шести шрифтов ДЕЙСТВИТЕЛЬНО одна и та же лицензия;
