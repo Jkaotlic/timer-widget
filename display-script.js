@@ -211,7 +211,7 @@ class DisplayTimer {
      */
     applyTimerScale() {
         const scale = (this.timerScale || 100) / 100;
-        const blocks = [this.timerRing, this.timerDigital, this.timerFlip, this.timerAnalog];
+        const blocks = [this.timerRing, this.timerDigital, this.timerFlip, this.timerAnalog, this.timerDigits];
         for (const block of blocks) {
             if (block) { block.style.transform = `scale(${scale})`; }
         }
@@ -264,6 +264,27 @@ class DisplayTimer {
         this.analogHandSecond = document.getElementById('analogHandSecond');
         this.analogDigitalTime = document.getElementById('analogDigitalTime');
         this.clockNumbers = document.getElementById('clockNumbers');
+
+        // Стиль «Цифры»
+        this.timerDigits = document.getElementById('timerDigits');
+        this.digitsTime = document.getElementById('digitsTime');
+        this.digitsSign = document.getElementById('digitsSign');
+        this.digitsValue = document.getElementById('digitsValue');
+        this.digitsProbe = document.getElementById('digitsProbe');
+        this.digitsFont = window.DigitsStyle.DEFAULT_FONT_ID;
+        this._digitsFontsReady = false;
+
+        // Замер эталона до загрузки woff2 меряет ЗАПАСНОЕ начертание и кэширует
+        // чужие цифры: у всех шрифтов проекта font-display: swap.
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                this._digitsFontsReady = true;
+                window.DigitsStyle.clearProbeCache();
+                this.updateDigitsScale();
+            });
+        } else {
+            this._digitsFontsReady = true;
+        }
     }
 
     initProgress() {
@@ -433,6 +454,17 @@ class DisplayTimer {
             this.setTimerStyle(style);
         }
 
+        // Шрифт стиля «Цифры». Имя СВОЁ: общее имя в этом проекте уже означало
+        // разные окна в разных наборах и стоило отдельного бага.
+        if (settings.displayDigitsFont !== undefined) {
+            const font = window.DigitsStyle.applyFont(this.digitsTime, settings.displayDigitsFont);
+            if (font.id !== this.digitsFont) {
+                this.digitsFont = font.id;
+                this._safeSetItem('displayDigitsFont', font.id);
+                this.updateDigitsScale();
+            }
+        }
+
         // Пресет расположения блоков времени
         const showBlocks = settings.showTimeBlocks !== undefined ? settings.showTimeBlocks : false;
         const preset = settings.timeLayoutPreset || 'frame';
@@ -577,13 +609,14 @@ class DisplayTimer {
         this._cachedFlipSeparators = null;
 
         // Удаляем все классы стилей с body
-        document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
+        document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
 
         // Скрываем все стили таймера
         if (this.timerRing) {this.timerRing.classList.remove('active');}
         if (this.timerDigital) {this.timerDigital.classList.remove('active');}
         if (this.timerFlip) {this.timerFlip.classList.remove('active');}
         if (this.timerAnalog) {this.timerAnalog.classList.remove('active');}
+        if (this.timerDigits) {this.timerDigits.classList.remove('active');}
 
         // Показываем выбранный и добавляем класс на body
         switch (style) {
@@ -602,6 +635,10 @@ class DisplayTimer {
             case 'analog':
                 if (this.timerAnalog) {this.timerAnalog.classList.add('active');}
                 document.body.classList.add('style-analog');
+                break;
+            case 'digits':
+                if (this.timerDigits) {this.timerDigits.classList.add('active');}
+                document.body.classList.add('style-digits');
                 break;
         }
 
@@ -665,6 +702,13 @@ class DisplayTimer {
                         settings.bgLocalOverlay = localBgSettings.overlay || 30;
                     }
                 }
+
+                // Шрифт стиля «Цифры» хранится под СВОИМ ключом (как displayTimerScale),
+                // а не внутри displayExtSettings — примешиваем его в тот же пакет
+                // настроек, чтобы применить ЧЕРЕЗ applyDisplaySettings, а не отдельным
+                // путём, который бы пришлось держать в синхроне с IPC-веткой.
+                const savedDigitsFont = localStorage.getItem('displayDigitsFont');
+                if (savedDigitsFont) { settings.displayDigitsFont = savedDigitsFont; }
 
                 this.applyBackground(settings);
                 this.applyDisplaySettings(settings);
@@ -824,6 +868,14 @@ class DisplayTimer {
             }
             this.digitalTime.style.color = '#ff3333';
             this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
+        }
+
+        // Цифры
+        if (this.digitsTime) {
+            if (!this.digitsTime.classList.contains('danger')) {
+                this.digitsTime.classList.add('danger', 'overtime');
+            }
+            this.digitsTime.style.color = '#ff4444';
         }
 
         // Flip cards + separators
@@ -1090,6 +1142,27 @@ class DisplayTimer {
         if (hasFormattedChanged || this.cache.lastAnalogUpdate !== secs) {
             this.updateAnalogDisplay(secs);
             this.cache.lastAnalogUpdate = secs;
+        }
+
+        // Обновляем стиль «Цифры»
+        this.updateDigitsDisplay(secs);
+
+        // Полоса срочности стиля «Цифры». Не через _colorBand() кэшированный
+        // где-то ещё — считается здесь же, потому что danger/warning должны
+        // покраситься на каждое реальное изменение секунд, а не только когда
+        // сменился формат ЧЧ (то, чем гейтится updateDigitsDisplay выше).
+        if (this.digitsTime) {
+            const band = this._colorBand(secs);
+            if (band === 'danger' || band === 'overtime') {
+                this.digitsTime.style.color = '#ff4444';
+            } else if (band === 'warning') {
+                this.digitsTime.style.color = '#ffc107';
+            } else {
+                // Пустая строка СНИМАЕТ инлайн и возвращает цвет CSS. Ветка
+                // `else if (this._baseTimerColor)` была бы багом: на чистом
+                // профиле базового цвета нет, и красный не снялся бы никогда.
+                this.digitsTime.style.color = this._normalColor();
+            }
         }
 
         // Прогресс обновляется только если процент изменился
@@ -1432,6 +1505,52 @@ class DisplayTimer {
                     this.analogDigitalTime.classList.add(band);
                 }
             }
+        }
+    }
+
+    /**
+     * Пересчитать кегль цифр под текущее окно.
+     *
+     * По эталону, а не по живому тексту: иначе цифры «дышат» каждую секунду
+     * на шрифтах с непостоянной шириной знака. Запас 0.9 по обеим осям —
+     * поля вокруг, как у остальных стилей окна.
+     */
+    updateDigitsScale() {
+        if (!this.timerDigits || !this.digitsTime || !this._digitsFontsReady) { return; }
+
+        const hasHours = Math.abs(Math.floor(this.remainingSeconds)) >= 3600;
+        const probe = window.DigitsStyle.measureDigits(this.digitsProbe, this.digitsFont, hasHours);
+        if (!probe) { return; }
+
+        const box = this.timerDigits.getBoundingClientRect();
+        const size = window.DigitsStyle.fitFontSize({
+            availableWidth: box.width * 0.9,
+            availableHeight: box.height * 0.9,
+            probeWidth: probe.width,
+            probeHeight: probe.height,
+            signWidth: probe.signWidth
+        });
+        if (size > 0) { this.digitsTime.style.setProperty('--digits-font-size', size + 'px'); }
+    }
+
+    /**
+     * Обновить текст стиля «Цифры».
+     *
+     * Знак и цифры — РАЗНЫЕ узлы: знак вынесен из потока, иначе центрируется
+     * надпись целиком и цифры уезжают с оси кольца.
+     */
+    updateDigitsDisplay(secs) {
+        if (!this.digitsValue) { return; }
+        const wasHours = this._digitsHadHours;
+        const hasHours = Math.abs(secs) >= 3600;
+
+        this.digitsSign.textContent = secs < 0 ? '−' : '';
+        this.digitsValue.textContent = this.formatTime(Math.abs(secs));
+
+        // Кегль пересчитываем только когда сменился ФОРМАТ, а не каждый тик.
+        if (wasHours !== hasHours) {
+            this._digitsHadHours = hasHours;
+            this.updateDigitsScale();
         }
     }
 
