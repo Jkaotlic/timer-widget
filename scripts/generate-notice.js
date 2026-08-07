@@ -24,6 +24,28 @@ try {
 
 const packages = JSON.parse(raw);
 
+// Встроенные шрифты. generate-notice обходит node_modules, а шрифты лежат
+// в fonts/ файлами и зависимостями не являются — то есть до этой секции
+// Inter и JetBrains Mono не были атрибутированы вообще. OFL требует
+// прикладывать копирайт и текст лицензии. Реестр один: digits-style.js.
+const { DIGIT_FONTS } = require('../digits-style');
+
+const fontsSection = [
+    '',
+    '='.repeat(80),
+    '',
+    'BUNDLED FONTS',
+    '',
+    'The following fonts are embedded in fonts/ and are not npm dependencies.',
+    ''
+].concat(DIGIT_FONTS.map((font) => [
+    `=== ${font.label} ===`,
+    `License: ${font.license}`,
+    font.copyright,
+    `Files: ${font.files.join(', ')}`,
+    ''
+].join('\n'))).join('\n');
+
 const header = `Timer Widget
 Copyright (c) 2026 ${pkg.author && pkg.author.name ? pkg.author.name : pkg.author || 'Jkaotlic'}
 Licensed under the ${pkg.license || 'MIT'} License.
@@ -56,5 +78,5 @@ const blocks = entries.map(([nameVer, info]) => {
 });
 
 const body = blocks.join('\n\n');
-fs.writeFileSync(OUT, header + body + '\n', 'utf8');
-console.log(`NOTICE written: ${entries.length} packages (${(fs.statSync(OUT).size / 1024).toFixed(1)} KB)`);
+fs.writeFileSync(OUT, header + body + '\n' + fontsSection, 'utf8');
+console.log(`NOTICE written: ${entries.length} packages + ${DIGIT_FONTS.length} fonts (${(fs.statSync(OUT).size / 1024).toFixed(1)} KB)`);
