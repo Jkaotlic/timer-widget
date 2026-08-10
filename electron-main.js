@@ -426,8 +426,8 @@ function createWidgetWindow() {
     const { width } = screen.getPrimaryDisplay().workAreaSize;
 
     widgetWindow = new BrowserWindow({
-        width: 250,
-        height: 280,
+        width: CONFIG.WIDGET_DEFAULT_WIDTH,
+        height: CONFIG.WIDGET_DEFAULT_HEIGHT,
         // Allow smaller and larger dynamic scaling; we will resize via IPC rather than CSS transforms
         minWidth: 120,
         minHeight: 140,

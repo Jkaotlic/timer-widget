@@ -54,3 +54,22 @@ test('CONFIG no longer exposes removed dead constants', () => {
     // IPC_CHANNELS was a dead third copy of the channel list (see channel-validator.js)
     assert.ok(!('IPC_CHANNELS' in CONFIG));
 });
+
+test('размеры виджета по умолчанию имеют ЧИТАТЕЛЯ, а не только объявление', () => {
+    // WIDGET_DEFAULT_WIDTH/HEIGHT лежали в реестре, но конструктор окна зашивал
+    // те же числа литералами — то есть значение существовало в двух местах и
+    // разошлось молча: реестр и окно говорили 280, а WIDGET_BASE_SIZE в
+    // рендерере делает окно КВАДРАТНЫМ, и первое же масштабирование навсегда
+    // превращало высоту в 250. Та же болезнь, что была у CONFIG.STORAGE_KEYS:
+    // реестр без точки доступа не ломается, он тихо гниёт.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'electron-main.js'), 'utf8');
+
+    assert.match(source, /width:\s*CONFIG\.WIDGET_DEFAULT_WIDTH/,
+        'конструктор окна виджета обязан читать CONFIG.WIDGET_DEFAULT_WIDTH');
+    assert.match(source, /height:\s*CONFIG\.WIDGET_DEFAULT_HEIGHT/,
+        'конструктор окна виджета обязан читать CONFIG.WIDGET_DEFAULT_HEIGHT');
+    assert.equal(CONFIG.WIDGET_DEFAULT_HEIGHT, CONFIG.WIDGET_DEFAULT_WIDTH,
+        'окно виджета квадратное при любом масштабе — стартовый размер обязан быть таким же');
+});
