@@ -803,12 +803,18 @@ test('font-select: присваивание .value молчит, событие 
             const onChange = () => { changes += 1; };
             el.addEventListener('change', onChange);
 
+            const activeId = () => el.getAttribute('aria-activedescendant');
+            const selectedId = () => {
+                const on = el.querySelector('.font-option[aria-selected="true"]');
+                return on ? on.id : null;
+            };
+
             el.value = 'oswald';
-            const afterAssign = { changes, value: el.value };
+            const afterAssign = { changes, value: el.value, active: activeId(), selected: selectedId() };
 
             const opt = el.querySelector('.font-option[data-val="mono"]');
             opt.click();
-            const afterClick = { changes, value: el.value };
+            const afterClick = { changes, value: el.value, active: activeId(), selected: selectedId() };
 
             el.removeEventListener('change', onChange);
             return { afterAssign, afterClick };
@@ -818,6 +824,21 @@ test('font-select: присваивание .value молчит, событие 
         expect(result.afterAssign.changes, 'присваивание .value НЕ должно слать change').toBe(0);
         expect(result.afterClick.value, 'клик обязан долететь до .value').toBe('mono');
         expect(result.afterClick.changes, 'клик обязан прислать РОВНО одно change').toBe(1);
+
+        // Фокус остаётся на КОНТЕЙНЕРЕ (у пунктов tabindex=-1), поэтому
+        // единственный канал, которым ассистивная технология узнаёт выбранный
+        // пункт, — aria-activedescendant. Он обязан указывать на тот же пункт,
+        // что и aria-selected, ОБОИМИ путями: и присваиванием (восстановление
+        // настройки при загрузке панели), и кликом. Идентификатор содержит id
+        // контейнера — на панели три независимых списка в одном document.
+        expect(result.afterAssign.active, 'после присваивания активный потомок = выбранный пункт')
+            .toBe('widgetDigitsFont-option-oswald');
+        expect(result.afterAssign.selected, 'aria-selected обязан совпасть с aria-activedescendant')
+            .toBe(result.afterAssign.active);
+        expect(result.afterClick.active, 'после клика активный потомок = выбранный пункт')
+            .toBe('widgetDigitsFont-option-mono');
+        expect(result.afterClick.selected, 'aria-selected обязан совпасть с aria-activedescendant')
+            .toBe(result.afterClick.active);
     } finally {
         await resetDigitsFonts(control);
         await app.close();

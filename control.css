@@ -686,7 +686,8 @@ body::after {
    треке. Инверсия (тёмная заливка), уместная в контрастной теме, на светлом
    выглядит тяжёлой кляксой и спорит с акцентом. */
 [data-theme="light"] .tab-btn.active,
-[data-theme="light"] .segmented button.active {
+[data-theme="light"] .segmented button.active,
+[data-theme="light"] .font-option.active {
     background: #ffffff;
     color: var(--tw-fg);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -1188,11 +1189,16 @@ body::after {
 }
 
 .font-option:hover { background: var(--tw-level-3); color: var(--tw-fg); }
-/* --tw-accent-soft не существует в design-tokens.css — вместо нового токена
-   взят тот же приём, что уже красит выбранный пункт в .bg-mode-btn.active по
-   соседству в этом файле: мягкая заливка акцентом + текст токеном --tw-blue
-   (оба уже проверены на контраст семантических цветов в tests/contrast.test.js). */
-.font-option.active { background: rgba(10, 132, 255, 0.14); color: var(--tw-blue); }
+/* Было rgba(10,132,255,0.14) + var(--tw-blue) — блокнот-синий текст на
+   голубоватой заливке того же тона систематически даёт низкий контраст
+   (измерено реальным пикселем: тёмная 2.46:1, светлая 5.36:1, порог 4.5/7).
+   Заменено на тот же приём, что .segmented button.active / .tab-btn.active
+   чуть выше в этом файле — нейтральная приподнятая поверхность + --tw-fg,
+   а не акцентный текст. Тёмная половина — БУКВАЛЬНО тот же литерал
+   rgba(255,255,255,0.1); светлая делит правило с ними же (см. блок
+   [data-theme="light"] выше). Измерено тем же методом (скриншот → canvas →
+   пиксель): тёмная 7.56:1, светлая 16.83:1 — оба порога с запасом. */
+.font-option.active { background: rgba(255,255,255,0.1); color: var(--tw-fg); }
 .font-option:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 
 .font-option-name { font-size: 12px; }
