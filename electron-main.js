@@ -24,6 +24,7 @@ const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
 const { createTimerController } = require('./timer-controller');
+const { fitScaledBounds } = require('./window-geometry');
 const recovery = require('./recovery');
 
 // Logger setup
@@ -169,17 +170,32 @@ function moveWindowBy(win, payload) {
     }
 }
 
-// Shared clamped resize for a frameless window. Clamps width/height to
-// [100, workArea] with a 220px default when the field is missing/non-numeric.
+// Изменение размера безрамочного окна. Держит неподвижным ЦЕНТР окна и
+// укладывает результат в рабочую область ТОГО монитора, где окно находится.
+//
+// Раньше здесь был `win.setSize()`: он оставляет неподвижным левый-верхний
+// угол, а позицию после него не правил никто, — поэтому окно росло вниз-вправо
+// и уезжало за край экрана, унося с собой отцентрированный внутри циферблат
+// (замерено: виджет при 400 % занимал x = 3170…4170 при ширине экрана 3440).
+// Поджатие шло вдобавок по getPrimaryDisplay(), то есть на втором мониторе по
+// чужим размерам.
+//
+// setBounds, а не setSize + setPosition: два вызова дают промежуточный кадр
+// «уже большое, ещё не сдвинутое».
+//
+// Вся арифметика — в чистой fitScaledBounds() из window-geometry.js, чтобы
+// проверяться в Node без запуска Electron.
 function resizeWindowClamped(win, payload) {
     if (!isPayloadObject(payload)) { return; }
-    if (win && !win.isDestroyed()) {
-        const { width, height } = payload;
-        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
-        const w = Math.max(100, Math.min(screenW, Number(width) || 220));
-        const h = Math.max(100, Math.min(screenH, Number(height) || 220));
-        win.setSize(w, h);
-    }
+    if (!win || win.isDestroyed()) { return; }
+
+    const current = win.getBounds();
+    // Минимум берётся у самого окна, а не из литерала: у виджета minHeight 140,
+    // и посчитанный по литералу центр промахнулся бы мимо настоящего.
+    const [minWidth, minHeight] = win.getMinimumSize();
+    const { workArea } = screen.getDisplayMatching(current);
+
+    win.setBounds(fitScaledBounds(current, payload, workArea, { width: minWidth, height: minHeight }));
 }
 
 // Shared position restore for a frameless widget window. Reads x/y from the
