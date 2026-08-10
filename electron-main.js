@@ -212,25 +212,36 @@ function positionWindowClamped(win, payload) {
     const { x, y } = payload;
     if (!win || win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) { return; }
 
-    const [w, h] = win.getSize();
+    const [width, height] = win.getSize();
+    const [minWidth, minHeight] = win.getMinimumSize();
     const targetX = Math.round(x);
     const targetY = Math.round(y);
 
-    // Visible if the window's top-left corner sits inside any display's bounds.
-    const onSomeDisplay = screen.getAllDisplays().some(({ bounds }) =>
+    // Какому монитору принадлежит сохранённая точка. Если ни одному — монитор
+    // отключили — берём главный.
+    const host = screen.getAllDisplays().find(({ bounds }) =>
         targetX >= bounds.x && targetX < bounds.x + bounds.width
-        && targetY >= bounds.y && targetY < bounds.y + bounds.height);
+        && targetY >= bounds.y && targetY < bounds.y + bounds.height)
+        || screen.getPrimaryDisplay();
 
-    if (onSomeDisplay) {
-        win.setPosition(targetX, targetY);
-        return;
-    }
-
-    const area = screen.getPrimaryDisplay().workArea;
-    win.setPosition(
-        Math.round(Math.max(area.x, Math.min(area.x + area.width - w, targetX))),
-        Math.round(Math.max(area.y, Math.min(area.y + area.height - h, targetY)))
-    );
+    // Поджимается ВЕСЬ прямоугольник, а не только угол. Прежняя версия считала
+    // окно видимым, если на дисплее лежал левый-верхний угол, и размер в проверке
+    // не участвовал вовсе — замерено: сохранённая точка (3320, 70) при размере
+    // 1000 px давала 880 px за правым краем, на экране оставалось 12 % окна.
+    // Точка попадала в хранилище буквально: так писала геометрию версия, у
+    // которой масштабирование росло вниз-вправо, поэтому испорченные профили
+    // существуют и правкой одного лишь масштабирования не лечатся.
+    //
+    // Арифметика переиспользуется из fitScaledBounds: передавая текущий размер и
+    // как размер, и как «запрошенный», получаем «поставить в точку и поджать»,
+    // потому что функция сохраняет центр переданного прямоугольника. Новой
+    // арифметики здесь нет намеренно — она уже проверена юнит-тестами.
+    win.setBounds(fitScaledBounds(
+        { x: targetX, y: targetY, width, height },
+        { width, height },
+        host.workArea,
+        { width: minWidth, height: minHeight }
+    ));
 }
 
 // Runtime app icon path. In dev it lives in build/icon.png (buildResources),
