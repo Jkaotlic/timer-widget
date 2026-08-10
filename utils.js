@@ -1,5 +1,22 @@
 // Utility functions для Timer Widget
 
+// CONFIG нужен здесь ровно ради одного порога. Сборщика нет, поэтому в Node он
+// приходит через require, а в рендерере — через window.CONFIG: constants.js
+// подключается раньше utils.js во всех четырёх окнах. Фолбэк оставлен, чтобы
+// модуль оставался самодостаточным, если его подключат в одиночку.
+const __CONFIG = (typeof window !== 'undefined' && window.CONFIG)
+    || (typeof require === 'function' ? require('./constants') : null);
+
+// Порог «жёлтой» зоны в секундах. Здесь стоял литерал 60, а
+// CONFIG.WARNING_THRESHOLD не читал НИ ОДИН рабочий файл — при этом тест
+// назывался «CONFIG.WARNING_THRESHOLD aligns with getTimerStatus» и проверял
+// `=== 60`, то есть сравнивал реестр сам с собой. Поменяй литерал здесь — не
+// упало бы ничего; поменяй константу — упал бы тест, а поведение не сдвинулось
+// бы ни на секунду. Теперь у значения один владелец.
+const WARNING_THRESHOLD_SECONDS = (__CONFIG && Number.isFinite(__CONFIG.WARNING_THRESHOLD))
+    ? __CONFIG.WARNING_THRESHOLD
+    : 60;
+
 /**
  * Форматирует секунды в строку HH:MM:SS
  * @param {number} totalSeconds - количество секунд (может быть отрицательным)
@@ -129,7 +146,7 @@ function debounce(func, delay = 120) {
 function getTimerStatus(remainingSeconds, totalSeconds = 0) {
     if (remainingSeconds < 0) {return 'overtime';}
     if (remainingSeconds === 0 && totalSeconds > 0) {return 'danger';}
-    if (remainingSeconds <= 60 && remainingSeconds > 0) {return 'warning';}
+    if (remainingSeconds <= WARNING_THRESHOLD_SECONDS && remainingSeconds > 0) {return 'warning';}
     return 'normal';
 }
 

@@ -187,9 +187,14 @@ test('ползунки масштаба совпадают по диапазон
     assert.match(controlHtml, /getElementById\('displayTimerScale'\),\s*\n\s*30, 300, 100,/);
     assert.match(controlHtml, /getElementById\('timeBlocksScale'\),\s*\n\s*50, 600, 100,/);
 
-    // Источник истины на стороне дисплея.
-    assert.match(displayScript, /const TIMER_MIN_SCALE = 30;/);
-    assert.match(displayScript, /const TIMER_MAX_SCALE = 300;/);
+    // Источник истины на стороне дисплея. Границы таймера переехали в CONFIG:
+    // они объявлялись там как 50/200 при настоящих 30/300 в этом файле, и
+    // разошлись именно потому, что реестр никто не читал.
+    const CONFIG = require('../constants');
+    assert.equal(CONFIG.MIN_TIMER_SCALE, 30);
+    assert.equal(CONFIG.MAX_TIMER_SCALE, 300);
+    assert.match(displayScript, /const TIMER_MIN_SCALE = window\.CONFIG\.MIN_TIMER_SCALE;/);
+    assert.match(displayScript, /const TIMER_MAX_SCALE = window\.CONFIG\.MAX_TIMER_SCALE;/);
     assert.match(displayScript, /const BLOCK_MIN_SCALE = 50;/);
     assert.match(displayScript, /const BLOCK_MAX_SCALE = 600;/);
 });
@@ -273,8 +278,20 @@ test('сохранённая позиция восстанавливается �
     // монитор. Без проверки виджет уезжал бы за пределы видимой области, и
     // вернуть его мышью было бы невозможно.
     assert.match(mainSource, /function positionWindowClamped\(win, payload\)/);
-    assert.match(mainSource, /screen\.getAllDisplays\(\)\.some/);
-    assert.match(mainSource, /screen\.getPrimaryDisplay\(\)\.workArea/);
+    // Монитор сохранённой точки ищется среди РЕАЛЬНО подключённых, с откатом на
+    // главный, если такого больше нет.
+    assert.match(mainSource, /screen\.getAllDisplays\(\)\.find/);
+    assert.match(mainSource, /\|\|\s*screen\.getPrimaryDisplay\(\)/);
+    // И поджимается ВЕСЬ прямоугольник, а не только угол: прежняя версия считала
+    // окно видимым по левому-верхнему углу, размер в проверке не участвовал, и
+    // крупное окно с точкой у края восстанавливалось на 12 % видимой ширины
+    // (замерено). Поэтому здесь обязан быть setBounds через общую арифметику, а
+    // не setPosition с сырой точкой.
+    const body = mainSource.match(/function positionWindowClamped\(win, payload\) \{[\s\S]*?\n\}/);
+    assert.ok(body, 'тело positionWindowClamped не найдено');
+    assert.match(body[0], /win\.setBounds\(fitScaledBounds\(/);
+    assert.doesNotMatch(body[0], /win\.setPosition\(/,
+        'сырая установка позиции возвращает баг: окно уедет за край экрана');
     // Оба окна ходят через общий помощник.
     assert.match(mainSource, /ipcMain\.on\('widget-set-position',[\s\S]{0,120}?positionWindowClamped\(widgetWindow, payload\)/);
     assert.match(mainSource, /ipcMain\.on\('clock-widget-set-position',[\s\S]{0,120}?positionWindowClamped\(clockWidgetWindow, payload\)/);

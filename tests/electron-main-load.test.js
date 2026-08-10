@@ -29,6 +29,8 @@ function createStubs() {
             this.opts = opts;
             this._size = [opts.width || 0, opts.height || 0];
             this._position = [opts.x || 0, opts.y || 0];
+            this._minWidth = opts.minWidth || 0;
+            this._minHeight = opts.minHeight || 0;
             this.webContents = {
                 on: noop, once: noop, send: noop, isDestroyed: () => false,
                 setWindowOpenHandler: noop, setZoomFactor: noop,
@@ -46,6 +48,19 @@ function createStubs() {
         getPosition() { return this._position.slice(); }
         setPosition(x, y) { this._position = [x, y]; }
         setSize(w, h) { this._size = [w, h]; }
+        // Подставка обязана уметь то же, что настоящее окно. Пока здесь были
+        // только четыре метода выше, главный процесс мог звать getBounds/
+        // setBounds/getMinimumSize и падать — но тесты этого не видели, потому
+        // что до соответствующих веток не доходили. Отсутствие метода в
+        // подставке не делает его ненужным, оно делает проверку слепой.
+        getBounds() {
+            return { x: this._position[0], y: this._position[1], width: this._size[0], height: this._size[1] };
+        }
+        setBounds(b) {
+            if (Number.isFinite(b.x) && Number.isFinite(b.y)) { this._position = [b.x, b.y]; }
+            if (Number.isFinite(b.width) && Number.isFinite(b.height)) { this._size = [b.width, b.height]; }
+        }
+        getMinimumSize() { return [this._minWidth || 0, this._minHeight || 0]; }
     }
 
     const electron = {

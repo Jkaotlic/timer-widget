@@ -212,25 +212,36 @@ function positionWindowClamped(win, payload) {
     const { x, y } = payload;
     if (!win || win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) { return; }
 
-    const [w, h] = win.getSize();
+    const [width, height] = win.getSize();
+    const [minWidth, minHeight] = win.getMinimumSize();
     const targetX = Math.round(x);
     const targetY = Math.round(y);
 
-    // Visible if the window's top-left corner sits inside any display's bounds.
-    const onSomeDisplay = screen.getAllDisplays().some(({ bounds }) =>
+    // Какому монитору принадлежит сохранённая точка. Если ни одному — монитор
+    // отключили — берём главный.
+    const host = screen.getAllDisplays().find(({ bounds }) =>
         targetX >= bounds.x && targetX < bounds.x + bounds.width
-        && targetY >= bounds.y && targetY < bounds.y + bounds.height);
+        && targetY >= bounds.y && targetY < bounds.y + bounds.height)
+        || screen.getPrimaryDisplay();
 
-    if (onSomeDisplay) {
-        win.setPosition(targetX, targetY);
-        return;
-    }
-
-    const area = screen.getPrimaryDisplay().workArea;
-    win.setPosition(
-        Math.round(Math.max(area.x, Math.min(area.x + area.width - w, targetX))),
-        Math.round(Math.max(area.y, Math.min(area.y + area.height - h, targetY)))
-    );
+    // Поджимается ВЕСЬ прямоугольник, а не только угол. Прежняя версия считала
+    // окно видимым, если на дисплее лежал левый-верхний угол, и размер в проверке
+    // не участвовал вовсе — замерено: сохранённая точка (3320, 70) при размере
+    // 1000 px давала 880 px за правым краем, на экране оставалось 12 % окна.
+    // Точка попадала в хранилище буквально: так писала геометрию версия, у
+    // которой масштабирование росло вниз-вправо, поэтому испорченные профили
+    // существуют и правкой одного лишь масштабирования не лечатся.
+    //
+    // Арифметика переиспользуется из fitScaledBounds: передавая текущий размер и
+    // как размер, и как «запрошенный», получаем «поставить в точку и поджать»,
+    // потому что функция сохраняет центр переданного прямоугольника. Новой
+    // арифметики здесь нет намеренно — она уже проверена юнит-тестами.
+    win.setBounds(fitScaledBounds(
+        { x: targetX, y: targetY, width, height },
+        { width, height },
+        host.workArea,
+        { width: minWidth, height: minHeight }
+    ));
 }
 
 // Runtime app icon path. In dev it lives in build/icon.png (buildResources),
@@ -361,13 +372,13 @@ function createControlWindow() {
     // Default size of the control panel WITHOUT drawer (drawer adds ~320px when opened).
     // Settings live in the drawer, so the panel itself can be narrow and short.
     const windowWidth = Math.min(CONFIG.CONTROL_WINDOW_WIDTH, Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, screenWidth - 100));
-    const windowHeight = Math.min(740, Math.max(660, screenHeight - 100));
+    const windowHeight = Math.min(CONFIG.CONTROL_WINDOW_HEIGHT, Math.max(CONFIG.CONTROL_WINDOW_MIN_HEIGHT, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
         minWidth: CONFIG.CONTROL_WINDOW_MIN_WIDTH,
-        minHeight: 660,
+        minHeight: CONFIG.CONTROL_WINDOW_MIN_HEIGHT,
         // Потолок один и тот же для главного процесса и для панели: панель
         // вычитает из него ширину ящика, когда считает свою колонку.
         maxWidth: CONFIG.CONTROL_WINDOW_MAX_WIDTH,
@@ -429,8 +440,8 @@ function createWidgetWindow() {
         width: CONFIG.WIDGET_DEFAULT_WIDTH,
         height: CONFIG.WIDGET_DEFAULT_HEIGHT,
         // Allow smaller and larger dynamic scaling; we will resize via IPC rather than CSS transforms
-        minWidth: 120,
-        minHeight: 140,
+        minWidth: CONFIG.WIDGET_MIN_WIDTH,
+        minHeight: CONFIG.WIDGET_MIN_HEIGHT,
         // Remove explicit max constraints so user scaling isn't capped artificially
         x: __screenshotMode ? -2500 : width - 270,
         y: __screenshotMode ? -2500 : 20,
@@ -489,10 +500,10 @@ function createClockWidgetWindow() {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
     clockWidgetWindow = new BrowserWindow({
-        width: 220,
-        height: 220,
-        minWidth: 120,
-        minHeight: 120,
+        width: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE,
+        height: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE,
+        minWidth: CONFIG.CLOCK_WIDGET_MIN_SIZE,
+        minHeight: CONFIG.CLOCK_WIDGET_MIN_SIZE,
         x: __screenshotMode ? -2800 : width - 240,
         y: __screenshotMode ? -2500 : height - 260,
         frame: false,
@@ -990,7 +1001,7 @@ ipcMain.on('resize-control-window', (event, size) => {
     const h = Number.isFinite(size.height) ? size.height : curH;
     // Нижний clamp = BrowserWindow min (см. createControlWindow).
     const targetWidth = Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, Math.min(w, screenWidth - 50));
-    const targetHeight = Math.max(660, Math.min(h, screenHeight - 50));
+    const targetHeight = Math.max(CONFIG.CONTROL_WINDOW_MIN_HEIGHT, Math.min(h, screenHeight - 50));
 
     // No-op если ничего не меняется — избегаем лишнего setSize (WM на Windows
     // иногда округляет outer на 1px при каждом вызове, что даёт дрейф).
