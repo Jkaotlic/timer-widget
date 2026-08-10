@@ -785,6 +785,108 @@ async function resetDigitsFonts(page) {
     }).catch(() => {});
 }
 
+// Кегль до и после трёх пересчётов подряд. Пересчёт вызывается тем же
+// событием `resize`, на которое подписаны все три окна; `settleMs` — время на
+// debounce (у дисплея он есть, у виджета и часов обработчик прямой).
+async function traceFontSize(page, selector, settleMs) {
+    const read = () => page.evaluate(
+        (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize),
+        selector
+    );
+    const out = [await read()];
+    for (let i = 0; i < 3; i += 1) {
+        await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+        await page.waitForTimeout(settleMs);
+        out.push(await read());
+    }
+    return out;
+}
+
+test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — во всех трёх окнах', async () => {
+    // Найдено ГЛАЗАМИ на кадре съёмки (шаг «посмотреть на снимки»), а не тестом:
+    // на дисплее 1280×720 цифры занимали пятую часть кадра, тогда как в виджете
+    // — четыре пятых. Замер объяснил разницу: дисплей брал доступную высоту из
+    // getBoundingClientRect() СВОЕГО ЖЕ блока `#timerDigits`, а тот объявлен
+    // `height: 100%` внутри `.display-container` с автоматической высотой —
+    // процент от auto разрешается в auto, то есть в высоту содержимого, то есть
+    // в высоту самих цифр. Пересчёт подавал собственный выход себе на вход и
+    // множил кегль на 0.744 КАЖДЫЙ раз: 89.26 → 66.38 → 49.38 → 36.73 → 27.31
+    // → 20.32 (замерено). Виджет и часы этим не страдали: они берут раму из
+    // `this.container.offsetWidth/offsetHeight` — окна, а не содержимого.
+    //
+    // Существующий тест «кегль реально подгоняется под окно» это пропускал: он
+    // требует, чтобы кегль МЕНЯЛСЯ с размером окна, а схлопывание — тоже
+    // изменение. Инвариант, который ловит именно этот класс дефекта, —
+    // идемпотентность: второй пересчёт подряд, без единого изменения снаружи,
+    // обязан дать тот же кегль. Он не зависит от того, ЧЕМ починено (CSS-рама
+    // или другой источник замера), поэтому переживёт любую переделку.
+    //
+    // Пересчёт запускается НАСТОЯЩИМ событием `resize`, а не вызовом метода
+    // экземпляра: во всех трёх окнах на него подписан ровно тот обработчик,
+    // который работает у пользователя (у дисплея — через debounce, отсюда
+    // ожидание), и ни один спек в e2e/ не лезет во внутренние объекты окна.
+    const { app, control } = await launchApp();
+    const geometry = { widget: null };
+    try {
+        await control.waitForLoadState('domcontentloaded');
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await control.waitForTimeout(1500);
+
+        // --- Дисплей ---
+        await control.click('.tab-btn[data-tab="display"]');
+        await control.click('#displayTimerStyle button[data-val="digits"]');
+        await control.waitForTimeout(800);
+
+        const display = await findWindow(app, IS_DISPLAY);
+        expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
+        const displayTrace = await traceFontSize(display, '#digitsTime', 500);
+        expect(
+            Math.max(...displayTrace) - Math.min(...displayTrace),
+            `дисплей: три пересчёта подряд обязаны дать один кегль, получено ${displayTrace.join(' → ')}`
+        ).toBeLessThan(0.5);
+
+        // --- Виджет ---
+        // Окно открываем кнопкой и ждём СОБЫТИЕМ: сразу после click() окна ещё
+        // нет, и findWindow() вернёт null (ровно так этот тест и упал первый раз).
+        await control.click('#openWidgetBtn');
+        const widget = await app.waitForEvent('window');
+        await widget.waitForLoadState('domcontentloaded');
+        expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
+
+        await control.click('.tab-btn[data-tab="timer"]');
+        await control.click('#timerStyle button[data-val="digits"]');
+        await control.waitForTimeout(900);
+        geometry.widget = await snapshotWidgetGeometry(widget);
+        const widgetTrace = await traceFontSize(widget, '#widgetDigitsTime', 200);
+        expect(
+            Math.max(...widgetTrace) - Math.min(...widgetTrace),
+            `виджет: три пересчёта подряд обязаны дать один кегль, получено ${widgetTrace.join(' → ')}`
+        ).toBeLessThan(0.5);
+
+        // --- Часы ---
+        await control.click('#openClockBtn');
+        const clock = await app.waitForEvent('window');
+        await clock.waitForLoadState('domcontentloaded');
+        expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
+
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.click('#clockStyle button[data-val="digits"]');
+        await control.waitForTimeout(900);
+        const clockTrace = await traceFontSize(clock, '#clockDigitsTime', 200);
+        expect(
+            Math.max(...clockTrace) - Math.min(...clockTrace),
+            `часы: три пересчёта подряд обязаны дать один кегль, получено ${clockTrace.join(' → ')}`
+        ).toBeLessThan(0.5);
+    } finally {
+        await resetDisplayStyle(control);
+        await resetWidgetStyle(control);
+        await resetClockStyle(control);
+        const widget = await findWindow(app, IS_WIDGET);
+        if (widget && geometry.widget !== null) { await restoreWidgetGeometry(widget, geometry.widget); }
+        await app.close();
+    }
+});
+
 test('font-select: присваивание .value молчит, событие шлёт только клик', async () => {
     // Прямая проверка инварианта из font-select.js/attachFontSelect (тот же,
     // что у _attachSegmented — см. подробный разбор в CLAUDE.md про
