@@ -110,3 +110,49 @@ for (const target of WINDOWS) {
         }
     });
 }
+
+for (const target of WINDOWS) {
+    test(`${target.name}: масштаб и позиция переживают переоткрытие`, async () => {
+        const { app, control } = await launchApp();
+        try {
+            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+            const win = await findWindow(app, target.url);
+            await win.waitForLoadState('domcontentloaded');
+            await win.waitForTimeout(800);
+
+            const size = target.base * 3;
+            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+                { ch: target.resize, size });
+            // Ждём дольше обычного: setBounds вызывает в рендерере resize, тот
+            // пишет геометрию в localStorage, и записи надо дать случиться.
+            await win.waitForTimeout(1200);
+            const before = await boundsOf(app, target.url);
+
+            await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
+            await control.waitForTimeout(700);
+            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+            const reopened = await findWindow(app, target.url);
+            await reopened.waitForLoadState('domcontentloaded');
+            await reopened.waitForTimeout(1400);
+
+            const after = await boundsOf(app, target.url);
+
+            // Допуск в 2 px: округление процента масштаба туда-обратно
+            // (outerWidth → pct → размер) законно даёт единицу.
+            expect(Math.abs(after.width - before.width), `ширина ${before.width} → ${after.width}`)
+                .toBeLessThanOrEqual(2);
+            expect(Math.abs(after.x - before.x), `позиция по x ${before.x} → ${after.x}`)
+                .toBeLessThanOrEqual(2);
+            expect(Math.abs(after.y - before.y), `позиция по y ${before.y} → ${after.y}`)
+                .toBeLessThanOrEqual(2);
+        } finally {
+            // Профиль e2e ОДИН на весь прогон, поэтому спек, менявший
+            // глобальное состояние, обязан его вернуть: иначе следующий файл
+            // получит виджет чужого размера в чужом месте.
+            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+                { ch: target.resize, size: target.base }).catch(() => {});
+            await control.waitForTimeout(600).catch(() => {});
+            await app.close();
+        }
+    });
+}

@@ -33,6 +33,12 @@
 const MIN_SCALE_PCT = 30;
 const MAX_SCALE_PCT = 600;
 
+// Сколько ждать тишины, прежде чем записать геометрию по событию resize.
+// Величина покрывает круг «главный процесс изменил окно → рендерер увидел
+// новый размер»; замеренный разброс на этой машине — единицы миллисекунд,
+// запас взят на загруженную систему.
+const SAVE_SETTLE_MS = 300;
+
 /**
  * @param {object} cfg
  * @param {string} cfg.storageKey — ключ в localStorage ('widgetGeometry' / 'clockGeometry')
@@ -54,6 +60,25 @@ function createWindowGeometry(cfg) {
     // старте, и без неё save() записал бы позицию ДО того, как придёт
     // *-set-position, затерев восстановленную.
     let scalePct;
+
+    // Отложенная запись по событию resize. См. saveSettled() ниже.
+    let settleTimer = null;
+
+    /**
+     * Записывает размер и позицию.
+     * @param {number} [explicitPct] — без него берётся ФАКТИЧЕСКАЯ ширина окна:
+     *   она учитывает и растягивание за край рамки, а не только Ctrl+колесо.
+     */
+    function save(explicitPct) {
+        const pct = Number.isFinite(explicitPct)
+            ? explicitPct
+            : (Math.round(getOuterWidth() / baseSize * 100) || scalePct || 100);
+        scalePct = pct;
+        const pos = getScreenPosition();
+        try {
+            storage.setItem(storageKey, JSON.stringify({ scalePct: pct, x: pos.x, y: pos.y }));
+        } catch { /* хранилище переполнено — геометрия не критична */ }
+    }
 
     return {
         get scalePct() { return scalePct; },
@@ -79,20 +104,39 @@ function createWindowGeometry(cfg) {
             }
         },
 
+        save,
+
         /**
-         * Записывает размер и позицию.
-         * @param {number} [explicitPct] — без него берётся ФАКТИЧЕСКАЯ ширина окна:
-         *   она учитывает и растягивание за край рамки, а не только Ctrl+колесо.
+         * Запись по событию `resize` — ПОСЛЕ того, как размер устоялся.
+         *
+         * Решение «писать или не писать» нельзя принимать в самом обработчике.
+         * Замеренный дефект: restore() выставляет scalePct сразу (иначе эхо его
+         * собственного resize записало бы позицию ДО того, как её применит
+         * *-set-position), но окно в этот момент ещё прежнего размера. Раннее
+         * событие resize давало pct = 100 при scalePct = 400, сравнение
+         * «не равно» пропускало запись — и восстановленная геометрия
+         * затиралась позицией открытия по умолчанию. Окно выглядело правильно,
+         * а следующее открытие показывало размер по умолчанию.
+         *
+         * Здесь getOuterWidth() читается в момент СРАБАТЫВАНИЯ таймера, когда
+         * окно уже доехало, поэтому одного события достаточно, а серия событий
+         * (растягивание за край рамки шлёт их десятками) даёт одну запись.
+         *
+         * Путь Ctrl+колеса этого не касается: он зовёт save() явно и сразу.
          */
-        save(explicitPct) {
-            const pct = Number.isFinite(explicitPct)
-                ? explicitPct
-                : (Math.round(getOuterWidth() / baseSize * 100) || scalePct || 100);
-            scalePct = pct;
-            const pos = getScreenPosition();
-            try {
-                storage.setItem(storageKey, JSON.stringify({ scalePct: pct, x: pos.x, y: pos.y }));
-            } catch { /* хранилище переполнено — геометрия не критична */ }
+        saveSettled(delayMs = SAVE_SETTLE_MS) {
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => {
+                settleTimer = null;
+                const pct = Math.round(getOuterWidth() / baseSize * 100) || scalePct || 100;
+                if (pct !== scalePct) { save(pct); }
+            }, delayMs);
+        },
+
+        /** Снимает отложенную запись — для cleanup() при закрытии окна. */
+        cancelPendingSave() {
+            clearTimeout(settleTimer);
+            settleTimer = null;
         },
 
         /** Размер окна в пикселях для заданного масштаба. */
@@ -234,7 +278,8 @@ const WindowGeometry = {
     bindWindowDrag,
     fitScaledBounds,
     MIN_SCALE_PCT,
-    MAX_SCALE_PCT
+    MAX_SCALE_PCT,
+    SAVE_SETTLE_MS
 };
 
 // Node (тесты)

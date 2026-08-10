@@ -85,9 +85,17 @@ test('часы: изменение размера окна сохраняет г
     const src = read('electron-clock-widget.html');
     const handler = src.match(/onResizeScalePct = \(\) => \{(.*?)\n {16}\};/s);
     assert.ok(handler, 'обработчик resize в часах не найден');
+    // Решение «писать или не писать» переехало в window-geometry.js и
+    // принимается ПОСЛЕ того, как размер устоялся: прежняя проверка
+    // `pct !== scalePct` прямо в обработчике читала размер окна до того, как он
+    // применился, и раннее событие затирало восстановленную геометрию. Само
+    // намерение теста прежнее — resize обязан сохранять геометрию, иначе
+    // масштаб из панели теряется при переоткрытии; изменился только владелец.
+    // Поведение проверяют tests/window-geometry.test.js и
+    // e2e/window-scale-fit.spec.js.
     assert.match(
         handler[1],
-        /if \(clockScalePct !== this\._geometry\.scalePct\) \{\s*this\.saveGeometry\(clockScalePct\);/s,
+        /this\._geometry\.saveSettled\(\)/s,
         'resize обязан сохранять геометрию — иначе масштаб из панели терялся при переоткрытии'
     );
 });
@@ -96,9 +104,11 @@ test('виджет: изменение размера окна тоже сохр
     const src = read('electron-widget.html');
     const handler = src.match(/onResizeScalePct = \(\) => \{(.*?)\n {16}\};/s);
     assert.ok(handler, 'обработчик resize в виджете не найден');
+    // См. комментарий у теста часов выше: владелец решения сменился, намерение —
+    // нет. Нативный ресайз за край окна обязан сохраняться.
     assert.match(
         handler[1],
-        /if \(widgetScalePct !== this\._geometry\.scalePct\) \{\s*this\.saveGeometry\(widgetScalePct\);/s,
+        /this\._geometry\.saveSettled\(\)/s,
         'нативный ресайз за край окна не сохранялся'
     );
 });
