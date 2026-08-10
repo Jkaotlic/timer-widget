@@ -1750,8 +1750,8 @@ class DisplayTimer {
     setupBlockControls() {
         const BLOCK_MIN_SCALE = 50;
         const BLOCK_MAX_SCALE = 600;
-        const TIMER_MIN_SCALE = 30;
-        const TIMER_MAX_SCALE = 300;
+        const TIMER_MIN_SCALE = window.CONFIG.MIN_TIMER_SCALE;
+        const TIMER_MAX_SCALE = window.CONFIG.MAX_TIMER_SCALE;
         const STORAGE_KEY = 'displayBlockPositions';
         const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
@@ -1812,7 +1812,7 @@ class DisplayTimer {
         this._handlers.wheel = (e) => {
             if (!e.ctrlKey && !e.shiftKey) { return; }
             e.preventDefault();
-            const step = 10;
+            const step = window.CONFIG.SCALE_STEP;
             const delta = e.deltaY < 0 ? step : -step;
 
             // Shift+Wheel always scales blocks
