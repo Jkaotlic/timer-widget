@@ -269,6 +269,111 @@ test('faint используется только для заливок, но н
     );
 });
 
+test('.font-option.active (список шрифтов) проходит порог в ОБЕИХ темах, посчитано по реальным правилам control.css', () => {
+    // Регресс, найденный ревью пикселем, а не формулой: первая версия красила
+    // выбранный пункт списка var(--tw-blue) поверх rgba(10,132,255,0.14) —
+    // синий текст на голубоватой заливке того же тона систематически даёт
+    // низкий контраст (не невезение с конкретными числами, а закономерность:
+    // текст и подложка тянут luminance в одну сторону). Реальный отрисованный
+    // пиксель (скриншот → canvas → getImageData, тот же метод, что здесь
+    // ниже применяется к --tw-led-green и другим акцентам) дал 2.46:1 в
+    // тёмной теме и 5.36:1 в светлой — при порогах 4.5:1 и 7:1 соответственно.
+    //
+    // Фикс красит выбранный пункт ТЕМ ЖЕ приёмом, что .tab-btn.active и
+    // .segmented button.active чуть выше в этом файле: нейтральная
+    // приподнятая поверхность + --tw-fg, без акцентного текста на акцентной
+    // заливке. Тест читает ПРАВИЛА ИЗ control.css регуляркой (а не дублирует
+    // литералы руками), чтобы правка кнопки в CSS без обновления этого теста
+    // проверялась на РЕАЛЬНОМ значении, а не на переписанной вручную копии.
+    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+
+    // Тёмная: собственное правило `.font-option.active { ... }`, НЕ внутри
+    // [data-theme="light"] — оно начинается с начала строки без префикса.
+    const darkRule = /^\.font-option\.active\s*\{([^}]*)\}/m.exec(control);
+    assert.ok(darkRule, 'не найдено правило .font-option.active (тёмная тема)');
+    const darkBg = /background:\s*([^;]+);/.exec(darkRule[1]);
+    const darkFgTok = /color:\s*var\(--([a-z0-9-]+)\)/.exec(darkRule[1]);
+    assert.ok(darkBg && darkFgTok, '.font-option.active: не разобраны background/color (тёмная)');
+
+    // Реальная подложка — .font-select (--tw-level-2) поверх панели (SURFACE),
+    // а поверх него сама полупрозрачная заливка активного пункта: та же
+    // цепочка компоновки, что рисует браузер.
+    const level2Dark = composite(darkToken('tw-level-2'), SURFACE);
+    const activeDark = composite(darkBg[1].trim(), level2Dark);
+    const ratioDark = contrast(composite(darkToken(darkFgTok[1]), activeDark), activeDark);
+    assert.ok(
+        ratioDark >= AA_NORMAL,
+        `.font-option.active тёмная тема: ${ratioDark.toFixed(2)}:1, нужно ${AA_NORMAL}:1 `
+        + `(фон ${darkBg[1].trim()} на --tw-level-2/SURFACE, текст --${darkFgTok[1]})`
+    );
+    console.log(`   .font-option.active тёмная (расчёт): ${ratioDark.toFixed(2)}:1 (нужно ${AA_NORMAL}:1)`);
+
+    // Светлая: делит правило с .tab-btn.active / .segmented button.active —
+    // ищем блок под [data-theme="light"], содержащий .font-option.active в
+    // списке селекторов (до 220 символов между маркером темы и селектором
+    // хватает на три строки списка селекторов из реальной разметки файла).
+    const lightRule = /\[data-theme="light"\][\s\S]{0,220}?\.font-option\.active\s*\{([^}]*)\}/.exec(control);
+    assert.ok(lightRule, 'не найдено правило .font-option.active под [data-theme="light"]');
+    const lightBg = /background:\s*([^;]+);/.exec(lightRule[1]);
+    const lightFgTok = /color:\s*var\(--([a-z0-9-]+)\)/.exec(lightRule[1]);
+    assert.ok(lightBg && lightFgTok, '.font-option.active: не разобраны background/color (светлая)');
+
+    const AAA_NORMAL = 7.0;
+    // Фон светлой темы здесь — сплошной цвет (#ffffff), поэтому цепочка
+    // подложек ниже не имеет значения: верхний непрозрачный слой перекрывает
+    // всё. composite() с alpha=1 у сплошного цвета просто возвращает его же.
+    const activeLight = composite(lightBg[1].trim(), parseColor(hcToken('tw-level-2')).rgb);
+    const ratioLight = contrast(composite(hcToken(lightFgTok[1]), activeLight), activeLight);
+    assert.ok(
+        ratioLight >= AAA_NORMAL,
+        `.font-option.active светлая тема: ${ratioLight.toFixed(2)}:1, нужно ${AAA_NORMAL}:1 `
+        + `(фон ${lightBg[1].trim()}, текст --${lightFgTok[1]})`
+    );
+    console.log(`   .font-option.active светлая (расчёт): ${ratioLight.toFixed(2)}:1 (нужно ${AAA_NORMAL}:1)`);
+});
+
+test('.bg-mode-btn.active — предсуществующий дефект контраста, ЗАФИКСИРОВАН числом, не исправляется здесь', () => {
+    // Найден тем же ревью пикселем, что и .font-option.active выше (тот же
+    // паттерн: var(--tw-blue) на rgba(10,132,255,·) заливке того же тона), но
+    // это код, который эта задача не трогает — кнопки режима фона существовали
+    // до неё. Тест не проваливает сборку: он документирует масштаб дефекта
+    // числом, чтобы следующий проход (или явное решение «чиним/не чиним») не
+    // начинался с нуля. Если однажды кто-то поднимет контраст выше порога —
+    // этот тест немедленно потребует поднять и здесь заявленный порог, а не
+    // останется тихо устаревшим утверждением «менее X:1».
+    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+    const rule = /^\.bg-mode-btn\.active\s*\{([^}]*)\}/m.exec(control);
+    assert.ok(rule, 'не найдено правило .bg-mode-btn.active — если оно переименовано, замер контраста тоже надо перенести');
+
+    const bg = /background:\s*([^;]+);/.exec(rule[1]);
+    const fgTok = /color:\s*var\(--([a-z0-9-]+)\)/.exec(rule[1]);
+    assert.ok(bg && fgTok, '.bg-mode-btn.active: не разобраны background/color');
+
+    const level2Dark = composite(darkToken('tw-level-2'), SURFACE);
+    const activeDark = composite(bg[1].trim(), level2Dark);
+    const ratioDark = contrast(composite(darkToken(fgTok[1]), activeDark), activeDark);
+    // Порог здесь НЕ WCAG (4.5), а «не стало хуже измеренного»: реальный
+    // пиксель на момент ревью 2026-08-07 — 2.12:1 (скриншот → canvas →
+    // getImageData, тот же метод, что и для .font-option.active выше);
+    // упрощённая аналитическая цепочка подложки этого теста (SURFACE →
+    // --tw-level-2 → заливка) даёт 3.37:1 — выше, чем реальный пиксель,
+    // потому что настоящий фон панели в этом месте светлее, чем предполагает
+    // упрощённая модель (та же разница, что и у .font-option.active: там
+    // аналитика дала 10.31:1 при реальном пикселе 7.56:1). Оба числа — и
+    // реальное, и расчётное — ниже порога WCAG AA (4.5:1), поэтому тест как
+    // «известный дефект» отражает действительность в любом случае.
+    assert.ok(
+        ratioDark < AA_NORMAL,
+        `.bg-mode-btn.active внезапно прошёл WCAG AA (${ratioDark.toFixed(2)}:1) — обнови комментарий, `
+        + 'дефект, видимо, устранили, но не в этой задаче'
+    );
+    assert.ok(
+        ratioDark >= 2.5,
+        `.bg-mode-btn.active стал ЕЩЁ темнее: ${ratioDark.toFixed(2)}:1 — это уже регресс контраста, не только известный дефект`
+    );
+    console.log(`   [известный дефект, не чинится здесь] .bg-mode-btn.active тёмная: ${ratioDark.toFixed(2)}:1 (нужно ${AA_NORMAL}:1)`);
+});
+
 // ---------------------------------------------------------------------------
 // Окна, не владеющие своим фоном: виджет и полноэкранный дисплей
 // ---------------------------------------------------------------------------

@@ -27,11 +27,17 @@ function attachFontSelect(el) {
     if (!el || !el.classList || !el.classList.contains('font-select')) { return; }
 
     const fonts = window.DigitsStyle.DIGIT_FONTS;
+    // id пункта содержит id КОНТЕЙНЕРА — на панели три независимых списка
+    // (виджет/часы/дисплей) в одном document, и голое "option-bebas" столкнулось
+    // бы у всех трёх.
+    const optionId = (fontId) => `${el.id}-option-${fontId}`;
+
     el.innerHTML = '';
     for (const font of fonts) {
         const option = document.createElement('div');
         option.className = 'font-option';
         option.setAttribute('role', 'option');
+        option.id = optionId(font.id);
         option.dataset.val = font.id;
         option.tabIndex = -1;
 
@@ -57,6 +63,14 @@ function attachFontSelect(el) {
             o.classList.toggle('active', on);
             o.setAttribute('aria-selected', on ? 'true' : 'false');
         });
+        // Фокус остаётся НА КОНТЕЙНЕРЕ (tabindex=0 на .font-select ниже,
+        // у пунктов tabindex=-1) — паттерн listbox с "виртуальным" фокусом.
+        // Без aria-activedescendant скринридер не знает, какой пункт сейчас
+        // выделен, хотя визуально и по клику/стрелкам всё работает: клик и
+        // ArrowDown реально меняют .value, но ни один из них НЕ переносит
+        // DOM-фокус на сам пункт, поэтому единственный канал для ассистивных
+        // технологий — этот атрибут, и без него он не выставлялся вовсе.
+        el.setAttribute('aria-activedescendant', optionId(font.id));
     };
 
     if (!Object.getOwnPropertyDescriptor(el, 'value')) {
