@@ -142,7 +142,20 @@
                                 <button type="button" data-val="digital">LED</button>
                                 <button type="button" data-val="flip">Флип</button>
                                 <button type="button" data-val="analog">Аналог</button>
+                                <button type="button" data-val="digits">Цифры</button>
                             </div>
+                        </div>
+                        <!-- Видна только при стиле «Цифры» (начертание у остальных
+                             четырёх — часть стиля). Блок, не .toggle-row: список
+                             раскрыт постоянно (6 строк с образцами), в правую
+                             половину flex-строки не помещается; раскрытый список
+                             вместо попапа — ещё один слой поверх и так слоёного Esc
+                             в этом окне это лишний способ его сломать. id — на
+                             РЕАЛЬНОЙ обёртке контрола (см. урок #clockStyleRow). -->
+                        <div class="setting-block" id="widgetDigitsFontRow" style="display: none;">
+                            <span class="toggle-label">Шрифт цифр</span>
+                            <div class="font-select" id="widgetDigitsFont" role="listbox"
+                                 aria-label="Шрифт цифр виджета" data-value="inter"></div>
                         </div>
                         <div class="toggle-row">
                             <span class="toggle-label">Масштаб</span>
@@ -413,7 +426,14 @@
                                     <button type="button" data-val="digital">LED</button>
                                     <button type="button" data-val="flip">Флип</button>
                                     <button type="button" data-val="analog">Аналог</button>
+                                    <button type="button" data-val="digits">Цифры</button>
                                 </div>
+                            </div>
+                            <!-- Видна только при «Цифрах» — см. #widgetDigitsFontRow выше. -->
+                            <div class="setting-block" id="clockDigitsFontRow" style="display: none;">
+                                <span class="toggle-label">Шрифт цифр</span>
+                                <div class="font-select" id="clockDigitsFont" role="listbox"
+                                     aria-label="Шрифт цифр часов" data-value="inter"></div>
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
@@ -506,7 +526,14 @@
                                     <button type="button" data-val="digital">LED</button>
                                     <button type="button" data-val="flip">Флип</button>
                                     <button type="button" data-val="analog">Аналог</button>
+                                    <button type="button" data-val="digits">Цифры</button>
                                 </div>
+                            </div>
+                            <!-- Видна только при «Цифрах» — см. #widgetDigitsFontRow выше. -->
+                            <div class="setting-block" id="displayDigitsFontRow" style="display: none;">
+                                <span class="toggle-label">Шрифт цифр</span>
+                                <div class="font-select" id="displayDigitsFont" role="listbox"
+                                     aria-label="Шрифт цифр дисплея" data-value="inter"></div>
                             </div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Масштаб</span>
@@ -927,6 +954,8 @@
     <script src="utils.js"></script>
     <script src="renderer-storage.js"></script>
     <script src="renderer-shared.js"></script>
+    <script src="digits-style.js"></script>
+    <script src="font-select.js"></script>
     <script src="settings-schema.js"></script>
     <script src="clock-settings-schema.js"></script>
     <script src="sound-bank.js"></script>
@@ -1053,6 +1082,7 @@
                         ipcRenderer.send('widget-style-update', {
                             timerStyle: this.timerStyleEl.value,
                             timerScale: parseInt(this.timerScaleEl.value),
+                            digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
                             showTicks: val
                         });
                         // Деления — общая настройка ДВУХ циферблатов: и виджет
@@ -1085,7 +1115,19 @@
                 this.clockShowTimezoneEl = document.getElementById('clockShowTimezone');
                 this.clockShowSecondsEl = document.getElementById('clockShowSeconds');
                 this.clockFormat24hEl = document.getElementById('clockFormat24h');
-                
+
+                // Шрифт стиля «Цифры» — свой список на каждое окно (Task 7).
+                this.widgetDigitsFontEl = document.getElementById('widgetDigitsFont');
+                this.clockDigitsFontEl = document.getElementById('clockDigitsFont');
+                this.displayDigitsFontEl = document.getElementById('displayDigitsFont');
+                // attachFontSelect — в font-select.js, не здесь (лимит строк).
+                attachFontSelect(this.widgetDigitsFontEl);
+                attachFontSelect(this.clockDigitsFontEl);
+                attachFontSelect(this.displayDigitsFontEl);
+                this.widgetDigitsFontRowEl = document.getElementById('widgetDigitsFontRow');
+                this.clockDigitsFontRowEl = document.getElementById('clockDigitsFontRow');
+                this.displayDigitsFontRowEl = document.getElementById('displayDigitsFontRow');
+
                 // Синхронизация стилей (по умолчанию включена)
                 this.syncClockStyle = false;
                 
@@ -1527,24 +1569,35 @@
                 
                 this.timerStyleEl.addEventListener('change', () => {
                     // Send widget-specific style update (only affects widget, not display)
-                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, showTicks: this.widgetShowTicksEl?.checked ?? false });
+                    ipcRenderer.send('widget-style-update', {
+                        timerStyle: this.timerStyleEl.value,
+                        digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
+                        showTicks: this.widgetShowTicksEl?.checked ?? false
+                    });
                     // Sync clock style when syncClockStyle is enabled
                     if (this.syncClockStyle) {
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
                     this.updateClockAnalogNumbersVisibility();
+                    this.updateDigitsFontRowsVisibility();
                     this.saveExtSettings();
                 });
 
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
-                    ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: parseInt(this.timerScaleEl.value), showTicks: this.widgetShowTicksEl?.checked ?? false });
+                    ipcRenderer.send('widget-style-update', {
+                        timerStyle: this.timerStyleEl.value,
+                        timerScale: parseInt(this.timerScaleEl.value),
+                        digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
+                        showTicks: this.widgetShowTicksEl?.checked ?? false
+                    });
                     this.saveExtSettings();
                 });
 
                 // Display-specific style/scale (Полноэкранный tab)
                 if (this.displayTimerStyleEl) {
                     this.displayTimerStyleEl.addEventListener('change', () => {
+                        this.updateDigitsFontRowsVisibility();
                         this.pushDisplaySettings();
                     });
                 }
@@ -1566,6 +1619,7 @@
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
                     this.updateClockAnalogNumbersVisibility();
+                    this.updateDigitsFontRowsVisibility();
                     this.saveExtSettings();
                 });
 
@@ -1577,8 +1631,32 @@
                     }
                     ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
                     this.updateClockAnalogNumbersVisibility();
+                    this.updateDigitsFontRowsVisibility();
                     this.saveExtSettings();
                 });
+
+                // Три независимых списка шрифта — каждый шлёт только своему окну.
+                if (this.widgetDigitsFontEl) {
+                    this.widgetDigitsFontEl.addEventListener('change', () => {
+                        ipcRenderer.send('widget-style-update', {
+                            timerStyle: this.timerStyleEl.value,
+                            digitsFont: this.widgetDigitsFontEl.value,
+                            showTicks: this.widgetShowTicksEl?.checked ?? false
+                        });
+                        this.saveExtSettings();
+                    });
+                }
+                if (this.clockDigitsFontEl) {
+                    this.clockDigitsFontEl.addEventListener('change', () => {
+                        this.pushClockSettings();
+                        this.saveExtSettings();
+                    });
+                }
+                if (this.displayDigitsFontEl) {
+                    this.displayDigitsFontEl.addEventListener('change', () => {
+                        this.pushDisplaySettings();
+                    });
+                }
 
                 // Масштаб часов
                 const clockScaleEl = document.getElementById('clockScale');
@@ -1598,7 +1676,12 @@
                     document.getElementById('timerScale'),
                     30, 600, 100,
                     (val) => {
-                        ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, timerScale: val, showTicks: this.widgetShowTicksEl?.checked ?? false });
+                        ipcRenderer.send('widget-style-update', {
+                            timerStyle: this.timerStyleEl.value,
+                            timerScale: val,
+                            digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
+                            showTicks: this.widgetShowTicksEl?.checked ?? false
+                        });
                         this.saveExtSettings();
                     }
                 );
@@ -1806,7 +1889,10 @@
 
                 // Обновляем видимость опции цифр для часов
                 this.updateClockAnalogNumbersVisibility();
-                
+                // Строки выбора шрифта «Цифры» — видимость зависит от
+                // восстановленного выше стиля каждого из трёх окон.
+                this.updateDigitsFontRowsVisibility();
+
                 // Отправляем стиль часам при загрузке
                 const clockStyleToSend = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
                 setTimeout(() => {
@@ -1822,6 +1908,7 @@
                     ipcRenderer.send('widget-style-update', {
                         timerStyle: this.timerStyleEl.value,
                         timerScale: parseInt(this.timerScaleEl.value),
+                        digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
                         showTicks: this.widgetShowTicksEl?.checked ?? false
                     });
                 }, 600);
@@ -1933,7 +2020,9 @@
                     displayTimerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
                     displayTimerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
                     timerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
-                    timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value)
+                    timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
+                    // Шрифт стиля «Цифры» дисплея — своё имя, свой список (Task 7).
+                    displayDigitsFont: this.displayDigitsFontEl ? this.displayDigitsFontEl.value : 'inter'
                 };
                 ipcRenderer.send('display-settings-update', settings);
             }
@@ -1944,6 +2033,21 @@
                 // Показываем опцию цифр только для аналогового стиля
                 if (this.clockAnalogNumbersRowEl) {
                     this.clockAnalogNumbersRowEl.style.display = clockStyle === 'analog' ? 'flex' : 'none';
+                }
+            }
+
+            // Строка выбора шрифта видна только при стиле «Цифры» — у остальных
+            // четырёх стилей начертание задаёт сам стиль, выбирать нечего.
+            // Три независимых проверки: у каждого окна свой активный стиль.
+            updateDigitsFontRowsVisibility() {
+                const clockStyle = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
+                const rows = [
+                    [this.widgetDigitsFontRowEl, this.timerStyleEl.value],
+                    [this.clockDigitsFontRowEl, clockStyle],
+                    [this.displayDigitsFontRowEl, this.displayTimerStyleEl ? this.displayTimerStyleEl.value : 'circle']
+                ];
+                for (const [row, style] of rows) {
+                    if (row) { row.style.display = style === 'digits' ? 'flex' : 'none'; }
                 }
             }
 

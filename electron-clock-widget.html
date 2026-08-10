@@ -544,7 +544,8 @@
         .circular-widget,
         .widget-digital,
         .widget-flip,
-        .widget-analog {
+        .widget-analog,
+        .clock-digits {
             display: none !important;
         }
 
@@ -553,6 +554,7 @@
         .widget-digital.active { display: flex !important; }
         .widget-flip.active { display: flex !important; }
         .widget-analog.active { display: flex !important; }
+        .clock-digits.active { display: flex !important; }
 
         /* ============================================
            СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
@@ -819,6 +821,40 @@
         }
 
         /* ============================================
+           СТИЛЬ: ЦИФРЫ — только время, окно прозрачное.
+           Часы, в отличие от таймера, не бывают отрицательными — знака
+           минуса и .clock-digits-sign здесь нет вообще (см. brief Task 6).
+           ============================================ */
+        .clock-digits {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        .clock-digits.active { display: flex !important; }
+
+        .clock-digits-time {
+            position: relative;
+            width: fit-content;
+            margin-inline: auto;
+            font-size: var(--digits-font-size, 40px);
+            line-height: 1;
+            white-space: nowrap;
+            color: var(--tw-fg);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .clock-digits-probe {
+            position: absolute;
+            visibility: hidden;
+            white-space: nowrap;
+            pointer-events: none;
+            left: -9999px;
+            top: 0;
+        }
+
+        /* ============================================
            Hint toast — first-run hint
            ============================================ */
         .widget-hint {
@@ -1058,6 +1094,12 @@
             </div>
             </div><!-- закрытие widget-analog-content -->
         </div>
+
+        <!-- Стиль: Цифры -->
+        <div class="clock-digits" id="clockDigits">
+            <div class="clock-digits-time" id="clockDigitsTime"><span class="clock-digits-value" id="clockDigitsValue">00:00</span></div>
+            <span class="clock-digits-probe" id="clockDigitsProbe" aria-hidden="true"></span>
+        </div>
     </div>
 
     <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
@@ -1068,6 +1110,7 @@
     <script src="renderer-shared.js"></script>
     <script src="flip-card.js"></script>
     <script src="window-geometry.js"></script>
+    <script src="digits-style.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1174,7 +1217,25 @@
                 this.clockAnalogNumbers = document.getElementById('clockAnalogNumbers');
                 this.analogDateBadge = document.getElementById('analogDateBadge');
                 this.analogTimezoneBadge = document.getElementById('analogTimezoneBadge');
-                
+
+                // Стиль «Цифры». Знака минуса нет — часы не бывают
+                // отрицательными, поэтому потомка -sign у #clockDigitsTime нет.
+                this.clockDigits = document.getElementById('clockDigits');
+                this.clockDigitsTime = document.getElementById('clockDigitsTime');
+                this.clockDigitsValue = document.getElementById('clockDigitsValue');
+                this.clockDigitsProbe = document.getElementById('clockDigitsProbe');
+                this.digitsFont = window.DigitsStyle.DEFAULT_FONT_ID;
+                this._digitsFontsReady = false;
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => {
+                        this._digitsFontsReady = true;
+                        window.DigitsStyle.clearProbeCache();
+                        this.updateScaling();
+                    });
+                } else {
+                    this._digitsFontsReady = true;
+                }
+
                 // Устанавливаем стиль по умолчанию
                 if (this.circularWidget) {this.circularWidget.classList.add('active');}
                 document.body.classList.add('style-circle');
@@ -1224,6 +1285,44 @@
                 const analogScale = Math.min(analogScaleX, analogScaleY);
                 
                 this.container.style.setProperty('--analog-scale', analogScale);
+
+                // Цифры: кегль по замеру ЭТАЛОНА через measureDigits()/
+                // fitFontSize() (digits-style.js) — тем же путём (и тем же
+                // кэшу по паре «шрифт, эталон»), что у виджета и дисплея.
+                // signWidth: 0, потому что часы не бывают отрицательными и
+                // знака у них нет вообще (в отличие от таймера).
+                //
+                // Эталон — СВОЯ строка, не PROBE_MINUTES/PROBE_HOURS: те два
+                // смоделированы под ТАЙМЕР и ничего не знают про суффикс
+                // « AM»/« PM», который существует только у часов, в
+                // 12-часовом формате. Замерено e2e (`часы «Цифры» не
+                // обрезаются…`): при 12ч + секундах реальная строка
+                // «07:29:58 PM» рисовалась 496px против эталонных 74px по
+                // PROBE_HOURS, кегль выходил в 1.5 раза крупнее нужного, и
+                // текст резался о край окна (320px блок). Эталон строится из
+                // РЕАЛЬНОЙ формы текущего форматирования (showSeconds и
+                // _uses24h() — те же источники, что уже определяют timeStr в
+                // updateDisplay()), но измерение — measureDigits(), не
+                // отдельный инлайновый DOM-замер: тот раньше не кэшировался
+                // (getBoundingClientRect() на КАЖДЫЙ resize) и молча
+                // расходился бы с этой функцией при любой будущей правке
+                // самого модуля (например, letter-spacing).
+                if (this.clockDigitsTime && this.clockDigitsProbe && this._digitsFontsReady) {
+                    const sample = (showSeconds ? '88:88:88' : '88:88') + (this._uses24h() ? '' : ' PM');
+                    const probe = window.DigitsStyle.measureDigits(this.clockDigitsProbe, this.digitsFont, sample);
+                    if (probe) {
+                        const size = window.DigitsStyle.fitFontSize({
+                            availableWidth: containerWidth * 0.9,
+                            availableHeight: containerHeight * 0.9,
+                            probeWidth: probe.width,
+                            probeHeight: probe.height,
+                            signWidth: 0
+                        });
+                        if (size > 0) {
+                            this.clockDigitsTime.style.setProperty('--digits-font-size', size + 'px');
+                        }
+                    }
+                }
             }
 
             initProgress() {
@@ -1261,6 +1360,12 @@
                     this.widgetDigitalTime.style.color = timerColor;
                     this.widgetDigitalTime.style.textShadow =
                         `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
+                }
+
+                // Цифры — у часов нет полос срочности (danger/overtime), красим
+                // безусловно, без гейта по data-status, в отличие от таймера.
+                if (timerColor && this.clockDigitsTime) {
+                    this.clockDigitsTime.style.color = timerColor;
                 }
 
                 // Flip style
@@ -1430,11 +1535,11 @@
                 // Виджет и дисплей кладут литералы в ветках switch и такой
                 // дырки не имеют. Мусор нельзя и запоминать: this.clockStyle
                 // уезжает обратно в localStorage при сохранении настроек.
-                const safeStyle = ['circle', 'digital', 'flip', 'analog'].includes(style) ? style : 'circle';
+                const safeStyle = ['circle', 'digital', 'flip', 'analog', 'digits'].includes(style) ? style : 'circle';
                 this.clockStyle = safeStyle;
 
                 // Применяем класс стиля к body
-                document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
+                document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
                 document.body.classList.add('style-' + safeStyle);
 
                 // Скрываем все стили
@@ -1442,6 +1547,7 @@
                 if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
                 if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
                 if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
+                if (this.clockDigits) {this.clockDigits.classList.remove('active');}
 
                 // Показываем выбранный
                 switch (safeStyle) {
@@ -1456,6 +1562,9 @@
                         break;
                     case 'analog':
                         if (this.widgetAnalog) {this.widgetAnalog.classList.add('active');}
+                        break;
+                    case 'digits':
+                        if (this.clockDigits) {this.clockDigits.classList.add('active');}
                         break;
                 }
                 
@@ -1571,6 +1680,14 @@
                             this.clockAnalogNumbers.classList.toggle('visible', s.showNumbers);
                         }
                     }
+                    // Шрифт стиля «Цифры» — своё имя внутри clockWidgetSettings
+                    // (СОБСТВЕННЫЙ набор часов, в отличие от виджета/дисплея,
+                    // которые читают displayExtSettings). У шрифта нет
+                    // локального источника изменений (только панель).
+                    if (s.clockDigitsFont !== undefined) {
+                        const font = window.DigitsStyle.applyFont(this.clockDigitsTime, s.clockDigitsFont);
+                        this.digitsFont = font.id;
+                    }
                     if (s.clockStyle) {
                         this.clockStyle = s.clockStyle;
                         this.setClockStyle(s.clockStyle);
@@ -1605,7 +1722,8 @@
                     showDate: this.showDate,
                     showTimezone: this.showTimezone,
                     showNumbers: this.showNumbers,
-                    clockStyle: this.clockStyle
+                    clockStyle: this.clockStyle,
+                    clockDigitsFont: this.digitsFont
                 };
                 // СЛИЯНИЕ, а не перезапись — см. тот же комментарий в
                 // electron-control.html:pushClockSettings(). Оба окна пишут этот
@@ -1666,6 +1784,16 @@
                         if (this.showNumbersEl) { this.showNumbersEl.checked = settings.showNumbers; }
                         if (this.clockAnalogNumbers) {
                             this.clockAnalogNumbers.classList.toggle('visible', settings.showNumbers);
+                        }
+                    }
+                    // Шрифт «Цифр» — своё поле в том же пакете, сохраняется в
+                    // СОБСТВЕННОМ наборе часов (clockWidgetSettings), а не в
+                    // displayExtSettings, как у виджета/дисплея.
+                    if (settings.clockDigitsFont !== undefined) {
+                        const font = window.DigitsStyle.applyFont(this.clockDigitsTime, settings.clockDigitsFont);
+                        if (font.id !== this.digitsFont) {
+                            this.digitsFont = font.id;
+                            this.updateScaling();
                         }
                     }
                     this.updateDateTimezoneVisibility();
@@ -1777,6 +1905,13 @@
                 // Обновляем цифровой стиль
                 if (this.widgetDigitalTime) {
                     this.widgetDigitalTime.textContent = timeStr;
+                }
+
+                // Цифры: та же готовая строка (_uses24h() и showSeconds уже
+                // учтены выше) — в отличие от flip, у «Цифр» есть место под
+                // AM/PM, поэтому 24-часовое ограничение сюда не переносится.
+                if (this.clockDigitsValue) {
+                    this.clockDigitsValue.textContent = timeStr;
                 }
 
                 // Обновляем перекидные часы

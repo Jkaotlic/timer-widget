@@ -38,6 +38,10 @@ const PLAN = [
     { id: 'timerStyle', kind: 'segmented', value: 'flip' },
     { id: 'timerScale', kind: 'range', value: '150' },
     { id: 'widgetShowTicks', kind: 'checkbox', value: true },
+    // Список шрифта живёт в displayExtSettings ровно как стиль/масштаб выше —
+    // читается и пишется независимо от того, каким стилем сейчас выставлен
+    // timerStyle в этом же плане (строка «скрыта», но контрол в DOM остаётся).
+    { id: 'widgetDigitsFont', kind: 'fontselect', value: 'bebas' },
 
     // --- вкладка «Часы» ---
     { id: 'clockStyle', kind: 'segmented', value: 'digital' },
@@ -48,10 +52,12 @@ const PLAN = [
     // Цифры циферблата видимы только у аналогового стиля, но пишутся и читаются
     // всегда — скрытая строка не повод не проверять сохранение.
     { id: 'clockShowAnalogNumbers', kind: 'checkbox', value: true },
+    { id: 'clockDigitsFont', kind: 'fontselect', value: 'oswald' },
 
     // --- вкладка «Полноэкранный» ---
     { id: 'displayTimerStyle', kind: 'segmented', value: 'analog' },
     { id: 'displayTimerScale', kind: 'range', value: '180' },
+    { id: 'displayDigitsFont', kind: 'fontselect', value: 'orbitron' },
     { id: 'showCurrentTime', kind: 'checkbox', value: false },
     { id: 'showTimeBlocks', kind: 'checkbox', value: true },
     { id: 'timeLayoutPreset', kind: 'select', value: 'corners' },
@@ -135,6 +141,14 @@ function applyPlan(plan) {
                 applied[item.id] = el.getAttribute('data-value') || el.value;
                 break;
             }
+            case 'fontselect': {
+                // Тот же инвариант, что у 'segmented' выше: .value молчит,
+                // событие шлёт только клик по пункту списка.
+                const opt = el.querySelector(`.font-option[data-val="${item.value}"]`);
+                if (opt) { opt.click(); }
+                applied[item.id] = el.getAttribute('data-value') || el.value;
+                break;
+            }
             default:
                 applied[item.id] = '__НЕИЗВЕСТНЫЙ ВИД__';
         }
@@ -182,8 +196,9 @@ function readPlan(plan) {
         const el = document.getElementById(item.id);
         if (!el) { state[item.id] = '__НЕТ ЭЛЕМЕНТА__'; continue; }
         if (item.kind === 'checkbox') { state[item.id] = el.checked; }
-        else if (item.kind === 'segmented') { state[item.id] = el.getAttribute('data-value') || el.value; }
-        else { state[item.id] = el.value; }
+        else if (item.kind === 'segmented' || item.kind === 'fontselect') {
+            state[item.id] = el.getAttribute('data-value') || el.value;
+        } else { state[item.id] = el.value; }
     }
     return state;
 }

@@ -118,6 +118,42 @@ async function waitForFonts(win, timeoutMs = 5000) {
     } catch { /* окно могло закрыться — снимок всё равно будет сделан */ }
 }
 
+// Ждём, пока тема РЕАЛЬНО применена в окне, а не «столько-то мс после send».
+//
+// `ui-theme-update` — обычное IPC-сообщение: применяет его обработчик в
+// рендерере, и до этого момента окно остаётся в прежней теме. Слепой sleep(500)
+// после рассылки давал плавающий кадр: `light-control.png` расходился с
+// эталоном на 99.72% — то есть был снят целиком в ТЁМНОЙ теме, — причём два
+// прогона подряд перед этим прошли по нулям. Ровно тот же класс гонки, что уже
+// описан выше про шрифты, и лечится так же: условием вместо задержки.
+//
+// Двойной requestAnimationFrame после совпадения атрибута обязателен: снимок
+// берёт КОМПОЗИТОР, а не DOM, и без нового кадра capturePage вернёт прежнюю
+// картинку при уже правильном data-theme.
+async function waitForTheme(win, theme, timeoutMs = 3000) {
+    if (!win || win.isDestroyed()) { return true; }
+    try {
+        return await win.webContents.executeJavaScript(`
+            Promise.race([
+                new Promise((resolve) => {
+                    const want = ${JSON.stringify(theme)};
+                    const check = () => {
+                        if (document.documentElement.getAttribute('data-theme') === want) {
+                            requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+                        } else {
+                            setTimeout(check, 50);
+                        }
+                    };
+                    check();
+                }),
+                new Promise((r) => setTimeout(() => r(false), ${timeoutMs}))
+            ])
+        `, true);
+    } catch {
+        return false; // окно могло закрыться — снимок всё равно будет сделан
+    }
+}
+
 async function capture(win, filePath, log) {
     if (!win || win.isDestroyed()) {
         log.warn(`[screenshot] skip ${path.basename(filePath)} — window missing`);
@@ -341,7 +377,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         // the state loop above exercises, so drive the other three explicitly:
         // poison with overtime, then recover, then look.
         log.info('[screenshot] style sweep (stuck-colour check)');
-        const STYLES = ['circle', 'digital', 'flip', 'analog'];
+        const STYLES = ['circle', 'digital', 'flip', 'analog', 'digits'];
         const poison = { totalSeconds: 300, presetSeconds: 300, remainingSeconds: -47,
             isRunning: true, isPaused: false, finished: false };
         const recover = { totalSeconds: 300, presetSeconds: 300, remainingSeconds: 300,
@@ -520,7 +556,15 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                     log.warn(`[screenshot] тема ${theme} → ${name}: ${e.message}`);
                 }
             }
-            await sleep(500);
+            // Ждём подтверждения от КАЖДОГО окна, а не общей паузы: рассылка
+            // асинхронная, и «в среднем успевает» здесь уже давало кадр в
+            // чужой теме (см. waitForTheme).
+            for (const name of WINDOWS) {
+                const applied = await waitForTheme(w[name], theme);
+                if (!applied) {
+                    log.warn(`[screenshot] тема ${theme} не подтверждена окном ${name} — кадр может быть в чужой теме`);
+                }
+            }
         };
 
         try {

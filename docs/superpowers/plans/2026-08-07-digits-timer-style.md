@@ -31,8 +31,8 @@
 | --- | --- | --- |
 | `digits-style.js` | **создать** — реестр шрифтов, `resolveFont`, `fitScale`, `fitFontSize`, замер эталона с кэшем, `applyFont` | 1 |
 | `tests/digits-style.test.js` | **создать** — белый список, реестр против `fonts/` и `fonts.css`, арифметика | 1 |
-| `fonts/*.woff2` | **добавить 4 файла** | 2 |
-| `fonts.css` | **дополнить** — 4 объявления `@font-face` | 2 |
+| `fonts/*.woff2` | **добавить 4 файла** | 1 |
+| `fonts.css` | **дополнить** — 4 объявления `@font-face` | 1 |
 | `scripts/generate-notice.js` | **дополнить** — секция «Bundled fonts» из реестра | 2 |
 | `tests/release-gates.test.js` | **править** — счётчик объявлений `@font-face` | 2 |
 | `e2e/display-timer-scale.spec.js` | **создать** — характеризация масштаба дисплея | 3 |
@@ -49,10 +49,12 @@
 
 ---
 
-### Task 1: Модуль `digits-style.js`
+### Task 1: Модуль `digits-style.js` и его шрифты
 
 **Files:**
+- Create: `fonts/bebas-neue-latin-400-normal.woff2`, `fonts/oswald-latin-500-normal.woff2`, `fonts/orbitron-latin-700-normal.woff2`, `fonts/playfair-display-latin-600-normal.woff2`
 - Create: `digits-style.js`
+- Modify: `fonts.css`
 - Test: `tests/digits-style.test.js`
 - Modify: `package.json` (`build.files`)
 
@@ -68,7 +70,49 @@
   `clearProbeCache() → void`,
   `applyFont(el, fontId) → font`.
 
-- [ ] **Step 1: Написать падающий тест**
+- [ ] **Step 1: Скачать пакеты во временный каталог**
+
+Скачиваем в scratchpad, а не в `node_modules`: шрифты нужны файлами, зависимостью приложения они не становятся.
+
+```bash
+SCRATCH="$(mktemp -d)"
+cd "$SCRATCH"
+npm pack @fontsource/bebas-neue@5.3.0 @fontsource/oswald@5.3.0 \
+         @fontsource/orbitron@5.3.0 @fontsource/playfair-display@5.3.0
+for f in *.tgz; do tar -xzf "$f"; mv package "${f%.tgz}"; done
+ls */files/*latin-4*.woff2 */files/*latin-5*.woff2 */files/*latin-6*.woff2 */files/*latin-7*.woff2
+echo "$SCRATCH"
+```
+
+- [ ] **Step 2: Проверить, что нужные веса есть, и скопировать**
+
+Если веса из реестра в пакете нет — взять ближайший имеющийся и **поправить `weight` и `files` в `DIGIT_FONTS`**, а не подставлять несуществующий файл.
+
+```bash
+cd /Users/user/timer-widget
+cp "$SCRATCH/fontsource-bebas-neue-5.3.0/files/bebas-neue-latin-400-normal.woff2"            fonts/
+cp "$SCRATCH/fontsource-oswald-5.3.0/files/oswald-latin-500-normal.woff2"                    fonts/
+cp "$SCRATCH/fontsource-orbitron-5.3.0/files/orbitron-latin-700-normal.woff2"                fonts/
+cp "$SCRATCH/fontsource-playfair-display-5.3.0/files/playfair-display-latin-600-normal.woff2" fonts/
+ls -la fonts/ | tail -5
+```
+
+- [ ] **Step 3: Объявить шрифты в `fonts.css`**
+
+Дописать в конец `fonts.css` (кириллических подмножеств нет намеренно — стиль печатает только цифры, `:` и `−`):
+
+```css
+
+/* Шрифты стиля «Цифры». Только latin: стиль печатает цифры, двоеточие и минус.
+   Реестр, который решает, какой файл какому идентификатору принадлежит, лежит
+   в digits-style.js — там же лицензии для NOTICE. */
+@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/bebas-neue-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Oswald'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/oswald-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Orbitron'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/orbitron-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Playfair Display'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/playfair-display-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+```
+
+- [ ] **Step 4: Написать падающий тест**
 
 Создать `tests/digits-style.test.js`:
 
@@ -193,12 +237,12 @@ test('эталонные строки: минуты и часы — самые �
 });
 ```
 
-- [ ] **Step 2: Прогнать тест и убедиться, что он падает**
+- [ ] **Step 5: Прогнать тест и убедиться, что он падает**
 
 Run: `node --test tests/digits-style.test.js`
 Expected: FAIL — `Cannot find module '../digits-style'`
 
-- [ ] **Step 3: Написать модуль**
+- [ ] **Step 6: Написать модуль**
 
 Создать `digits-style.js`:
 
@@ -470,12 +514,12 @@ if (typeof window !== 'undefined') {
 }
 ```
 
-- [ ] **Step 4: Прогнать тест — четыре проверки реестра ещё падают**
+- [ ] **Step 7: Прогнать тест — теперь он обязан пройти ЦЕЛИКОМ**
 
 Run: `node --test tests/digits-style.test.js`
-Expected: PASS для белого списка и арифметики; FAIL для «каждый файл лежит в fonts/» и «каждый файл объявлен в fonts.css» — четырёх woff2 ещё нет. Это ожидаемо, их приносит Task 2.
+Expected: PASS, все проверки. Шрифты уже на диске и объявлены (шаги 1–3), поэтому сверка реестра с `fonts/` и с `fonts.css` проходит здесь же. Красным эта задача не коммитится.
 
-- [ ] **Step 5: Добавить модуль в `build.files`**
+- [ ] **Step 8: Добавить модуль в `build.files`**
 
 В `package.json`, в массив `build.files`, сразу после строки `"window-geometry.js",` добавить:
 
@@ -483,83 +527,34 @@ Expected: PASS для белого списка и арифметики; FAIL д
     "digits-style.js",
 ```
 
-- [ ] **Step 6: Прогнать тест упаковки**
+- [ ] **Step 9: Прогнать тест упаковки**
 
 Run: `node --test tests/packaging.test.js`
 Expected: PASS
 
-- [ ] **Step 7: Линтер**
+- [ ] **Step 10: Линтер**
 
 Run: `npm run lint`
 Expected: PASS
 
-- [ ] **Step 8: Коммит**
+- [ ] **Step 11: Коммит**
 
 ```bash
-git add digits-style.js tests/digits-style.test.js package.json
-git commit -m "feat(digits): модуль стиля «Цифры» — реестр шрифтов, белый список, подгонка размера"
+git add fonts/ fonts.css digits-style.js tests/digits-style.test.js package.json
+git commit -m "feat(digits): модуль стиля «Цифры» и четыре шрифта к нему"
 ```
 
 ---
 
-### Task 2: Четыре шрифта, объявления и атрибуция
+### Task 2: Атрибуция шрифтов и релизные гейты
 
 **Files:**
-- Create: `fonts/bebas-neue-latin-400-normal.woff2`, `fonts/oswald-latin-500-normal.woff2`, `fonts/orbitron-latin-700-normal.woff2`, `fonts/playfair-display-latin-600-normal.woff2`
-- Modify: `fonts.css`, `scripts/generate-notice.js`, `tests/release-gates.test.js`, `NOTICE`
 
 **Interfaces:**
-- Consumes: `DIGIT_FONTS` из Task 1 (поля `files`, `label`, `license`, `copyright`).
-- Produces: файлы шрифтов на диске и объявления `@font-face`, на которые опираются проверки реестра из Task 1.
+- Consumes: `DIGIT_FONTS` из Task 1 (поля `files`, `label`, `license`, `copyright`) и объявления `@font-face`, добавленные там же.
+- Produces: секцию «Bundled fonts» в `NOTICE` и поднятый счётчик объявлений в релизных гейтах.
 
-- [ ] **Step 1: Скачать пакеты во временный каталог**
-
-Скачиваем в scratchpad, а не в `node_modules`: шрифты нужны файлами, зависимостью приложения они не становятся.
-
-```bash
-SCRATCH="$(mktemp -d)"
-cd "$SCRATCH"
-npm pack @fontsource/bebas-neue@5.3.0 @fontsource/oswald@5.3.0 \
-         @fontsource/orbitron@5.3.0 @fontsource/playfair-display@5.3.0
-for f in *.tgz; do tar -xzf "$f"; mv package "${f%.tgz}"; done
-ls */files/*latin-4*.woff2 */files/*latin-5*.woff2 */files/*latin-6*.woff2 */files/*latin-7*.woff2
-echo "$SCRATCH"
-```
-
-- [ ] **Step 2: Проверить, что нужные веса есть, и скопировать**
-
-Если веса из реестра в пакете нет — взять ближайший имеющийся и **поправить `weight` и `files` в `DIGIT_FONTS`**, а не подставлять несуществующий файл.
-
-```bash
-cd /Users/user/timer-widget
-cp "$SCRATCH/fontsource-bebas-neue-5.3.0/files/bebas-neue-latin-400-normal.woff2"            fonts/
-cp "$SCRATCH/fontsource-oswald-5.3.0/files/oswald-latin-500-normal.woff2"                    fonts/
-cp "$SCRATCH/fontsource-orbitron-5.3.0/files/orbitron-latin-700-normal.woff2"                fonts/
-cp "$SCRATCH/fontsource-playfair-display-5.3.0/files/playfair-display-latin-600-normal.woff2" fonts/
-ls -la fonts/ | tail -5
-```
-
-- [ ] **Step 3: Объявить шрифты в `fonts.css`**
-
-Дописать в конец `fonts.css` (кириллических подмножеств нет намеренно — стиль печатает только цифры, `:` и `−`):
-
-```css
-
-/* Шрифты стиля «Цифры». Только latin: стиль печатает цифры, двоеточие и минус.
-   Реестр, который решает, какой файл какому идентификатору принадлежит, лежит
-   в digits-style.js — там же лицензии для NOTICE. */
-@font-face { font-family: 'Bebas Neue'; font-weight: 400; font-style: normal; font-display: swap; src: url('fonts/bebas-neue-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Oswald'; font-weight: 500; font-style: normal; font-display: swap; src: url('fonts/oswald-latin-500-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Orbitron'; font-weight: 700; font-style: normal; font-display: swap; src: url('fonts/orbitron-latin-700-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'Playfair Display'; font-weight: 600; font-style: normal; font-display: swap; src: url('fonts/playfair-display-latin-600-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-```
-
-- [ ] **Step 4: Прогнать тест реестра — теперь он должен пройти целиком**
-
-Run: `node --test tests/digits-style.test.js`
-Expected: PASS, все проверки, включая «каждый файл лежит в fonts/» и «каждый файл объявлен в fonts.css»
-
-- [ ] **Step 5: Поправить счётчик `@font-face` в релизных гейтах**
+- [ ] **Step 1: Поправить счётчик `@font-face` в релизных гейтах**
 
 Найти проверку количества объявлений:
 
@@ -567,12 +562,12 @@ Run: `grep -n "font-face" tests/release-gates.test.js`
 
 Ожидаемое число объявлений было 20, стало 24. Поднять нижнюю границу в проверке до 24 и обновить комментарий рядом, чтобы он объяснял, откуда взялись четыре новых.
 
-- [ ] **Step 6: Прогнать релизные гейты**
+- [ ] **Step 2: Прогнать релизные гейты**
 
 Run: `node --test tests/release-gates.test.js`
 Expected: PASS. Если падает проверка «каждый font src начинается с `fonts/`» — значит в объявлении опечатка в пути, а не проблема теста.
 
-- [ ] **Step 7: Дописать секцию шрифтов в генератор NOTICE**
+- [ ] **Step 3: Дописать секцию шрифтов в генератор NOTICE**
 
 В `scripts/generate-notice.js`, перед записью файла, добавить секцию из реестра — второго списка шрифтов не заводим:
 
@@ -602,7 +597,7 @@ const fontsSection = [
 
 и дописать `fontsSection` в содержимое, которое пишется в `OUT`.
 
-- [ ] **Step 8: Перегенерировать NOTICE и проверить глазами, что секция на месте**
+- [ ] **Step 4: Перегенерировать NOTICE и проверить глазами, что секция на месте**
 
 ```bash
 node scripts/generate-notice.js
@@ -610,16 +605,16 @@ grep -n -A 8 "BUNDLED FONTS" NOTICE
 ```
 Expected: секция с шестью шрифтами, у каждого лицензия, копирайт и файлы
 
-- [ ] **Step 9: Полный прогон**
+- [ ] **Step 5: Полный прогон**
 
 Run: `npm run ci`
 Expected: PASS
 
-- [ ] **Step 10: Коммит**
+- [ ] **Step 6: Коммит**
 
 ```bash
-git add fonts/ fonts.css scripts/generate-notice.js tests/release-gates.test.js NOTICE
-git commit -m "feat(fonts): четыре шрифта для стиля «Цифры» и секция шрифтов в NOTICE"
+git add scripts/generate-notice.js tests/release-gates.test.js NOTICE
+git commit -m "docs(fonts): атрибуция встроенных шрифтов в NOTICE и счётчик в релизных гейтах"
 ```
 
 ---
@@ -675,9 +670,10 @@ async function findDisplay(app) {
 }
 
 test('масштаб дисплея применяется ко всем блокам стилей', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -1103,9 +1099,10 @@ function measureDigits() {
 }
 
 test('стиль «Цифры» доходит до полноэкранного окна кликом', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -1136,9 +1133,10 @@ test('стиль «Цифры» доходит до полноэкранного
 });
 
 test('масштаб дисплея действует и на стиль «Цифры» — ползунком и колесом', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         await control.waitForTimeout(1500);
@@ -1180,9 +1178,10 @@ test('масштаб дисплея действует и на стиль «Ци
 });
 
 test('в перерасходе ЦИФРЫ остаются на оси окна, а надпись — нет', async () => {
-    const app = await launchApp();
+    // launchApp() возвращает { app, control } — так её зовут все живые спеки
+    // в e2e/. Вызов вида `const app = await launchApp()` падает TypeError.
+    const { app, control } = await launchApp();
     try {
-        const control = await app.firstWindow();
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         await control.waitForTimeout(1500);
@@ -1566,7 +1565,7 @@ git commit -m "feat(clock): стиль «Цифры» в виджете часо
 
 **Interfaces:**
 - Consumes: `window.DigitsStyle.DIGIT_FONTS` (Task 1); блоки стилей из Task 4–6.
-- Produces: три контрола `#widgetDigitsFont`, `#clockDigitsFont`, `#displayDigitsFont` (каждый — `div.font-select` с `.value`, ведущий себя как форм-контрол: присваивание МОЛЧАЛИВО, событие `change` шлёт только клик); три строки-обёртки `#widgetDigitsFontRow`, `#clockDigitsFontRow`, `#displayDigitsFontRow`.
+- Produces: три контрола `#widgetDigitsFont`, `#clockDigitsFont`, `#displayDigitsFont` (каждый — `div.font-select` с `.value`, ведущий себя как форм-контрол: присваивание МОЛЧАЛИВО, событие `change` шлёт только клик); три блока-обёртки `#widgetDigitsFontRow`, `#clockDigitsFontRow`, `#displayDigitsFontRow` (класс `.setting-block` — подпись сверху, список во всю ширину под ней, а НЕ `.toggle-row`: шесть строк списка в правой половине flex-строки не помещаются).
 
 - [ ] **Step 1: Написать падающий тест на схемы**
 
@@ -1702,10 +1701,17 @@ Expected: PASS
 ```html
                         <!-- Видна только при стиле «Цифры»: у остальных четырёх
                              стилей начертание — часть самого стиля.
+                             Блок, а не .toggle-row: список постоянно раскрыт
+                             (шесть строк с образцами), и в правую половину
+                             flex-строки он не помещается. Раскрытый список
+                             выбран вместо всплывающего сознательно — Esc в
+                             этом окне уже слоёный (ящик, модалки, глобальный
+                             обработчик), и ещё один слой поверх ящика — это
+                             ещё один способ его сломать.
                              id строки СТОИТ на элементе, который реально
                              оборачивает контрол: та же ошибка с #clockStyleRow
                              в прошлом означала, что скрывать было нечего. -->
-                        <div class="toggle-row" id="widgetDigitsFontRow" style="display: none;">
+                        <div class="setting-block" id="widgetDigitsFontRow" style="display: none;">
                             <span class="toggle-label">Шрифт цифр</span>
                             <div class="font-select" id="widgetDigitsFont" role="listbox"
                                  aria-label="Шрифт цифр виджета" data-value="inter"></div>
@@ -1807,6 +1813,14 @@ Expected: PASS
 ```css
 /* Список выбора шрифта цифр. Пункт слева — название, справа — образец,
    набранный ЭТИМ шрифтом: выбирать по названию вслепую бессмысленно. */
+/* Подпись сверху, список во всю ширину под ней. */
+.setting-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 0;
+}
+
 .font-select {
     display: flex;
     flex-direction: column;

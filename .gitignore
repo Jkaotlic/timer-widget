@@ -1,5 +1,9 @@
 # Node / Electron artifacts
-node_modules/
+# Без завершающего слэша НАМЕРЕННО: `node_modules/` совпадает только с
+# каталогами, а в git-ворктри это обычно симлинк на node_modules основного
+# чекаута (иначе Electron пришлось бы качать заново). Симлинк каталогом не
+# является, повисал как untracked и попадал под `git add -A`.
+node_modules
 dist/
 *.log
 .DS_Store
