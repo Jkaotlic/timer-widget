@@ -16,7 +16,16 @@ test('CONFIG has expected core keys', () => {
 });
 
 test('CONFIG.WARNING_THRESHOLD aligns with getTimerStatus', () => {
-    assert.equal(CONFIG.WARNING_THRESHOLD, 60);
+    // Раньше здесь стояло `assert.equal(CONFIG.WARNING_THRESHOLD, 60)` — реестр
+    // сравнивался сам с собой, потому что getTimerStatus держал СВОЙ литерал 60
+    // и константу не читал. Такой тест не мог поймать расхождение ни в одну
+    // сторону. Теперь проверяется граница ПОВЕДЕНИЯ: она обязана двигаться
+    // вместе с константой.
+    const { getTimerStatus } = require('../utils');
+    assert.equal(getTimerStatus(CONFIG.WARNING_THRESHOLD, 600), 'warning',
+        'на самом пороге статус жёлтый');
+    assert.equal(getTimerStatus(CONFIG.WARNING_THRESHOLD + 1, 600), 'normal',
+        'на секунду выше порога — уже обычный');
 });
 
 test('CONFIG.MAX_FLASH_COUNT is 6', () => {
@@ -72,4 +81,45 @@ test('размеры виджета по умолчанию имеют ЧИТА�
         'конструктор окна виджета обязан читать CONFIG.WIDGET_DEFAULT_HEIGHT');
     assert.equal(CONFIG.WIDGET_DEFAULT_HEIGHT, CONFIG.WIDGET_DEFAULT_WIDTH,
         'окно виджета квадратное при любом масштабе — стартовый размер обязан быть таким же');
+});
+
+test('в CONFIG нет ключей, которых не читает НИКТО', () => {
+    // Та же болезнь, что уже лечили у CONFIG.STORAGE_KEYS: рендереры обращаются
+    // к настройкам литералами (сборщика нет, обёрток нет), поэтому реестр не
+    // ломается при расхождении — он тихо гниёт. Замер 10.08.2026: 32 ключа из 53
+    // не читал никто, и у пяти из них литерал-двойник в коде УЖЕ разошёлся с
+    // объявленным значением (CONTROL_WINDOW_MIN_HEIGHT 300 против настоящих 660,
+    // MIN/MAX_TIMER_SCALE 50/200 против 30/300, SCALE_STEP 20 против 10,
+    // CLOCK_WIDGET_MIN_SIZE 100 против 120). Пока у значения нет единственного
+    // владельца, разойтись — вопрос времени.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const root = path.join(__dirname, '..');
+
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'screenshots', 'dist', 'coverage', 'test-results']);
+    const files = [];
+    (function walk(dir) {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) {
+                if (!SKIP_DIRS.has(entry.name)) { walk(path.join(dir, entry.name)); }
+            } else if (/\.(js|html)$/.test(entry.name)) {
+                const full = path.join(dir, entry.name);
+                // Сам реестр и сам этот тест не считаются читателями.
+                if (full !== path.join(root, 'constants.js') && full !== __filename) { files.push(full); }
+            }
+        }
+    })(root);
+
+    const haystack = files.map(f => fs.readFileSync(f, 'utf8')).join('\n');
+    const keys = fs.readFileSync(path.join(root, 'constants.js'), 'utf8')
+        .split('\n')
+        .map(line => line.match(/^ {4}([A-Z_]+):/))
+        .filter(Boolean)
+        .map(m => m[1]);
+
+    assert.ok(keys.length > 10, `ключей найдено ${keys.length} — разбор constants.js сломался`);
+
+    const orphans = keys.filter(k => !haystack.includes(k));
+    assert.deepEqual(orphans, [],
+        `эти ключи объявлены, но их никто не читает — либо дать им владельца, либо удалить:\n  ${orphans.join('\n  ')}`);
 });

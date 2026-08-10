@@ -372,13 +372,13 @@ function createControlWindow() {
     // Default size of the control panel WITHOUT drawer (drawer adds ~320px when opened).
     // Settings live in the drawer, so the panel itself can be narrow and short.
     const windowWidth = Math.min(CONFIG.CONTROL_WINDOW_WIDTH, Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, screenWidth - 100));
-    const windowHeight = Math.min(740, Math.max(660, screenHeight - 100));
+    const windowHeight = Math.min(CONFIG.CONTROL_WINDOW_HEIGHT, Math.max(CONFIG.CONTROL_WINDOW_MIN_HEIGHT, screenHeight - 100));
 
     controlWindow = new BrowserWindow({
         width: windowWidth,
         height: windowHeight,
         minWidth: CONFIG.CONTROL_WINDOW_MIN_WIDTH,
-        minHeight: 660,
+        minHeight: CONFIG.CONTROL_WINDOW_MIN_HEIGHT,
         // Потолок один и тот же для главного процесса и для панели: панель
         // вычитает из него ширину ящика, когда считает свою колонку.
         maxWidth: CONFIG.CONTROL_WINDOW_MAX_WIDTH,
@@ -440,8 +440,8 @@ function createWidgetWindow() {
         width: CONFIG.WIDGET_DEFAULT_WIDTH,
         height: CONFIG.WIDGET_DEFAULT_HEIGHT,
         // Allow smaller and larger dynamic scaling; we will resize via IPC rather than CSS transforms
-        minWidth: 120,
-        minHeight: 140,
+        minWidth: CONFIG.WIDGET_MIN_WIDTH,
+        minHeight: CONFIG.WIDGET_MIN_HEIGHT,
         // Remove explicit max constraints so user scaling isn't capped artificially
         x: __screenshotMode ? -2500 : width - 270,
         y: __screenshotMode ? -2500 : 20,
@@ -500,10 +500,10 @@ function createClockWidgetWindow() {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
     clockWidgetWindow = new BrowserWindow({
-        width: 220,
-        height: 220,
-        minWidth: 120,
-        minHeight: 120,
+        width: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE,
+        height: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE,
+        minWidth: CONFIG.CLOCK_WIDGET_MIN_SIZE,
+        minHeight: CONFIG.CLOCK_WIDGET_MIN_SIZE,
         x: __screenshotMode ? -2800 : width - 240,
         y: __screenshotMode ? -2500 : height - 260,
         frame: false,
@@ -1001,7 +1001,7 @@ ipcMain.on('resize-control-window', (event, size) => {
     const h = Number.isFinite(size.height) ? size.height : curH;
     // Нижний clamp = BrowserWindow min (см. createControlWindow).
     const targetWidth = Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, Math.min(w, screenWidth - 50));
-    const targetHeight = Math.max(660, Math.min(h, screenHeight - 50));
+    const targetHeight = Math.max(CONFIG.CONTROL_WINDOW_MIN_HEIGHT, Math.min(h, screenHeight - 50));
 
     // No-op если ничего не меняется — избегаем лишнего setSize (WM на Windows
     // иногда округляет outer на 1px при каждом вызове, что даёт дрейф).
