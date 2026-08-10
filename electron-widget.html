@@ -1436,7 +1436,7 @@
                 this._handlers.onWheel = (e) => {
                     if (!e.ctrlKey) { return; }
                     e.preventDefault();
-                    const step = 10;
+                    const step = window.CONFIG.SCALE_STEP;
                     const delta = e.deltaY < 0 ? step : -step;
                     const newPct = window.RendererShared.clampScale(widgetScalePct + delta, WIDGET_MIN_SCALE, WIDGET_MAX_SCALE);
                     if (newPct === widgetScalePct) { return; }
