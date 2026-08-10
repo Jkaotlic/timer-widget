@@ -21,6 +21,7 @@ const WINDOWS = [
         close: 'close-widget',
         url: 'electron-widget.html',
         resize: 'widget-resize',
+        storageKey: 'widgetGeometry',
         base: 250
     },
     {
@@ -29,6 +30,7 @@ const WINDOWS = [
         close: 'close-clock-widget',
         url: 'electron-clock-widget.html',
         resize: 'clock-widget-resize',
+        storageKey: 'clockGeometry',
         base: 220
     }
 ];
@@ -106,6 +108,50 @@ for (const target of WINDOWS) {
             expect(bounds.y + bounds.height, `нижний край ${bounds.y + bounds.height} за пределами ${area.y + area.height}`)
                 .toBeLessThanOrEqual(area.y + area.height);
         } finally {
+            await app.close();
+        }
+    });
+}
+
+for (const target of WINDOWS) {
+    test(`${target.name}: сохранённая точка у края не выносит окно за экран`, async () => {
+        // Восстановление позиции требовало, чтобы на дисплее лежал ЛЕВЫЙ-ВЕРХНИЙ
+        // УГОЛ, а не всё окно. Замерено на виджете: сохранённая точка (3320, 70)
+        // при размере 1000 px давала 880 px за правым краем — на экране
+        // оставалось 12 % окна. Точка попадает в хранилище буквально: именно так
+        // писала геометрию прежняя версия, увеличивая масштаб у края экрана,
+        // поэтому испорченные профили существуют и правка масштабирования их
+        // НЕ лечит — путь восстановления идёт мимо неё.
+        const { app, control } = await launchApp();
+        try {
+            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+            const win = await findWindow(app, target.url);
+            await win.waitForLoadState('domcontentloaded');
+            await win.waitForTimeout(800);
+
+            const area = await workAreaOf(app, target.url);
+            // Точка ВНУТРИ экрана (угол видно), но окну там не поместиться.
+            const poisoned = { scalePct: 400, x: area.x + area.width - 120, y: area.y + 40 };
+            await win.evaluate(({ key, geo }) => {
+                localStorage.setItem(key, JSON.stringify(geo));
+            }, { key: target.storageKey, geo: poisoned });
+
+            await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
+            await control.waitForTimeout(700);
+            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+            const reopened = await findWindow(app, target.url);
+            await reopened.waitForLoadState('domcontentloaded');
+            await reopened.waitForTimeout(1600);
+
+            const b = await boundsOf(app, target.url);
+            expect(b.x, `левый край ${b.x} левее ${area.x}`).toBeGreaterThanOrEqual(area.x);
+            expect(b.y, `верх ${b.y} выше ${area.y}`).toBeGreaterThanOrEqual(area.y);
+            expect(b.x + b.width, `правый край ${b.x + b.width} за пределами ${area.x + area.width}`)
+                .toBeLessThanOrEqual(area.x + area.width);
+            expect(b.y + b.height, `нижний край ${b.y + b.height} за пределами ${area.y + area.height}`)
+                .toBeLessThanOrEqual(area.y + area.height);
+        } finally {
+            await control.evaluate((k) => localStorage.removeItem(k), target.storageKey).catch(() => {});
             await app.close();
         }
     });
