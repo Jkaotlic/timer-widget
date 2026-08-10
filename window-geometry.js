@@ -115,6 +115,60 @@ function isWindowDragTarget(target) {
 }
 
 /**
+ * Границы окна при смене размера: центр сохраняется, прямоугольник целиком
+ * укладывается в рабочую область.
+ *
+ * Зачем: размер менялся через `win.setSize()`, он оставляет неподвижным
+ * ЛЕВЫЙ-ВЕРХНИЙ угол, а позицию после него не правил никто. Содержимое в этих
+ * окнах отцентрировано, поэтому при увеличении циферблат уезжал вниз-вправо
+ * ровно на половину прироста и вылезал за край экрана — замерено: виджет при
+ * 400 % занимал x = 3170…4170 при ширине экрана 3440, часы — y = 1060…1940 при
+ * высоте 1440. Вернуть окно перетаскиванием можно во все стороны, кроме ВВЕРХ:
+ * macOS не пускает окно выше рабочей области НИ ПРИ КАКОМ уровне — замерено на
+ * floating, screen-saver и pop-up-menu, через setPosition и через setBounds,
+ * все дают y рабочей области. Значит чинить надо так, чтобы наверх не
+ * требовалось двигать.
+ *
+ * Функция чистая — на входе только прямоугольники, ни одного обращения к
+ * Electron, — поэтому вся арифметика проверяется в Node без запуска приложения.
+ *
+ * @param {{x:number,y:number,width:number,height:number}} current — текущие границы окна
+ * @param {{width:*,height:*}} requested — запрошенный размер; приходит из IPC, то есть может быть мусором
+ * @param {{x:number,y:number,width:number,height:number}} workArea — рабочая область ЕГО монитора
+ * @param {{width:number,height:number}} min — минимальный размер окна
+ * @returns {{x:number,y:number,width:number,height:number}}
+ */
+function fitScaledBounds(current, requested, workArea, min) {
+    // Размер по одной оси. Мусор ИГНОРИРУЕТСЯ, а не подменяется числом: раньше
+    // здесь стояло `Number(width) || 220`, и нулевая или нечисловая ширина
+    // молча делала окно 220 px независимо от его базового размера.
+    const sideSize = (asked, currentSide, minSide, areaSide) => {
+        const value = Number(asked);
+        const wanted = Number.isFinite(value) && value > 0 ? value : currentSide;
+        // Минимум окна побеждает рабочую область: на мониторе уже минимума окно
+        // всё равно нельзя сделать меньше.
+        return Math.round(Math.max(minSide, Math.min(wanted, Math.max(minSide, areaSide))));
+    };
+
+    // Позиция по одной оси. Нижняя граница побеждает верхнюю: если окно шире
+    // монитора, верхняя оказывается меньше нижней, и окно прижимается к
+    // левому/верхнему краю вместо неопределённого результата.
+    const sidePos = (center, size, areaStart, areaSize) => Math.round(
+        Math.max(areaStart, Math.min(center - size / 2, areaStart + areaSize - size))
+    );
+
+    const width = sideSize(requested.width, current.width, min.width, workArea.width);
+    const height = sideSize(requested.height, current.height, min.height, workArea.height);
+
+    return {
+        x: sidePos(current.x + current.width / 2, width, workArea.x, workArea.width),
+        y: sidePos(current.y + current.height / 2, height, workArea.y, workArea.height),
+        width,
+        height
+    };
+}
+
+/**
  * Вешает перетаскивание окна на контейнер.
  *
  * @param {object} cfg
@@ -178,6 +232,7 @@ const WindowGeometry = {
     createWindowGeometry,
     isWindowDragTarget,
     bindWindowDrag,
+    fitScaledBounds,
     MIN_SCALE_PCT,
     MAX_SCALE_PCT
 };

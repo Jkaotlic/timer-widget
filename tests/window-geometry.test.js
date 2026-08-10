@@ -16,6 +16,7 @@ const {
     createWindowGeometry,
     isWindowDragTarget,
     bindWindowDrag,
+    fitScaledBounds,
     MIN_SCALE_PCT,
     MAX_SCALE_PCT
 } = require('../window-geometry');
@@ -321,4 +322,129 @@ test('начало перетаскивания гасит событие', () =
     const down = mouseEvent();
     container.fire('mousedown', down);
     assert.equal(down.prevented, true);
+});
+
+// --- границы при смене размера ---------------------------------------------
+
+// Рабочая область как на настоящем мониторе, где дефект и замерен:
+// 3440×1440 со строкой меню сверху.
+const WORK_AREA = { x: 0, y: 30, width: 3440, height: 1320 };
+const WIDGET_MIN = { width: 120, height: 140 };
+
+function centerOf(rect) {
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+}
+
+test('увеличение сохраняет центр окна', () => {
+    // Позиция выбрана так, чтобы выросшему окну хватало места со всех сторон:
+    // центр 1000×1000 в этой рабочей области обязан лежать в x 500…2940,
+    // y 530…850. Иначе сработает поджатие, и тест будет проверять уже его.
+    const current = { x: 1000, y: 500, width: 250, height: 250 };
+    const next = fitScaledBounds(current, { width: 1000, height: 1000 }, WORK_AREA, WIDGET_MIN);
+
+    assert.deepEqual(centerOf(next), centerOf(current),
+        'центр обязан остаться на месте: содержимое в окне отцентрировано, ' +
+        'и смещение центра — это и есть уехавший за край циферблат');
+    assert.equal(next.width, 1000);
+    assert.equal(next.height, 1000);
+});
+
+test('поджатие ПОБЕЖДАЕТ сохранение центра, когда они спорят', () => {
+    // Найдено падением предыдущего теста на его первой фикстуре: центр окна
+    // (1000, 400) 250×250 — это y = 525, а выросшему до 1000 px окну нужен
+    // центр не выше 530, иначе верхняя кромка уходит выше рабочей области.
+    // Приоритет тут не вкусовой: выше рабочей области macOS окно всё равно не
+    // пускает (замерено), поэтому сохранённый центр был бы недостижим.
+    const current = { x: 1000, y: 400, width: 250, height: 250 };
+    const next = fitScaledBounds(current, { width: 1000, height: 1000 }, WORK_AREA, WIDGET_MIN);
+
+    assert.equal(next.y, WORK_AREA.y, 'окно прижато к верху рабочей области');
+    assert.equal(centerOf(next).y, 530, 'центр сместился ровно на недостающие 5 px');
+    assert.equal(centerOf(next).x, centerOf(current).x, 'по горизонтали спора нет — центр сохранён');
+});
+
+test('уменьшение тоже сохраняет центр', () => {
+    const current = { x: 1000, y: 400, width: 1000, height: 1000 };
+    const next = fitScaledBounds(current, { width: 250, height: 250 }, WORK_AREA, WIDGET_MIN);
+
+    assert.deepEqual(centerOf(next), centerOf(current));
+    assert.equal(next.width, 250);
+});
+
+test('окно у правого верхнего угла уезжает ВНУТРЬ, а не наружу', () => {
+    // Ровно замеренный дефект: виджет стоит в правом верхнем углу
+    // (3170, 30) 250×280, масштаб 400% давал x = 3170…4170 при экране 3440.
+    const current = { x: 3170, y: 30, width: 250, height: 280 };
+    const next = fitScaledBounds(current, { width: 1000, height: 1000 }, WORK_AREA, WIDGET_MIN);
+
+    assert.deepEqual(next, { x: 2440, y: 30, width: 1000, height: 1000 });
+    assert.ok(next.x + next.width <= WORK_AREA.x + WORK_AREA.width, 'правый край в кадре');
+    assert.ok(next.y >= WORK_AREA.y, 'верх не выше рабочей области');
+});
+
+test('окно у нижнего края уезжает вверх на столько, на сколько нужно', () => {
+    // Часы: (3200, 1060) 220×220, масштаб 400% давал y = 1060…1940 при экране 1440.
+    const current = { x: 3200, y: 1060, width: 220, height: 220 };
+    const next = fitScaledBounds(current, { width: 880, height: 880 }, WORK_AREA, { width: 120, height: 120 });
+
+    assert.deepEqual(next, { x: 2560, y: 470, width: 880, height: 880 });
+    assert.ok(next.y + next.height <= WORK_AREA.y + WORK_AREA.height, 'низ в кадре');
+});
+
+test('монитор с ненулевым началом координат считается по СВОИМ границам', () => {
+    // Второй экран слева от главного: отрицательный x. Раньше поджатие шло по
+    // getPrimaryDisplay(), то есть по чужим размерам.
+    const left = { x: -1920, y: 0, width: 1920, height: 1080 };
+    const current = { x: -300, y: 900, width: 250, height: 250 };
+    const next = fitScaledBounds(current, { width: 900, height: 900 }, left, WIDGET_MIN);
+
+    assert.ok(next.x >= left.x, `x=${next.x} не должен быть левее ${left.x}`);
+    assert.ok(next.x + next.width <= left.x + left.width, 'правый край в пределах своего экрана');
+    assert.ok(next.y + next.height <= left.y + left.height, 'нижний край в пределах своего экрана');
+});
+
+test('запрошенный размер больше рабочей области поджимается до неё', () => {
+    const current = { x: 100, y: 100, width: 250, height: 250 };
+    const next = fitScaledBounds(current, { width: 9000, height: 9000 }, WORK_AREA, WIDGET_MIN);
+
+    assert.equal(next.width, WORK_AREA.width);
+    assert.equal(next.height, WORK_AREA.height);
+    assert.equal(next.x, WORK_AREA.x);
+    assert.equal(next.y, WORK_AREA.y);
+});
+
+test('мусор по одной оси ИГНОРИРУЕТСЯ, вторая ось применяется', () => {
+    // Раньше здесь стояло `Number(width) || 220`: ширина 0/NaN/undefined
+    // превращала окно в 220 px независимо от того, каким оно было. Подогнать
+    // испорченное значение — значит молча показать окно неожиданного размера.
+    const current = { x: 1000, y: 400, width: 250, height: 250 };
+
+    for (const bad of [NaN, Infinity, -Infinity, 0, -5, undefined, null, 'много', {}]) {
+        const next = fitScaledBounds(current, { width: bad, height: 600 }, WORK_AREA, WIDGET_MIN);
+        assert.equal(next.width, 250, `ширина при мусоре ${String(bad)} обязана остаться прежней`);
+        assert.equal(next.height, 600, 'высота при мусоре в ширине обязана примениться');
+    }
+});
+
+test('минимум окна ПОБЕЖДАЕТ рабочую область, границы не инвертируются', () => {
+    // Вырожденный случай: монитор уже минимального размера окна. Верхняя
+    // граница поджатия оказывается меньше нижней — результат обязан быть
+    // определён, а не «как получится».
+    const tiny = { x: 0, y: 0, width: 80, height: 80 };
+    const current = { x: 0, y: 0, width: 250, height: 250 };
+    const next = fitScaledBounds(current, { width: 250, height: 250 }, tiny, WIDGET_MIN);
+
+    assert.equal(next.width, WIDGET_MIN.width);
+    assert.equal(next.height, WIDGET_MIN.height);
+    assert.equal(next.x, tiny.x, 'прижато к левому краю');
+    assert.equal(next.y, tiny.y, 'прижато к верхнему краю');
+});
+
+test('результат — целые числа: setBounds не принимает дроби', () => {
+    const current = { x: 101, y: 201, width: 251, height: 251 };
+    const next = fitScaledBounds(current, { width: 333, height: 333 }, WORK_AREA, WIDGET_MIN);
+
+    for (const [k, v] of Object.entries(next)) {
+        assert.equal(Number.isInteger(v), true, `${k}=${v} обязано быть целым`);
+    }
 });
