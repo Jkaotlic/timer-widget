@@ -1452,14 +1452,17 @@
                 document.addEventListener('wheel', this._handlers.onWheel, { passive: false });
                 this._handlers.onResizeScalePct = () => {
                     widgetScalePct = Math.round(window.outerWidth / WIDGET_BASE_SIZE * 100);
-                    // Тот же случай, что и у часов: размер могли изменить не
-                    // колесом, а потянув за край окна — тогда saveGeometry никто
-                    // не вызывал и размер терялся при переоткрытии. Сравнение с
-                    // текущим масштабом гасит эхо от restoreGeometry() и от
-                    // посылки масштаба панелью (там saveGeometry уже вызвана явно).
-                    if (widgetScalePct !== this._geometry.scalePct) {
-                        this.saveGeometry(widgetScalePct);
-                    }
+                    // Размер могли изменить не колесом, а ползунком «Масштаб» в
+                    // панели или потянув за край окна — тогда saveGeometry никто
+                    // не вызывал и размер терялся при переоткрытии.
+                    //
+                    // Решение «писать или не писать» принимает сам модуль, и
+                    // принимает ПОСЛЕ того, как размер устоялся. Здесь его
+                    // принимать нельзя: в момент события окно ещё прежнего
+                    // размера, и раннее событие затирало восстановленную
+                    // геометрию позицией открытия по умолчанию — замерено,
+                    // см. saveSettled() в window-geometry.js.
+                    this._geometry.saveSettled();
                 };
                 window.addEventListener('resize', this._handlers.onResizeScalePct);
             }
@@ -1800,6 +1803,10 @@
                 if (this.widgetStyleUpdateHandler) {
                     ipcRenderer.removeListener('widget-style-update', this.widgetStyleUpdateHandler);
                 }
+
+                // Отложенная запись геометрии не должна сработать после того,
+                // как окно закрыли: тот же принцип, что у FlipCard.cancelPending().
+                if (this._geometry) { this._geometry.cancelPendingSave(); }
 
                 // Удаляем DOM и IPC handlers из _handlers
                 const h = this._handlers || {};

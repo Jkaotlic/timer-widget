@@ -324,6 +324,100 @@ test('начало перетаскивания гасит событие', () =
     assert.equal(down.prevented, true);
 });
 
+// --- отложенное сохранение после resize ------------------------------------
+
+const RESTORED = JSON.stringify({ scalePct: 400, x: 2440, y: 30 });
+
+test('раннее событие resize НЕ затирает восстановленную геометрию', (t) => {
+    // Замеренный дефект: restore() выставляет scalePct = 400 сразу, а окно ещё
+    // 250 px. Приходящее следом раннее событие resize давало pct = 100, оно не
+    // равно 400 — и защита, написанная чтобы гасить эхо восстановления, вместо
+    // этого РАЗРЕШАЛА запись и стирала восстановленные значения позицией
+    // открытия по умолчанию. Следующее открытие показывало 250 px.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    let outer = 250; // окно ещё не успело измениться
+    const storage = fakeStorage({ widgetGeometry: RESTORED });
+    const { geo } = makeGeometry({
+        storage,
+        getOuterWidth: () => outer,
+        getScreenPosition: () => ({ x: 3170, y: 30 }) // позиция открытия по умолчанию
+    });
+
+    geo.restore();
+    geo.saveSettled(); // раннее событие: размер ещё старый
+
+    outer = 1000; // а теперь размер применился
+    t.mock.timers.tick(1000);
+
+    assert.equal(storage.data.widgetGeometry, RESTORED,
+        'восстановленная геометрия обязана остаться нетронутой');
+});
+
+test('размер читается в момент СРАБАТЫВАНИЯ, а не в момент события', (t) => {
+    // Одного события достаточно: к моменту, когда таймер срабатывает, окно уже
+    // доехало. Именно поэтому решение нельзя принимать в обработчике.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    let outer = 250;
+    const storage = fakeStorage();
+    const { geo } = makeGeometry({ storage, getOuterWidth: () => outer });
+
+    geo.saveSettled();
+    outer = 750;
+    t.mock.timers.tick(1000);
+
+    assert.deepEqual(JSON.parse(storage.data.widgetGeometry).scalePct, 300,
+        'записан размер, который окно имеет ПОСЛЕ того, как устоялось');
+});
+
+test('настоящее изменение размера всё-таки сохраняется', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    const storage = fakeStorage({ widgetGeometry: RESTORED });
+    const { geo } = makeGeometry({
+        storage,
+        getOuterWidth: () => 750,
+        getScreenPosition: () => ({ x: 100, y: 200 })
+    });
+
+    geo.restore();
+    geo.saveSettled();
+    t.mock.timers.tick(1000);
+
+    assert.deepEqual(JSON.parse(storage.data.widgetGeometry), { scalePct: 300, x: 100, y: 200 });
+});
+
+test('серия событий даёт ОДНУ запись, а не по записи на событие', (t) => {
+    // Растягивание за край рамки шлёт resize десятками; писать на каждое —
+    // значит долбить localStorage во время жеста.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    let writes = 0;
+    const storage = fakeStorage();
+    const inner = storage.setItem;
+    storage.setItem = (k, v) => { writes++; inner(k, v); };
+    const { geo } = makeGeometry({ storage, getOuterWidth: () => 500 });
+
+    for (let i = 0; i < 20; i++) { geo.saveSettled(); }
+    t.mock.timers.tick(1000);
+
+    assert.equal(writes, 1, `ожидалась одна запись, случилось ${writes}`);
+});
+
+test('отменённое сохранение не срабатывает после закрытия окна', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    const storage = fakeStorage();
+    const { geo } = makeGeometry({ storage, getOuterWidth: () => 500 });
+
+    geo.saveSettled();
+    geo.cancelPendingSave();
+    t.mock.timers.tick(1000);
+
+    assert.equal(storage.data.widgetGeometry, undefined, 'записи быть не должно');
+});
+
 // --- границы при смене размера ---------------------------------------------
 
 // Рабочая область как на настоящем мониторе, где дефект и замерен:

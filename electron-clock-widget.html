@@ -1503,13 +1503,14 @@
                     // часы при следующем открытии откатывались к прежнему размеру,
                     // а ползунок в панели показывал уже третье значение.
                     //
-                    // Сравнение с текущим масштабом обязательно: restoreGeometry()
-                    // при старте сама вызывает resize, и без проверки saveGeometry
-                    // успела бы записать позицию ДО того, как её применит
-                    // clock-widget-set-position, затерев восстановленную.
-                    if (clockScalePct !== this._geometry.scalePct) {
-                        this.saveGeometry(clockScalePct);
-                    }
+                    // Решение «писать или не писать» принимает сам модуль, и
+                    // принимает ПОСЛЕ того, как размер устоялся. Здесь его
+                    // принимать нельзя: restoreGeometry() при старте сама
+                    // вызывает resize, и в момент события окно ещё прежнего
+                    // размера — раннее событие затирало восстановленную
+                    // геометрию позицией открытия по умолчанию, замерено.
+                    // См. saveSettled() в window-geometry.js.
+                    this._geometry.saveSettled();
                 };
                 window.addEventListener('resize', this._handlers.onResizeScalePct);
             }
@@ -1824,6 +1825,9 @@
                     this._scalingTimer = null;
                 }
                 window.FlipCard.cancelPending();
+                // Отложенная запись геометрии не должна сработать после того,
+                // как окно закрыли — тот же принцип, что строкой выше.
+                if (this._geometry) { this._geometry.cancelPendingSave(); }
                 if (this._onSetClockStyle) {ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);}
                 if (this._onDisplaySettingsUpdate) {ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);}
                 if (this._onClockSettings) {ipcRenderer.removeListener('clock-settings', this._onClockSettings);}
