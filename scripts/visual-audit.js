@@ -6,7 +6,7 @@ const { _electron: electron } = require('playwright');
 
 const repoRoot = path.join(__dirname, '..');
 const outRoot = process.argv[2] || path.join(repoRoot, 'artifacts', 'visual-full-audit', 'latest');
-const styles = ['circle', 'digital', 'flip', 'analog'];
+const styles = ['circle', 'digital', 'flip', 'analog', 'digits'];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -176,9 +176,12 @@ async function setRendererStyle(page, kind, style) {
                 circle: '.circular-widget',
                 digital: '#widgetDigital',
                 flip: '#widgetFlip',
-                analog: '#widgetAnalog'
+                analog: '#widgetAnalog',
+                // У часов блок «Цифры» называется иначе (#clockDigits) — остальные
+                // три стиля они делят с виджетом по идентификаторам, а этот нет.
+                digits: '#widgetDigits'
             };
-            document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
+            document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
             document.body.classList.add(`style-${nextStyle}`);
             Object.values(active).forEach((selector) => document.querySelector(selector)?.classList.remove('active'));
             document.querySelector(active[nextStyle])?.classList.add('active');
@@ -187,9 +190,10 @@ async function setRendererStyle(page, kind, style) {
                 circle: '.circular-widget',
                 digital: '#widgetDigital',
                 flip: '#widgetFlip',
-                analog: '#widgetAnalog'
+                analog: '#widgetAnalog',
+                digits: '#clockDigits'
             };
-            document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
+            document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
             document.body.classList.add(`style-${nextStyle}`);
             Object.values(active).forEach((selector) => document.querySelector(selector)?.classList.remove('active'));
             document.querySelector(active[nextStyle])?.classList.add('active');
@@ -198,9 +202,10 @@ async function setRendererStyle(page, kind, style) {
                 circle: '#timerRing',
                 digital: '#timerDigital',
                 flip: '#timerFlip',
-                analog: '#timerAnalog'
+                analog: '#timerAnalog',
+                digits: '#timerDigits'
             };
-            document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog');
+            document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
             document.body.classList.add(`style-${nextStyle}`);
             Object.values(active).forEach((selector) => document.querySelector(selector)?.classList.remove('active'));
             document.querySelector(active[nextStyle])?.classList.add('active');

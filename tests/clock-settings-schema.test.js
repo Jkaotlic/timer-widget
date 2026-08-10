@@ -15,20 +15,43 @@ const assert = require('node:assert/strict');
 
 const { CLOCK_SETTINGS, collectClockSettings, applyClockSettings } = require('../clock-settings-schema');
 
-/** Подставные чекбоксы — по одному на каждую строку таблицы. */
+/**
+ * Подставные контролы — по одному на каждую строку таблицы. Форма элемента
+ * зависит от `kind`: галочка получает `.checked`, строковая настройка —
+ * `.value`. Оба свойства присутствуют всегда (реальный DOM-элемент тоже не
+ * бывает без обоих), но читает и пишет каждую строку только СВОЁ поле —
+ * ровно то, что проверяет collectClockSettings/applyClockSettings.
+ */
 function fakeControls(initial = {}) {
     const els = {};
     for (const row of CLOCK_SETTINGS) {
-        els[row.el] = { checked: initial[row.key] !== undefined ? initial[row.key] : row.def };
+        const value = initial[row.key] !== undefined ? initial[row.key] : row.def;
+        els[row.el] = row.kind === 'value' ? { value } : { checked: value };
     }
     return els;
 }
 
+// Читает подставной контрол СВОИМ полем — .value для строковой настройки,
+// .checked для галочки. Тот же выбор, что делают collectClockSettings и
+// fakeControls; вынесен отдельно, чтобы тесты ниже не подглядывали в .checked
+// у строковой настройки (там его просто нет).
+function readControl(row, els) {
+    const el = els[row.el];
+    return row.kind === 'value' ? el.value : el.checked;
+}
+
 test('оборот запись → чтение не теряет ни одну настройку', () => {
-    // Главная проверка: гоняем ВСЕ комбинации, а не одну удобную.
+    // Главная проверка: гоняем ВСЕ комбинации, а не одну удобную — включая
+    // строковую настройку (шрифт «Цифры»), а не только галочки.
     const combos = [
-        { showDate: true, showTimezone: true, showSeconds: false, format24h: false, showNumbers: true },
-        { showDate: false, showTimezone: false, showSeconds: true, format24h: true, showNumbers: false }
+        {
+            showDate: true, showTimezone: true, showSeconds: false, format24h: false, showNumbers: true,
+            clockDigitsFont: 'oswald'
+        },
+        {
+            showDate: false, showTimezone: false, showSeconds: true, format24h: true, showNumbers: false,
+            clockDigitsFont: 'playfair'
+        }
     ];
 
     for (const want of combos) {
@@ -42,18 +65,19 @@ test('оборот запись → чтение не теряет ни одну
 });
 
 test('умолчания берутся из таблицы, когда настройку никогда не трогали', () => {
-    const els = fakeControls({ showDate: true, showSeconds: false, format24h: false });
+    const els = fakeControls({ showDate: true, showSeconds: false, format24h: false, clockDigitsFont: 'bebas' });
     applyClockSettings(els, {});
 
     for (const row of CLOCK_SETTINGS) {
-        assert.equal(els[row.el].checked, row.def, `${row.key}: без сохранённого значения нужен дефолт из таблицы`);
+        assert.equal(readControl(row, els), row.def, `${row.key}: без сохранённого значения нужен дефолт из таблицы`);
     }
 
     // Секунды и 24 часа включены по умолчанию — часы без секунд и в 12-часовом
-    // формате на чистом профиле были бы неожиданностью.
+    // формате на чистом профиле были бы неожиданностью. Шрифт по умолчанию — Inter.
     const defaults = Object.fromEntries(CLOCK_SETTINGS.map(r => [r.key, r.def]));
     assert.deepEqual(defaults, {
-        showDate: false, showTimezone: false, showSeconds: true, format24h: true, showNumbers: false
+        showDate: false, showTimezone: false, showSeconds: true, format24h: true, showNumbers: false,
+        clockDigitsFont: 'inter'
     });
 });
 
@@ -80,6 +104,28 @@ test('мусор вместо сохранённых настроек не ро�
         applyClockSettings(els, junk);
         assert.equal(els.clockShowDateEl.checked, false, `${JSON.stringify(junk)}: нужен дефолт`);
     }
+});
+
+test('таблица часов принимает строковое значение, а не только галочки', () => {
+    const row = CLOCK_SETTINGS.find((r) => r.key === 'clockDigitsFont');
+    assert.ok(row, 'строка clockDigitsFont должна быть в таблице');
+    assert.equal(row.kind, 'value');
+    assert.equal(row.def, 'inter');
+});
+
+test('строковая строка таблицы кладётся и читается через .value, а не .checked', () => {
+    const els = { clockDigitsFontEl: { value: 'oswald' } };
+    assert.equal(collectClockSettings(els).clockDigitsFont, 'oswald');
+
+    const target = { clockDigitsFontEl: { value: '' } };
+    applyClockSettings(target, { clockDigitsFont: 'playfair' });
+    assert.equal(target.clockDigitsFontEl.value, 'playfair');
+});
+
+test('строковая строка: сохранённая пустая строка НЕ подменяется умолчанием', () => {
+    const target = { clockDigitsFontEl: { value: 'oswald' } };
+    applyClockSettings(target, { clockDigitsFont: '' });
+    assert.equal(target.clockDigitsFontEl.value, '');
 });
 
 test('пропавший контрол не ломает ни сбор, ни расстановку', () => {

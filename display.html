@@ -134,6 +134,12 @@
                четыре стиля разом. Вместо этого делаем колонку симметричной:
                снизу добавляем ровно ту высоту, которую лейбл занимает сверху. */
             --hero-block: calc(clamp(18px, 2.2vmin, 44px) * 1.2 + clamp(16px, 2.5vh, 48px));
+            /* Рама героя — ОДНА на все стили, объявлена здесь, а не у каждого.
+               Кольцо жило по ней и раньше (`--ring-size` у .timer-ring), стиль
+               «Цифры» берёт её же: раскладка эту высоту заведомо вмещает, и
+               второй копии литерала, которой предстояло бы разъехаться с
+               первой, не появляется. */
+            --timer-box: min(60vw, 55vh, 1600px);
             padding: var(--tw-s-10);
             padding-bottom: calc(var(--tw-s-10) + var(--hero-block));
             margin: 0 auto;
@@ -405,7 +411,7 @@
                55%. Доли вьюпорта НЕ трогаем: на 720p/1080p/1440p вычисленный
                размер остаётся байт в байт прежним — потолок начинает работать
                только выше 2909px, — поэтому эталоны сверки не переписываются. */
-            --ring-size: min(60vw, 55vh, 1600px);
+            --ring-size: var(--timer-box);
             position: relative;
             width: var(--ring-size);
             height: var(--ring-size);
@@ -1150,6 +1156,67 @@
         }
 
         /* ============================================================
+           СТИЛЬ: ЦИФРЫ
+           — только время; ни кольца, ни подложки, ни свечения
+           ============================================================ */
+        .timer-digits {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            /* Высота — ЯВНАЯ рама, и это не косметика. `height: 100%` внутри
+               .display-container (высота auto) разрешается в auto, то есть в
+               высоту содержимого, то есть в высоту самих цифр — а
+               updateDigitsScale() читает getBoundingClientRect() ЭТОГО блока
+               как доступное место. Подгонка подавала собственный выход себе на
+               вход и множила кегль на 0.744 при каждом пересчёте: 89 → 66 → 49
+               → 37 → 27 (замерено). Виджет и часы этим не болели — они берут
+               раму из this.container.offsetWidth/offsetHeight, то есть из окна.
+               Инвариант держит e2e «пересчёт кегля ИДЕМПОТЕНТЕН». */
+            height: var(--timer-box);
+        }
+        .timer-digits.active { display: flex !important; }
+
+        /* ЦИФРЫ по центру окна, знак висит слева и ширины не занимает —
+           тот же механизм, что у .time-text: контейнер сжимается по
+           содержимому и центрируется, поэтому его левый край совпадает с
+           левым краем ЦИФР, а знак позиционируется от него абсолютно.
+           Центрировать надпись целиком нельзя: на дисплее это уводило цифры
+           с оси на 54px (замерено). */
+        .digits-time {
+            position: relative;
+            width: fit-content;
+            margin-inline: auto;
+            font-size: var(--digits-font-size, 120px);
+            line-height: 1;
+            white-space: nowrap;
+            color: var(--tw-fg);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Знак МЕНЬШЕ цифр и по вертикали центрирован ОТНОСИТЕЛЬНО ЦИФР.
+           Полноразмерный минус — отдельная клякса чернил, тянущая композицию
+           влево; знак, привязанный к top: 0, при уменьшенном кегле читается
+           как надстрочный индекс. */
+        .digits-sign {
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.62em;
+            margin-right: 0.1em;
+        }
+
+        .digits-probe {
+            position: absolute;
+            visibility: hidden;
+            white-space: nowrap;
+            pointer-events: none;
+            left: -9999px;
+            top: 0;
+        }
+
+        /* ============================================================
            WINDOW CONTROLS (close / minimize / fullscreen)
            ============================================================ */
         .window-controls {
@@ -1599,6 +1666,15 @@
                 <div class="clock-center"></div>
             </div>
         </div>
+
+        <!-- Стиль: Цифры — только время, без кольца, подложки и свечения -->
+        <div class="timer-digits" id="timerDigits">
+            <div class="digits-time" id="digitsTime"><span class="digits-sign" id="digitsSign"></span><span class="digits-value" id="digitsValue">00:00</span></div>
+            <!-- Эталон замера. Скрыт от глаз и от чтения с экрана, но участвует
+                 в раскладке: visibility:hidden оставляет размеры, display:none
+                 обнулил бы их и замер вернул бы 0. -->
+            <span class="digits-probe" id="digitsProbe" aria-hidden="true"></span>
+        </div>
     </div>
 
     <!-- Статус (фиксированный внизу) — color + glyph per SKILL -->
@@ -1616,6 +1692,7 @@
     <script src="constants.js"></script>
     <script src="renderer-shared.js"></script>
     <script src="flip-card.js"></script>
+    <script src="digits-style.js"></script>
     <script src="display-script.js"></script>
     <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
     <script>window.UITheme.bindThemeSync(window.ipcRenderer);</script>

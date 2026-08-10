@@ -658,15 +658,17 @@
         .circular-widget,
         .widget-digital,
         .widget-flip,
-        .widget-analog {
+        .widget-analog,
+        .widget-digits {
             display: none !important;
         }
-        
+
         /* Показываем только активный */
         .circular-widget.active { display: flex !important; }
         .widget-digital.active { display: flex !important; }
         .widget-flip.active { display: flex !important; }
         .widget-analog.active { display: flex !important; }
+        .widget-digits.active { display: flex !important; }
 
         /* ============================================
            СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
@@ -867,6 +869,49 @@
         @keyframes widget-analog-text-pulse {
             0%, 100% { opacity: 1; }
             50%     { opacity: 0.7; }
+        }
+
+        /* ============================================
+           СТИЛЬ: ЦИФРЫ — только время, окно прозрачное
+           ============================================ */
+        .widget-digits {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        .widget-digits.active { display: flex !important; }
+
+        /* Центрируются ЦИФРЫ, не надпись: см. .digits-time в display.html —
+           там же история двух неудачных итераций. */
+        .widget-digits-time {
+            position: relative;
+            width: fit-content;
+            margin-inline: auto;
+            font-size: var(--digits-font-size, 40px);
+            line-height: 1;
+            white-space: nowrap;
+            color: var(--tw-fg);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .widget-digits-sign {
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.62em;
+            margin-right: 0.1em;
+        }
+
+        .widget-digits-probe {
+            position: absolute;
+            visibility: hidden;
+            white-space: nowrap;
+            pointer-events: none;
+            left: -9999px;
+            top: 0;
         }
 
         /* First-run hint strip — inset shadow only, no outer */
@@ -1102,6 +1147,12 @@
                 </div>
             </div>
         </div>
+
+        <!-- Стиль: Цифры -->
+        <div class="widget-digits" id="widgetDigits">
+            <div class="widget-digits-time" id="widgetDigitsTime"><span class="widget-digits-sign" id="widgetDigitsSign"></span><span class="widget-digits-value" id="widgetDigitsValue">00:00</span></div>
+            <span class="widget-digits-probe" id="widgetDigitsProbe" aria-hidden="true"></span>
+        </div>
     </div>
 
     <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
@@ -1112,6 +1163,7 @@
     <script src="renderer-shared.js"></script>
     <script src="flip-card.js"></script>
     <script src="window-geometry.js"></script>
+    <script src="digits-style.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1215,7 +1267,25 @@
                 this.wFlipMin2 = document.getElementById('wFlipMin2');
                 this.wFlipSec1 = document.getElementById('wFlipSec1');
                 this.wFlipSec2 = document.getElementById('wFlipSec2');
-                
+
+                // Стиль «Цифры»
+                this.widgetDigits = document.getElementById('widgetDigits');
+                this.widgetDigitsTime = document.getElementById('widgetDigitsTime');
+                this.widgetDigitsSign = document.getElementById('widgetDigitsSign');
+                this.widgetDigitsValue = document.getElementById('widgetDigitsValue');
+                this.widgetDigitsProbe = document.getElementById('widgetDigitsProbe');
+                this.digitsFont = window.DigitsStyle.DEFAULT_FONT_ID;
+                this._digitsFontsReady = false;
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => {
+                        this._digitsFontsReady = true;
+                        window.DigitsStyle.clearProbeCache();
+                        this.updateScaling();
+                    });
+                } else {
+                    this._digitsFontsReady = true;
+                }
+
                 // Текущий стиль
                 this.timerStyle = 'circle';
                 
@@ -1259,8 +1329,34 @@
                 const analogScaleX = (containerWidth * 0.85) / baseAnalogSize;
                 const analogScaleY = (containerHeight * 0.85) / baseAnalogSize;
                 const analogScale = Math.min(analogScaleX, analogScaleY);
-                
+
                 this.container.style.setProperty('--analog-scale', analogScale);
+
+                // Цифры: кегль по замеру ЭТАЛОНА. Формула charCount * 0.6 выше
+                // предполагает моноширинный шрифт и на шести шрифтах стиля
+                // «Цифры» врёт от 0.42 до 0.78 em — поэтому здесь меряем.
+                if (this.widgetDigitsTime && this._digitsFontsReady) {
+                    const hasDigitsHours = Math.abs(Math.floor(this.remainingSeconds)) >= 3600;
+                    // measureDigits() принимает ЯВНУЮ эталонную строку, не булев
+                    // hasHours — выбор строки остаётся здесь, у потребителя.
+                    const probeText = hasDigitsHours
+                        ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
+                    const probe = window.DigitsStyle.measureDigits(
+                        this.widgetDigitsProbe, this.digitsFont, probeText
+                    );
+                    if (probe) {
+                        const size = window.DigitsStyle.fitFontSize({
+                            availableWidth: containerWidth * 0.9,
+                            availableHeight: containerHeight * 0.9,
+                            probeWidth: probe.width,
+                            probeHeight: probe.height,
+                            signWidth: probe.signWidth
+                        });
+                        if (size > 0) {
+                            this.widgetDigitsTime.style.setProperty('--digits-font-size', size + 'px');
+                        }
+                    }
+                }
             }
 
             initProgress() {
@@ -1462,6 +1558,13 @@
                     this.widgetDigitalTime.style.textShadow = this._baseDigitalGlow;
                 }
 
+                // Цифры — базовый цвет темы, кроме перерасхода (его держит
+                // ладдер в updateDisplay).
+                if (timerColor && this.widgetDigitsTime
+                    && !this.widgetDigitsTime.dataset.status?.match(/danger|overtime/)) {
+                    this.widgetDigitsTime.style.color = timerColor;
+                }
+
                 // Flip style — save base color, skip if in danger/overtime
                 if (timerColor) {
                     document.querySelectorAll('.widget-flip-digit').forEach(el => {
@@ -1581,6 +1684,18 @@
                         if (ownStyle) {
                             this.setTimerStyle(ownStyle);
                         }
+
+                        // Шрифт стиля «Цифры» — своё имя внутри displayExtSettings,
+                        // тем же путём, каким приходит widgetTimerStyle. У шрифта нет
+                        // локального источника изменений (только панель), поэтому
+                        // отдельного ключа в localStorage у него нет.
+                        if (settings.widgetDigitsFont !== undefined) {
+                            const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.widgetDigitsFont);
+                            if (font.id !== this.digitsFont) {
+                                this.digitsFont = font.id;
+                                this.updateScaling();
+                            }
+                        }
                     }
                 }
             }
@@ -1637,6 +1752,13 @@
                     if (settings.timerStyle) {
                         this._hasWidgetStyle = true;
                         this.setTimerStyle(settings.timerStyle);
+                    }
+                    if (settings.digitsFont !== undefined) {
+                        const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.digitsFont);
+                        if (font.id !== this.digitsFont) {
+                            this.digitsFont = font.id;
+                            this.updateScaling();
+                        }
                     }
                     // Панель управления повторно шлёт timerScale и при смене стиля,
                     // и один раз при своей загрузке. Применяем только реальное
@@ -1724,7 +1846,8 @@
                 if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
                 if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
                 if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
-                
+                if (this.widgetDigits) {this.widgetDigits.classList.remove('active');}
+
                 // Показываем выбранный
                 switch (style) {
                     case 'circle':
@@ -1738,6 +1861,9 @@
                         break;
                     case 'analog':
                         if (this.widgetAnalog) {this.widgetAnalog.classList.add('active');}
+                        break;
+                    case 'digits':
+                        if (this.widgetDigits) {this.widgetDigits.classList.add('active');}
                         break;
                 }
                 
@@ -1767,7 +1893,18 @@
                 if (this.widgetDigitalTime) {
                     this.widgetDigitalTime.textContent = formatted;
                 }
-                
+
+                // Цифры: знак и цифры — РАЗНЫЕ узлы, знак вне потока.
+                if (this.widgetDigitsValue) {
+                    this.widgetDigitsSign.textContent = secs < 0 ? '−' : '';
+                    this.widgetDigitsValue.textContent = this.formatTime(Math.abs(secs));
+                    const nowHours = Math.abs(secs) >= 3600;
+                    if (this._digitsHadHours !== nowHours) {
+                        this._digitsHadHours = nowHours;
+                        this.updateScaling();
+                    }
+                }
+
                 // Обновляем перекидные часы
                 this.updateFlipDisplay(secs);
                 
@@ -1820,6 +1957,20 @@
                     } else {
                         this.widgetDigitalTime.style.color = '';
                         this.widgetDigitalTime.style.textShadow = '';
+                    }
+                }
+
+                if (this.widgetDigitsTime) {
+                    this.widgetDigitsTime.dataset.status = status;
+                    if (status === 'danger' || status === 'overtime') {
+                        this.widgetDigitsTime.style.color = '#ff4444';
+                    } else if (status === 'warning') {
+                        this.widgetDigitsTime.style.color = '#ffc107';
+                    } else {
+                        // `|| ''` — пустая строка снимает инлайн. Ветка
+                        // `else if (this._baseTimerColor)` оставила бы красный
+                        // навсегда на чистом профиле.
+                        this.widgetDigitsTime.style.color = this._baseTimerColor || '';
                     }
                 }
 

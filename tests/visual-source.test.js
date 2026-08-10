@@ -327,7 +327,7 @@ test('стиль часов приводится к белому списку п
     const clockHtml = readCode('electron-clock-widget.html');
     const JS_CODE = clockHtml.replace(/\/\/[^\n]*/g, '');
 
-    assert.match(JS_CODE, /const safeStyle = \['circle', 'digital', 'flip', 'analog'\]\.includes\(style\)/);
+    assert.match(JS_CODE, /const safeStyle = \['circle', 'digital', 'flip', 'analog', 'digits'\]\.includes\(style\)/);
     assert.match(JS_CODE, /classList\.add\('style-' \+ safeStyle\)/);
     // Сырое значение больше не должно доходить ни до класса, ни до поля.
     assert.doesNotMatch(JS_CODE, /classList\.add\('style-' \+ style\)/);

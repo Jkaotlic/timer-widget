@@ -299,6 +299,33 @@ test('панель не сохранила у себя вторую копию �
     assert.match(inline, /ext\.bgMode \|\| 'solid'/);
 });
 
+test('шрифт цифр: три ключа, у каждого свой контрол и умолчание inter', () => {
+    const rows = SETTINGS_DESCRIPTORS.filter((d) => d.key.endsWith('DigitsFont'));
+    assert.deepEqual(
+        rows.map((r) => r.key).sort(),
+        ['clockDigitsFont', 'displayDigitsFont', 'widgetDigitsFont']
+    );
+    for (const row of rows) {
+        assert.equal(row.kind, 'value');
+        assert.equal(row.def, 'inter');
+        assert.equal(row.el, row.key, 'id контрола совпадает с именем ключа');
+        assert.ok(!row.legacy, 'общего устаревшего имени у новых ключей нет');
+    }
+});
+
+test('шрифт цифр: круговой рейс через поддельный документ', () => {
+    const doc = fakeDoc();
+    applyStoredSettings({ widgetDigitsFont: 'bebas', displayDigitsFont: 'orbitron' }, doc);
+    assert.equal(doc._get('widgetDigitsFont').value, 'bebas');
+    assert.equal(doc._get('displayDigitsFont').value, 'orbitron');
+    assert.equal(doc._get('clockDigitsFont').value, 'inter', 'незаданный — умолчание');
+
+    const out = collectSettings(doc);
+    assert.equal(out.widgetDigitsFont, 'bebas');
+    assert.equal(out.displayDigitsFont, 'orbitron');
+    assert.equal(out.clockDigitsFont, 'inter');
+});
+
 test('ключи, оставленные панели, названы явно', () => {
     // Два ключа таблицей не выражаются (свой формат и кнопки вместо поля).
     // Список нужен, чтобы «не описан» нельзя было спутать с «забыт».

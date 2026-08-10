@@ -417,7 +417,7 @@ test('скриншот-прогон проверяет выход из пере�
     // Состояние recovered обязано идти СРАЗУ после overtime — иначе оно не ловит
     // залипшие инлайновые цвета.
     assert.match(runner, /name: 'overtime'[\s\S]{0,600}?name: 'recovered'/);
-    assert.match(runner, /const STYLES = \['circle', 'digital', 'flip', 'analog'\]/);
+    assert.match(runner, /const STYLES = \['circle', 'digital', 'flip', 'analog', 'digits'\]/);
 });
 
 // ---------------------------------------------------------------------------
