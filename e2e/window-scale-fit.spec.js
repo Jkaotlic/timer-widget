@@ -6,9 +6,14 @@ const { launchApp } = require('./launch');
  *
  * Что здесь красное до исправления (замерено зондом на 3440×1440): виджет при
  * 400 % занимал x = 3170…4170, то есть 730 px за правым краем; часы —
- * y = 1060…1940 при высоте экрана 1440. Вернуть окно наверх нельзя: macOS не
- * пускает его выше рабочей области ни при каком уровне окна — проверено на
- * floating, screen-saver и pop-up-menu, через setPosition и через setBounds.
+ * y = 1060…1940 при высоте экрана 1440.
+ *
+ * Областью укладки служат ГРАНИЦЫ экрана, а не рабочая область: виджет и часы
+ * держатся выше полоски меню и вправе занимать её полосу — см.
+ * e2e/window-top-edge.spec.js. Прежняя редакция этого файла утверждала, что
+ * выше рабочей области окно не поднять «ни при каком уровне»; замер был неполон
+ * — поджимал `constrainFrameRect:toScreen:`, отключаемый опцией
+ * `enableLargerThanScreen`.
  *
  * Мерится настоящий BrowserWindow.getBounds(), а не DOM: дефект был именно в
  * геометрии окна, а отрисовка внутри него всё это время была безупречна.
@@ -53,15 +58,15 @@ function boundsOf(app, urlPart) {
     }, urlPart);
 }
 
-function workAreaOf(app, urlPart) {
+function screenBoundsOf(app, urlPart) {
     return app.evaluate(({ BrowserWindow, screen }, part) => {
         const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes(part));
-        return win ? screen.getDisplayMatching(win.getBounds()).workArea : null;
+        return win ? screen.getDisplayMatching(win.getBounds()).bounds : null;
     }, urlPart);
 }
 
 /**
- * Ставит окно в правый верхний угол рабочей области — исходное положение,
+ * Ставит окно в правый верхний угол экрана — исходное положение,
  * в котором дефект и был замерен. Без этого тест зависел бы от того, где
  * окно открылось на конкретной машине, и мог бы вхолостую зеленеть.
  */
@@ -69,15 +74,15 @@ function parkAtTopRight(app, urlPart) {
     return app.evaluate(({ BrowserWindow, screen }, part) => {
         const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes(part));
         if (!win) { return null; }
-        const { workArea } = screen.getDisplayMatching(win.getBounds());
+        const { bounds } = screen.getDisplayMatching(win.getBounds());
         const [w] = win.getSize();
-        win.setPosition(workArea.x + workArea.width - w, workArea.y);
+        win.setPosition(bounds.x + bounds.width - w, bounds.y);
         return win.getBounds();
     }, urlPart);
 }
 
 for (const target of WINDOWS) {
-    test(`${target.name}: после увеличения масштаба окно целиком в рабочей области`, async () => {
+    test(`${target.name}: после увеличения масштаба окно целиком на экране`, async () => {
         const { app, control } = await launchApp();
         try {
             await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
@@ -96,12 +101,12 @@ for (const target of WINDOWS) {
             await win.waitForTimeout(700);
 
             const bounds = await boundsOf(app, target.url);
-            const area = await workAreaOf(app, target.url);
+            const area = await screenBoundsOf(app, target.url);
 
             expect(bounds, 'границы окна должны читаться').toBeTruthy();
-            expect(bounds.x, `левый край ${bounds.x} левее рабочей области ${area.x}`)
+            expect(bounds.x, `левый край ${bounds.x} левее экрана ${area.x}`)
                 .toBeGreaterThanOrEqual(area.x);
-            expect(bounds.y, `верх ${bounds.y} выше рабочей области ${area.y}`)
+            expect(bounds.y, `верх ${bounds.y} выше экрана ${area.y}`)
                 .toBeGreaterThanOrEqual(area.y);
             expect(bounds.x + bounds.width, `правый край ${bounds.x + bounds.width} за пределами ${area.x + area.width}`)
                 .toBeLessThanOrEqual(area.x + area.width);
@@ -129,7 +134,7 @@ for (const target of WINDOWS) {
             await win.waitForLoadState('domcontentloaded');
             await win.waitForTimeout(800);
 
-            const area = await workAreaOf(app, target.url);
+            const area = await screenBoundsOf(app, target.url);
             // Точка ВНУТРИ экрана (угол видно), но окну там не поместиться.
             const poisoned = { scalePct: 400, x: area.x + area.width - 120, y: area.y + 40 };
             await win.evaluate(({ key, geo }) => {
