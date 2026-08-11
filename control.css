@@ -3361,12 +3361,20 @@ select optgroup,
 /* Toast notifications */
 .toast-container {
     position: fixed;
-    top: var(--tw-s-10);
+    /* ВНИЗУ, а не сверху. При `top: 40px` контейнер стоял ровно на цифрах
+       героя: замер в живом окне давал тост 40…98 при цифрах 87…145 —
+       перекрытие 11px. И это не только подсказка первого запуска: тем же
+       путём приходят сообщение о восстановлении после падения и ошибки
+       загрузки звука, то есть сообщение закрывало главное, что есть в окне.
+       Замеряется e2e/toast-placement.spec.js. */
+    bottom: var(--tw-s-10);
     left: 50%;
     transform: translateX(-50%);
     z-index: 10001;
     display: flex;
-    flex-direction: column;
+    /* Новый тост появляется ближе к нижнему краю и отталкивает предыдущие
+       вверх, а не наоборот. */
+    flex-direction: column-reverse;
     align-items: center;
     gap: var(--tw-s-2);
     pointer-events: none;
@@ -3382,7 +3390,8 @@ select optgroup,
     font-size: var(--tw-t-label);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     opacity: 0;
-    transform: translateY(-10px);
+    /* Выезд СНИЗУ вверх — контейнер теперь у нижнего края. */
+    transform: translateY(10px);
     transition: opacity var(--tw-dur-slow) var(--tw-ease),
                 transform var(--tw-dur-slow) var(--tw-ease);
     pointer-events: auto;
