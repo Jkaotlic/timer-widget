@@ -3411,15 +3411,8 @@ select optgroup,
 .toast.warning { background: rgba(255, 159, 10, 0.9); border-color: rgba(255, 159, 10, 0.3); }
 .toast.success { background: rgba(48, 209, 88, 0.9);  border-color: rgba(48, 209, 88, 0.3); }
 
-/* Small-screen adaptations */
-@media (max-height: 600px) {
-    .timer-header { padding: var(--tw-s-3) var(--tw-s-4) var(--tw-s-2); }
-    .timer-display-main { font-size: 40px !important; margin: 2px 0 !important; }
-    .main-controls { padding: 6px; gap: var(--tw-s-2); }
-    .main-btn { width: 44px !important; height: 44px !important; font-size: 1.2em !important; }
-    .main-btn.start { width: 50px !important; height: 50px !important; }
-    .quick-presets { padding: 6px; }
-    .quick-preset { padding: 5px var(--tw-s-2); font-size: var(--tw-t-tiny); }
+    .compact-section .group-title { margin-bottom: 6px; }
+    .main-controls { padding: var(--tw-s-2) var(--tw-s-4) var(--tw-s-3); }
 }
 
 @media (max-width: 380px) {
@@ -3539,3 +3532,44 @@ textarea:focus-visible,
 
 .footer-hints { padding: 6px var(--panel-inset) 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
 
+/* ============ Низкое окно ============
+   Блок стоит В КОНЦЕ файла осознанно. Первая версия лежала выше «Compact
+   panel», и она не действовала ВООБЩЕ: медиа-запрос не добавляет
+   специфичности, а `.compact-section { padding: 8px … }` из compact-panel идёт
+   ниже по файлу и побеждает при равной специфичности. Замер это и показал —
+   правило применилось (matchMedia дал true, computed padding сменился), а
+   высоты секций не изменились ни на пиксель.
+
+   Порог 680px, а не 600. Прежний блок был заведён на `max-height: 600px` —
+   НИЖЕ собственного минимума окна управления (CONFIG.CONTROL_WINDOW_MIN_HEIGHT
+   = 660), то есть не срабатывал ни при каком размере, до которого окно можно
+   довести. Роль «ужать панель на низком окне» вместо него исполнял flex, и
+   ужимал он единственный элемент с `flex: 0 1 auto` — секцию настроек.
+
+   Замер на 380×660 (объявленный минимум) ДО правки:
+
+       .content-section секции настроек   70px при содержимом 94px
+       ряд вкладок .tabs-row              низ 626 при низе секции 630
+
+   То есть на минимуме окна 24px секции уже уезжали в прокрутку, а входу во все
+   настройки приложения оставалось 4px запаса. Ещё ниже — и от кнопок видно две
+   трети: именно это попало на кадр control-minsize.png, который стенд снимал
+   при 360×640, ниже разрешённого минимума.
+
+   Ужимаются ОТСТУПЫ, а не кегли: панель остаётся похожей на себя. Прежний
+   вариант блока трогал кегль героя (40px !important) и размер кнопок — при
+   660…680 это выглядело бы поломкой, а не адаптацией.
+
+   Порог 680 выбран так, чтобы блок не срабатывал на каноническом размере
+   съёмки (400×700) и на размере по умолчанию (400×740): иначе он менял бы все
+   эталонные кадры, а не один минимальный.
+
+   Замеряется e2e/min-size-layout.spec.js, порог проверяется
+   tests/visual-source.test.js. */
+@media (max-height: 680px) {
+    .compact-section { padding-top: 4px; padding-bottom: 4px; }
+    .compact-section + .compact-section { padding-top: 4px; }
+    .group-title { margin: 2px 0 4px; }
+    .main-controls { padding: 4px var(--panel-inset) 6px; }
+    .footer-hints { padding: 4px var(--panel-inset) 6px; }
+}
