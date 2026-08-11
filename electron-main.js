@@ -17,7 +17,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell } = require('electron');
 const path = require('path');
 const log = require('electron-log/main');
 const { safelySendToWindow, formatTimeShort } = require('./utils');
@@ -1065,6 +1065,23 @@ ipcMain.on('close-widget', () => {
 });
 
 // Управление окном панели управления
+// Страница релизов. Адрес — КОНСТАНТА в main-процессе, и это единственно
+// безопасная форма: shell.openExternal с адресом, пришедшим из рендерера, —
+// это выполнение произвольного URL руками ОС (file://, а на Windows и куда
+// хуже). Поэтому канал не принимает payload вообще: рендерер может лишь
+// сказать «открой», но не «открой ЧТО».
+//
+// Автообновления по-прежнему нет и не будет — релизный гейт это стережёт.
+// Приложение не ходит в сеть само: страница открывается в браузере
+// пользователя и только по явному клику.
+const RELEASES_URL = 'https://github.com/Jkaotlic/timer-widget/releases';
+
+ipcMain.on('open-releases-page', () => {
+    shell.openExternal(RELEASES_URL).catch((err) => {
+        log.warn('не удалось открыть страницу релизов:', err && err.message);
+    });
+});
+
 ipcMain.on('minimize-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) { win.minimize(); }

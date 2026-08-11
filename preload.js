@@ -41,7 +41,8 @@ const ALLOWED_CHANNELS = {
         // Дубль из channel-validator.js — sandbox запрещает здесь require().
         // Оба списка обязаны совпадать, это проверяет channel-validator.test.js.
         'ui-theme-update',
-        'minimize-window',
+        'open-releases-page',
+    'minimize-window',
         'toggle-fullscreen',
         'quit-app',
         'reset-and-relaunch'

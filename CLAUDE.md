@@ -55,6 +55,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `ui-feedback.js` | `Toast` and `LoadingIndicator` |
 | `modal-manager.js` | `openModal`/`closeModal` with focus trap and focus return |
 | `shortcuts-help.js` | The F1 shortcuts overlay |
+| `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown`, ставится ДО показа — иначе перезапуск во время задержки показал бы её второй раз) и кнопка «Проверить обновления». Зависимости внедряются, поэтому модуль проверяется в Node на поддельных `document`/`localStorage`; в панели вызов занимает одну строку, потому что она упирается в потолок размера |
 | `scale-input.js` | Click-to-edit / double-click-to-reset on scale percentages |
 | `font-select.js` | The font list of the «Цифры» style: `div.font-select` impersonates a form control with `.value`. Three independent instances (widget/clock/display) in one document, so an option's `id` carries its container's id. A native `<select>` cannot be used: on macOS the popup is drawn by the system and `font-family` on `<option>` is ignored — the preview, which is the whole point, would not render |
 
@@ -120,6 +121,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `display-settings-update` | Display style, background, clock settings |
 | `get-timer-state` | Request current timer state |
 | `get-displays` | Request list of available displays |
+| `open-releases-page` | Без payload. Просит main открыть страницу релизов в браузере ПОЛЬЗОВАТЕЛЯ через `shell.openExternal`. Адрес — константа в main и в канал не передаётся: `openExternal` с URL из рендерера означал бы выполнение произвольного адреса руками ОС. Приложение по-прежнему не ходит в сеть само |
 | `open-widget` / `close-widget` | Toggle widget window |
 | `open-display` / `close-display` | Toggle display window |
 | `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
@@ -221,6 +223,7 @@ Two flavours of test live here:
 | `color-validation-single-owner.test.js` | One colour validator (`SecurityUtils.isSafeColor`); the weaker copies stay gone |
 | `release-gates.test.js` | Release gates: DevTools guarded on EVERY window, isolation on every window, no external URLs in shipped files, local fonts, no auto-update, CSP per window, Linux sandbox scoped to AppImage only |
 | `docs-integrity.test.js` | Связность `CLAUDE.md` ↔ `docs/lessons.md`: каждая ссылка ведёт в существующий разбор, каждый разбор либо достижим, либо ЯВНО помечен устаревшим и указывает на замену; плюс потолок размера самого `CLAUDE.md` — он попадает в контекст каждого разговора целиком |
+| `onboarding.test.js` | Подсказка первого запуска на поддельном хранилище: показывается один раз, флаг ставится ДО показа, сломанное хранилище не роняет и не показывает; канал релизов уходит БЕЗ payload |
 | `digits-style.test.js` | The «Цифры» registry checked in THREE directions — every registry font has files on disk, every file is declared in `fonts.css`, and no `fonts/` file is orphaned — plus the `resolveFont` whitelist and the fit arithmetic (garbage in gives 0, never NaN/Infinity: either one collapses the digits to nothing) |
 
 e2e specs (`npx playwright test`, `workers: 1`):
@@ -245,6 +248,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `digits-style.spec.js` | The «Цифры» style reaches all three windows BY CLICK; the size is really fitted (not the CSS fallback); the font choice lands in its OWN window and touches neither of the other two; the font row shows only for this style; the `.value` setter is silent while a click fires `change`; and the fit is **idempotent** — three recalculations in a row must return one size |
 | `window-scale-fit.spec.js` | After scaling, the widget's and clock's window rect lies ENTIRELY inside the work area of its own display (measured on the real `BrowserWindow`, parked at the top-right corner first so the check cannot pass by accident on a roomier screen); a poisoned stored point near the screen edge no longer restores the window off-frame (it used to leave 12% of it visible); and the scale plus position survive a close/reopen — that last scenario is what caught the geometry-clobbering bug |
 | `color-ownership.spec.js` | Характеризация окраски: 5 стилей × 4 полосы × 2 окна, сверка ВЫЧИСЛЕННЫХ цвета и тени с эталоном. Написан ДО перевода цвета на каскад и прошёл неизменённым после. Нормализует запись цвета: один и тот же цвет браузер печатает как `rgba(255,204,0,0.4)` из литерала и как `color(srgb 1 0.8 0 / 0.4)` из `color-mix`, и без нормализации корректный рефакторинг выглядел бы регрессией |
+| `onboarding-reachable.spec.js` | Кнопка «Проверить обновления» ВИДИМА и не схлопнута — юнит-тесты знают только про поддельный DOM. Кнопка намеренно не кликается: обработчик открыл бы настоящий браузер на машине с прогоном |
 | `color-band-reset.spec.js` | Выход из полосы снимает ВСЁ, что полоса нарисовала — на чистом профиле (там залипал красный ореол) и с выбранным цветом (там полоса обязана этот цвет перебивать) |
 | `display-timer-scale.spec.js` | Characterization of the display's timer scale across every style block — settings push, Ctrl+wheel, and restore on window load. Written BEFORE folding three copies into `applyTimerScale()` |
 
@@ -344,6 +348,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **A segmented control's `.value` setter must NOT fire `change` (CRITICAL)** — [разбор](docs/lessons.md#a-segmented-controls-value-setter-must-not-fire-change-criti)
 - **`#clockStyleRow` must be on the real row** — [разбор](docs/lessons.md#clockstylerow-must-be-on-the-real-row)
 - **Segmented controls are `role="radiogroup"` + `role="radio"` + `aria-checked`, not tabs** — [разбор](docs/lessons.md#segmented-controls-are-roleradiogroup-roleradio-aria-checked)
+- **`shell.openExternal` получает КОНСТАНТУ из main, а не адрес из рендерера** — канал `open-releases-page` не принимает payload вообще; исключение в релизном гейте адресное и подпёрто встречной проверкой (адрес не должен попасть ни в `loadURL`, ни в `fetch`)
 - **Цвет — это переменная, состояние — это класс; инлайн НЕ используется (CRITICAL)** — [разбор](docs/lessons.md#color-belongs-to-the-cascade)
 - **Overtime on the display is painted by `.danger`, never by `.overtime`** — [разбор](docs/lessons.md#overtime-on-the-display-is-painted-by-danger-never-by-overti)
 - **`styles.css` and `components.css` are gone, and the reason is not tidiness** — [разбор](docs/lessons.md#stylescss-and-componentscss-are-gone-and-the-reason-is-not-t)
