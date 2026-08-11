@@ -24,6 +24,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { codeOnly } = require('./helpers/source-scan.js');
 
 const TOKENS = fs.readFileSync(path.join(__dirname, '..', 'design-tokens.css'), 'utf8');
 
@@ -591,6 +592,81 @@ test('тема красит ЗНАЧЕНИЕ info-блока, но не подп
         /setProperty\('--info-color-dim'/,
         '--info-color-dim снова красится из темы: подписи уйдут ниже WCAG AA'
     );
+});
+
+/* ============================================================
+   ЦВЕТА, ВПИСАННЫЕ В КОМПОНЕНТНЫЙ ФАЙЛ ЛИТЕРАЛОМ
+
+   До 11.08.2026 этот тест читал ТОЛЬКО design-tokens.css и сверял токены
+   между собой. Цвет, вписанный литералом в control.css, был для него
+   невидим — и ровно так прошли мимо два дефекта светлой темы, найденные
+   осмотром 64 кадров:
+
+     фон пункта списка   #1d1d1f на #1c1c1e  =  1.01:1
+     индикатор окна      #12652f на #0053ae  =  1.03:1
+
+   Первый — литерал в фоне при токене в тексте. Второй — ЧЕСТНЫЙ токен,
+   но упавший на фон из другой роли. Отсюда правило: проверять ПАРУ
+   «цвет × фон, на котором он окажется», а не токен сам по себе.
+   ============================================================ */
+
+test('фон выпадающего списка не задан литералом и читаем в обеих темах', () => {
+    const control = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8'));
+    assert.ok(
+        !/#1c1c1e/i.test(control),
+        'литерал #1c1c1e вернулся в control.css: в светлой теме он даёт 1.01:1 под --tw-fg'
+    );
+
+    // Порог AAA: список читают так же, как подписи, и кегль там тот же 12–13px.
+    const AAA_NORMAL = 7.0;
+    for (const [themeName, token] of [['тёмная', darkToken], ['светлая', hcToken]]) {
+        const bg = parseColor(token('tw-bg-surface-solid')).rgb;
+        const ratio = contrast(composite(token('tw-fg'), bg), bg);
+        assert.ok(
+            ratio >= AAA_NORMAL,
+            `${themeName}: текст пункта списка на --tw-bg-surface-solid даёт `
+            + `${ratio.toFixed(2)}:1, нужно ${AAA_NORMAL}:1`
+        );
+        console.log(`   [option/${themeName}] ${ratio.toFixed(2)}:1`);
+    }
+});
+
+test('индикатор открытого окна виден в обеих темах', () => {
+    // Точка «окно открыто» брала --tw-green и лежала на заливке --tw-blue.
+    // Оба токена в СВЕТЛОЙ теме тёмные — светлые акценты Apple на белом не
+    // читаются, поэтому у светлой темы свои, затемнённые, — и точка на
+    // заливке давала 1.03:1. Индикатора просто не было.
+    // Порог 3:1 — нетекстовая графика по WCAG 1.4.11.
+    const NON_TEXT = 3.0;
+    for (const [themeName, token] of [['тёмная', darkToken], ['светлая', hcToken]]) {
+        // Фон кнопки строится ПОСЛОЙНО, а не берётся из токена ступени
+        // напрямую: в тёмной теме --tw-level-2 это плёнка
+        // rgba(255,255,255,0.075), и сравнение с ней как с непрозрачным
+        // цветом занижает результат втрое (2.02:1 вместо настоящего). В
+        // светлой ступени сплошные, и наложение — пустая операция.
+        const base = parseColor(token('tw-bg-dark')).rgb;
+        const surface = composite(token('tw-bg-surface'), base);
+        const bg = composite(token('tw-level-2'), surface);
+        const ratio = contrast(composite(token('tw-green'), bg), bg);
+        assert.ok(
+            ratio >= NON_TEXT,
+            `${themeName}: точка --tw-green на --tw-level-2 даёт ${ratio.toFixed(2)}:1, нужно ${NON_TEXT}:1`
+        );
+        console.log(`   [индикатор/${themeName}] ${ratio.toFixed(2)}:1`);
+    }
+
+    // Встречная проверка: заливка активной кнопки акцентом не должна
+    // вернуться — именно она делала точку невидимой. Проверяется ОТСУТСТВИЕ
+    // старого поведения, а не только наличие нового: иначе регрессия
+    // проскользнёт молча.
+    const control = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8'));
+    const lightActive = /\[data-theme="light"\]\s*\.quick-window-btn\.active\s*\{[^}]*\}/.exec(control);
+    if (lightActive) {
+        assert.ok(
+            !/background:\s*var\(--tw-blue\)/.test(lightActive[0]),
+            'активная кнопка окна снова заливается --tw-blue: точка --tw-green на ней даёт 1.03:1'
+        );
+    }
 });
 
 test('расчёт контраста сверен с эталонными парами WCAG', () => {

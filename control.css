@@ -622,9 +622,11 @@ body::after {
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
+/* .sound-check отсюда убран вместе с самим классом: подпись ряда звука теперь
+   .sound-name и красится токеном --tw-fg, то есть работает в обеих темах без
+   отдельного переопределения. */
 [data-theme="light"] .drawer-close,
-[data-theme="light"] .drawer-body .toggle-label,
-[data-theme="light"] .sound-check {
+[data-theme="light"] .drawer-body .toggle-label {
     color: var(--tw-fg-secondary);
 }
 
@@ -692,16 +694,11 @@ body::after {
     color: var(--tw-fg);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
-[data-theme="light"] .quick-window-btn.active {
-    background: var(--tw-blue);
-    border-color: transparent;
-    color: var(--tw-on-accent);
-    box-shadow: 0 2px 10px rgba(0, 83, 174, 0.28);
-}
-[data-theme="light"] .quick-window-btn.active .qw-icon {
-    background: rgba(255, 255, 255, 0.22);
-    color: var(--tw-on-accent);
-}
+/* Переопределения активной кнопки окна для светлой темы УДАЛЕНЫ, а не
+   поправлены. Они заливали кнопку синим, из-за чего зелёная точка «окно
+   открыто» ложилась на синее и давала 1.03:1. Общее правило ниже по файлу
+   работает в обеих темах через токены лестницы поверхностей — отдельная
+   светлая версия ему больше не нужна и была бы вторым владельцем состояния. */
 
 [data-theme="light"] .manual-time-input:focus-visible {
     background: #ffffff;
@@ -726,11 +723,10 @@ body::after {
 }
 
 /* --- Мелочи, которые иначе остаются от тёмной темы --- */
-[data-theme="light"] .sound-item .sound-preview {
-    background: var(--tw-blue);
-    color: var(--tw-on-accent);
-    box-shadow: 0 2px 6px rgba(0, 83, 174, 0.25);
-}
+/* Переопределения для .sound-item .sound-preview здесь больше нет: кнопка
+   стала призрачной и описана токенами (--tw-border, --tw-fg-muted,
+   --tw-level-2), которые сами меняются вместе с темой. Заливка акцентом в
+   светлой теме вернула бы ровно то, от чего кнопку и уводили. */
 [data-theme="light"] .drawer-body #tab-sound .add-sound-btn {
     background: rgba(0, 83, 174, 0.05);
     border: 1.5px dashed rgba(0, 83, 174, 0.35);
@@ -1163,6 +1159,14 @@ body::after {
     padding: 10px 0;
 }
 
+/* Внутри блока сегментированный контрол занимает всю ширину, а сегменты
+   делят её поровну. В строке (.toggle-row) им доставалась правая половина, и
+   пять штук жались до касания краёв — «Аналог» и «Цифры» упирались в рамку.
+   Проверяется e2e/segmented-label.spec.js: разброс ширин сегментов не больше
+   пикселя. */
+.setting-block .segmented { width: 100%; }
+.setting-block .segmented button { flex: 1; min-width: 0; }
+
 .font-select {
     display: flex;
     flex-direction: column;
@@ -1308,30 +1312,50 @@ body::after {
     border-radius: 10px;
     min-width: 0;
 }
-.sound-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex: 0 0 96px;
-    min-width: 0;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.88);
-    cursor: pointer;
-    user-select: none;
+/* Ряд звука: переключатель — название — список — «прослушать».
+   Здесь стоял .sound-check с нативным чекбоксом 14×14. Смысл у него ровно тот
+   же, что у общего выключателя звука в шапке группы, а контрол был другой — и
+   вчетверо мельче порога мишени --tw-hit-min (32px).
+
+   Мишень растёт БОКСОМ переключателя, а трек пиннуется полосой внутри него:
+   `height: 32px` без пиннинга растянул бы сам трек, ручка 14px вылезла бы
+   наружу. Тот же приём уже применён к .timer-mode-row, там же разобрано
+   почему. Замеряется e2e/sound-controls.spec.js. */
+.sound-item .sound-toggle {
+    flex: 0 0 auto;
+    width: 34px;
+    height: var(--tw-hit-min);
 }
-.sound-check input[type="checkbox"] {
+.sound-item .sound-toggle .toggle-slider {
+    top: 7px;
+    bottom: 7px;
+    border-radius: 9px;
+}
+.sound-item .sound-toggle .toggle-slider::before {
     width: 14px;
     height: 14px;
-    accent-color: var(--tw-blue);
-    flex-shrink: 0;
-    cursor: pointer;
+    left: 2px;
+    bottom: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
-.sound-check .sound-name {
+.sound-item .sound-toggle input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+}
+.sound-item .sound-name {
+    flex: 0 0 74px;
+    min-width: 0;
+    font-size: 12px;
     font-weight: 500;
     color: var(--tw-fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    user-select: none;
+}
+/* Выключенный ряд гасит и НАЗВАНИЕ: состояние читается по строке целиком, а не
+   по одному контролу слева. */
+.sound-item:has(.sound-toggle input:not(:checked)) .sound-name {
+    color: var(--tw-fg-dim);
 }
 .sound-item .select-wrap { flex: 1 1 auto; min-width: 0; }
 .sound-item .sound-select {
@@ -1361,26 +1385,34 @@ body::after {
     transform: translateY(-70%) rotate(45deg);
     pointer-events: none;
 }
+/* «Прослушать» — призрачная, а не залитая акцентом. Четыре градиента
+   синий→зелёный подряд тянули внимание сильнее, чем настройки, ради которых
+   в этот ящик заходят, и спорили с зелёным переключателем в том же ряду.
+   Заодно мишень доросла с 30 до --tw-hit-min. Заливка осталась у состояния
+   .playing — там она значит «сейчас звучит», а не «здесь кнопка». */
 .sound-item .sound-preview {
-    width: 30px;
-    height: 30px;
+    width: var(--tw-hit-min);
+    height: var(--tw-hit-min);
     font-size: 11px;
     flex: 0 0 auto;
-    border: none;
+    border: 1px solid var(--tw-border);
     border-radius: 9px;
-    background: linear-gradient(135deg, var(--tw-blue), var(--tw-green));
-    color: #fff;
+    background: transparent;
+    color: var(--tw-fg-muted);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
     transition: transform var(--tw-dur-fast) var(--tw-ease),
-                filter var(--tw-dur-base) var(--tw-ease),
+                color var(--tw-dur-base) var(--tw-ease),
                 background var(--tw-dur-base) var(--tw-ease);
-    box-shadow: 0 3px 10px rgba(10, 132, 255, 0.25);
 }
-.sound-item .sound-preview:hover { filter: brightness(1.1); transform: scale(1.06); }
+.sound-item .sound-preview:hover {
+    background: var(--tw-level-2);
+    color: var(--tw-fg);
+    transform: scale(1.06);
+}
 .sound-item .sound-preview:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 .sound-item .sound-preview.playing {
     background: linear-gradient(135deg, #f5576c, var(--tw-red));
@@ -1422,12 +1454,18 @@ body::after {
 .drawer-body #tab-sound .settings-group { padding: 10px 12px 12px; }
 .drawer-body #tab-sound .settings-group-title { margin-bottom: 10px; }
 
-/* Master toggle in "Звуки" header — compact variant */
+/* Master toggle in "Звуки" header — compact variant.
+   Бокс 34×32 при треке 34×18: мишень обязана быть не меньше --tw-hit-min, а
+   выглядеть выключатель должен так же компактно, как раньше. Трек пиннуется
+   полосой внутри бокса — тот же приём, что у рядов звука и .timer-mode-row.
+   Раньше бокс был 32×18, то есть сам контрол и был мишенью. */
 .drawer-body #tab-sound .settings-group-title .toggle-switch {
-    width: 32px;
-    height: 18px;
+    width: 34px;
+    height: var(--tw-hit-min);
 }
 .drawer-body #tab-sound .settings-group-title .toggle-slider {
+    top: 7px;
+    bottom: 7px;
     border-radius: 10px;
 }
 .drawer-body #tab-sound .settings-group-title .toggle-slider::before {
@@ -1865,16 +1903,27 @@ body::after {
     box-shadow: var(--tw-focus-ring);
 }
 
-/* Fix dropdown visibility for all selects */
+/* Фон пункта списка берётся из ТОКЕНА ПОВЕРХНОСТИ, а не литералом.
+   Литерал #1c1c1e работал только в тёмной теме: цвет текста здесь честный
+   токен, и в светлой теме он становится #1d1d1f — почти тем же цветом, что
+   и захардкоженный фон. Замер: 17.01:1 в тёмной, 1.01:1 в светлой, то есть
+   списка всех восьми <select> панели в светлой теме не существовало.
+   На macOS попап рисует система и дефекта не видно; Chromium на Windows и
+   Linux применяет правило буквально — а смотрят на эти две ОС только
+   поведенческие e2e, кадров оттуда никто не снимает.
+   Проверяется tests/contrast.test.js. */
 select option,
 .sound-select option {
-    background: #1c1c1e;
+    background: var(--tw-bg-surface-solid);
     color: var(--tw-fg);
 }
 
+/* Заголовок группы в списке — та же болезнь, что и у пункта выше, и найден
+   он был не глазами, а тестом: --tw-fg-secondary в светлой теме это #313136,
+   на захардкоженном фоне даёт 1.05:1. */
 select optgroup,
 .sound-select optgroup {
-    background: #1c1c1e;
+    background: var(--tw-bg-surface-solid);
     color: var(--tw-fg-secondary);
 }
 
@@ -2828,20 +2877,26 @@ select optgroup,
     transform: scale(1.05);
 }
 
+/* Открытое окно помечается ФОРМОЙ, а не только цветом: засечка слева плюс
+   точка у верхнего края. Раньше состояние несла заливка акцентом, и в
+   светлой теме она была синей (--tw-blue), а точка — зелёной (--tw-green):
+   оба токена в этой теме тёмные, потому что светлые акценты Apple на белом
+   не читаются. Замер точки на заливке: 1.03:1 — индикатора не существовало,
+   а tests/contrast.test.js этого не видел, потому что сверял токены между
+   собой, а не ПАРУ «цвет × фон, на котором он окажется».
+   Заодно с экрана уходит третий акцент: до правки одновременно светились
+   зелёный активный пресет, зелёная галочка подтверждения времени и синяя
+   заливка этих трёх кнопок. */
 .quick-window-btn.active {
-    background: linear-gradient(135deg,
-        rgba(10, 132, 255, 0.28),
-        rgba(48, 209, 88, 0.18));
-    border-color: rgba(10, 132, 255, 0.55);
+    background: var(--tw-level-2);
+    border-color: var(--tw-border-strong);
     color: var(--tw-fg);
-    box-shadow: 0 3px 14px rgba(10, 132, 255, 0.22),
-                inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    box-shadow: inset 2px 0 0 var(--tw-green);
 }
 .quick-window-btn.active .qw-icon {
-    background: rgba(48, 209, 88, 0.28);
+    background: transparent;
     color: var(--tw-green);
 }
-/* Active indicator — small green dot top-right (consistent across buttons) */
 .quick-window-btn { position: relative; }
 .quick-window-btn.active::after {
     content: "";
@@ -2852,13 +2907,10 @@ select optgroup,
     height: 6px;
     border-radius: 50%;
     background: var(--tw-green);
-    box-shadow: 0 0 6px rgba(48, 209, 88, 0.55);
 }
 
 .quick-window-btn.active:hover {
-    background: linear-gradient(135deg,
-        rgba(10, 132, 255, 0.34),
-        rgba(48, 209, 88, 0.22));
+    background: var(--tw-level-3);
 }
 
 .quick-window-btn:focus-visible {
@@ -3352,12 +3404,20 @@ select optgroup,
 /* Toast notifications */
 .toast-container {
     position: fixed;
-    top: var(--tw-s-10);
+    /* ВНИЗУ, а не сверху. При `top: 40px` контейнер стоял ровно на цифрах
+       героя: замер в живом окне давал тост 40…98 при цифрах 87…145 —
+       перекрытие 11px. И это не только подсказка первого запуска: тем же
+       путём приходят сообщение о восстановлении после падения и ошибки
+       загрузки звука, то есть сообщение закрывало главное, что есть в окне.
+       Замеряется e2e/toast-placement.spec.js. */
+    bottom: var(--tw-s-10);
     left: 50%;
     transform: translateX(-50%);
     z-index: 10001;
     display: flex;
-    flex-direction: column;
+    /* Новый тост появляется ближе к нижнему краю и отталкивает предыдущие
+       вверх, а не наоборот. */
+    flex-direction: column-reverse;
     align-items: center;
     gap: var(--tw-s-2);
     pointer-events: none;
@@ -3373,7 +3433,8 @@ select optgroup,
     font-size: var(--tw-t-label);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     opacity: 0;
-    transform: translateY(-10px);
+    /* Выезд СНИЗУ вверх — контейнер теперь у нижнего края. */
+    transform: translateY(10px);
     transition: opacity var(--tw-dur-slow) var(--tw-ease),
                 transform var(--tw-dur-slow) var(--tw-ease);
     pointer-events: auto;
@@ -3385,15 +3446,8 @@ select optgroup,
 .toast.warning { background: rgba(255, 159, 10, 0.9); border-color: rgba(255, 159, 10, 0.3); }
 .toast.success { background: rgba(48, 209, 88, 0.9);  border-color: rgba(48, 209, 88, 0.3); }
 
-/* Small-screen adaptations */
-@media (max-height: 600px) {
-    .timer-header { padding: var(--tw-s-3) var(--tw-s-4) var(--tw-s-2); }
-    .timer-display-main { font-size: 40px !important; margin: 2px 0 !important; }
-    .main-controls { padding: 6px; gap: var(--tw-s-2); }
-    .main-btn { width: 44px !important; height: 44px !important; font-size: 1.2em !important; }
-    .main-btn.start { width: 50px !important; height: 50px !important; }
-    .quick-presets { padding: 6px; }
-    .quick-preset { padding: 5px var(--tw-s-2); font-size: var(--tw-t-tiny); }
+    .compact-section .group-title { margin-bottom: 6px; }
+    .main-controls { padding: var(--tw-s-2) var(--tw-s-4) var(--tw-s-3); }
 }
 
 @media (max-width: 380px) {
@@ -3513,3 +3567,44 @@ textarea:focus-visible,
 
 .footer-hints { padding: 6px var(--panel-inset) 9px; margin-top: 2px; font-size: 10px; line-height: 1.2; flex-shrink: 0; }
 
+/* ============ Низкое окно ============
+   Блок стоит В КОНЦЕ файла осознанно. Первая версия лежала выше «Compact
+   panel», и она не действовала ВООБЩЕ: медиа-запрос не добавляет
+   специфичности, а `.compact-section { padding: 8px … }` из compact-panel идёт
+   ниже по файлу и побеждает при равной специфичности. Замер это и показал —
+   правило применилось (matchMedia дал true, computed padding сменился), а
+   высоты секций не изменились ни на пиксель.
+
+   Порог 680px, а не 600. Прежний блок был заведён на `max-height: 600px` —
+   НИЖЕ собственного минимума окна управления (CONFIG.CONTROL_WINDOW_MIN_HEIGHT
+   = 660), то есть не срабатывал ни при каком размере, до которого окно можно
+   довести. Роль «ужать панель на низком окне» вместо него исполнял flex, и
+   ужимал он единственный элемент с `flex: 0 1 auto` — секцию настроек.
+
+   Замер на 380×660 (объявленный минимум) ДО правки:
+
+       .content-section секции настроек   70px при содержимом 94px
+       ряд вкладок .tabs-row              низ 626 при низе секции 630
+
+   То есть на минимуме окна 24px секции уже уезжали в прокрутку, а входу во все
+   настройки приложения оставалось 4px запаса. Ещё ниже — и от кнопок видно две
+   трети: именно это попало на кадр control-minsize.png, который стенд снимал
+   при 360×640, ниже разрешённого минимума.
+
+   Ужимаются ОТСТУПЫ, а не кегли: панель остаётся похожей на себя. Прежний
+   вариант блока трогал кегль героя (40px !important) и размер кнопок — при
+   660…680 это выглядело бы поломкой, а не адаптацией.
+
+   Порог 680 выбран так, чтобы блок не срабатывал на каноническом размере
+   съёмки (400×700) и на размере по умолчанию (400×740): иначе он менял бы все
+   эталонные кадры, а не один минимальный.
+
+   Замеряется e2e/min-size-layout.spec.js, порог проверяется
+   tests/visual-source.test.js. */
+@media (max-height: 680px) {
+    .compact-section { padding-top: 4px; padding-bottom: 4px; }
+    .compact-section + .compact-section { padding-top: 4px; }
+    .group-title { margin: 2px 0 4px; }
+    .main-controls { padding: 4px var(--panel-inset) 6px; }
+    .footer-hints { padding: 4px var(--panel-inset) 6px; }
+}

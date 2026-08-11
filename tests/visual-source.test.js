@@ -363,3 +363,63 @@ test('release-facing docs do not point back to Electron 41 or production DevTool
     assert.doesNotMatch(performance, /devTools:\s*true/);
     assert.match(performance, /npm run dev/);
 });
+
+test('съёмка минимального размера идёт по объявленному минимуму окна, а не ниже него', () => {
+    // Кадр control-minsize.png снимался при 360×640, хотя окно управления
+    // объявляет минимум 380×660 и главный процесс держит его через minWidth /
+    // minHeight. Стенд сначала ОПУСКАЛ минимум (`setMinimumSize(360, 640)`), а
+    // затем ставил этот размер — то есть документировал состояние, в которое
+    // приложение попасть не может.
+    //
+    // Цена этого расхождения: на 640 секции настроек остаётся 50px при ряде
+    // вкладок в 40px, и ряд вылезает на 16px за нижний край своей секции —
+    // ровно те «две трети кнопок», которые видно на кадре. Дефект искали в
+    // раскладке панели, а его половина жила в стенде.
+    const runner = readCode('scripts/screenshot-runner.js');
+    const CONFIG = require('../constants.js');
+
+    const block = /const MIN_SIZES = \{[\s\S]*?\};/.exec(runner);
+    assert.ok(block, 'блок MIN_SIZES в стенде не найден');
+
+    const control = /control:\s*\{([^}]*)\}/.exec(block[0]);
+    assert.ok(control, 'строка control в MIN_SIZES не найдена');
+
+    // Значения берутся ИЗ реестра, а не переписываются литералом: иначе они
+    // разъедутся ровно так же, как разъехались в прошлый раз.
+    assert.match(
+        control[1],
+        /CONFIG\.CONTROL_WINDOW_MIN_WIDTH/,
+        'ширина минимума в стенде обязана читаться из CONFIG.CONTROL_WINDOW_MIN_WIDTH'
+    );
+    assert.match(
+        control[1],
+        /CONFIG\.CONTROL_WINDOW_MIN_HEIGHT/,
+        'высота минимума в стенде обязана читаться из CONFIG.CONTROL_WINDOW_MIN_HEIGHT'
+    );
+    assert.doesNotMatch(control[1], /\b360\b|\b640\b/, 'литерал 360×640 вернулся: это НИЖЕ минимума окна');
+
+    // И встречная проверка: сам минимум не уехал вниз в реестре.
+    assert.equal(CONFIG.CONTROL_WINDOW_MIN_WIDTH, 380);
+    assert.equal(CONFIG.CONTROL_WINDOW_MIN_HEIGHT, 660);
+});
+
+test('блок отзывчивости панели срабатывает выше минимальной высоты окна', () => {
+    // `@media (max-height: 600px)` был мёртвым кодом: окно управления не
+    // опускается ниже 660, поэтому блок не срабатывал НИКОГДА. Роль «ужать
+    // панель на низком окне» при этом исполнял flex — сжималась секция
+    // настроек, единственная с `flex: 0 1 auto`, и запас у ряда вкладок на
+    // минимуме был 4px. Порог обязан быть выше CONTROL_WINDOW_MIN_HEIGHT.
+    const css = readCode('control.css');
+    const CONFIG = require('../constants.js');
+
+    const thresholds = [...css.matchAll(/@media\s*\(max-height:\s*(\d+)px\)/g)]
+        .map((m) => Number(m[1]));
+    assert.ok(thresholds.length > 0, 'блок @media (max-height: …) в control.css не найден');
+
+    const live = thresholds.filter((t) => t > CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+    assert.ok(
+        live.length > 0,
+        `все пороги ${thresholds.join(', ')} не выше минимума окна ${CONFIG.CONTROL_WINDOW_MIN_HEIGHT}: `
+        + 'блок отзывчивости не срабатывает ни при каком размере окна'
+    );
+});

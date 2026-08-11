@@ -25,8 +25,18 @@ const WINDOWS = ['control', 'widget', 'clock', 'display'];
 
 // Minimum sizes advertised by BrowserWindow options — used to catch layout
 // overflow/clipping when the user resizes to the floor.
+//
+// Окно управления берёт свой минимум ИЗ РЕЕСТРА, а не литералом. Здесь стояло
+// 360×640 — ниже объявленного минимума (380×660), который главный процесс
+// держит через minWidth/minHeight. Стенд перед съёмкой сам опускает минимум
+// (setMinimumSize ниже), поэтому расхождение не падало, а молча снимало
+// состояние, в которое приложение попасть не может: на кадре control-minsize
+// ряд вкладок настроек вылезал на 16px за нижний край своей секции, и дефект
+// искали в раскладке панели. Проверяется tests/visual-source.test.js.
+const CONFIG = require('../constants.js');
+
 const MIN_SIZES = {
-    control: { width: 360, height: 640 },
+    control: { width: CONFIG.CONTROL_WINDOW_MIN_WIDTH, height: CONFIG.CONTROL_WINDOW_MIN_HEIGHT },
     widget:  { width: 120, height: 140 },
     clock:   { width: 120, height: 120 },
     display: { width: 1280, height: 720 } // display doesn't resize, but keep consistent
