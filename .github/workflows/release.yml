@@ -177,11 +177,17 @@ jobs:
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
+          # sbom.json прикладывается К РЕЛИЗУ, а не кладётся внутрь app.asar.
+          # Внутри приложения его не читает никто — это артефакт цепочки
+          # поставки, а не рантайма, и он занимал 812 КБ из 2241 КБ всего кода
+          # приложения (36%). Здесь он остаётся доступен тем, кому нужен:
+          # аудиту, сканерам, корпоративной приёмке.
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.zip
             artifacts/**/*.exe
             artifacts/**/*.deb
             artifacts/**/*.AppImage
+            sbom.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

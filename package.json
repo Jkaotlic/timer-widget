@@ -34,9 +34,9 @@
     "email": "jkaotlic@users.noreply.github.com"
   },
   "license": "MIT",
-  "comment:overrides": "brace-expansion <=5.0.7 has two high-severity ReDoS/OOM advisories (GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg) and every 1.x/2.x/4.x line is affected — 5.0.8 is the only patched release. It reaches us purely through the electron-builder dev toolchain (glob/minimatch/rimraf/asar), never through app runtime code. 5.0.8 ships dual CJS+ESM exports, so the CJS consumers in that tree keep working.",
+  "comment:overrides": "brace-expansion <=5.0.8 has a high-severity DoS advisory (GHSA-rgw5-rvv9-x895) that bypasses the earlier CVE-2026-14257 mitigation; it supersedes the two ReDoS/OOM advisories this override was originally written for (GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg). 5.0.9 is the patched release. The override is still load-bearing and must NOT be dropped as 'probably fixed upstream': the consumers in this tree ask for ^1.1.7 / ^2.0.1 / ^2.0.2 / ^5.0.5 (minimatch under glob, asar, universal, dir-compare, filelist), so without the pin npm resolves vulnerable 1.x and 2.x copies alongside the patched one. It reaches us purely through the electron-builder dev toolchain, never through app runtime code — 'npm audit --omit=dev' is clean either way. 5.0.9 ships dual CJS+ESM exports, so the CJS consumers keep working.",
   "overrides": {
-    "brace-expansion": "^5.0.8"
+    "brace-expansion": "^5.0.9"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -147,8 +147,7 @@
       "display-script.js",
       "sounds/**/*",
       "fonts/**/*",
-      "NOTICE",
-      "sbom.json"
+      "NOTICE"
     ],
     "appImage": {
       "artifactName": "${productName}-${version}-${arch}.${ext}",
