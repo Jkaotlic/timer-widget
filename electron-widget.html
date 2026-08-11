@@ -247,9 +247,17 @@
             letter-spacing: 0.02em;
             font-variant-numeric: tabular-nums;
             line-height: 1;
+            /* Цвет пользователя приходит ПЕРЕМЕННОЙ --timer-glow (её ставит
+               applyColors на documentElement), а не инлайном на этом элементе.
+               Разница не косметическая: инлайн бьёт любое правило, поэтому
+               пока свечение писалось инлайном, правила [data-status] ниже были
+               мертвы, и полосам приходилось писать свой цвет инлайном тоже — а
+               значит и СНИМАТЬ его вручную при возврате в норму. Ветка снятия
+               и оказалась дырявой на свежем профиле. */
+            --glow-color: var(--timer-glow, rgba(10, 132, 255, 0.6));
             text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 20px var(--glow-color, rgba(10, 132, 255, 0.6));
+                0 0 20px var(--glow-color);
             transition: color var(--tw-dur-base) var(--tw-ease),
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
@@ -1547,8 +1555,13 @@
                         if (progressColor) { stops[1].setAttribute('stop-color', progressColor); }
                     }
                 }
-                if (timerColor && this.timeDisplay) {
-                    this.timeDisplay.style.setProperty('--glow-color', `${timerColor}80`);
+                // --timer-glow, а НЕ --glow-color инлайном на .time-display:
+                // инлайновая переменная перебивала правила [data-status] и
+                // делала красное/жёлтое свечение полос недостижимым из CSS.
+                // Теперь это только ЗАПАСНОЕ значение — полоса, когда она есть,
+                // переопределяет --glow-color своим правилом.
+                if (timerColor) {
+                    document.documentElement.style.setProperty('--timer-glow', `${timerColor}80`);
                 }
 
                 // Digital style — save base color, skip if in danger/overtime
@@ -1935,19 +1948,22 @@
                 this.progressBar.dataset.status = status;
                 this.timeDisplay.dataset.status = status;
 
-                // Circle time-display: force inline color for overtime/danger
-                if (status === 'danger' || status === 'overtime') {
-                    this.timeDisplay.style.color = '#ff4444';
-                    this.timeDisplay.style.setProperty('--glow-color', 'rgba(255, 68, 68, 0.8)');
-                } else if (status === 'warning') {
-                    this.timeDisplay.style.color = '#ffc107';
-                    this.timeDisplay.style.setProperty('--glow-color', 'rgba(255, 193, 7, 0.6)');
-                } else {
-                    this.timeDisplay.style.color = '';
-                    if (this._baseTimerColor) {
-                        this.timeDisplay.style.setProperty('--glow-color', `${this._baseTimerColor}80`);
-                    }
-                }
+                // Круг цвет и свечение полосы НЕ пишет: и то и другое уже
+                // задают правила `.time-display[data-status="…"]` выше по файлу
+                // (color: #ff4444 / var(--tw-yellow), --glow-color красный /
+                // жёлтый — значения сверены, они те же самые). Достаточно
+                // выставленного строкой выше data-status.
+                //
+                // Здесь стоял инлайновый ладдер, и он был не просто лишним —
+                // он был источником бага. Ветка возврата в норму снимала цвет
+                // (`style.color = ''`), но свечение возвращала только под
+                // условием `if (this._baseTimerColor)`, БЕЗ завершающего else.
+                // А _baseTimerColor заполняется исключительно в applyColors(),
+                // которая выходит раньше, когда в localStorage нет `timerColors`
+                // — то есть на свежей установке ветки сброса не существовало.
+                // Замерено: после выхода из danger отрисовывалось
+                // `rgba(255,68,68,0.8) 0 0 20px` на цифрах нормального цвета,
+                // и держалось до перезапуска. e2e/color-band-reset.spec.js.
 
                 // Digital time: force inline color
                 if (this.widgetDigitalTime) {
