@@ -692,16 +692,11 @@ body::after {
     color: var(--tw-fg);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
-[data-theme="light"] .quick-window-btn.active {
-    background: var(--tw-blue);
-    border-color: transparent;
-    color: var(--tw-on-accent);
-    box-shadow: 0 2px 10px rgba(0, 83, 174, 0.28);
-}
-[data-theme="light"] .quick-window-btn.active .qw-icon {
-    background: rgba(255, 255, 255, 0.22);
-    color: var(--tw-on-accent);
-}
+/* Переопределения активной кнопки окна для светлой темы УДАЛЕНЫ, а не
+   поправлены. Они заливали кнопку синим, из-за чего зелёная точка «окно
+   открыто» ложилась на синее и давала 1.03:1. Общее правило ниже по файлу
+   работает в обеих темах через токены лестницы поверхностей — отдельная
+   светлая версия ему больше не нужна и была бы вторым владельцем состояния. */
 
 [data-theme="light"] .manual-time-input:focus-visible {
     background: #ffffff;
@@ -2839,20 +2834,26 @@ select optgroup,
     transform: scale(1.05);
 }
 
+/* Открытое окно помечается ФОРМОЙ, а не только цветом: засечка слева плюс
+   точка у верхнего края. Раньше состояние несла заливка акцентом, и в
+   светлой теме она была синей (--tw-blue), а точка — зелёной (--tw-green):
+   оба токена в этой теме тёмные, потому что светлые акценты Apple на белом
+   не читаются. Замер точки на заливке: 1.03:1 — индикатора не существовало,
+   а tests/contrast.test.js этого не видел, потому что сверял токены между
+   собой, а не ПАРУ «цвет × фон, на котором он окажется».
+   Заодно с экрана уходит третий акцент: до правки одновременно светились
+   зелёный активный пресет, зелёная галочка подтверждения времени и синяя
+   заливка этих трёх кнопок. */
 .quick-window-btn.active {
-    background: linear-gradient(135deg,
-        rgba(10, 132, 255, 0.28),
-        rgba(48, 209, 88, 0.18));
-    border-color: rgba(10, 132, 255, 0.55);
+    background: var(--tw-level-2);
+    border-color: var(--tw-border-strong);
     color: var(--tw-fg);
-    box-shadow: 0 3px 14px rgba(10, 132, 255, 0.22),
-                inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    box-shadow: inset 2px 0 0 var(--tw-green);
 }
 .quick-window-btn.active .qw-icon {
-    background: rgba(48, 209, 88, 0.28);
+    background: transparent;
     color: var(--tw-green);
 }
-/* Active indicator — small green dot top-right (consistent across buttons) */
 .quick-window-btn { position: relative; }
 .quick-window-btn.active::after {
     content: "";
@@ -2863,13 +2864,10 @@ select optgroup,
     height: 6px;
     border-radius: 50%;
     background: var(--tw-green);
-    box-shadow: 0 0 6px rgba(48, 209, 88, 0.55);
 }
 
 .quick-window-btn.active:hover {
-    background: linear-gradient(135deg,
-        rgba(10, 132, 255, 0.34),
-        rgba(48, 209, 88, 0.22));
+    background: var(--tw-level-3);
 }
 
 .quick-window-btn:focus-visible {
