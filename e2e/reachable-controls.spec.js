@@ -222,3 +222,43 @@ test('«Как у виджета» скрывает выбор стиля час
 
     await app.close();
 });
+
+/**
+ * Состояние «окно открыто» читается формой, а не только цветом.
+ *
+ * Раньше открытое окно помечалось заливкой кнопки акцентом плюс зелёной
+ * точкой. В светлой теме заливка была синей, а точка зелёной — и оба токена в
+ * этой теме тёмные: 1.03:1, индикатора не существовало. Замер живёт в
+ * tests/contrast.test.js; здесь проверяется, что признак состояния вообще
+ * доезжает до кнопки при настоящем клике.
+ */
+test('открытое окно помечено формой, а не только цветом', async () => {
+    const { app, control } = await launchApp();
+    try {
+        const probe = () => {
+            const btn = document.getElementById('openWidgetBtn');
+            const cs = getComputedStyle(btn);
+            return { active: btn.classList.contains('active'), shadow: cs.boxShadow };
+        };
+
+        const before = await control.evaluate(probe);
+        expect(before.active, 'виджет уже открыт — профиль не вернули в исходное').toBe(false);
+
+        await control.click('#openWidgetBtn');
+        await control.waitForTimeout(800);
+
+        const after = await control.evaluate(probe);
+        expect(after.active).toBe(true);
+        // Засечка — inset-тень. Признак, который переживает смену темы: он
+        // описан токеном, а не литералом одной из тем.
+        expect(after.shadow, `тень активной кнопки: ${after.shadow}`).toContain('inset');
+        expect(after.shadow).not.toBe(before.shadow);
+
+        // Профиль e2e общий: тест, меняющий глобальное состояние, обязан его
+        // вернуть, иначе следующий спек стартует с открытым виджетом.
+        await control.click('#openWidgetBtn');
+        await control.waitForTimeout(500);
+    } finally {
+        await app.close();
+    }
+});
