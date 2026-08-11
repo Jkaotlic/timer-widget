@@ -62,6 +62,18 @@ const __inTestMode = process.env.NODE_TEST_CONTEXT !== undefined;
 // When active, all windows boot hidden/offscreen so the desktop isn't disturbed.
 const __screenshotMode = process.argv.includes('--screenshot');
 
+// Уровень окна для виджета и часов — ВЫШЕ полоски меню macOS.
+//
+// Обычный alwaysOnTop даёт `floating` (уровень 3), полоска меню — 24, поэтому
+// окно, поставленное к верхнему краю экрана, уходило ПОД неё: замерено съёмкой
+// экрана — на `floating` верхние 30 px окна закрыты меню, на `status` (25) окно
+// видно целиком. Выше не берём намеренно: `pop-up-menu` (101) перекрыл бы
+// раскрытые меню и системные подсказки.
+//
+// На Windows и Linux значение игнорируется — там окно и так не поджимается к
+// рабочей области.
+const WINDOW_LEVEL_ABOVE_MENU_BAR = 'status';
+
 // Runtime memory monitor (dev only, not in tests)
 if (process.argv.includes('--dev') && !__inTestMode) {
     setInterval(() => {
@@ -193,9 +205,13 @@ function resizeWindowClamped(win, payload) {
     // Минимум берётся у самого окна, а не из литерала: у виджета minHeight 140,
     // и посчитанный по литералу центр промахнулся бы мимо настоящего.
     const [minWidth, minHeight] = win.getMinimumSize();
-    const { workArea } = screen.getDisplayMatching(current);
+    // Область укладки — ГРАНИЦЫ экрана, а не рабочая область: виджет и часы
+    // держатся выше полоски меню (WINDOW_LEVEL_ABOVE_MENU_BAR) и вправе занимать
+    // её полосу. По рабочей области увеличенное окно отжималось вниз, и вернуть
+    // его к краю было нечем.
+    const { bounds: screenBounds } = screen.getDisplayMatching(current);
 
-    win.setBounds(fitScaledBounds(current, payload, workArea, { width: minWidth, height: minHeight }));
+    win.setBounds(fitScaledBounds(current, payload, screenBounds, { width: minWidth, height: minHeight }));
 }
 
 // Shared position restore for a frameless widget window. Reads x/y from the
@@ -236,10 +252,13 @@ function positionWindowClamped(win, payload) {
     // как размер, и как «запрошенный», получаем «поставить в точку и поджать»,
     // потому что функция сохраняет центр переданного прямоугольника. Новой
     // арифметики здесь нет намеренно — она уже проверена юнит-тестами.
+    // Область та же, что при масштабировании, — границы экрана: иначе окно,
+    // намеренно поставленное к верхнему краю, после перезапуска съезжало вниз
+    // на высоту полоски меню.
     win.setBounds(fitScaledBounds(
         { x: targetX, y: targetY, width, height },
         { width, height },
-        host.workArea,
+        host.bounds,
         { width: minWidth, height: minHeight }
     ));
 }
@@ -451,6 +470,12 @@ function createWidgetWindow() {
         alwaysOnTop: !__screenshotMode,
         skipTaskbar: true,
         resizable: true,
+        // Без этой опции macOS поджимает окно к рабочей области: `y` упирался в
+        // 30 (край полоски меню) при любом уровне окна и через setPosition, и
+        // через setBounds. Поджимает не система, а
+        // `-[NSWindow constrainFrameRect:toScreen:]`, который Electron этой
+        // опцией отключает — с ней замерено y = 0 и даже y = -60.
+        enableLargerThanScreen: true,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -460,6 +485,11 @@ function createWidgetWindow() {
         },
         hasShadow: false
     });
+    // Уровень задаётся ПОСЛЕ конструктора: в опциях окна его задать нельзя.
+    // В режиме съёмки окна намеренно не всплывают, поэтому и уровень не трогаем.
+    if (!__screenshotMode) {
+        widgetWindow.setAlwaysOnTop(true, WINDOW_LEVEL_ABOVE_MENU_BAR);
+    }
     widgetWindow.loadFile('electron-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(widgetWindow);
     bindRenderCrashHandler(widgetWindow, 'widget');
@@ -512,6 +542,9 @@ function createClockWidgetWindow() {
         alwaysOnTop: !__screenshotMode,
         skipTaskbar: true,
         resizable: true,
+        // См. комментарий у виджета: без этого окно не поднимается выше
+        // рабочей области.
+        enableLargerThanScreen: true,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -521,6 +554,9 @@ function createClockWidgetWindow() {
         },
         hasShadow: false
     });
+    if (!__screenshotMode) {
+        clockWidgetWindow.setAlwaysOnTop(true, WINDOW_LEVEL_ABOVE_MENU_BAR);
+    }
     clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => log.error('loadFile failed:', err));
     hardenWindow(clockWidgetWindow);
     bindRenderCrashHandler(clockWidgetWindow, 'clock');
