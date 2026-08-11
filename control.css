@@ -622,9 +622,11 @@ body::after {
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
+/* .sound-check отсюда убран вместе с самим классом: подпись ряда звука теперь
+   .sound-name и красится токеном --tw-fg, то есть работает в обеих темах без
+   отдельного переопределения. */
 [data-theme="light"] .drawer-close,
-[data-theme="light"] .drawer-body .toggle-label,
-[data-theme="light"] .sound-check {
+[data-theme="light"] .drawer-body .toggle-label {
     color: var(--tw-fg-secondary);
 }
 
@@ -721,11 +723,10 @@ body::after {
 }
 
 /* --- Мелочи, которые иначе остаются от тёмной темы --- */
-[data-theme="light"] .sound-item .sound-preview {
-    background: var(--tw-blue);
-    color: var(--tw-on-accent);
-    box-shadow: 0 2px 6px rgba(0, 83, 174, 0.25);
-}
+/* Переопределения для .sound-item .sound-preview здесь больше нет: кнопка
+   стала призрачной и описана токенами (--tw-border, --tw-fg-muted,
+   --tw-level-2), которые сами меняются вместе с темой. Заливка акцентом в
+   светлой теме вернула бы ровно то, от чего кнопку и уводили. */
 [data-theme="light"] .drawer-body #tab-sound .add-sound-btn {
     background: rgba(0, 83, 174, 0.05);
     border: 1.5px dashed rgba(0, 83, 174, 0.35);
@@ -1311,30 +1312,50 @@ body::after {
     border-radius: 10px;
     min-width: 0;
 }
-.sound-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    flex: 0 0 96px;
-    min-width: 0;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.88);
-    cursor: pointer;
-    user-select: none;
+/* Ряд звука: переключатель — название — список — «прослушать».
+   Здесь стоял .sound-check с нативным чекбоксом 14×14. Смысл у него ровно тот
+   же, что у общего выключателя звука в шапке группы, а контрол был другой — и
+   вчетверо мельче порога мишени --tw-hit-min (32px).
+
+   Мишень растёт БОКСОМ переключателя, а трек пиннуется полосой внутри него:
+   `height: 32px` без пиннинга растянул бы сам трек, ручка 14px вылезла бы
+   наружу. Тот же приём уже применён к .timer-mode-row, там же разобрано
+   почему. Замеряется e2e/sound-controls.spec.js. */
+.sound-item .sound-toggle {
+    flex: 0 0 auto;
+    width: 34px;
+    height: var(--tw-hit-min);
 }
-.sound-check input[type="checkbox"] {
+.sound-item .sound-toggle .toggle-slider {
+    top: 7px;
+    bottom: 7px;
+    border-radius: 9px;
+}
+.sound-item .sound-toggle .toggle-slider::before {
     width: 14px;
     height: 14px;
-    accent-color: var(--tw-blue);
-    flex-shrink: 0;
-    cursor: pointer;
+    left: 2px;
+    bottom: 2px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
-.sound-check .sound-name {
+.sound-item .sound-toggle input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+}
+.sound-item .sound-name {
+    flex: 0 0 74px;
+    min-width: 0;
+    font-size: 12px;
     font-weight: 500;
     color: var(--tw-fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    user-select: none;
+}
+/* Выключенный ряд гасит и НАЗВАНИЕ: состояние читается по строке целиком, а не
+   по одному контролу слева. */
+.sound-item:has(.sound-toggle input:not(:checked)) .sound-name {
+    color: var(--tw-fg-dim);
 }
 .sound-item .select-wrap { flex: 1 1 auto; min-width: 0; }
 .sound-item .sound-select {
@@ -1364,26 +1385,34 @@ body::after {
     transform: translateY(-70%) rotate(45deg);
     pointer-events: none;
 }
+/* «Прослушать» — призрачная, а не залитая акцентом. Четыре градиента
+   синий→зелёный подряд тянули внимание сильнее, чем настройки, ради которых
+   в этот ящик заходят, и спорили с зелёным переключателем в том же ряду.
+   Заодно мишень доросла с 30 до --tw-hit-min. Заливка осталась у состояния
+   .playing — там она значит «сейчас звучит», а не «здесь кнопка». */
 .sound-item .sound-preview {
-    width: 30px;
-    height: 30px;
+    width: var(--tw-hit-min);
+    height: var(--tw-hit-min);
     font-size: 11px;
     flex: 0 0 auto;
-    border: none;
+    border: 1px solid var(--tw-border);
     border-radius: 9px;
-    background: linear-gradient(135deg, var(--tw-blue), var(--tw-green));
-    color: #fff;
+    background: transparent;
+    color: var(--tw-fg-muted);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
     transition: transform var(--tw-dur-fast) var(--tw-ease),
-                filter var(--tw-dur-base) var(--tw-ease),
+                color var(--tw-dur-base) var(--tw-ease),
                 background var(--tw-dur-base) var(--tw-ease);
-    box-shadow: 0 3px 10px rgba(10, 132, 255, 0.25);
 }
-.sound-item .sound-preview:hover { filter: brightness(1.1); transform: scale(1.06); }
+.sound-item .sound-preview:hover {
+    background: var(--tw-level-2);
+    color: var(--tw-fg);
+    transform: scale(1.06);
+}
 .sound-item .sound-preview:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 .sound-item .sound-preview.playing {
     background: linear-gradient(135deg, #f5576c, var(--tw-red));
@@ -1425,12 +1454,18 @@ body::after {
 .drawer-body #tab-sound .settings-group { padding: 10px 12px 12px; }
 .drawer-body #tab-sound .settings-group-title { margin-bottom: 10px; }
 
-/* Master toggle in "Звуки" header — compact variant */
+/* Master toggle in "Звуки" header — compact variant.
+   Бокс 34×32 при треке 34×18: мишень обязана быть не меньше --tw-hit-min, а
+   выглядеть выключатель должен так же компактно, как раньше. Трек пиннуется
+   полосой внутри бокса — тот же приём, что у рядов звука и .timer-mode-row.
+   Раньше бокс был 32×18, то есть сам контрол и был мишенью. */
 .drawer-body #tab-sound .settings-group-title .toggle-switch {
-    width: 32px;
-    height: 18px;
+    width: 34px;
+    height: var(--tw-hit-min);
 }
 .drawer-body #tab-sound .settings-group-title .toggle-slider {
+    top: 7px;
+    bottom: 7px;
     border-radius: 10px;
 }
 .drawer-body #tab-sound .settings-group-title .toggle-slider::before {
