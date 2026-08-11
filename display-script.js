@@ -1,7 +1,9 @@
 // Display Timer - Полноэкранное отображение таймера
 class DisplayTimer {
     constructor() {
-        this.radius = 160;
+        // Радиус дуги прогресса во вьюбоксе 400×400. Дублируется в display.html
+        // (r у .ring-track и #progressRing) — там же разбор, почему 176.
+        this.radius = 176;
         this.circumference = 2 * Math.PI * this.radius;
         this.totalSeconds = 0;
         this.remainingSeconds = 0;

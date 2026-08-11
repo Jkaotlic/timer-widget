@@ -132,12 +132,20 @@
                 </g>
 
                 <!-- Трек прогресса -->
-                <circle class="ring-track" cx="200" cy="200" r="160" />
+                <!-- r=176, а не 160: при stroke-width 12 внешний край дуги встаёт на 182 и
+                     остаётся внутри декоративной окружности r=185. Замер до правки: дуга
+                     занимала 44,0% высоты окна при боксе 55,0% — 11 процентных пунктов
+                     уходило в пустую полосу между дугой и этой окружностью. --timer-box
+                     НЕ трогаем, он настроен осознанно (см. разбор про 4K в display.css).
+                     Радиус ЖИВЁТ В ДВУХ МЕСТАХ: здесь и в display-script.js (this.radius),
+                     откуда считается длина окружности. Замеряется
+                     e2e/display-ring-proportion.spec.js. -->
+                <circle class="ring-track" cx="200" cy="200" r="176" />
 
                 <!-- Прогресс -->
-                <circle class="ring-progress" id="progressRing" cx="200" cy="200" r="160"
-                        stroke-dasharray="1005.31"
-                        stroke-dashoffset="1005.31" />
+                <circle class="ring-progress" id="progressRing" cx="200" cy="200" r="176"
+                        stroke-dasharray="1105.84"
+                        stroke-dashoffset="1105.84" />
             </svg>
 
             <!-- Центральное отображение времени -->
