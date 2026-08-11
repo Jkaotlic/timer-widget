@@ -213,10 +213,12 @@
                         </div>
                         <div class="sound-list">
                           <div class="sound-item" data-kind="start">
-                            <label class="sound-check" title="Включить звук старта">
-                                <input type="checkbox" id="soundStartEnabled">
-                                <span class="sound-name">Старт</span>
+                            <!-- Переключатель, а не чекбокс: разбор в control.css у .sound-item .sound-toggle -->
+                            <label class="toggle-switch sound-toggle" title="Включить звук старта">
+                                <input type="checkbox" id="soundStartEnabled" aria-label="Звук старта включён">
+                                <span class="toggle-slider"></span>
                             </label>
+                            <span class="sound-name">Старт</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundStartPreset" aria-label="Звук старта">
                                 <option value="none">— без звука —</option>
@@ -245,10 +247,11 @@
                           </div>
 
                           <div class="sound-item" data-kind="end">
-                            <label class="sound-check" title="Включить звук окончания">
-                                <input type="checkbox" id="soundEndEnabled" checked>
-                                <span class="sound-name">Окончание</span>
+                            <label class="toggle-switch sound-toggle" title="Включить звук окончания">
+                                <input type="checkbox" id="soundEndEnabled" checked aria-label="Звук окончания включён">
+                                <span class="toggle-slider"></span>
                             </label>
+                            <span class="sound-name">Окончание</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundEndPreset" aria-label="Звук окончания">
                                 <option value="none">— без звука —</option>
@@ -283,10 +286,11 @@
                           </div>
 
                           <div class="sound-item" data-kind="minute">
-                            <label class="sound-check" title="Звук за минуту до конца">
-                                <input type="checkbox" id="soundMinuteEnabled">
-                                <span class="sound-name">Минута</span>
+                            <label class="toggle-switch sound-toggle" title="Звук за минуту до конца">
+                                <input type="checkbox" id="soundMinuteEnabled" aria-label="Звук за минуту до конца включён">
+                                <span class="toggle-slider"></span>
                             </label>
+                            <span class="sound-name">Минута</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundMinutePreset" aria-label="Звук за минуту до конца">
                                 <option value="none">— без звука —</option>
@@ -312,10 +316,11 @@
                           </div>
 
                           <div class="sound-item" data-kind="overrun">
-                            <label class="sound-check" title="Звук перерасхода">
-                                <input type="checkbox" id="soundOverrunEnabled">
-                                <span class="sound-name">Перерасход</span>
+                            <label class="toggle-switch sound-toggle" title="Звук перерасхода">
+                                <input type="checkbox" id="soundOverrunEnabled" aria-label="Звук перерасхода включён">
+                                <span class="toggle-slider"></span>
                             </label>
+                            <span class="sound-name">Перерасход</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundOverrunPreset" aria-label="Звук овертайма">
                                 <option value="none">— без звука —</option>
