@@ -365,26 +365,30 @@ test('reduced-motion гасит движение, а не информацию',
 /* ────────────────────── дисплей: три мёртвых правила ─────────────────────── */
 
 const DISPLAY_JS = codeOnly(read('display-script.js'));
-const DISPLAY_HTML = codeOnly(read('display.html'));
+const DISPLAY_HTML = codeOnly(read('display.html') + '\n' + read('display.css'));
 
 test('LED-«внимание» на дисплее совпадает с собственным CSS дисплея', () => {
-    // JS писал #ffc107 инлайном, CSS говорил --tw-led-warn = #ffcc00: правило
-    // .digital-time.warning не применялось НИКОГДА, потому что инлайн бьёт
-    // класс. Проверено, что тест на '#ffc107' в audit-2026-07-fixes пришит к
-    // ВИДЖЕТУ, а не сюда, поэтому правка его не касается.
-    // Проверяем ТОЛЬКО ветку LED. Остальные два вхождения #ffc107 в файле —
-    // круговой и флип-стили, и там оно ВЕРНО: их CSS говорит var(--tw-yellow),
-    // а это ровно #ffc107. Широкая проверка «нигде нет #ffc107» потребовала бы
-    // сломать два правильных места ради одного неправильного.
-    // Якоримся на СИГНАТУРЫ методов, а не на имена: имя встречается и в
-    // вызове выше по файлу, и срез по нему захватил бы шесть строк без цветов —
-    // проверка прошла бы вхолостую.
+    // Исходный дефект: JS писал #ffc107 инлайном, а CSS говорил
+    // --tw-led-warn = #ffcc00. Правило .digital-time.warning не применялось
+    // НИКОГДА, потому что инлайн бьёт класс, и пользователь видел цвет, которого
+    // в стилях не было.
+    //
+    // Раньше тест требовал, чтобы в ветке LED стоял #ffcc00 (то есть чтобы две
+    // копии значения совпадали). С 11.08.2026 копий нет: цвет полосы задаёт
+    // ТОЛЬКО CSS, а JS ставит класс. Совпадать нечему — источник один.
+    // Проверяем именно это, иначе тест требовал бы вернуть вторую копию.
     const from = DISPLAY_JS.indexOf('updateDigitalDisplay(secs, _formatted) {');
     const to = DISPLAY_JS.indexOf('updateFlipDisplay(secs) {');
     assert.ok(from > 0 && to > from, 'ветка LED не найдена');
     const led = DISPLAY_JS.slice(from, to);
-    assert.ok(!/#ffc107/.test(led), 'в LED вернулся #ffc107');
-    assert.match(led, /#ffcc00/);
+    assert.ok(!/#ffc107|#ffcc00|#ff3333/.test(led),
+        'в ветку LED вернулся цветовой литерал — цвет полосы принадлежит CSS');
+    assert.match(led, /classList\.add\('warning'\)/, 'ветка LED обязана ставить класс полосы');
+
+    // Единственный источник значения — правило CSS, и оно берёт токен.
+    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    assert.match(css, /\.digital-time\.warning \{[^}]*color: var\(--tw-led-warn\)/,
+        '.digital-time.warning обязано красить токеном --tw-led-warn');
 });
 
 test('глиф статуса имеет ОДНОГО владельца', () => {

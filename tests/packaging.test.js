@@ -143,3 +143,24 @@ test('every local require() in main-process JS is listed in package.json build.f
 
     assert.deepStrictEqual(missing, [], missing.join('\n'));
 });
+
+// build.files — это ещё и список того, что пользователь СКАЧИВАЕТ. Файл,
+// который в рантайме не читает никто, платить за себя не должен.
+//
+// История: sbom.json (812 КБ) лежал в build.files и ехал внутрь app.asar,
+// занимая 36% всего кода приложения — при том, что ни один require(), ни один
+// <script src>, ни одна строка main-процесса его не открывает. Это артефакт
+// цепочки поставки: его место в release assets (там он теперь и есть, см.
+// .github/workflows/release.yml), а не в бандле.
+//
+// NOTICE остаётся намеренно: атрибуции лицензий MIT/BSD обязаны
+// распространяться ВМЕСТЕ с бинарником, это юридическое требование, а не
+// удобство.
+test('в build.files не попадают файлы, которые рантайм не читает', () => {
+    const runtimeReadsNothing = ['sbom.json', 'package-lock.json', 'CHANGELOG.md', 'README.md'];
+    const leaked = runtimeReadsNothing.filter(f => filesPatterns.includes(f));
+    assert.deepStrictEqual(
+        leaked, [],
+        `эти файлы попадают в сборку, но их никто не читает в рантайме: ${leaked.join(', ')}`
+    );
+});

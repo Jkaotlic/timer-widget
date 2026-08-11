@@ -929,6 +929,8 @@
                      v2.1.1 при фактических 2.3.2 — проверить это глазами было
                      нельзя, подвал справки не открывался вместе с ней. -->
                 <span id="appVersion">TimerWidget v2.4.1</span>
+                <!-- Ссылка, а не запрос: см. onboarding.js -->
+                <button class="reset-btn" id="checkUpdatesBtn" type="button">Проверить обновления</button>
                 <button class="reset-btn" id="resetSettingsBtn">Сбросить настройки</button>
             </div>
         </div>
@@ -964,6 +966,7 @@
     <script src="color-picker.js"></script>
     <script src="modal-manager.js"></script>
     <script src="shortcuts-help.js"></script>
+    <script src="onboarding.js"></script>
     <script src="custom-sounds.js"></script>
     <script src="local-background.js"></script>
     <script src="theme-grid.js"></script>
@@ -2693,6 +2696,10 @@
 
         // FAQ Modal Logic
         const faqBtn = document.getElementById('faqBtn');
+        // Подсказка про F1 при первом запуске + кнопка «Проверить
+        // обновления». Подробности и зависимости — в onboarding.js.
+        window.Onboarding.init();
+
         const faqModal = document.getElementById('faqModal');
         const faqClose = document.getElementById('faqClose');
         const faqQuestions = document.querySelectorAll('.faq-question');
