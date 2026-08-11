@@ -152,6 +152,33 @@ function readPaint(selector) {
     return { color: cs.color, textShadow: cs.textShadow };
 }
 
+/**
+ * Приводит запись цвета к одному виду перед сравнением.
+ *
+ * Зачем: один и тот же цвет браузер сериализует по-разному в зависимости от
+ * того, откуда он взялся. Инлайновый литерал `#ffcc0066` печатается как
+ * `rgba(255, 204, 0, 0.4)`, а ровно тот же цвет, посчитанный правилом CSS через
+ * `color-mix(in srgb, currentColor 40%, transparent)` — как
+ * `color(srgb 1 0.8 0 / 0.4)`. Пиксель идентичен, строка разная.
+ *
+ * Без нормализации перевод стиля с инлайна на CSS выглядел бы как регрессия
+ * окраски, хотя не меняет ни одного пикселя, — и тест заставил бы «чинить»
+ * правильный код. Сравнивать надо цвет, а не то, как его напечатали.
+ */
+function canonicalColor(value) {
+    if (typeof value !== 'string') { return value; }
+    return value.replace(
+        /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/g,
+        (_m, r, g, b, a) => {
+            const to255 = (x) => Math.round(parseFloat(x) * 255);
+            const alpha = a === undefined ? 1 : parseFloat(a);
+            return alpha === 1
+                ? `rgb(${to255(r)}, ${to255(g)}, ${to255(b)})`
+                : `rgba(${to255(r)}, ${to255(g)}, ${to255(b)}, ${alpha})`;
+        }
+    );
+}
+
 test.beforeAll(async () => {
     ({ app, control } = await launchApp());
     await control.evaluate(() => {
@@ -235,10 +262,10 @@ test('снимок окраски: 5 стилей × 4 полосы в видж�
             drift.push(`${key}: было ${JSON.stringify(was)}, стало ${JSON.stringify(now)}`);
             continue;
         }
-        if (was.color !== now.color) {
+        if (canonicalColor(was.color) !== canonicalColor(now.color)) {
             drift.push(`${key} color: было ${was.color}, стало ${now.color}`);
         }
-        if (was.textShadow !== now.textShadow) {
+        if (canonicalColor(was.textShadow) !== canonicalColor(now.textShadow)) {
             drift.push(`${key} textShadow:\n    было  ${was.textShadow}\n    стало ${now.textShadow}`);
         }
     }
