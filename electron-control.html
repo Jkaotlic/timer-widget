@@ -135,7 +135,12 @@
                             <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><rect x="7.5" y="7.5" width="6.5" height="6.5" rx="1.5"/></svg></span>
                             Стиль виджета
                         </div>
-                        <div class="toggle-row">
+                        <!-- .setting-block, а не .toggle-row: пять сегментов не
+                             помещаются в правую половину flex-строки ни при какой
+                             ширине ящика. Замер до правки: подпись 30px при
+                             интерлиньяже 15px, то есть ровно две строки. Тот же
+                             приём уже применён к «Шрифту цифр» ниже. -->
+                        <div class="setting-block">
                             <span class="toggle-label">Стиль таймера</span>
                             <div class="segmented" id="timerStyle" role="radiogroup" aria-label="Стиль виджета" data-value="circle">
                                 <button type="button" data-val="circle" class="active">Круг</button>
@@ -419,7 +424,11 @@
                                  скрывать было нечего — пользователь ставил галочку
                                  синхронизации и продолжал видеть активный выбор стиля часов,
                                  а клик по нему молча снимал ту же галочку. -->
-                            <div class="toggle-row" id="clockStyleRow">
+                            <!-- .setting-block по той же причине, что и у виджета.
+                                 id остаётся на ЭТОЙ обёртке: синхронизация стиля
+                                 прячет ряд целиком, и перенос id на внутренний узел
+                                 однажды уже оставил подпись висеть без контрола. -->
+                            <div class="setting-block" id="clockStyleRow">
                                 <span class="toggle-label">Стиль</span>
                                 <div class="segmented" id="clockStyle" role="radiogroup" aria-label="Стиль часов" data-value="circle">
                                     <button type="button" data-val="circle" class="active">Круг</button>
@@ -519,7 +528,8 @@
                                 <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><rect x="7.5" y="7.5" width="6.5" height="6.5" rx="1.5"/></svg></span>
                                 Стиль таймера
                             </div>
-                            <div class="toggle-row">
+                            <!-- .setting-block по той же причине, что и у виджета. -->
+                            <div class="setting-block">
                                 <span class="toggle-label">Стиль</span>
                                 <div class="segmented" id="displayTimerStyle" role="radiogroup" aria-label="Стиль таймера дисплея" data-value="circle">
                                     <button type="button" data-val="circle" class="active">Круг</button>

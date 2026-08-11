@@ -1158,6 +1158,14 @@ body::after {
     padding: 10px 0;
 }
 
+/* Внутри блока сегментированный контрол занимает всю ширину, а сегменты
+   делят её поровну. В строке (.toggle-row) им доставалась правая половина, и
+   пять штук жались до касания краёв — «Аналог» и «Цифры» упирались в рамку.
+   Проверяется e2e/segmented-label.spec.js: разброс ширин сегментов не больше
+   пикселя. */
+.setting-block .segmented { width: 100%; }
+.setting-block .segmented button { flex: 1; min-width: 0; }
+
 .font-select {
     display: flex;
     flex-direction: column;
