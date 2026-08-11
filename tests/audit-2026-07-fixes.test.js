@@ -348,11 +348,34 @@ test('восстановление цвета не зависит от нали�
     assert.doesNotMatch(displayScript, /\} else if \(this\._baseTimerColor\) \{/);
     assert.doesNotMatch(displayScript, /if \(digit && this\._baseTimerColor\)/);
 
-    // Ветка цифр flip в виджете обязана иметь завершающий else со сбросом.
-    assert.match(
-        widgetHtml,
-        /digit\.style\.color = '#ffc107';\s*\n\s*\} else \{[\s\S]{0,400}?digit\.style\.color = this\._baseTimerColor \|\| ''/
+    // Виджет: гарантия стала СИЛЬНЕЕ, а не исчезла.
+    //
+    // Раньше здесь требовалась завершающая ветка `else` со сбросом
+    // `digit.style.color = this._baseTimerColor || ''`. 11.08.2026 цвет полос в
+    // виджете переведён с инлайна на каскад: полосу задаёт `data-status` и
+    // правило CSS, цвет темы приходит переменной `--timer-color`. Инлайнового
+    // цвета на цифрах не остаётся вовсе — значит и залипнуть нечему.
+    //
+    // Проверяем ровно это: в файле не должно быть НИ ОДНОЙ инлайновой записи
+    // цвета полосы. Требовать ветку сброса теперь означало бы требовать вернуть
+    // механизм, который её и порождал.
+    // widgetHtml уже прошёл codeOnly() при чтении — комментарии сняты.
+    assert.doesNotMatch(
+        widgetHtml, /digit\.style\.color\s*=/,
+        'виджет не должен красить flip-цифры инлайном — цвет задаёт CSS по data-status'
     );
+    assert.doesNotMatch(
+        widgetHtml, /style\.color\s*=\s*'#(ff4444|ff3333|ffc107|ffcc00)'/i,
+        'виджет не должен писать цвет полосы инлайном ни в одном стиле'
+    );
+    // И положительная сторона: правила полос действительно объявлены.
+    for (const selector of [
+        /\.widget-digital-time\[data-status="danger"\]/,
+        /\.widget-digits-time\[data-status="danger"\]/,
+        /\.widget-flip-card\[data-status="danger"\]/
+    ]) {
+        assert.match(widgetHtml, selector, `правило полосы отсутствует: ${selector}`);
+    }
 
     // Вместо условных веток — помощники, которые при отсутствии темы отдают
     // пустую строку, то есть УДАЛЯЮТ инлайновый стиль и возвращают управление CSS.
