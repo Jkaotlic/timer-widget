@@ -36,6 +36,12 @@ const read = (file) => codeOnly(readRaw(file));
 // то, в каком файле физически лежит правило.
 const readControlSource = () => read('electron-control.html') + '\n' + read('control.css');
 
+// CSS полноэкранного окна вынесен в display.css 11.08.2026 — по той же причине
+// и тем же приёмом, что стили панели. Проверки ниже описывают ОДНО окно как оно
+// поставляется, поэтому разметку склеиваем со стилями: иначе тест «правило есть»
+// начал бы означать «правило есть В ЭТОМ ФАЙЛЕ», что не то же самое.
+const readDisplaySource = () => read('display.html') + '\n' + read('display.css');
+
 const controlHtml = readControlSource();
 const widgetHtml = read('electron-widget.html');
 const clockHtml = read('electron-clock-widget.html');
@@ -348,50 +354,91 @@ test('восстановление цвета не зависит от нали�
     assert.doesNotMatch(displayScript, /\} else if \(this\._baseTimerColor\) \{/);
     assert.doesNotMatch(displayScript, /if \(digit && this\._baseTimerColor\)/);
 
-    // Ветка цифр flip в виджете обязана иметь завершающий else со сбросом.
-    assert.match(
-        widgetHtml,
-        /digit\.style\.color = '#ffc107';\s*\n\s*\} else \{[\s\S]{0,400}?digit\.style\.color = this\._baseTimerColor \|\| ''/
+    // Виджет: гарантия стала СИЛЬНЕЕ, а не исчезла.
+    //
+    // Раньше здесь требовалась завершающая ветка `else` со сбросом
+    // `digit.style.color = this._baseTimerColor || ''`. 11.08.2026 цвет полос в
+    // виджете переведён с инлайна на каскад: полосу задаёт `data-status` и
+    // правило CSS, цвет темы приходит переменной `--timer-color`. Инлайнового
+    // цвета на цифрах не остаётся вовсе — значит и залипнуть нечему.
+    //
+    // Проверяем ровно это: в файле не должно быть НИ ОДНОЙ инлайновой записи
+    // цвета полосы. Требовать ветку сброса теперь означало бы требовать вернуть
+    // механизм, который её и порождал.
+    // widgetHtml уже прошёл codeOnly() при чтении — комментарии сняты.
+    assert.doesNotMatch(
+        widgetHtml, /digit\.style\.color\s*=/,
+        'виджет не должен красить flip-цифры инлайном — цвет задаёт CSS по data-status'
+    );
+    assert.doesNotMatch(
+        widgetHtml, /style\.color\s*=\s*'#(ff4444|ff3333|ffc107|ffcc00)'/i,
+        'виджет не должен писать цвет полосы инлайном ни в одном стиле'
+    );
+    // И положительная сторона: правила полос действительно объявлены.
+    for (const selector of [
+        /\.widget-digital-time\[data-status="danger"\]/,
+        /\.widget-digits-time\[data-status="danger"\]/,
+        /\.widget-flip-card\[data-status="danger"\]/
+    ]) {
+        assert.match(widgetHtml, selector, `правило полосы отсутствует: ${selector}`);
+    }
+
+    // Дисплей: та же гарантия, тоже усиленная.
+    //
+    // Раньше здесь требовались помощники _normalColor() / _normalGlow(),
+    // отдающие пустую строку при отсутствии темы. Они были правильным решением
+    // неверной задачи: возвращаться приходилось потому, что цвет полосы
+    // писался инлайном. Теперь тема — переменная --timer-color, полосу держат
+    // классы, и восстанавливать нечего.
+    assert.doesNotMatch(
+        displayScript, /_normalColor\(\)|_normalGlow\(\)|_baseTimerColor|_baseCenterBg|_baseSecondHandBg/,
+        'вернулась механика «запомнить цвет, чтобы потом восстановить» — значит вернулся и инлайн'
+    );
+    assert.doesNotMatch(
+        displayScript, /_enforceOvertimeColors/,
+        'вернулась перекраска DOM на каждом тике: она существовала только чтобы возвращать инлайн, стёртый другим инлайном'
+    );
+});
+
+test('дисплей не пишет цвет полосы инлайном ни в одном стиле', () => {
+    // Три отдельных теста («цифровой сбрасывает красный», «flip сбрасывает цвет
+    // цифр и разделителей», «аналоговый снимает инлайновые стрелки») сторожили
+    // ВЕТКИ СБРОСА. Ветки сброса нужны ровно тогда, когда есть инлайновый
+    // писатель: инлайн бьёт CSS-класс, поэтому полоса вынуждена писать цвет
+    // инлайном, а значит и снимать его вручную. 11.08.2026 писатель убран —
+    // цвет темы приходит переменной --timer-color, полосу держат классы.
+    //
+    // Поэтому проверяется сильное утверждение вместо трёх слабых: инлайновых
+    // записей цвета в файле нет вовсе. Оно покрывает все пять стилей разом и не
+    // может быть удовлетворено «правильно написанным сбросом».
+    const colorWrites = displayScript.match(
+        /\.style\.(color|textShadow|boxShadow)\s*=|\.style\.background\s*=\s*['"`](?!rgba\(0, 0, 0)/g
+    ) || [];
+    assert.deepStrictEqual(
+        colorWrites, [],
+        `дисплей снова красит инлайном (${colorWrites.length} мест): цвет обязан приходить переменной, полоса — классом`
     );
 
-    // Вместо условных веток — помощники, которые при отсутствии темы отдают
-    // пустую строку, то есть УДАЛЯЮТ инлайновый стиль и возвращают управление CSS.
-    assert.match(displayScript, /_normalColor\(\)\s*\{\s*return this\._baseTimerColor \|\| '';/);
-    assert.match(displayScript, /_normalGlow\(\)\s*\{\s*return this\._baseTimerColor \?/);
-});
+    // Обратная сторона: правила полос обязаны существовать в CSS, иначе
+    // «инлайна нет» означало бы «цвета нет».
+    const displayCss = readDisplaySource();
+    for (const selector of [
+        /\.time-text\.danger/,
+        /\.digital-time\.danger/,
+        /\.digits-time\.danger/,
+        /\.flip-card\.danger \.flip-digit/,
+        /\.flip-separator\.danger/,
+        /\.analog-digital-time\.danger/,
+        /\.hand-second\.danger/,
+        /\.clock-center\.danger/
+    ]) {
+        assert.match(displayCss, selector, `правило полосы отсутствует: ${selector}`);
+    }
 
-test('цифровой стиль дисплея сбрасывает красный при возврате в норму', () => {
-    const digital = displayScript.match(/updateDigitalDisplay\(secs, _formatted\)\s*\{[\s\S]*?\n {4}\}/);
-    assert.ok(digital, 'updateDigitalDisplay должен существовать');
-    // Лесенка полос заканчивается безусловным else, который сбрасывает и цвет,
-    // и свечение — без него инлайновый красный переживал возврат в норму.
-    assert.match(
-        digital[0],
-        /\} else \{\s*\n\s*this\.digitalTime\.style\.color = this\._normalColor\(\);\s*\n\s*this\.digitalTime\.style\.textShadow = this\._normalGlow\(\);/
-    );
-});
-
-test('flip-стиль дисплея сбрасывает цвет цифр и разделителей', () => {
-    const flip = displayScript.match(/updateFlipDisplay\(secs\)\s*\{[\s\S]*?\n {4}\}\n/);
-    assert.ok(flip, 'updateFlipDisplay должен существовать');
-    // Цвет считается один раз и применяется БЕЗУСЛОВНО и к цифрам, и к
-    // разделителям: для нормальной полосы это _normalColor(), то есть сброс инлайна.
-    assert.match(flip[0], /const digitColor = BAND_COLOR\[band\] \|\| this\._normalColor\(\)/);
-    assert.match(flip[0], /if \(digit\) \{ digit\.style\.color = digitColor; \}/);
-    assert.match(flip[0], /flipSeparators\.forEach\(el => \{ el\.style\.color = digitColor; \}\)/);
-});
-
-test('аналоговый стиль дисплея снимает инлайновые красные стрелки и центр', () => {
-    // Ветка перерасхода красит стрелку/центр инлайном; без обратного сброса они
-    // оставались красными до следующей смены темы.
-    const analog = displayScript.match(/updateAnalogDisplay\(secs\)\s*\{[\s\S]*?\n {4}\}\n/);
-    assert.ok(analog, 'updateAnalogDisplay должен существовать');
-    assert.match(analog[0], /this\.analogHandSecond\.style\.background = this\._baseSecondHandBg \|\| ''/);
-    assert.match(analog[0], /clockCenter\.style\.background = this\._baseCenterBg \|\| ''/);
-    assert.match(analog[0], /this\.analogDigitalTime\.style\.color = this\._baseAnalogDigitalColor \|\| ''/);
-    // Базовые значения должны запоминаться в applyColors ВСЕГДА, иначе восстанавливать нечем.
-    assert.match(displayScript, /this\._baseSecondHandBg =\s*\n?\s*`linear-gradient/);
-    assert.match(displayScript, /this\._baseCenterBg = `linear-gradient/);
+    // И цвет темы обязан доезжать переменной — иначе выбор темы просто перестанет
+    // действовать, а тест выше этого не заметит.
+    assert.match(displayScript, /setProperty\('--timer-color', timerColor\)/);
+    assert.match(displayCss, /var\(--timer-color,/);
 });
 
 test('круглый стиль дисплея сбрасывает цвет и без пресета', () => {
@@ -467,8 +514,8 @@ test('цветовая полоса считается в одном месте 
 test('плашка статуса дисплея не красится двумя конкурирующими системами классов', () => {
     // .is-success / .is-attention объявлены в CSS ниже семантических классов и
     // выигрывали каскад: «ВРЕМЯ ВЫШЛО!» становилось зелёным поверх красной .finished.
-    assert.doesNotMatch(read('display.html'), /\.status-pill\.is-success\s*\{/);
-    assert.doesNotMatch(read('display.html'), /\.status-pill\.is-attention\s*\{/);
+    assert.doesNotMatch(readDisplaySource(), /\.status-pill\.is-success\s*\{/);
+    assert.doesNotMatch(readDisplaySource(), /\.status-pill\.is-attention\s*\{/);
     assert.doesNotMatch(displayScript, /tone: 'is-success'/);
     assert.doesNotMatch(displayScript, /tone: 'is-attention'/);
 });
@@ -497,7 +544,7 @@ test('подсветка быстрого выбора выводится из �
 test('пауза во всех окнах оранжевая', () => {
     assert.match(controlHtml, /\.status-dot\.paused \{[^}]*background: var\(--tw-orange\)/s);
     assert.match(widgetHtml, /\.status-badge\.paused \{[^}]*color: var\(--tw-orange\)/s);
-    assert.match(read('display.html'), /\.status-pill\.paused \{[^}]*color: var\(--tw-orange\)/s);
+    assert.match(readDisplaySource(), /\.status-pill\.paused \{[^}]*color: var\(--tw-orange\)/s);
 });
 
 test('завершено во всех окнах красное и БЕЗ пульсации', () => {
@@ -509,7 +556,7 @@ test('завершено во всех окнах красное и БЕЗ пу�
     assert.match(widgetFinished, /color: var\(--tw-red\)/);
     assert.doesNotMatch(widgetFinished, /animation:/);
 
-    const displayFinished = read('display.html').match(/\.status-pill\.finished \{[^}]*\}/s)[0];
+    const displayFinished = readDisplaySource().match(/\.status-pill\.finished \{[^}]*\}/s)[0];
     assert.match(displayFinished, /color: var\(--tw-red\)/);
     assert.doesNotMatch(displayFinished, /animation:/);
 });
@@ -523,14 +570,14 @@ test('перерасход во всех окнах красный и С пул�
     assert.match(widgetOvertime, /color: var\(--tw-red\)/);
     assert.match(widgetOvertime, /animation: badge-pulse/);
 
-    const displayOvertime = read('display.html').match(/\.status-pill\.overtime \{[^}]*\}/s)[0];
+    const displayOvertime = readDisplaySource().match(/\.status-pill\.overtime \{[^}]*\}/s)[0];
     assert.match(displayOvertime, /color: var\(--tw-red\)/);
     assert.match(displayOvertime, /animation: overtime-pulse/);
 });
 
 test('розовый из палитры статусов убран во всех окнах', () => {
     // --tw-pink не входит в задекларированную палитру приложения (blue/green/red/orange).
-    for (const src of [controlHtml, widgetHtml, read('display.html')]) {
+    for (const src of [controlHtml, widgetHtml, readDisplaySource()]) {
         assert.doesNotMatch(src, /\.status-(dot|badge|pill)\.\w+ \{[^}]*--tw-pink/s);
     }
 });

@@ -247,9 +247,17 @@
             letter-spacing: 0.02em;
             font-variant-numeric: tabular-nums;
             line-height: 1;
+            /* Цвет пользователя приходит ПЕРЕМЕННОЙ --timer-glow (её ставит
+               applyColors на documentElement), а не инлайном на этом элементе.
+               Разница не косметическая: инлайн бьёт любое правило, поэтому
+               пока свечение писалось инлайном, правила [data-status] ниже были
+               мертвы, и полосам приходилось писать свой цвет инлайном тоже — а
+               значит и СНИМАТЬ его вручную при возврате в норму. Ветка снятия
+               и оказалась дырявой на свежем профиле. */
+            --glow-color: var(--timer-glow, rgba(10, 132, 255, 0.6));
             text-shadow:
                 0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 20px var(--glow-color, rgba(10, 132, 255, 0.6));
+                0 0 20px var(--glow-color);
             transition: color var(--tw-dur-base) var(--tw-ease),
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
@@ -430,7 +438,10 @@
             font-family: var(--tw-font-mono);
             font-size: var(--digital-font-size, 24px);
             font-weight: 700;
-            color: var(--tw-led-green);
+            /* Цвет темы приходит переменной --timer-color; правила
+               [data-status] ниже перекрывают её каскадом. Свечение построено
+               на currentColor, поэтому следует за цветом само. */
+            color: var(--timer-color, var(--tw-led-green));
             text-shadow:
                 0 0 10px currentColor,
                 0 0 20px currentColor,
@@ -607,15 +618,15 @@
             font-family: var(--tw-font-sans);
             font-size: 52px;
             font-weight: 600;
-            color: var(--tw-fg);
+            color: var(--timer-color, var(--tw-fg));
             line-height: 1;
             font-variant-numeric: tabular-nums;
             text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
         }
 
-        .widget-flip-card[data-status="warning"] .widget-flip-digit { color: var(--tw-yellow); }
+        .widget-flip-card[data-status="warning"] .widget-flip-digit { color: var(--tw-band-warning); }
         .widget-flip-card[data-status="danger"]   .widget-flip-digit,
-        .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: #ff4444; }
+        .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: var(--tw-band-danger); }
         .widget-flip-card[data-status="danger"],
         .widget-flip-card[data-status="overtime"] {
             animation: widget-flip-pulse 1s ease-in-out infinite;
@@ -784,7 +795,9 @@
             position: absolute;
             width: 12px;
             height: 12px;
-            background: var(--tw-ring);
+            /* Тот же приём, что у цифр аналога: цвет темы — переменная, чтобы
+               правило [data-status="danger"] ниже могло его перебить каскадом. */
+            background: var(--timer-center-bg, var(--tw-ring));
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.92);
             z-index: 5;
@@ -800,9 +813,11 @@
             justify-content: center;
             font-family: var(--tw-font-mono);
             font-size: 14px;
-            color: var(--tw-fg-muted);
+            /* Цвет пользователя приходит переменной (её ставит applyColors), а
+               не инлайном: инлайн бил бы правило [data-status] ниже. */
+            color: var(--timer-analog-color, var(--tw-fg-muted));
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 0 10px rgba(10, 132, 255, 0.3);
+            text-shadow: 0 0 10px var(--timer-analog-glow, rgba(10, 132, 255, 0.3));
         }
 
         /* Numerals 12/3/6/9 */
@@ -853,7 +868,14 @@
 
         .widget-analog-digital[data-status="danger"],
         .widget-analog-digital[data-status="overtime"] {
-            color: #ff453a;
+            /* rgba(255,69,58,0.7), а не непрозрачный #ff453a — и это НЕ смена
+               оформления, а перенос того, что рисовалось на самом деле.
+               Цвет полосы писал инлайном ладдер в updateAnalogDisplay(), и
+               инлайн бил это правило: замер показывал rgba(255,69,58,0.7).
+               То есть правило было мертво, а значение в нём — тем, что кто-то
+               когда-то имел в виду, но пользователь никогда не видел.
+               Приводим правило к отрисованному, инлайн убираем. */
+            color: rgba(255, 69, 58, 0.7);
             text-shadow: 0 0 10px rgba(255, 69, 58, 0.5);
             animation: widget-analog-text-pulse 1s ease-in-out infinite;
         }
@@ -892,9 +914,17 @@
             font-size: var(--digits-font-size, 40px);
             line-height: 1;
             white-space: nowrap;
-            color: var(--tw-fg);
+            color: var(--timer-color, var(--tw-fg));
             font-variant-numeric: tabular-nums;
         }
+
+        /* Полосы «Цифр». Раньше их не было вовсе: цвет полосы писал инлайном
+           ладдер в updateDisplay(), и правил CSS для этого стиля не
+           существовало — то есть состояние нельзя было ни переопределить темой,
+           ни увидеть в стилях. Значения перенесены из того ладдера дословно. */
+        .widget-digits-time[data-status="warning"] { color: var(--tw-band-warning); }
+        .widget-digits-time[data-status="danger"],
+        .widget-digits-time[data-status="overtime"] { color: var(--tw-band-danger); }
 
         .widget-digits-sign {
             position: absolute;
@@ -1547,34 +1577,32 @@
                         if (progressColor) { stops[1].setAttribute('stop-color', progressColor); }
                     }
                 }
-                if (timerColor && this.timeDisplay) {
-                    this.timeDisplay.style.setProperty('--glow-color', `${timerColor}80`);
-                }
-
-                // Digital style — save base color, skip if in danger/overtime
+                // --timer-glow, а НЕ --glow-color инлайном на .time-display:
+                // инлайновая переменная перебивала правила [data-status] и
+                // делала красное/жёлтое свечение полос недостижимым из CSS.
+                // Теперь это только ЗАПАСНОЕ значение — полоса, когда она есть,
+                // переопределяет --glow-color своим правилом.
                 if (timerColor) {
-                    this._baseTimerColor = timerColor;
-                    this._baseDigitalGlow = `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
-                }
-                if (timerColor && this.widgetDigitalTime && !this.widgetDigitalTime.dataset.status?.match(/danger|overtime/)) {
-                    this.widgetDigitalTime.style.color = timerColor;
-                    this.widgetDigitalTime.style.textShadow = this._baseDigitalGlow;
+                    document.documentElement.style.setProperty('--timer-glow', `${timerColor}80`);
                 }
 
-                // Цифры — базовый цвет темы, кроме перерасхода (его держит
-                // ладдер в updateDisplay).
-                if (timerColor && this.widgetDigitsTime
-                    && !this.widgetDigitsTime.dataset.status?.match(/danger|overtime/)) {
-                    this.widgetDigitsTime.style.color = timerColor;
-                }
-
-                // Flip style — save base color, skip if in danger/overtime
+                // LED, «Цифры» и флип берут цвет темы из ОДНОЙ переменной.
+                //
+                // Раньше это были три отдельные ветки, каждая со своим
+                // охранником `!dataset.status?.match(/danger|overtime/)` — они
+                // существовали ровно потому, что инлайн бьёт правила полос и
+                // применить цвет темы поверх полосы означало её стереть. С
+                // переменной охранники не нужны: правило [data-status] сильнее
+                // по специфичности и выигрывает само, независимо от того, в
+                // каком порядке пришли обновление цвета и обновление полосы.
+                //
+                // Заодно ушла и гонка: applyColors и updateDisplay больше не
+                // пишут в одно и то же свойство одного и того же элемента.
                 if (timerColor) {
-                    document.querySelectorAll('.widget-flip-digit').forEach(el => {
-                        if (!el.closest('[data-status="danger"]') && !el.closest('[data-status="overtime"]')) {
-                            el.style.color = timerColor;
-                        }
-                    });
+                    document.documentElement.style.setProperty('--timer-color', timerColor);
+                }
+
+                if (timerColor) {
                     // Separator dots are pseudo-elements with a fixed brand
                     // gradient; user color themes don't apply to them. Status
                     // overrides (warning/danger/overtime) are handled via CSS
@@ -1588,23 +1616,35 @@
                 // Секундная стрелка отдана CSS. Раньше она красилась ТЕМ ЖЕ
                 // градиентом, что и минутная: две стрелки становились
                 // неразличимы по цвету, а CSS-правило с красной секундной было
-                // мертво. Ветка сброса ниже пишет `this._baseSecondHandBg || ''`,
-                // поэтому пустая строка корректно снимает инлайн и возвращает
-                // управление CSS — инвариант сброса не нарушается.
-                this._baseSecondHandBg = '';
+                // мертво. Пустая строка удаляет инлайн, поставленный прошлой
+                // версией в этом же профиле, и возвращает управление CSS.
+                // (Раньше здесь упоминалась «ветка сброса ниже» с
+                // _baseSecondHandBg — той ветки больше нет: полосу теперь
+                // держит правило [data-status], снимать нечего.)
                 if (secondHand) { secondHand.style.background = ''; }
+                // Центр и цифры аналога красятся ПЕРЕМЕННЫМИ, а не инлайном.
+                // Инлайн на элементе бьёт правила [data-status], поэтому раньше
+                // полосе приходилось писать свой цвет тоже инлайном, а при
+                // выходе из полосы — восстанавливать сохранённый в _base*.
+                // Переменная живёт на documentElement и служит лишь ЗАПАСНЫМ
+                // значением, которое правило полосы перекрывает каскадом.
                 if (timerColor && clockCenter) {
-                    this._baseCenterBg = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
-                    clockCenter.style.background = this._baseCenterBg;
+                    document.documentElement.style.setProperty(
+                        '--timer-center-bg',
+                        `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`
+                    );
                     clockCenter.style.boxShadow = '';
                 }
                 if (timerColor && analogDigital) {
                     // Альфа b3 давала 2.95:1 при кегле 14px. Цвет и так
                     // вторичен по кеглю и положению — приглушать его ещё и
                     // прозрачностью незачем.
-                    this._baseAnalogDigitalColor = timerColor;
-                    analogDigital.style.color = this._baseAnalogDigitalColor;
-                    analogDigital.style.textShadow = `0 0 10px ${timerColor}4d`;
+                    document.documentElement.style.setProperty('--timer-analog-color', timerColor);
+                    // Свечение — тоже переменной. Инлайновый text-shadow бил бы
+                    // text-shadow правила [data-status="danger"] ровно так же,
+                    // как это делал инлайновый color: в перерасходе цифры стали
+                    // бы красными, а ореол вокруг них остался бы цвета темы.
+                    document.documentElement.style.setProperty('--timer-analog-glow', `${timerColor}4d`);
                 }
             }
 
@@ -1935,50 +1975,37 @@
                 this.progressBar.dataset.status = status;
                 this.timeDisplay.dataset.status = status;
 
-                // Circle time-display: force inline color for overtime/danger
-                if (status === 'danger' || status === 'overtime') {
-                    this.timeDisplay.style.color = '#ff4444';
-                    this.timeDisplay.style.setProperty('--glow-color', 'rgba(255, 68, 68, 0.8)');
-                } else if (status === 'warning') {
-                    this.timeDisplay.style.color = '#ffc107';
-                    this.timeDisplay.style.setProperty('--glow-color', 'rgba(255, 193, 7, 0.6)');
-                } else {
-                    this.timeDisplay.style.color = '';
-                    if (this._baseTimerColor) {
-                        this.timeDisplay.style.setProperty('--glow-color', `${this._baseTimerColor}80`);
-                    }
-                }
+                // Круг цвет и свечение полосы НЕ пишет: и то и другое уже
+                // задают правила `.time-display[data-status="…"]` выше по файлу
+                // (color: #ff4444 / var(--tw-yellow), --glow-color красный /
+                // жёлтый — значения сверены, они те же самые). Достаточно
+                // выставленного строкой выше data-status.
+                //
+                // Здесь стоял инлайновый ладдер, и он был не просто лишним —
+                // он был источником бага. Ветка возврата в норму снимала цвет
+                // (`style.color = ''`), но свечение возвращала только под
+                // условием `if (this._baseTimerColor)`, БЕЗ завершающего else.
+                // А _baseTimerColor заполняется исключительно в applyColors(),
+                // которая выходит раньше, когда в localStorage нет `timerColors`
+                // — то есть на свежей установке ветки сброса не существовало.
+                // Замерено: после выхода из danger отрисовывалось
+                // `rgba(255,68,68,0.8) 0 0 20px` на цифрах нормального цвета,
+                // и держалось до перезапуска. e2e/color-band-reset.spec.js.
 
-                // Digital time: force inline color
+                // LED и «Цифры» цвет полосы не пишут — его задают правила
+                // [data-status] в CSS. Значения сверены до удаления ладдера:
+                // --tw-led-warn === #ffcc00, --tw-led-danger === #ff3333,
+                // --tw-band-warning === #ffc107, --tw-band-danger === #ff4444,
+                // то есть ровно те литералы, что стояли здесь.
+                //
+                // Свечение LED в CSS построено на currentColor, поэтому оно
+                // следует за цветом само — отдельная строка textShadow здесь
+                // была третьей копией одного и того же значения.
                 if (this.widgetDigitalTime) {
                     this.widgetDigitalTime.dataset.status = status;
-                    if (status === 'danger' || status === 'overtime') {
-                        this.widgetDigitalTime.style.color = '#ff3333';
-                        this.widgetDigitalTime.style.textShadow = '0 0 10px #ff3333, 0 0 20px #ff3333, 0 0 40px #ff333366';
-                    } else if (status === 'warning') {
-                        this.widgetDigitalTime.style.color = '#ffcc00';
-                        this.widgetDigitalTime.style.textShadow = '0 0 10px #ffcc00, 0 0 20px #ffcc00, 0 0 40px #ffcc0066';
-                    } else if (this._baseTimerColor) {
-                        this.widgetDigitalTime.style.color = this._baseTimerColor;
-                        this.widgetDigitalTime.style.textShadow = this._baseDigitalGlow || '';
-                    } else {
-                        this.widgetDigitalTime.style.color = '';
-                        this.widgetDigitalTime.style.textShadow = '';
-                    }
                 }
-
                 if (this.widgetDigitsTime) {
                     this.widgetDigitsTime.dataset.status = status;
-                    if (status === 'danger' || status === 'overtime') {
-                        this.widgetDigitsTime.style.color = '#ff4444';
-                    } else if (status === 'warning') {
-                        this.widgetDigitsTime.style.color = '#ffc107';
-                    } else {
-                        // `|| ''` — пустая строка снимает инлайн. Ветка
-                        // `else if (this._baseTimerColor)` оставила бы красный
-                        // навсегда на чистом профиле.
-                        this.widgetDigitsTime.style.color = this._baseTimerColor || '';
-                    }
                 }
 
                 // Обновляем статус
@@ -2044,23 +2071,13 @@
                 // Полоса срочности — общая для всех окон (RendererShared).
                 const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
 
+                // Карточке достаточно data-status: цвет цифры задают правила
+                // `.widget-flip-card[data-status=…] .widget-flip-digit`, и они
+                // несут ровно те же значения, что стояли в удалённом отсюда
+                // инлайновом ладдере (--tw-band-warning === #ffc107,
+                // --tw-band-danger === #ff4444).
                 flipCards.forEach(card => {
                     card.dataset.status = status;
-                    // Override inline color set by applyColors()
-                    const digit = card.querySelector('.widget-flip-digit');
-                    if (digit) {
-                        if (status === 'danger' || status === 'overtime') {
-                            digit.style.color = '#ff4444';
-                        } else if (status === 'warning') {
-                            digit.style.color = '#ffc107';
-                        } else {
-                            // Раньше здесь стояло `else if (this._baseTimerColor)`, и без
-                            // пользовательской темы инлайновый красный не снимался никогда —
-                            // цифры оставались красными даже после установки нового пресета.
-                            // Пустая строка удаляет инлайн и возвращает управление CSS.
-                            digit.style.color = this._baseTimerColor || '';
-                        }
-                    }
                 });
 
                 // Separator dots are painted by ::before/::after backgrounds, so
@@ -2120,30 +2137,13 @@
                     if (el) { el.dataset.status = status; }
                 });
 
-                // Override inline colors for analog overtime
-                if (status === 'danger' || status === 'overtime') {
-                    if (this.widgetHandSecond) {
-                        this.widgetHandSecond.style.background = '#ff453a';
-                        this.widgetHandSecond.style.boxShadow = '';
-                    }
-                    if (this.widgetClockCenter) {
-                        this.widgetClockCenter.style.background = '#ff453a';
-                        this.widgetClockCenter.style.boxShadow = '';
-                    }
-                    if (this.widgetAnalogDigital) {
-                        this.widgetAnalogDigital.style.color = 'rgba(255,69,58,0.7)';
-                    }
-                } else {
-                    if (this.widgetHandSecond) {
-                        this.widgetHandSecond.style.background = this._baseSecondHandBg || '';
-                    }
-                    if (this.widgetClockCenter) {
-                        this.widgetClockCenter.style.background = this._baseCenterBg || '';
-                    }
-                    if (this.widgetAnalogDigital) {
-                        this.widgetAnalogDigital.style.color = this._baseAnalogDigitalColor || '';
-                    }
-                }
+                // Цвет полосы здесь больше не пишется. Стрелка, центр и цифры
+                // аналога красятся правилами [data-status] выше по файлу, а
+                // цвет темы приходит переменными (--timer-center-bg,
+                // --timer-analog-color, --timer-analog-glow), которые эти
+                // правила перекрывают каскадом. Восстанавливать при выходе из
+                // полосы нечего — вместе с ладдером ушли и поля
+                // _baseSecondHandBg / _baseCenterBg / _baseAnalogDigitalColor.
             }
 
             // Приоритеты статуса — общие для всех трёх окон, живут в

@@ -447,7 +447,9 @@ function colorStops(value) {
         : [value];
 }
 
-const OWNS_NO_BACKGROUND = ['electron-widget.html', 'display.html'];
+// Виджет держит стили инлайном, у дисплея они в display.css — окно то же,
+// файл другой.
+const OWNS_NO_BACKGROUND = ['electron-widget.html', 'display.css'];
 
 test('виджет и дисплей: акценты читаемы на своей прибитой подложке в светлой теме', () => {
     const report = [];
@@ -561,7 +563,7 @@ test('подписи info-блоков читаемы во всех темах (
 
 test('подпись LED-стиля читаема на своём тёмном фоне', () => {
     // Отдельный fallback: зелёный по --tw-bg-led. При alpha 0.55 давал 3.57:1.
-    const display = fs.readFileSync(path.join(__dirname, '..', 'display.html'), 'utf8');
+    const display = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
     const m = /body\.style-digital \.info-label \{[\s\S]*?color: var\(--info-color-dim, (rgba\([^)]+\))\)/.exec(display);
     assert.ok(m, 'не найден fallback подписи LED-стиля');
 

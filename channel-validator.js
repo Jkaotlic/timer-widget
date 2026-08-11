@@ -31,7 +31,8 @@ const ALLOWED_CHANNELS = {
         // Тема интерфейса. Канал в ОБОИХ списках: панель отправляет смену,
         // все окна её принимают (ui-theme.js).
         'ui-theme-update',
-        'minimize-window',
+        'open-releases-page',
+    'minimize-window',
         'toggle-fullscreen',
         'quit-app',
         'reset-and-relaunch'

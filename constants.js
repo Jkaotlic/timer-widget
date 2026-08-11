@@ -126,6 +126,8 @@ const CONFIG = {
         // Фон полноэкранного режима
         LOCAL_BG_IMAGE: 'localBgImage',
         LOCAL_BG_SETTINGS: 'localBgSettings',
+        // Первый запуск: показана ли подсказка про F1 (ровно один раз за профиль)
+        ONBOARDING_SHOWN: 'onboardingShown',
         // Звук
         CUSTOM_SOUNDS: 'customSounds',
         SOUND_ENABLED: 'soundEnabled',

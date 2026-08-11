@@ -236,7 +236,7 @@ test('минус вне потока: по центру стоят ЦИФРЫ', 
     // Живой замер держит e2e/overtime-centering.spec.js.
     const controlHtml = readControlSource();
     const widgetHtml = readCode('electron-widget.html');
-    const displayHtml = readCode('display.html');
+    const displayHtml = readCode('display.html') + '\n' + readCode('display.css');
     const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
 
     for (const [name, src, signSel, boxSel] of [
