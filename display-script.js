@@ -747,58 +747,17 @@ class DisplayTimer {
             document.documentElement.style.setProperty('--glow-color', `${timerColor}80`);
         }
 
-        // Digital style — save base color, apply only if not in danger/overtime
-        const digitalTime = document.getElementById('digitalTime');
+        // Цвет темы для цифр КРУГА, LED, «Цифр» и ФЛИПА — одна переменная.
+        //
+        // Раньше каждый из этих стилей красился инлайном, и каждому нужен был
+        // охранник «не трогать, если сейчас danger/warning»: инлайн бьёт
+        // правило полосы, поэтому применить цвет темы поверх полосы означало
+        // её стереть. С переменной охранники не нужны — правило .danger
+        // сильнее по специфичности и выигрывает само, в каком бы порядке ни
+        // пришли обновление цвета и обновление полосы.
         if (timerColor) {
-            this._baseTimerColor = timerColor;
-            this._baseTimerGlow = `0 0 20px ${timerColor}, 0 0 40px ${timerColor}, 0 0 80px ${timerColor}66`;
+            document.documentElement.style.setProperty('--timer-color', timerColor);
         }
-        // L7: also skip the 'warning' (yellow) band, not just 'danger', so a color
-        // update while paused in the warning band doesn't overwrite the yellow.
-        if (timerColor && digitalTime
-            && !digitalTime.classList.contains('danger')
-            && !digitalTime.classList.contains('warning')) {
-            digitalTime.style.color = timerColor;
-            digitalTime.style.textShadow = this._baseTimerGlow;
-        }
-
-        // Digits style — save base color, apply only if not in danger/overtime.
-        // Без этого блока `display-colors-update`, пришедший, пока дисплей стоит
-        // на паузе в стиле «Цифры», не менял цвет вообще: единственный ладдер,
-        // который красит digitsTime, живёт в updateDisplay() и защёлкнут кэшем
-        // «секунды не изменились» — перекраска ждала бы следующего реального тика.
-        if (timerColor && this.digitsTime
-            && !this.digitsTime.classList.contains('danger')
-            && !this.digitsTime.classList.contains('warning')) {
-            this.digitsTime.style.color = timerColor;
-        }
-
-        // Flip style — save base color, apply only if not in danger/overtime
-        // F-023: кэшируем узлы, чтобы не вызывать querySelectorAll на каждое обновление цвета
-        if (timerColor) {
-            if (!this._cachedFlipDigits) {
-                this._cachedFlipDigits = document.querySelectorAll('.flip-digit');
-            }
-            if (!this._cachedFlipSeparators) {
-                this._cachedFlipSeparators = document.querySelectorAll('.flip-separator');
-            }
-            // L7: skip both 'danger' and 'warning' so a color update during the
-            // warning band doesn't overwrite the yellow on flip digits.
-            this._cachedFlipDigits.forEach(el => {
-                if (!el.closest('.danger') && !el.closest('.warning')) {
-                    el.style.color = timerColor;
-                }
-            });
-            // L6: while in overtime the separators must stay red (only
-            // _enforceOvertimeColors / per-tick methods own that). Keep the cache
-            // populated above, but guard the actual recolor on overtime.
-            if (this.remainingSeconds >= 0) {
-                this._cachedFlipSeparators.forEach(el => {
-                    el.style.color = timerColor;
-                });
-            }
-        }
-
         // Info blocks (time blocks): ЗНАЧЕНИЕ берёт цвет темы, ПОДПИСЬ — нет.
         //
         // Раньше подпись красилась в `${timerColor}80`, то есть в цвет темы при
@@ -835,104 +794,30 @@ class DisplayTimer {
         // перерасход закончился. Раньше эти инлайновые стили ставила только ветка
         // перерасхода, а снять их было нечем — красные стрелки залипали до
         // следующей смены цвета в панели управления.
+        const root = document.documentElement.style;
         if (progressColor) {
-            this._baseSecondHandBg =
-                `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
-            this._baseSecondHandShadow = `0 0 15px ${progressColor}80`;
+            root.setProperty('--analog-hand-bg',
+                `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`);
+            root.setProperty('--analog-hand-shadow', `0 0 15px ${progressColor}80`);
         }
         if (timerColor) {
-            this._baseCenterBg = `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`;
-            this._baseCenterShadow = `0 0 15px ${timerColor}99`;
+            root.setProperty('--analog-center-bg',
+                `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`);
+            root.setProperty('--analog-center-shadow', `0 0 15px ${timerColor}99`);
             // Было b3 (0.7): выбор темы приглушал отсчёт ВТОРОЙ раз поверх
             // токена, который и так вторичен. Инвариант сброса не задет —
             // это база восстановления после перерасхода, она и должна быть
             // непустой, а красные полосы ставятся и снимаются своими ветками.
-            this._baseAnalogDigitalColor = `${timerColor}e6`;
+            root.setProperty('--analog-digital-color', `${timerColor}e6`);
         }
 
-        // L6: пока идёт перерасход, стрелки/центр/цифры держит красными
-        // _enforceOvertimeColors и per-tick методы — не перебиваем их здесь.
-        if (this.remainingSeconds >= 0) {
-            const secondHand = document.getElementById('analogHandSecond');
-            const clockCenter = document.querySelector('.clock-center');
-            const analogDigital = document.getElementById('analogDigitalTime');
-            if (progressColor && secondHand) {
-                secondHand.style.background = this._baseSecondHandBg;
-                secondHand.style.boxShadow = this._baseSecondHandShadow;
-            }
-            if (timerColor && clockCenter) {
-                clockCenter.style.background = this._baseCenterBg;
-                clockCenter.style.boxShadow = this._baseCenterShadow;
-            }
-            if (timerColor && analogDigital) {
-                analogDigital.style.color = this._baseAnalogDigitalColor;
-            }
-        }
+        // Охранника «применять цвет темы, только если НЕ идёт перерасход» здесь
+        // больше нет, и он больше не нужен. Он существовал потому, что цвет
+        // писался инлайном и затирал красный перерасхода; теперь тема — это
+        // переменные, а полосу держат классы .danger/.warning, которые сильнее
+        // по специфичности. Порядок прихода событий перестал иметь значение.
     }
 
-    // Called every tick to ensure overtime red color persists
-    // (applyColors or cache logic may reset inline styles)
-    _enforceOvertimeColors(secs) {
-        const isOvertime = secs < 0;
-        if (!isOvertime) { return; }
-
-        // Circle time-text
-        if (this.timeDisplay) {
-            if (!this.timeDisplay.classList.contains('danger')) {
-                this.timeDisplay.classList.add('danger', 'overtime');
-            }
-            this.timeDisplay.style.color = '#ff4444';
-        }
-
-        // Circle progress ring
-        if (this.progressRing && !this.progressRing.classList.contains('danger')) {
-            this.progressRing.classList.add('danger', 'overtime');
-        }
-
-        // Digital
-        if (this.digitalTime) {
-            if (!this.digitalTime.classList.contains('danger')) {
-                this.digitalTime.classList.add('danger', 'overtime');
-            }
-            this.digitalTime.style.color = '#ff3333';
-            this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
-        }
-
-        // Цифры
-        if (this.digitsTime) {
-            if (!this.digitsTime.classList.contains('danger')) {
-                this.digitsTime.classList.add('danger', 'overtime');
-            }
-            this.digitsTime.style.color = '#ff4444';
-        }
-
-        // Flip cards + separators
-        const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2].filter(Boolean);
-        flipCards.forEach(card => {
-            if (!card.classList.contains('danger')) {
-                card.classList.add('danger', 'overtime');
-            }
-            const digit = card.querySelector('.flip-digit');
-            if (digit) { digit.style.color = '#ff4444'; }
-        });
-        document.querySelectorAll('.flip-separator').forEach(el => {
-            el.style.color = '#ff4444';
-        });
-
-        // Analog
-        if (this.analogHandSecond) {
-            this.analogHandSecond.style.background = 'linear-gradient(180deg, #ff4444 0%, #cc0000 100%)';
-            this.analogHandSecond.style.boxShadow = '0 0 15px rgba(255,68,68,0.8)';
-        }
-        const clockCenter = this.timerAnalog ? this.timerAnalog.querySelector('.clock-center') : null;
-        if (clockCenter) {
-            clockCenter.style.background = 'linear-gradient(145deg, #ff4444, #cc0000)';
-            clockCenter.style.boxShadow = '0 0 15px rgba(255,68,68,0.6)';
-        }
-        if (this.analogDigitalTime) {
-            this.analogDigitalTime.style.color = '#ff4444';
-        }
-    }
 
     _isSafeColor(value) {
         // Тот же валидатор, что у остальных окон: своя регулярка принимала
@@ -1132,10 +1017,12 @@ class DisplayTimer {
                 this.cache.lastPaused = this.isPaused;
                 this.cache.lastFinished = this.finished;
             }
-            // L6: applyColors (decoupled from ticks) can reset overtime red on
-            // flip separators / analog elements while paused in overtime. Re-enforce
-            // here too — _enforceOvertimeColors no-ops when secs >= 0.
-            this._enforceOvertimeColors(secs);
+            // Здесь стоял вызов _enforceOvertimeColors(secs) — перекраска
+            // «на всякий случай» на КАЖДОМ тике. Она была нужна лишь потому,
+            // что applyColors писала цвет инлайном и стирала красный
+            // перерасхода. Инлайна больше нет: цвет темы приходит переменной
+            // --timer-color, а полосу держат классы .danger/.warning. Стирать
+            // друг друга им нечем, и восстанавливать нечего.
             return;
         }
 
@@ -1189,18 +1076,10 @@ class DisplayTimer {
             const band = this._colorBand(secs);
             if (band === 'overtime') {
                 this.digitsTime.classList.add('danger', 'overtime');
-                this.digitsTime.style.color = '#ff4444';
             } else if (band === 'danger') {
                 this.digitsTime.classList.add('danger');
-                this.digitsTime.style.color = '#ff4444';
             } else if (band === 'warning') {
                 this.digitsTime.classList.add('warning');
-                this.digitsTime.style.color = '#ffc107';
-            } else {
-                // Пустая строка СНИМАЕТ инлайн и возвращает цвет CSS. Ветка
-                // `else if (this._baseTimerColor)` была бы багом: на чистом
-                // профиле базового цвета нет, и красный не снялся бы никогда.
-                this.digitsTime.style.color = this._normalColor();
             }
         }
 
@@ -1211,8 +1090,6 @@ class DisplayTimer {
             this.cache.lastProgress = progress;
         }
 
-        // Force overtime color on every tick (applyColors or cache may reset it)
-        this._enforceOvertimeColors(secs);
 
         // Статус-пилюля зависит от нескольких флагов, а getTimerStatusValue()
         // смотрит только на секунды — нужно инвалидировать кэш по каждому из них.
@@ -1262,26 +1139,20 @@ class DisplayTimer {
         return Math.round((this.remainingSeconds / this.totalSeconds) * 1000) / 1000;
     }
 
-    // Цвет и свечение для «нормальной» полосы времени.
-    //
-    // КЛЮЧЕВОЙ МОМЕНТ. Раньше во всех местах восстановление было записано как
-    // `else if (this._baseTimerColor) { ...ставим цвет... }` — без завершающего
-    // else. Если пользователь не менял тему, `_baseTimerColor` не определён
-    // (applyColors вызывается только когда в localStorage есть timerColors либо
-    // пришло display-colors-update), и тогда ветка не срабатывала вообще, а
-    // инлайновый красный/жёлтый, выставленный полосой danger/warning, не снимался.
-    // Результат: время осталось красным навсегда — в том числе после установки
-    // нового пресета, когда до конца снова далеко.
-    //
-    // Пустая строка здесь принципиальна: она УДАЛЯЕТ инлайновый стиль и возвращает
-    // управление CSS-классу, а не «красит в чёрное».
     // Полоса срочности — общая для всех окон (RendererShared.timerColorBand).
+    //
+    // Здесь же жили _normalColor() / _normalGlow() — помощники «к чему
+    // возвращаться после полосы». Они были правильным решением НЕВЕРНОЙ задачи:
+    // возвращаться приходилось потому, что цвет полосы писался инлайном и бил
+    // CSS. С 11.08.2026 цвет темы приходит переменной --timer-color, полосу
+    // держат классы .warning/.danger, и восстанавливать нечего — вместе с
+    // помощниками ушли поля _baseTimerColor / _baseTimerGlow /
+    // _baseSecondHandBg / _baseSecondHandShadow / _baseCenterBg /
+    // _baseCenterShadow / _baseAnalogDigitalColor и вся функция
+    // _enforceOvertimeColors(), которая перекрашивала DOM на каждом тике.
     _colorBand(secs) {
         return window.RendererShared.timerColorBand(secs, this.totalSeconds);
     }
-
-    _normalColor() { return this._baseTimerColor || ''; }
-    _normalGlow() { return this._baseTimerColor ? (this._baseTimerGlow || '') : ''; }
 
     // Вспомогательная функция для определения статуса (для кэширования)
     getTimerStatusValue(secs) {
@@ -1328,24 +1199,17 @@ class DisplayTimer {
         // Классы предупреждения + inline color override (applyColors sets inline style)
         this.digitalTime.classList.remove('warning', 'danger', 'overtime');
         const band = this._colorBand(secs);
+        // Цвет и свечение полосы задают правила .digital-time.warning /
+        // .digital-time.danger — значения сверены до удаления инлайна:
+        // --tw-led-warn === #ffcc00, --tw-led-danger === #ff3333, тени те же
+        // 20/40/80px. Классов достаточно; снимать при возврате в норму нечего,
+        // потому что инлайн больше не ставится.
         if (band === 'overtime') {
             this.digitalTime.classList.add('danger', 'overtime');
-            this.digitalTime.style.color = '#ff3333';
-            this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
         } else if (band === 'danger') {
             this.digitalTime.classList.add('danger');
-            this.digitalTime.style.color = '#ff3333';
-            this.digitalTime.style.textShadow = '0 0 20px #ff3333, 0 0 40px #ff3333, 0 0 80px #ff333366';
         } else if (band === 'warning') {
             this.digitalTime.classList.add('warning');
-            // Было #ffc107 против --tw-led-warn = #ffcc00 в собственном CSS
-            // этого же окна: правило .digital-time.warning не применялось
-            // НИКОГДА, потому что инлайн всегда бьёт класс.
-            this.digitalTime.style.color = '#ffcc00';
-            this.digitalTime.style.textShadow = '0 0 20px #ffcc00, 0 0 40px #ffcc00, 0 0 80px #ffcc0066';
-        } else {
-            this.digitalTime.style.color = this._normalColor();
-            this.digitalTime.style.textShadow = this._normalGlow();
         }
     }
 
@@ -1414,23 +1278,25 @@ class DisplayTimer {
 
         const band = this._colorBand(secs);
         const flipSeparators = document.querySelectorAll('.flip-separator');
-        // Цвет цифр и разделителей всегда задаётся ЯВНО для каждой полосы —
-        // включая normal, где пустая строка снимает инлайн и отдаёт цвет CSS.
-        const BAND_COLOR = { overtime: '#ff4444', danger: '#ff4444', warning: '#ffc107' };
-        const digitColor = BAND_COLOR[band] || this._normalColor();
+        // Разделители ведут полосу тем же классом, что и карточки. Раньше их
+        // красил инлайн, и правил CSS для них не существовало вовсе — то есть
+        // состояние было выражено только в JS и теме не подчинялось.
+        flipSeparators.forEach(el => el.classList.remove('warning', 'danger', 'overtime'));
 
         if (band === 'overtime') {
             flipCards.forEach(card => card.classList.add('danger', 'overtime'));
+            flipSeparators.forEach(el => el.classList.add('danger', 'overtime'));
         } else if (band === 'danger') {
             flipCards.forEach(card => card.classList.add('danger'));
+            flipSeparators.forEach(el => el.classList.add('danger'));
         } else if (band === 'warning') {
             flipCards.forEach(card => card.classList.add('warning'));
+            flipSeparators.forEach(el => el.classList.add('warning'));
         }
-        flipCards.forEach(card => {
-            const digit = card.querySelector('.flip-digit');
-            if (digit) { digit.style.color = digitColor; }
-        });
-        flipSeparators.forEach(el => { el.style.color = digitColor; });
+        // Цифры и разделители цвет инлайном не получают: полосу задают правила
+        // `.flip-card.warning/.danger .flip-digit`, цвет темы — переменная
+        // --timer-color в базовом правиле. Раньше здесь считался digitColor,
+        // который приходилось выбирать между темой и полосой вручную.
     }
 
     // Перекидывание карточки. Реализация общая для всех трёх окон —
@@ -1508,34 +1374,12 @@ class DisplayTimer {
             });
             if (this.analogDigitalTime) {
                 this.analogDigitalTime.classList.add('danger', 'overtime');
-                this.analogDigitalTime.style.color = '#ff4444';
             }
-            // Override inline styles from applyColors
-            if (this.analogHandSecond) {
-                this.analogHandSecond.style.background = 'linear-gradient(180deg, #ff4444 0%, #cc0000 100%)';
-                this.analogHandSecond.style.boxShadow = '0 0 15px rgba(255,68,68,0.8)';
-            }
-            if (clockCenter) {
-                clockCenter.style.background = 'linear-gradient(145deg, #ff4444, #cc0000)';
-                clockCenter.style.boxShadow = '0 0 15px rgba(255,68,68,0.6)';
-            }
+            // Инлайновые красные стили стрелки и центра больше не ставятся:
+            // их задают правила `.hand-second.danger` / `.clock-center.danger`.
+            // Раньше их приходилось ставить и снимать вручную, и ветка снятия
+            // была отдельным источником залипшего красного.
         } else {
-            // Снимаем ИНЛАЙНОВЫЕ красные стили, выставленные веткой перерасхода.
-            // Раньше эта ветка трогала только классы, а инлайн переживал выход из
-            // перерасхода и побеждал CSS — секундная стрелка, центр циферблата и
-            // цифры под ним оставались красными до следующей смены темы.
-            if (this.analogHandSecond) {
-                this.analogHandSecond.style.background = this._baseSecondHandBg || '';
-                this.analogHandSecond.style.boxShadow = this._baseSecondHandShadow || '';
-            }
-            if (clockCenter) {
-                clockCenter.style.background = this._baseCenterBg || '';
-                clockCenter.style.boxShadow = this._baseCenterShadow || '';
-            }
-            if (this.analogDigitalTime) {
-                this.analogDigitalTime.style.color = this._baseAnalogDigitalColor || '';
-            }
-
             if (band === 'danger' || band === 'warning') {
                 analogElements.forEach(el => {
                     if (el) {el.classList.add(band);}
@@ -1612,21 +1456,19 @@ class DisplayTimer {
             this.progressRing.classList.remove('warning', 'danger', 'overtime');
             this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
 
+            // Комментарий «CSS class alone may be insufficient» описывал
+            // следствие, а не причину: класса не хватало ровно потому, что
+            // applyColors писала цвет темы ИНЛАЙНОМ и била его. Теперь тема
+            // приходит переменной, и класса достаточно.
             if (band === 'overtime') {
                 this.progressRing.classList.add('danger', 'overtime');
                 this.timeDisplay.classList.add('danger', 'overtime');
-                // Force inline color override — CSS class alone may be insufficient
-                this.timeDisplay.style.color = '#ff4444';
             } else if (band === 'danger') {
                 this.progressRing.classList.add('danger');
                 this.timeDisplay.classList.add('danger');
-                this.timeDisplay.style.color = '#ff4444';
             } else if (band === 'warning') {
                 this.progressRing.classList.add('warning');
                 this.timeDisplay.classList.add('warning');
-                this.timeDisplay.style.color = '#ffc107';
-            } else {
-                this.timeDisplay.style.color = this._normalColor();
             }
         } else {
             this.progressRing.style.strokeDashoffset = this.circumference;
@@ -1635,7 +1477,6 @@ class DisplayTimer {
             // перерасхода круглый стиль оставался красным.
             this.progressRing.classList.remove('warning', 'danger', 'overtime');
             this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
-            this.timeDisplay.style.color = this._normalColor();
         }
     }
 

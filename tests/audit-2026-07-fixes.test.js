@@ -377,44 +377,62 @@ test('восстановление цвета не зависит от нали�
         assert.match(widgetHtml, selector, `правило полосы отсутствует: ${selector}`);
     }
 
-    // Вместо условных веток — помощники, которые при отсутствии темы отдают
-    // пустую строку, то есть УДАЛЯЮТ инлайновый стиль и возвращают управление CSS.
-    assert.match(displayScript, /_normalColor\(\)\s*\{\s*return this\._baseTimerColor \|\| '';/);
-    assert.match(displayScript, /_normalGlow\(\)\s*\{\s*return this\._baseTimerColor \?/);
-});
-
-test('цифровой стиль дисплея сбрасывает красный при возврате в норму', () => {
-    const digital = displayScript.match(/updateDigitalDisplay\(secs, _formatted\)\s*\{[\s\S]*?\n {4}\}/);
-    assert.ok(digital, 'updateDigitalDisplay должен существовать');
-    // Лесенка полос заканчивается безусловным else, который сбрасывает и цвет,
-    // и свечение — без него инлайновый красный переживал возврат в норму.
-    assert.match(
-        digital[0],
-        /\} else \{\s*\n\s*this\.digitalTime\.style\.color = this\._normalColor\(\);\s*\n\s*this\.digitalTime\.style\.textShadow = this\._normalGlow\(\);/
+    // Дисплей: та же гарантия, тоже усиленная.
+    //
+    // Раньше здесь требовались помощники _normalColor() / _normalGlow(),
+    // отдающие пустую строку при отсутствии темы. Они были правильным решением
+    // неверной задачи: возвращаться приходилось потому, что цвет полосы
+    // писался инлайном. Теперь тема — переменная --timer-color, полосу держат
+    // классы, и восстанавливать нечего.
+    assert.doesNotMatch(
+        displayScript, /_normalColor\(\)|_normalGlow\(\)|_baseTimerColor|_baseCenterBg|_baseSecondHandBg/,
+        'вернулась механика «запомнить цвет, чтобы потом восстановить» — значит вернулся и инлайн'
+    );
+    assert.doesNotMatch(
+        displayScript, /_enforceOvertimeColors/,
+        'вернулась перекраска DOM на каждом тике: она существовала только чтобы возвращать инлайн, стёртый другим инлайном'
     );
 });
 
-test('flip-стиль дисплея сбрасывает цвет цифр и разделителей', () => {
-    const flip = displayScript.match(/updateFlipDisplay\(secs\)\s*\{[\s\S]*?\n {4}\}\n/);
-    assert.ok(flip, 'updateFlipDisplay должен существовать');
-    // Цвет считается один раз и применяется БЕЗУСЛОВНО и к цифрам, и к
-    // разделителям: для нормальной полосы это _normalColor(), то есть сброс инлайна.
-    assert.match(flip[0], /const digitColor = BAND_COLOR\[band\] \|\| this\._normalColor\(\)/);
-    assert.match(flip[0], /if \(digit\) \{ digit\.style\.color = digitColor; \}/);
-    assert.match(flip[0], /flipSeparators\.forEach\(el => \{ el\.style\.color = digitColor; \}\)/);
-});
+test('дисплей не пишет цвет полосы инлайном ни в одном стиле', () => {
+    // Три отдельных теста («цифровой сбрасывает красный», «flip сбрасывает цвет
+    // цифр и разделителей», «аналоговый снимает инлайновые стрелки») сторожили
+    // ВЕТКИ СБРОСА. Ветки сброса нужны ровно тогда, когда есть инлайновый
+    // писатель: инлайн бьёт CSS-класс, поэтому полоса вынуждена писать цвет
+    // инлайном, а значит и снимать его вручную. 11.08.2026 писатель убран —
+    // цвет темы приходит переменной --timer-color, полосу держат классы.
+    //
+    // Поэтому проверяется сильное утверждение вместо трёх слабых: инлайновых
+    // записей цвета в файле нет вовсе. Оно покрывает все пять стилей разом и не
+    // может быть удовлетворено «правильно написанным сбросом».
+    const colorWrites = displayScript.match(
+        /\.style\.(color|textShadow|boxShadow)\s*=|\.style\.background\s*=\s*['"`](?!rgba\(0, 0, 0)/g
+    ) || [];
+    assert.deepStrictEqual(
+        colorWrites, [],
+        `дисплей снова красит инлайном (${colorWrites.length} мест): цвет обязан приходить переменной, полоса — классом`
+    );
 
-test('аналоговый стиль дисплея снимает инлайновые красные стрелки и центр', () => {
-    // Ветка перерасхода красит стрелку/центр инлайном; без обратного сброса они
-    // оставались красными до следующей смены темы.
-    const analog = displayScript.match(/updateAnalogDisplay\(secs\)\s*\{[\s\S]*?\n {4}\}\n/);
-    assert.ok(analog, 'updateAnalogDisplay должен существовать');
-    assert.match(analog[0], /this\.analogHandSecond\.style\.background = this\._baseSecondHandBg \|\| ''/);
-    assert.match(analog[0], /clockCenter\.style\.background = this\._baseCenterBg \|\| ''/);
-    assert.match(analog[0], /this\.analogDigitalTime\.style\.color = this\._baseAnalogDigitalColor \|\| ''/);
-    // Базовые значения должны запоминаться в applyColors ВСЕГДА, иначе восстанавливать нечем.
-    assert.match(displayScript, /this\._baseSecondHandBg =\s*\n?\s*`linear-gradient/);
-    assert.match(displayScript, /this\._baseCenterBg = `linear-gradient/);
+    // Обратная сторона: правила полос обязаны существовать в CSS, иначе
+    // «инлайна нет» означало бы «цвета нет».
+    const displayCss = read('display.html');
+    for (const selector of [
+        /\.time-text\.danger/,
+        /\.digital-time\.danger/,
+        /\.digits-time\.danger/,
+        /\.flip-card\.danger \.flip-digit/,
+        /\.flip-separator\.danger/,
+        /\.analog-digital-time\.danger/,
+        /\.hand-second\.danger/,
+        /\.clock-center\.danger/
+    ]) {
+        assert.match(displayCss, selector, `правило полосы отсутствует: ${selector}`);
+    }
+
+    // И цвет темы обязан доезжать переменной — иначе выбор темы просто перестанет
+    // действовать, а тест выше этого не заметит.
+    assert.match(displayScript, /setProperty\('--timer-color', timerColor\)/);
+    assert.match(displayCss, /var\(--timer-color,/);
 });
 
 test('круглый стиль дисплея сбрасывает цвет и без пресета', () => {

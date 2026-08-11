@@ -196,7 +196,13 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-    // Профиль e2e общий на прогон — глобальное состояние возвращаем.
+    // Профиль e2e ОДИН на весь прогон, поэтому спека обязана вернуть всё, что
+    // трогала. Эта перебирает пять стилей в двух окнах и оставляла последний
+    // («Цифры») — следующие спеки открывали окна не в том стиле, который
+    // ожидали, и падали по таймауту, проходя при этом в одиночку.
+    // Ровно тот же класс поломки, что описан в CLAUDE.md про #contrastToggle.
+    await setWidgetStyle('circle').catch(() => {});
+    await setDisplayStyle('circle').catch(() => {});
     await sendCommand({ type: 'set', seconds: 300, allowNegative: false }).catch(() => {});
     await app.close();
 });
