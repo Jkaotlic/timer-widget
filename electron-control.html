@@ -2406,9 +2406,10 @@
             updateDisplay() {
                 // Сплит знака и цифр держит цифры центрированными при переходе в минус.
                 const _neg = this.remainingSeconds < 0;
+                const _digits = this.formatTime(Math.abs(this.remainingSeconds));
                 this.controlTimeSignEl.textContent = _neg ? '−' : '';
-                this.controlTimeDigitsEl.textContent = this.formatTime(Math.abs(this.remainingSeconds));
-                
+                this.controlTimeDigitsEl.textContent = _digits;
+
                 // Цветовые классы для времени
                 // Полоса срочности — общая для всех окон (RendererShared).
                 this.controlTimeEl.classList.remove('warning', 'danger');
@@ -2447,6 +2448,10 @@
                 if (this.controlHeroLabelEl) {
                     this.controlHeroLabelEl.textContent = isOvertime ? 'Сверх времени' : 'Осталось';
                 }
+
+                // Полоса берёт время ОТСЮДА, а не считает своё: второй источник
+                // времени — расхождение, которое проект уже ловил на дисплее.
+                window.miniBar?.render({ text: (_neg ? '−' : '') + _digits, band: isOvertime ? 'danger' : band });
             }
 
             // Подсветка быстрого выбора выводится из состояния таймера, а не из
@@ -2731,7 +2736,10 @@
         // обновления». Подробности и зависимости — в onboarding.js.
         window.Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
-        window.miniBar = window.MiniBar.init({ doc: document, ipc: window.ipcRenderer, onToggle: (on) => { if (on) { window.timerController?.closeSettingsDrawer(); } } });
+        const _tc = () => window.timerController;
+        window.miniBar = window.MiniBar.init({ doc: document, ipc: window.ipcRenderer,
+            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); } },
+            actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
 
         const faqModal = document.getElementById('faqModal');
         const faqClose = document.getElementById('faqClose');
@@ -2962,6 +2970,13 @@
                     window.ipcRenderer.send('close-widget');
                     window.ipcRenderer.send('close-clock-widget');
                 }
+            }
+
+            // M: свернуть окно в полосу и обратно. Клавиша выбрана по коду из
+            // свободных; модификаторы не трогаем — Cmd+M остаётся за системой.
+            else if (event.code === 'KeyM') {
+                event.preventDefault();
+                if (window.miniBar) { window.miniBar.toggle(); }
             }
 
             // F1: Show help/shortcuts

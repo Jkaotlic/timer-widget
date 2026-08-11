@@ -23,10 +23,15 @@ function fakeDoc() {
         setAttribute(k, v) { this.attrs[k] = v; },
         getAttribute(k) { return this.attrs[k]; }
     });
-    for (const id of ['miniBarToggle', 'miniBarExpand', 'miniBar']) { els.set(id, mkEl(id)); }
+    for (const id of ['miniBarToggle', 'miniBarExpand', 'miniBar', 'miniBarTime', 'miniBarDot',
+        'miniBarStart', 'miniBarPause', 'miniBarReset']) {
+        els.set(id, mkEl(id));
+    }
+    els.set('titlebar', mkEl('titlebar'));
     return {
         body,
         getElementById: (id) => els.get(id) || null,
+        querySelector: (sel) => (sel === '.custom-titlebar' ? els.get('titlebar') : null),
         _el: (id) => els.get(id)
     };
 }
@@ -142,4 +147,77 @@ test('состояние объявлено для доступности', () =
 test('без документа init возвращает null и ничего не ломает', () => {
     assert.equal(MiniBar.init({}), null);
     assert.equal(MiniBar.init({ doc: {} }), null);
+});
+
+test('render пишет время и полосу состояния в полосу', () => {
+    // DOM полосы принадлежит модулю полосы: панель отдаёт ей ЗНАЧЕНИЯ, а не
+    // лезет в её элементы. Иначе разметка полосы оказывается размазана между
+    // двумя файлами, а inline-скрипт панели упирается в свой потолок.
+    const doc = fakeDoc();
+    const bar = MiniBar.init({ doc, ipc: fakeIpc() });
+
+    bar.render({ text: '−01:30', band: 'danger' });
+
+    assert.equal(doc._el('miniBarTime').textContent, '−01:30');
+    assert.equal(doc._el('miniBarDot').className, 'mini-dot danger');
+});
+
+test('render переводит спокойное состояние в ok, а неизвестное — тоже в ok', () => {
+    const doc = fakeDoc();
+    const bar = MiniBar.init({ doc, ipc: fakeIpc() });
+
+    bar.render({ text: '05:00', band: 'normal' });
+    assert.equal(doc._el('miniBarDot').className, 'mini-dot ok');
+
+    bar.render({ text: '05:00', band: 'нечто' });
+    assert.equal(doc._el('miniBarDot').className, 'mini-dot ok');
+
+    bar.render({ text: '01:00', band: 'warning' });
+    assert.equal(doc._el('miniBarDot').className, 'mini-dot warning');
+});
+
+test('двойной клик по полосе и по титлбару переключает режим, по кнопке — нет', () => {
+    // Двойной клик по кнопке — это два клика по кнопке. Превращать его ещё и
+    // в смену режима нельзя: пользователь дважды нажал «пауза», а окно
+    // схлопнулось.
+    const doc = fakeDoc();
+    const bar = MiniBar.init({ doc, ipc: fakeIpc() });
+
+    doc._el('miniBar').handlers.dblclick({ target: { closest: () => null } });
+    assert.equal(bar.isCollapsed(), true);
+
+    doc._el('miniBar').handlers.dblclick({ target: { closest: (sel) => (sel === 'button' ? {} : null) } });
+    assert.equal(bar.isCollapsed(), true, 'двойной клик по кнопке режим не меняет');
+
+    doc._el('titlebar').handlers.dblclick({ target: { closest: () => null } });
+    assert.equal(bar.isCollapsed(), false);
+});
+
+test('кнопки транспорта полосы ведут в переданные действия', () => {
+    // Своего управления таймером у полосы нет: она вызывает ТЕ ЖЕ методы
+    // контроллера, что и большие кнопки панели. Действия внедряются, поэтому
+    // проводка проверяется здесь, а не только кликом в e2e.
+    const doc = fakeDoc();
+    const calls = [];
+    MiniBar.init({
+        doc,
+        ipc: fakeIpc(),
+        actions: {
+            start: () => calls.push('start'),
+            pause: () => calls.push('pause'),
+            reset: () => calls.push('reset')
+        }
+    });
+
+    doc._el('miniBarStart').handlers.click();
+    doc._el('miniBarPause').handlers.click();
+    doc._el('miniBarReset').handlers.click();
+
+    assert.deepEqual(calls, ['start', 'pause', 'reset']);
+});
+
+test('без действий кнопки транспорта не роняют модуль', () => {
+    const doc = fakeDoc();
+    MiniBar.init({ doc, ipc: fakeIpc() });
+    assert.doesNotThrow(() => doc._el('miniBarStart').handlers.click());
 });
