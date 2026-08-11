@@ -37,8 +37,35 @@ function init(deps) {
         isCollapsed: () => collapsed,
         collapse: () => setState(true),
         expand: () => setState(false),
-        toggle: () => setState(!collapsed)
+        toggle: () => setState(!collapsed),
+        render
     };
+
+    /**
+     * Отрисовать состояние таймера в полосе.
+     *
+     * Панель отдаёт сюда ЗНАЧЕНИЯ (готовую строку времени и полосу срочности,
+     * посчитанную общим RendererShared.timerColorBand), а не лезет в элементы
+     * полосы: иначе её разметка размазана между двумя файлами, а inline-скрипт
+     * панели упирается в собственный потолок размера.
+     *
+     * @param {{text: string, band: string}} state
+     */
+    function render(state) {
+        if (!state) { return api; }
+        const time = doc.getElementById('miniBarTime');
+        if (time) { time.textContent = state.text; }
+        const dot = doc.getElementById('miniBarDot');
+        if (dot) {
+            // Всё, что не «тревога» и не «предупреждение», — спокойное
+            // состояние. Незнакомое значение тоже: полоса не то место, где
+            // стоит падать из-за неизвестного статуса.
+            const band = (state.band === 'danger' || state.band === 'overtime') ? 'danger'
+                : (state.band === 'warning' ? 'warning' : 'ok');
+            dot.className = 'mini-dot ' + band;
+        }
+        return api;
+    }
 
     function setState(next) {
         // Без дребезга: каждый лишний setSize на Windows округляет внешний
@@ -73,6 +100,30 @@ function init(deps) {
         const el = doc.getElementById(id);
         if (el && el.addEventListener) { el.addEventListener('click', () => api.toggle()); }
     }
+
+    // Транспорт полосы ведёт в ТЕ ЖЕ действия, что и большие кнопки панели:
+    // своего управления таймером у свёрнутого состояния нет. Действия
+    // внедряются, поэтому проводка проверяется в Node.
+    const actions = (deps && deps.actions) || {};
+    for (const [id, name] of [['miniBarStart', 'start'], ['miniBarPause', 'pause'], ['miniBarReset', 'reset']]) {
+        const el = doc.getElementById(id);
+        if (el && el.addEventListener) {
+            el.addEventListener('click', () => { if (typeof actions[name] === 'function') { actions[name](); } });
+        }
+    }
+
+    // Двойной клик — по самой полосе и по титлбару панели. Клик по КНОПКЕ
+    // исключён: двойное нажатие на «паузу» — это два нажатия на паузу, и
+    // схлопывать по нему окно нельзя.
+    const onDoubleClick = (e) => {
+        if (e && e.target && typeof e.target.closest === 'function' && e.target.closest('button')) { return; }
+        api.toggle();
+    };
+    const bar = doc.getElementById('miniBar');
+    if (bar && bar.addEventListener) { bar.addEventListener('dblclick', onDoubleClick); }
+    const titlebar = typeof doc.querySelector === 'function' ? doc.querySelector('.custom-titlebar') : null;
+    if (titlebar && titlebar.addEventListener) { titlebar.addEventListener('dblclick', onDoubleClick); }
+
     syncAria();
 
     return api;
