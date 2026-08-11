@@ -46,6 +46,7 @@ const RENDERER_FILES = [
     'color-picker.js',
     'shortcuts-help.js',
     'onboarding.js',
+    'mini-bar.js',
     'ui-theme.js',
     'flip-card.js',
     'window-geometry.js',
