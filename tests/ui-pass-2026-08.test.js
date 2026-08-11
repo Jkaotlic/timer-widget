@@ -365,7 +365,7 @@ test('reduced-motion гасит движение, а не информацию',
 /* ────────────────────── дисплей: три мёртвых правила ─────────────────────── */
 
 const DISPLAY_JS = codeOnly(read('display-script.js'));
-const DISPLAY_HTML = codeOnly(read('display.html'));
+const DISPLAY_HTML = codeOnly(read('display.html') + '\n' + read('display.css'));
 
 test('LED-«внимание» на дисплее совпадает с собственным CSS дисплея', () => {
     // Исходный дефект: JS писал #ffc107 инлайном, а CSS говорил
@@ -386,7 +386,7 @@ test('LED-«внимание» на дисплее совпадает с соб�
     assert.match(led, /classList\.add\('warning'\)/, 'ветка LED обязана ставить класс полосы');
 
     // Единственный источник значения — правило CSS, и оно берёт токен.
-    const css = fs.readFileSync(path.join(__dirname, '..', 'display.html'), 'utf8');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
     assert.match(css, /\.digital-time\.warning \{[^}]*color: var\(--tw-led-warn\)/,
         '.digital-time.warning обязано красить токеном --tw-led-warn');
 });

@@ -143,6 +143,7 @@
       "fonts.css",
       "design-tokens.css",
       "control.css",
+      "display.css",
       "display.html",
       "display-script.js",
       "sounds/**/*",
