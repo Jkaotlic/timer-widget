@@ -1865,16 +1865,27 @@ body::after {
     box-shadow: var(--tw-focus-ring);
 }
 
-/* Fix dropdown visibility for all selects */
+/* Фон пункта списка берётся из ТОКЕНА ПОВЕРХНОСТИ, а не литералом.
+   Литерал #1c1c1e работал только в тёмной теме: цвет текста здесь честный
+   токен, и в светлой теме он становится #1d1d1f — почти тем же цветом, что
+   и захардкоженный фон. Замер: 17.01:1 в тёмной, 1.01:1 в светлой, то есть
+   списка всех восьми <select> панели в светлой теме не существовало.
+   На macOS попап рисует система и дефекта не видно; Chromium на Windows и
+   Linux применяет правило буквально — а смотрят на эти две ОС только
+   поведенческие e2e, кадров оттуда никто не снимает.
+   Проверяется tests/contrast.test.js. */
 select option,
 .sound-select option {
-    background: #1c1c1e;
+    background: var(--tw-bg-surface-solid);
     color: var(--tw-fg);
 }
 
+/* Заголовок группы в списке — та же болезнь, что и у пункта выше, и найден
+   он был не глазами, а тестом: --tw-fg-secondary в светлой теме это #313136,
+   на захардкоженном фоне даёт 1.05:1. */
 select optgroup,
 .sound-select optgroup {
-    background: #1c1c1e;
+    background: var(--tw-bg-surface-solid);
     color: var(--tw-fg-secondary);
 }
 

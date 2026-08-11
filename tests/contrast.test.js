@@ -24,6 +24,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { codeOnly } = require('./helpers/source-scan.js');
 
 const TOKENS = fs.readFileSync(path.join(__dirname, '..', 'design-tokens.css'), 'utf8');
 
@@ -591,6 +592,43 @@ test('тема красит ЗНАЧЕНИЕ info-блока, но не подп
         /setProperty\('--info-color-dim'/,
         '--info-color-dim снова красится из темы: подписи уйдут ниже WCAG AA'
     );
+});
+
+/* ============================================================
+   ЦВЕТА, ВПИСАННЫЕ В КОМПОНЕНТНЫЙ ФАЙЛ ЛИТЕРАЛОМ
+
+   До 11.08.2026 этот тест читал ТОЛЬКО design-tokens.css и сверял токены
+   между собой. Цвет, вписанный литералом в control.css, был для него
+   невидим — и ровно так прошли мимо два дефекта светлой темы, найденные
+   осмотром 64 кадров:
+
+     фон пункта списка   #1d1d1f на #1c1c1e  =  1.01:1
+     индикатор окна      #12652f на #0053ae  =  1.03:1
+
+   Первый — литерал в фоне при токене в тексте. Второй — ЧЕСТНЫЙ токен,
+   но упавший на фон из другой роли. Отсюда правило: проверять ПАРУ
+   «цвет × фон, на котором он окажется», а не токен сам по себе.
+   ============================================================ */
+
+test('фон выпадающего списка не задан литералом и читаем в обеих темах', () => {
+    const control = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8'));
+    assert.ok(
+        !/#1c1c1e/i.test(control),
+        'литерал #1c1c1e вернулся в control.css: в светлой теме он даёт 1.01:1 под --tw-fg'
+    );
+
+    // Порог AAA: список читают так же, как подписи, и кегль там тот же 12–13px.
+    const AAA_NORMAL = 7.0;
+    for (const [themeName, token] of [['тёмная', darkToken], ['светлая', hcToken]]) {
+        const bg = parseColor(token('tw-bg-surface-solid')).rgb;
+        const ratio = contrast(composite(token('tw-fg'), bg), bg);
+        assert.ok(
+            ratio >= AAA_NORMAL,
+            `${themeName}: текст пункта списка на --tw-bg-surface-solid даёт `
+            + `${ratio.toFixed(2)}:1, нужно ${AAA_NORMAL}:1`
+        );
+        console.log(`   [option/${themeName}] ${ratio.toFixed(2)}:1`);
+    }
 });
 
 test('расчёт контраста сверен с эталонными парами WCAG', () => {
