@@ -170,7 +170,7 @@ test('окна с пользовательским фоном не отдают 
     // текстовые токены, получались почти чёрные цифры на тёмно-синем фоне — на
     // проекторе время не читалось вовсе. Эти два окна остаются светлым по
     // тёмному в обеих темах; окно часов владеет своим фоном и за темой следует.
-    for (const file of ['electron-widget.html', 'display.html']) {
+    for (const file of ['electron-widget.html', 'display.css']) {
         const html = read(file);
         const block = /\[data-theme="light"\]\s*\{[\s\S]*?\}/.exec(html);
         assert.ok(block, `${file}: нет блока, закрепляющего палитру в светлой теме`);

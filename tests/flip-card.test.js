@@ -95,7 +95,7 @@ test('длительность в JS совпадает с длительнос�
 
     const seconds = (FLIP_DURATION_MS / 1000).toFixed(1).replace(/\.0$/, '');
     for (const [file, rule] of [
-        ['display.html', /\.flip-card\.flipping \.flip-card-inner \{[^}]*animation: flip-animation ([\d.]+)s/s],
+        ['display.css', /\.flip-card\.flipping \.flip-card-inner \{[^}]*animation: flip-animation ([\d.]+)s/s],
         ['electron-widget.html', /\.widget-flip-card\.flipping \.widget-flip-inner \{[^}]*animation: widget-flip-animation ([\d.]+)s/s],
         ['electron-clock-widget.html', /\.widget-flip-card\.flipping \.widget-flip-inner \{[^}]*animation: widget-flip-animation ([\d.]+)s/s]
     ]) {

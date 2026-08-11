@@ -36,6 +36,12 @@ const read = (file) => codeOnly(readRaw(file));
 // то, в каком файле физически лежит правило.
 const readControlSource = () => read('electron-control.html') + '\n' + read('control.css');
 
+// CSS полноэкранного окна вынесен в display.css 11.08.2026 — по той же причине
+// и тем же приёмом, что стили панели. Проверки ниже описывают ОДНО окно как оно
+// поставляется, поэтому разметку склеиваем со стилями: иначе тест «правило есть»
+// начал бы означать «правило есть В ЭТОМ ФАЙЛЕ», что не то же самое.
+const readDisplaySource = () => read('display.html') + '\n' + read('display.css');
+
 const controlHtml = readControlSource();
 const widgetHtml = read('electron-widget.html');
 const clockHtml = read('electron-clock-widget.html');
@@ -415,7 +421,7 @@ test('дисплей не пишет цвет полосы инлайном ни
 
     // Обратная сторона: правила полос обязаны существовать в CSS, иначе
     // «инлайна нет» означало бы «цвета нет».
-    const displayCss = read('display.html');
+    const displayCss = readDisplaySource();
     for (const selector of [
         /\.time-text\.danger/,
         /\.digital-time\.danger/,
@@ -508,8 +514,8 @@ test('цветовая полоса считается в одном месте 
 test('плашка статуса дисплея не красится двумя конкурирующими системами классов', () => {
     // .is-success / .is-attention объявлены в CSS ниже семантических классов и
     // выигрывали каскад: «ВРЕМЯ ВЫШЛО!» становилось зелёным поверх красной .finished.
-    assert.doesNotMatch(read('display.html'), /\.status-pill\.is-success\s*\{/);
-    assert.doesNotMatch(read('display.html'), /\.status-pill\.is-attention\s*\{/);
+    assert.doesNotMatch(readDisplaySource(), /\.status-pill\.is-success\s*\{/);
+    assert.doesNotMatch(readDisplaySource(), /\.status-pill\.is-attention\s*\{/);
     assert.doesNotMatch(displayScript, /tone: 'is-success'/);
     assert.doesNotMatch(displayScript, /tone: 'is-attention'/);
 });
@@ -538,7 +544,7 @@ test('подсветка быстрого выбора выводится из �
 test('пауза во всех окнах оранжевая', () => {
     assert.match(controlHtml, /\.status-dot\.paused \{[^}]*background: var\(--tw-orange\)/s);
     assert.match(widgetHtml, /\.status-badge\.paused \{[^}]*color: var\(--tw-orange\)/s);
-    assert.match(read('display.html'), /\.status-pill\.paused \{[^}]*color: var\(--tw-orange\)/s);
+    assert.match(readDisplaySource(), /\.status-pill\.paused \{[^}]*color: var\(--tw-orange\)/s);
 });
 
 test('завершено во всех окнах красное и БЕЗ пульсации', () => {
@@ -550,7 +556,7 @@ test('завершено во всех окнах красное и БЕЗ пу�
     assert.match(widgetFinished, /color: var\(--tw-red\)/);
     assert.doesNotMatch(widgetFinished, /animation:/);
 
-    const displayFinished = read('display.html').match(/\.status-pill\.finished \{[^}]*\}/s)[0];
+    const displayFinished = readDisplaySource().match(/\.status-pill\.finished \{[^}]*\}/s)[0];
     assert.match(displayFinished, /color: var\(--tw-red\)/);
     assert.doesNotMatch(displayFinished, /animation:/);
 });
@@ -564,14 +570,14 @@ test('перерасход во всех окнах красный и С пул�
     assert.match(widgetOvertime, /color: var\(--tw-red\)/);
     assert.match(widgetOvertime, /animation: badge-pulse/);
 
-    const displayOvertime = read('display.html').match(/\.status-pill\.overtime \{[^}]*\}/s)[0];
+    const displayOvertime = readDisplaySource().match(/\.status-pill\.overtime \{[^}]*\}/s)[0];
     assert.match(displayOvertime, /color: var\(--tw-red\)/);
     assert.match(displayOvertime, /animation: overtime-pulse/);
 });
 
 test('розовый из палитры статусов убран во всех окнах', () => {
     // --tw-pink не входит в задекларированную палитру приложения (blue/green/red/orange).
-    for (const src of [controlHtml, widgetHtml, read('display.html')]) {
+    for (const src of [controlHtml, widgetHtml, readDisplaySource()]) {
         assert.doesNotMatch(src, /\.status-(dot|badge|pill)\.\w+ \{[^}]*--tw-pink/s);
     }
 });

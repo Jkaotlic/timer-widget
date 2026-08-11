@@ -171,3 +171,52 @@ test('у каждого модуля есть заголовочный комм�
         assert.ok(src.includes(mod), `${mod} должен называть себя в заголовке`);
     }
 });
+
+// ---------------------------------------------------------------------------
+// Полноэкранное окно: та же декомпозиция, те же гарантии.
+//
+// CSS дисплея (1383 строки) вынесен из inline-<style> в display.css 11.08.2026.
+// Причина не в тидинессе: именно в этом наборе за один проход нашлись ЧЕТЫРЕ
+// мёртвых или отсутствующих правила цветовых полос. Правило, которое нельзя
+// увидеть, нельзя и проверить.
+// ---------------------------------------------------------------------------
+
+test('стили дисплея вынесены в display.css, инлайнового <style> не осталось', () => {
+    const displayHtml = fs.readFileSync(path.join(repoRoot, 'display.html'), 'utf8');
+    assert.doesNotMatch(displayHtml, /<style>/, 'в display.html вернулся inline-<style>');
+    assert.match(displayHtml, /<link rel="stylesheet" href="display\.css">/);
+
+    // Файл обязан существовать и быть непустым: перенос, потерявший содержимое,
+    // проходит проверку «инлайна нет» с блеском.
+    const css = fs.readFileSync(path.join(repoRoot, 'display.css'), 'utf8');
+    assert.ok(css.split('\n').length > 1000, `display.css подозрительно короткий: ${css.split('\n').length} строк`);
+});
+
+test('таблицы стилей дисплея подключены в правильном порядке', () => {
+    // Требования те же, что у панели, и оба настоящие:
+    //   1. fonts.css первым — @font-face обязан существовать до правил, которые
+    //      этим шрифтом рисуют, иначе первый кадр уйдёт в запасной шрифт;
+    //   2. display.css последним — в нём живёт пин палитры
+    //      ([data-theme="light"] с тёмными значениями), который обязан
+    //      переопределять design-tokens.css при равной специфичности. Фон этого
+    //      окна красит пользователь, и светлая тема здесь сделала бы почти
+    //      чёрные цифры на тёмно-синем — на проекторе это нечитаемо.
+    const displayHtml = fs.readFileSync(path.join(repoRoot, 'display.html'), 'utf8');
+    const order = [...displayHtml.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)]
+        .map((m) => m[1]);
+    assert.deepEqual(
+        order,
+        ['fonts.css', 'design-tokens.css', 'display.css'],
+        'порядок таблиц стилей дисплея изменился — проверьте, что понимаете, зачем'
+    );
+});
+
+test('display.css перечислен в build.files', () => {
+    // Ровно так в 2.3.2 потерялся design-tokens.css: файл был, в списке — нет,
+    // и упакованное приложение рисовало окно без единого токена.
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+    assert.ok(
+        pkg.build.files.includes('display.css'),
+        'display.css отсутствует в build.files — в собранном приложении окно останется без стилей'
+    );
+});
