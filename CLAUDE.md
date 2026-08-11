@@ -126,6 +126,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `open-display` / `close-display` | Toggle display window |
 | `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
 | `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
+| `control-collapse` | `{ collapsed, height }` — свернуть окно управления в полосу или развернуть обратно. Отдельный канал, потому что `resize-control-window` зажимает высоту снизу минимумом окна (660) и полоса в 52px через него недостижима. Снимает и возвращает пол `minHeight`, поднимает полосу поверх окон, держит ВЕРХНИЙ край; `height` из рендерера зажимается в 36…120 |
 | `widget-resize` / `widget-move` / `widget-set-position` | Widget geometry |
 | `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
 | `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
