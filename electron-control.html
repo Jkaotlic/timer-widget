@@ -28,9 +28,24 @@
                 <!-- Переключатель темы живёт в титлбаре, а не во вкладках настроек:
                      вкладки настраивают КОНКРЕТНОЕ окно (виджет, часы, дисплей), а
                      тема общая для всего приложения. -->
+                <button class="titlebar-help" id="miniBarToggle" type="button" aria-expanded="true" title="Свернуть в полосу (M)" aria-label="Свернуть в полосу">▾</button>
                 <button class="titlebar-help" id="contrastToggle" type="button" aria-pressed="false" title="Высокий контраст" aria-label="Высокий контраст">◐</button>
                 <button class="titlebar-help" id="faqBtn" title="Справка (F1)" aria-label="Справка">?</button>
             </div>
+        </div>
+
+        <!-- Полоса: ВТОРОЕ СОСТОЯНИЕ этого окна, а не отдельное окно и не
+             второй таймер. Время и точку сюда пишет тот же updateDisplay(),
+             что и в герой-блок; своего источника времени у полосы нет. -->
+        <div class="mini-bar" id="miniBar">
+            <span class="mini-dot" id="miniBarDot" aria-hidden="true"></span>
+            <span class="mini-time" id="miniBarTime">00:00</span>
+            <span class="mini-spacer"></span>
+            <button class="mini-btn" id="miniBarPause" title="Пауза (Space)" aria-label="Приостановить">⏸</button>
+            <button class="mini-btn mini-start" id="miniBarStart" title="Старт (Space)" aria-label="Запустить таймер">▶</button>
+            <button class="mini-btn" id="miniBarReset" title="Сброс (R)" aria-label="Сбросить">↺</button>
+            <span class="mini-divider" aria-hidden="true"></span>
+            <button class="mini-btn" id="miniBarExpand" title="Развернуть (M)" aria-label="Развернуть панель">▴</button>
         </div>
 
         <!-- Таймер -->
@@ -982,6 +997,7 @@
     <script src="modal-manager.js"></script>
     <script src="shortcuts-help.js"></script>
     <script src="onboarding.js"></script>
+    <script src="mini-bar.js"></script>
     <script src="custom-sounds.js"></script>
     <script src="local-background.js"></script>
     <script src="theme-grid.js"></script>
@@ -2714,6 +2730,8 @@
         // Подсказка про F1 при первом запуске + кнопка «Проверить
         // обновления». Подробности и зависимости — в onboarding.js.
         window.Onboarding.init();
+        // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
+        window.miniBar = window.MiniBar.init({ doc: document, ipc: window.ipcRenderer, onToggle: (on) => { if (on) { window.timerController?.closeSettingsDrawer(); } } });
 
         const faqModal = document.getElementById('faqModal');
         const faqClose = document.getElementById('faqClose');

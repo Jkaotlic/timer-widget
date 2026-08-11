@@ -254,3 +254,19 @@ test('мёртвые правила CSS удалены', () => {
     assert.match(HTML, /<span class="arrow" aria-hidden="true">/, 'стрелка аккордеона исчезла из разметки');
     assert.match(CSS, /\.faq-question \.arrow/, 'стиль стрелки аккордеона исчез');
 });
+
+test('кнопки режима полосы достижимы и названы', () => {
+    // Кнопка без доступного имени — это кнопка, которой нет для скринридера.
+    // Шеврон нарисован глифом, поэтому имя обязано быть в aria-label.
+    for (const id of ['miniBarToggle', 'miniBarExpand']) {
+        const tag = new RegExp(`<button[^>]*id="${id}"[^>]*>`).exec(HTML_CODE);
+        assert.ok(tag, `кнопки #${id} нет в разметке`);
+        assert.match(tag[0], /aria-label="[^"]+"/, `#${id} без доступного имени`);
+    }
+
+    // Полоса не прячется инлайновым стилем: состояние несёт класс на <body>,
+    // иначе его нельзя перекрыть из CSS и невозможно проверить кликом.
+    const bar = /<div[^>]*id="miniBar"[^>]*>/.exec(HTML_CODE);
+    assert.ok(bar, 'блока #miniBar нет в разметке');
+    assert.doesNotMatch(bar[0], /style="[^"]*display:\s*none/);
+});
