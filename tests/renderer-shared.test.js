@@ -353,3 +353,51 @@ test('windowRowSubtitle: мусор вместо объекта не роняе�
     assert.equal(windowRowSubtitle(null), '');
     assert.equal(windowRowSubtitle(undefined), '');
 });
+
+// ---------------------------------------------------------------------------
+// Страж яркости дисплея (редизайн 2026-08-12)
+// ---------------------------------------------------------------------------
+
+const { relativeLuminance, backgroundTone } = require('../renderer-shared');
+
+test('relativeLuminance: крайние точки и краткая запись', () => {
+    assert.equal(relativeLuminance('#ffffff'), 1);
+    assert.equal(relativeLuminance('#000000'), 0);
+    assert.equal(relativeLuminance('#fff'), 1, 'краткая запись обязана разбираться');
+});
+
+test('relativeLuminance: мусор даёт null, а не NaN', () => {
+    for (const junk of ['', '#xyz', 'red', null, undefined, 42, {}, '#12345']) {
+        assert.equal(relativeLuminance(junk), null, `цвет ${String(junk)}`);
+    }
+});
+
+test('backgroundTone: заливка решает сама, вопреки теме', () => {
+    // Ровно тот случай, ради которого страж и написан: тёмная заливка при
+    // СВЕТЛОЙ теме обязана дать тёмный фон, иначе цифры станут чёрными на чёрном.
+    assert.equal(backgroundTone({ mode: 'solid', solid: '#0b0b0d', theme: 'light' }), 'dark');
+    assert.equal(backgroundTone({ mode: 'solid', solid: '#ffffff', theme: 'dark' }), 'light');
+});
+
+test('backgroundTone: у градиента считается среднее по обеим точкам', () => {
+    assert.equal(backgroundTone({ mode: 'gradient', grad1: '#0f0c29', grad2: '#302b63' }), 'dark');
+    assert.equal(backgroundTone({ mode: 'gradient', grad1: '#ffffff', grad2: '#f2f2f7' }), 'light');
+});
+
+test('backgroundTone: картинка не разбирается — остаётся светлый текст', () => {
+    // У фотографии нет одной яркости. Гадать хуже, чем держать заведомо
+    // читаемый светлый текст с затемняющим оверлеем.
+    assert.equal(backgroundTone({ mode: 'local', theme: 'light' }), 'dark');
+});
+
+test('backgroundTone: без своего фона решает тема', () => {
+    assert.equal(backgroundTone({ theme: 'light' }), 'light');
+    assert.equal(backgroundTone({ theme: 'dark' }), 'dark');
+    assert.equal(backgroundTone({}), 'dark', 'без темы — прежнее поведение');
+    assert.equal(backgroundTone(), 'dark', 'без аргумента тоже');
+});
+
+test('backgroundTone: нечитаемый цвет откатывается к теме, а не роняет окно', () => {
+    assert.equal(backgroundTone({ mode: 'solid', solid: 'чепуха', theme: 'light' }), 'light');
+    assert.equal(backgroundTone({ mode: 'gradient', grad1: 'нет', grad2: 'тоже нет', theme: 'dark' }), 'dark');
+});

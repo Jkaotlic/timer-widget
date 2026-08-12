@@ -25,7 +25,10 @@ test('control window has timer display', async () => {
 });
 
 test('control window has start button', async () => {
-    const startBtn = await controlWindow.locator('#startBtn, button:has-text("Старт"), button:has-text("Start")').first();
+    // Именно кнопка транспорта. Широкий локатор `button:has-text("Старт")`
+    // после редизайна первым находил чип свёрнутой ПОЛОСЫ (#miniBarStart) —
+    // он тоже называется «Старт» и в развёрнутой панели скрыт.
+    const startBtn = controlWindow.locator('#startBtn');
     await expect(startBtn).toBeVisible({ timeout: 5000 });
 });
 
@@ -67,7 +70,9 @@ test('start/pause timer cycle', async () => {
         expect(text).toMatch(/4:5[89]|04:5[89]/);
 
         // Pause
-        const pauseBtn = await controlWindow.locator('#pauseBtn, #startBtn').first();
+        // Кнопка транспорта в панели ОДНА, вторая скрыта состоянием: берём ту,
+        // что видна сейчас, а не первую в DOM.
+        const pauseBtn = controlWindow.locator('.transport-main:visible').first();
         await pauseBtn.click();
     }
 });
@@ -88,7 +93,10 @@ test('tabs are navigable', async () => {
 
 test('widget window can be opened', async () => {
     // Look for widget toggle
-    const widgetToggle = await controlWindow.locator('#widgetToggle, button:has-text("Виджет"), [data-action="toggle-widget"]').first();
+    // Тумблер строки «Виджет». Прежний широкий локатор искал кнопку с текстом
+    // «Виджет»; после редизайна имя окна лежит в <span> строки, а не в кнопке,
+    // и локатор цеплял не тот элемент.
+    const widgetToggle = controlWindow.locator('#openWidgetBtn');
     if (await widgetToggle.isVisible()) {
         await widgetToggle.click();
         await controlWindow.waitForTimeout(1000);

@@ -57,6 +57,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `shortcuts-help.js` | The F1 shortcuts overlay |
 | `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown`, ставится ДО показа — иначе перезапуск во время задержки показал бы её второй раз) и кнопка «Проверить обновления». Зависимости внедряются, поэтому модуль проверяется в Node на поддельных `document`/`localStorage`; в панели вызов занимает одну строку, потому что она упирается в потолок размера |
 | `mini-bar.js` | Режим «полоса»: окно управления схлопывается в строку 400×52 — точка состояния, время, транспорт, шеврон разворота. Класс `collapsed` на `<body>` — единственное, что модуль знает о вёрстке; DOM самой полосы (время, точка, кнопки, двойной клик) принадлежит ему, панель отдаёт только ЗНАЧЕНИЯ через `render({text, band})`. Размер окна меняет главный процесс по каналу `control-collapse`: пол `minHeight: 660` снимается только там. Зависимости внедряются, поэтому режим проверяется в Node на поддельных `document`/`ipc` |
+| `panel-state.js` | Четыре состояния панели (покой/отсчёт/перерасход/ввод) — **прототипная примесь**. Класс `state-*` на `<body>` и горстка id — всё, что модуль знает о вёрстке; видимость блоков решает CSS по этому классу. Здесь же единственная сборка payload канала `widget-style-update` и проводка ручного ввода |
 | `scale-input.js` | Click-to-edit / double-click-to-reset on scale percentages |
 | `font-select.js` | The font list of the «Цифры» style: `div.font-select` impersonates a form control with `.value`. Three independent instances (widget/clock/display) in one document, so an option's `id` carries its container's id. A native `<select>` cannot be used: on macOS the popup is drawn by the system and `font-family` on `<option>` is ignored — the preview, which is the whole point, would not render |
 
@@ -73,7 +74,7 @@ Rules when working here:
 - `constants.js` — all magic numbers, IPC channel names, storage keys, theme definitions, dimension limits
 - `utils.js` — `formatTime()`, `formatTimeShort()`, `parseTime()`, `debounce()`, `getTimerStatus()`, `calculateProgress()`, `safelySendToWindow()`
 - `security.js` — input validation (`isValidDataURL`, `isValidURL`, `validateImageSource`), `escapeHTML()`, `safeJSONParse()`
-- `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`
+- `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt` (подпись «закончится в 14:50»), `relativeLuminance` + `backgroundTone` (страж яркости дисплея)
 - `window-geometry.js` — перетаскивание, размер и позиция виджета и часов, плюс арифметика полосы LED (`ledStripHeight`/`ledStripMetrics`) и восстановления позиции (`fitRestoredBounds`). Двойной экспорт, проверяется в Node на внедрённых хранилище и DOM
 - `clock-settings-schema.js` — the clock's settings table (key → control → default) plus `collectClockSettings` / `applyClockSettings`
 - `digits-style.js` — the «Цифры» style: the six-font registry, the `resolveFont()` whitelist, and the fit arithmetic (`fitScale` / `fitFontSize` / `measureDigits` with a probe cache / `applyFont`). The size is derived by **measuring a reference string** (`88:88` / `8:88:88`) at a 100px probe, not from a per-character width constant: the old `charCount * 0.6` assumes a monospace face and is wrong by 0.42–0.78 em across these six fonts
@@ -228,6 +229,7 @@ Two flavours of test live here:
 | `release-gates.test.js` | Release gates: DevTools guarded on EVERY window, isolation on every window, no external URLs in shipped files, local fonts, no auto-update, CSP per window, Linux sandbox scoped to AppImage only |
 | `docs-integrity.test.js` | Связность `CLAUDE.md` ↔ `docs/lessons.md`: каждая ссылка ведёт в существующий разбор, каждый разбор либо достижим, либо ЯВНО помечен устаревшим и указывает на замену; плюс потолок размера самого `CLAUDE.md` — он попадает в контекст каждого разговора целиком |
 | `onboarding.test.js` | Подсказка первого запуска на поддельном хранилище: показывается один раз, флаг ставится ДО показа, сломанное хранилище не роняет и не показывает; канал релизов уходит БЕЗ payload |
+| `flat-surfaces.test.js` | Инвариант «плоско»: блюр погашен в обеих темах, тёмные поверхности непрозрачны, живого `backdrop-filter` нет, внешних цветных свечений нет ни через `box-shadow`, ни через `text-shadow`/`drop-shadow`. Пятая проверка проверяет САМ разбор: кольцо фокуса, подъём ручки, внутренняя и нейтральная тень обязаны НЕ считаться свечением |
 | `digits-style.test.js` | The «Цифры» registry checked in THREE directions — every registry font has files on disk, every file is declared in `fonts.css`, and no `fonts/` file is orphaned — plus the `resolveFont` whitelist and the fit arithmetic (garbage in gives 0, never NaN/Infinity: either one collapses the digits to nothing) |
 
 e2e specs (`npx playwright test`, `workers: 1`):
@@ -257,6 +259,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `color-ownership.spec.js` | Характеризация окраски: 5 стилей × 4 полосы × 2 окна, сверка ВЫЧИСЛЕННЫХ цвета и тени с эталоном. Написан ДО перевода цвета на каскад и прошёл неизменённым после. Нормализует запись цвета: один и тот же цвет браузер печатает как `rgba(255,204,0,0.4)` из литерала и как `color(srgb 1 0.8 0 / 0.4)` из `color-mix`, и без нормализации корректный рефакторинг выглядел бы регрессией |
 | `onboarding-reachable.spec.js` | Кнопка «Проверить обновления» ВИДИМА и не схлопнута — юнит-тесты знают только про поддельный DOM. Кнопка намеренно не кликается: обработчик открыл бы настоящий браузер на машине с прогоном |
 | `color-band-reset.spec.js` | Выход из полосы снимает ВСЁ, что полоса нарисовала — на чистом профиле (там залипал красный ореол) и с выбранным цветом (там полоса обязана этот цвет перебивать) |
+| `panel-states.spec.js` | Четыре состояния панели ПО КЛИКУ: какая кнопка на экране и каким словом названа, есть ли пресеты и ряд ±, что написано под цифрами; ящик открывается шевроном строки (вкладок нет вообще), тумблер строки открывает окно и подпись говорит его состояние |
 | `display-timer-scale.spec.js` | Characterization of the display's timer scale across every style block — settings push, Ctrl+wheel, and restore on window load. Written BEFORE folding three copies into `applyTimerScale()` |
 
 ## CI
@@ -296,6 +299,11 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 разбор: правило говорит ЧТО делать, разбор — почему все предыдущие попытки
 сделали иначе.
 
+- **Тест, утверждающий ОТСУТСТВИЕ, обязан проверять сам себя — иначе зелёный значит и «чисто», и «регулярка не работает» (CRITICAL)** — [разбор](docs/lessons.md#an-invariant-test-must-be-verified-against-itself)
+- **Долг, не закрываемый сегодня, фиксируется храповиком: число может только убывать, и в нём записано условие превращения в запрет** — [разбор](docs/lessons.md#a-ratchet-beats-a-ban-when-the-debt-spans-stages)
+- **Дисплей следует теме, но цвет текста решает ЯРКОСТЬ фона; класс палитры вешается на `<html>`, а не на `<body>` (CRITICAL)** — [разбор](docs/lessons.md#the-display-follows-the-theme-but-the-background-owns-the-text)
+- **Перед добавлением поля в payload соберите payload в одном месте** — [разбор](docs/lessons.md#a-payload-assembled-in-six-places-is-a-setting-you-will-forget)
+- **Надпись — это обещание: если элемент обещает жест, у жеста должен быть обработчик** — [разбор](docs/lessons.md#an-interface-that-promises-what-it-does-not-do)
 - **A green test does NOT prove a feature is reachable (CRITICAL)** — [разбор](docs/lessons.md#a-green-test-does-not-prove-a-feature-is-reachable-critical)
 - **Search for the identifier, not the CSS class** — [разбор](docs/lessons.md#search-for-the-identifier-not-the-css-class)
 - **Source-level tests must strip comments before asserting absence** — [разбор](docs/lessons.md#source-level-tests-must-strip-comments-before-asserting-abse)

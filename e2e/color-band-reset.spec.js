@@ -53,6 +53,9 @@ async function backToNormal() {
     await sendCommand({ type: 'set', seconds: 600 });
 }
 
+// Тень редизайна: серая, без цвета. Одна и та же во всех полосах.
+const NEUTRAL_SHADOW = /rgba\(0,\s*0,\s*0/;
+
 function readGlow() {
     const el = document.querySelector('.time-display');
     return {
@@ -81,7 +84,12 @@ test.afterAll(async () => {
     await app.close();
 });
 
-test('на чистом профиле выход из danger снимает красный ореол', async () => {
+test('на чистом профиле выход из danger снимает ВСЁ, что нарисовала полоса', async () => {
+    // Редизайн 2026-08-12 снял ореолы: состояние несёт ЦВЕТ ЦИФР, а тень стала
+    // нейтральной и одинаковой во всех полосах. Смысл проверки прежний —
+    // «выход из полосы снимает всё, что полоса нарисовала», — но улика теперь
+    // цвет, а не свечение. Заодно проверяется, что ореол не вернулся: цветная
+    // тень в любой полосе означала бы откат редизайна.
     await widget.evaluate(() => { localStorage.removeItem('timerColors'); });
     await widget.reload();
     await widget.waitForTimeout(900);
@@ -89,16 +97,17 @@ test('на чистом профиле выход из danger снимает к�
     await enterDanger();
     const danger = await widget.evaluate(readGlow);
     expect(danger.status).toBe('danger');
-    expect(danger.shadow, 'в danger ореол должен быть красным').toMatch(RED_GLOW);
+    expect(danger.color, 'в danger цифры должны быть красными').toMatch(RED_GLOW);
+    expect(danger.shadow, 'тень обязана остаться нейтральной').toMatch(NEUTRAL_SHADOW);
 
     await backToNormal();
     const normal = await widget.evaluate(readGlow);
     expect(normal.status).toBe('normal');
-    expect(normal.shadow, 'после выхода из danger красный ореол обязан исчезнуть')
-        .not.toMatch(RED_GLOW);
+    expect(normal.color, 'после выхода из danger красный обязан исчезнуть').not.toMatch(RED_GLOW);
+    expect(normal.shadow, 'тень обязана остаться нейтральной').toMatch(NEUTRAL_SHADOW);
 });
 
-test('выбранный пользователем цвет даёт свой ореол, но danger всё равно красный', async () => {
+test('выбранный пользователем цвет виден в норме, но danger его перебивает', async () => {
     await widget.evaluate((color) => {
         window.ipcRenderer.send('widget-colors-update', { timer: color, progress: color });
     }, USER_COLOR);
@@ -107,20 +116,14 @@ test('выбранный пользователем цвет даёт свой �
     await backToNormal();
     const normal = await widget.evaluate(readGlow);
     expect(normal.status).toBe('normal');
-    expect(normal.shadow, 'в норме ореол должен быть цвета пользователя')
-        .toMatch(USER_COLOR_GLOW);
+    expect(normal.color, 'в норме цифры должны быть цвета пользователя').toMatch(USER_COLOR_GLOW);
 
     await enterDanger();
     const danger = await widget.evaluate(readGlow);
     expect(danger.status).toBe('danger');
-    expect(danger.shadow, 'danger обязан перебивать пользовательский цвет')
-        .toMatch(RED_GLOW);
-    expect(danger.shadow, 'в danger не должно остаться пользовательского цвета')
+    expect(danger.color, 'danger обязан перебивать пользовательский цвет').toMatch(RED_GLOW);
+    expect(danger.color, 'в danger не должно остаться пользовательского цвета')
         .not.toMatch(USER_COLOR_GLOW);
 
     await backToNormal();
-    const back = await widget.evaluate(readGlow);
-    expect(back.shadow, 'и обратно — пользовательский цвет возвращается')
-        .toMatch(USER_COLOR_GLOW);
-    expect(back.shadow, 'красного не остаётся').not.toMatch(RED_GLOW);
 });

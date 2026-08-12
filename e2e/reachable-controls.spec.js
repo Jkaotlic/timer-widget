@@ -237,8 +237,15 @@ test('открытое окно помечено формой, а не толь�
     try {
         const probe = () => {
             const btn = document.getElementById('openWidgetBtn');
-            const cs = getComputedStyle(btn);
-            return { active: btn.classList.contains('active'), shadow: cs.boxShadow };
+            const knob = btn.querySelector('.wrow-knob');
+            return {
+                active: btn.classList.contains('active'),
+                checked: btn.getAttribute('aria-checked'),
+                // Форма состояния после редизайна 2026-08-12 — ПОЛОЖЕНИЕ ручки
+                // тумблера. Раньше ей была inset-тень плитки; тумблер сильнее:
+                // сдвиг ручки виден и в чёрно-белом, и мимо любой темы.
+                knob: knob ? getComputedStyle(knob).transform : null
+            };
         };
 
         const before = await control.evaluate(probe);
@@ -249,10 +256,12 @@ test('открытое окно помечено формой, а не толь�
 
         const after = await control.evaluate(probe);
         expect(after.active).toBe(true);
-        // Засечка — inset-тень. Признак, который переживает смену темы: он
-        // описан токеном, а не литералом одной из тем.
-        expect(after.shadow, `тень активной кнопки: ${after.shadow}`).toContain('inset');
-        expect(after.shadow).not.toBe(before.shadow);
+        // Форма, а не только цвет: ручка тумблера сдвинута, и состояние
+        // объявлено скринридеру.
+        expect(after.checked).toBe('true');
+        expect(before.checked).toBe('false');
+        expect(after.knob, `положение ручки: ${after.knob}`).not.toBe(before.knob);
+        expect(after.knob).not.toBe('none');
 
         // Профиль e2e общий: тест, меняющий глобальное состояние, обязан его
         // вернуть, иначе следующий спек стартует с открытым виджетом.

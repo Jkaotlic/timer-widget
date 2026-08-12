@@ -3761,12 +3761,18 @@ body.collapsed .toast {
     --p-progress-tr: rgba(255, 255, 255, 0.10);
 }
 [data-theme="light"] .control-panel {
-    --p-fill:        #f5f5f7;
-    --p-fill-weak:   #f5f5f7;
-    --p-row-active:  #f7f7f9;
-    --p-icon-off:    #f0f0f3;
+    /* Макет рисует заливку контролов как #f5f5f7. Взят токен --tw-level-2
+       (#ebebf1): сумма каналов у макетного значения 737, а e2e/ui-theme.spec.js
+       требует < 720 — иначе кнопка на белой панели перестаёт читаться как
+       кнопка. Разница на глаз неразличима, порог же стоит именно потому, что
+       почти-белые контролы пропадают. Заодно уходит литерал: цвет обязан
+       приходить из каскада. */
+    --p-fill:        var(--tw-level-2);
+    --p-fill-weak:   var(--tw-level-2);
+    --p-row-active:  var(--tw-level-1);
+    --p-icon-off:    var(--tw-level-2);
     --p-track-off:   #e4e4e9;
-    --p-progress-tr: #f0f0f3;
+    --p-progress-tr: var(--tw-level-2);
 }
 
 /* ---------- ГЕРОЙ ---------- */

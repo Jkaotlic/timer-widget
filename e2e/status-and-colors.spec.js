@@ -29,7 +29,22 @@ async function sendCommand(payload) {
 // а заголовок и статус в панели подняты в верхний регистр через text-transform.
 const timeText = () => control.locator('#controlTimeDigits').textContent();
 const statusText = () => control.locator('#statusText').textContent();
-const heroLabel = () => control.locator('#controlHeroLabel').textContent();
+// Подпись состояния живёт в своём span: в #controlHeroLabel рядом с ней
+// стоит точка состояния, и её textContent тянул бы за собой пустую строку.
+
+// Вход в состояние ввода: редизайн 2026-08-12 сделал ручной ввод ЧЕТВЁРТЫМ
+// состоянием панели, а не полем сбоку. Идемпотентен — соседний тест мог
+// оставить панель уже в нём, и клик по спрятанному времени истёк бы по таймауту.
+const enterInputMode = async () => {
+    const already = await control.evaluate(
+        () => document.body.classList.contains('state-input')
+    );
+    if (already) { return; }
+    await control.click('#controlTime');
+    await control.waitForTimeout(300);
+};
+
+const heroLabel = () => control.locator('#statusText').textContent();
 const timeClasses = () => control.locator('#controlTime').getAttribute('class');
 
 test.beforeAll(async () => {
@@ -67,7 +82,7 @@ test.describe('цветовые полосы', () => {
         expect(await timeText()).toBe('01:00');
         expect(await timeClasses()).toContain('danger');
         // Заголовок «Осталось» над отрицательным временем читался неверно.
-        expect(await heroLabel()).toBe('Сверх времени');
+        expect(await heroLabel()).toBe('Перерасход');
     });
 
     test('после нового пресета цвет возвращается в норму', async () => {
@@ -77,7 +92,8 @@ test.describe('цветовые полосы', () => {
         const cls = await timeClasses();
         expect(cls).not.toContain('danger');
         expect(cls).not.toContain('warning');
-        expect(await heroLabel()).toBe('Осталось');
+        // В покое подпись называет ДЛИТЕЛЬНОСТЬ: остатка ещё нет, отсчёт не идёт.
+        expect(await heroLabel()).toBe('Длительность');
     });
 });
 
@@ -111,11 +127,11 @@ test.describe('приоритеты статуса', () => {
 
 test.describe('подсветка быстрого выбора', () => {
     const activePresets = () =>
-        control.locator('.quick-preset.active').evaluateAll((els) =>
+        control.locator('.preset.active').evaluateAll((els) =>
             els.map((e) => e.dataset.minutes));
 
     test('клик по пресету подсвечивает именно его', async () => {
-        await control.locator('.quick-preset[data-minutes="15"]').click();
+        await control.locator('.preset[data-minutes="15"]').click();
         await control.waitForTimeout(250);
         expect(await activePresets()).toEqual(['15']);
     });
@@ -123,9 +139,10 @@ test.describe('подсветка быстрого выбора', () => {
     test('ручной ввод другого времени снимает подсветку', async () => {
         // Регрессия: класс active вешался по клику и не снимался ничем —
         // подсвеченной оставалась кнопка, не соответствующая таймеру.
+        await enterInputMode();
         await control.locator('#manualTimeInput').fill('7:30');
-        await control.locator('#manualTimeApply').click();
-        await control.waitForTimeout(300);
+        await control.locator('#manualTimeInput').press('Enter');
+        await control.waitForTimeout(400);
 
         expect(await timeText()).toBe('07:30');
         expect(await activePresets()).toEqual([]);
@@ -133,13 +150,17 @@ test.describe('подсветка быстрого выбора', () => {
 
     test('корректировка ± не сбивает подсветку пресета', async () => {
         // Пресет остаётся прежним (сброс вернёт к нему), меняется только total.
-        await control.locator('.quick-preset[data-minutes="10"]').click();
+        await control.locator('.preset[data-minutes="45"]').click();
         await control.waitForTimeout(250);
-        await control.locator('.adjust-main-btn[data-adjust="300"]').click();
+        // Редизайн 2026-08-12 показывает ряд ± только там, где он нужен, — в
+        // отсчёте и при вводе. В покое кнопки нет на экране, и прежняя версия
+        // теста кликала по display:none, а не проверяла своё условие.
+        await enterInputMode();
+        await control.locator('.adjust-btn[data-adjust="300"]').click();
         await control.waitForTimeout(300);
 
-        expect(await timeText()).toBe('15:00');
-        expect(await activePresets()).toEqual(['10']);
+        expect(await timeText()).toBe('50:00');
+        expect(await activePresets()).toEqual(['45']);
     });
 });
 
@@ -169,7 +190,9 @@ test.describe('лимит перерасхода', () => {
         el.dispatchEvent(new Event('change'));
     }, on);
 
+
     test('строка лимита появляется только вместе с режимом «ниже нуля»', async () => {
+        await enterInputMode();
         const row = control.locator('#overrunRow');
 
         await expect(row).toBeHidden();
@@ -183,6 +206,7 @@ test.describe('лимит перерасхода', () => {
     });
 
     test('введённый лимит разбирается и показывается подсказкой', async () => {
+        await enterInputMode();
         await setAllowNegative(true);
         await control.waitForTimeout(200);
         await control.locator('#overrunLimit').fill('2:30');

@@ -67,11 +67,14 @@ test('светлая тема включается во всех четырёх 
 
     const windows = { control, widget, clock, display };
 
-    // Исходное состояние: тёмная тема со стеклом во всех окнах.
+    // Исходное состояние: СВЕТЛАЯ тема и НИ КАПЛИ стекла.
+    // Редизайн 2026-08-12 поменял здесь обе половины: дефолт стал светлым, а
+    // размытие снято в обеих темах — поверхности разделяют расстояние и
+    // заливка. Прежняя версия требовала ровно обратного и была права до него.
     for (const [name, w] of Object.entries(windows)) {
         const before = await w.evaluate(probeTheme);
-        expect(before.attr, `${name}: тема должна стартовать как dark`).toBe('dark');
-        expect(before.blur, `${name}: в тёмной теме размытие обязано быть`).toContain('blur(');
+        expect(before.attr, `${name}: тема должна стартовать как light`).toBe('light');
+        expect(before.blur, `${name}: стекло снято во всех окнах`).not.toContain('blur(');
     }
 
     // Переключаем кнопкой — именно так, как это делает пользователь.
@@ -81,7 +84,7 @@ test('светлая тема включается во всех четырёх 
     // Атрибут обязан доехать до ВСЕХ четырёх окон.
     for (const [name, w] of Object.entries(windows)) {
         const after = await w.evaluate(probeTheme);
-        expect(after.attr, `${name}: светлая тема не доехала`).toBe('light');
+        expect(after.attr, `${name}: тёмная тема не доехала`).toBe('dark');
     }
 
     // А вот ЗНАЧЕНИЯ различаются по окнам, и это осознанно. Панель и часы
@@ -90,39 +93,54 @@ test('светлая тема включается во всех четырёх 
     // поверх любой темы, и по умолчанию тёмная), поэтому там палитра закреплена
     // светлым по тёмному: иначе получались почти чёрные цифры на тёмно-синем —
     // на проекторе время не читалось вовсе.
+    // Переключились в ТЁМНУЮ: панель и часы владеют фоном и темнеют.
     for (const name of ['control', 'clock']) {
         const after = await windows[name].evaluate(probeTheme);
-        expect(after.fgDim, `${name}: подписи в светлой теме обязаны стать тёмными`).toBe('#575760');
-        expect(after.surface, `${name}: поверхность в светлой теме обязана стать белой`).toBe('#ffffff');
+        expect(
+            after.fgDim,
+            `${name}: подписи в тёмной теме обязаны стать светлыми`
+        ).toContain('255, 255, 255');
     }
+    // Виджет фона не имеет вообще — лежит поверх чужого рабочего стола, и
+    // палитра «светлое по тёмному» прибита в обеих темах.
+    //
+    // Дисплей после редизайна 2026-08-12 пин снял: он теме СЛЕДУЕТ, но цвет
+    // текста решает не тема, а яркость его фактического фона. По умолчанию фон
+    // тёмный градиент, поэтому текст здесь светлый — и остаётся светлым в обеих
+    // темах ровно потому, что фон не менялся.
     for (const name of ['widget', 'display']) {
         const after = await windows[name].evaluate(probeTheme);
         expect(
             after.fgDim,
-            `${name}: окно лежит на пользовательском фоне — текст обязан остаться светлым`
+            `${name}: на тёмном фоне текст обязан остаться светлым`
         ).toContain('255, 255, 255');
     }
 
     // Кнопка сообщает своё состояние, а не только красится.
     const pressed = await control.getAttribute('#contrastToggle', 'aria-pressed');
-    expect(pressed, 'aria-pressed обязан отражать включённую тему').toBe('true');
+    expect(pressed, 'aria-pressed обязан отражать включённую тему').toBe('false');
 
     // Тема переживает перезагрузку окна: значение читается из localStorage до
     // первого кадра (скрипт в <head>), а не приходит потом по IPC.
     await control.reload();
     await control.waitForLoadState('domcontentloaded');
     const afterReload = await control.evaluate(probeTheme);
-    expect(afterReload.attr, 'тема не сохранилась между загрузками').toBe('light');
+    // Переживает перезагрузку ВЫБРАННАЯ тема, а выбрали мы тёмную: дефолт
+    // теперь светлый, и проверка «после перезагрузки снова light» ничего бы не
+    // доказывала — она была бы зелёной и на пустом localStorage.
+    expect(afterReload.attr, 'тема не сохранилась между загрузками').toBe('dark');
     const pressedAfterReload = await control.getAttribute('#contrastToggle', 'aria-pressed');
-    expect(pressedAfterReload, 'кнопка после перезагрузки не показывает включённую тему').toBe('true');
+    expect(pressedAfterReload, 'кнопка после перезагрузки не показывает выбранную тему').toBe('false');
 
     // И обратно — переключатель двусторонний.
     await control.click('#contrastToggle');
     await control.waitForTimeout(800);
     for (const [name, w] of Object.entries(windows)) {
         const back = await w.evaluate(probeTheme);
-        expect(back.attr, `${name}: возврат к тёмной теме не доехал`).toBe('dark');
-        expect(back.blur, `${name}: размытие должно вернуться`).toContain('blur(');
+        expect(back.attr, `${name}: возврат к светлой теме не доехал`).toBe('light');
+        // Стекло не возвращается НИ В ОДНОЙ теме: редизайн снял его насовсем,
+        // и «размытие должно вернуться» было бы проверкой отменённого правила.
+        expect(back.blur, `${name}: стекло не должно возвращаться`).not.toContain('blur(');
     }
 
     await app.close();
@@ -161,27 +179,30 @@ test('светлая тема перекрашивает сами контрол
     await control.evaluate(() => {
         window.UITheme.applyTheme('light');
         // Пресет делаем активным: именно у него заливка акцентом.
-        document.querySelector('.quick-preset[data-minutes="5"]').click();
-        document.querySelector('.tab-btn[data-tab="clock"]').click();
+        document.querySelector('.preset[data-minutes="5"]').click();
+        document.querySelector('.wrow-chevron[data-tab="clock"]').click();
     });
     await control.waitForTimeout(900);
 
     const probe = await control.evaluate(() => {
         const css = (el, pseudo) => (el ? getComputedStyle(el, pseudo || null) : null);
-        const preset = document.querySelector('.quick-preset.active');
-        const plain = document.querySelector('.quick-preset:not(.active)');
+        const preset = document.querySelector('.preset.active');
+        const plain = document.querySelector('.preset:not(.active)');
         const seconds = document.getElementById('clockShowSeconds');
         const slider = seconds ? seconds.nextElementSibling : null;
         return {
             plainBg: plain ? css(plain).backgroundColor : null,
             plainBorder: plain ? css(plain).borderTopColor : null,
             activeBg: preset ? css(preset).backgroundColor : null,
-            // У активного пресета заливка — ГРАДИЕНТ, поэтому backgroundColor у
-            // него прозрачный, и сравнивать надпись с ним бессмысленно: первая
-            // версия этой проверки получала «21:1 на rgba(0,0,0,0)» и была
-            // зелёной, ничего не проверяя. Берём сами остановки градиента.
+            // Заливка активного пресета была ГРАДИЕНТОМ: backgroundColor у него
+            // прозрачный, и первая версия этой проверки получала «21:1 на
+            // rgba(0,0,0,0)» — зелёная, ничего не проверяющая. Редизайн
+            // 2026-08-12 сделал заливку ПЛОСКОЙ, но ловушку убирать нельзя:
+            // берём остановки градиента, если он есть, иначе сплошной цвет.
+            // Список пуст только если заливки нет вообще — это и есть провал.
             activeStops: preset
-                ? (css(preset).backgroundImage.match(/rgba?\([^)]+\)/g) || [])
+                ? ((css(preset).backgroundImage.match(/rgba?\([^)]+\)/g))
+                    || [css(preset).backgroundColor].filter((c) => c && c !== 'rgba(0, 0, 0, 0)'))
                 : [],
             activeColor: preset ? css(preset).color : null,
             track: slider ? css(slider).backgroundColor : null,
@@ -204,8 +225,8 @@ test('светлая тема перекрашивает сами контрол
     const activeFg = parseRgb(probe.activeColor);
     expect(
         probe.activeStops.length,
-        `у активного пресета не нашлось заливки акцентом (background-image пуст)`
-    ).toBeGreaterThanOrEqual(2);
+        'у активного пресета не нашлось заливки акцентом — ни градиента, ни сплошного цвета'
+    ).toBeGreaterThanOrEqual(1);
     for (const stop of probe.activeStops) {
         const ratio = contrastRatio(activeFg, parseRgb(stop));
         console.log(`надпись активного пресета: ${probe.activeColor} на ${stop} → ${ratio.toFixed(2)}:1`);
