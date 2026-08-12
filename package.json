@@ -136,6 +136,7 @@
       "shortcuts-help.js",
       "onboarding.js",
       "mini-bar.js",
+      "panel-state.js",
       "custom-sounds.js",
       "local-background.js",
     "theme-grid.js",
