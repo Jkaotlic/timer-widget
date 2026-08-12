@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face{font-family:'Inter';src:url('fonts/inter-cyrillic-200-normal.woff2') format('woff2');font-weight:200;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;}
+@font-face{font-family:'Inter';src:url('fonts/inter-latin-200-normal.woff2') format('woff2');font-weight:200;}
+@font-face{font-family:'Inter';src:url('fonts/inter-cyrillic-400-normal.woff2') format('woff2');font-weight:400;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;}
+@font-face{font-family:'Inter';src:url('fonts/inter-latin-400-normal.woff2') format('woff2');font-weight:400;}
+@font-face{font-family:'Inter';src:url('fonts/inter-cyrillic-500-normal.woff2') format('woff2');font-weight:500;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;}
+@font-face{font-family:'Inter';src:url('fonts/inter-latin-500-normal.woff2') format('woff2');font-weight:500;}
+@font-face{font-family:'Inter';src:url('fonts/inter-cyrillic-600-normal.woff2') format('woff2');font-weight:600;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116;}
+@font-face{font-family:'Inter';src:url('fonts/inter-latin-600-normal.woff2') format('woff2');font-weight:600;}
+@font-face{font-family:'JetBrains Mono';src:url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');font-weight:400;}
+@font-face{font-family:'JetBrains Mono';src:url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');font-weight:500;}
+body{margin:0;background:#ececed;}
+a{color:#0053ae;}a:hover{color:#0a84ff;}
+</style>
+</helmet>
+
+<div style="min-height:100%;padding:56px;box-sizing:border-box;background:#ececed;font-family:'Inter',system-ui,sans-serif;color:#1d1d1f">
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:44px;max-width:760px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:11px;font-weight:600;letter-spacing:1px;padding:3px 8px;border-radius:6px;background:#1d1d1f;color:#fff">1a</span>
+      <span style="font-size:11px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:#575760">Редизайн · светлая тема по умолчанию</span>
+    </div>
+    <div style="font-size:32px;font-weight:200;letter-spacing:-0.5px">Плоские поверхности, воздух вместо карточек, один понятный путь</div>
+    <div style="font-size:14px;line-height:1.55;color:#48484f;text-wrap:pretty">Панель отвечает на два вопроса подряд: сколько времени и где его показать. Настройки уехали на строку своего окна — вкладок «Виджет / Часы / Дисплей / Звуки» больше нет. Палитра Apple сохранена, стекло и блюр убраны.</div>
+  </div>
+
+  <!-- ================= ПАНЕЛЬ: СОСТОЯНИЯ ================= -->
+  <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760;margin-bottom:16px">Панель управления · 380 px · четыре состояния</div>
+  <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start;margin-bottom:56px">
+
+    <!-- A: покой -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="width:380px;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05),0 18px 44px rgba(0,0,0,0.12);overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px">
+          <div style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e;display:block"></span></div>
+          <div style="display:flex;gap:4px">
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">◐</span>
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">?</span>
+          </div>
+        </div>
+
+        <div style="padding:14px 24px 0;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760">Длительность</div>
+          <div style="font-size:76px;font-weight:200;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums">25:00</div>
+          <div style="font-size:11.5px;color:#575760">нажмите на время, чтобы ввести своё</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:22px 20px 0">
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#1d1d1f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">5</span>
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#1d1d1f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">15</span>
+          <span style="height:34px;border-radius:10px;background:#0a84ff;color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center">25</span>
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#1d1d1f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">45</span>
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#48484f;font-size:12px;font-weight:500;display:flex;align-items:center;justify-content:center">мин</span>
+        </div>
+
+        <div style="display:flex;gap:8px;padding:14px 20px 0">
+          <span style="flex:1;height:48px;border-radius:12px;background:#0a84ff;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px">Старт<span style="font-size:11px;font-weight:500;opacity:0.72;font-family:'JetBrains Mono',monospace">Space</span></span>
+          <span style="width:48px;height:48px;border-radius:12px;background:#f5f5f7;color:#48484f;font-size:16px;display:flex;align-items:center;justify-content:center">↺</span>
+        </div>
+
+        <div style="padding:26px 20px 0;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Показать на экране</div>
+        <div style="display:flex;flex-direction:column;padding:6px 12px 0">
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#f0f0f3;color:#48484f;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="9" r="5.2"></circle><path d="M8 6.4V9l1.8 1.1"></path><path d="M6.2 2h3.6"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Виджет</span><span style="font-size:11.5px;color:#575760">маленький таймер поверх окон</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#e4e4e9;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#f0f0f3;color:#48484f;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.4V8l2.6 1.6"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Часы</span><span style="font-size:11.5px;color:#575760">текущее время и дата</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#e4e4e9;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#f0f0f3;color:#48484f;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"></rect><path d="M5.6 13.4h4.8"></path><path d="M8 11v2.4"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Дисплей</span><span style="font-size:11.5px;color:#575760">во весь экран, для проектора</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#e4e4e9;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+        </div>
+
+        <div style="padding:20px 20px 18px;text-align:center;font-size:11px;color:#575760;font-family:'JetBrains Mono',monospace">Space — старт · R — сброс · 1–8 — пресеты</div>
+      </div>
+      <div style="font-size:11.5px;color:#575760;width:380px">Покой. Время → пресеты → старт → куда показать. Ниже — ничего.</div>
+    </div>
+
+    <!-- B: идёт -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="width:380px;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05),0 18px 44px rgba(0,0,0,0.12);overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px">
+          <div style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e;display:block"></span></div>
+          <div style="display:flex;gap:4px">
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">◐</span>
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">?</span>
+          </div>
+        </div>
+
+        <div style="padding:14px 24px 0;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#12652f"><span style="width:7px;height:7px;border-radius:50%;background:#30d158;display:block"></span>Осталось</div>
+          <div style="font-size:76px;font-weight:200;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums">18:24</div>
+          <div style="font-size:11.5px;color:#575760">закончится в 14:50</div>
+        </div>
+
+        <div style="height:3px;background:#f0f0f3;margin:20px 0 0;position:relative"><span style="position:absolute;left:0;top:0;height:3px;width:27%;background:#30d158;display:block"></span></div>
+
+        <div style="display:flex;gap:8px;padding:18px 20px 0">
+          <span style="flex:1;height:48px;border-radius:12px;background:#f5f5f7;color:#1d1d1f;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px">Пауза<span style="font-size:11px;font-weight:500;color:#575760;font-family:'JetBrains Mono',monospace">Space</span></span>
+          <span style="width:48px;height:48px;border-radius:12px;background:#f5f5f7;color:#48484f;font-size:16px;display:flex;align-items:center;justify-content:center">↺</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 20px 0">
+          <span style="height:32px;border-radius:10px;background:#fff;border:1px solid #ececf0;color:#48484f;font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">−5</span>
+          <span style="height:32px;border-radius:10px;background:#fff;border:1px solid #ececf0;color:#48484f;font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">−1</span>
+          <span style="height:32px;border-radius:10px;background:#fff;border:1px solid #ececf0;color:#48484f;font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">+1</span>
+          <span style="height:32px;border-radius:10px;background:#fff;border:1px solid #ececf0;color:#48484f;font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">+5</span>
+        </div>
+
+        <div style="padding:26px 20px 0;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Показать на экране</div>
+        <div style="display:flex;flex-direction:column;padding:6px 12px 0">
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px;background:#f7f7f9;border-radius:12px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#0a84ff;color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="9" r="5.2"></circle><path d="M8 6.4V9l1.8 1.1"></path><path d="M6.2 2h3.6"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Виджет</span><span style="font-size:11.5px;color:#12652f">показан · круг · 140%</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#f0f0f3;color:#48484f;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.4V8l2.6 1.6"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Часы</span><span style="font-size:11.5px;color:#575760">текущее время и дата</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#e4e4e9;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#f0f0f3;color:#48484f;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"></rect><path d="M5.6 13.4h4.8"></path><path d="M8 11v2.4"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Дисплей</span><span style="font-size:11.5px;color:#575760">во весь экран, для проектора</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#e4e4e9;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+        </div>
+
+        <div style="padding:20px 20px 18px;text-align:center;font-size:11px;color:#575760;font-family:'JetBrains Mono',monospace">Space — пауза · R — сброс</div>
+      </div>
+      <div style="font-size:11.5px;color:#575760;width:380px">Отсчёт. Пресеты уступают место ±, полоса прогресса заменяет кольцо.</div>
+    </div>
+
+    <!-- C: перерасход -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="width:380px;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05),0 18px 44px rgba(0,0,0,0.12);overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px">
+          <div style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e;display:block"></span></div>
+          <div style="display:flex;gap:4px">
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">◐</span>
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">?</span>
+          </div>
+        </div>
+        <div style="padding:14px 24px 0;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#b31025"><span style="width:7px;height:7px;border-radius:50%;background:#ff453a;display:block"></span>Перерасход</div>
+          <div style="font-size:76px;font-weight:200;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;color:#b31025;position:relative;width:fit-content"><span style="position:absolute;right:100%;top:50%;transform:translateY(-50%);font-size:0.62em;margin-right:0.1em">−</span>02:14</div>
+          <div style="font-size:11.5px;color:#575760">должно было закончиться в 14:50</div>
+        </div>
+        <div style="height:3px;background:#f7d9d9;margin:20px 0 0"><span style="height:3px;width:100%;background:#ff453a;display:block"></span></div>
+        <div style="display:flex;gap:8px;padding:18px 20px 0">
+          <span style="flex:1;height:48px;border-radius:12px;background:#b31025;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px">Стоп<span style="font-size:11px;font-weight:500;opacity:0.72;font-family:'JetBrains Mono',monospace">Space</span></span>
+          <span style="width:48px;height:48px;border-radius:12px;background:#f5f5f7;color:#48484f;font-size:16px;display:flex;align-items:center;justify-content:center">↺</span>
+        </div>
+        <div style="padding:26px 20px 0;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Показать на экране</div>
+        <div style="display:flex;flex-direction:column;padding:6px 12px 0">
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px;background:#f7f7f9;border-radius:12px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#0a84ff;color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="9" r="5.2"></circle><path d="M8 6.4V9l1.8 1.1"></path><path d="M6.2 2h3.6"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Виджет</span><span style="font-size:11.5px;color:#b31025">показан · перерасход</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+            <span style="width:30px;height:30px;border-radius:9px;background:#f0f0f3;color:#48484f;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"></rect><path d="M5.6 13.4h4.8"></path><path d="M8 11v2.4"></path></svg></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Дисплей</span><span style="font-size:11.5px;color:#12652f">показан · монитор 2</span></span>
+            <span style="font-size:16px;color:#575760;padding:0 4px">›</span>
+            <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+          </div>
+        </div>
+        <div style="padding:20px 20px 18px;text-align:center;font-size:11px;color:#575760;font-family:'JetBrains Mono',monospace">Уведомление каждые 5 минут</div>
+      </div>
+      <div style="font-size:11.5px;color:#575760;width:380px">Перерасход. Красный только на цифрах, знаке и полосе.</div>
+    </div>
+
+    <!-- D: ввод времени -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="width:380px;border-radius:16px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05),0 18px 44px rgba(0,0,0,0.12);overflow:hidden;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px">
+          <div style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e;display:block"></span></div>
+          <div style="display:flex;gap:4px">
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">◐</span>
+            <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#575760">?</span>
+          </div>
+        </div>
+        <div style="padding:14px 24px 0;display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#0053ae">Своё время</div>
+          <div style="font-size:76px;font-weight:200;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;display:flex;align-items:baseline">1:30<span style="color:#8e8e93">:00</span><span style="width:2px;height:60px;background:#0a84ff;margin-left:4px;align-self:center;display:block"></span></div>
+          <div style="font-size:11.5px;color:#575760">90 — секунды · 5:30 — минуты · 1:30:00 — часы</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:22px 20px 0">
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#48484f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">−5</span>
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#48484f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">−1</span>
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#48484f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">+1</span>
+          <span style="height:34px;border-radius:10px;background:#f5f5f7;color:#48484f;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center">+5</span>
+        </div>
+        <div style="display:flex;gap:8px;padding:10px 20px 0">
+          <span style="flex:1;height:48px;border-radius:12px;background:#0a84ff;color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px">Поставить<span style="font-size:11px;font-weight:500;opacity:0.72;font-family:'JetBrains Mono',monospace">Enter</span></span>
+          <span style="width:88px;height:48px;border-radius:12px;background:#f5f5f7;color:#48484f;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center">Отмена</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 20px 0">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Считать ниже нуля</span><span style="font-size:11.5px;color:#575760">после нуля таймер уходит в минус</span></span>
+          <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 22px">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Остановить на</span><span style="font-size:11.5px;color:#575760">без лимита</span></span>
+          <span style="width:96px;height:36px;border-radius:10px;background:#f5f5f7;color:#575760;font-size:14px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums">00:00</span>
+        </div>
+      </div>
+      <div style="font-size:11.5px;color:#575760;width:380px">Ввод времени. Сюда же уехали «ниже нуля» и лимит перерасхода.</div>
+    </div>
+  </div>
+
+  <!-- ================= НАСТРОЙКИ ОКНА ================= -->
+  <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760;margin-bottom:16px">Настройки окна · раскрываются со строки «Виджет», а не из вкладок</div>
+  <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start;margin-bottom:56px">
+    <div style="display:flex;gap:0;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.05),0 18px 44px rgba(0,0,0,0.12)">
+      <div style="width:380px;background:#fff;display:flex;flex-direction:column;opacity:0.55">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px">
+          <div style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e;display:block"></span></div>
+        </div>
+        <div style="padding:14px 24px 0;display:flex;flex-direction:column;align-items:center;gap:6px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760">Осталось</div>
+          <div style="font-size:76px;font-weight:200;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums">18:24</div>
+        </div>
+        <div style="height:3px;background:#f0f0f3;margin:20px 0 0"><span style="height:3px;width:27%;background:#30d158;display:block"></span></div>
+        <div style="display:flex;gap:8px;padding:18px 20px 0">
+          <span style="flex:1;height:48px;border-radius:12px;background:#f5f5f7;color:#1d1d1f;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center">Пауза</span>
+          <span style="width:48px;height:48px;border-radius:12px;background:#f5f5f7;color:#48484f;font-size:16px;display:flex;align-items:center;justify-content:center">↺</span>
+        </div>
+        <div style="padding:26px 20px 0;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Показать на экране</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 40px">
+          <span style="width:30px;height:30px;border-radius:9px;background:#0a84ff;color:#fff;display:inline-flex;align-items:center;justify-content:center"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="9" r="5.2"></circle><path d="M8 6.4V9l1.8 1.1"></path><path d="M6.2 2h3.6"></path></svg></span>
+          <span style="flex:1;font-size:14px;font-weight:500">Виджет</span>
+          <span style="font-size:16px;color:#0a84ff">›</span>
+        </div>
+      </div>
+      <div style="width:320px;background:#fbfbfc;border-left:1px solid #ececf0;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:16px 18px 12px">
+          <span style="font-size:15px;color:#575760">‹</span>
+          <span style="flex:1;font-size:15px;font-weight:600">Виджет</span>
+          <span style="font-size:16px;color:#575760">×</span>
+        </div>
+        <div style="padding:0 18px 8px;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Вид</div>
+        <div style="padding:0 18px 18px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+          <span style="height:56px;border-radius:10px;background:#0a84ff;color:#fff;font-size:10.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:18px;height:18px;border-radius:50%;border:2px solid currentColor;display:block"></span>Круг</span>
+          <span style="height:56px;border-radius:10px;background:#f2f2f5;color:#48484f;font-size:10.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="font-family:'JetBrains Mono',monospace;font-size:13px">88</span>LED</span>
+          <span style="height:56px;border-radius:10px;background:#f2f2f5;color:#48484f;font-size:10.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:16px;border-radius:3px;background:#c9c9d0;display:block"></span>Флип</span>
+          <span style="height:56px;border-radius:10px;background:#f2f2f5;color:#48484f;font-size:10.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:18px;height:18px;border-radius:50%;border:1.5px solid currentColor;position:relative;display:block"><span style="position:absolute;left:50%;top:3px;width:1.5px;height:6px;background:currentColor;display:block"></span></span>Аналог</span>
+          <span style="height:56px;border-radius:10px;background:#f2f2f5;color:#48484f;font-size:10.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="font-size:14px;font-weight:200">12</span>Цифры</span>
+        </div>
+        <div style="padding:0 18px 8px;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Размер</div>
+        <div style="padding:0 18px 20px;display:flex;align-items:center;gap:12px">
+          <span style="flex:1;height:4px;border-radius:2px;background:#e4e4e9;position:relative;display:block"><span style="position:absolute;left:0;top:0;height:4px;width:38%;border-radius:2px;background:#0a84ff;display:block"></span><span style="position:absolute;left:38%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.25);display:block"></span></span>
+          <span style="font-size:13px;color:#48484f;font-variant-numeric:tabular-nums;min-width:42px;text-align:right">140%</span>
+        </div>
+        <div style="padding:0 18px 8px;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#575760">Цвет цифр</div>
+        <div style="padding:0 18px 20px;display:flex;gap:8px">
+          <span style="width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #d2d2d9,0 0 0 4px rgba(10,132,255,0.25);display:block"></span>
+          <span style="width:30px;height:30px;border-radius:50%;background:#1d1d1f;display:block"></span>
+          <span style="width:30px;height:30px;border-radius:50%;background:#0a84ff;display:block"></span>
+          <span style="width:30px;height:30px;border-radius:50%;background:#30d158;display:block"></span>
+          <span style="width:30px;height:30px;border-radius:50%;background:#ff9f0a;display:block"></span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 16px">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:500">Кольцо прогресса</span><span style="font-size:11px;color:#575760">тонкая дуга вокруг цифр</span></span>
+          <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 16px">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:500">Подпись состояния</span><span style="font-size:11px;color:#575760">«идёт», «пауза», «перерасход»</span></span>
+          <span style="width:42px;height:25px;border-radius:13px;background:#e4e4e9;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 18px 20px">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:500">Поверх всех окон</span><span style="font-size:11px;color:#575760">не прячется за другие приложения</span></span>
+          <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+        </div>
+        <div style="margin-top:auto;padding:14px 18px 18px;font-size:11px;color:#575760;line-height:1.5;font-family:'JetBrains Mono',monospace">Ctrl+колесо на самом виджете — размер<br>Перетаскивание — положение</div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="width:320px;border-radius:16px;background:#fbfbfc;box-shadow:0 1px 2px rgba(0,0,0,0.05),0 18px 44px rgba(0,0,0,0.12);display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:16px 18px 12px">
+          <span style="font-size:15px;color:#575760">‹</span><span style="flex:1;font-size:15px;font-weight:600">Звуки</span><span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);display:block"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 18px"><span style="font-size:13.5px;font-weight:500">Старт</span><span style="font-size:13px;color:#48484f">Мягкий клик ›</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 18px"><span style="font-size:13.5px;font-weight:500">Каждая минута</span><span style="font-size:13px;color:#575760">Выключено ›</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 18px"><span style="font-size:13.5px;font-weight:500">Финиш</span><span style="font-size:13px;color:#48484f">Колокол ›</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 18px 16px"><span style="font-size:13.5px;font-weight:500">Перерасход</span><span style="font-size:13px;color:#48484f">Двойной сигнал ›</span></div>
+        <div style="margin:0 18px 18px;height:64px;border-radius:12px;border:1px dashed #d2d2d9;display:flex;align-items:center;justify-content:center;gap:10px;color:#575760;font-size:12.5px">Перетащите свой файл · mp3, wav, ogg</div>
+      </div>
+      <div style="font-size:11.5px;color:#575760;width:320px">Звуки — такой же раздел, открывается из строки окна или горячей клавишей.</div>
+    </div>
+  </div>
+
+  <!-- ================= ВИДЖЕТ ================= -->
+  <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760;margin-bottom:16px">Виджет · без подложки, только цифры и дуга</div>
+  <div style="display:flex;flex-wrap:wrap;gap:24px;margin-bottom:56px">
+    <div style="width:1160px;height:300px;border-radius:16px;background:linear-gradient(135deg,#5b6d7f 0%,#8d9aa6 45%,#c2c8cd 100%);display:grid;grid-template-columns:repeat(5,1fr);align-items:center;justify-items:center;padding:0 20px;box-sizing:border-box">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="position:relative;width:150px;height:150px">
+          <svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="2"></circle>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#30d158" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="206" transform="rotate(-90 50 50)"></circle>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:200;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,0.45)">18:24</div>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85);letter-spacing:1.2px;text-transform:uppercase">Круг</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:500;color:#30d158;text-shadow:0 2px 14px rgba(0,0,0,0.5)">18:24</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85);letter-spacing:1.2px;text-transform:uppercase">LED</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="width:52px;height:66px;border-radius:10px;background:rgba(20,20,24,0.82);color:#fff;font-size:40px;font-weight:200;display:flex;align-items:center;justify-content:center">18</span>
+          <span style="color:rgba(255,255,255,0.9);font-size:26px;font-weight:200">:</span>
+          <span style="width:52px;height:66px;border-radius:10px;background:rgba(20,20,24,0.82);color:#fff;font-size:40px;font-weight:200;display:flex;align-items:center;justify-content:center">24</span>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85);letter-spacing:1.2px;text-transform:uppercase">Флип</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="width:140px;height:140px;border-radius:50%;border:2px solid rgba(255,255,255,0.5);position:relative">
+          <span style="position:absolute;left:50%;top:12px;width:2px;height:10px;background:rgba(255,255,255,0.7);transform:translateX(-50%);display:block"></span>
+          <span style="position:absolute;left:50%;top:50%;width:3px;height:38px;background:#fff;transform-origin:top center;transform:translate(-50%,0) rotate(148deg);border-radius:2px;display:block"></span>
+          <span style="position:absolute;left:50%;top:50%;width:2px;height:52px;background:#30d158;transform-origin:top center;transform:translate(-50%,0) rotate(292deg);border-radius:2px;display:block"></span>
+          <span style="position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);display:block"></span>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85);letter-spacing:1.2px;text-transform:uppercase">Аналог</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <div style="font-size:64px;font-weight:200;color:#fff;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;text-shadow:0 2px 16px rgba(0,0,0,0.5)">18:24</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85);letter-spacing:1.2px;text-transform:uppercase">Цифры</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:24px;align-items:flex-start">
+      <div style="width:360px;height:200px;border-radius:16px;background:linear-gradient(135deg,#2b3340 0%,#4a5563 100%);display:flex;align-items:center;justify-content:center;gap:36px">
+        <div style="position:relative;width:120px;height:120px">
+          <svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"></circle>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#ff453a" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="0" transform="rotate(-90 50 50)"></circle>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:200;color:#ff453a;font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,0.5)">−02:14</div>
+        </div>
+        <div style="position:relative;width:120px;height:120px;opacity:0.9">
+          <svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"></circle>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#ff9f0a" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="120" transform="rotate(-90 50 50)"></circle>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:200;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,0.5)">04:12</div>
+        </div>
+      </div>
+      <div style="width:360px;font-size:12.5px;line-height:1.6;color:#48484f;text-wrap:pretty">Подложки, рамки и свечения сняты: на любом фоне читаются только цифры, тонкая дуга и мягкая тень под текстом. Цвет дуги несёт состояние — зелёный идёт, оранжевый последние минуты, красный перерасход. Подпись «идёт / пауза» по умолчанию выключена: её работу делает цвет.</div>
+    </div>
+  </div>
+
+  <!-- ================= ЧАСЫ + МИНИ-ПОЛОСА ================= -->
+  <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760;margin-bottom:16px">Часы и свёрнутая панель</div>
+  <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start;margin-bottom:56px">
+    <div style="width:560px;height:220px;border-radius:16px;background:linear-gradient(135deg,#5b6d7f 0%,#8d9aa6 45%,#c2c8cd 100%);display:flex;align-items:center;justify-content:space-around">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="font-size:56px;font-weight:200;color:#fff;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;text-shadow:0 2px 16px rgba(0,0,0,0.45)">14:32</div>
+        <div style="font-size:12.5px;color:rgba(255,255,255,0.85);letter-spacing:0.4px">вторник, 12 августа · GMT+3</div>
+      </div>
+      <div style="width:130px;height:130px;border-radius:50%;border:2px solid rgba(255,255,255,0.5);position:relative">
+        <span style="position:absolute;left:50%;top:10px;width:2px;height:9px;background:rgba(255,255,255,0.75);transform:translateX(-50%);display:block"></span>
+        <span style="position:absolute;left:10px;top:50%;width:9px;height:2px;background:rgba(255,255,255,0.45);transform:translateY(-50%);display:block"></span>
+        <span style="position:absolute;right:10px;top:50%;width:9px;height:2px;background:rgba(255,255,255,0.45);transform:translateY(-50%);display:block"></span>
+        <span style="position:absolute;left:50%;bottom:10px;width:2px;height:9px;background:rgba(255,255,255,0.45);transform:translateX(-50%);display:block"></span>
+        <span style="position:absolute;left:50%;top:50%;width:3px;height:34px;background:#fff;transform-origin:top center;transform:translate(-50%,0) rotate(255deg);border-radius:2px;display:block"></span>
+        <span style="position:absolute;left:50%;top:50%;width:2px;height:48px;background:#fff;transform-origin:top center;transform:translate(-50%,0) rotate(12deg);border-radius:2px;display:block"></span>
+        <span style="position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);display:block"></span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="width:340px;display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.06),0 10px 30px rgba(0,0,0,0.12)">
+        <span style="width:8px;height:8px;border-radius:50%;background:#30d158;display:block"></span>
+        <span style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:-0.01em">18:24</span>
+        <span style="flex:1"></span>
+        <span style="font-size:13px;font-weight:500;color:#0053ae;padding:4px 10px;border-radius:8px;background:#f0f6ff">Пауза</span>
+        <span style="width:30px;height:30px;border-radius:9px;background:#f5f5f7;color:#48484f;display:inline-flex;align-items:center;justify-content:center;font-size:13px">↺</span>
+        <span style="width:30px;height:30px;border-radius:9px;background:#f5f5f7;color:#48484f;display:inline-flex;align-items:center;justify-content:center;font-size:13px">▴</span>
+      </div>
+      <div style="width:340px;display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:14px;background:#1c1c1f;box-shadow:0 10px 30px rgba(0,0,0,0.4)">
+        <span style="width:8px;height:8px;border-radius:50%;background:#30d158;display:block"></span>
+        <span style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;color:#fff">18:24</span>
+        <span style="flex:1"></span>
+        <span style="font-size:13px;font-weight:500;color:#0a84ff;padding:4px 10px;border-radius:8px;background:rgba(10,132,255,0.16)">Пауза</span>
+        <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78);display:inline-flex;align-items:center;justify-content:center;font-size:13px">↺</span>
+        <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78);display:inline-flex;align-items:center;justify-content:center;font-size:13px">▴</span>
+      </div>
+      <div style="width:340px;font-size:12.5px;line-height:1.6;color:#48484f">Полоса — то же окно в свёрнутом виде. Действие названо словом, а не глифом.</div>
+    </div>
+  </div>
+
+  <!-- ================= ДИСПЛЕЙ ================= -->
+  <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760;margin-bottom:16px">Полноэкранный дисплей · 1280×720</div>
+  <div style="display:flex;flex-direction:column;gap:32px;margin-bottom:56px">
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="width:1280px;height:720px;position:relative;border-radius:14px;overflow:hidden;background:#0b0b0d;color:#fff">
+        <div style="position:absolute;top:44px;left:56px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.42)">Сейчас</div>
+          <div style="font-size:44px;font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:-0.01em">14:32</div>
+        </div>
+        <div style="position:absolute;top:44px;right:56px;display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <div style="font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.42)">Окончание</div>
+          <div style="font-size:44px;font-weight:200;font-variant-numeric:tabular-nums;letter-spacing:-0.01em">14:50</div>
+        </div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+          <div style="font-size:18px;font-weight:600;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.42)">Осталось</div>
+          <div style="font-size:280px;font-weight:200;line-height:0.9;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">18:24</div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:8px;background:rgba(255,255,255,0.12)"><span style="display:block;height:8px;width:27%;background:#30d158"></span></div>
+      </div>
+      <div style="font-size:11.5px;color:#575760">Тёмный дисплей для проектора: кольцо и деления сняты, прогресс живёт полосой во всю ширину.</div>
+    </div>
+
+    <div style="display:flex;gap:24px;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="width:628px;height:353px;position:relative;border-radius:14px;overflow:hidden;background:#fff;color:#1d1d1f;box-shadow:0 1px 2px rgba(0,0,0,0.06),0 18px 44px rgba(0,0,0,0.12)">
+          <div style="position:absolute;top:22px;left:28px;display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:#575760">Сейчас</div>
+            <div style="font-size:22px;font-weight:200;font-variant-numeric:tabular-nums">14:32</div>
+          </div>
+          <div style="position:absolute;top:22px;right:28px;display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <div style="font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:#575760">Окончание</div>
+            <div style="font-size:22px;font-weight:200;font-variant-numeric:tabular-nums">14:50</div>
+          </div>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#575760">Осталось</div>
+            <div style="font-size:138px;font-weight:200;line-height:0.9;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">18:24</div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:5px;background:#ececf0"><span style="display:block;height:5px;width:27%;background:#30d158"></span></div>
+        </div>
+        <div style="font-size:11.5px;color:#575760;width:628px">Светлый дисплей — для белой аудитории и стрима.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="width:628px;height:353px;position:relative;border-radius:14px;overflow:hidden;background:#0b0b0d;color:#fff">
+          <div style="position:absolute;top:22px;left:28px;display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:rgba(255,255,255,0.42)">Сейчас</div>
+            <div style="font-size:22px;font-weight:200;font-variant-numeric:tabular-nums">14:52</div>
+          </div>
+          <div style="position:absolute;top:22px;right:28px;display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <div style="font-size:9px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;color:rgba(255,255,255,0.42)">Должно было кончиться</div>
+            <div style="font-size:22px;font-weight:200;font-variant-numeric:tabular-nums">14:50</div>
+          </div>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:#ff453a">Перерасход</div>
+            <div style="font-size:138px;font-weight:200;line-height:0.9;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;color:#ff453a;position:relative;width:fit-content"><span style="position:absolute;right:100%;top:50%;transform:translateY(-50%);font-size:0.62em;margin-right:0.1em">−</span>02:14</div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(255,69,58,0.25)"><span style="display:block;height:5px;width:100%;background:#ff453a"></span></div>
+        </div>
+        <div style="font-size:11.5px;color:#575760;width:628px">Перерасход: цвет берут только цифры, подпись и полоса.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ТЁМНАЯ ПАНЕЛЬ ================= -->
+  <div style="font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#575760;margin-bottom:16px">Тёмная тема · та же сетка, плоские поверхности</div>
+  <div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+    <div style="width:380px;border-radius:16px;background:#17171a;color:#fff;box-shadow:0 18px 44px rgba(0,0,0,0.45);overflow:hidden;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px 4px">
+        <div style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e;display:block"></span></div>
+        <div style="display:flex;gap:4px">
+          <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,0.48)">◐</span>
+          <span style="width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,0.48)">?</span>
+        </div>
+      </div>
+      <div style="padding:14px 24px 0;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#30d158"><span style="width:7px;height:7px;border-radius:50%;background:#30d158;display:block"></span>Осталось</div>
+        <div style="font-size:76px;font-weight:200;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums">18:24</div>
+        <div style="font-size:11.5px;color:rgba(255,255,255,0.48)">закончится в 14:50</div>
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,0.10);margin:20px 0 0"><span style="height:3px;width:27%;background:#30d158;display:block"></span></div>
+      <div style="display:flex;gap:8px;padding:18px 20px 0">
+        <span style="flex:1;height:48px;border-radius:12px;background:rgba(255,255,255,0.08);color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px">Пауза<span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.48);font-family:'JetBrains Mono',monospace">Space</span></span>
+        <span style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78);font-size:16px;display:flex;align-items:center;justify-content:center">↺</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 20px 0">
+        <span style="height:32px;border-radius:10px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.78);font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">−5</span>
+        <span style="height:32px;border-radius:10px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.78);font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">−1</span>
+        <span style="height:32px;border-radius:10px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.78);font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">+1</span>
+        <span style="height:32px;border-radius:10px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.78);font-size:12.5px;font-weight:500;display:flex;align-items:center;justify-content:center">+5</span>
+      </div>
+      <div style="padding:26px 20px 0;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,0.48)">Показать на экране</div>
+      <div style="display:flex;flex-direction:column;padding:6px 12px 0">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 8px;background:rgba(255,255,255,0.05);border-radius:12px">
+          <span style="width:30px;height:30px;border-radius:9px;background:#0a84ff;color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="9" r="5.2"></circle><path d="M8 6.4V9l1.8 1.1"></path><path d="M6.2 2h3.6"></path></svg></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Виджет</span><span style="font-size:11.5px;color:#30d158">показан · круг · 140%</span></span>
+          <span style="font-size:16px;color:rgba(255,255,255,0.48);padding:0 4px">›</span>
+          <span style="width:42px;height:25px;border-radius:13px;background:#30d158;position:relative;display:block;flex:0 0 auto"><span style="position:absolute;right:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;display:block"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+          <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.4V8l2.6 1.6"></path></svg></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Часы</span><span style="font-size:11.5px;color:rgba(255,255,255,0.48)">текущее время и дата</span></span>
+          <span style="font-size:16px;color:rgba(255,255,255,0.48);padding:0 4px">›</span>
+          <span style="width:42px;height:25px;border-radius:13px;background:rgba(255,255,255,0.14);position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;display:block"></span></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 8px">
+          <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.78);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"></rect><path d="M5.6 13.4h4.8"></path><path d="M8 11v2.4"></path></svg></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:500">Дисплей</span><span style="font-size:11.5px;color:rgba(255,255,255,0.48)">во весь экран, для проектора</span></span>
+          <span style="font-size:16px;color:rgba(255,255,255,0.48);padding:0 4px">›</span>
+          <span style="width:42px;height:25px;border-radius:13px;background:rgba(255,255,255,0.14);position:relative;display:block;flex:0 0 auto"><span style="position:absolute;left:2px;top:2px;width:21px;height:21px;border-radius:50%;background:#fff;display:block"></span></span>
+        </div>
+      </div>
+      <div style="padding:20px 20px 18px;text-align:center;font-size:11px;color:rgba(255,255,255,0.48);font-family:'JetBrains Mono',monospace">Space — пауза · R — сброс</div>
+    </div>
+
+    <div style="width:520px;display:flex;flex-direction:column;gap:18px">
+      <div style="font-size:16px;font-weight:600">Что изменилось</div>
+      <div style="display:flex;flex-direction:column;gap:14px;font-size:13.5px;line-height:1.6;color:#48484f">
+        <div><span style="color:#1d1d1f;font-weight:500">Один путь вместо пяти блоков.</span> Время → пресет → старт → куда показать. Вкладки «Виджет / Часы / Дисплей / Звуки» убраны, вместо них строка окна со стрелкой.</div>
+        <div><span style="color:#1d1d1f;font-weight:500">Пресетов пять вместо восьми</span> (5 / 15 / 25 / 45 и «мин» для своего значения). Ряд ± появляется только когда он нужен — во время отсчёта и при ручном вводе.</div>
+        <div><span style="color:#1d1d1f;font-weight:500">Кнопки названы словами.</span> «Старт», «Пауза», «Стоп» с подсказкой клавиши вместо трёх кружков с глифами.</div>
+        <div><span style="color:#1d1d1f;font-weight:500">Ни одной карточки и рамки.</span> Разделяет расстояние и одна заливка #f5f5f7; стекло, блюр, свечения и градиентные кольца сняты во всех окнах.</div>
+        <div><span style="color:#1d1d1f;font-weight:500">Прогресс — полоса, а не кольцо.</span> В панели 3 px под цифрами, на дисплее 8 px по нижнему краю. Кольцо остаётся стилем виджета для тех, кому оно нравится.</div>
+        <div><span style="color:#1d1d1f;font-weight:500">Палитра прежняя:</span> #0a84ff, #30d158, #ff9f0a, #ff453a. На светлом для текста берутся затемнённые варианты из design-tokens.css (#0053ae, #12652f, #b31025) — контраст AAA.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>
