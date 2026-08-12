@@ -28,9 +28,24 @@
                 <!-- Переключатель темы живёт в титлбаре, а не во вкладках настроек:
                      вкладки настраивают КОНКРЕТНОЕ окно (виджет, часы, дисплей), а
                      тема общая для всего приложения. -->
+                <button class="titlebar-help" id="miniBarToggle" type="button" aria-expanded="true" title="Свернуть в полосу (M)" aria-label="Свернуть в полосу">▾</button>
                 <button class="titlebar-help" id="contrastToggle" type="button" aria-pressed="false" title="Высокий контраст" aria-label="Высокий контраст">◐</button>
                 <button class="titlebar-help" id="faqBtn" title="Справка (F1)" aria-label="Справка">?</button>
             </div>
+        </div>
+
+        <!-- Полоса: ВТОРОЕ СОСТОЯНИЕ этого окна, а не отдельное окно и не
+             второй таймер. Время и точку сюда пишет тот же updateDisplay(),
+             что и в герой-блок; своего источника времени у полосы нет. -->
+        <div class="mini-bar" id="miniBar">
+            <span class="mini-dot" id="miniBarDot" aria-hidden="true"></span>
+            <span class="mini-time" id="miniBarTime">00:00</span>
+            <span class="mini-spacer"></span>
+            <button class="mini-btn" id="miniBarPause" title="Пауза (Space)" aria-label="Приостановить">⏸</button>
+            <button class="mini-btn mini-start" id="miniBarStart" title="Старт (Space)" aria-label="Запустить таймер">▶</button>
+            <button class="mini-btn" id="miniBarReset" title="Сброс (R)" aria-label="Сбросить">↺</button>
+            <span class="mini-divider" aria-hidden="true"></span>
+            <button class="mini-btn" id="miniBarExpand" title="Развернуть (M)" aria-label="Развернуть панель">▴</button>
         </div>
 
         <!-- Таймер -->
@@ -903,6 +918,7 @@
                                 <div class="shortcut"><span class="key">W</span> <span class="shortcut-desc">Виджет таймера (открыть / закрыть)</span></div>
                                 <div class="shortcut"><span class="key">C</span> <span class="shortcut-desc">Виджет часов (открыть / закрыть)</span></div>
                                 <div class="shortcut"><span class="key">D</span> <span class="shortcut-desc">Полноэкранный дисплей (открыть / закрыть)</span></div>
+                                <div class="shortcut"><span class="key">M</span> <span class="shortcut-desc">Свернуть окно в полосу (и обратно)</span></div>
                                 <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть все окна</span></div>
                                 <div class="shortcut"><span class="key">F1</span> <span class="shortcut-desc">Шпаргалка по клавишам</span></div>
                             </div>
@@ -982,6 +998,7 @@
     <script src="modal-manager.js"></script>
     <script src="shortcuts-help.js"></script>
     <script src="onboarding.js"></script>
+    <script src="mini-bar.js"></script>
     <script src="custom-sounds.js"></script>
     <script src="local-background.js"></script>
     <script src="theme-grid.js"></script>
@@ -2390,9 +2407,10 @@
             updateDisplay() {
                 // Сплит знака и цифр держит цифры центрированными при переходе в минус.
                 const _neg = this.remainingSeconds < 0;
+                const _digits = this.formatTime(Math.abs(this.remainingSeconds));
                 this.controlTimeSignEl.textContent = _neg ? '−' : '';
-                this.controlTimeDigitsEl.textContent = this.formatTime(Math.abs(this.remainingSeconds));
-                
+                this.controlTimeDigitsEl.textContent = _digits;
+
                 // Цветовые классы для времени
                 // Полоса срочности — общая для всех окон (RendererShared).
                 this.controlTimeEl.classList.remove('warning', 'danger');
@@ -2431,6 +2449,10 @@
                 if (this.controlHeroLabelEl) {
                     this.controlHeroLabelEl.textContent = isOvertime ? 'Сверх времени' : 'Осталось';
                 }
+
+                // Полоса берёт время ОТСЮДА, а не считает своё: второй источник
+                // времени — расхождение, которое проект уже ловил на дисплее.
+                window.miniBar?.render({ text: (_neg ? '−' : '') + _digits, band: isOvertime ? 'danger' : band });
             }
 
             // Подсветка быстрого выбора выводится из состояния таймера, а не из
@@ -2714,6 +2736,11 @@
         // Подсказка про F1 при первом запуске + кнопка «Проверить
         // обновления». Подробности и зависимости — в onboarding.js.
         window.Onboarding.init();
+        // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
+        const _tc = () => window.timerController;
+        window.miniBar = window.MiniBar.init({ doc: document, ipc: window.ipcRenderer,
+            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); } },
+            actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
 
         const faqModal = document.getElementById('faqModal');
         const faqClose = document.getElementById('faqClose');
@@ -2944,6 +2971,13 @@
                     window.ipcRenderer.send('close-widget');
                     window.ipcRenderer.send('close-clock-widget');
                 }
+            }
+
+            // M: свернуть окно в полосу и обратно. Клавиша выбрана по коду из
+            // свободных; модификаторы не трогаем — Cmd+M остаётся за системой.
+            else if (event.code === 'KeyM') {
+                event.preventDefault();
+                if (window.miniBar) { window.miniBar.toggle(); }
             }
 
             // F1: Show help/shortcuts

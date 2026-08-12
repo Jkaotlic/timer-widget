@@ -33,6 +33,7 @@ const ALLOWED_CHANNELS = {
         'clock-widget-set-style',
         'clock-widget-settings',
         'resize-control-window',
+        'control-collapse',
         'widget-set-position',
         'widget-resize',
         'widget-move',

@@ -23,6 +23,10 @@ const ALLOWED_CHANNELS = {
         'clock-widget-set-style',
         'clock-widget-settings',
         'resize-control-window',
+        // Свёртывание окна управления в полосу. Отдельный канал, а не
+        // resize-control-window: тот ЗАЖИМАЕТ высоту снизу минимумом окна
+        // (660), и полоса в 52px через него недостижима в принципе.
+        'control-collapse',
         'widget-set-position',
         'widget-resize',
         'widget-move',
