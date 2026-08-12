@@ -18,7 +18,85 @@
  * Модуль отдаёт ЗНАЧЕНИЯ и состояние, а не раскладку.
  */
 
+
+/**
+ * Подзаголовок строки окна: «показан · круг · 140%».
+ *
+ * Чистая функция — принимает уже собранные значения и возвращает строку.
+ * Отделена от DOM намеренно: собрать текст и достать значения — две разные
+ * задачи, и ошибаться они будут по-разному.
+ *
+ * @param {{open: boolean, idle: string, style?: string, scale?: number, where?: string}} p
+ * @returns {string}
+ */
+function windowRowSubtitle(p) {
+    // Закрытое окно описывает СЕБЯ, открытое — своё состояние.
+    if (!p || !p.open) { return (p && p.idle) || ''; }
+
+    const parts = ['показан'];
+    if (p.style) { parts.push(p.style); }
+    // 100% — это «как обычно», и в подписи оно только шумит. Показываем
+    // масштаб, только когда он о чём-то говорит.
+    if (Number.isFinite(p.scale) && p.scale !== 100) { parts.push(p.scale + '%'); }
+    if (p.where) { parts.push(p.where); }
+    return parts.join(' · ');
+}
+
+/** Человеческие имена стилей — те же слова, что на кнопках выбора стиля. */
+const STYLE_LABELS = {
+    circle: 'круг',
+    digital: 'LED',
+    flip: 'флип',
+    analog: 'аналог',
+    digits: 'цифры'
+};
+
 const PanelStateMixin = {
+
+    /**
+     * Раскладывает живое состояние окон в подзаголовки их строк.
+     *
+     * Значения берутся из САМИХ контролов настроек, а не из отдельной копии:
+     * копия разошлась бы с ящиком ровно в тот момент, когда пользователь
+     * что-то в нём поменял.
+     */
+    renderWindowRows() {
+        const val = (id) => {
+            const el = document.getElementById(id);
+            if (!el) { return undefined; }
+            return el.value !== undefined ? el.value : el.dataset.value;
+        };
+        const num = (id) => {
+            const n = parseInt(val(id), 10);
+            return Number.isFinite(n) ? n : undefined;
+        };
+        const styleOf = (id) => STYLE_LABELS[val(id)];
+
+        const monitor = document.getElementById('displaySelect');
+        const where = monitor && monitor.value !== 'auto'
+            ? monitor.options[monitor.selectedIndex]?.text.replace(/\s*\(.*\)$/, '')
+            : undefined;
+
+        const ROWS = [
+            { btn: 'openWidgetBtn',  sub: 'subWidget',  style: styleOf('timerStyle'), scale: num('timerScale') },
+            { btn: 'openClockBtn',   sub: 'subClock',   style: styleOf('clockStyle'), scale: num('clockScale') },
+            { btn: 'openDisplayBtn', sub: 'subDisplay', where }
+        ];
+
+        for (const row of ROWS) {
+            const btn = document.getElementById(row.btn);
+            const sub = document.getElementById(row.sub);
+            if (!btn || !sub) { continue; }
+            if (!sub.dataset.idle) { sub.dataset.idle = sub.textContent; }
+            sub.textContent = windowRowSubtitle({
+                open: btn.classList.contains('active'),
+                idle: sub.dataset.idle,
+                style: row.style,
+                scale: row.scale,
+                where: row.where
+            });
+        }
+    },
 
     /**
      * Проводка ручного ввода: поле, три входа в режим и мастер-тумблер звука.
@@ -144,6 +222,11 @@ const PanelStateMixin = {
         document.body.classList.remove('state-idle', 'state-running', 'state-overtime', 'state-input');
         document.body.classList.add('state-' + mode);
 
+        // Подписи строк пересобираются здесь же, а не только при открытии окна:
+        // стиль и масштаб меняются в ящике, и подпись обязана догонять их без
+        // отдельной проводки от каждого контрола.
+        this.renderWindowRows();
+
         const LABEL = {
             idle: 'Длительность',
             running: this.isPaused ? 'Пауза' : 'Осталось',
@@ -199,6 +282,7 @@ const PanelStateMixin = {
 // Node (тесты) и браузер (панель) — двойной экспорт, как у остальных модулей.
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PanelStateMixin;
+    module.exports.windowRowSubtitle = windowRowSubtitle;
 }
 if (typeof window !== 'undefined') {
     window.PanelStateMixin = PanelStateMixin;
