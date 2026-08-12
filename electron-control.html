@@ -41,10 +41,12 @@
             <span class="mini-dot" id="miniBarDot" aria-hidden="true"></span>
             <span class="mini-time" id="miniBarTime">00:00</span>
             <span class="mini-spacer"></span>
-            <button class="mini-btn" id="miniBarPause" title="Пауза (Space)" aria-label="Приостановить">⏸</button>
-            <button class="mini-btn mini-start" id="miniBarStart" title="Старт (Space)" aria-label="Запустить таймер">▶</button>
+            <!-- Действие названо СЛОВОМ, а не глифом. Кнопок по-прежнему две
+                 (за ними висят разные обработчики), на экране всегда одна:
+                 выбирает то же состояние, что и в развёрнутой панели. -->
+            <button class="mini-action" id="miniBarPause" title="Пауза (Space)" aria-label="Приостановить">Пауза</button>
+            <button class="mini-action" id="miniBarStart" title="Старт (Space)" aria-label="Запустить таймер">Старт</button>
             <button class="mini-btn" id="miniBarReset" title="Сброс (R)" aria-label="Сбросить">↺</button>
-            <span class="mini-divider" aria-hidden="true"></span>
             <button class="mini-btn" id="miniBarExpand" title="Развернуть (M)" aria-label="Развернуть панель">▴</button>
         </div>
 

@@ -263,16 +263,13 @@ body.style-digital .info-label {
        3.57:1, а подпись идёт 12px uppercase 600 — нужно 4.5:1.
        При 0.65 выходит 4.60:1. Проверяется tests/contrast.test.js. */
     color: var(--info-color-dim, rgba(48, 209, 88, 0.65));
-    text-shadow: 0 0 5px var(--info-glow, rgba(48, 209, 88, 0.3));
 }
 body.style-digital .info-value {
     font-family: var(--tw-font-mono);
     font-weight: 700;
     color: var(--info-color, var(--tw-led-green));
-    text-shadow:
-        0 0 10px var(--info-color, var(--tw-led-green)),
-        0 0 20px var(--info-color, var(--tw-led-green)),
-        0 0 40px var(--info-glow, rgba(48, 209, 88, 0.4));
+    /* Неон снят редизайном 2026-08-12. */
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 /* Flip style */
@@ -450,17 +447,14 @@ body.style-analog .info-block .mini-tick.quarter {
     stroke-width: 12;
     stroke-linecap: round;
     transition: stroke-dashoffset var(--tw-dur-slow) var(--tw-ease-out);
-    filter: drop-shadow(0 0 15px var(--glow-color, rgba(10, 132, 255, 0.55)));
 }
 
 .ring-progress.warning {
     stroke: url(#warningGradient);
-    filter: drop-shadow(0 0 15px rgba(255, 193, 7, 0.6));
 }
 
 .ring-progress.danger {
     stroke: url(#dangerGradient);
-    filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.7));
     animation: danger-pulse 1s infinite;
 }
 
@@ -519,9 +513,9 @@ body.style-analog .info-block .mini-tick.quarter {
     color: var(--timer-color, var(--tw-fg));
     letter-spacing: 0.02em;
     font-variant-numeric: tabular-nums;
-    text-shadow:
-        0 4px 8px rgba(0, 0, 0, 0.4),
-        0 0 60px var(--text-glow, rgba(10, 132, 255, 0.55));
+    /* Ореол снят; нейтральная тень оставлена — она отделяет цифры от фона,
+       который на дисплее задаёт пользователь. */
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
     transition: color var(--tw-dur-base) var(--tw-ease-out),
                 text-shadow var(--tw-dur-base) var(--tw-ease-out),
                 font-size var(--tw-dur-base) var(--tw-ease-out);
@@ -708,20 +702,18 @@ body.style-digital .status-pill {
     border: 1px solid var(--tw-border);
     border-radius: var(--tw-r-md);
     color: var(--tw-led-green);
-    text-shadow: 0 0 10px var(--tw-led-green);
     box-shadow: none;
 }
-body.style-digital .status-pill.running  { color: var(--tw-led-green); text-shadow: 0 0 15px var(--tw-led-green); }
-body.style-digital .status-pill.paused   { color: var(--tw-led-warn); text-shadow: 0 0 10px var(--tw-led-warn); }
-body.style-digital .status-pill.finished { color: var(--tw-led-danger); text-shadow: 0 0 15px var(--tw-led-danger); }
+body.style-digital .status-pill.running  { color: var(--tw-led-green); }
+body.style-digital .status-pill.paused   { color: var(--tw-led-warn); }
+body.style-digital .status-pill.finished { color: var(--tw-led-danger); }
 body.style-digital .status-pill.overtime {
     color: var(--tw-led-danger);
-    text-shadow: 0 0 15px var(--tw-led-danger);
     animation: led-overtime-pulse 1s infinite;
 }
 @keyframes led-overtime-pulse {
-    0%, 100% { text-shadow: 0 0 15px #ff3333; }
-    50%      { text-shadow: 0 0 30px #ff3333, 0 0 50px #ff3333; }
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.85; }
 }
 
 body.style-flip .status-pill {
@@ -772,10 +764,7 @@ body.style-flip .status-pill {
     /* Цвет темы приходит ПЕРЕМЕННОЙ, а не инлайном: инлайн бьёт правила
        полос (.warning/.danger) и делал их недостижимыми из CSS. */
     color: var(--timer-color, var(--tw-led-green));
-    text-shadow:
-        0 0 20px var(--tw-led-green),
-        0 0 40px var(--tw-led-green),
-        0 0 80px rgba(48, 209, 88, 0.4);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
     letter-spacing: 8px;
     position: relative;
     font-variant-numeric: tabular-nums;
@@ -788,17 +777,11 @@ body.style-flip .status-pill {
 
 .digital-time.warning {
     color: var(--tw-led-warn);
-    text-shadow:
-        0 0 20px var(--tw-led-warn),
-        0 0 40px var(--tw-led-warn),
-        0 0 80px rgba(255, 204, 0, 0.4);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
 }
 .digital-time.danger {
     color: var(--tw-led-danger);
-    text-shadow:
-        0 0 20px var(--tw-led-danger),
-        0 0 40px var(--tw-led-danger),
-        0 0 80px rgba(255, 51, 51, 0.4);
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
     animation: led-danger-pulse 1s infinite;
 }
 
@@ -872,9 +855,7 @@ body.style-flip .status-pill {
     font-size: clamp(2rem, 7vw, 5rem);
     font-weight: 700;
     color: var(--tw-red);
-    text-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(255, 69, 58, 0.5);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 .flip-minus.visible { display: flex; }
 
@@ -1390,3 +1371,38 @@ textarea:focus-visible,
     outline: none;
     box-shadow: var(--tw-focus-ring);
 }
+
+/* ============================================================================
+   РЕДИЗАЙН 2026-08-12 · ПОЛОСА ПРОГРЕССА ДИСПЛЕЯ
+   ----------------------------------------------------------------------------
+   8 px в полноэкранном, 5 px в оконном — числа из макета. Во всю ширину и без
+   радиуса: это шкала, а не элемент управления.
+   ========================================================================== */
+.display-progress {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 5px;
+    background: var(--tw-overlay-medium);
+    z-index: 5;
+    pointer-events: none;
+}
+body.is-fullscreen .display-progress { height: 8px; }
+
+.display-progress-fill {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--tw-green);
+    transition: width var(--tw-dur-base) linear;
+}
+/* Перерасход: шкала заполнена целиком и красная. Проценты там уже ничего не
+   значат — время вышло, вопрос только «насколько». */
+body.overtime .display-progress { background: rgba(255, 69, 58, 0.25); }
+body.overtime .display-progress-fill { background: var(--tw-red); width: 100% !important; }
+
+/* Полоса берёт цвет полосы срочности. Класс ставит display-script по тому же
+   _colorBand(), что красит цифры, — второго решения о цвете здесь нет. */
+body.warning .display-progress-fill { background: var(--tw-orange); }
+body.danger  .display-progress-fill { background: var(--tw-red); }

@@ -336,6 +336,14 @@
         </div>
     </div>
 
+    <!-- Полоса прогресса во всю ширину нижнего края. Пришла на смену кольцу
+         как ОБЩЕМУ индикатору: кольцо осталось одним из пяти стилей таймера,
+         а прогресс теперь виден в любом стиле, включая «Цифры» и «Флип», где
+         его не было вовсе. -->
+    <div class="display-progress" id="displayProgress" role="presentation">
+        <span class="display-progress-fill" id="displayProgressFill"></span>
+    </div>
+
     <script src="ipc-compat.js"></script>
     <script src="security.js"></script>
     <script src="utils.js"></script>
