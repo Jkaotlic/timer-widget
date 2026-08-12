@@ -39,14 +39,22 @@ test('normalizeTheme: неизвестное значение — это тем�
     // В localStorage может лежать что угодно из прошлых версий — в том числе
     // 'hc-dark' от высококонтрастной темы, которая была второй до 2.4.1.
     for (const junk of ['hc-dark', '', null, undefined, 0, 'LIGHT', {}, []]) {
-        assert.equal(UITheme.normalizeTheme(junk), 'dark', `мусор ${JSON.stringify(junk)} обязан дать dark`);
+        assert.equal(UITheme.normalizeTheme(junk), 'light', `мусор ${JSON.stringify(junk)} обязан дать light`);
     }
+});
+
+test('темой по умолчанию является светлая', () => {
+    // Макет редизайна объявляет светлую тему темой по умолчанию. Проверяется
+    // САМА константа, а не только normalizeTheme: смена дефолта — продуктовое
+    // решение, и оно обязано ломать тест, а не проезжать молча вместе с
+    // рефакторингом normalizeTheme.
+    assert.equal(UITheme.UI_THEME_DEFAULT, 'light');
 });
 
 test('nextTheme ходит по кругу и не залипает', () => {
     assert.equal(UITheme.nextTheme('dark'), 'light');
     assert.equal(UITheme.nextTheme('light'), 'dark');
-    assert.equal(UITheme.nextTheme('чепуха'), 'light', 'из мусора переключаемся в светлую');
+    assert.equal(UITheme.nextTheme('чепуха'), 'dark', 'из мусора (это светлая по умолчанию) переключаемся в тёмную');
     // Двойное переключение возвращает в исходную — иначе кнопка была бы односторонней.
     assert.equal(UITheme.nextTheme(UITheme.nextTheme('dark')), 'dark');
 });
