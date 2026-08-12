@@ -85,6 +85,14 @@ const FREEZE_ANIMATIONS_CSS = `
        3.66% кадра, ровно тот же класс недетерминизма, что курсор и анимации.
        Снимаем их из кадра всегда. */
     #controlsHint, #widgetHint, #clockHint { display: none !important; }
+    /* Тосты — тот же класс недетерминизма, что подсказки выше, только заметнее.
+       Подсказка первого запуска («F1 — список горячих клавиш») показывается
+       один раз на профиль и гаснет через 3.5 секунды: попадёт она в кадр или
+       нет, зависит от того, стоит ли флаг onboardingShown и как быстро прошла
+       съёмка. На кадре control-collapsed.png она заняла ПОЛОВИНУ полосы — в
+       окне 400×52 тост перекрывает почти всё. Размещение тостов проверяется
+       замером в e2e (toast-placement, mini-bar), а не картинкой. */
+    .toast-container { display: none !important; }
 `;
 
 async function freezeAnimations(ctx, log) {
@@ -376,6 +384,33 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             for (const name of WINDOWS) {
                 await capture(windows[name], path.join(outDir, `${name}-${state.name}.png`), log);
             }
+        }
+
+        // Полоса — состояние, которого нет ни на одном другом кадре: панели на
+        // нём не видно вовсе. Любая ошибка в правиле `body.collapsed` (не
+        // спрятанная секция, съехавшая кнопка, цвет точки не от той полосы)
+        // видна сразу и целиком, потому что кадр всего 400×52.
+        //
+        // Снимается в состоянии running: у полосы есть точка состояния, и на
+        // покое она ничего не покажет.
+        try {
+            applyTimerState({
+                totalSeconds: 300, presetSeconds: 300, remainingSeconds: 183,
+                isRunning: true, isPaused: false, finished: false
+            });
+            const c = ctx().control;
+            if (c && !c.isDestroyed()) {
+                // Возвращаем примитив: collapse() отдаёт объект API, а его
+                // executeJavaScript пытается склонировать через structured clone
+                // и падает с «An object could not be cloned».
+                await c.webContents.executeJavaScript('!!(window.miniBar && window.miniBar.collapse())');
+                await sleep(600);
+                await capture(c, path.join(outDir, 'control-collapsed.png'), log);
+                await c.webContents.executeJavaScript('!!(window.miniBar && window.miniBar.expand())');
+                await sleep(600);
+            }
+        } catch (e) {
+            log.warn(`[screenshot] кадр полосы: ${e.message}`);
         }
 
         // Stuck-colour sweep across all 4 timer styles.

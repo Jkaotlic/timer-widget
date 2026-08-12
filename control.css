@@ -3704,3 +3704,26 @@ body.collapsed .mini-bar button {
 .mini-btn:hover { background: var(--tw-level-2); color: var(--tw-fg); }
 .mini-btn:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 .mini-start { color: var(--tw-green); border-color: var(--tw-green); }
+
+/* Сообщения в свёрнутом состоянии.
+   Контейнер тостов прибит к нижнему краю окна (bottom: --tw-s-10 = 40px) —
+   это правка прохода по дефектам, там тост ложился на герой-время. В окне
+   высотой 52px тот же отступ выносит тост ЗА верхний край: замер дал верх
+   тоста на отметке -46, то есть сообщение читать нечем.
+
+   Здесь тост встаёт по центру полосы и на её время подменяет собой её
+   содержимое: терять сообщение нельзя (так приходит и уведомление о
+   восстановлении после сбоя), а разворачивать окно ради него — значит менять
+   режим, который выбрал пользователь. Через 3.5 секунды полоса возвращается.
+   Замеряется e2e/mini-bar.spec.js. */
+body.collapsed .toast-container {
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+}
+body.collapsed .toast {
+    max-width: calc(100% - 2 * var(--panel-inset));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
