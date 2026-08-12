@@ -220,6 +220,29 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <!-- По умолчанию ВЫКЛЮЧЕНА: состояние уже несёт цвет дуги
+                             (зелёный идёт, оранжевый последние минуты, красный
+                             перерасход), а на маленьком виджете слово занимает
+                             место, которого нет. Тумблер для тех, кому слово
+                             нужнее места. -->
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="widgetStatusLabel">Подпись состояния</label>
+                            <label class="toggle-switch" title="Показывать «идёт», «пауза», «перерасход» под цифрами виджета">
+                                <input type="checkbox" id="widgetStatusLabel">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <!-- Уровень окна раньше был прибит в главном процессе и
+                             пользователю не подчинялся. Выключение опускает виджет
+                             в обычный слой — он перестаёт закрывать собой
+                             полноэкранные приложения. -->
+                        <div class="toggle-row">
+                            <label class="toggle-label" for="widgetAlwaysOnTop">Поверх всех окон</label>
+                            <label class="toggle-switch" title="Виджет не прячется за другие приложения">
+                                <input type="checkbox" id="widgetAlwaysOnTop" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -1140,18 +1163,24 @@
                 this.timerStyleEl = document.getElementById('timerStyle');
                 this._attachSegmented(this.timerStyleEl, 'circle');
                 this.widgetShowTicksEl = document.getElementById('widgetShowTicks');
+                // Два тумблера редизайна. Проводка одинаковая: записать и
+                // отправить ВЕСЬ payload стиля — он собирается в одном месте,
+                // поэтому новое поле уезжает само.
+                this.widgetStatusLabelEl = document.getElementById('widgetStatusLabel');
+                this.widgetAlwaysOnTopEl = document.getElementById('widgetAlwaysOnTop');
+                for (const el of [this.widgetStatusLabelEl, this.widgetAlwaysOnTopEl]) {
+                    el?.addEventListener('change', () => {
+                        ipcRenderer.send('widget-style-update', this.widgetStylePayload());
+                        this.saveExtSettings();
+                    });
+                }
                 if (this.widgetShowTicksEl) {
                     this.widgetShowTicksEl.checked = localStorage.getItem('widgetShowTicks') === 'true';
                     this.widgetShowTicksEl.addEventListener('change', () => {
                         const val = this.widgetShowTicksEl.checked;
                         localStorage.setItem('widgetShowTicks', val);
                         localStorage.setItem('clockShowTicks', val);
-                        ipcRenderer.send('widget-style-update', {
-                            timerStyle: this.timerStyleEl.value,
-                            timerScale: parseInt(this.timerScaleEl.value),
-                            digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
-                            showTicks: val
-                        });
+                        ipcRenderer.send('widget-style-update', this.widgetStylePayload({ showTicks: val }));
                         // Деления — общая настройка ДВУХ циферблатов: и виджет
                         // таймера, и виджет часов имеют SVG-группу .tick-marks и
                         // правило .ticks-on. Поэтому пушим часам всегда, а не
@@ -1610,11 +1639,7 @@
                 
                 this.timerStyleEl.addEventListener('change', () => {
                     // Send widget-specific style update (only affects widget, not display)
-                    ipcRenderer.send('widget-style-update', {
-                        timerStyle: this.timerStyleEl.value,
-                        digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
-                        showTicks: this.widgetShowTicksEl?.checked ?? false
-                    });
+                    ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                     // Sync clock style when syncClockStyle is enabled
                     if (this.syncClockStyle) {
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
@@ -1626,12 +1651,7 @@
 
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
-                    ipcRenderer.send('widget-style-update', {
-                        timerStyle: this.timerStyleEl.value,
-                        timerScale: parseInt(this.timerScaleEl.value),
-                        digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
-                        showTicks: this.widgetShowTicksEl?.checked ?? false
-                    });
+                    ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                     this.saveExtSettings();
                 });
 
@@ -1679,11 +1699,7 @@
                 // Три независимых списка шрифта — каждый шлёт только своему окну.
                 if (this.widgetDigitsFontEl) {
                     this.widgetDigitsFontEl.addEventListener('change', () => {
-                        ipcRenderer.send('widget-style-update', {
-                            timerStyle: this.timerStyleEl.value,
-                            digitsFont: this.widgetDigitsFontEl.value,
-                            showTicks: this.widgetShowTicksEl?.checked ?? false
-                        });
+                        ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                         this.saveExtSettings();
                     });
                 }
@@ -1717,12 +1733,7 @@
                     document.getElementById('timerScale'),
                     30, 600, 100,
                     (val) => {
-                        ipcRenderer.send('widget-style-update', {
-                            timerStyle: this.timerStyleEl.value,
-                            timerScale: val,
-                            digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
-                            showTicks: this.widgetShowTicksEl?.checked ?? false
-                        });
+                        ipcRenderer.send('widget-style-update', this.widgetStylePayload({ timerScale: val }));
                         this.saveExtSettings();
                     }
                 );
@@ -1841,6 +1852,7 @@
                     document.getElementById('soundFileInput').click();
                 });
 
+                this.bindSoundDropZone();
                 document.getElementById('soundFileInput').addEventListener('change', (e) => {
                     this.handleSoundFileUpload(e);
                 });
@@ -1946,12 +1958,7 @@
 
                 // Отправляем начальный стиль виджета
                 setTimeout(() => {
-                    ipcRenderer.send('widget-style-update', {
-                        timerStyle: this.timerStyleEl.value,
-                        timerScale: parseInt(this.timerScaleEl.value),
-                        digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
-                        showTicks: this.widgetShowTicksEl?.checked ?? false
-                    });
+                    ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                 }, 600);
 
                 // Загружаем per-window цвета

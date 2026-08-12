@@ -4278,3 +4278,10 @@ body.state-input .panel-footer { display: none; }
 .wrow-toggle.quick-window-btn.active::after { content: none; }
 .wrow-toggle.quick-window-btn:hover,
 [data-theme="light"] .wrow-toggle.quick-window-btn:hover { transform: none; }
+
+/* Зона перетаскивания подсвечивается, пока файл над ней: без обратной связи
+   пользователь не знает, попал он или нет. */
+.add-sound-btn.drag-over {
+    border-color: var(--tw-blue);
+    background: var(--tw-level-1);
+}
