@@ -17,6 +17,9 @@ const {
     isWindowDragTarget,
     bindWindowDrag,
     fitScaledBounds,
+    fitRestoredBounds,
+    ledStripHeight,
+    ledStripMetrics,
     MIN_SCALE_PCT,
     MAX_SCALE_PCT
 } = require('../window-geometry');
@@ -263,7 +266,28 @@ test('перетаскивание шлёт РАЗНИЦУ и сдвигает �
 
     // Второе движение даёт разницу от ПЕРВОГО, а не от начала: главный процесс
     // складывает дельту с текущей позицией окна.
-    assert.deepEqual(moves, [{ deltaX: 30, deltaY: 20 }, { deltaX: 10, deltaY: 5 }]);
+    assert.deepEqual(moves, [
+        { deltaX: 30, deltaY: 20, first: true },
+        { deltaX: 10, deltaY: 5, first: false }
+    ]);
+});
+
+test('первое движение ЖЕСТА помечено, остальные — нет', () => {
+    // Флаг нужен главному процессу: по нему он запоминает размер окна на время
+    // жеста и держит его неизменным. Без границы жеста «размер на время
+    // перетаскивания» определить не из чего — канал шлёт только дельты.
+    const { container, doc, moves } = setupDrag();
+
+    container.fire('mousedown', mouseEvent({ screenX: 100, screenY: 100 }));
+    doc.fire('mousemove', mouseEvent({ screenX: 110, screenY: 100 }));
+    doc.fire('mousemove', mouseEvent({ screenX: 120, screenY: 100 }));
+    doc.fire('mouseup', mouseEvent());
+
+    container.fire('mousedown', mouseEvent({ screenX: 500, screenY: 500 }));
+    doc.fire('mousemove', mouseEvent({ screenX: 510, screenY: 500 }));
+
+    assert.deepEqual(moves.map(m => m.first), [true, false, true],
+        'каждый новый жест начинается заново');
 });
 
 test('движение без нажатия игнорируется', () => {
@@ -541,4 +565,198 @@ test('результат — целые числа: setBounds не приним�
     for (const [k, v] of Object.entries(next)) {
         assert.equal(Number.isInteger(v), true, `${k}=${v} обязано быть целым`);
     }
+});
+
+// --- fitRestoredBounds: восстановление сохранённой позиции ------------------
+//
+// Правило поменялось осознанно. Прежняя редакция укладывала окно ЦЕЛИКОМ внутрь
+// экрана, потому что испорченный профиль (наследие масштабирования до 2.4.2)
+// оставлял на экране 12 % окна. Но тем же поджатием отменялось и НАМЕРЕННОЕ
+// расположение: виджет, свисающий за край, после закрытия возвращался на экран —
+// замерено зондом: сохранено x = 3470 при экране 3440, восстановлено x = 3190.
+// Свисать за край разрешено; неотменяемым остаётся только одно — окно обязано
+// остаться ухватываемым мышью, то есть сохранить видимую полосу по каждой оси.
+
+const DISPLAYS = [{ bounds: { x: 0, y: 0, width: 3440, height: 1440 } }];
+const MIN_VISIBLE = 64;
+
+test('свисающее за правый край окно восстанавливается КАК СОХРАНЕНО', () => {
+    const target = { x: 3320, y: 100, width: 250, height: 250 };
+    const next = fitRestoredBounds(target, DISPLAYS, MIN_VISIBLE, DISPLAYS[0].bounds, WIDGET_MIN);
+
+    assert.deepEqual(next, target, 'видно 120 px по горизонтали — этого достаточно');
+});
+
+test('свисающее за верхний край окно тоже остаётся на месте', () => {
+    const target = { x: 500, y: -120, width: 250, height: 250 };
+    const next = fitRestoredBounds(target, DISPLAYS, MIN_VISIBLE, DISPLAYS[0].bounds, WIDGET_MIN);
+
+    assert.equal(next.y, -120, 'верхний край выше экрана — законное расположение');
+});
+
+test('окно, от которого видна одна кромка, поджимается обратно на экран', () => {
+    // 20 px видимой полосы — это уже не «свисает», а «потеряно».
+    const target = { x: 3420, y: 100, width: 250, height: 250 };
+    const next = fitRestoredBounds(target, DISPLAYS, MIN_VISIBLE, DISPLAYS[0].bounds, WIDGET_MIN);
+
+    assert.equal(next.x + next.width <= 3440, true, `правый край ${next.x + next.width}`);
+    assert.equal(next.x >= 0, true);
+});
+
+test('окно с отключённого монитора возвращается на живой экран', () => {
+    const target = { x: -4000, y: 200, width: 250, height: 250 };
+    const next = fitRestoredBounds(target, DISPLAYS, MIN_VISIBLE, DISPLAYS[0].bounds, WIDGET_MIN);
+
+    assert.equal(next.x >= 0, true, 'ушедшее за пределы всех мониторов окно возвращается');
+    assert.equal(next.x + next.width <= 3440, true);
+});
+
+test('видимость считается по САМОМУ подходящему монитору, а не по первому', () => {
+    const two = [
+        { bounds: { x: 0, y: 0, width: 1440, height: 900 } },
+        { bounds: { x: 1440, y: 0, width: 2560, height: 1440 } }
+    ];
+    // Окно целиком на втором мониторе: первый его не видит вовсе.
+    const target = { x: 2000, y: 300, width: 250, height: 250 };
+    const next = fitRestoredBounds(target, two, MIN_VISIBLE, two[0].bounds, WIDGET_MIN);
+
+    assert.deepEqual(next, target);
+});
+
+test('от окна тоньше полосы требуется половина, а не невозможное', () => {
+    // Полоса LED ниже 64 px: требовать 64 px видимой высоты от окна высотой 44
+    // значило бы поджимать его всегда, то есть запретить ему свисать вовсе.
+    const target = { x: 3300, y: -10, width: 250, height: 44 };
+    const next = fitRestoredBounds(target, DISPLAYS, MIN_VISIBLE, DISPLAYS[0].bounds, { width: 120, height: 44 });
+
+    assert.equal(next.y, -10, 'видно 34 px из 44 — окно ухватываемо');
+});
+
+test('результат восстановления — целые числа', () => {
+    const target = { x: 100.6, y: 200.4, width: 250, height: 250 };
+    const next = fitRestoredBounds(target, DISPLAYS, MIN_VISIBLE, DISPLAYS[0].bounds, WIDGET_MIN);
+
+    for (const [k, v] of Object.entries(next)) {
+        assert.equal(Number.isInteger(v), true, `${k}=${v} обязано быть целым`);
+    }
+});
+
+// --- источник геометрии ----------------------------------------------------
+//
+// Размер и позицию окна считал РЕНДЕРЕР: outerWidth и screenX/screenY. Владеет
+// ими при этом главный процесс — он же их и задаёт. Пока масштаб экрана равен
+// 100 %, обе величины совпадают, и расхождению неоткуда взяться; на мониторе с
+// иным масштабом CSS-пиксель рендерера и DIP главного процесса — разные
+// единицы, то есть окно записывает СВОЙ размер и СВОЮ точку в чужих единицах.
+// Поэтому источником стал главный процесс, а показания рендерера остались
+// запасным путём — на случай, если сообщение ещё не пришло.
+
+test('геометрия пишется по данным ГЛАВНОГО процесса, а не рендерера', () => {
+    const { geo, storage } = makeGeometry({
+        // Рендерер видит одно...
+        getOuterWidth: () => 331,
+        getScreenPosition: () => ({ x: 1, y: 2 })
+    });
+    // ...а главный процесс сообщает настоящее.
+    geo.setWindowBounds({ x: 300, y: 400, width: 500, height: 500 });
+    geo.save();
+
+    assert.deepEqual(JSON.parse(storage.data.widgetGeometry), { scalePct: 200, x: 300, y: 400 });
+});
+
+test('без сообщения от главного процесса работают показания рендерера', () => {
+    const { geo, storage } = makeGeometry({
+        getOuterWidth: () => 500,
+        getScreenPosition: () => ({ x: 7, y: 8 })
+    });
+    geo.save();
+
+    assert.deepEqual(JSON.parse(storage.data.widgetGeometry), { scalePct: 200, x: 7, y: 8 });
+});
+
+test('явный масштаб по-прежнему сильнее любого источника', () => {
+    const { geo, storage } = makeGeometry({ getOuterWidth: () => 500 });
+    geo.setWindowBounds({ x: 0, y: 0, width: 500, height: 500 });
+    geo.save(120);
+
+    assert.equal(JSON.parse(storage.data.widgetGeometry).scalePct, 120);
+});
+
+test('отложенная запись тоже сверяется с размером ГЛАВНОГО процесса', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { geo, storage } = makeGeometry({ getOuterWidth: () => 250 });
+    geo.scalePct = 100;
+
+    geo.setWindowBounds({ x: 10, y: 20, width: 750, height: 750 });
+    geo.saveSettled();
+    t.mock.timers.tick(400);
+
+    assert.equal(JSON.parse(storage.data.widgetGeometry).scalePct, 300,
+        'рендерер всё ещё показывает 250 — верить надо главному процессу');
+});
+
+// --- полоса LED ------------------------------------------------------------
+//
+// Жалоба: «нет возможности уменьшить фоновую рамку по размеру часов в лед
+// режиме». Рамка занимала ОКНО, а окно было квадратом при любом стиле —
+// поэтому вокруг строки «00:00» оставалась пустая тёмная коробка, и на
+// минимальном размере (120×140) она же была основной частью виджета.
+//
+// Владелец пропорции здесь один — эта арифметика. Ею считает и рендерер (кегль
+// цифр и поля рамки), и главный процесс (минимальная высота окна), поэтому
+// рамка обнимает цифры, а не сходится с ними примерно.
+
+test('высота полосы выводится из ширины и длины строки', () => {
+    // MM:SS с запасом на знак минуса — шесть знакомест.
+    const short = ledStripHeight(250, 6);
+    // H:MM:SS со знаком — девять.
+    const long = ledStripHeight(250, 9);
+
+    assert.equal(short, 90);
+    assert.equal(long, 64, 'строка длиннее — полоса ниже: ширину задаёт масштаб, а не содержимое');
+});
+
+test('высота полосы пропорциональна ширине', () => {
+    // Допуск 1 px: высота округляется до целого — setBounds дробей не принимает.
+    assert.ok(Math.abs(ledStripHeight(500, 6) - 2 * ledStripHeight(250, 6)) <= 1,
+        `${ledStripHeight(500, 6)} против ${2 * ledStripHeight(250, 6)}`);
+});
+
+test('кегль и поля считаются от МЕНЬШЕЙ из двух посадок', () => {
+    // Окно ровно той формы, которую даёт ledStripHeight: посадки совпадают.
+    const m = ledStripMetrics(250, 90, 6);
+    assert.equal(Math.round(m.fontSize), 53);
+    assert.equal(Math.round(m.padY), 18);
+    assert.equal(Math.round(m.padX), 24);
+
+    // Окно ниже нужного — решает высота.
+    const low = ledStripMetrics(250, 60, 6);
+    assert.equal(Math.round(low.fontSize), 35);
+
+    // Окно уже нужного — решает ширина.
+    const narrow = ledStripMetrics(150, 90, 6);
+    assert.equal(Math.round(narrow.fontSize), 32);
+});
+
+test('мусор даёт 0, а не NaN и не Infinity', () => {
+    // Любое из двух, попав в font-size, схлопывает цифры до невидимых —
+    // тот же принцип, что в digits-style.js.
+    for (const bad of [[0, 90, 6], [250, 0, 6], [250, 90, 0], ['x', 90, 6], [250, 90, -3]]) {
+        const m = ledStripMetrics(bad[0], bad[1], bad[2]);
+        assert.equal(m.fontSize, 0, `${JSON.stringify(bad)} → ${m.fontSize}`);
+        assert.equal(m.padX, 0);
+        assert.equal(m.padY, 0);
+    }
+    assert.equal(ledStripHeight(0, 6), 0);
+    assert.equal(ledStripHeight(250, 0), 0);
+});
+
+test('поля и радиус — доли КЕГЛЯ, а не окна', () => {
+    // Значение этого: рамка обнимает цифры одинаково на любом масштабе.
+    const small = ledStripMetrics(250, 90, 6);
+    const big = ledStripMetrics(1000, 360, 6);
+
+    assert.equal(Math.round(big.fontSize / small.fontSize), 4);
+    assert.equal(Math.round(big.padX / small.padX), 4);
+    assert.equal(Math.round(big.radius / small.radius), 4);
 });

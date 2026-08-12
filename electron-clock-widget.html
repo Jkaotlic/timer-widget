@@ -1734,6 +1734,14 @@
             }
 
             setupIPC() {
+                // Границы окна от ГЛАВНОГО процесса — источник для записи
+                // геометрии. Свои outerWidth/screenX остаются запасным путём,
+                // см. window-geometry.js.
+                this._handlers.onWindowGeometry = (event, bounds) => {
+                    this._geometry.setWindowBounds(bounds);
+                };
+                ipcRenderer.on('window-geometry', this._handlers.onWindowGeometry);
+
                 // Получаем стиль от панели управления
                 this._onSetClockStyle = (event, style) => {
                     this.setClockStyle(style);
@@ -1849,6 +1857,7 @@
                 if (h.onTimerState) { ipcRenderer.removeListener('timer-state', h.onTimerState); }
                 if (h.onDisplayWindowState) { ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState); }
                 if (h.onWidgetWindowState) { ipcRenderer.removeListener('widget-window-state', h.onWidgetWindowState); }
+                if (h.onWindowGeometry) { ipcRenderer.removeListener('window-geometry', h.onWindowGeometry); }
                 this._handlers = {};
             }
 

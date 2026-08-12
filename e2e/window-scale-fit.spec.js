@@ -118,42 +118,75 @@ for (const target of WINDOWS) {
     });
 }
 
+/**
+ * Восстановление сохранённой точки. Здесь ДВА разных случая, и различает их
+ * ширина видимой полосы, а не факт выхода за край.
+ *
+ * История правила. Сначала окно считалось видимым, если на дисплее лежал его
+ * ЛЕВЫЙ-ВЕРХНИЙ УГОЛ: размер в проверке не участвовал, и точка (3320, 70) при
+ * размере 1000 px оставляла на экране 12 % окна. Потом прямоугольник стали
+ * поджимать ЦЕЛИКОМ — и вместе с испорченными профилями отменилось намеренное
+ * расположение внахлёст с краем: замерено зондом на 3440×1440, сохранено
+ * x = 3470, восстановлено x = 3190. Теперь свисать разрешено, а поджимается
+ * только окно, от которого не осталось полосы для захвата мышью
+ * (CONFIG.WINDOW_MIN_VISIBLE_PX = 64).
+ */
+async function restoreFromPoint(app, control, target, point, scalePct) {
+    await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+    const win = await findWindow(app, target.url);
+    await win.waitForLoadState('domcontentloaded');
+    await win.waitForTimeout(800);
+
+    const area = await screenBoundsOf(app, target.url);
+    const geo = { scalePct, x: point(area).x, y: point(area).y };
+    await win.evaluate(({ key, g }) => localStorage.setItem(key, JSON.stringify(g)),
+        { key: target.storageKey, g: geo });
+
+    await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
+    await control.waitForTimeout(700);
+    await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+    const reopened = await findWindow(app, target.url);
+    await reopened.waitForLoadState('domcontentloaded');
+    await reopened.waitForTimeout(1600);
+
+    return { area, geo, bounds: await boundsOf(app, target.url) };
+}
+
 for (const target of WINDOWS) {
-    test(`${target.name}: сохранённая точка у края не выносит окно за экран`, async () => {
-        // Восстановление позиции требовало, чтобы на дисплее лежал ЛЕВЫЙ-ВЕРХНИЙ
-        // УГОЛ, а не всё окно. Замерено на виджете: сохранённая точка (3320, 70)
-        // при размере 1000 px давала 880 px за правым краем — на экране
-        // оставалось 12 % окна. Точка попадает в хранилище буквально: именно так
-        // писала геометрию прежняя версия, увеличивая масштаб у края экрана,
-        // поэтому испорченные профили существуют и правка масштабирования их
-        // НЕ лечит — путь восстановления идёт мимо неё.
+    test(`${target.name}: свисающее за край окно восстанавливается КАК СОХРАНЕНО`, async () => {
         const { app, control } = await launchApp();
         try {
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await findWindow(app, target.url);
-            await win.waitForLoadState('domcontentloaded');
-            await win.waitForTimeout(800);
+            // 120 px видимой полосы: окно свисает за правый край на три четверти
+            // и всё равно остаётся ухватываемым.
+            const { geo, bounds } = await restoreFromPoint(
+                app, control, target,
+                (area) => ({ x: area.x + area.width - 120, y: area.y + 40 }),
+                400
+            );
 
-            const area = await screenBoundsOf(app, target.url);
-            // Точка ВНУТРИ экрана (угол видно), но окну там не поместиться.
-            const poisoned = { scalePct: 400, x: area.x + area.width - 120, y: area.y + 40 };
-            await win.evaluate(({ key, geo }) => {
-                localStorage.setItem(key, JSON.stringify(geo));
-            }, { key: target.storageKey, geo: poisoned });
+            expect(Math.abs(bounds.x - geo.x), `x ${geo.x} → ${bounds.x}: позиция не должна поджиматься`)
+                .toBeLessThanOrEqual(2);
+            expect(Math.abs(bounds.y - geo.y), `y ${geo.y} → ${bounds.y}`).toBeLessThanOrEqual(2);
+        } finally {
+            await control.evaluate((k) => localStorage.removeItem(k), target.storageKey).catch(() => {});
+            await app.close();
+        }
+    });
 
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
-            await control.waitForTimeout(700);
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const reopened = await findWindow(app, target.url);
-            await reopened.waitForLoadState('domcontentloaded');
-            await reopened.waitForTimeout(1600);
+    test(`${target.name}: потерянное за краем окно возвращается на экран`, async () => {
+        const { app, control } = await launchApp();
+        try {
+            // 20 px видимой полосы — это уже не «свисает», а «потеряно».
+            const { area, bounds } = await restoreFromPoint(
+                app, control, target,
+                (a) => ({ x: a.x + a.width - 20, y: a.y + 40 }),
+                400
+            );
 
-            const b = await boundsOf(app, target.url);
-            expect(b.x, `левый край ${b.x} левее ${area.x}`).toBeGreaterThanOrEqual(area.x);
-            expect(b.y, `верх ${b.y} выше ${area.y}`).toBeGreaterThanOrEqual(area.y);
-            expect(b.x + b.width, `правый край ${b.x + b.width} за пределами ${area.x + area.width}`)
+            expect(bounds.x, `левый край ${bounds.x} левее ${area.x}`).toBeGreaterThanOrEqual(area.x);
+            expect(bounds.x + bounds.width, `правый край ${bounds.x + bounds.width} за пределами ${area.x + area.width}`)
                 .toBeLessThanOrEqual(area.x + area.width);
-            expect(b.y + b.height, `нижний край ${b.y + b.height} за пределами ${area.y + area.height}`)
+            expect(bounds.y + bounds.height, `нижний край ${bounds.y + bounds.height} за пределами ${area.y + area.height}`)
                 .toBeLessThanOrEqual(area.y + area.height);
         } finally {
             await control.evaluate((k) => localStorage.removeItem(k), target.storageKey).catch(() => {});

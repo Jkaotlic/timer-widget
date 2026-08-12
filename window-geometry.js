@@ -69,25 +69,61 @@ function createWindowGeometry(cfg) {
     // Отложенная запись по событию resize. См. saveSettled() ниже.
     let settleTimer = null;
 
+    // Последние границы окна, СООБЩЁННЫЕ главным процессом.
+    //
+    // Зачем: размер и позицию окна рендерер считал сам — outerWidth и
+    // screenX/screenY. Владеет ими при этом главный процесс, он же их и задаёт.
+    // Пока масштаб экрана 100 %, обе величины совпадают (замерено на 3440×1440:
+    // outerWidth 250 при getBounds().width 250), и расхождению неоткуда взяться.
+    // На мониторе с иным масштабом CSS-пиксель рендерера и DIP главного процесса
+    // — разные единицы: окно записывает свой размер и свою точку в чужих
+    // единицах, а восстановление читает их как свои. Отсюда и «виджет
+    // самопроизвольно растёт», и «позиция не сохраняется» — у обоих один корень.
+    //
+    // Показания рендерера остаются запасным путём: до первого сообщения от
+    // главного процесса других данных нет.
+    let reported = null;
+
+    /** Фактические границы окна: сообщённые главным процессом либо свои. */
+    function currentBounds() {
+        if (reported) { return reported; }
+        const pos = getScreenPosition();
+        return { x: pos.x, y: pos.y, width: getOuterWidth(), height: getOuterWidth() };
+    }
+
     /**
      * Записывает размер и позицию.
      * @param {number} [explicitPct] — без него берётся ФАКТИЧЕСКАЯ ширина окна:
      *   она учитывает и растягивание за край рамки, а не только Ctrl+колесо.
      */
     function save(explicitPct) {
+        const b = currentBounds();
         const pct = Number.isFinite(explicitPct)
             ? explicitPct
-            : (Math.round(getOuterWidth() / baseSize * 100) || scalePct || 100);
+            : (Math.round(b.width / baseSize * 100) || scalePct || 100);
         scalePct = pct;
-        const pos = getScreenPosition();
         try {
-            storage.setItem(storageKey, JSON.stringify({ scalePct: pct, x: pos.x, y: pos.y }));
+            storage.setItem(storageKey, JSON.stringify({ scalePct: pct, x: b.x, y: b.y }));
         } catch { /* хранилище переполнено — геометрия не критична */ }
     }
 
     return {
         get scalePct() { return scalePct; },
         set scalePct(v) { scalePct = v; },
+
+        /**
+         * Границы окна, как их видит ГЛАВНЫЙ процесс. Приходят каналом
+         * `window-geometry` после каждой операции, которая двигает или меняет
+         * размер окна. Мусор игнорируется: пропущенное сообщение оставит
+         * прежние данные, а подмена их на undefined увела бы запись на
+         * показания рендерера, то есть ровно туда, откуда мы уходим.
+         */
+        setWindowBounds(bounds) {
+            if (!bounds || typeof bounds !== 'object') { return; }
+            const { x, y, width, height } = bounds;
+            if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) { return; }
+            reported = { x, y, width, height };
+        },
 
         /** Восстанавливает размер и позицию прошлой сессии. */
         restore() {
@@ -133,7 +169,7 @@ function createWindowGeometry(cfg) {
             clearTimeout(settleTimer);
             settleTimer = setTimeout(() => {
                 settleTimer = null;
-                const pct = Math.round(getOuterWidth() / baseSize * 100) || scalePct || 100;
+                const pct = Math.round(currentBounds().width / baseSize * 100) || scalePct || 100;
                 if (pct !== scalePct) { save(pct); }
             }, delayMs);
         },
@@ -148,6 +184,76 @@ function createWindowGeometry(cfg) {
         sizeFor(pct) {
             return Math.round(baseSize * pct / 100);
         }
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Полоса LED
+// ---------------------------------------------------------------------------
+//
+// Рамка стиля LED занимала ОКНО целиком, а окно виджета было квадратом при
+// любом стиле — отсюда пустая тёмная коробка вокруг строки «00:00», особенно
+// заметная на минимальном размере (120×140), где эта коробка и была основной
+// частью виджета.
+//
+// Теперь пропорцию окна и поля рамки задаёт ОДНА арифметика — эта. Ею считает
+// рендерер (кегль цифр и поля, которые уходят в CSS-переменные) и главный
+// процесс (минимальная высота окна и высота при смене стиля). Будь у них по
+// своей формуле, рамка сходилась бы с цифрами примерно — а «примерно» здесь и
+// есть та самая пустая коробка, только поменьше.
+//
+// Числа — доли КЕГЛЯ, а не окна: тогда рамка обнимает цифры одинаково на любом
+// масштабе.
+const LED_ADVANCE_EM = 0.64;   // ширина знакоместа: 0.6 моноширинного + letter-spacing 0.04
+const LED_PAD_Y_EM = 0.35;     // поле сверху и снизу
+const LED_PAD_X_EM = 0.45;     // поле слева и справа
+const LED_RADIUS_EM = 0.42;    // скругление рамки
+
+const ledPositive = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+
+/**
+ * Высота полосы под заданную ширину окна.
+ *
+ * Ширину задаёт масштаб и НИКОГДА не содержимое: из ширины считается
+ * сохраняемый процент масштаба, и окно, которое расширялось бы при переходе
+ * через час, наращивало бы этот процент с каждым переоткрытием. Поэтому
+ * длинная строка делает полосу НИЖЕ, а не шире.
+ *
+ * @param {number} width — ширина окна
+ * @param {number} chars — знакомест в строке С ЗАПАСОМ на знак минуса
+ * @returns {number} высота окна; 0 при мусоре на входе
+ */
+function ledStripHeight(width, chars) {
+    const w = ledPositive(width);
+    const n = ledPositive(chars);
+    if (!w || !n) { return 0; }
+    return Math.round(w * (1 + 2 * LED_PAD_Y_EM) / (n * LED_ADVANCE_EM + 2 * LED_PAD_X_EM));
+}
+
+/**
+ * Кегль цифр и поля рамки для окна заданного размера.
+ *
+ * Рамка растёт от СОДЕРЖИМОГО (в CSS у неё `width: auto`), поэтому окно,
+ * оказавшееся не той формы — например, пока не пришёл стиль от панели, — даёт
+ * не растянутую коробку, а ту же обнимающую рамку с воздухом вокруг неё.
+ *
+ * @returns {{fontSize:number, padX:number, padY:number, radius:number}} нули при мусоре
+ */
+function ledStripMetrics(width, height, chars) {
+    const w = ledPositive(width);
+    const h = ledPositive(height);
+    const n = ledPositive(chars);
+    if (!w || !h || !n) { return { fontSize: 0, padX: 0, padY: 0, radius: 0 }; }
+
+    const byWidth = w / (n * LED_ADVANCE_EM + 2 * LED_PAD_X_EM);
+    const byHeight = h / (1 + 2 * LED_PAD_Y_EM);
+    const fontSize = Math.min(byWidth, byHeight);
+
+    return {
+        fontSize,
+        padX: fontSize * LED_PAD_X_EM,
+        padY: fontSize * LED_PAD_Y_EM,
+        radius: fontSize * LED_RADIUS_EM
     };
 }
 
@@ -223,6 +329,68 @@ function fitScaledBounds(current, requested, workArea, min) {
 }
 
 /**
+ * Куда поставить окно при ВОССТАНОВЛЕНИИ сохранённой позиции.
+ *
+ * Правило здесь мягче, чем при масштабировании, и это осознанно. Восстановление
+ * тоже укладывало окно ЦЕЛИКОМ внутрь экрана — тем же fitScaledBounds. Причина
+ * была: испорченный профиль (наследие масштабирования до 2.4.2, оно росло
+ * вниз-вправо) оставлял на экране 12 % окна. Но одно и то же поджатие отменяло и
+ * НАМЕРЕННОЕ расположение: виджет, поставленный внахлёст с краем экрана, после
+ * закрытия возвращался внутрь — замерено зондом на 3440×1440: сохранено
+ * x = 3470, восстановлено x = 3190.
+ *
+ * Свисать за край разрешено. Неотменяемым остаётся ровно одно требование: окно
+ * должно остаться ухватываемым мышью, то есть сохранить видимую полосу
+ * `minVisible` по КАЖДОЙ оси (для окна тоньше полосы — сколько есть). Не
+ * сохранило — значит это не «свисает», а «потеряно»: такое окно поджимается
+ * прежним способом, и профили, испорченные старым масштабированием, лечатся
+ * по-прежнему.
+ *
+ * Функция чистая: на входе прямоугольники, ни одного обращения к Electron.
+ *
+ * @param {{x:number,y:number,width:number,height:number}} target — прямоугольник, как он сохранён
+ * @param {Array<{bounds:{x:number,y:number,width:number,height:number}}>} displays — РЕАЛЬНО подключённые мониторы
+ * @param {number} minVisible — сколько пикселей окна обязано остаться видимым по каждой оси
+ * @param {{x:number,y:number,width:number,height:number}} fallbackArea — куда поджимать потерянное окно
+ * @param {{width:number,height:number}} min — минимальный размер окна
+ * @returns {{x:number,y:number,width:number,height:number}}
+ */
+function fitRestoredBounds(target, displays, minVisible, fallbackArea, min) {
+    const rect = {
+        x: Math.round(target.x),
+        y: Math.round(target.y),
+        width: Math.round(target.width),
+        height: Math.round(target.height)
+    };
+
+    // Перекрытие по одной оси с одним монитором.
+    const overlap = (start, size, areaStart, areaSize) =>
+        Math.max(0, Math.min(start + size, areaStart + areaSize) - Math.max(start, areaStart));
+
+    // Сколько обязано быть видно по оси: полоса `minVisible`, но не больше
+    // ПОЛОВИНЫ окна. Верхняя граница нужна для окон тоньше полосы — требовать
+    // 64 px видимой высоты от полосы LED высотой 44 значило бы поджимать её
+    // всегда, то есть запретить ей свисать в принципе.
+    const need = (size) => Math.min(minVisible, Math.round(size / 2));
+    const needX = need(rect.width);
+    const needY = need(rect.height);
+
+    // Монитор выбирается по ЛУЧШЕМУ перекрытию, а не по попаданию угла: окно
+    // может свисать с одного экрана на соседний, и «его» экран — тот, где окна
+    // больше. Проверка идёт по каждому монитору целиком: полоса, набранная на
+    // двух экранах сразу, видимой полосой не считается — между ними может не
+    // быть общей границы.
+    const visible = (displays || []).some(({ bounds }) =>
+        overlap(rect.x, rect.width, bounds.x, bounds.width) >= needX
+        && overlap(rect.y, rect.height, bounds.y, bounds.height) >= needY);
+
+    if (visible) { return rect; }
+
+    // Потеряно — прежнее поведение: поставить в точку и поджать целиком.
+    return fitScaledBounds(rect, { width: rect.width, height: rect.height }, fallbackArea, min);
+}
+
+/**
  * Вешает перетаскивание окна на контейнер.
  *
  * @param {object} cfg
@@ -235,6 +403,10 @@ function fitScaledBounds(current, requested, workArea, min) {
  */
 function bindWindowDrag({ container, doc, onMove, onDrop, handlers }) {
     let isDragging = false;
+    // Первое движение ЖЕСТА помечается флагом: по нему главный процесс
+    // запоминает размер окна и держит его неизменным до конца перетаскивания.
+    // Иначе границу жеста определить не из чего — канал несёт только дельты.
+    let isFirstMove = true;
     let dragStartX = 0;
     let dragStartY = 0;
 
@@ -253,6 +425,7 @@ function bindWindowDrag({ container, doc, onMove, onDrop, handlers }) {
             return;
         }
         isDragging = true;
+        isFirstMove = true;
         dragStartX = e.screenX;
         dragStartY = e.screenY;
         e.preventDefault();
@@ -264,7 +437,8 @@ function bindWindowDrag({ container, doc, onMove, onDrop, handlers }) {
         const dx = e.screenX - dragStartX;
         const dy = e.screenY - dragStartY;
         if (dx !== 0 || dy !== 0) {
-            onMove({ deltaX: dx, deltaY: dy });
+            onMove({ deltaX: dx, deltaY: dy, first: isFirstMove });
+            isFirstMove = false;
             // Точку отсчёта сдвигаем каждый раз: главный процесс складывает
             // РАЗНИЦУ с текущей позицией окна, а не ставит абсолютную.
             dragStartX = e.screenX;
@@ -287,6 +461,9 @@ const WindowGeometry = {
     isWindowDragTarget,
     bindWindowDrag,
     fitScaledBounds,
+    fitRestoredBounds,
+    ledStripHeight,
+    ledStripMetrics,
     MIN_SCALE_PCT,
     MAX_SCALE_PCT,
     SAVE_SETTLE_MS

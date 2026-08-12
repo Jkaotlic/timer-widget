@@ -74,7 +74,7 @@ Rules when working here:
 - `utils.js` — `formatTime()`, `formatTimeShort()`, `parseTime()`, `debounce()`, `getTimerStatus()`, `calculateProgress()`, `safelySendToWindow()`
 - `security.js` — input validation (`isValidDataURL`, `isValidURL`, `validateImageSource`), `escapeHTML()`, `safeJSONParse()`
 - `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`
-- `window-geometry.js` — window drag + size/position persistence for the widget and the clock (dual export, unit-tested in Node with injected storage/DOM)
+- `window-geometry.js` — перетаскивание, размер и позиция виджета и часов, плюс арифметика полосы LED (`ledStripHeight`/`ledStripMetrics`) и восстановления позиции (`fitRestoredBounds`). Двойной экспорт, проверяется в Node на внедрённых хранилище и DOM
 - `clock-settings-schema.js` — the clock's settings table (key → control → default) plus `collectClockSettings` / `applyClockSettings`
 - `digits-style.js` — the «Цифры» style: the six-font registry, the `resolveFont()` whitelist, and the fit arithmetic (`fitScale` / `fitFontSize` / `measureDigits` with a probe cache / `applyFont`). The size is derived by **measuring a reference string** (`88:88` / `8:88:88`) at a 100px probe, not from a per-character width constant: the old `charCount * 0.6` assumes a monospace face and is wrong by 0.42–0.78 em across these six fonts
 - `ui-theme.js` — the only owner of `data-theme`. Pure part (`normalizeTheme`, `nextTheme`, `themeLabel`) is unit-tested; the DOM/storage part (`initTheme`, `applyTheme`, `storeTheme`, `bindThemeSync`) is loaded by all four windows from `<head>`
@@ -128,7 +128,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
 | `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
 | `control-collapse` | `{ collapsed, height }` — свернуть окно управления в полосу или развернуть обратно. Отдельный канал, потому что `resize-control-window` зажимает высоту снизу минимумом окна (660) и полоса в 52px через него недостижима. Снимает и возвращает пол `minHeight`, поднимает полосу поверх окон, держит ВЕРХНИЙ край; `height` из рендерера зажимается в 36…120 |
-| `widget-resize` / `widget-move` / `widget-set-position` | Widget geometry |
+| `widget-resize` / `widget-move` / `widget-set-position` | Widget geometry. `widget-move` несёт `{deltaX, deltaY, first}`: `first` помечает начало жеста, по нему главный процесс запоминает размер окна и держит его до конца перетаскивания |
 | `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
 | `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
 | `clock-widget-set-position` | `{ x, y }` — restore saved clock position (clamped to a live display) |
@@ -155,6 +155,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `set-clock-style` / `clock-settings` | Clock widget settings |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
 | `ui-theme-update` | `{ theme }` — applied by `UITheme.bindThemeSync()` in every window |
+| `window-geometry` | `{x, y, width, height}` — НАСТОЯЩИЕ границы окна от главного процесса. Виджет и часы пишут в `localStorage` их, а не свои `outerWidth`/`screenX`: на мониторе с масштабом ≠ 100 % это разные единицы |
 | `timer-recovery-available` | The crash snapshot (`{ presetSeconds, totalSeconds, remainingSeconds, savedAt }`), sent to the control window once on `did-finish-load`. Main restores the time itself; this only tells the panel to say so (a toast) |
 
 ## Timer State Structure
@@ -249,7 +250,9 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and button targets do not move it. Written BEFORE the drag/geometry extraction and passed unchanged after it |
 | `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the returned clock toggles actually change the clock window; style-sync hides the style row. Everything by CLICK on visible elements only |
 | `digits-style.spec.js` | The «Цифры» style reaches all three windows BY CLICK; the size is really fitted (not the CSS fallback); the font choice lands in its OWN window and touches neither of the other two; the font row shows only for this style; the `.value` setter is silent while a click fires `change`; and the fit is **idempotent** — three recalculations in a row must return one size |
-| `window-scale-fit.spec.js` | After scaling, the widget's and clock's window rect lies ENTIRELY inside the work area of its own display (measured on the real `BrowserWindow`, parked at the top-right corner first so the check cannot pass by accident on a roomier screen); a poisoned stored point near the screen edge no longer restores the window off-frame (it used to leave 12% of it visible); and the scale plus position survive a close/reopen — that last scenario is what caught the geometry-clobbering bug |
+| `led-strip.spec.js` | Стиль LED: окно — полоса, рамка обнимает цифры (мерится ДОЛЯ пустоты, а не «ширина ≠ высоте»), минимум ниже прежнего пола 140, строка с часами делает полосу ниже БЕЗ смены ширины, возврат к другому стилю возвращает квадрат |
+| `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED на мониторе с другим масштабом) играет `win.setSize()` из главного процесса: воспроизводится следствие, а не причина — второго монитора на машине разработки нет |
+| `window-scale-fit.spec.js` | After scaling, the widget's and clock's window rect lies ENTIRELY inside the work area of its own display (measured on the real `BrowserWindow`, parked at the top-right corner first so the check cannot pass by accident on a roomier screen); сохранённая точка у края разбирается на ДВА случая — окно, свисающее за край, восстанавливается как сохранено (120 px видимой полосы), а потерянное (20 px) возвращается на экран; and the scale plus position survive a close/reopen — that last scenario is what caught the geometry-clobbering bug |
 | `window-top-edge.spec.js` | Виджет и часы доезжают до САМОГО верха экрана (y = 0, а не y рабочей области) и остаются там после переоткрытия. Красный до правки с замером `30` вместо `0` |
 | `color-ownership.spec.js` | Характеризация окраски: 5 стилей × 4 полосы × 2 окна, сверка ВЫЧИСЛЕННЫХ цвета и тени с эталоном. Написан ДО перевода цвета на каскад и прошёл неизменённым после. Нормализует запись цвета: один и тот же цвет браузер печатает как `rgba(255,204,0,0.4)` из литерала и как `color(srgb 1 0.8 0 / 0.4)` из `color-mix`, и без нормализации корректный рефакторинг выглядел бы регрессией |
 | `onboarding-reachable.spec.js` | Кнопка «Проверить обновления» ВИДИМА и не схлопнута — юнит-тесты знают только про поддельный DOM. Кнопка намеренно не кликается: обработчик открыл бы настоящий браузер на машине с прогоном |
@@ -303,7 +306,12 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **`showTicks` drives TWO dials** — [разбор](docs/lessons.md#showticks-drives-two-dials)
 - **Resizing a window must hold its CENTRE, not its top-left corner (CRITICAL)** — [разбор](docs/lessons.md#resizing-a-window-must-hold-its-centre-not-its-top-left-corn)
 - **Верхний край экрана достижим: поджимает `constrainFrameRect`, а не уровень окна (CRITICAL)** — [разбор](docs/lessons.md#the-top-edge-is-reachable-what-clamps-is-constrainframerect)
-- **A restored position must fit the WHOLE window, not just its corner (CRITICAL)** — [разбор](docs/lessons.md#a-restored-position-must-fit-the-whole-window-not-just-its-c)
+- **Восстановленная позиция сохраняет ПОЛОСУ ЗАХВАТА, а не всё окно; свисать за край разрешено (CRITICAL)** — [разбор](docs/lessons.md#a-restored-position-keeps-a-grabbable-strip-not-the-whole-window-critical)
+- **Геометрию окна считает ГЛАВНЫЙ процесс и шлёт каналом `window-geometry`; `outerWidth`/`screenX` — запасной путь (CRITICAL)** — [разбор](docs/lessons.md#window-geometry-is-owned-by-the-main-process-critical)
+- **Жест перемещения не меняет размер окна: размер ЗАДАЁТСЯ на каждом шаге, начало жеста помечает рендерер** — [разбор](docs/lessons.md#a-move-gesture-must-not-change-the-window-size)
+- **Рамка LED размером с ЦИФРЫ, окно под ней — полоса; ширину не меняет никто, под строку подстраивается высота** — [разбор](docs/lessons.md#the-led-frame-is-sized-by-its-content-not-by-the-window)
+- **Скрытое окно не перерисовывается: `capturePage` отдаёт прошлый кадр, лечится прогревочным снимком, а не сном** — [разбор](docs/lessons.md#a-hidden-window-does-not-repaint-so-capturepage-returns-a-stale-frame)
+- **Съёмочный стенд ходит теми же путями, что приложение: стиль — через главный процесс, размер — ПОСЛЕ смены стиля** — [разбор](docs/lessons.md#the-capture-harness-must-drive-the-app-through-its-real-paths)
 - **The geometry write must wait until the size has SETTLED (CRITICAL)** — [разбор](docs/lessons.md#the-geometry-write-must-wait-until-the-size-has-settled-crit)
 - **Geometry is saved on `resize`, not only from Ctrl+wheel** — [разбор](docs/lessons.md#geometry-is-saved-on-resize-not-only-from-ctrlwheel)
 - **A theme block must sit BELOW the shared `:root`, and its name must not appear above it (CRITICAL)** — [разбор](docs/lessons.md#a-theme-block-must-sit-below-the-shared-root-and-its-name-mu)
