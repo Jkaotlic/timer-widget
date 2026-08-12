@@ -3830,8 +3830,77 @@ body.state-input    .hero-label { color: var(--tw-blue); }
 body.state-overtime .control-panel .timer-display-main,
 body.state-overtime .timer-display-main { color: var(--tw-red); }
 
-/* Ввод занимает МЕСТО цифр и повторяет их начертание — чтобы «нажал на время
-   и печатаешь» читалось как одно движение, а не как прыжок в другое поле. */
+/* ---------- ВВОД ВРЕМЕНИ: ДВА ПОЛЯ ----------
+   Занимает МЕСТО цифр, чтобы «нажал на время и печатаешь» читалось как одно
+   движение. Полей два: слепленная строка «5:30» требовала помнить формат и
+   попадать курсором в нужную позицию, а два поля сами говорят, что куда. */
+.time-entry {
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+}
+body.state-input .time-entry { display: flex; }
+
+.time-field {
+    /* Три поля, два разделителя и отступы обязаны уместиться в 380 px минимума
+       окна: 3×96 + 2×14 + 4×8 = 348. Поэтому flex-basis, а не фиксированная
+       ширина, — на широком окне поля растут вместе с панелью. */
+    flex: 1 1 96px;
+    max-width: 112px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: text;
+}
+.time-field input {
+    width: 100%;
+    height: 88px;
+    border: 0;
+    outline: 0;
+    border-radius: 14px;
+    background: var(--p-fill);
+    color: var(--tw-fg);
+    font-family: inherit;
+    font-size: 44px;
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    caret-color: var(--tw-blue);
+    padding: 0;
+    /* Обводка — ВНУТРЕННЯЯ тень, а не border: рамка меняла бы размер поля при
+       фокусе и толкала соседнее. */
+    box-shadow: inset 0 0 0 0 var(--tw-blue);
+    transition: box-shadow var(--tw-dur-fast) var(--tw-ease);
+}
+.time-field input::placeholder { color: var(--tw-fg-dim); opacity: 1; }
+.time-field input:focus { box-shadow: inset 0 0 0 2px var(--tw-blue); }
+
+.time-field-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--tw-fg-dim);
+}
+/* Двоеточие стоит по центру ПОЛЕЙ, а не всего блока: под полями ещё подписи,
+   и центр блока уехал бы вниз. 96px — высота поля. */
+.time-entry-sep {
+    flex: 0 0 auto;
+    height: 88px;
+    display: flex;
+    align-items: center;
+    font-size: 32px;
+    font-weight: 200;
+    color: var(--tw-fg-dim);
+}
+
+/* Поле с недопустимым значением. Класс тот же, что у прежнего ввода. */
+.time-field input.input-error { box-shadow: inset 0 0 0 2px var(--tw-red); }
+
 .hero-input {
     display: none;
     width: 100%;

@@ -151,43 +151,97 @@ const PanelStateMixin = {
             });
         });
 
-        // Manual time input
-        const manualTimeInput = document.getElementById('manualTimeInput');
+        // ВВОД ВРЕМЕНИ: три поля вместо одной слепленной строки.
+        //
+        // Разбирать формат больше не нужно — каждое поле принимает просто
+        // число, и «1:30:00» перестало быть тем, что надо помнить и во что
+        // надо попадать курсором.
+        //
+        // Таблица, а не три копии обработчика: поля отличаются только
+        // потолком и соседями, и написанные по отдельности они разошлись бы
+        // на первой же правке — как уже разошлись шесть копий payload.
+        const TIME_FIELDS = [
+            { id: 'manualHours', max: 99, mult: 3600 },
+            { id: 'manualMinutes', max: 59, mult: 60 },
+            { id: 'manualSeconds', max: 59, mult: 1 }
+        ];
+        const fields = TIME_FIELDS
+            .map((f) => Object.assign({}, f, { el: document.getElementById(f.id) }))
+            .filter((f) => f.el);
+        this._timeFields = fields;
 
-        // Smart manual time parsing — delegate to TimeUtils (utils.js)
-        // Сборщика нет: каждый файл — обычный <script>, поэтому ссылка на
-        // соседний модуль идёт через window, а не голым именем.
-        const parseManualTime = (input) => window.TimeUtils.parseManualTime(input);
+        const flashError = (el) => {
+            el.classList.add('input-error');
+            setTimeout(() => el.classList.remove('input-error'), 300);
+            el.focus();
+            el.select();
+        };
 
         const applyManualTime = () => {
-            const seconds = parseManualTime(manualTimeInput.value);
-            if (seconds !== null) {
-                ipcRenderer.send('timer-command', { type: 'set', seconds: seconds });
-                manualTimeInput.value = '';
-                manualTimeInput.blur();
-                this.setInputMode(false);
-            } else {
-                manualTimeInput.classList.add('input-error');
-                setTimeout(() => manualTimeInput.classList.remove('input-error'), 300);
+            let total = 0;
+            for (const f of fields) {
+                const n = parseInt(f.el.value, 10) || 0;
+                // Значение выше потолка — опечатка, а не «ещё одна единица
+                // старшего разряда»: молча перенести 75 секунд в минуты значило
+                // бы поставить не то время, которое набрано. Часы потолка по
+                // смыслу не имеют, но 99 хватает с запасом на любой доклад.
+                if (n > f.max) { flashError(f.el); return; }
+                total += n * f.mult;
             }
+            // Ноль — не время. Прежний парсер его тоже не принимал.
+            if (total <= 0) { flashError(fields[0].el); return; }
+
+            ipcRenderer.send('timer-command', { type: 'set', seconds: total });
+            this.setInputMode(false);
         };
         // Кнопка «Поставить» живёт в attachEvents() — это ДРУГАЯ область
         // видимости, локальная const оттуда не видна. Кладём на объект.
         this._applyManualTime = applyManualTime;
 
-        manualTimeInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                applyManualTime();
-            }
-            // Esc из поля выходит из режима ввода, а не всплывает выше:
-            // Escape в этом окне слоёный, и без остановки он закрыл бы
-            // заодно ящик настроек.
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                e.stopPropagation();
-                this.setInputMode(false);
-            }
+        fields.forEach((f, i) => {
+            const prev = fields[i - 1];
+            const next = fields[i + 1];
+
+            // Цифры и ничего больше: поле числовое, буквам тут делать нечего.
+            f.el.addEventListener('input', () => {
+                const clean = f.el.value.replace(/\D/g, '').slice(0, 2);
+                if (clean !== f.el.value) { f.el.value = clean; }
+            });
+            // Выделяем по фокусу: первая же цифра заменяет значение целиком,
+            // а не дописывается к предзаполненному.
+            f.el.addEventListener('focus', () => f.el.select());
+
+            f.el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyManualTime();
+                    return;
+                }
+                // Esc выходит из режима ввода и НЕ всплывает выше: Escape в этом
+                // окне слоёный, и без остановки он закрыл бы заодно ящик настроек.
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.setInputMode(false);
+                    return;
+                }
+                // Двоеточие — привычный разделитель: набравший «1:30:00» подряд
+                // попадёт туда же, куда и нажавший Tab.
+                if ((e.key === ':' || e.key === 'ArrowRight') && next) {
+                    e.preventDefault();
+                    next.el.focus();
+                }
+                if (e.key === 'ArrowLeft' && prev && f.el.selectionStart === 0) {
+                    e.preventDefault();
+                    prev.el.focus();
+                }
+                // Backspace в пустом поле возвращает к предыдущему — иначе
+                // стирание упирается в невидимую стену.
+                if (e.key === 'Backspace' && prev && f.el.value === '') {
+                    e.preventDefault();
+                    prev.el.focus();
+                }
+            });
         });
 
         // Три входа в ручной ввод — клик по времени, ячейка «мин» и
@@ -215,14 +269,24 @@ const PanelStateMixin = {
         // Во время отсчёта вводить нечего: там работают ± и пауза.
         if (on && (this.isRunning || this.isPaused)) { return; }
         this.inputMode = !!on;
-        const field = document.getElementById('manualTimeInput');
+        const fields = this._timeFields || [];
         if (this.inputMode) {
-            field.value = '';
-            // focus() после смены класса: пока поле display:none,
-            // фокус на нём не удерживается.
-            requestAnimationFrame(() => field.focus());
+            // Предзаполняем ТЕКУЩИМ временем, а не пустотой: чаще всего правят
+            // его, а не набирают с нуля. Поле выделяется по фокусу, поэтому
+            // первая же цифра заменяет значение целиком.
+            const total = Math.max(0, Math.round(this.remainingSeconds || this.presetSeconds || 0));
+            const parts = window.RendererShared.breakdown(total);
+            const value = { manualHours: parts.hours, manualMinutes: parts.minutes, manualSeconds: parts.seconds };
+            for (const f of fields) {
+                f.el.value = String(value[f.id]).padStart(f.id === 'manualHours' ? 1 : 2, '0');
+            }
+            // focus() после смены класса: пока поле display:none, фокус на нём
+            // не удерживается. Начинаем с МИНУТ — часы почти всегда нули, и
+            // начинать с них значило бы заставлять пропускать их каждый раз.
+            const first = fields.find((f) => f.id === 'manualMinutes') || fields[0];
+            requestAnimationFrame(() => first?.el.focus());
         } else {
-            field.blur();
+            for (const f of fields) { f.el.blur(); }
         }
         this.renderPanelState();
     },
@@ -292,7 +356,7 @@ const PanelStateMixin = {
             idle: 'нажмите на время, чтобы ввести своё',
             running: endLabel ? `закончится в ${endLabel}` : '',
             overtime: endLabel ? `должно было закончиться в ${endLabel}` : '',
-            input: '90 — секунды · 5:30 — минуты · 1:30:00 — часы'
+            input: 'часы · минуты · секунды — Enter поставит'
         };
         const hintEl = document.getElementById('heroHint');
         if (hintEl) { hintEl.textContent = HINT[mode]; }

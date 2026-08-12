@@ -140,8 +140,10 @@ test.describe('подсветка быстрого выбора', () => {
         // Регрессия: класс active вешался по клику и не снимался ничем —
         // подсвеченной оставалась кнопка, не соответствующая таймеру.
         await enterInputMode();
-        await control.locator('#manualTimeInput').fill('7:30');
-        await control.locator('#manualTimeInput').press('Enter');
+        // Полей теперь ДВА: минуты и секунды отдельно, формат помнить не нужно.
+        await control.locator('#manualMinutes').fill('7');
+        await control.locator('#manualSeconds').fill('30');
+        await control.locator('#manualSeconds').press('Enter');
         await control.waitForTimeout(400);
 
         expect(await timeText()).toBe('07:30');

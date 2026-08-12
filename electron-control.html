@@ -60,7 +60,30 @@
                 <span id="statusText">Длительность</span>
             </div>
             <div class="timer-display-main" id="controlTime" title="Нажмите, чтобы ввести своё время"><span class="tm-sign" id="controlTimeSign"></span><span class="tm-digits" id="controlTimeDigits">00:00</span></div>
-            <input type="text" id="manualTimeInput" class="hero-input" placeholder="0:00" autocomplete="off" spellcheck="false" aria-label="Ручной ввод времени" title="90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1 ч 30 мин">
+            <!-- ТРИ поля, а не одна слепленная строка. «1:30:00» требует
+                 помнить формат и попадать курсором в нужную позицию; поля сами
+                 говорят, что куда, и каждое принимает просто число.
+                 Часы появились сразу за минутами и секундами: без них длинный
+                 таймер набирался как «90 минут», то есть в уме. -->
+            <div class="time-entry" id="timeEntry" role="group" aria-label="Ввод времени">
+                <label class="time-field">
+                    <input type="text" id="manualHours" inputmode="numeric" maxlength="2"
+                           autocomplete="off" spellcheck="false" aria-label="Часы" placeholder="0">
+                    <span class="time-field-label">час</span>
+                </label>
+                <span class="time-entry-sep" aria-hidden="true">:</span>
+                <label class="time-field">
+                    <input type="text" id="manualMinutes" inputmode="numeric" maxlength="2"
+                           autocomplete="off" spellcheck="false" aria-label="Минуты" placeholder="00">
+                    <span class="time-field-label">мин</span>
+                </label>
+                <span class="time-entry-sep" aria-hidden="true">:</span>
+                <label class="time-field">
+                    <input type="text" id="manualSeconds" inputmode="numeric" maxlength="2"
+                           autocomplete="off" spellcheck="false" aria-label="Секунды" placeholder="00">
+                    <span class="time-field-label">сек</span>
+                </label>
+            </div>
             <div class="hero-hint" id="heroHint">нажмите на время, чтобы ввести своё</div>
         </div>
 
