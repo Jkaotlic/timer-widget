@@ -932,7 +932,10 @@ body::after {
 
 .timer-display-main.warning {
     color: var(--tw-yellow);
-    text-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 0 30px rgba(255, 214, 10, 0.45);
+    /* Жёлтый ореол снят: полосу состояния несёт цвет цифр. Нейтральная тень
+       под текстом оставлена — макет её сохраняет. Соседние .danger/.overtime
+       гасятся сами: они ходят через --tw-glow-*, а те уже none. */
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
 /* Status chip — neutral · success · attention (glyph carried by dot) */
@@ -963,7 +966,7 @@ body::after {
 
 .status-dot.running {
     background: var(--tw-green);
-    box-shadow: 0 0 8px rgba(48, 209, 88, 0.7);
+    /* Ореол снят: состояние несут цвет и пульсация, а не свечение. */
     animation: pulse-dot 1.5s infinite;
 }
 
@@ -981,7 +984,7 @@ body::after {
 
 .status-dot.overtime {
     background: var(--tw-red);
-    box-shadow: 0 0 8px rgba(255, 69, 58, 0.8);
+    /* Ореол снят: состояние несут цвет и частота пульсации. */
     animation: pulse-dot 0.6s infinite;
 }
 
@@ -1774,11 +1777,12 @@ body::after {
 .color-picker-toggle:hover {
     opacity: 1;
     transform: scale(1.12);
+    /* Синий ореол четвёртым слоем снят; обводка, кольцо и подъём остались —
+       наведение обязано читаться формой и подъёмом, а не свечением. */
     box-shadow:
         inset 0 0 0 1px rgba(0, 0, 0, 0.4),
         0 0 0 1px rgba(255, 255, 255, 0.14),
-        0 3px 10px rgba(0, 0, 0, 0.45),
-        0 0 12px rgba(10, 132, 255, 0.35);
+        0 3px 10px rgba(0, 0, 0, 0.45);
 }
 .color-picker-toggle:focus-visible {
     outline: none;
