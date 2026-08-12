@@ -43,7 +43,12 @@ test('control window keeps enough breathing room for rounded glass panel', () =>
 test('control settings use one outer shell instead of a nested window frame', () => {
     const controlHtml = readControlSource();
 
-    assert.match(controlHtml, /\.app-shell::before\s*\{[^}]*background:[^}]*var\(--tw-bg-surface-solid\);[^}]*box-shadow:\s*var\(--tw-shadow-panel\);/s);
+    // Заливка ОДНА и берётся из --tw-bg-surface, а не из его «-solid»-близнеца:
+    // редизайн 2026-08-12 сделал сам --tw-bg-surface плотным, и запасной токен
+    // здесь стал лишним звеном. Заодно ушли два радиальных градиента и рамка —
+    // в макете нет ни подцветки, ни рамок. Тень остаётся: она единственное,
+    // что отделяет панель от рабочего стола.
+    assert.match(controlHtml, /\.app-shell::before\s*\{[^}]*background:\s*var\(--tw-bg-surface\);[^}]*border:\s*0;[^}]*box-shadow:\s*var\(--tw-shadow-panel\);/s);
     assert.match(controlHtml, /\.control-panel\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;/s);
     // Разделитель между панелью и ящиком обязан существовать, но принадлежит он
     // ЯЩИКУ: линия проходит по его левому краю. Раньше её рисовала панель через
