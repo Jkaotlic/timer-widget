@@ -30,6 +30,43 @@ const CustomSoundsMixin = {
             el.classList.add('visible');
     },
 
+    /**
+     * Перетаскивание файла на зону загрузки.
+     *
+     * Надпись «Перетащите файл сюда» стояла в разметке с самого начала, а
+     * обработчика не было: интерфейс обещал то, чего не делал. Проверка формата
+     * и размера НЕ дублируется — событие приводится к той же форме, что даёт
+     * <input type="file">, и уходит в тот же handleSoundFileUpload. Вторая копия
+     * валидации разошлась бы с первой на первом же изменении лимита.
+     */
+    bindSoundDropZone() {
+        const zone = document.getElementById('addSoundBtn');
+        if (!zone) { return; }
+
+        const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+        // dragover обязателен и обязан гасить событие: без него браузер
+        // отказывается быть целью сброса, и drop не приходит вообще.
+        zone.addEventListener('dragover', (e) => { stop(e); zone.classList.add('drag-over'); });
+        zone.addEventListener('dragenter', (e) => { stop(e); zone.classList.add('drag-over'); });
+        zone.addEventListener('dragleave', (e) => { stop(e); zone.classList.remove('drag-over'); });
+        zone.addEventListener('drop', (e) => {
+            stop(e);
+            zone.classList.remove('drag-over');
+            const file = e.dataTransfer?.files?.[0];
+            if (!file) { return; }
+            this.handleSoundFileUpload({ target: { files: [file] } });
+        });
+
+        // Сброс МИМО зоны не должен открывать файл вместо окна: иначе
+        // промахнувшийся пользователь теряет приложение и получает плеер.
+        for (const type of ['dragover', 'drop']) {
+            document.addEventListener(type, (e) => {
+                if (!zone.contains(e.target)) { e.preventDefault(); }
+            });
+        }
+    },
+
     // Пользовательские звуки
     async handleSoundFileUpload(event) {
             const file = event.target.files[0];

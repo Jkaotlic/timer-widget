@@ -54,6 +54,33 @@ const STYLE_LABELS = {
 const PanelStateMixin = {
 
     /**
+     * Единственная сборка payload канала `widget-style-update`.
+     *
+     * Она была написана ШЕСТЬ раз подряд — в обработчиках стиля, шрифта,
+     * масштаба, делений и в отложенном пуше. Копии уже разошлись: две из шести
+     * не клали `timerScale` вообще, то есть виджет получал стиль без размера.
+     * Добавить сюда новое поле значило бы отредактировать шесть мест и забыть
+     * одно — ровно та поломка, которую этот проект уже ловил на настройках.
+     *
+     * @param {object} [extra] поля, которые вызывающий знает точнее (например
+     *                         новое значение из обработчика change, ещё не
+     *                         записанное в контрол)
+     */
+    widgetStylePayload(extra) {
+        return Object.assign({
+            timerStyle: this.timerStyleEl.value,
+            timerScale: parseInt(this.timerScaleEl.value, 10),
+            digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
+            showTicks: this.widgetShowTicksEl?.checked ?? false,
+            // Подпись состояния («идёт / пауза / перерасход») по умолчанию
+            // ВЫКЛЮЧЕНА: её работу делает цвет дуги, а на маленьком виджете
+            // слово занимает место, которого нет.
+            statusLabel: this.widgetStatusLabelEl?.checked ?? false,
+            alwaysOnTop: this.widgetAlwaysOnTopEl?.checked ?? true
+        }, extra || {});
+    },
+
+    /**
      * Раскладывает живое состояние окон в подзаголовки их строк.
      *
      * Значения берутся из САМИХ контролов настроек, а не из отдельной копии:

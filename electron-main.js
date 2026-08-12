@@ -24,7 +24,7 @@ const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
 const timerEngine = require('./timer-engine');
 const { createTimerController } = require('./timer-controller');
-const { fitScaledBounds } = require('./window-geometry');
+const { fitScaledBounds, fitRestoredBounds } = require('./window-geometry');
 const recovery = require('./recovery');
 
 // Logger setup
@@ -173,13 +173,45 @@ function isPayloadObject(payload) {
 // Shared delta-move for a frameless window. Reads deltaX/deltaY from the payload
 // INSIDE the body (never destructured in the IPC handler params — see
 // tests/electron-main-source.test.js). Validates the payload object + finite deltas.
+// Сообщает окну его НАСТОЯЩИЕ границы. Виджет и часы записывают в localStorage
+// то, что пришло сюда, а не то, что насчитали сами по outerWidth/screenX:
+// владелец геометрии — главный процесс, и на мониторе с масштабом ≠ 100 % его
+// DIP и CSS-пиксели рендерера — разные единицы (см. window-geometry.js).
+function reportGeometry(win) {
+    if (!win || win.isDestroyed()) { return; }
+    safelySendToWindow(win, 'window-geometry', win.getBounds());
+}
+
+// Перемещение окна за время ОДНОГО жеста не меняет его размер.
+//
+// Размер здесь не просто «не трогается» — он ЗАДАЁТСЯ на каждом шаге, тем
+// самым, что был у окна в начале жеста. Разница принципиальная: прежний
+// setPosition оставлял размер на усмотрение системы, а система вправе его
+// менять — при переходе на монитор с другим масштабом Windows присылает
+// WM_DPICHANGED с новым прямоугольником, и окно, которое просто тащат мышью,
+// растёт само. Это и есть жалоба «при перемещении по экрану виджет
+// самопроизвольно увеличивается». Здесь такой рост отменяется следующим же
+// движением мыши, а размер за границами жеста по-прежнему свободен — тянуть
+// окно за край рамки можно.
 function moveWindowBy(win, payload) {
     if (!isPayloadObject(payload)) { return; }
-    const { deltaX, deltaY } = payload;
-    if (win && Number.isFinite(deltaX) && Number.isFinite(deltaY)) {
-        const [currentX, currentY] = win.getPosition();
-        win.setPosition(Math.round(currentX + deltaX), Math.round(currentY + deltaY), true);
+    const { deltaX, deltaY, first } = payload;
+    if (!win || win.isDestroyed() || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) { return; }
+
+    const bounds = win.getBounds();
+    // Начало жеста помечает рендерер (bindWindowDrag): иначе границу жеста
+    // определить не из чего — канал несёт только дельты.
+    if (first || !win.__dragSize) {
+        win.__dragSize = { width: bounds.width, height: bounds.height };
     }
+
+    win.setBounds({
+        x: Math.round(bounds.x + deltaX),
+        y: Math.round(bounds.y + deltaY),
+        width: win.__dragSize.width,
+        height: win.__dragSize.height
+    });
+    reportGeometry(win);
 }
 
 // Изменение размера безрамочного окна. Держит неподвижным ЦЕНТР окна и
@@ -212,6 +244,7 @@ function resizeWindowClamped(win, payload) {
     const { bounds: screenBounds } = screen.getDisplayMatching(current);
 
     win.setBounds(fitScaledBounds(current, payload, screenBounds, { width: minWidth, height: minHeight }));
+    reportGeometry(win);
 }
 
 // Shared position restore for a frameless widget window. Reads x/y from the
@@ -221,8 +254,9 @@ function resizeWindowClamped(win, payload) {
 // Positions are persisted by the renderers across sessions, so a saved point can
 // reference a monitor that is no longer attached (docked laptop, unplugged TV).
 // Restoring it verbatim would drop the widget somewhere invisible with no way to
-// drag it back, so we require the window to land on a real display and otherwise
-// clamp it into the primary work area.
+// drag it back, so the window has to keep a grabbable strip on a REAL display —
+// see fitRestoredBounds() in window-geometry.js for what that means and why
+// hanging over the edge is deliberately allowed.
 function positionWindowClamped(win, payload) {
     if (!isPayloadObject(payload)) { return; }
     const { x, y } = payload;
@@ -240,27 +274,27 @@ function positionWindowClamped(win, payload) {
         && targetY >= bounds.y && targetY < bounds.y + bounds.height)
         || screen.getPrimaryDisplay();
 
-    // Поджимается ВЕСЬ прямоугольник, а не только угол. Прежняя версия считала
-    // окно видимым, если на дисплее лежал левый-верхний угол, и размер в проверке
-    // не участвовал вовсе — замерено: сохранённая точка (3320, 70) при размере
-    // 1000 px давала 880 px за правым краем, на экране оставалось 12 % окна.
-    // Точка попадала в хранилище буквально: так писала геометрию версия, у
-    // которой масштабирование росло вниз-вправо, поэтому испорченные профили
-    // существуют и правкой одного лишь масштабирования не лечатся.
+    // Проверяется ВИДИМАЯ ПОЛОСА, а не попадание угла и не полная укладка.
     //
-    // Арифметика переиспользуется из fitScaledBounds: передавая текущий размер и
-    // как размер, и как «запрошенный», получаем «поставить в точку и поджать»,
-    // потому что функция сохраняет центр переданного прямоугольника. Новой
-    // арифметики здесь нет намеренно — она уже проверена юнит-тестами.
-    // Область та же, что при масштабировании, — границы экрана: иначе окно,
-    // намеренно поставленное к верхнему краю, после перезапуска съезжало вниз
-    // на высоту полоски меню.
-    win.setBounds(fitScaledBounds(
+    // Прежних редакций было две, и обе ошибались в разные стороны. Первая
+    // считала окно видимым, если на дисплее лежал его левый-верхний угол:
+    // размер в проверке не участвовал вовсе, и сохранённая точка (3320, 70) при
+    // размере 1000 px оставляла на экране 12 % окна. Вторая поджимала
+    // прямоугольник целиком — и вместе с испорченными профилями отменяла
+    // НАМЕРЕННОЕ расположение внахлёст с краем: замерено зондом на 3440×1440,
+    // сохранено x = 3470, восстановлено x = 3190.
+    //
+    // Область укладки для потерянного окна — границы экрана, а не рабочая
+    // область: иначе окно, намеренно поставленное к верхнему краю, после
+    // перезапуска съезжало вниз на высоту полоски меню.
+    win.setBounds(fitRestoredBounds(
         { x: targetX, y: targetY, width, height },
-        { width, height },
+        screen.getAllDisplays(),
+        CONFIG.WINDOW_MIN_VISIBLE_PX,
         host.bounds,
         { width: minWidth, height: minHeight }
     ));
+    reportGeometry(win);
 }
 
 // Runtime app icon path. In dev it lives in build/icon.png (buildResources),
@@ -506,6 +540,9 @@ function createWidgetWindow() {
             safelySendToWindow(win, 'widget-colors-update', lastWidgetColors);
         }
         if (lastWidgetStyle) {
+            // Пол размера — до досылки стиля: окно создаётся квадратным полом
+            // (WIDGET_MIN_HEIGHT), и полоса LED без этого не поместится.
+            applyWidgetMinimumSize(lastWidgetStyle.timerStyle);
             safelySendToWindow(win, 'widget-style-update', lastWidgetStyle);
         }
     });
@@ -1120,8 +1157,49 @@ ipcMain.on('display-colors-update', (_event, colors) => {
 // Widget style update (independent from display style)
 ipcMain.on('widget-style-update', (_event, settings) => {
     lastWidgetStyle = settings;
+    // Минимальную высоту окна задаёт СТИЛЬ, и сделать это может только главный
+    // процесс. Форму окна выбирает рендерер (syncWindowShape), но пол в
+    // WIDGET_MIN_HEIGHT = 140 делает полосу LED недостижимой: запрошенные ~90 px
+    // подожмутся обратно до 140, и рамка снова окажется в пустой коробке.
+    // Порядок здесь важен: минимум снимается ДО того, как стиль уйдёт в окно,
+    // иначе ответный widget-resize придёт к ещё не опущенному полу.
+    applyWidgetMinimumSize(isPayloadObject(settings) ? settings.timerStyle : null);
+    applyWidgetAlwaysOnTop(isPayloadObject(settings) ? settings.alwaysOnTop : undefined);
     safelySendToWindow(widgetWindow, 'widget-style-update', settings);
 });
+
+/**
+ * «Поверх всех окон» — тумблер редизайна 2026-08-12.
+ *
+ * Едет ЭТИМ каналом, а не своим: payload стиля уже проходит через главный
+ * процесс, и заводить второй канал ради одного булева значило бы расширить
+ * список разрешений без новой возможности. Канал в этом проекте — разрешение,
+ * а не функция.
+ *
+ * Уровень при включении — WINDOW_LEVEL_ABOVE_MENU_BAR, тот же, что при
+ * создании окна: обычный `floating` (3) ниже полоски меню (24), и окно у
+ * верхнего края экрана уходило бы под неё. Это условие проверяет
+ * tests/window-top-edge.test.js, и оно обязано пережить выключение-включение
+ * тумблера, а не только запуск.
+ */
+function applyWidgetAlwaysOnTop(on) {
+    if (!widgetWindow || widgetWindow.isDestroyed()) { return; }
+    // undefined — это «панель ничего не сказала» (например старый payload).
+    // Молчание не должно опускать окно: трогаем уровень только по явному значению.
+    if (typeof on !== 'boolean') { return; }
+    // В режиме съёмки окна намеренно не всплывают.
+    if (__screenshotMode) { return; }
+    widgetWindow.setAlwaysOnTop(on, on ? WINDOW_LEVEL_ABOVE_MENU_BAR : undefined);
+}
+
+// Пол размера окна виджета для текущего стиля.
+function applyWidgetMinimumSize(style) {
+    if (!widgetWindow || widgetWindow.isDestroyed()) { return; }
+    const minHeight = style === 'digital'
+        ? CONFIG.WIDGET_LED_MIN_HEIGHT
+        : CONFIG.WIDGET_MIN_HEIGHT;
+    widgetWindow.setMinimumSize(CONFIG.WIDGET_MIN_WIDTH, minHeight);
+}
 
 // Рассылка настроек отображения fullscreen и widget (clockStyle/background)
 ipcMain.on('display-settings-update', (event, settings) => {

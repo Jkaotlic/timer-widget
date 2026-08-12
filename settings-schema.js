@@ -106,6 +106,12 @@ const SETTINGS_DESCRIPTORS = [
         legacy: ['timerScale'], label: 'timerScaleValue', numeric: true,
         alsoWrite: ['timerScale']
     },
+    // Подпись состояния выключена по умолчанию: её работу делает цвет дуги, а
+    // на маленьком виджете слово занимает место, которого нет.
+    { key: 'widgetStatusLabel', el: 'widgetStatusLabel', kind: 'checkbox', def: false },
+    // Уровень окна был прибит в главном процессе; теперь им управляет
+    // пользователь. По умолчанию включено — это прежнее поведение.
+    { key: 'widgetAlwaysOnTop', el: 'widgetAlwaysOnTop', kind: 'checkbox', def: true },
     {
         key: 'displayTimerStyle', el: 'displayTimerStyle', kind: 'value', def: 'circle',
         legacy: ['timerStyle'], fallbackEl: 'timerStyle'

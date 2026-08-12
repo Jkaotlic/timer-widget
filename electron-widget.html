@@ -326,6 +326,12 @@
         }
 
         /* Status chip — pill, backdrop-blur, 3 semantic tiers */
+        /* Скрыта, пока панель не включит «Подпись состояния». Это ДЕФОЛТ
+           редизайна 2026-08-12, а не забытая настройка: цвет дуги уже
+           говорит то же самое, а место на виджете дороже слова. */
+        .status-badge { display: none; }
+        body.status-label-on .status-badge { display: block; }
+
         .status-badge {
             grid-row: 3;
             align-self: start;
@@ -397,7 +403,9 @@
             height: 100%;
             align-items: center;
             justify-content: center;
-            padding: 5%;
+            /* Зазор до края окна — только чтобы не срезать свечение и границу
+               рамки: сама рамка размером с цифры, поля живут внутри неё. */
+            padding: 2%;
             overflow: hidden;
         }
 
@@ -405,18 +413,25 @@
             display: flex;
         }
 
+        /* Рамка растёт от СОДЕРЖИМОГО, а не от окна.
+           Прежде здесь стояло width/height: 100% и padding: 10%: рамка занимала
+           окно, окно было квадратом при любом стиле — и вокруг строки «00:00»
+           оставалась пустая тёмная коробка, на минимальном размере (120×140)
+           бывшая основной частью виджета. Поля и скругление приходят долями
+           КЕГЛЯ из ledStripMetrics() (window-geometry.js) — один владелец
+           пропорции на рендерер и главный процесс. */
         .widget-digital-display {
             background: rgba(10, 10, 15, 0.85);
             -webkit-backdrop-filter: var(--tw-blur-sm);
             backdrop-filter: var(--tw-blur-sm);
             border: 1px solid var(--tw-border);
-            border-radius: 14px;
+            border-radius: var(--digital-radius, 14px);
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 100%;
-            height: 100%;
-            padding: 10%;
+            max-width: 100%;
+            max-height: 100%;
+            padding: var(--digital-pad-y, 10px) var(--digital-pad-x, 12px);
             position: relative;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
             overflow: hidden;
@@ -431,7 +446,7 @@
             height: 50%;
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
             pointer-events: none;
-            border-radius: 14px 14px 0 0;
+            border-radius: var(--digital-radius, 14px) var(--digital-radius, 14px) 0 0;
         }
 
         .widget-digital-time {
@@ -1332,17 +1347,23 @@
                 const containerWidth = this.container.offsetWidth;
                 const containerHeight = this.container.offsetHeight;
                 
-                // Размер шрифта для digital - подбираем чтобы текст вместился
-                // Для таймера формат MM:SS или HH:MM:SS, +1 символ для возможного минуса при перерасходе
+                // LED: кегль и поля рамки — из общей арифметики полосы
+                // (ledStripMetrics в window-geometry.js). Здесь стояла формула
+                // «ширина символа примерно 0.6 кегля» с двумя эмпирическими
+                // множителями (0.85 по ширине, 0.7 по высоте): они отмеряли
+                // воздух ОТ ОКНА, а рамка была размером с окно — то есть пустая
+                // коробка вокруг цифр была прямым следствием этой формулы.
+                // Теперь воздух отмеряется от КЕГЛЯ и уходит в поля самой рамки.
                 const hasHours = this.wFlipHoursGroup && this.wFlipHoursGroup.style.display !== 'none';
-                const baseCharCount = hasHours ? 8 : 5;
-                const charCount = baseCharCount + 1; // +1 для знака минуса при перерасходе
-                // Ширина символа примерно 0.6 от размера шрифта для моноширинного
-                const maxFontByWidth = (containerWidth * 0.85) / (charCount * 0.6);
-                const maxFontByHeight = containerHeight * 0.7;
-                const digitalFontSize = Math.min(maxFontByWidth, maxFontByHeight);
-                this.container.style.setProperty('--digital-font-size', digitalFontSize + 'px');
-                
+                const charCount = (hasHours ? 8 : 5) + 1; // +1 — знак минуса при перерасходе
+                const led = window.WindowGeometry.ledStripMetrics(containerWidth, containerHeight, charCount);
+                if (led.fontSize > 0) {
+                    this.container.style.setProperty('--digital-font-size', led.fontSize + 'px');
+                    this.container.style.setProperty('--digital-pad-x', led.padX + 'px');
+                    this.container.style.setProperty('--digital-pad-y', led.padY + 'px');
+                    this.container.style.setProperty('--digital-radius', led.radius + 'px');
+                }
+
                 // Масштаб для flip (базовая ширина с запасом для возможного знака минуса:
                 // карточка минуса 25px + margin 4px ≈ 30px + буфер)
                 const baseFlipWidth = hasHours ? 420 : 320;
@@ -1471,11 +1492,10 @@
                     const newPct = window.RendererShared.clampScale(widgetScalePct + delta, WIDGET_MIN_SCALE, WIDGET_MAX_SCALE);
                     if (newPct === widgetScalePct) { return; }
                     widgetScalePct = newPct;
-                    const newSize = Math.round(WIDGET_BASE_SIZE * newPct / 100);
-                    ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
                     // Масштаб от Ctrl+колеса раньше нигде не сохранялся, поэтому
-                    // при следующем открытии виджет откатывался к 250px.
-                    this.saveGeometry(newPct);
+                    // при следующем открытии виджет откатывался к 250px. Запись
+                    // делает resizeToScale — он же выводит высоту из стиля.
+                    this.resizeToScale(newPct);
                     // И сообщаем панели управления, чтобы её ползунок не врал.
                     ipcRenderer.send('report-scale', { source: 'widget', scalePct: newPct });
                 };
@@ -1792,6 +1812,13 @@
                 };
 
                 this.widgetStyleUpdateHandler = (event, settings) => {
+                    // Подпись состояния. По умолчанию СКРЫТА: состояние уже несёт
+                    // цвет дуги, а на маленьком виджете слово занимает место,
+                    // которого нет. Класс на <body>, а не инлайн на элементе:
+                    // видимостью в этом проекте распоряжается каскад.
+                    if (settings.statusLabel !== undefined) {
+                        document.body.classList.toggle('status-label-on', !!settings.statusLabel);
+                    }
                     if (settings.timerStyle) {
                         this._hasWidgetStyle = true;
                         this.setTimerStyle(settings.timerStyle);
@@ -1812,15 +1839,21 @@
                         const incoming = parseInt(settings.timerScale, 10);
                         if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
                             if (this._lastPushedTimerScale !== undefined) {
-                                const newSize = Math.round(250 * incoming / 100);
-                                ipcRenderer.send('widget-resize', { width: newSize, height: newSize });
-                                this.saveGeometry(incoming);
+                                this.resizeToScale(incoming);
                             }
                             this._lastPushedTimerScale = incoming;
                         }
                     }
                     applyShowTicks(settings?.showTicks ?? false);
                 };
+
+                // Границы окна от ГЛАВНОГО процесса — источник для записи
+                // геометрии. Свои outerWidth/screenX остаются запасным путём,
+                // см. window-geometry.js.
+                this._handlers.onWindowGeometry = (event, bounds) => {
+                    this._geometry.setWindowBounds(bounds);
+                };
+                ipcRenderer.on('window-geometry', this._handlers.onWindowGeometry);
 
                 // Регистрируем обработчики
                 ipcRenderer.on('timer-state', this.timerStateHandler);
@@ -1865,6 +1898,9 @@
                 if (h.onClockWindowState) {
                     ipcRenderer.removeListener('clock-window-state', h.onClockWindowState);
                 }
+                if (h.onWindowGeometry) {
+                    ipcRenderer.removeListener('window-geometry', h.onWindowGeometry);
+                }
                 this._handlers = {};
 
                 // Очищаем интервал обновления
@@ -1885,8 +1921,72 @@
                 window.FlipCard.cancelPending();
             }
             
+            /**
+             * Приводит ФОРМУ окна к стилю: LED — полоса по размеру цифр,
+             * остальные стили — квадрат.
+             *
+             * Ширину не трогаем НИКОГДА: из неё считается сохраняемый процент
+             * масштаба (см. save() в window-geometry.js), и окно, менявшее
+             * ширину под содержимое, наращивало бы этот процент с каждым
+             * переоткрытием. Под длину строки подстраивается высота.
+             *
+             * Минимальную высоту окна снимает главный процесс, когда получает
+             * стиль: рендереру она недоступна, а с полом в 140 px полоса
+             * недостижима.
+             */
+            syncWindowShape() {
+                const width = window.outerWidth;
+                if (!(width > 0)) { return; }
+                const height = this.windowHeightFor(width);
+
+                // Порог в 1 px: запрос, ничего не меняющий, всё равно вызвал бы
+                // setBounds, событие resize и отложенную запись геометрии.
+                if (Math.abs(window.outerHeight - height) <= 1) { return; }
+                ipcRenderer.send('widget-resize', { width, height });
+            }
+
+            /**
+             * Высота окна для заданной ширины — ЕДИНСТВЕННОЕ место, где она
+             * выводится. Прежде размер окна собирался в трёх местах отдельно
+             * (Ctrl+колесо, ползунок панели, восстановление геометрии), и все
+             * три считали окно квадратом: полоса LED, выставленная сменой
+             * стиля, схлопывалась обратно в квадрат от первого же поворота
+             * колеса — замерено зондом (окно 120×95 вместо 120×43).
+             */
+            windowHeightFor(width) {
+                if (this.timerStyle !== 'digital') { return width; }
+                // Знакоместа СТРОКИ, что сейчас на табло, плюс запас на знак
+                // минуса при перерасходе.
+                const charCount = (Math.abs(Math.floor(this.remainingSeconds)) >= 3600 ? 8 : 5) + 1;
+                const height = window.WindowGeometry.ledStripHeight(width, charCount);
+                return height > 0 ? height : width;
+            }
+
+            /** Меняет масштаб окна: ширину задаёт процент, высоту — стиль. */
+            resizeToScale(pct) {
+                // Пол ширины учитываем ЗДЕСЬ, а не полагаемся на поджатие в
+                // главном процессе: оно правит ширину уже после того, как
+                // высота посчитана, и пропорция полосы разъезжается — замерено
+                // зондом на 30 %: окно 120×28 при рамке 70 px, то есть рамка
+                // переставала заполнять полосу.
+                const width = Math.max(
+                    window.CONFIG.WIDGET_MIN_WIDTH,
+                    Math.round(WIDGET_BASE_SIZE * pct / 100)
+                );
+                ipcRenderer.send('widget-resize', { width, height: this.windowHeightFor(width) });
+                this.saveGeometry(pct);
+            }
+
             setTimerStyle(style) {
+                // Форму окна меняет не всякая смена стиля, а только переход
+                // В полосу LED или ИЗ неё. Прочие стили делят одну форму
+                // (квадрат), и навязывать её заново нельзя: окно растягивают и
+                // за край рамки, а переключение, скажем, «Флип» → «Цифры»
+                // схлопывало бы растянутое обратно — поймано визуальной
+                // сверкой, кадры hours-*-digits/flip уехали с 320×260 на 320×320.
+                const wasLed = this.timerStyle === 'digital';
                 this.timerStyle = style;
+                const ledChanged = wasLed !== (style === 'digital');
                 
                 // Скрываем все стили
                 if (this.circularWidget) {this.circularWidget.classList.remove('active');}
@@ -1914,6 +2014,9 @@
                         break;
                 }
                 
+                // Форма окна принадлежит стилю: LED — полоса, остальные — квадрат.
+                if (ledChanged) { this.syncWindowShape(); }
+
                 // Обновляем масштабирование после смены стиля
                 if (this._scalingTimer) { clearTimeout(this._scalingTimer); }
                 this._scalingTimer = setTimeout(() => {
@@ -1948,6 +2051,18 @@
                     const nowHours = Math.abs(secs) >= 3600;
                     if (this._digitsHadHours !== nowHours) {
                         this._digitsHadHours = nowHours;
+                        // Строка стала длиннее или короче: «Цифрам» это меняет
+                        // кегль, полосе LED — ещё и высоту окна.
+                        //
+                        // ТОЛЬКО для LED. Прочие стили тоже имеют форму
+                        // (квадрат), но навязывать её здесь нельзя: окно
+                        // растягивают и за край рамки, а переход через час
+                        // тогда молча схлопывал бы растянутое обратно в
+                        // квадрат — поймано визуальной сверкой, кадры
+                        // hours-h1-circle/digits/flip уехали с 320×260 на
+                        // 320×320. Форму НЕ-LED стилей возвращает смена стиля,
+                        // и только она.
+                        if (this.timerStyle === 'digital') { this.syncWindowShape(); }
                         this.updateScaling();
                     }
                 }
