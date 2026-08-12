@@ -113,3 +113,48 @@ test('клавиша M переключает режим, а ящик настр
         await app.close();
     }
 });
+
+/**
+ * Сообщение, пришедшее в свёрнутом состоянии, целиком помещается в полосу.
+ *
+ * Контейнер тостов прибит к НИЖНЕМУ краю окна (bottom: var(--tw-s-10) = 40px)
+ * — это правка прошлого прохода, там тост закрывал герой-время. В окне высотой
+ * 52px тот же отступ выносит тост ВЫШЕ верхнего края: замер на живом окне —
+ * верх тоста на отметке -46 при высоте окна 52, то есть сообщение почти
+ * целиком за кадром и прочитать его нельзя.
+ *
+ * Нашёл это кадр control-collapsed.png, добавленный в съёмку вместе с
+ * режимом: на нём тост срезан верхним краем и виден как тёмная ступенька.
+ */
+test('тост в свёрнутом состоянии виден целиком', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await control.click('#miniBarToggle');
+        await control.waitForTimeout(700);
+
+        const m = await control.evaluate(async () => {
+            window.Toast.show('Проверка размещения сообщения в полосе');
+            await new Promise((r) => setTimeout(r, 400));
+            const toast = document.querySelector('.toast');
+            if (!toast) { return null; }
+            const r = toast.getBoundingClientRect();
+            return {
+                top: +r.top.toFixed(1), bottom: +r.bottom.toFixed(1),
+                left: +r.left.toFixed(1), right: +r.right.toFixed(1),
+                viewportH: window.innerHeight, viewportW: window.innerWidth
+            };
+        });
+
+        expect(m, 'тост не появился — проверять нечего').not.toBeNull();
+        expect(m.top, `верх тоста ${m.top} выше окна`).toBeGreaterThanOrEqual(0);
+        expect(m.bottom, `низ тоста ${m.bottom} при высоте окна ${m.viewportH}`)
+            .toBeLessThanOrEqual(m.viewportH);
+        expect(m.left).toBeGreaterThanOrEqual(0);
+        expect(m.right).toBeLessThanOrEqual(m.viewportW);
+
+        await control.click('#miniBarExpand');
+        await control.waitForTimeout(400);
+    } finally {
+        await app.close();
+    }
+});
