@@ -4070,14 +4070,25 @@ body.state-overtime .adjust { display: none; }
 .adjust-btn:hover { background: var(--tw-level-3); }
 
 /* ---------- ДВЕ НАСТРОЙКИ ОТСЧЁТА (только при вводе) ---------- */
-.input-extras { display: none; padding: 24px 20px 0; }
+/* Две настройки отсчёта видны в ПОКОЕ и при вводе — везде, где решают, каким
+   будет таймер. Макет рисует их только в кадре ввода, и первая версия так и
+   сделала: получилось, что включить «ниже нуля» посреди доклада, когда стало
+   ясно, что не укладываешься, уже нельзя — а это ровно тот момент, когда она
+   и нужна. Во время отсчёта их прячет не отсутствие, а невозможность войти в
+   ввод; здесь же они доступны заранее. */
+/* Отступ 10, а не 24: на минимуме окна 380×660 панель с этими рядами давала
+   674 px содержимого при 660 доступных — ровно 14 px. Забраны здесь и в
+   строке ниже, потому что это воздух, а не несущий отступ; замер после
+   правки держит e2e/min-size-layout.spec.js. */
+.input-extras { display: none; padding: 10px 20px 0; }
+body.state-idle .input-extras,
 body.state-input .input-extras { display: block; }
 .srow {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 0 0 14px;
+    padding: 0 0 10px;
 }
 .srow-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .srow-name { font-size: 14px; font-weight: 500; color: var(--tw-fg); }

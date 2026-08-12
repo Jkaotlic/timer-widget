@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Спека: `docs/superpowers/specs/2026-08-12-redesign-all-windows-design.md`.
-- Макет: `~/Downloads/Редизайн - все окна.dc.html`. Числа берутся оттуда, не выдумываются.
+- Макет: `docs/redesign-2026-08-12.dc.html`. Числа берутся оттуда, не выдумываются.
 - 2 пробела, одинарные кавычки, `eqeqeq: always`, `curly: always` (ESLint 9 flat config).
 - Ни один канал IPC на этом этапе не добавляется и не удаляется.
 - Разметка (`*.html`) на этом этапе **не трогается**, кроме inline-`<style>` в окнах виджета и часов.
