@@ -315,3 +315,41 @@ test('endsAt: мусор даёт null, а не NaN в подписи', () => {
         assert.equal(endsAt(60, badNow), null, `момент ${String(badNow)}`);
     }
 });
+
+// ---------------------------------------------------------------------------
+// windowRowSubtitle — подпись строки окна (panel-state.js, редизайн 2026-08-12)
+// ---------------------------------------------------------------------------
+
+const { windowRowSubtitle } = require('../panel-state');
+
+test('windowRowSubtitle: закрытое окно описывает себя', () => {
+    assert.equal(
+        windowRowSubtitle({ open: false, idle: 'маленький таймер поверх окон', style: 'круг', scale: 140 }),
+        'маленький таймер поверх окон'
+    );
+});
+
+test('windowRowSubtitle: открытое окно говорит состояние', () => {
+    assert.equal(
+        windowRowSubtitle({ open: true, idle: 'неважно', style: 'круг', scale: 140 }),
+        'показан · круг · 140%'
+    );
+});
+
+test('windowRowSubtitle: масштаб 100% не пишется — он ничего не сообщает', () => {
+    assert.equal(windowRowSubtitle({ open: true, idle: 'x', style: 'круг', scale: 100 }), 'показан · круг');
+});
+
+test('windowRowSubtitle: у дисплея вместо стиля монитор', () => {
+    assert.equal(windowRowSubtitle({ open: true, idle: 'x', where: 'Монитор 2' }), 'показан · Монитор 2');
+});
+
+test('windowRowSubtitle: без данных остаётся просто «показан», а не «показан · undefined»', () => {
+    assert.equal(windowRowSubtitle({ open: true, idle: 'x' }), 'показан');
+    assert.equal(windowRowSubtitle({ open: true, idle: 'x', scale: NaN, style: undefined }), 'показан');
+});
+
+test('windowRowSubtitle: мусор вместо объекта не роняет панель', () => {
+    assert.equal(windowRowSubtitle(null), '');
+    assert.equal(windowRowSubtitle(undefined), '');
+});

@@ -4161,3 +4161,120 @@ body.state-input .panel-footer { display: none; }
     box-shadow: none;
     background: transparent;
 }
+
+/* ============================================================================
+   РЕДИЗАЙН 2026-08-12 · ЯЩИК НАСТРОЕК
+   ----------------------------------------------------------------------------
+   Мок рисует ящик так же плоско, как панель: ни карточек, ни рамок вокруг
+   групп. Разделяют заголовок группы и расстояние.
+   ========================================================================== */
+
+/* Крошка «НАСТРОЙКИ /» снята: заголовок ящика называет ОДНО окно, а путь к
+   нему виден в самой панели — это строка, из которой ящик открыли. Селектор
+   именно .drawer-head::before: крошку рисует шапка, а не заголовок. */
+.drawer-head::before { content: none; }
+
+.settings-drawer.open { background: var(--tw-bg-glass); }
+[data-theme="light"] .settings-drawer.open { background: #fbfbfc; }
+
+.drawer-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 18px 12px;
+}
+.drawer-back,
+.drawer-close {
+    flex: 0 0 auto;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--tw-fg-dim);
+    cursor: pointer;
+}
+.drawer-back:hover,
+.drawer-close:hover { color: var(--tw-fg); }
+.drawer-title {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--tw-fg);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Группа — не карточка. Она была рамкой с фоном и радиусом; макет оставляет
+   от неё только заголовок и воздух.
+   Селектор двойной намеренно: карточку задают .drawer-body .settings-group и
+   [data-theme="light"] .settings-group, обе специфичнее одиночного класса, и
+   правило «последний выигрывает» тут не работает — выигрывает специфичность. */
+.drawer-body .settings-group,
+[data-theme="light"] .settings-group,
+[data-theme="light"] .drawer-body .settings-group {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0 18px;
+    margin: 0 0 20px;
+}
+.drawer-body .settings-group-title,
+[data-theme="light"] .drawer-body .settings-group-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--tw-fg-dim);
+    padding: 0 0 8px;
+    background: none;
+    border: 0;
+}
+/* Иконки у заголовков групп сняты: в макете заголовок — это слово, и только.
+   Ряд из пяти значков соревновался за внимание с самими настройками. */
+.settings-group-title .icon { display: none; }
+
+/* Подсказка вверху таба — та же плоская строка, а не карточка в рамке. */
+.settings-hint {
+    background: var(--tw-level-1);
+    border: 0;
+    border-radius: 12px;
+    box-shadow: none;
+}
+
+/* Строка настройки: имя, пояснение, контрол справа. Числа из мока. */
+.toggle-row { padding: 0 0 16px; }
+.toggle-label { font-size: 13.5px; font-weight: 500; color: var(--tw-fg); }
+.toggle-hint  { font-size: 11px; color: var(--tw-fg-dim); }
+
+/* Иконка перед заголовком группы. Правило одиночным классом проигрывало
+   `.drawer-body .settings-group-title .icon`; повторяем ту же глубину. */
+.drawer-body .settings-group-title .icon,
+[data-theme="light"] .drawer-body .settings-group-title .icon { display: none; }
+
+/* Тумблер строки — это КНОПКА окна (id и обработчики сохранены), поэтому на
+   неё продолжают действовать правила прежней плитки: заливка, рамка, отступы
+   и «галочка» ::after, которой в макете нет. Снимаем их разом.
+   Селектор двойной: .quick-window-btn.active::after и цветные правила светлой
+   темы объявлены с той же или большей глубиной. */
+.wrow-toggle.quick-window-btn,
+[data-theme="light"] .wrow-toggle.quick-window-btn {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: var(--p-track-off);
+    font-size: 0;
+    min-width: 0;
+    gap: 0;
+}
+.wrow-toggle.quick-window-btn.active,
+[data-theme="light"] .wrow-toggle.quick-window-btn.active {
+    background: var(--p-track-on);
+    border: 0;
+    box-shadow: none;
+}
+.wrow-toggle.quick-window-btn::after,
+.wrow-toggle.quick-window-btn.active::after { content: none; }
+.wrow-toggle.quick-window-btn:hover,
+[data-theme="light"] .wrow-toggle.quick-window-btn:hover { transform: none; }

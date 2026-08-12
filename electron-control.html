@@ -168,7 +168,7 @@
                 <div class="tab-content active" id="tab-timer">
                     <div class="settings-hint" role="note">
                         <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                        <span class="hint-text">На виджете: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>8</kbd> работают и здесь</span>
+                        <span class="hint-text">На виджете: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>4</kbd> работают и здесь</span>
                     </div>
                     <div class="settings-group">
                         <div class="settings-group-title">
@@ -441,7 +441,7 @@
                     <div class="settings-column">
                         <div class="settings-hint" role="note">
                             <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                            <span class="hint-text">На часах: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>8</kbd> работают и здесь</span>
+                            <span class="hint-text">На часах: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>4</kbd> работают и здесь</span>
                         </div>
                         <div class="settings-group">
                             <div class="settings-group-title">
@@ -732,7 +732,11 @@
          `visibility: hidden` в control.css — проверено замером: 90 контролов
          внутри, ни один не получает фокус, пока ящик закрыт. -->
     <aside class="settings-drawer" id="settingsDrawer" aria-hidden="true" role="region" aria-label="Настройки">
+        <!-- Шапка макета: «‹ Имя ×». Шеврон назад и крестик делают одно и то же
+             (закрывают ящик) и это НЕ дубль: «‹» отвечает на «как вернуться к
+             списку», «×» — на «как это убрать». Обе роли в макете нарисованы. -->
         <div class="drawer-head">
+            <button class="drawer-back" id="drawerBack" type="button" title="Назад к списку (Esc)" aria-label="Назад к списку">‹</button>
             <span class="drawer-title" id="drawerTitle">Настройки</span>
             <button class="drawer-close" id="drawerClose" type="button" title="Закрыть (Esc)" aria-label="Закрыть">×</button>
         </div>
@@ -1219,6 +1223,9 @@
 
                 if (this.drawerCloseBtn) {
                     this.drawerCloseBtn.addEventListener('click', () => this.closeSettingsDrawer());
+                    // «‹» ведёт туда же: список окон — это и есть то, из
+                    // чего ящик открыли.
+                    document.getElementById('drawerBack')?.addEventListener('click', () => this.closeSettingsDrawer());
                 }
 
                 document.addEventListener('keydown', (e) => {
@@ -2677,13 +2684,11 @@
             if (button.getAttribute('role') === 'switch') {
                 button.setAttribute('aria-checked', String(isOpen));
             }
-            // Подзаголовок строки говорит СОСТОЯНИЕ, когда окно открыто, и
-            // описание, когда закрыто.
-            const sub = button.closest('.wrow')?.querySelector('.wrow-sub');
-            if (sub) {
-                if (!sub.dataset.idle) { sub.dataset.idle = sub.textContent; }
-                sub.textContent = isOpen ? 'показан' : sub.dataset.idle;
-            }
+            // Подзаголовок собирает panel-state.js: он читает ЖИВЫЕ значения
+            // стиля, масштаба и монитора из самих контролов настроек. Первая
+            // версия писала здесь просто «показан» — то есть теряла ровно ту
+            // часть, ради которой строка и заведена.
+            window.timerController?.renderWindowRows?.();
             if (isOpen) {
                 button.title = button.title.replace(/открыть|Компактный|Часы в реальном|На весь экран/i, 'Закрыть');
             } else if (buttonId === 'openWidgetBtn') {
