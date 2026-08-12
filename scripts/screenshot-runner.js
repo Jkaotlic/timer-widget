@@ -8,6 +8,21 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { diffBitmaps, isRegression, isTimeDependent } = require('../visual-diff');
 
+/**
+ * Смена стиля виджета — ЧЕРЕЗ главный процесс, а не прямой посылкой в окно.
+ *
+ * С 12.08.2026 на стиле висит не только отрисовка, но и форма окна: у LED это
+ * полоса по размеру цифр, и пол высоты для неё снимает обработчик
+ * `widget-style-update` в electron-main.js. Прямая посылка в webContents идёт
+ * мимо него — окно остаётся с полом 140 px, полоса поджимается, и кадр
+ * показывает состояние, которого у пользователя не бывает (замерено: 250×140
+ * вместо 250×90). `ipcMain.emit` зовёт НАСТОЯЩИЙ обработчик тем же путём, каким
+ * приходит сообщение из панели.
+ */
+function sendWidgetStyle(style) {
+    require('electron').ipcMain.emit('widget-style-update', {}, { timerStyle: style });
+}
+
 const STATES = [
     { name: 'idle',     remaining: 300, total: 300, isRunning: false, finished: false },
     { name: 'running',  remaining: 183, total: 300, isRunning: true,  finished: false },
@@ -172,6 +187,35 @@ async function waitForTheme(win, theme, timeoutMs = 3000) {
     }
 }
 
+/**
+ * Ждёт, пока окно ПОКАЖЕТ заданное время, а не «столько-то миллисекунд».
+ *
+ * Кадр `hours-hmax-digital-widget` расходился между прогонами на 49.6 %: на нём
+ * оказывалось время предыдущего состояния (1:02:03 вместо 99:59:59). Причина не
+ * в отрисовке — состояние просто не успевало доехать до окна за отведённый сон,
+ * и никакой сон не превращает гонку в гарантию. Здесь опрашивается САМО окно.
+ *
+ * Возвращает false по истечении срока: съёмка продолжается, но в журнале
+ * остаётся след — «кадр снят не тем, чем ожидали» лучше видеть, чем угадывать
+ * по расхождению.
+ */
+async function waitForRemaining(win, seconds, log, timeoutMs = 3000) {
+    if (!win || win.isDestroyed()) { return false; }
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        try {
+            const ok = await win.webContents.executeJavaScript(
+                `typeof widgetTimer !== 'undefined' && Math.floor(widgetTimer.remainingSeconds) === ${Math.floor(seconds)}`,
+                true
+            );
+            if (ok) { return true; }
+        } catch { /* окно перезагружается — пробуем дальше */ }
+        await sleep(50);
+    }
+    log.warn(`[screenshot] окно не показало ${seconds} c за ${timeoutMs} мс — кадр может быть снят с прежним временем`);
+    return false;
+}
+
 async function capture(win, filePath, log) {
     if (!win || win.isDestroyed()) {
         log.warn(`[screenshot] skip ${path.basename(filePath)} — window missing`);
@@ -182,6 +226,23 @@ async function capture(win, filePath, log) {
     // forces the surface to exist, but sometimes the first capture still races
     // the surface handshake. Retry up to 3 times with a short back-off.
     if (!win.isVisible()) { win.showInactive(); }
+
+    // Прогревочный снимок, результат которого выбрасывается.
+    //
+    // Замерено: окно виджета в режиме съёмки стоит за краем экрана и его
+    // страница отчитывается `document.visibilityState === 'hidden'`. Скрытая
+    // страница не перерисовывается, поэтому capturePage отдаёт ПРОШЛЫЙ кадр
+    // композитора — на hours-hmax-digital-widget в PNG попадало время
+    // предыдущего шага (1:02:03 вместо 99:59:59) при том, что DOM в тот же
+    // момент показывал правильное (проверено запросом к окну). Первый вызов
+    // заставляет композитор собрать свежий кадр, второй его и забирает.
+    // Никакой сон этого не заменяет: это не медленная отрисовка, а её
+    // отсутствие до запроса.
+    try {
+        await win.webContents.capturePage();
+        await sleep(120);
+    } catch { /* прогрев не обязан удаться — дальше обычные попытки с ретраями */ }
+
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
@@ -435,7 +496,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                     w.display.webContents.send('display-settings-update', { timerStyle: style });
                 }
                 if (w.widget && !w.widget.isDestroyed()) {
-                    w.widget.webContents.send('widget-style-update', { timerStyle: style });
+                    sendWidgetStyle(style);
                 }
             } catch (e) {
                 log.warn(`[screenshot] style ${style} switch failed: ${e.message}`);
@@ -552,8 +613,22 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                     w.display.webContents.send('display-settings-update', { timerStyle: style });
                 }
                 if (w.widget && !w.widget.isDestroyed()) {
-                    w.widget.setSize(320, 260);
-                    w.widget.webContents.send('widget-style-update', { timerStyle: style });
+                    sendWidgetStyle(style);
+                    // Размер задаётся ПОСЛЕ смены стиля, а не до неё: с 12.08.2026
+                    // форму окна выбирает сам стиль (LED — полоса по размеру цифр,
+                    // остальные — квадрат), и выставленная заранее геометрия
+                    // перебивалась переходом ИЗ полосы в квадрат — кадры flip
+                    // уезжали с 320×260 на 320×320 в зависимости от того, какой
+                    // стиль снимался перед ним.
+                    //
+                    // Для LED размер не навязывается вовсе: полосу задаёт
+                    // приложение, и подменять её здесь значило бы снимать не то,
+                    // что видит пользователь.
+                    if (style !== 'digital') {
+                        setTimeout(() => {
+                            if (!w.widget.isDestroyed()) { w.widget.setSize(320, 260); }
+                        }, 120);
+                    }
                 }
             } catch (e) {
                 log.warn(`[screenshot] hour formats: style ${style} failed: ${e.message}`);
@@ -576,8 +651,11 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                     log.warn(`[screenshot] hour state ${hs.name} failed: ${e.message}`);
                     continue;
                 }
-                await sleep(450);
                 const now = ctx();
+                // Ждём, пока состояние ДОЕДЕТ до окна, а не фиксированный сон:
+                // именно здесь кадр hmax снимался с временем предыдущего шага.
+                await waitForRemaining(now.widget, hs.remaining, log);
+                await sleep(250);
                 await capture(now.widget, path.join(outDir, `hours-${hs.name}-${style}-widget.png`), log);
                 await capture(now.display, path.join(outDir, `hours-${hs.name}-${style}-display.png`), log);
             }
@@ -622,7 +700,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                 w.display.webContents.send('display-settings-update', { timerStyle: 'circle' });
             }
             if (w.widget && !w.widget.isDestroyed()) {
-                w.widget.webContents.send('widget-style-update', { timerStyle: 'circle' });
+                sendWidgetStyle('circle');
             }
             applyTimerState({
                 totalSeconds: 300, presetSeconds: 300, remainingSeconds: 183,

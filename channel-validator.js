@@ -58,6 +58,12 @@ const ALLOWED_CHANNELS = {
         'widget-window-state',
         'clock-window-state',
         'scale-report',
+        // Границы окна, как их видит ГЛАВНЫЙ процесс. Он ими и владеет: окно
+        // двигают и масштабируют его вызовы. Виджет и часы записывают в
+        // localStorage то, что пришло сюда, а не то, что насчитали сами по
+        // outerWidth/screenX — на мониторе с масштабом ≠ 100 % это разные
+        // единицы (см. window-geometry.js).
+        'window-geometry',
         'ui-theme-update',
         'timer-recovery-available'
     ]

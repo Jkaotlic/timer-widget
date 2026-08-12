@@ -65,6 +65,7 @@ const ALLOWED_CHANNELS = {
         'widget-window-state',
         'clock-window-state',
         'scale-report',
+        'window-geometry',
         'ui-theme-update',
         'timer-recovery-available'
     ]
