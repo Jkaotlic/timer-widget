@@ -46,10 +46,15 @@
   /* SURFACES */
   --tw-bg-void:     #000000;
   --tw-bg-dark:     #141423;
-  --tw-bg-surface:  rgba(28, 28, 30, 0.72);
-  --tw-bg-glass:    rgba(20, 20, 35, 0.95);
-  --tw-bg-timer:    rgba(15, 15, 25, 0.7);
-  --tw-bg-led:      rgba(10, 10, 15, 0.75);
+  /* Плотные, а не полупрозрачные. Редизайн 2026-08-12 снял backdrop-filter, и
+     размывать под поверхностью стало нечего: полупрозрачная поверхность БЕЗ
+     блюра — это не «стекло», а дыра на рабочий стол. Значения взяты из макета
+     (тёмная панель там #17171a). tests/flat-surfaces.test.js падает на любом
+     rgba(), вернувшемся в эту четвёрку. */
+  --tw-bg-surface:  #1e1e22;
+  --tw-bg-glass:    #17171a;
+  --tw-bg-timer:    #17171a;
+  --tw-bg-led:      #0f0f12;
 
   /* Solid fallbacks (used when backdrop-filter unavailable) */
   --tw-bg-surface-solid: #1e1e22;
