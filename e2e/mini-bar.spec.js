@@ -31,7 +31,7 @@ test('окно сжимается в полосу и разворачивает�
         // Полоса видна, а панель — нет.
         const seen = await control.evaluate(() => ({
             bar: document.getElementById('miniBar').getBoundingClientRect().height,
-            hero: document.querySelector('.timer-header').getBoundingClientRect().height
+            hero: document.querySelector('.hero').getBoundingClientRect().height
         }));
         expect(seen.bar).toBeGreaterThan(40);
         expect(seen.hero).toBe(0);
@@ -53,6 +53,12 @@ test('окно сжимается в полосу и разворачивает�
 test('полоса показывает то же время, что и панель, и управляет таймером', async () => {
     const { app, control } = await launchApp();
     try {
+        // Время нужно задать ДО сворачивания: редизайн 2026-08-12 показывает в
+        // полосе одно действие из двух по состоянию таймера, и без пресета
+        // «Старт» не переводит панель в отсчёт — «Паузы» не появится вовсе.
+        await control.click('.preset[data-minutes="5"]');
+        await control.waitForTimeout(300);
+
         await control.click('#miniBarToggle');
         await control.waitForTimeout(600);
 

@@ -419,8 +419,14 @@ function readWindowCss(file) {
 // Токены прибитого блока окна. Отсутствие блока — само по себе провал: без него
 // светлая тема переворачивает текст и цифры становятся чёрными по тёмно-синему.
 function readPin(css, file) {
-    const m = /\[data-theme="light"\]\s*\{([\s\S]*?)\n\s*\}/.exec(css);
-    assert.ok(m, `${file}: блок [data-theme="light"] не найден`);
+    // Виджет по-прежнему прибивает палитру темой: он лежит поверх ЧУЖОГО
+    // рабочего стола и своего фона не имеет вообще. Дисплей после редизайна
+    // 2026-08-12 решает по ЯРКОСТИ своего фона, поэтому у него палитра
+    // «светлое по тёмному» объявлена как body:not(.on-light-bg) — тот же
+    // набор токенов, другое условие. Проверка одна: важен НАБОР, а не селектор.
+    const m = /\[data-theme="light"\]\s*\{([\s\S]*?)\n\s*\}/.exec(css)
+        || /:root:not\(\.on-light-bg\)[^{]*\{([\s\S]*?)\n\}/.exec(css);
+    assert.ok(m, `${file}: не найден ни блок [data-theme="light"], ни body:not(.on-light-bg)`);
     const pin = new Map();
     for (const decl of m[1].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
         pin.set(decl[1], decl[2].trim());
@@ -678,4 +684,37 @@ test('расчёт контраста сверен с эталонными па�
     // #767676 на белом — канонический порог 4.5:1 из спецификации WCAG.
     const ratio = contrast([0x76, 0x76, 0x76], [255, 255, 255]);
     assert.ok(ratio > 4.45 && ratio < 4.6, `#767676 на белом должен давать ≈4.5:1, вышло ${ratio.toFixed(2)}`);
+});
+
+test('дисплей на СВЕТЛОМ фоне: текст и акценты держат AA', () => {
+    // Редизайн 2026-08-12 разрешил дисплею быть светлым — «для белой аудитории
+    // и стрима». Это вторая палитра одного окна, и без счёта она повторила бы
+    // историю светлой темы: та была недостижима, её контраст никто не
+    // настраивал, и подписи давали 2.70:1.
+    //
+    // Фон здесь БЕЛЫЙ и известен: класс .on-light-bg ставится ровно тогда,
+    // когда backgroundTone() намерил светлый фон.
+    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    const m = /:root\.on-light-bg\s*\{([\s\S]*?)\n\}/.exec(css);
+    assert.ok(m, 'блок :root.on-light-bg не найден — светлый дисплей остался без палитры');
+
+    const pin = new Map();
+    for (const decl of m[1].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
+        pin.set(decl[1], decl[2].trim());
+    }
+
+    const WHITE = [255, 255, 255];
+    const report = [];
+    const checked = [...TEXT_TOKENS, 'tw-blue', 'tw-green', 'tw-red', 'tw-orange'];
+    for (const token of checked) {
+        assert.ok(pin.has(token), `--${token} не объявлен для светлого дисплея`);
+        const ratio = contrast(composite(pin.get(token), WHITE), WHITE);
+        report.push(`--${token} (${pin.get(token)}): ${ratio.toFixed(2)}:1`);
+        assert.ok(
+            ratio >= AA_NORMAL,
+            `светлый дисплей: --${token} (${pin.get(token)}) на белом даёт `
+            + `${ratio.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+        );
+    }
+    console.log('   [светлый дисплей] ' + report.join('\n   [светлый дисплей] '));
 });

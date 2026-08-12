@@ -238,6 +238,12 @@ const PanelStateMixin = {
      * приводить панель в тот же вид.
      */
     renderPanelState(status, band) {
+        // Замечание про ПЕРВЫЙ КАДР: класс state-idle стоит прямо в разметке
+        // <body>. До прихода первого timer-state этот метод ещё не вызывался,
+        // класса состояния нет вообще — и правила видимости не находят ни одной
+        // кнопки транспорта: панель показывалась без «Старта». Дефект живёт
+        // ровно одну секунду и потому незаметен в разработке.
+
         const isOvertime = (band || window.RendererShared.timerColorBand(
             this.remainingSeconds, this.totalSeconds)) === 'overtime';
         const live = this.isRunning || this.isPaused;
@@ -254,13 +260,29 @@ const PanelStateMixin = {
         // отдельной проводки от каждого контрола.
         this.renderWindowRows();
 
-        const LABEL = {
-            idle: 'Длительность',
-            running: this.isPaused ? 'Пауза' : 'Осталось',
+        // СЛОВО берётся из общего владельца приоритетов, а не из режима
+        // раскладки. Первая версия писала слово по режиму и завела вторую
+        // лестницу приоритетов: в перерасходе она печатала «Перерасход»,
+        // затирая паузу, — а правило этого проекта обратное, пауза важнее
+        // всего (докладчик, выбившийся из времени и нажавший паузу, видел
+        // «Завершено» ровно из-за такой же второй лестницы).
+        // Режим решает РАСКЛАДКУ, статус решает НАДПИСЬ.
+        const LIFECYCLE_LABEL = {
+            paused: 'Пауза',
             overtime: 'Перерасход',
-            input: 'Своё время'
+            finished: 'Завершено',
+            running: 'Осталось',
+            idle: 'Длительность'
         };
-        if (this.statusText) { this.statusText.textContent = LABEL[mode]; }
+        const lifecycle = status || window.RendererShared.timerLifecycleStatus({
+            remainingSeconds: this.remainingSeconds,
+            totalSeconds: this.totalSeconds,
+            isRunning: this.isRunning,
+            isPaused: this.isPaused,
+            finished: this.wasFinished
+        });
+        const label = mode === 'input' ? 'Своё время' : LIFECYCLE_LABEL[lifecycle];
+        if (this.statusText) { this.statusText.textContent = label; }
 
         // Подсказка под цифрами. В отсчёте и перерасходе это ВРЕМЯ
         // ОКОНЧАНИЯ — оно отвечает на вопрос, который иначе считают в

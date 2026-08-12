@@ -833,6 +833,13 @@ class DisplayTimer {
         const mode = settings.bgMode || 'gradient';
         let bg = '';
 
+        // Страж яркости: цвет текста решает ФОН, а не тема. Режим передаётся уже
+        // РАЗРЕШЁННЫЙ: первая версия отдавала сырой settings.bgMode, и на
+        // профиле без сохранённого фона страж видел undefined, откатывался к
+        // теме и красил светлым по тёмному градиенту — ровно тот провал,
+        // который он и обязан предотвращать. Поймал это снимок окраски.
+        this.applyBackgroundTone(settings, mode);
+
         // Три радиальных свечения из body::before рисуются ПОВЕРХ фона, а не
         // под ним, поэтому режим «Заливка» заливки не давал: выбранный цвет
         // всегда оставался подкрашен синим и зелёным пятнами. Комментарий над
@@ -862,6 +869,30 @@ class DisplayTimer {
         if (bg) {
             document.body.style.setProperty('--bg', bg);
         }
+    }
+
+    /**
+     * Ставит класс .on-light-bg по яркости фактического фона.
+     *
+     * Тема сюда попадает только как выбор фона ПО УМОЛЧАНИЮ: если своего фона
+     * нет, светлая тема даёт белый холст, тёмная — тёмный градиент. Решение о
+     * цвете текста принимает владелец фона, и владелец тут один.
+     */
+    applyBackgroundTone(settings, mode) {
+        const tone = window.RendererShared.backgroundTone({
+            mode: mode || settings.bgMode,
+            solid: settings.bgSolid,
+            grad1: settings.bgGrad1,
+            grad2: settings.bgGrad2,
+            theme: document.documentElement.getAttribute('data-theme')
+        });
+        // Класс вешается на <html>, а не на <body>, и это не стиль, а
+        // необходимость: токены вроде `--tw-led-green: var(--tw-green)`
+        // объявлены в design-tokens.css на :root и вычисляются ТАМ ЖЕ. Палитра
+        // на <body> переопределяла --tw-green уже после того, как
+        // --tw-led-green вычислился из html-овского значения, и LED-зелёный
+        // оставался светлым на тёмном фоне. Поймал это снимок окраски.
+        document.documentElement.classList.toggle('on-light-bg', tone === 'light');
     }
 
     applyLocalBackground(imageData, fit, overlay) {

@@ -297,6 +297,70 @@ function endsAt(remainingSeconds, now) {
     return `${hh}:${mm}`;
 }
 
+
+/**
+ * Относительная яркость цвета по WCAG. Принимает #rgb и #rrggbb.
+ * @param {string} color
+ * @returns {number|null} 0..1, либо null если цвет не разобран
+ */
+function relativeLuminance(color) {
+    if (typeof color !== 'string') { return null; }
+    let hex = color.trim().replace(/^#/, '');
+    if (hex.length === 3) { hex = hex.split('').map((c) => c + c).join(''); }
+    if (!/^[0-9a-f]{6}$/i.test(hex)) { return null; }
+
+    const channel = (v) => {
+        const c = parseInt(v, 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    const r = channel(hex.slice(0, 2));
+    const g = channel(hex.slice(2, 4));
+    const b = channel(hex.slice(4, 6));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Страж яркости дисплея: светлый под ним фон или тёмный.
+ *
+ * Дисплей следует теме, но фон под цифрами задаёт ПОЛЬЗОВАТЕЛЬ — заливкой,
+ * градиентом или картинкой. Решать цвет текста по теме означало бы вернуть
+ * задокументированный провал: тёмная заливка при светлой теме даёт чёрные
+ * цифры на чёрном, и на проекторе время не видно вообще.
+ *
+ * Поэтому решает не тема, а ЯРКОСТЬ фактического фона. Тема лишь выбирает
+ * фон по умолчанию, когда пользователь своего не задал.
+ *
+ * Порог 0.179 — точка, где белый и чёрный текст дают равный контраст по WCAG.
+ *
+ * Картинка не разбирается принципиально: у фотографии нет одной яркости, и
+ * гадать по ней хуже, чем держать заведомо читаемый светлый текст с затемняющим
+ * оверлеем — так это и работало до редизайна.
+ *
+ * @param {{mode?: string, solid?: string, grad1?: string, grad2?: string, theme?: string}} bg
+ * @returns {'light'|'dark'} какой ФОН получился, а не какой текст нужен
+ */
+function backgroundTone(bg) {
+    const LIGHT_THRESHOLD = 0.179;
+    const settings = bg || {};
+    const mode = settings.mode;
+
+    if (mode === 'local') { return 'dark'; }
+
+    let lum = null;
+    if (mode === 'solid') {
+        lum = relativeLuminance(settings.solid);
+    } else if (mode === 'gradient') {
+        const a = relativeLuminance(settings.grad1);
+        const b = relativeLuminance(settings.grad2);
+        const stops = [a, b].filter((v) => v !== null);
+        lum = stops.length ? stops.reduce((x, y) => x + y, 0) / stops.length : null;
+    }
+
+    // Своего фона нет — его выбирает тема. Светлая даёт белый холст.
+    if (lum === null) { return settings.theme === 'light' ? 'light' : 'dark'; }
+    return lum > LIGHT_THRESHOLD ? 'light' : 'dark';
+}
+
 // ---------------------------------------------------------------------------
 // Exports — dual pattern identical to utils.js
 // ---------------------------------------------------------------------------
@@ -307,7 +371,9 @@ const RendererShared = {
     timerLifecycleStatus,
     timerColorBand,
     pickOwnSetting,
-    endsAt
+    endsAt,
+    relativeLuminance,
+    backgroundTone
 };
 
 // Node.js (tests / main process)

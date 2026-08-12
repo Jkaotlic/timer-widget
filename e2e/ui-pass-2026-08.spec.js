@@ -30,12 +30,18 @@ test('часовая стрелка виджета движется', async () =
     // Стиль переключаем ЧЕРЕЗ интерфейс: контейнеры стилей скрыты и
     // показываются классом .active, поэтому ожидание #widgetAnalog без
     // переключения висело бы на скрытом элементе.
-    await control.click('.tab-btn[data-tab="timer"]');
+    await control.click('.wrow-chevron[data-tab="timer"]');
     await control.waitForSelector('#settingsDrawer.open');
     await control.click('#timerStyle button:has-text("Аналог")');
 
+    // Ящик закрываем: он перекрывает панель, а клик по времени — это вход в
+    // состояние ввода, которого редизайн 2026-08-12 требует перед вводом.
+    await control.click('#drawerClose');
+    await control.waitForTimeout(500);
+    await control.click('#controlTime');
+    await control.waitForTimeout(300);
     await control.fill('#manualTimeInput', '1:30:00');
-    await control.click('#manualTimeApply');
+    await control.press('#manualTimeInput', 'Enter');
     await widget.waitForSelector('#widgetAnalog.active');
     await widget.waitForTimeout(500);
 
@@ -55,7 +61,7 @@ test('деления циферблата виджета стоят на одн�
     const widget = await app.waitForEvent('window');
     await widget.waitForLoadState('domcontentloaded');
 
-    await control.click('.tab-btn[data-tab="timer"]');
+    await control.click('.wrow-chevron[data-tab="timer"]');
     await control.waitForSelector('#settingsDrawer.open');
     await control.click('#timerStyle button:has-text("Аналог")');
     await widget.waitForSelector('#widgetAnalog.active');
@@ -83,7 +89,9 @@ test('в светлой теме часы читаемы: стрелки, циф
     const clock = await app.waitForEvent('window');
     await clock.waitForLoadState('domcontentloaded');
 
-    await control.click('#contrastToggle');          // тёмная → светлая
+    // Дефолт после редизайна 2026-08-12 — СВЕТЛАЯ тема, поэтому переключать
+    // ничего не нужно: часы уже в ней. Прежняя версия кликала «тёмная →
+    // светлая» и теперь уводила бы ровно из проверяемого состояния.
     await clock.waitForTimeout(400);
 
     const seen = await clock.evaluate(() => {
@@ -113,12 +121,12 @@ test('в светлой теме часы читаемы: стрелки, циф
     expect(Number(seen.seconds)).toBeCloseTo(0.62, 2);
 
     // Тема живёт в localStorage, а профиль e2e ОДИН на весь прогон (иначе
-    // crash-recovery.spec.js не увидел бы свой снимок после SIGKILL). Не
-    // вернув тему, этот тест оставлял бы её включённой для всех последующих
-    // спеков — ui-theme.spec.js падал с «тема должна стартовать как dark».
-    await control.click('#contrastToggle');
-    await control.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
-
+    // crash-recovery.spec.js не увидел бы свой снимок после SIGKILL). Раньше
+    // тест ПЕРЕКЛЮЧАЛ тему в начале и возвращал её здесь. После редизайна
+    // 2026-08-12 светлая стала дефолтом: переключать нечего, и прежний
+    // «возврат» стал бы порчей — он оставлял бы тёмную тему следующим спекам.
+    // Ровно так ui-theme.spec.js и падал в общем прогоне, оставаясь зелёным
+    // в одиночку: 126 из 127 проходили, один — нет.
     await app.close();
 });
 

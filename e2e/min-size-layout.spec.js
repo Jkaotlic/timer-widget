@@ -39,7 +39,10 @@ test(`при ${MIN_W}×${MIN_H} секция настроек не обреза�
 
         const m = await control.evaluate(() => {
             const section = document.getElementById('advancedSettings');
-            const row = document.querySelector('.tabs-row');
+            // Ряда вкладок больше нет: редизайн 2026-08-12 заменил его списком
+            // строк окон. Мерим последний ряд той же секции — он и упирается
+            // в нижний край первым.
+            const row = document.querySelector('.wrows');
             const sr = section.getBoundingClientRect();
             const rr = row.getBoundingClientRect();
             // Мерить надо КАЖДОГО предка с прокруткой, а не только внешнюю
