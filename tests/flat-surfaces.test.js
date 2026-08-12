@@ -65,17 +65,41 @@ function declarations(src, property) {
 }
 
 /**
+ * Ахроматичен ли цвет слоя, то есть тень это или ореол.
+ *
+ * Отличить удаётся только у явных rgb/rgba/#hex. `currentColor`, `var(…)` и
+ * `color-mix(…)` не разрешаются на уровне исходника и считаются ЦВЕТНЫМИ —
+ * это осознанно строгая сторона: пропустить ореол хуже, чем лишний раз
+ * потребовать объяснения.
+ */
+function isAchromatic(layer) {
+    const rgb = layer.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rgb) {
+        const [r, g, b] = [rgb[1], rgb[2], rgb[3]].map(Number);
+        return Math.max(r, g, b) - Math.min(r, g, b) <= 8;
+    }
+    const hex = layer.match(/#([0-9a-f]{6})\b/i);
+    if (hex) {
+        const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16));
+        return Math.max(r, g, b) - Math.min(r, g, b) <= 8;
+    }
+    return false;
+}
+
+/**
  * Разбирает значение box-shadow на слои и оставляет только СВЕЧЕНИЯ.
  *
- * Свечение — это слой, у которого оба смещения нулевые, а размытие ненулевое.
- * Такое определение отделяет его от трёх вещей, которые редизайн СОХРАНЯЕТ:
- *   `0 0 0 2px …`  — кольцо фокуса: размытие нулевое, это форма;
- *   `inset 0 0 …`  — внутренняя тень: она внутри, а не ореол;
- *   `0 1px 3px …`  — подъём ручки тумблера: смещение по Y ненулевое.
+ * Свечение — это слой, у которого оба смещения нулевые, размытие ненулевое,
+ * а цвет ЦВЕТНОЙ. Такое определение отделяет его от четырёх вещей, которые
+ * редизайн СОХРАНЯЕТ:
+ *   `0 0 0 2px …`            — кольцо фокуса: размытие нулевое, это форма;
+ *   `inset 0 0 …`            — внутренняя тень: она внутри, а не ореол;
+ *   `0 1px 3px …`            — подъём ручки тумблера: смещение по Y ненулевое;
+ *   `0 0 4px rgba(0,0,0,.5)` — нейтральная мягкая тень: она серая, а не цветная.
  *
- * Первая версия этой проверки была регуляркой `0\s+0\s+([1-9]\d*)px` и падала
- * на `0 0 0 2px`, находя там «свечение 2px»: она матчилась со второго нуля.
- * Отсюда разбор по слоям вместо поиска подстроки.
+ * Первая версия была регуляркой `0\s+0\s+([1-9]\d*)px` и находила «свечение
+ * 2px» в `0 0 0 2px`, то есть объявляла стеклом кольцо фокуса. Вторая ловила
+ * нейтральные тени. Отсюда разбор по слоям И проверка цветности.
  */
 function glowLayers(value) {
     // Запятые ВНЕ скобок разделяют слои; запятые внутри rgba() — нет.
@@ -93,7 +117,8 @@ function glowLayers(value) {
                 .filter(Boolean);
             if (lengths.length < 3) { return false; }
             const num = (t) => parseFloat(t) || 0;
-            return num(lengths[0]) === 0 && num(lengths[1]) === 0 && num(lengths[2]) > 0;
+            if (!(num(lengths[0]) === 0 && num(lengths[1]) === 0 && num(lengths[2]) > 0)) { return false; }
+            return !isAchromatic(layer);
         });
 }
 
@@ -144,7 +169,7 @@ test('живого backdrop-filter не осталось: только none ил
     }
 });
 
-test('внешних цветных свечений не осталось', { skip: 'включается задачей 4' }, () => {
+test('внешних цветных свечений не осталось', () => {
     for (const file of SURFACE_FILES) {
         for (const value of declarations(read(file), 'box-shadow')) {
             const glows = glowLayers(value);
@@ -156,6 +181,57 @@ test('внешних цветных свечений не осталось', { s
     }
 });
 
+/**
+ * Свечения через text-shadow и filter: drop-shadow — тот же ореол, но другим
+ * свойством. Их находит тот же разбор слоёв.
+ */
+function textGlowCount(src) {
+    const code = codeOnly(src);
+    let count = 0;
+    let m;
+
+    const drop = /drop-shadow\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
+    while ((m = drop.exec(code)) !== null) {
+        if (glowLayers(m[1]).length > 0) { count += 1; }
+    }
+
+    const text = /text-shadow\s*:\s*([^;{}]+);/g;
+    while ((m = text.exec(code)) !== null) {
+        count += glowLayers(m[1]).length;
+    }
+    return count;
+}
+
+test('свечения через text-shadow/drop-shadow только УБЫВАЮТ', () => {
+    // Храповик, а не запрет. Этап A снял ореолы, живущие в box-shadow; те же
+    // ореолы, написанные через text-shadow и drop-shadow, — это неоновые стили
+    // LED и «Цифры» в трёх окнах, и снимает их этап D, который эти окна и
+    // переписывает. Досрочная зачистка означала бы переписать LED посреди
+    // этапа про токены.
+    //
+    // Числа — зафиксированный ДОЛГ. Меньше — снять потолок и записать новый;
+    // больше — свечение вернули, и это регрессия. Ноль во всех четырёх строках
+    // означает, что этап D закрыт и тест пора превратить в запрет.
+    const DEBT = {
+        'control.css': 0,
+        'display.css': 25,
+        'electron-widget.html': 10,
+        'electron-clock-widget.html': 6
+    };
+
+    for (const [file, ceiling] of Object.entries(DEBT)) {
+        const actual = textGlowCount(read(file));
+        assert.ok(
+            actual <= ceiling,
+            `${file}: свечений через text-shadow/drop-shadow стало ${actual} при потолке ${ceiling} — ореол вернули`
+        );
+        assert.equal(
+            actual, ceiling,
+            `${file}: свечений осталось ${actual}, потолок ${ceiling}. Долг уменьшился — опустить число здесь`
+        );
+    }
+});
+
 test('разбор слоёв тени не путает свечение с кольцом, подъёмом и внутренней тенью', () => {
     // Проверка самой проверки. Без неё три предыдущих теста могли бы быть
     // зелёными потому, что ничего не находят в принципе.
@@ -163,6 +239,8 @@ test('разбор слоёв тени не путает свечение с к�
     assert.deepEqual(glowLayers('0 1px 3px rgba(0,0,0,0.2)'), [], 'подъём ручки тумблера — не свечение');
     assert.deepEqual(glowLayers('inset 0 0 15px rgba(0,0,0,0.5)'), [], 'внутренняя тень — не свечение');
     assert.deepEqual(glowLayers('none'), [], '`none` — не свечение');
+    assert.deepEqual(glowLayers('0 0 4px rgba(0,0,0,0.5)'), [], 'нейтральная мягкая тень — не свечение');
+    assert.deepEqual(glowLayers('0 0 6px #222222'), [], 'серая тень через hex — не свечение');
 
     assert.equal(glowLayers('0 0 25px rgba(48, 209, 88, 0.2)').length, 1, 'ореол обязан находиться');
     assert.equal(glowLayers('0 0 8px currentColor').length, 1, 'ореол через currentColor обязан находиться');
