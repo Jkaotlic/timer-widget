@@ -4146,3 +4146,18 @@ body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-r
     color: var(--tw-fg-dim);
 }
 body.state-input .panel-footer { display: none; }
+
+/* Поле ввода времени не рисует рамку НИ В ОДНОМ состоянии, включая фокус:
+   в макете на месте цифр только цифры и каретка. Правило идёт последним и
+   перечисляет :focus/:focus-visible явно — иначе общие правила для input в
+   этом файле возвращают коробку именно в фокусе, а поле в этом режиме
+   сфокусировано всегда. */
+.hero-input,
+.hero-input:hover,
+.hero-input:focus,
+.hero-input:focus-visible {
+    border: 0;
+    outline: 0;
+    box-shadow: none;
+    background: transparent;
+}
