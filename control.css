@@ -127,14 +127,15 @@ body::after {
     inset: 0;
     z-index: 0;
     border-radius: var(--tw-r-2xl);
-    background:
-        radial-gradient(ellipse at 30% 20%, rgba(88, 86, 214, 0.18) 0%, transparent 55%),
-        radial-gradient(ellipse at 70% 80%, rgba(0, 122, 255, 0.12) 0%, transparent 55%),
-        var(--tw-bg-surface-solid);
-    border: 1px solid var(--tw-border);
+    /* Одна плоская заливка. Два радиальных градиента (фиолетовый и синий) и
+       рамка 1px сняты редизайном 2026-08-12: в макете нет ни подцветки, ни
+       рамок — поверхности разделяют расстояние и тень. Тень остаётся: она
+       единственное, что отделяет панель от рабочего стола. */
+    background: var(--tw-bg-surface);
+    border: 0;
     box-shadow: var(--tw-shadow-panel);
-    backdrop-filter: var(--tw-blur);
-    -webkit-backdrop-filter: var(--tw-blur);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     pointer-events: none;
 }
 .control-panel {
@@ -230,9 +231,12 @@ body::after {
     width: 0;
     max-width: 0;
     min-width: 0;
-    background: rgba(22, 22, 28, 0.72);
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    /* Плотная заливка вместо стекла: блюр снят, а полупрозрачный ящик без него
+       показывал бы рабочий стол сквозь настройки. Токен, а не литерал — цвет
+       обязан приходить из каскада (docs/lessons.md, «Цвет — это переменная»). */
+    background: var(--tw-bg-glass);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: 1px solid transparent;
     box-shadow: none;
     display: flex;
@@ -945,8 +949,8 @@ body::after {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1px;
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .status-dot {
@@ -2945,8 +2949,8 @@ select optgroup,
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     z-index: 10001;
     display: flex;
     align-items: center;
@@ -3026,8 +3030,8 @@ select optgroup,
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     z-index: 10000;
     display: flex;
     align-items: center;
