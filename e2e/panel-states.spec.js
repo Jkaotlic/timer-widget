@@ -103,7 +103,7 @@ test.describe('панель: четыре состояния', () => {
 
         await expect(control.locator('body')).toHaveClass(/state-input/);
         expect(await primaryLabel(control)).toBe('Поставить');
-        expect(await shown(control, '#manualTimeInput')).toBe(true);
+        expect(await shown(control, '.time-entry')).toBe(true);
         expect(await shown(control, '#controlTime')).toBe(false);
         expect(await shown(control, '.transport-cancel')).toBe(true);
         expect(await shown(control, '.transport-reset')).toBe(false);
@@ -113,8 +113,9 @@ test.describe('панель: четыре состояния', () => {
     });
 
     test('введённое время доезжает до таймера, а «Отмена» возвращает в покой', async () => {
-        await control.fill('#manualTimeInput', '7:30');
-        await control.press('#manualTimeInput', 'Enter');
+        await control.fill('#manualMinutes', '7');
+        await control.fill('#manualSeconds', '30');
+        await control.press('#manualSeconds', 'Enter');
         await control.waitForTimeout(600);
 
         await expect(control.locator('body')).toHaveClass(/state-idle/);
@@ -127,17 +128,98 @@ test.describe('панель: четыре состояния', () => {
         await expect(control.locator('body')).toHaveClass(/state-idle/);
     });
 
-    test('поле ввода не рисует рамку — в макете на месте цифр только цифры', async () => {
+    test('ввод — ДВА поля, предзаполненных текущим временем', async () => {
+        // Слепленная строка «5:30» требовала помнить формат и попадать курсором
+        // в нужную позицию. Полей два, каждое принимает просто число.
+        await control.click('.preset[data-minutes="25"]');
+        await control.waitForTimeout(300);
         await control.click('#controlTime');
         await control.waitForTimeout(400);
+
         const box = await control.evaluate(() => {
-            const el = document.getElementById('manualTimeInput');
-            el.focus();
-            const cs = getComputedStyle(el);
-            return { border: cs.borderStyle, outline: cs.outlineStyle, shadow: cs.boxShadow };
+            const hrs = document.getElementById('manualHours');
+            const min = document.getElementById('manualMinutes');
+            const sec = document.getElementById('manualSeconds');
+            min.focus();
+            const cs = getComputedStyle(min);
+            return {
+                hrs: hrs.value,
+                min: min.value,
+                sec: sec.value,
+                focused: document.activeElement.id,
+                // Обводка фокуса — ВНУТРЕННЯЯ тень, а не border: рамка меняла бы
+                // размер поля и толкала соседнее.
+                border: cs.borderStyle,
+                shadow: cs.boxShadow
+            };
         });
+        expect(box.hrs).toBe('0');
+        expect(box.min).toBe('25');
+        expect(box.sec).toBe('00');
+        // Фокус начинается с МИНУТ: часы почти всегда нули, и начинать с них
+        // значило бы заставлять пропускать их каждый раз.
+        expect(box.focused).toBe('manualMinutes');
         expect(box.border).toBe('none');
-        expect(box.shadow).toBe('none');
+        expect(box.shadow).toContain('inset');
+
+        await control.click('#manualCancel');
+        await control.waitForTimeout(300);
+    });
+
+    test('двоеточие переводит из минут в секунды — «7:30» набирается подряд', async () => {
+        await control.click('#controlTime');
+        await control.waitForTimeout(400);
+        await control.keyboard.type('7');
+        await control.keyboard.press(':');
+        await control.keyboard.type('30');
+        await control.waitForTimeout(200);
+        const where = await control.evaluate(() => ({
+            focused: document.activeElement.id,
+            min: document.getElementById('manualMinutes').value,
+            sec: document.getElementById('manualSeconds').value
+        }));
+        expect(where.focused).toBe('manualSeconds');
+        expect(where.min).toBe('7');
+        expect(where.sec).toBe('30');
+
+        await control.keyboard.press('Enter');
+        await control.waitForTimeout(500);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('07:30');
+    });
+
+    test('часы отдельным полем: 1:30:00 набирается без счёта в уме', async () => {
+        await control.click('#controlTime');
+        await control.waitForTimeout(400);
+        await control.fill('#manualHours', '1');
+        await control.fill('#manualMinutes', '30');
+        await control.fill('#manualSeconds', '0');
+        await control.press('#manualSeconds', 'Enter');
+        await control.waitForTimeout(600);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('1:30:00');
+    });
+
+    test('минуты больше 59 — тоже опечатка: для этого и есть часы', async () => {
+        await control.click('#controlTime');
+        await control.waitForTimeout(400);
+        await control.fill('#manualMinutes', '90');
+        await control.press('#manualMinutes', 'Enter');
+        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
+        await control.click('#manualCancel');
+        await control.waitForTimeout(300);
+    });
+
+    test('секунды больше 59 — опечатка, а не «ещё минута»', async () => {
+        await control.click('#controlTime');
+        await control.waitForTimeout(400);
+        await control.fill('#manualMinutes', '5');
+        await control.fill('#manualSeconds', '75');
+        await control.press('#manualSeconds', 'Enter');
+        await control.waitForTimeout(400);
+
+        // Молча перенести 75 секунд в минуты значило бы поставить не то время,
+        // что набрано. Панель остаётся в вводе и помечает поле.
+        await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.click('#manualCancel');
         await control.waitForTimeout(300);
     });

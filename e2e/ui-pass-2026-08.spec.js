@@ -40,8 +40,11 @@ test('часовая стрелка виджета движется', async () =
     await control.waitForTimeout(500);
     await control.click('#controlTime');
     await control.waitForTimeout(300);
-    await control.fill('#manualTimeInput', '1:30:00');
-    await control.press('#manualTimeInput', 'Enter');
+    // Полей три: часы отдельно, поэтому минуты ограничены 59, как и секунды.
+    await control.fill('#manualHours', '1');
+    await control.fill('#manualMinutes', '30');
+    await control.fill('#manualSeconds', '0');
+    await control.press('#manualSeconds', 'Enter');
     await widget.waitForSelector('#widgetAnalog.active');
     await widget.waitForTimeout(500);
 
