@@ -299,6 +299,7 @@ class DisplayTimer {
     }
 
     initProgress() {
+        this.displayProgressFill = document.getElementById('displayProgressFill');
         this.progressRing.style.strokeDasharray = `${this.circumference}`;
         this.progressRing.style.strokeDashoffset = this.circumference;
     }
@@ -1452,8 +1453,23 @@ class DisplayTimer {
             const offset = this.circumference - (ratio * this.circumference);
             this.progressRing.style.strokeDashoffset = offset;
 
+            // Полоса по нижнему краю показывает ПРОЙДЕННОЕ, а кольцо —
+            // оставшееся: у полосы нет начала отсчёта по кругу, и «пустая
+            // слева» читается как «ещё не начали». Источник у обеих один —
+            // calculateProgressValue(), второго счёта времени тут нет.
+            if (this.displayProgressFill) {
+                this.displayProgressFill.style.width = ((1 - ratio) * 100) + '%';
+            }
+
             // Цветовые предупреждения
             const band = this._colorBand(Math.floor(this.remainingSeconds));
+
+            // Полосу красит КЛАСС на <body>, а не инлайн: цвет в этом проекте
+            // принадлежит каскаду. Полоса лежит вне всех пяти контейнеров
+            // стилей, поэтому и класс общий, на body.
+            document.body.classList.toggle('overtime', band === 'overtime');
+            document.body.classList.toggle('warning', band === 'warning');
+            document.body.classList.toggle('danger', band === 'danger');
 
             this.progressRing.classList.remove('warning', 'danger', 'overtime');
             this.timeDisplay.classList.remove('warning', 'danger', 'overtime');

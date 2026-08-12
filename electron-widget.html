@@ -125,10 +125,13 @@
         }
 
         /* Glass face backdrop behind the ring */
+        /* Подложки нет. Редизайн 2026-08-12: на любом фоне читаются только
+           цифры, тонкая дуга и мягкая тень под текстом. Заливка круга шла из
+           настроек фона ДИСПЛЕЯ (своего контрола «фон виджета» в панели нет
+           вообще) — то есть она ещё и была чужой. */
         .bg-circle {
-            fill: var(--widget-bg-fill, var(--tw-bg-timer));
-            stroke: var(--tw-border-strong);
-            stroke-width: 1.5;
+            fill: none;
+            stroke: none;
         }
 
         /* Background image mode */
@@ -187,18 +190,16 @@
             stroke-width: 6;
             stroke-linecap: round;
             transition: stroke-dashoffset var(--tw-dur-slow) var(--tw-ease);
-            filter: drop-shadow(0 0 12px rgba(10, 132, 255, 0.35));
         }
 
         .progress-bar[data-status="warning"] {
             stroke: url(#warningGradient);
-            filter: drop-shadow(0 0 12px rgba(255, 193, 7, 0.4));
         }
 
         .progress-bar[data-status="danger"],
         .progress-bar[data-status="overtime"] {
             stroke: url(#dangerGradient);
-            filter: drop-shadow(0 0 14px rgba(255, 68, 68, 0.55));
+
             animation: pulse-glow 1s ease-in-out infinite;
         }
 
@@ -254,10 +255,9 @@
                мертвы, и полосам приходилось писать свой цвет инлайном тоже — а
                значит и СНИМАТЬ его вручную при возврате в норму. Ветка снятия
                и оказалась дырявой на свежем профиле. */
-            --glow-color: var(--timer-glow, rgba(10, 132, 255, 0.6));
-            text-shadow:
-                0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 20px var(--glow-color);
+            /* Ореол снят: цвет уже несёт состояние. Осталась мягкая тень —
+               она не красит, а отделяет цифры от произвольного фона. */
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
             transition: color var(--tw-dur-base) var(--tw-ease),
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
@@ -457,10 +457,9 @@
                [data-status] ниже перекрывают её каскадом. Свечение построено
                на currentColor, поэтому следует за цветом само. */
             color: var(--timer-color, var(--tw-led-green));
-            text-shadow:
-                0 0 10px currentColor,
-                0 0 20px currentColor,
-                0 0 40px color-mix(in srgb, currentColor 40%, transparent);
+            /* Неон снят. Цвет LED остался цветом состояния, но светиться
+               перестал: макет держит один приём тени на все пять стилей. */
+            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
             letter-spacing: 0.04em;
             white-space: nowrap;
             line-height: 1;
@@ -571,9 +570,7 @@
             font-size: 32px;
             font-weight: 700;
             color: var(--tw-red);
-            text-shadow:
-                0 2px 4px rgba(0, 0, 0, 0.5),
-                0 0 10px rgba(255, 69, 58, 0.5);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .widget-flip-minus.visible {
@@ -832,7 +829,7 @@
                не инлайном: инлайн бил бы правило [data-status] ниже. */
             color: var(--timer-analog-color, var(--tw-fg-muted));
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 0 10px var(--timer-analog-glow, rgba(10, 132, 255, 0.3));
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
         }
 
         /* Numerals 12/3/6/9 */
@@ -891,7 +888,7 @@
                когда-то имел в виду, но пользователь никогда не видел.
                Приводим правило к отрисованному, инлайн убираем. */
             color: rgba(255, 69, 58, 0.7);
-            text-shadow: 0 0 10px rgba(255, 69, 58, 0.5);
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
             animation: widget-analog-text-pulse 1s ease-in-out infinite;
         }
 

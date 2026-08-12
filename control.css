@@ -4285,3 +4285,29 @@ body.state-input .panel-footer { display: none; }
     border-color: var(--tw-blue);
     background: var(--tw-level-1);
 }
+
+/* ---------- ПОЛОСА: действие словом ---------- */
+.mini-action {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: none;
+    /* Чип, а не залитая кнопка: в полосе он стоит рядом со временем, и полная
+       заливка перетягивала бы на себя внимание с самого времени. */
+    background: color-mix(in srgb, var(--tw-blue) 16%, transparent);
+    color: var(--tw-blue);
+}
+[data-theme="light"] .mini-action { background: #f0f6ff; }
+body.state-idle  #miniBarStart,
+body.state-input #miniBarStart { display: block; }
+body.state-running  #miniBarPause,
+body.state-overtime #miniBarPause { display: block; }
+body.state-overtime #miniBarPause {
+    background: color-mix(in srgb, var(--tw-red) 16%, transparent);
+    color: var(--tw-red);
+}
