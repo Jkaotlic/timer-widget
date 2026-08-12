@@ -1051,6 +1051,55 @@ ipcMain.on('resize-control-window', (event, size) => {
     }
 });
 
+// Свёрнутое состояние окна управления — режим «полоса».
+//
+// Пол минимального размера (minHeight: 660) задан при создании окна, и снять
+// его из рендерера нельзя — поэтому режим живёт здесь. Порядок важен: сначала
+// снять пол, потом сжимать, иначе setSize молча обрежется до 660 и получится
+// худшее из двух состояний — окно панелью, разметка полосой.
+//
+// Верхний край держится намеренно: полоса встаёт туда, где был титлбар, и
+// шеврон не убегает из-под курсора, который по нему кликнул. Правило проекта
+// «держать ЦЕНТР при изменении размера» относится к Ctrl+колесу в виджете и
+// часах, где содержимое растёт вокруг себя и курсор ни к чему не привязан;
+// здесь источник — клик по конкретной кнопке вверху окна.
+let controlBoundsBeforeCollapse = null;
+
+ipcMain.on('control-collapse', (_event, payload) => {
+    if (!controlWindow || controlWindow.isDestroyed() || !payload || typeof payload !== 'object') { return; }
+    const collapsed = payload.collapsed === true;
+    const [curW] = controlWindow.getSize();
+
+    if (collapsed) {
+        // Высота приходит из рендерера (её знает CSS), но доверять ей нельзя:
+        // это тот же непроверенный payload, что и во всех остальных
+        // обработчиках размеров.
+        const raw = Number.isFinite(payload.height) ? payload.height : 52;
+        const barHeight = Math.max(36, Math.min(120, Math.round(raw)));
+
+        controlBoundsBeforeCollapse = controlWindow.getBounds();
+        const { x, y } = controlBoundsBeforeCollapse;
+        controlWindow.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, 1);
+        controlWindow.setSize(curW, barHeight);
+        controlWindow.setPosition(x, y);   // держим ВЕРХНИЙ край
+        controlWindow.setAlwaysOnTop(true);
+        return;
+    }
+
+    // Разворот: пол возвращается ДО восстановления границ, иначе окно можно
+    // оставить панелью высотой 52 — это обрезанная раскладка, которую чинила
+    // задача про минимальную высоту.
+    controlWindow.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+    controlWindow.setAlwaysOnTop(false);
+    const prev = controlBoundsBeforeCollapse;
+    if (prev) {
+        controlWindow.setBounds(prev);
+        controlBoundsBeforeCollapse = null;
+    } else {
+        controlWindow.setSize(curW, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+    }
+});
+
 // Per-window color updates (independent themes)
 ipcMain.on('widget-colors-update', (_event, colors) => {
     lastWidgetColors = colors;

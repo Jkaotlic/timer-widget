@@ -135,6 +135,7 @@
       "modal-manager.js",
       "shortcuts-help.js",
       "onboarding.js",
+      "mini-bar.js",
       "custom-sounds.js",
       "local-background.js",
     "theme-grid.js",

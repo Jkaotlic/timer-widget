@@ -3608,3 +3608,122 @@ textarea:focus-visible,
     .main-controls { padding: 4px var(--panel-inset) 6px; }
     .footer-hints { padding: 4px var(--panel-inset) 6px; }
 }
+
+/* ============ Режим «полоса» ============
+   Полоса — второе состояние ОКНА, а не отдельное окно: `body.collapsed`
+   прячет всё, кроме неё. Прятать секции инлайновым стилем нельзя — тогда
+   состояние окажется в двух местах сразу (класс и атрибут), поэтому правит
+   один селектор.
+
+   Блок стоит в КОНЦЕ файла: он перекрывает безусловные правила «Compact
+   panel», а при равной специфичности выигрывает то, что ниже. Первая версия
+   блока про низкое окно лежала выше и не действовала вообще — тот же файл,
+   та же ошибка, разбор в docs/lessons.md.
+
+   Размер окна меняет главный процесс (канал control-collapse): пол
+   minHeight: 660 снимается только там. Замеряется e2e/mini-bar.spec.js. */
+.mini-bar { display: none; }
+
+body.collapsed .control-panel > *:not(.mini-bar) { display: none; }
+body.collapsed .settings-drawer { display: none; }
+body.collapsed .app-shell,
+body.collapsed .control-panel {
+    height: 100vh;
+    max-height: 100vh;
+}
+/* Подложка окна в свёрнутом виде — ровная. Два радиальных градиента
+   («ellipse at 30% 20%» и «at 70% 80%») рассчитаны на панель в 700px: на
+   высоте 52px эллипсы сжимаются в поперечные полосы и красят почти всю
+   поверхность. Замер разницы «плоская подложка против исходной» на живом
+   окне: 64,7% пикселей расходятся сильнее порога 8/255, максимум 58 —
+   то есть правило не косметическое, эффект больше, чем визуальная сверка
+   вообще считает изменением. Радиус уменьшен по той же причине: 20px на
+   52px высоты съедают углы почти до овала. */
+body.collapsed .app-shell::before {
+    background: var(--tw-bg-surface-solid);
+    border-radius: var(--tw-r-lg);
+}
+
+body.collapsed .mini-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--tw-s-2);
+    height: 52px;
+    padding: 0 var(--panel-inset);
+    /* Полоса сама себе титлбар: её тянут за неё саму. Кнопки внутри —
+       no-drag, иначе клик по ним превратится в перетаскивание окна. */
+    app-region: drag;
+    -webkit-app-region: drag;
+    user-select: none;
+}
+body.collapsed .mini-bar button {
+    app-region: no-drag;
+    -webkit-app-region: no-drag;
+}
+
+.mini-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    /* Полосу состояния ставит JS классом, а значение берётся из тех же
+       токенов, что у виджета и дисплея: палитра статусов одна на все окна. */
+    background: var(--tw-fg-dim);
+}
+.mini-dot.ok      { background: var(--tw-green); }
+.mini-dot.warning { background: var(--tw-yellow); }
+.mini-dot.danger  { background: var(--tw-red); }
+
+.mini-time {
+    font-family: var(--tw-font-display);
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    color: var(--tw-fg);
+    line-height: 1;
+}
+.mini-spacer { flex: 1 1 auto; }
+.mini-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--tw-divider);
+    flex: 0 0 auto;
+}
+.mini-btn {
+    width: var(--tw-hit-min);
+    height: var(--tw-hit-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--tw-border);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--tw-fg-muted);
+    cursor: pointer;
+    font-size: 13px;
+}
+.mini-btn:hover { background: var(--tw-level-2); color: var(--tw-fg); }
+.mini-btn:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
+.mini-start { color: var(--tw-green); border-color: var(--tw-green); }
+
+/* Сообщения в свёрнутом состоянии.
+   Контейнер тостов прибит к нижнему краю окна (bottom: --tw-s-10 = 40px) —
+   это правка прохода по дефектам, там тост ложился на герой-время. В окне
+   высотой 52px тот же отступ выносит тост ЗА верхний край: замер дал верх
+   тоста на отметке -46, то есть сообщение читать нечем.
+
+   Здесь тост встаёт по центру полосы и на её время подменяет собой её
+   содержимое: терять сообщение нельзя (так приходит и уведомление о
+   восстановлении после сбоя), а разворачивать окно ради него — значит менять
+   режим, который выбрал пользователь. Через 3.5 секунды полоса возвращается.
+   Замеряется e2e/mini-bar.spec.js. */
+body.collapsed .toast-container {
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+}
+body.collapsed .toast {
+    max-width: calc(100% - 2 * var(--panel-inset));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

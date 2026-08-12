@@ -56,6 +56,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `modal-manager.js` | `openModal`/`closeModal` with focus trap and focus return |
 | `shortcuts-help.js` | The F1 shortcuts overlay |
 | `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown`, ставится ДО показа — иначе перезапуск во время задержки показал бы её второй раз) и кнопка «Проверить обновления». Зависимости внедряются, поэтому модуль проверяется в Node на поддельных `document`/`localStorage`; в панели вызов занимает одну строку, потому что она упирается в потолок размера |
+| `mini-bar.js` | Режим «полоса»: окно управления схлопывается в строку 400×52 — точка состояния, время, транспорт, шеврон разворота. Класс `collapsed` на `<body>` — единственное, что модуль знает о вёрстке; DOM самой полосы (время, точка, кнопки, двойной клик) принадлежит ему, панель отдаёт только ЗНАЧЕНИЯ через `render({text, band})`. Размер окна меняет главный процесс по каналу `control-collapse`: пол `minHeight: 660` снимается только там. Зависимости внедряются, поэтому режим проверяется в Node на поддельных `document`/`ipc` |
 | `scale-input.js` | Click-to-edit / double-click-to-reset on scale percentages |
 | `font-select.js` | The font list of the «Цифры» style: `div.font-select` impersonates a form control with `.value`. Three independent instances (widget/clock/display) in one document, so an option's `id` carries its container's id. A native `<select>` cannot be used: on macOS the popup is drawn by the system and `font-family` on `<option>` is ignored — the preview, which is the whole point, would not render |
 
@@ -126,6 +127,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `open-display` / `close-display` | Toggle display window |
 | `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
 | `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
+| `control-collapse` | `{ collapsed, height }` — свернуть окно управления в полосу или развернуть обратно. Отдельный канал, потому что `resize-control-window` зажимает высоту снизу минимумом окна (660) и полоса в 52px через него недостижима. Снимает и возвращает пол `minHeight`, поднимает полосу поверх окон, держит ВЕРХНИЙ край; `height` из рендерера зажимается в 36…120 |
 | `widget-resize` / `widget-move` / `widget-set-position` | Widget geometry |
 | `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
 | `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |

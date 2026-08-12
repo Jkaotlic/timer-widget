@@ -254,3 +254,39 @@ test('мёртвые правила CSS удалены', () => {
     assert.match(HTML, /<span class="arrow" aria-hidden="true">/, 'стрелка аккордеона исчезла из разметки');
     assert.match(CSS, /\.faq-question \.arrow/, 'стиль стрелки аккордеона исчез');
 });
+
+test('кнопки режима полосы достижимы и названы', () => {
+    // Кнопка без доступного имени — это кнопка, которой нет для скринридера.
+    // Шеврон нарисован глифом, поэтому имя обязано быть в aria-label.
+    for (const id of ['miniBarToggle', 'miniBarExpand']) {
+        const tag = new RegExp(`<button[^>]*id="${id}"[^>]*>`).exec(HTML_CODE);
+        assert.ok(tag, `кнопки #${id} нет в разметке`);
+        assert.match(tag[0], /aria-label="[^"]+"/, `#${id} без доступного имени`);
+    }
+
+    // Полоса не прячется инлайновым стилем: состояние несёт класс на <body>,
+    // иначе его нельзя перекрыть из CSS и невозможно проверить кликом.
+    const bar = /<div[^>]*id="miniBar"[^>]*>/.exec(HTML_CODE);
+    assert.ok(bar, 'блока #miniBar нет в разметке');
+    assert.doesNotMatch(bar[0], /style="[^"]*display:\s*none/);
+});
+
+test('каждая буквенная горячая клавиша панели описана в обеих справках', () => {
+    // Списков справки ДВА — накладка по F1 (shortcuts-help.js) и раздел в
+    // модалке справки (разметка панели), — и оба ведутся руками. Клавиша,
+    // которой нет в списке, — это клавиша, о которой никто не узнает; клавиша
+    // в одном списке из двух — это ещё и расхождение между ними.
+    //
+    // Источник правды — сам обработчик: из него и берётся набор букв.
+    const handled = [...HTML_CODE.matchAll(/event\.code === 'Key([A-Z])'/g)].map((m) => m[1]);
+    assert.ok(handled.length >= 5, `буквенных клавиш найдено подозрительно мало: ${handled.length}`);
+
+    const overlay = fs.readFileSync(path.join(ROOT, 'shortcuts-help.js'), 'utf8');
+    const missingOverlay = handled.filter((k) => !new RegExp(`\\['${k}',`).test(overlay));
+    assert.deepStrictEqual(missingOverlay, [], `нет в накладке F1: ${missingOverlay.join(', ')}`);
+
+    const missingModal = handled.filter(
+        (k) => !new RegExp(`<span class="key">${k}</span>`).test(HTML_CODE)
+    );
+    assert.deepStrictEqual(missingModal, [], `нет в справке панели: ${missingModal.join(', ')}`);
+});

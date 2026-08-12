@@ -69,3 +69,41 @@ test('control window uses a transparent native surface for rounded corners', () 
     assert.match(source, /backgroundColor:\s*__screenshotMode\s*\?\s*'#000000'\s*:\s*'#00000000'/);
     assert.match(source, /hasShadow:\s*false/);
 });
+
+// ---------------------------------------------------------------------------
+// Режим «полоса»: свёртывание окна управления
+// ---------------------------------------------------------------------------
+
+const { codeOnly } = require('./helpers/source-scan.js');
+
+test('свёртывание в полосу снимает пол минимального размера и возвращает его', () => {
+    // Окно управления создаётся с minHeight: 660. Полоса — 52px, то есть НИЖЕ
+    // пола, и без setMinimumSize запрос на сжатие молча обрезается до 660:
+    // окно осталось бы панелью, а разметка уже переключилась бы в полосу.
+    // Возврат пола обязателен: без него окно можно было бы растянуть мышью в
+    // панель высотой 52 и получить обрезанную раскладку — ровно тот дефект,
+    // который чинила задача про минимальную высоту.
+    const src = codeOnly(source);
+    const handler = /ipcMain\.on\('control-collapse'[\s\S]*?\n\}\);/.exec(src);
+    assert.ok(handler, 'обработчика control-collapse нет');
+
+    assert.match(
+        handler[0],
+        /setMinimumSize\(\s*CONFIG\.CONTROL_WINDOW_MIN_WIDTH\s*,\s*1\s*\)/,
+        'пол не снимается перед сжатием'
+    );
+    assert.match(
+        handler[0],
+        /setMinimumSize\(\s*CONFIG\.CONTROL_WINDOW_MIN_WIDTH\s*,\s*CONFIG\.CONTROL_WINDOW_MIN_HEIGHT\s*\)/,
+        'пол не возвращается при развороте'
+    );
+    assert.match(handler[0], /setAlwaysOnTop\(/, 'полоса не поднимается поверх окон');
+    // Payload — не доверенный: высота обязана проверяться, как во всех
+    // остальных обработчиках размеров.
+    assert.match(handler[0], /Number\.isFinite\(/, 'высота из рендерера не проверяется');
+});
+
+test('канал control-collapse объявлен в whitelist', () => {
+    const validator = require('../channel-validator.js');
+    assert.ok(validator.ALLOWED_CHANNELS.send.includes('control-collapse'));
+});
