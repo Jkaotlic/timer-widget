@@ -3735,3 +3735,414 @@ body.collapsed .toast {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ============================================================================
+   РЕДИЗАЙН 2026-08-12 · ТЕЛО ПАНЕЛИ
+   ----------------------------------------------------------------------------
+   Числа взяты из макета «Редизайн — все окна», не выдуманы. Ни одной карточки
+   и ни одной рамки: поверхности разделяют расстояние и одна заливка.
+
+   Блок стоит В КОНЦЕ файла намеренно — control.css подключается последним из
+   трёх таблиц окна, а внутри него последним идёт этот блок. Так новая вёрстка
+   перекрывает старые правила, не требуя их удаления построчно.
+   ========================================================================== */
+
+/* Палитра тела панели. Значения макета, объявленные ОДИН раз: цвет обязан
+   приходить из каскада, а не из литерала в каждом правиле. Здесь — тёмная
+   тема (она же общий :root), ниже — светлая. */
+.control-panel {
+    --p-fill:        rgba(255, 255, 255, 0.08);
+    --p-fill-weak:   rgba(255, 255, 255, 0.05);
+    --p-row-active:  rgba(255, 255, 255, 0.05);
+    --p-icon-off:    rgba(255, 255, 255, 0.08);
+    --p-track-off:   rgba(255, 255, 255, 0.14);
+    --p-track-on:    #30d158;
+    --p-knob:        #ffffff;
+    --p-progress-tr: rgba(255, 255, 255, 0.10);
+}
+[data-theme="light"] .control-panel {
+    --p-fill:        #f5f5f7;
+    --p-fill-weak:   #f5f5f7;
+    --p-row-active:  #f7f7f9;
+    --p-icon-off:    #f0f0f3;
+    --p-track-off:   #e4e4e9;
+    --p-progress-tr: #f0f0f3;
+}
+
+/* ---------- ГЕРОЙ ---------- */
+.hero {
+    padding: 14px 24px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+.hero-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--tw-fg-dim);
+}
+/* Точка состояния: 7px, и её НЕТ в покое — там нечему пульсировать. */
+.hero-label .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: none;
+}
+body.state-running .hero-label .status-dot,
+body.state-overtime .hero-label .status-dot { display: block; }
+body.state-running  .hero-label { color: var(--tw-green); }
+body.state-overtime .hero-label { color: var(--tw-red); }
+body.state-input    .hero-label { color: var(--tw-blue); }
+
+.control-panel .timer-display-main {
+    font-size: 76px;
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--tw-fg);
+    cursor: pointer;
+    /* Знак выносится абсолютом, поэтому у надписи собственная ширина: иначе
+       минус сдвинул бы ЦИФРЫ, а центрируются именно они. */
+    position: relative;
+    width: fit-content;
+}
+.control-panel .timer-display-main .tm-sign {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.62em;
+    margin-right: 0.1em;
+}
+body.state-overtime .control-panel .timer-display-main,
+body.state-overtime .timer-display-main { color: var(--tw-red); }
+
+/* Ввод занимает МЕСТО цифр и повторяет их начертание — чтобы «нажал на время
+   и печатаешь» читалось как одно движение, а не как прыжок в другое поле. */
+.hero-input {
+    display: none;
+    width: 100%;
+    text-align: center;
+    background: transparent;
+    border: 0;
+    outline: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: 76px;
+    font-weight: 200;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--tw-fg);
+    caret-color: var(--tw-blue);
+}
+body.state-input .hero-input { display: block; }
+body.state-input .timer-display-main { display: none; }
+
+.hero-hint {
+    font-size: 11.5px;
+    color: var(--tw-fg-dim);
+    text-align: center;
+}
+
+/* ---------- ПОЛОСА ПРОГРЕССА ---------- */
+.panel-progress {
+    height: 3px;
+    margin-top: 20px;
+    background: var(--p-progress-tr);
+    display: none;
+}
+body.state-running .panel-progress,
+body.state-overtime .panel-progress { display: block; }
+.panel-progress-fill {
+    display: block;
+    height: 3px;
+    width: 0;
+    background: var(--tw-green);
+    transition: width var(--tw-dur-base) var(--tw-ease);
+}
+body.state-overtime .panel-progress    { background: rgba(255, 69, 58, 0.22); }
+body.state-overtime .panel-progress-fill { background: var(--tw-red); width: 100%; }
+
+/* ---------- ПРЕСЕТЫ ---------- */
+.presets {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 22px 20px 0;
+}
+body:not(.state-idle) .presets { display: none; }
+.preset {
+    height: 34px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--p-fill);
+    color: var(--tw-fg);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--tw-dur-fast) var(--tw-ease);
+}
+.preset:hover { background: var(--tw-level-3); }
+.preset.active {
+    background: var(--tw-blue);
+    color: var(--tw-on-accent);
+    font-weight: 600;
+}
+.preset-custom {
+    font-size: 12px;
+    color: var(--tw-fg-muted);
+}
+
+/* ---------- ТРАНСПОРТ ---------- */
+.transport {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px 0;
+}
+.transport-main {
+    flex: 1;
+    height: 48px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--p-fill);
+    color: var(--tw-fg);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.transport-key {
+    font-family: var(--tw-font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--tw-fg-dim);
+}
+/* Покой и ввод ведёт синяя кнопка, отсчёт — нейтральная, перерасход — красная.
+   Подсказка клавиши на залитой кнопке гасится прозрачностью, а не своим
+   цветом: у неё один фон с текстом, и второй токен тут только разошёлся бы. */
+body.state-idle  #startBtn,
+body.state-input #startBtn { display: inline-flex; background: var(--tw-blue); color: var(--tw-on-accent); }
+body.state-idle  #startBtn .transport-key,
+body.state-input #startBtn .transport-key { color: currentColor; opacity: 0.72; }
+body.state-running  #pauseBtn { display: inline-flex; }
+body.state-overtime #pauseBtn { display: inline-flex; background: var(--tw-red); color: var(--tw-on-accent); }
+body.state-overtime #pauseBtn .transport-key { color: currentColor; opacity: 0.72; }
+
+.transport-reset {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 12px;
+    background: var(--p-fill);
+    color: var(--tw-fg-muted);
+    font-size: 16px;
+    cursor: pointer;
+}
+.transport-cancel {
+    width: 88px;
+    height: 48px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 12px;
+    background: var(--p-fill);
+    color: var(--tw-fg-muted);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    display: none;
+    cursor: pointer;
+}
+body.state-input .transport-cancel { display: block; }
+body.state-input .transport-reset  { display: none; }
+
+/* ---------- РЯД ± ---------- */
+.adjust {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 10px 20px 0;
+}
+body.state-idle .adjust,
+body.state-overtime .adjust { display: none; }
+.adjust-btn {
+    height: 32px;
+    /* Залитая и БЕЗ рамки. Макет рисует этот ряд двумя разными способами —
+       белым с рамкой в кадре отсчёта и залитым в кадре ввода. При манифесте
+       «ни одной карточки и рамки» верен залитый. */
+    border: 0;
+    border-radius: 10px;
+    background: var(--p-fill-weak);
+    color: var(--tw-fg-muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.adjust-btn:hover { background: var(--tw-level-3); }
+
+/* ---------- ДВЕ НАСТРОЙКИ ОТСЧЁТА (только при вводе) ---------- */
+.input-extras { display: none; padding: 24px 20px 0; }
+body.state-input .input-extras { display: block; }
+.srow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 0 14px;
+}
+.srow-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.srow-name { font-size: 14px; font-weight: 500; color: var(--tw-fg); }
+.srow-sub  { font-size: 11.5px; color: var(--tw-fg-dim); }
+.srow-input {
+    width: 96px;
+    height: 36px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 10px;
+    background: var(--p-fill);
+    color: var(--tw-fg-dim);
+    font-family: inherit;
+    font-size: 14px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- ТУМБЛЕР ---------- */
+.switch { position: relative; display: block; width: 42px; height: 25px; flex: 0 0 auto; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 13px;
+    background: var(--p-track-off);
+    pointer-events: none;
+    transition: background var(--tw-dur-fast) var(--tw-ease);
+}
+.switch-track::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: var(--p-knob, #fff);
+    /* Подъём ручки макет СОХРАНЯЕТ — это тень, а не ореол. */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform var(--tw-dur-fast) var(--tw-ease);
+}
+.switch input:checked + .switch-track { background: var(--p-track-on); }
+.switch input:checked + .switch-track::after { transform: translateX(17px); }
+
+/* ---------- СТРОКИ ОКОН ---------- */
+.control-panel .group-title {
+    padding: 26px 20px 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--tw-fg-dim);
+    text-align: left;
+}
+.wrows { display: flex; flex-direction: column; padding: 6px 12px 0; }
+.wrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 8px;
+    border-radius: 12px;
+}
+.wrow:has(.wrow-toggle.active),
+.wrow:has(.wrow-toggle[aria-checked="true"]) { background: var(--p-row-active); }
+
+.wrow-icon {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    background: var(--p-icon-off);
+    color: var(--tw-fg-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.wrow-icon svg { width: 15px; height: 15px; }
+.wrow:has(.wrow-toggle.active) .wrow-icon,
+.wrow:has(.wrow-toggle[aria-checked="true"]) .wrow-icon {
+    background: var(--tw-blue);
+    color: var(--tw-on-accent);
+}
+
+.wrow-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wrow-name { font-size: 14px; font-weight: 500; color: var(--tw-fg); }
+.wrow-sub  { font-size: 11.5px; color: var(--tw-fg-dim); }
+/* Включённая строка говорит СОСТОЯНИЕ, а не описание, и говорит его цветом
+   полосы: зелёным в норме, красным в перерасходе. */
+.wrow:has(.wrow-toggle.active) .wrow-sub,
+.wrow:has(.wrow-toggle[aria-checked="true"]) .wrow-sub { color: var(--tw-green); }
+body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-red); }
+
+.wrow-chevron {
+    flex: 0 0 auto;
+    border: 0;
+    background: none;
+    padding: 0 4px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--tw-fg-dim);
+    cursor: pointer;
+}
+.wrow-chevron:hover { color: var(--tw-fg); }
+
+/* Тумблер строки — это КНОПКА (за ней висит открытие окна), поэтому у неё нет
+   input, а состояние читается из .active, которое ставит обработчик окна. */
+.wrow-toggle {
+    position: relative;
+    width: 42px;
+    height: 25px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 13px;
+    background: var(--p-track-off);
+    cursor: pointer;
+    transition: background var(--tw-dur-fast) var(--tw-ease);
+}
+.wrow-toggle.active,
+.wrow-toggle[aria-checked="true"] { background: var(--p-track-on); }
+.wrow-knob {
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: transform var(--tw-dur-fast) var(--tw-ease);
+}
+.wrow-toggle.active .wrow-knob,
+.wrow-toggle[aria-checked="true"] .wrow-knob { transform: translateX(17px); }
+
+/* ---------- ФУТЕР ---------- */
+.panel-footer {
+    padding: 20px 20px 18px;
+    text-align: center;
+    font-family: var(--tw-font-mono);
+    font-size: 11px;
+    color: var(--tw-fg-dim);
+}
+body.state-input .panel-footer { display: none; }

@@ -270,6 +270,33 @@ function pickOwnSetting(settings, ownKey, sharedKey) {
     return settings[ownKey] !== undefined ? settings[ownKey] : settings[sharedKey];
 }
 
+/**
+ * Час и минута, когда таймер дойдёт до нуля: «закончится в 14:50».
+ *
+ * Считается ОТ переданного момента, а не от new Date() внутри, — иначе
+ * функцию нельзя проверить, а её единственная интересная точка это переход
+ * через полночь.
+ *
+ * Отрицательный остаток — это перерасход: время окончания уже в прошлом, и
+ * подпись над ним меняется на «должно было закончиться в». Арифметика та же,
+ * поэтому знак здесь не особый случай.
+ *
+ * @param {number} remainingSeconds остаток, может быть отрицательным
+ * @param {Date}   now              момент отсчёта
+ * @returns {string|null} 'ЧЧ:ММ' либо null, если аргументы бессмысленны
+ */
+function endsAt(remainingSeconds, now) {
+    if (!Number.isFinite(remainingSeconds)) { return null; }
+    if (!(now instanceof Date) || Number.isNaN(now.getTime())) { return null; }
+
+    const end = new Date(now.getTime() + Math.round(remainingSeconds) * 1000);
+    if (Number.isNaN(end.getTime())) { return null; }
+
+    const hh = String(end.getHours()).padStart(2, '0');
+    const mm = String(end.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+}
+
 // ---------------------------------------------------------------------------
 // Exports — dual pattern identical to utils.js
 // ---------------------------------------------------------------------------
@@ -279,7 +306,8 @@ const RendererShared = {
     clampScale,
     timerLifecycleStatus,
     timerColorBand,
-    pickOwnSetting
+    pickOwnSetting,
+    endsAt
 };
 
 // Node.js (tests / main process)

@@ -5,7 +5,8 @@ const {
     flipCells,
     clampScale,
     timerLifecycleStatus,
-    timerColorBand
+    timerColorBand,
+    endsAt
 } = require('../renderer-shared');
 
 // ---------------------------------------------------------------------------
@@ -277,4 +278,40 @@ test('timerColorBand: мусорный ввод не роняет', () => {
     assert.equal(band(NaN, 300), 'danger');
     assert.equal(band(100, NaN), 'normal');
     assert.equal(band(undefined, undefined), 'normal');
+});
+
+// ---------------------------------------------------------------------------
+// endsAt — подпись «закончится в 14:50» под цифрами панели (редизайн 2026-08-12)
+// ---------------------------------------------------------------------------
+
+test('endsAt: прибавляет остаток к переданному моменту', () => {
+    const now = new Date(2026, 7, 12, 14, 32, 0);
+    assert.equal(endsAt(18 * 60 + 24, now), '14:50');
+});
+
+test('endsAt: перерасход даёт время в ПРОШЛОМ, а не ошибку', () => {
+    // Отрицательный остаток — это «должно было закончиться в». Отдельной ветки
+    // для знака нет и быть не должно: арифметика та же.
+    const now = new Date(2026, 7, 12, 14, 52, 0);
+    assert.equal(endsAt(-(2 * 60 + 14), now), '14:49');
+});
+
+test('endsAt: переход через полночь не ломает час', () => {
+    const now = new Date(2026, 7, 12, 23, 50, 0);
+    assert.equal(endsAt(20 * 60, now), '00:10');
+});
+
+test('endsAt: часы и минуты всегда двузначные', () => {
+    const now = new Date(2026, 7, 12, 8, 5, 0);
+    assert.equal(endsAt(0, now), '08:05');
+});
+
+test('endsAt: мусор даёт null, а не NaN в подписи', () => {
+    const now = new Date(2026, 7, 12, 10, 0, 0);
+    for (const junk of [NaN, Infinity, -Infinity, undefined, null, '10', {}]) {
+        assert.equal(endsAt(junk, now), null, `остаток ${String(junk)}`);
+    }
+    for (const badNow of [null, undefined, 0, 'сейчас', new Date('нет')]) {
+        assert.equal(endsAt(60, badNow), null, `момент ${String(badNow)}`);
+    }
 });

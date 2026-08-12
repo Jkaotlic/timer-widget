@@ -45,8 +45,8 @@ test('CONFIG.STORAGE_KEYS is an object with string values', () => {
     }
 });
 
-test('CONFIG.PRESET_DURATIONS holds the 8 keyboard-preset seconds', () => {
-    assert.deepEqual(CONFIG.PRESET_DURATIONS, [300, 600, 900, 1200, 1500, 1800, 2700, 3600]);
+test('CONFIG.PRESET_DURATIONS holds the 4 keyboard-preset seconds', () => {
+    assert.deepEqual(CONFIG.PRESET_DURATIONS, [300, 900, 1500, 2700]);
 });
 
 test('CONFIG.PRESET_DURATIONS is frozen (immutable)', () => {

@@ -111,14 +111,14 @@ test('Escape не закрывает окна поверх открытой мо
     assert.match(guard[0], /settingsDrawer/);
 });
 
-test('справка по F1 описывает реальные пресеты 1—8, а не выдуманные 1-5', () => {
+test('справка по F1 описывает реальные пресеты, а не выдуманные', () => {
     // Баг: в справке значилось «1-5 — пресеты (1, 5, 10, 15, 30 мин)», хотя
     // обработчик слушает Digit1..Digit8 и раскладывает 5..60 минут.
     // Оверлей справки переехал в shortcuts-help.js при декомпозиции панели, а
     // обработчик остался в electron-control.html — тест держит их согласованными.
     const help = read('shortcuts-help.js');
     assert.doesNotMatch(help, /'1-5', 'Быстрые пресеты/);
-    assert.match(help, /\['1—8', 'Пресеты: 5, 10, 15, 20, 25, 30, 45, 60 мин'\]/);
+    assert.match(help, /\['1—4', 'Пресеты: 5, 15, 25, 45 мин'\]/);
 
     // Набор пресетов в справке обязан совпадать с тем, что реально раскладывает
     // обработчик. Раньше здесь цементировался ЛИТЕРАЛ в панели — то есть тест
@@ -288,16 +288,24 @@ test('сохранённая позиция восстанавливается �
     // главный, если такого больше нет.
     assert.match(mainSource, /screen\.getAllDisplays\(\)\.find/);
     assert.match(mainSource, /\|\|\s*screen\.getPrimaryDisplay\(\)/);
-    // И поджимается ВЕСЬ прямоугольник, а не только угол: прежняя версия считала
-    // окно видимым по левому-верхнему углу, размер в проверке не участвовал, и
-    // крупное окно с точкой у края восстанавливалось на 12 % видимой ширины
-    // (замерено). Поэтому здесь обязан быть setBounds через общую арифметику, а
-    // не setPosition с сырой точкой.
+    // И решение принимается по ВИДИМОЙ ПОЛОСЕ, а не по попаданию угла.
+    // Прежняя версия считала окно видимым по левому-верхнему углу — размер в
+    // проверке не участвовал вовсе, и крупное окно с точкой у края
+    // восстанавливалось на 12 % видимой ширины (замерено). Сменившая её
+    // укладывала прямоугольник целиком — и отменяла НАМЕРЕННОЕ расположение
+    // внахлёст с краем (замерено: сохранено x = 3470 при экране 3440,
+    // восстановлено x = 3190). Поэтому здесь обязан быть setBounds через
+    // fitRestoredBounds с порогом видимости, а не setPosition с сырой точкой и
+    // не безусловная укладка целиком.
     const body = mainSource.match(/function positionWindowClamped\(win, payload\) \{[\s\S]*?\n\}/);
     assert.ok(body, 'тело positionWindowClamped не найдено');
-    assert.match(body[0], /win\.setBounds\(fitScaledBounds\(/);
+    assert.match(body[0], /win\.setBounds\(fitRestoredBounds\(/);
+    assert.match(body[0], /WINDOW_MIN_VISIBLE_PX/,
+        'порог видимости обязан участвовать, иначе правило снова «всё или ничего»');
     assert.doesNotMatch(body[0], /win\.setPosition\(/,
         'сырая установка позиции возвращает баг: окно уедет за край экрана');
+    assert.doesNotMatch(body[0], /win\.setBounds\(fitScaledBounds\(/,
+        'безусловная укладка целиком отменяет свисание за край');
     // Оба окна ходят через общий помощник.
     assert.match(mainSource, /ipcMain\.on\('widget-set-position',[\s\S]{0,120}?positionWindowClamped\(widgetWindow, payload\)/);
     assert.match(mainSource, /ipcMain\.on\('clock-widget-set-position',[\s\S]{0,120}?positionWindowClamped\(clockWidgetWindow, payload\)/);
@@ -332,7 +340,7 @@ test('лимит перерасхода реально доходит до дв�
     );
 
     // Поле видимое и живёт в строке, которая показывается вместе с минусом.
-    assert.match(controlHtml, /<div class="manual-time-row" id="overrunRow"/);
+    assert.match(controlHtml, /<div class="srow" id="overrunRow"/);
     assert.match(controlHtml, /id="overrunLimit"/);
     // Лимит досылается сразу, не дожидаясь следующей команды таймера.
     assert.match(controlHtml, /pushOverrunLimit\(\)\s*\{/);
@@ -527,8 +535,12 @@ test('подсветка быстрого выбора выводится из �
     assert.match(controlHtml, /this\.syncPresetHighlight\(\)/);
     assert.match(controlHtml, /this\.presetSeconds = Number\(state\.presetSeconds\) \|\| 0/);
 
-    const presetHandler = controlHtml.match(
-        /document\.querySelectorAll\('\.quick-preset'\)\.forEach\(btn => \{\s*\n\s*btn\.addEventListener\('click'[\s\S]*?\n {16}\}\);/
+    // Обработчик переехал в panel-state.js: потолок inline-скрипта выгнал
+    // проводку из панели. Ищем его там, где он теперь живёт, и по новому
+    // селектору `.preset[data-minutes]` — пятая ячейка «мин» не длительность.
+    const panelState = readRaw('panel-state.js');
+    const presetHandler = panelState.match(
+        /document\.querySelectorAll\('\.preset\[data-minutes\]'\)\.forEach\(btn => \{[\s\S]*?\}\);/
     );
     assert.ok(presetHandler, 'обработчик клика по пресету должен существовать');
     assert.doesNotMatch(presetHandler[0], /classList\.add\('active'\)/);

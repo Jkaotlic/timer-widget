@@ -48,96 +48,121 @@
             <button class="mini-btn" id="miniBarExpand" title="Развернуть (M)" aria-label="Развернуть панель">▴</button>
         </div>
 
-        <!-- Таймер -->
-        <div class="timer-header">
-            <h1 id="controlHeroLabel">Осталось</h1>
-            <div class="timer-display-main" id="controlTime"><span class="tm-sign" id="controlTimeSign"></span><span class="tm-digits" id="controlTimeDigits">00:00</span></div>
-            <div class="timer-status">
+        <!-- ГЕРОЙ. Порядок строк — из макета редизайна: подпись состояния СВЕРХУ
+             (в ней же точка), под ней цифры, под цифрами подсказка. Раньше точка
+             и подпись стояли ПОД цифрами; «Осталось» над отрицательным числом
+             читается неверно, и состояние теперь объявляется до числа. -->
+        <div class="hero" id="hero">
+            <div class="hero-label" id="controlHeroLabel">
                 <span class="status-dot" id="statusDot"></span>
-                <span id="statusText">готов</span>
+                <span id="statusText">Длительность</span>
             </div>
+            <div class="timer-display-main" id="controlTime" title="Нажмите, чтобы ввести своё время"><span class="tm-sign" id="controlTimeSign"></span><span class="tm-digits" id="controlTimeDigits">00:00</span></div>
+            <input type="text" id="manualTimeInput" class="hero-input" placeholder="0:00" autocomplete="off" spellcheck="false" aria-label="Ручной ввод времени" title="90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1 ч 30 мин">
+            <div class="hero-hint" id="heroHint">нажмите на время, чтобы ввести своё</div>
         </div>
 
-        <!-- Главные кнопки управления -->
-        <div class="main-controls">
-            <button class="main-btn pause" id="pauseBtn" title="Приостановить (Space)" aria-label="Приостановить" disabled>⏸</button>
-            <button class="main-btn start" id="startBtn" title="Запустить таймер (Space)" aria-label="Запустить таймер">▶</button>
-            <button class="main-btn reset" id="resetBtn" title="Сбросить к начальному значению (R)" aria-label="Сбросить">↺</button>
+        <!-- Прогресс полосой, а не кольцом. Во всю ширину панели, без радиуса. -->
+        <div class="panel-progress" id="panelProgress" role="presentation">
+            <span class="panel-progress-fill" id="panelProgressFill"></span>
         </div>
 
-        <!-- Быстрые пресеты: 2×4 сетка -->
-        <div class="compact-section">
-            <div class="group-title">БЫСТРЫЙ ВЫБОР</div>
-            <div class="quick-presets">
-                <button class="quick-preset" data-minutes="5">5 мин</button>
-                <button class="quick-preset" data-minutes="10">10 мин</button>
-                <button class="quick-preset" data-minutes="15">15 мин</button>
-                <button class="quick-preset" data-minutes="20">20 мин</button>
-                <button class="quick-preset" data-minutes="25">25 мин</button>
-                <button class="quick-preset" data-minutes="30">30 мин</button>
-                <button class="quick-preset" data-minutes="45">45 мин</button>
-                <button class="quick-preset" data-minutes="60">1 час</button>
-            </div>
+        <!-- ПРЕСЕТЫ: пять ячеек в ряд. Пятая — «мин», она не длительность, а
+             вход в ручной ввод. Видны только в покое. -->
+        <div class="presets" id="presetsRow">
+            <button class="preset" data-minutes="5">5</button>
+            <button class="preset" data-minutes="15">15</button>
+            <button class="preset" data-minutes="25">25</button>
+            <button class="preset" data-minutes="45">45</button>
+            <button class="preset preset-custom" id="presetCustom" title="Своё время">мин</button>
         </div>
 
-        <!-- Корректировка + ручной ввод -->
-        <div class="compact-section">
-            <div class="group-title">ТОЧНАЯ НАСТРОЙКА</div>
-            <div class="adjust-main-row">
-                <button class="adjust-main-btn minus" data-adjust="-3600">−1 ч</button>
-                <button class="adjust-main-btn minus" data-adjust="-300">−5 м</button>
-                <button class="adjust-main-btn minus" data-adjust="-60">−1 м</button>
-                <div class="adjust-divider"></div>
-                <button class="adjust-main-btn plus" data-adjust="60">+1 м</button>
-                <button class="adjust-main-btn plus" data-adjust="300">+5 м</button>
-                <button class="adjust-main-btn plus" data-adjust="3600">+1 ч</button>
-            </div>
-            <div class="manual-time-row">
-                <span class="manual-time-label">Точное время</span>
-                <input type="text" id="manualTimeInput" class="manual-time-input" placeholder="0:00" autocomplete="off" spellcheck="false" aria-label="Ручной ввод времени" title="Введите время: 90 = 90 сек, 5:30 = 5 мин 30 сек, 1:30:00 = 1ч 30 мин">
-                <button class="manual-time-apply" id="manualTimeApply" title="Установить время (Enter)" aria-label="Установить время">✓</button>
-            </div>
-            <div class="timer-mode-row">
-                <label class="timer-mode-label" for="allowNegative">
-                    <span class="timer-mode-icon" aria-hidden="true">∞</span>
-                    Считать ниже нуля
+        <!-- ТРАНСПОРТ. Действие названо СЛОВОМ с подсказкой клавиши. Кнопок в
+             разметке две, на экране всегда одна: состояние выбирает, какая. -->
+        <div class="transport">
+            <button class="transport-main start" id="startBtn" title="Запустить таймер (Space)" aria-label="Запустить таймер">Старт<span class="transport-key" aria-hidden="true">Space</span></button>
+            <button class="transport-main pause" id="pauseBtn" title="Приостановить (Space)" aria-label="Приостановить">Пауза<span class="transport-key" aria-hidden="true">Space</span></button>
+            <button class="transport-reset" id="resetBtn" title="Сбросить к начальному значению (R)" aria-label="Сбросить">↺</button>
+            <button class="transport-cancel" id="manualCancel" title="Отменить ввод (Esc)" aria-label="Отменить ввод">Отмена</button>
+        </div>
+
+        <!-- РЯД ±: четыре кнопки, залитые и БЕЗ рамки. Появляется только там,
+             где нужен, — в отсчёте и при ручном вводе. -->
+        <div class="adjust" id="adjustRow">
+            <button class="adjust-btn" data-adjust="-300">−5</button>
+            <button class="adjust-btn" data-adjust="-60">−1</button>
+            <button class="adjust-btn" data-adjust="60">+1</button>
+            <button class="adjust-btn" data-adjust="300">+5</button>
+        </div>
+
+        <!-- Две настройки отсчёта живут при ВВОДЕ: они про то, каким будет
+             таймер, а не про то, что показывать на экране. -->
+        <div class="input-extras" id="inputExtras">
+            <div class="srow">
+                <span class="srow-text">
+                    <span class="srow-name">Считать ниже нуля</span>
+                    <span class="srow-sub">после нуля таймер уходит в минус</span>
+                </span>
+                <!-- aria-label обязателен: видимая подпись лежит СОСЕДОМ, а не
+                     внутри <label>, поэтому имя чекбоксу больше ничем не даётся.
+                     tests/faq-and-hidden-controls.test.js проверяет это по всей
+                     панели и поймал ровно этот случай. -->
+                <label class="switch" title="Таймер продолжит отсчёт в минус после окончания">
+                    <input type="checkbox" id="allowNegative" aria-label="Считать ниже нуля">
+                    <span class="switch-track"></span>
                 </label>
-                <label class="toggle-switch" title="Таймер продолжит отсчёт в минус после окончания">
-                    <input type="checkbox" id="allowNegative">
-                    <span class="toggle-slider"></span>
-                </label>
             </div>
-            <!-- Жёсткий стоп перерасхода. Движок (timer-engine) умел это с самого
-                 начала, но UI был удалён, а getConfig() слал 0 — лимит нельзя было
-                 задать в принципе. Строка видна только когда включён минус. -->
-            <div class="manual-time-row" id="overrunRow" style="display: none;">
-                <span class="manual-time-label">Стоп на</span>
-                <input type="text" id="overrunLimit" class="manual-time-input" value="00:00"
+            <div class="srow" id="overrunRow">
+                <span class="srow-text">
+                    <span class="srow-name">Остановить на</span>
+                    <span class="srow-sub" id="overrunLimitHint">без лимита</span>
+                </span>
+                <input type="text" id="overrunLimit" class="srow-input" value="00:00"
                        autocomplete="off" spellcheck="false" aria-label="Лимит перерасхода"
                        title="Остановить таймер, уйдя в минус на столько: 90 = 90 сек, 5:00 = 5 мин. 00:00 — без лимита">
-                <span class="manual-time-hint" id="overrunLimitHint">без лимита</span>
             </div>
         </div>
 
-        <!-- Window buttons -->
-        <div class="compact-section">
-            <div class="group-title">ОКНА</div>
-            <div class="quick-windows">
-                <button class="quick-window-btn widget" id="openWidgetBtn" title="Компактный таймер поверх окон (W)"><span class="qw-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="5.2"/><path d="M8 6.4V9l1.8 1.1"/><path d="M6.2 2h3.6"/></svg></span><span class="qw-label">Виджет</span></button>
-                <button class="quick-window-btn clock" id="openClockBtn" title="Часы в реальном времени (C)"><span class="qw-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.4V8l2.6 1.6"/></svg></span><span class="qw-label">Часы</span></button>
-                <button class="quick-window-btn display" id="openDisplayBtn" title="Полноэкранный режим для презентаций (D)"><span class="qw-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"/><path d="M5.6 13.4h4.8"/><path d="M8 11v2.4"/></svg></span><span class="qw-label">Дисплей</span></button>
+        <!-- ПОКАЗАТЬ НА ЭКРАНЕ. Строка окна заменила и плитку «открыть», и
+             вкладку настроек: тумблер открывает окно, шеврон — его настройки.
+             Поэтому id кнопок и data-tab сохранены — за ними висят обработчики
+             открытия окон и ящика настроек. -->
+        <div class="group-title">Показать на экране</div>
+        <div class="wrows">
+            <div class="wrow">
+                <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="5.2"/><path d="M8 6.4V9l1.8 1.1"/><path d="M6.2 2h3.6"/></svg></span>
+                <span class="wrow-text"><span class="wrow-name">Виджет</span><span class="wrow-sub" id="subWidget">маленький таймер поверх окон</span></span>
+                <button class="wrow-chevron tab-btn" data-tab="timer" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки виджета" aria-label="Настройки виджета">›</button>
+                <button class="wrow-toggle quick-window-btn widget" id="openWidgetBtn" role="switch" aria-checked="false" title="Компактный таймер поверх окон (W)" aria-label="Виджет"><span class="wrow-knob" aria-hidden="true"></span></button>
+            </div>
+            <div class="wrow">
+                <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.4V8l2.6 1.6"/></svg></span>
+                <span class="wrow-text"><span class="wrow-name">Часы</span><span class="wrow-sub" id="subClock">текущее время и дата</span></span>
+                <button class="wrow-chevron tab-btn" data-tab="clock" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки часов" aria-label="Настройки часов">›</button>
+                <button class="wrow-toggle quick-window-btn clock" id="openClockBtn" role="switch" aria-checked="false" title="Часы в реальном времени (C)" aria-label="Часы"><span class="wrow-knob" aria-hidden="true"></span></button>
+            </div>
+            <div class="wrow">
+                <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"/><path d="M5.6 13.4h4.8"/><path d="M8 11v2.4"/></svg></span>
+                <span class="wrow-text"><span class="wrow-name">Дисплей</span><span class="wrow-sub" id="subDisplay">во весь экран, для проектора</span></span>
+                <button class="wrow-chevron tab-btn" data-tab="display" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки дисплея" aria-label="Настройки дисплея">›</button>
+                <button class="wrow-toggle quick-window-btn display" id="openDisplayBtn" role="switch" aria-checked="false" title="Полноэкранный режим для презентаций (D)" aria-label="Дисплей"><span class="wrow-knob" aria-hidden="true"></span></button>
+            </div>
+            <!-- Звуки — не окно, но раздел тех же настроек, и вход к ним обязан
+                 быть виден. Тумблер здесь означает звук вкл/выкл. -->
+            <div class="wrow">
+                <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.4 3.2 5.4 5.8H2.8v4.4h2.6l3 2.6z"/><path d="M11 6.2a2.6 2.6 0 0 1 0 3.6"/></svg></span>
+                <span class="wrow-text"><span class="wrow-name">Звуки</span><span class="wrow-sub" id="subSound">сигналы старта, минуты и финиша</span></span>
+                <button class="wrow-chevron tab-btn" data-tab="sound" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки звука" aria-label="Настройки звука">›</button>
+                <button class="wrow-toggle" id="soundMasterToggle" role="switch" aria-checked="true" title="Звук включён" aria-label="Звук"><span class="wrow-knob" aria-hidden="true"></span></button>
             </div>
         </div>
+
+        <!-- Подсказка клавиш моноширинным, по центру — последняя строка панели. -->
+        <div class="panel-footer" id="panelFooter">Space — старт · R — сброс · 1–4 — пресеты</div>
+
         <!-- Настройки (всегда видны) -->
         <div class="advanced-settings open" id="advancedSettings">
             <div class="content-section">
-                <div class="group-title">НАСТРОЙКИ</div>
-                <div class="tabs-row">
-                    <button class="tab-btn" data-tab="timer" aria-controls="settingsDrawer" aria-expanded="false">Виджет</button>
-                    <button class="tab-btn" data-tab="clock" aria-controls="settingsDrawer" aria-expanded="false">Часы</button>
-                    <button class="tab-btn" data-tab="display" aria-controls="settingsDrawer" aria-expanded="false">Дисплей</button>
-                    <button class="tab-btn" data-tab="sound" aria-controls="settingsDrawer" aria-expanded="false">Звуки</button>
-                </div>
 
                 <!-- Таб: Виджет -->
                 <div class="tab-content active" id="tab-timer">
@@ -697,7 +722,6 @@
 
             </div>
         </div>
-        <div class="footer-hints">Space — старт/пауза · R — сброс · 1-8 — пресеты</div>
     </div>
     <!-- role="region", а не "dialog": это раскрывающаяся панель, а не модальное
          окно. Модальность подразумевает ловушку фокуса и блокировку остального
@@ -753,7 +777,7 @@
                         <div class="faq-answer">
                             <ul>
                                 <li><strong>Быстрый выбор</strong> — восемь кнопок: 5, 10, 15, 20, 25, 30, 45 мин и 1 час</li>
-                                <li><strong>Клавиши 1–8</strong> — те же восемь пресетов, работают из любого окна</li>
+                                <li><strong>Клавиши 1–4</strong> — четыре пресета (5, 15, 25, 45 мин), работают из любого окна; <strong>5</strong> — своё время</li>
                                 <li><strong>Точное время</strong> — одно поле с умным разбором: <code>90</code> — это 90 секунд, <code>5:30</code> — 5 мин 30 с, <code>1:30:00</code> — 1 ч 30 мин. Максимум 99:59:59. Применить — <strong>Enter</strong> или <strong>✓</strong></li>
                                 <li><strong>± на ходу</strong> — кнопки −1 ч / −5 м / −1 м / +1 м / +5 м / +1 ч меняют время даже во время отсчёта</li>
                             </ul>
@@ -907,7 +931,8 @@
                                 <div class="shortcut"><span class="key">Space</span> <span class="shortcut-desc">Старт / Пауза</span></div>
                                 <div class="shortcut"><span class="key">S</span> <span class="shortcut-desc">Пауза</span></div>
                                 <div class="shortcut"><span class="key">R</span> <span class="shortcut-desc">Сброс к исходному значению</span></div>
-                                <div class="shortcut"><span class="key">1</span>–<span class="key">8</span> <span class="shortcut-desc">Пресеты: 5, 10, 15, 20, 25, 30, 45, 60 мин</span></div>
+                                <div class="shortcut"><span class="key">1</span>–<span class="key">4</span> <span class="shortcut-desc">Пресеты: 5, 15, 25, 45 мин</span></div>
+                                <div class="shortcut"><span class="key">5</span> <span class="shortcut-desc">Своё время</span></div>
                             </div>
                         </div>
                     </div>
@@ -999,6 +1024,7 @@
     <script src="shortcuts-help.js"></script>
     <script src="onboarding.js"></script>
     <script src="mini-bar.js"></script>
+    <script src="panel-state.js"></script>
     <script src="custom-sounds.js"></script>
     <script src="local-background.js"></script>
     <script src="theme-grid.js"></script>
@@ -1035,6 +1061,8 @@
                 this.isPaused = false;
                 this.lastTimestamp = 0;
                 this.soundEnabled = true; // overwritten by initTabs()
+                // Ручной ввод — состояние панели, а не поле сбоку.
+                this.inputMode = false;
                 this.lastUpdateCounter = -1;
                 this.wasFinished = false;
                 this.currentBgMode = 'solid';
@@ -1439,46 +1467,11 @@
                 // после ручного ввода времени, кнопок ±, горячих клавиш 1-8 или
                 // команды из другого окна подсвеченной оставалась кнопка, которая
                 // уже не соответствует таймеру.
-                document.querySelectorAll('.quick-preset').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const minutes = parseInt(btn.dataset.minutes);
-                        this.sendCommand('set', { seconds: minutes * 60 });
-                    });
-                });
 
-                // Кнопки корректировки времени на главном экране (+/- 1мин, 5мин, 1час)
-                document.querySelectorAll('.adjust-main-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        this.adjustTime(parseInt(btn.dataset.adjust));
-                    });
-                });
-
-                // Manual time input
-                const manualTimeInput = document.getElementById('manualTimeInput');
-                const manualTimeApply = document.getElementById('manualTimeApply');
-
-                // Smart manual time parsing — delegate to TimeUtils (utils.js)
-                const parseManualTime = (input) => TimeUtils.parseManualTime(input);
-
-                const applyManualTime = () => {
-                    const seconds = parseManualTime(manualTimeInput.value);
-                    if (seconds !== null) {
-                        ipcRenderer.send('timer-command', { type: 'set', seconds: seconds });
-                        manualTimeInput.value = '';
-                        manualTimeInput.blur();
-                    } else {
-                        manualTimeInput.classList.add('input-error');
-                        setTimeout(() => manualTimeInput.classList.remove('input-error'), 300);
-                    }
-                };
-
-                manualTimeApply.addEventListener('click', applyManualTime);
-                manualTimeInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        applyManualTime();
-                    }
-                });
+                // Проводка ручного ввода и мастер-тумблера звука — в panel-state.js:
+                // это те же четыре состояния, вид сбоку. Потолок inline-скрипта
+                // (tests/control-decomposition.test.js) выгнал её отсюда, и правильно.
+                this.bindPanelInputs();
 
                 // Стартовое состояние: localStorage — лишь подсказка, финальное
                 // значение выставит loadSettings() из soundMasterEnabled, чтобы
@@ -1524,7 +1517,13 @@
                 // .adjust-main-btn с data-adjust, они подключаются выше.
 
                 // Главные кнопки
-                this.startBtn.addEventListener('click', () => this.start());
+                // В режиме ввода та же синяя кнопка называется «Поставить» и
+                // ставит время, а не запускает: кнопка ОДНА, потому что в макете
+                // она одна, и разводится по смыслу здесь, а не второй кнопкой.
+                this.startBtn.addEventListener('click', () => {
+                    if (this.inputMode) { this._applyManualTime?.(); return; }
+                    this.start();
+                });
                 this.pauseBtn.addEventListener('click', () => this.pause());
                 this.resetBtn.addEventListener('click', () => this.reset());
 
@@ -2443,16 +2442,16 @@
                 if (status !== 'idle') { this.statusDot.classList.add(status); }
                 this.statusText.textContent = STATUS_TEXT[status];
 
-                // Заголовок «Осталось» над отрицательным числом читается неверно —
-                // в перерасходе полноэкранный режим уже меняет его на «Сверх времени»,
-                // приводим панель к тому же поведению.
-                if (this.controlHeroLabelEl) {
-                    this.controlHeroLabelEl.textContent = isOvertime ? 'Сверх времени' : 'Осталось';
-                }
+                // Подпись героя принадлежит renderPanelState(): она зависит от
+                // СОСТОЯНИЯ, а не только от знака остатка. Прежняя строка писала
+                // сюда textContent и сносила разом и точку, и <span id="statusText">,
+                // из-за чего в покое оставалось «Осталось» вместо «Длительность».
 
                 // Полоса берёт время ОТСЮДА, а не считает своё: второй источник
                 // времени — расхождение, которое проект уже ловил на дисплее.
                 window.miniBar?.render({ text: (_neg ? '−' : '') + _digits, band: isOvertime ? 'danger' : band });
+
+                this.renderPanelState(status, band);
             }
 
             // Подсветка быстрого выбора выводится из состояния таймера, а не из
@@ -2460,7 +2459,7 @@
             // задать время (ручной ввод, ±, горячие клавиши, команда из другого окна).
             syncPresetHighlight() {
                 const preset = this.presetSeconds || 0;
-                document.querySelectorAll('.quick-preset').forEach(btn => {
+                document.querySelectorAll('.preset').forEach(btn => {
                     const minutes = parseInt(btn.dataset.minutes, 10);
                     const matches = Number.isFinite(minutes) && preset > 0 && minutes * 60 === preset;
                     btn.classList.toggle('active', matches);
@@ -2468,8 +2467,11 @@
             }
 
             updateControls() {
-                this.startBtn.disabled = this.isRunning;
-                this.pauseBtn.disabled = !this.isRunning;
+                // Какая кнопка на экране, решает состояние (CSS по классу на
+                // <body>). disabled здесь снят намеренно: он оставался бы на
+                // СКРЫТОЙ кнопке и глушил бы её, когда состояние её показывает.
+                this.startBtn.disabled = false;
+                this.pauseBtn.disabled = false;
             }
 
             updateDisplaysList(displays) {
@@ -2620,6 +2622,7 @@
         Object.assign(TimerController.prototype, window.CustomSoundsMixin);
         Object.assign(TimerController.prototype, window.LocalBackgroundMixin);
         Object.assign(TimerController.prototype, window.ThemeGridMixin);
+        Object.assign(TimerController.prototype, window.PanelStateMixin);
 
         window.timerController = new TimerController();
 
@@ -2669,6 +2672,18 @@
             if (!button) { return; }
 
             button.classList.toggle('active', isOpen);
+            // Тумблер строки объявлен role="switch" — состояние обязано
+            // читаться скринридером, а не только глазом по цвету дорожки.
+            if (button.getAttribute('role') === 'switch') {
+                button.setAttribute('aria-checked', String(isOpen));
+            }
+            // Подзаголовок строки говорит СОСТОЯНИЕ, когда окно открыто, и
+            // описание, когда закрыто.
+            const sub = button.closest('.wrow')?.querySelector('.wrow-sub');
+            if (sub) {
+                if (!sub.dataset.idle) { sub.dataset.idle = sub.textContent; }
+                sub.textContent = isOpen ? 'показан' : sub.dataset.idle;
+            }
             if (isOpen) {
                 button.title = button.title.replace(/открыть|Компактный|Часы в реальном|На весь экран/i, 'Закрыть');
             } else if (buttonId === 'openWidgetBtn') {
@@ -2949,13 +2964,22 @@
                 }
             }
 
-            // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
-            else if (event.code >= 'Digit1' && event.code <= 'Digit8') {
-                event.preventDefault();
-                const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
+            // 1–4: пресеты (5, 15, 25, 45 минут). 5: своё время.
+            // Диапазон клавиш выводится ИЗ реестра, а не пишется числом: после
+            // редизайна длительностей стало четыре, и вторая копия числа «8»
+            // здесь означала бы setTime(undefined) на клавишах 5–8.
+            else if (event.code >= 'Digit1' && event.code <= 'Digit9') {
                 const presets = window.CONFIG.PRESET_DURATIONS;
-                if (window.timerController) {
-                    window.timerController.setTime(presets[presetIndex]);
+                const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
+                if (presetIndex < presets.length) {
+                    event.preventDefault();
+                    if (window.timerController) {
+                        window.timerController.setTime(presets[presetIndex]);
+                    }
+                } else if (presetIndex === presets.length) {
+                    // Клавиша сразу за последним пресетом — та же «мин».
+                    event.preventDefault();
+                    window.timerController?.setInputMode(true);
                 }
             }
 
