@@ -2,18 +2,24 @@ const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
 
 /**
- * Синхронизация стиля часов со стилем виджета скрывает выбор стиля часов.
+ * Синхронизация стиля часов со стилем виджета: переключатель ЗЕРКАЛИТ виджет.
  *
- * Дефект: панель прятала `#clockStyleRow`, но этот id висел на ПУСТОМ div внутри
- * скрытого блока «Hidden elements: removed from UI but needed by JS». Настоящая
- * строка с переключателем `#clockStyle` жила в другом месте и не скрывалась
- * никогда. Пользователь ставил галочку «синхронизировать со стилем виджета» и
- * продолжал видеть активный выбор стиля часов — а клик по нему молча снимал ту
- * же галочку (обработчик clockStyleEl выключает syncClockStyle). Два контрола
- * противоречили друг другу.
+ * До 13.08.2026 панель прятала строку выбора стиля часов, пока синхронизация
+ * включена. Прятать её придумали от противоречия: переключатель показывал
+ * СОБСТВЕННЫЙ выбор пользователя, часы в это время рисовали стиль виджета, и
+ * два контрола говорили разное. Спрятать — значит убрать противоречие вместе с
+ * ответом на вопрос «почему часы поехали за виджетом»: единственное место, где
+ * стиль часов виден, исчезало ровно тогда, когда он менялся не по воле
+ * пользователя. Так дефект и пришёл от пользователя — «меняю стиль, а меняются
+ * оба окна, и в настройках стиль не тот».
  *
- * Проверяем видимость через offsetParent: он null у элемента, спрятанного через
- * display:none в любом из родителей, — то есть измеряем ровно то, что видит глаз,
+ * Теперь противоречия нет по-другому: при включённой синхронизации
+ * переключатель показывает ДЕЙСТВУЮЩИЙ стиль (то есть стиль виджета), а клик по
+ * нему означает «хочу свой» и снимает синхронизацию — этот обработчик был здесь
+ * и раньше. Скрытых состояний не осталось ни одного.
+ *
+ * Видимость меряется через offsetParent: он null у элемента, спрятанного через
+ * display:none в любом из родителей, — то есть меряем ровно то, что видит глаз,
  * а не наличие класса.
  */
 
@@ -27,7 +33,10 @@ async function readState(control) {
             rowContainsPicker: !!(row && picker && row.contains(picker)),
             rowVisible: !!(row && row.offsetParent !== null),
             pickerVisible: !!(picker && picker.offsetParent !== null),
-            syncChecked: document.getElementById('syncClockStyle').checked
+            syncChecked: document.getElementById('syncClockStyle').checked,
+            clockValue: picker ? picker.value : null,
+            widgetValue: document.getElementById('timerStyle').value,
+            storedClockStyle: JSON.parse(localStorage.getItem('displayExtSettings') || '{}').clockStyle
         };
     });
 }
@@ -42,7 +51,7 @@ async function setSync(control, on) {
     }, on);
 }
 
-test('строка «Стиль часов» прячется при включённой синхронизации', async () => {
+test('строка «Стиль часов» видна всегда и под синхронизацией показывает виджет', async () => {
     const { app, control } = await launchApp();
 
     // Настройки живут в выезжающем ящике — откроем вкладку «Часы».
@@ -57,18 +66,22 @@ test('строка «Стиль часов» прячется при включ�
     expect(base.rowExists, '#clockStyleRow должен существовать').toBe(true);
     expect(
         base.rowContainsPicker,
-        '#clockStyleRow обязан содержать сам переключатель #clockStyle — иначе прячется пустышка'
+        '#clockStyleRow обязан содержать сам переключатель #clockStyle'
     ).toBe(true);
 
     // --- Синхронизация ВЫКЛючена: выбор стиля часов доступен ---
     await setSync(control, false);
+    await control.evaluate(() => {
+        document.querySelector('#clockStyle button[data-val="digital"]').click();
+    });
     await control.waitForTimeout(400);
     const off = await readState(control);
     console.log('sync выкл →', JSON.stringify(off));
     expect(off.syncChecked).toBe(false);
     expect(off.pickerVisible, 'без синхронизации стиль часов выбирается вручную').toBe(true);
+    expect(off.clockValue).toBe('digital');
 
-    // --- Синхронизация ВКЛючена: выбор обязан исчезнуть ---
+    // --- Синхронизация ВКЛючена: выбор остаётся ВИДНЫМ и берёт стиль виджета ---
     await setSync(control, true);
     await control.waitForTimeout(400);
     const on = await readState(control);
@@ -76,15 +89,36 @@ test('строка «Стиль часов» прячется при включ�
     expect(on.syncChecked).toBe(true);
     expect(
         on.pickerVisible,
-        'при синхронизации выбор стиля часов обязан скрыться: иначе он противоречит галочке'
-    ).toBe(false);
+        'переключатель — единственное место, где виден стиль часов: прятать его нельзя'
+    ).toBe(true);
+    expect(on.clockValue, 'под синхронизацией показывается стиль ВИДЖЕТА').toBe(on.widgetValue);
 
-    // --- И вернуться при выключении ---
-    await setSync(control, false);
+    // --- Смена стиля виджета при включённой синхронизации тянет переключатель ---
+    await control.evaluate(() => {
+        document.querySelector('#timerStyle button[data-val="flip"]').click();
+    });
+    await control.waitForTimeout(600);
+    const moved = await readState(control);
+    console.log('виджет→флип при sync вкл →', JSON.stringify(moved));
+    expect(moved.syncChecked, 'смена стиля виджета не выключает синхронизацию').toBe(true);
+    expect(moved.clockValue, 'переключатель часов обязан догнать виджет').toBe('flip');
+    expect(moved.storedClockStyle, 'и в хранилище то же значение').toBe('flip');
+
+    // --- Клик по стилю часов означает «хочу свой» и снимает синхронизацию ---
+    await control.click('#clockStyle button[data-val="analog"]');
+    await control.waitForTimeout(500);
+    const own = await readState(control);
+    console.log('клик по стилю часов →', JSON.stringify(own));
+    expect(own.syncChecked, 'явный выбор стиля часов снимает синхронизацию').toBe(false);
+    expect(own.clockValue).toBe('analog');
+    expect(own.widgetValue, 'и НЕ трогает виджет').toBe('flip');
+
+    // Убираем за собой: профиль общий на весь прогон.
+    await control.evaluate(() => {
+        document.querySelector('#timerStyle button[data-val="circle"]').click();
+        document.querySelector('#clockStyle button[data-val="circle"]').click();
+    });
     await control.waitForTimeout(400);
-    const back = await readState(control);
-    expect(back.pickerVisible, 'после выключения синхронизации выбор возвращается').toBe(true);
-
     await app.close();
 });
 
@@ -157,12 +191,14 @@ test('при синхронизации стиль часов идёт за ст
     expect(res.widget).toBe('flip');
     expect(res.syncStillOn, 'смена стиля ВИДЖЕТА не должна выключать синхронизацию').toBe(true);
 
-    // Замечание, а не дефект: res.clock остаётся прежним ('circle'). При включённой
-    // синхронизации панель шлёт часам timerStyleEl.value напрямую (и в
-    // clock-widget-set-style, и в pushDisplaySettings), а значение собственного
-    // переключателя часов не переписывает — строка всё равно скрыта. Смысл такой:
-    // выключил синхронизацию — вернулся к СВОЕМУ выбору, а не остался на чужом.
-    // Поэтому здесь ничего не утверждаем про res.clock намеренно.
+    // Раньше здесь стояло замечание, что res.clock намеренно остаётся прежним:
+    // панель слала часам timerStyleEl.value напрямую, а переключатель часов не
+    // трогала — «выключил синхронизацию, вернулся к своему выбору». Пока строка
+    // была скрыта, это выглядело безобидно. На деле панель хранила стиль, которого
+    // на экране нет, и подпись строки «Часы» этим стилем и отчитывалась.
+    // Теперь переключатель зеркалит виджет: показанное значение всегда равно
+    // тому, что рисуют часы.
+    expect(res.clock, 'переключатель часов обязан показывать действующий стиль').toBe('flip');
 
     await control.evaluate(() => {
         const el = document.getElementById('syncClockStyle');

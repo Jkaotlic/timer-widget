@@ -287,13 +287,15 @@ test('синхронизация стиля часов переживает пе
     const before = await control.evaluate(() => ({
         sync: document.getElementById('syncClockStyle').checked,
         clockStyle: document.getElementById('clockStyle').value,
-        rowVisible: document.getElementById('clockStyleRow').offsetParent !== null,
         stored: localStorage.getItem('displayExtSettings')
     }));
 
     expect(before.sync, 'галочку не удалось включить — тест бы ничего не проверил').toBe(true);
     expect(before.clockStyle, 'при включении синхронизации часы обязаны взять стиль виджета').toBe('flip');
-    expect(before.rowVisible, 'строка выбора стиля часов обязана скрыться').toBe(false);
+    // Видимость ряда здесь НЕ проверяется, и это исправление: ящик настроек в
+    // этом тесте закрыт, поэтому offsetParent у ряда null независимо от
+    // синхронизации. Прежняя проверка стояла и была зелёной по неверной причине.
+    // Настоящий замер — там, где ящик открыт: e2e/clock-style-sync.spec.js.
     expect(
         JSON.parse(before.stored || '{}').syncClockStyle,
         'syncClockStyle не записан в displayExtSettings'
@@ -306,7 +308,6 @@ test('синхронизация стиля часов переживает пе
     const after = await control.evaluate(() => ({
         sync: document.getElementById('syncClockStyle').checked,
         clockStyle: document.getElementById('clockStyle').value,
-        rowVisible: document.getElementById('clockStyleRow').offsetParent !== null,
         stored: localStorage.getItem('displayExtSettings')
     }));
 
@@ -314,7 +315,7 @@ test('синхронизация стиля часов переживает пе
         after.sync,
         `после перезагрузки синхронизация выключилась. В хранилище: ${after.stored}`
     ).toBe(true);
-    expect(after.rowVisible, 'после перезагрузки строка стиля часов снова видна при включённой синхронизации').toBe(false);
+    expect(after.clockStyle, 'после перезагрузки переключатель показывает действующий стиль').toBe('flip');
 
     await resetStorages(control);
     await app.close();
