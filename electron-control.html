@@ -1249,7 +1249,8 @@
                 this.clockDigitsFontRowEl = document.getElementById('clockDigitsFontRow');
                 this.displayDigitsFontRowEl = document.getElementById('displayDigitsFontRow');
 
-                // Синхронизация стилей (по умолчанию включена)
+                // Синхронизация стиля часов. ВЫКЛЮЧЕНА по умолчанию — то же
+                // значение стоит строкой в settings-schema.js.
                 this.syncClockStyle = false;
                 
                 // Пресет расположения по умолчанию - "Рамка"
@@ -2042,6 +2043,9 @@
                 // приложения, и незнакомые панели поля переживают обновление.
                 const prev = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
+                // Подписи строк — производная от этих же настроек (почему здесь,
+                // а не в пяти обработчиках, — в renderWindowRows).
+                this.renderWindowRows();
             }
 
             pushOverrunLimit() {
@@ -2488,7 +2492,9 @@
 
                 // Полоса берёт время ОТСЮДА, а не считает своё: второй источник
                 // времени — расхождение, которое проект уже ловил на дисплее.
-                window.miniBar?.render({ text: (_neg ? '−' : '') + _digits, band: isOvertime ? 'danger' : band });
+                // `resume` — признак паузы, а не слово: как его показать, решает сама полоса.
+                window.miniBar?.render({ text: (_neg ? '−' : '') + _digits,
+                    band: isOvertime ? 'danger' : band, resume: !this.inputMode && !!this.isPaused });
 
                 this.renderPanelState(status, band);
             }
@@ -2791,7 +2797,8 @@
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
         const _tc = () => window.timerController;
         window.miniBar = window.MiniBar.init({ doc: document, ipc: window.ipcRenderer,
-            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); } },
+            // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
+            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } },
             actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
 
         const faqModal = document.getElementById('faqModal');

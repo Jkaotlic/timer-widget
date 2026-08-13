@@ -162,6 +162,21 @@ test('render пишет время и полосу состояния в пол�
     assert.equal(doc._el('miniBarDot').className, 'mini-dot danger');
 });
 
+test('в паузе кнопка полосы называется «Продолжить», а не «Старт»', () => {
+    // Слово принадлежит полосе, а признак — панели: панель знает, что таймер
+    // на паузе, полоса знает, каким элементом это показать. Раньше слова не
+    // было вовсе — в паузе на экране висела «Пауза», нажатие по которой
+    // ставило паузу ещё раз.
+    const doc = fakeDoc();
+    const bar = MiniBar.init({ doc, ipc: fakeIpc() });
+
+    bar.render({ text: '04:12', band: 'normal', resume: true });
+    assert.equal(doc._el('miniBarStart').textContent, 'Продолжить');
+
+    bar.render({ text: '05:00', band: 'normal', resume: false });
+    assert.equal(doc._el('miniBarStart').textContent, 'Старт');
+});
+
 test('render переводит спокойное состояние в ok, а неизвестное — тоже в ok', () => {
     const doc = fakeDoc();
     const bar = MiniBar.init({ doc, ipc: fakeIpc() });
