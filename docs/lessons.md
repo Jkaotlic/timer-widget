@@ -435,7 +435,7 @@
 
 ### syncClockStyle
 
-- **syncClockStyle**: Defaults to **`false`** (`this.syncClockStyle = !!ext.syncClockStyle` in `loadSettings`) — the clock keeps its own style unless the user opts in. When true, clock style follows the widget style dropdown, and the `timerStyleEl` change handler must send both `widget-style-update` AND `clock-widget-set-style`. Changing the clock style directly from the Часы tab turns the sync back off.
+- **syncClockStyle**: Defaults to **`false`** (`this.syncClockStyle = !!ext.syncClockStyle` in `loadSettings`) — the clock keeps its own style unless the user opts in. When true, clock style follows the widget style dropdown, and the `timerStyleEl` change handler must send both `widget-style-update` AND `clock-widget-set-style`. Changing the clock style directly from the Часы tab turns the sync back off. С 13.08.2026 тот же обработчик обязан ещё и переписать `clockStyleEl.value`: переключатель часов зеркалит виджет, а не хранит невидимый собственный выбор — см. [разбор про ряд стиля часов](#clockstylerow-must-be-on-the-real-row).
 
 ---
 
@@ -562,9 +562,39 @@
 
 <a id="clockstylerow-must-be-on-the-real-row"></a>
 
-### `#clockStyleRow` must be on the real row
+### Скрытый ряд — это скрытое состояние: переключатель часов зеркалит виджет
 
-- **`#clockStyleRow` must be on the real row**: the panel hides that row when style sync is on. The id used to sit on an empty orphan `<div>` inside a `display:none` "removed from UI but needed by JS" block, so nothing was ever hidden and the user saw an active clock-style picker that contradicted the checkbox they had just ticked. If you move the markup, keep the id on the element that actually wraps `#clockStyle`; the e2e test asserts `row.contains(picker)`.
+Разбор переписан 13.08.2026: прежнее правило звучало «панель прячет этот ряд
+при включённой синхронизации», и именно пряталово оказалось дефектом. Правило
+про сам id действует по-прежнему: если двигаете разметку,
+`#clockStyleRow` обязан оставаться на элементе, который РЕАЛЬНО оборачивает
+`#clockStyle` (e2e проверяет `row.contains(picker)`). Когда-то этот id висел на
+пустом сироте-`<div>` внутри блока `display:none` «removed from UI but needed by
+JS» — прятать было нечего, и пользователь видел активный выбор стиля часов,
+противоречащий только что поставленной галочке.
+
+Само пряталово прожило дольше и стоило дефекта от пользователя: «меняю стиль —
+меняются оба окна, а в настройках стиль не тот». Цепочка такая. Ряд скрыт, пока
+включена синхронизация. Значит, единственный видимый переключатель стиля — у
+виджета, и он двигает ОБА окна, а откуда взялась связь, на экране не написано.
+Одновременно панель хранила собственный выбор часов (`clockStyle: digits`),
+которого на экране нет (часы рисуют `circle` вслед за виджетом) — и отчитывалась
+им в подписи строки. Профиль пользователя это и показал: `syncClockStyle: true`,
+`clockStyle: digits`, `widgetTimerStyle: circle`.
+
+**Правило.** Ряд виден ВСЕГДА. При включённой синхронизации переключатель часов
+показывает ДЕЙСТВУЮЩИЙ стиль, то есть зеркалит виджет (в UI, в хранилище, в
+подписи), а клик по нему означает «хочу свой» и снимает синхронизацию —
+обработчик для этого был и раньше. Прятать контрол, чтобы убрать противоречие
+между ним и реальностью, — значит убрать вместе с противоречием и ответ на
+вопрос «почему это изменилось само».
+
+**Чем закреплено.** Присваивание `clockStyleEl.value = timerStyleEl.value` в
+обработчике стиля виджета и в `loadSettings()` (второе лечит профили прежней
+версии, где расхождение уже накоплено); сеттер сегментированного контрола
+намеренно НЕ порождает `change`, иначе синхронизация гасила бы сама себя.
+Замеряется `e2e/clock-style-sync.spec.js` — включая то, что клик по стилю часов
+снимает галочку и НЕ трогает виджет.
 
 ---
 

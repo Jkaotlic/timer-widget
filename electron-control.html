@@ -510,17 +510,11 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
-                            <!-- id="clockStyleRow" обязан быть ЗДЕСЬ, на реальной строке с
-                                 переключателем: панель скрывает эту строку, когда включена
-                                 синхронизация со стилем виджета. Раньше этот id висел на
-                                 пустом div внутри скрытого блока «removed from UI», поэтому
-                                 скрывать было нечего — пользователь ставил галочку
-                                 синхронизации и продолжал видеть активный выбор стиля часов,
-                                 а клик по нему молча снимал ту же галочку. -->
-                            <!-- .setting-block по той же причине, что и у виджета.
-                                 id остаётся на ЭТОЙ обёртке: синхронизация стиля
-                                 прячет ряд целиком, и перенос id на внутренний узел
-                                 однажды уже оставил подпись висеть без контрола. -->
+                            <!-- Ряд виден ВСЕГДА. При включённой синхронизации он
+                                 показывает действующий стиль (стиль виджета), а клик
+                                 по нему означает «хочу свой» и снимает синхронизацию.
+                                 Прежде ряд прятался — и вместе с ним исчезал ответ на
+                                 вопрос, почему часы поехали за виджетом. -->
                             <div class="setting-block" id="clockStyleRow">
                                 <span class="toggle-label">Стиль</span>
                                 <div class="segmented" id="clockStyle" role="radiogroup" aria-label="Стиль часов" data-value="circle">
@@ -1229,7 +1223,6 @@
                 this.syncClockStyleEl = document.getElementById('syncClockStyle');
                 this.clockStyleEl = document.getElementById('clockStyle');
                 this._attachSegmented(this.clockStyleEl, 'circle');
-                this.clockStyleRowEl = document.getElementById('clockStyleRow');
                 this.clockAnalogNumbersRowEl = document.getElementById('clockAnalogNumbersRow');
                 this.clockShowAnalogNumbersEl = document.getElementById('clockShowAnalogNumbers');
                 this.clockShowDateEl = document.getElementById('clockShowDate');
@@ -1666,8 +1659,11 @@
                 this.timerStyleEl.addEventListener('change', () => {
                     // Send widget-specific style update (only affects widget, not display)
                     ipcRenderer.send('widget-style-update', this.widgetStylePayload());
-                    // Sync clock style when syncClockStyle is enabled
+                    // При синхронизации часы идут за виджетом — И ОКНО, И ПЕРЕКЛЮЧАТЕЛЬ.
+                    // Присваивание .value не порождает 'change' (см. _attachSegmented),
+                    // поэтому петля не замыкается и синхронизация не гаснет.
                     if (this.syncClockStyle) {
+                        this.clockStyleEl.value = this.timerStyleEl.value;
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
                     this.updateClockAnalogNumbersVisibility();
@@ -1698,7 +1694,6 @@
                 // Синхронизация стиля часов
                 this.syncClockStyleEl.addEventListener('change', () => {
                     this.syncClockStyle = this.syncClockStyleEl.checked;
-                    this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
                     
                     if (this.syncClockStyle) {
                         // При включении синхронизации - применяем стиль таймера к часам
@@ -1946,9 +1941,11 @@
                 document.getElementById('timeBlocksSettings').style.display = applied.showTimeBlocks ? 'block' : 'none';
                 this.timeLayoutPreset = applied.timeLayoutPreset;
 
-                // Синхронизация стиля часов прячет выбор стиля часов.
+                // Синхронизация: переключатель часов показывает стиль виджета.
+                // Присваивание лечит и профили прежней версии, где в хранилище
+                // остался стиль, которого на экране нет (ряд был скрыт).
                 this.syncClockStyle = applied.syncClockStyle;
-                this.clockStyleRowEl.style.display = this.syncClockStyle ? 'none' : 'flex';
+                if (this.syncClockStyle) { this.clockStyleEl.value = this.timerStyleEl.value; }
 
                 // Ползунок «Масштаб часов». Единственный источник правды здесь —
                 // clockGeometry, который пишет САМО окно часов (localStorage общий

@@ -186,7 +186,7 @@ test('вернувшиеся переключатели часов меняют 
     await app.close();
 });
 
-test('«Как у виджета» скрывает выбор стиля часов и сохраняется', async () => {
+test('«Как у виджета» переводит выбор стиля часов на виджет и сохраняется', async () => {
     const { app, control } = await launchApp();
 
     await control.click('.tab-btn[data-tab="clock"]');
@@ -200,7 +200,15 @@ test('«Как у виджета» скрывает выбор стиля час
 
     await control.click('label[for="syncClockStyle"]');
     await control.waitForTimeout(500);
-    await expect(row, 'при включённой синхронизации строку выбора стиля надо скрывать').toBeHidden();
+    // Строка НЕ прячется: она — единственное место, где виден стиль часов, и
+    // при включённой синхронизации показывает действующий, то есть стиль
+    // виджета. Прятать её значило убирать ответ на вопрос «почему часы поехали».
+    await expect(row, 'строка выбора стиля часов остаётся видимой').toBeVisible();
+    const mirrored = await control.evaluate(() => ({
+        clock: document.getElementById('clockStyle').value,
+        widget: document.getElementById('timerStyle').value
+    }));
+    expect(mirrored.clock, 'под синхронизацией показан стиль виджета').toBe(mirrored.widget);
 
     // Настройка обязана дожить до перезагрузки: раньше loadSettings() её убивала,
     // потому что присваивание .value самодельному сегментированному контролу
