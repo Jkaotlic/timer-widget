@@ -86,6 +86,14 @@ const PanelStateMixin = {
      * Значения берутся из САМИХ контролов настроек, а не из отдельной копии:
      * копия разошлась бы с ящиком ровно в тот момент, когда пользователь
      * что-то в нём поменял.
+     *
+     * Вызывается из двух мест и оба обязательны: renderPanelState() (состояние
+     * таймера меняет и окраску строк) и saveExtSettings() (настройка окна
+     * изменилась). Второй вызов появился потому, что первого не хватало:
+     * тик таймера в покое НЕ ПРИХОДИТ, и после смены стиля строка часов
+     * продолжала утверждать «показан · круг» про часы, уже ставшие флипом, —
+     * до первого запуска отсчёта. Один вызов на запись настроек, а не пять
+     * по обработчикам: пятая копия проводки в этом проекте уже теряла поле.
      */
     renderWindowRows() {
         const val = (id) => {
@@ -104,9 +112,18 @@ const PanelStateMixin = {
             ? monitor.options[monitor.selectedIndex]?.text.replace(/\s*\(.*\)$/, '')
             : undefined;
 
+        // Стиль часов — ДЕЙСТВУЮЩИЙ, а не тот, что лежит в их переключателе.
+        // При включённой синхронизации часам уходит стиль виджета, а
+        // собственный выбор часов намеренно не переписывается (выключил
+        // синхронизацию — вернулся к своему). Строка выбора при этом скрыта,
+        // и подпись остаётся ЕДИНСТВЕННЫМ местом, где виден стиль часов:
+        // читая скрытый переключатель, она сообщала «круг» про часы, которые
+        // в этот момент аналоговые.
+        const clockStyleId = this.syncClockStyle ? 'timerStyle' : 'clockStyle';
+
         const ROWS = [
             { btn: 'openWidgetBtn',  sub: 'subWidget',  style: styleOf('timerStyle'), scale: num('timerScale') },
-            { btn: 'openClockBtn',   sub: 'subClock',   style: styleOf('clockStyle'), scale: num('clockScale') },
+            { btn: 'openClockBtn',   sub: 'subClock',   style: styleOf(clockStyleId), scale: num('clockScale') },
             { btn: 'openDisplayBtn', sub: 'subDisplay', where }
         ];
 
@@ -319,6 +336,17 @@ const PanelStateMixin = {
         document.body.classList.remove('state-idle', 'state-running', 'state-overtime', 'state-input');
         document.body.classList.add('state-' + mode);
 
+        // Пауза — МОДИФИКАТОР состояния, а не пятое состояние.
+        //
+        // Раскладка в паузе та же, что в отсчёте (ряд ±, полоса, никаких
+        // пресетов), меняется ровно одно: какое действие предлагает транспорт.
+        // Пока пауза жила внутри `state-running`, на экране оставалась кнопка
+        // «Пауза» — единственное действие, которое в паузе не делает ничего, —
+        // и возобновить таймер мышью было нечем ни в панели, ни в полосе.
+        // Отдельным классом это чинится в CSS, без второй лестницы состояний.
+        const paused = !this.inputMode && !!this.isPaused;
+        document.body.classList.toggle('paused', paused);
+
         // Подписи строк пересобираются здесь же, а не только при открытии окна:
         // стиль и масштаб меняются в ящике, и подпись обязана догонять их без
         // отдельной проводки от каждого контрола.
@@ -370,19 +398,23 @@ const PanelStateMixin = {
             fill.style.width = Math.max(0, Math.min(1, done)) * 100 + '%';
         }
 
+        // Подсказка внизу называет то действие, которое пробел сделает СЕЙЧАС:
+        // в паузе он продолжает отсчёт, а не ставит паузу ещё раз.
         const footer = document.getElementById('panelFooter');
         if (footer) {
             const every = parseInt(this.overrunIntervalEl?.value, 10);
-            footer.textContent = mode === 'overtime' && Number.isFinite(every) && every > 0
+            footer.textContent = mode === 'overtime' && !paused && Number.isFinite(every) && every > 0
                 ? `Уведомление каждые ${every} мин`
-                : mode === 'running'
-                    ? 'Space — пауза · R — сброс'
-                    : 'Space — старт · R — сброс · 1–4 — пресеты';
+                : paused
+                    ? 'Space — продолжить · R — сброс'
+                    : mode === 'running'
+                        ? 'Space — пауза · R — сброс'
+                        : 'Space — старт · R — сброс · 1–4 — пресеты';
         }
 
-        // Кнопка одна, названий у неё три.
+        // Кнопка одна, названий у неё четыре: пауза добавила «Продолжить».
         if (this.startBtn) {
-            this.startBtn.firstChild.nodeValue = this.inputMode ? 'Поставить' : 'Старт';
+            this.startBtn.firstChild.nodeValue = this.inputMode ? 'Поставить' : (paused ? 'Продолжить' : 'Старт');
             const key = this.startBtn.querySelector('.transport-key');
             if (key) { key.textContent = this.inputMode ? 'Enter' : 'Space'; }
         }

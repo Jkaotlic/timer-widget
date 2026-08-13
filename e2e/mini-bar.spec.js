@@ -97,6 +97,85 @@ test('полоса показывает то же время, что и пане
     }
 });
 
+/**
+ * В паузе полоса обязана предлагать ПРОДОЛЖИТЬ.
+ *
+ * Действие в полосе выбиралось классом состояния, а пауза класса не имела:
+ * `state-running` стоял и на идущем таймере, и на остановленном, поэтому в
+ * паузе на экране висело слово «Пауза» — нажатие по нему ставило паузу ещё
+ * раз, то есть не делало ничего. Со стороны это и выглядит как «свернул окно,
+ * и оно пишет пауза и перестало слушаться».
+ */
+test('в паузе полоса предлагает продолжить, и это работает', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await control.click('.preset[data-minutes="5"]');
+        await control.waitForTimeout(300);
+        await control.click('#startBtn');
+        await control.waitForTimeout(1300);
+        await control.click('#pauseBtn');
+        await control.waitForTimeout(500);
+
+        await control.click('#miniBarToggle');
+        await control.waitForTimeout(700);
+
+        const visible = await control.evaluate(() => {
+            const vis = (id) => getComputedStyle(document.getElementById(id)).display !== 'none';
+            return { start: vis('miniBarStart'), pause: vis('miniBarPause') };
+        });
+        expect(visible.start, 'в паузе полоса обязана предлагать старт').toBe(true);
+        expect(visible.pause, 'кнопка «Пауза» в паузе не делает ничего').toBe(false);
+
+        await control.click('#miniBarStart');
+        await control.waitForTimeout(1300);
+        expect(await control.evaluate(() => window.timerController.isRunning)).toBe(true);
+
+        await control.click('#miniBarExpand');
+        await control.waitForTimeout(500);
+        await control.click('#resetBtn');
+        await control.waitForTimeout(400);
+    } finally {
+        await app.close();
+    }
+});
+
+/**
+ * Сворачивание выходит из режима ручного ввода.
+ *
+ * В полосе полей ввода нет — они спрятаны вместе со всей панелью, — но класс
+ * `state-input` на body оставался, и полоса застревала в состоянии, где её
+ * «Старт» означает «поставить набранное». Набирать было негде, ставить
+ * нечего: и кнопка полосы, и пробел в свёрнутом окне переставали запускать
+ * таймер. Замерено: после сворачивания из ввода Space не запускал отсчёт.
+ */
+test('сворачивание выходит из режима ввода, и пробел снова запускает таймер', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await control.click('.preset[data-minutes="5"]');
+        await control.waitForTimeout(300);
+        await control.click('#controlTime');
+        await control.waitForTimeout(500);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
+
+        await control.click('#miniBarToggle');
+        await control.waitForTimeout(700);
+        await expect(control.locator('body')).not.toHaveClass(/state-input/);
+
+        await control.keyboard.press('Space');
+        await control.waitForTimeout(1300);
+        expect(await control.evaluate(() => window.timerController.isRunning),
+            'пробел обязан запускать таймер из полосы').toBe(true);
+
+        await control.click('#miniBarExpand');
+        await control.waitForTimeout(500);
+        await control.click('#pauseBtn');
+        await control.click('#resetBtn');
+        await control.waitForTimeout(400);
+    } finally {
+        await app.close();
+    }
+});
+
 test('клавиша M переключает режим, а ящик настроек при сворачивании закрывается', async () => {
     const { app, control } = await launchApp();
     try {

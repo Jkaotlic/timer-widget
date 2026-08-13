@@ -173,6 +173,58 @@ test('при синхронизации стиль часов идёт за ст
     await app.close();
 });
 
+/**
+ * При включённой синхронизации панель обязана ОТЧИТЫВАТЬСЯ о том, что на
+ * экране, а не о том, что лежит в скрытом переключателе.
+ *
+ * Собственный выбор стиля часов синхронизация намеренно не переписывает (см.
+ * тест выше: выключил — вернулся к своему). Но подпись строки «Часы» читала
+ * ИМЕННО этот скрытый переключатель, и при включённой синхронизации честно
+ * сообщала «показан · круг» о часах, которые в этот момент аналоговые.
+ * Подпись — единственное место в панели, где виден стиль часов, пока строка
+ * выбора спрятана, и врать ей нельзя.
+ */
+test('при синхронизации подпись строки «Часы» показывает стиль виджета', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await control.click('#openClockBtn');
+        await control.waitForTimeout(1600);
+
+        await control.evaluate(() => {
+            const el = document.getElementById('syncClockStyle');
+            el.checked = true;
+            el.dispatchEvent(new Event('change'));
+        });
+        await control.waitForTimeout(500);
+
+        await control.evaluate(() => {
+            document.querySelector('#timerStyle button[data-val="analog"]').click();
+        });
+        await control.waitForTimeout(700);
+
+        const subs = await control.evaluate(() => ({
+            clock: document.getElementById('subClock').textContent,
+            widget: document.getElementById('subWidget').textContent
+        }));
+        console.log('подписи при синхронизации →', JSON.stringify(subs));
+        expect(subs.clock, 'часы показывают стиль виджета — так и надо писать').toContain('аналог');
+    } finally {
+        // Профиль e2e общий на весь прогон: тест, оставивший синхронизацию
+        // включённой, прячет строку выбора стиля и роняет чужие спеки —
+        // ровно так этот файл однажды и сделал.
+        await control.evaluate(() => {
+            const el = document.getElementById('syncClockStyle');
+            el.checked = false;
+            el.dispatchEvent(new Event('change'));
+            document.querySelector('#timerStyle button[data-val="circle"]').click();
+            const clockBtn = document.getElementById('openClockBtn');
+            if (clockBtn && clockBtn.classList.contains('active')) { clockBtn.click(); }
+        });
+        await control.waitForTimeout(800);
+        await app.close();
+    }
+});
+
 test('переключатели стилей объявляют выбранное значение в ARIA', async () => {
     // Раньше контейнеры были role="tablist" с обычными кнопками внутри:
     // структура невалидная (в tablist обязаны быть role="tab"), и состояние

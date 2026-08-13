@@ -49,12 +49,24 @@ function init(deps) {
      * полосы: иначе её разметка размазана между двумя файлами, а inline-скрипт
      * панели упирается в собственный потолок размера.
      *
-     * @param {{text: string, band: string}} state
+     * @param {{text: string, band: string, resume?: boolean}} state
+     *        resume — таймер стоит на паузе, то есть кнопка запуска означает
+     *        «продолжить», а не «начать». Панель знает ПРИЗНАК, полоса решает,
+     *        каким словом его показать.
      */
     function render(state) {
         if (!state) { return api; }
         const time = doc.getElementById('miniBarTime');
         if (time) { time.textContent = state.text; }
+        const start = doc.getElementById('miniBarStart');
+        if (start) {
+            const word = state.resume ? 'Продолжить' : 'Старт';
+            start.textContent = word;
+            if (start.setAttribute) {
+                start.setAttribute('title', word + ' (Space)');
+                start.setAttribute('aria-label', state.resume ? 'Продолжить отсчёт' : 'Запустить таймер');
+            }
+        }
         const dot = doc.getElementById('miniBarDot');
         if (dot) {
             // Всё, что не «тревога» и не «предупреждение», — спокойное

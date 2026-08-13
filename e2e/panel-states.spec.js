@@ -95,6 +95,36 @@ test.describe('панель: четыре состояния', () => {
         expect(after).not.toBe(before);
     });
 
+    /**
+     * Пауза — ЧЕТВЁРТОЕ состояние транспорта, а не разновидность отсчёта.
+     *
+     * Раскладка выводилась из `isRunning || isPaused`, поэтому в паузе на
+     * экране оставалась кнопка «Пауза» — единственное действие, которое в
+     * паузе не делает ничего. Возобновить таймер мышью было НЕЧЕМ: ни в
+     * панели, ни в свёрнутой полосе, где та же кнопка звалась «Пауза» же.
+     * Оставался только пробел, и пользователь, глядя на слово «Пауза»,
+     * закономерно считал, что окно вообще перестало слушаться.
+     */
+    test('пауза: кнопка предлагает продолжить, а не паузу ещё раз', async () => {
+        await control.click('#pauseBtn');
+        await control.waitForTimeout(500);
+
+        await expect(control.locator('#statusText')).toHaveText('Пауза');
+        expect(await primaryLabel(control)).toBe('Продолжить');
+        expect(await shown(control, '#pauseBtn'), 'в паузе кнопка «Пауза» бессмысленна').toBe(false);
+        // Раскладка отсчёта в паузе сохраняется: ряд ± и полоса на месте,
+        // пресеты по-прежнему уступили им место.
+        expect(await shown(control, '.adjust')).toBe(true);
+        expect(await shown(control, '.panel-progress')).toBe(true);
+        expect(await shown(control, '.presets')).toBe(false);
+
+        // И главное: кнопка РАБОТАЕТ — таймер снова идёт.
+        await control.click('#startBtn');
+        await control.waitForTimeout(1300);
+        expect(await control.evaluate(() => window.timerController.isRunning)).toBe(true);
+        expect(await primaryLabel(control)).toBe('Пауза');
+    });
+
     test('ввод: цифры уступают место полю, кнопка называется «Поставить»', async () => {
         await control.click('#pauseBtn');
         await control.waitForTimeout(300);
@@ -272,6 +302,32 @@ test.describe('панель: строки окон', () => {
         await control.waitForTimeout(1200);
         await expect(control.locator('#openWidgetBtn')).toHaveAttribute('aria-checked', 'false');
         await expect(sub).toHaveText('маленький таймер поверх окон');
+    });
+
+    /**
+     * Подпись строки — это ОТЧЁТ о том, что сейчас на экране, и врать он не
+     * должен ни секунды. Пересобирался он только в renderPanelState(), то есть
+     * на тике таймера: в покое тиков нет вообще, и после смены стиля строка
+     * часов продолжала утверждать «показан · круг», пока пользователь не
+     * запустит отсчёт. Замер до правки: стиль часов «флип», подпись «круг».
+     */
+    test('подпись строки догоняет смену стиля сразу, без тика таймера', async () => {
+        await control.click('#openClockBtn');
+        await control.waitForTimeout(1600);
+        await control.click('.wrow:has(#openClockBtn) .wrow-chevron');
+        await control.waitForTimeout(700);
+
+        await control.click('#clockStyle button[data-val="flip"]');
+        await control.waitForTimeout(500);
+        await expect(control.locator('#subClock')).toHaveText(/флип/);
+
+        // Убираем за собой: профиль e2e общий на весь прогон.
+        await control.click('#clockStyle button[data-val="circle"]');
+        await control.waitForTimeout(400);
+        await control.click('#drawerClose');
+        await control.waitForTimeout(600);
+        await control.click('#openClockBtn');
+        await control.waitForTimeout(900);
     });
 
     test('строка «Звуки» ведёт в свой раздел', async () => {

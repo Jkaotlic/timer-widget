@@ -4016,6 +4016,30 @@ body.state-running  #pauseBtn { display: inline-flex; }
 body.state-overtime #pauseBtn { display: inline-flex; background: var(--tw-red); color: var(--tw-on-accent); }
 body.state-overtime #pauseBtn .transport-key { color: currentColor; opacity: 0.72; }
 
+/* Пауза — модификатор, а не пятое состояние: раскладка остаётся от отсчёта,
+   меняется ТОЛЬКО предлагаемое действие. Кнопка «Пауза» в паузе не делает
+   ничего, и пока она стояла на экране, возобновить таймер мышью было нечем —
+   ни здесь, ни в свёрнутой полосе.
+
+   Блок обязан идти НИЖЕ правил выше: специфичность у них одинаковая
+   (`body.state-running #pauseBtn` против `body.paused #pauseBtn` — по одному
+   идентификатору и по одному классу), и при равенстве выигрывает то, что
+   ниже. Это же правило в проекте уже стоило отдельного разбора про
+   тематический блок и про «Режим полосы» в конце файла. */
+/* Слово «Пауза» в общей палитре статусов — ОРАНЖЕВОЕ (активен зелёный, пауза
+   оранжевая, красное — завершение и перерасход). Пока пауза жила внутри
+   `state-running`, подпись красилась зелёным «идёт», а точка рядом с ней —
+   оранжевым: два разных ответа на один вопрос в одной строке. Оба значения
+   токена проверены на контраст в обеих темах (tests/contrast.test.js). */
+body.paused .hero-label { color: var(--tw-orange); }
+
+body.paused #pauseBtn { display: none; }
+body.paused #startBtn { display: inline-flex; background: var(--tw-blue); color: var(--tw-on-accent); }
+body.paused #startBtn .transport-key { color: currentColor; opacity: 0.72; }
+/* Пауза, наступившая в перерасходе, остаётся красной темой экрана: синяя
+   кнопка посреди красного означала бы, что состояние сменилось. */
+body.state-overtime.paused #startBtn { background: var(--tw-red); }
+
 .transport-reset {
     width: 48px;
     height: 48px;
@@ -4397,3 +4421,8 @@ body.state-overtime #miniBarPause {
     background: color-mix(in srgb, var(--tw-red) 16%, transparent);
     color: var(--tw-red);
 }
+/* Пауза: в полосе тот же обмен, что и в панели. Ниже правил выше по той же
+   причине — специфичность равная, решает порядок. Слово на кнопке ставит сам
+   модуль полосы (mini-bar.js): панель отдаёт ему признак, а не разметку. */
+body.paused #miniBarPause { display: none; }
+body.paused #miniBarStart { display: block; }
