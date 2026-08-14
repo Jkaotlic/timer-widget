@@ -125,6 +125,17 @@ const PROBE_SIGN = '−';
 const SIGN_FONT_RATIO = 0.62;
 const SIGN_GAP_EM = 0.1;
 
+// Поля рамки вокруг цифр — в долях КЕГЛЯ, потому что рамка обязана расти
+// вместе с ними. Эти же значения стоят в CSS всех трёх окон
+// (`.widget-digits-time`, `.clock-digits-time`, `.digits-time`), и совпадение
+// проверяется тестом: разойдутся — подогнанные цифры вылезут за рамку, ведь
+// подгонка считает по этим числам.
+//
+// Рамка появилась при слиянии стилей: LED был теми же цифрами в тёмной
+// коробке, и без полей у объединённого стиля фон лип бы вплотную к глифам.
+const FRAME_PAD_X_EM = 0.34;
+const FRAME_PAD_Y_EM = 0.18;
+
 // ---------------------------------------------------------------------------
 // Белый список
 // ---------------------------------------------------------------------------
@@ -171,8 +182,12 @@ function fitScale(options) {
     if (!(availableWidth > 0) || !(availableHeight > 0)) { return 0; }
     if (!(probeWidth > 0) || !(probeHeight > 0)) { return 0; }
 
-    const byWidth = availableWidth / (probeWidth + Math.max(0, signWidth));
-    const byHeight = availableHeight / probeHeight;
+    // Поля рамки входят в габарит: цифры подгоняются вместе с ней, иначе при
+    // заданном фоне рамка вылезала бы за окно ровно на свои поля.
+    const frameX = PROBE_FONT_SIZE * 2 * FRAME_PAD_X_EM;
+    const frameY = PROBE_FONT_SIZE * 2 * FRAME_PAD_Y_EM;
+    const byWidth = availableWidth / (probeWidth + Math.max(0, signWidth) + frameX);
+    const byHeight = availableHeight / (probeHeight + frameY);
     const scale = Math.min(byWidth, byHeight);
     return Number.isFinite(scale) && scale > 0 ? scale : 0;
 }
@@ -273,6 +288,8 @@ const DigitsStyle = {
     PROBE_SIGN,
     SIGN_FONT_RATIO,
     SIGN_GAP_EM,
+    FRAME_PAD_X_EM,
+    FRAME_PAD_Y_EM,
     resolveFont,
     fitScale,
     fitFontSize,

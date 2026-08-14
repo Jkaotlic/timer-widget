@@ -18,8 +18,6 @@ const {
     bindWindowDrag,
     fitScaledBounds,
     fitRestoredBounds,
-    ledStripHeight,
-    ledStripMetrics,
     MIN_SCALE_PCT,
     MAX_SCALE_PCT
 } = require('../window-geometry');
@@ -706,57 +704,8 @@ test('отложенная запись тоже сверяется с разм�
 // цифр и поля рамки), и главный процесс (минимальная высота окна), поэтому
 // рамка обнимает цифры, а не сходится с ними примерно.
 
-test('высота полосы выводится из ширины и длины строки', () => {
-    // MM:SS с запасом на знак минуса — шесть знакомест.
-    const short = ledStripHeight(250, 6);
-    // H:MM:SS со знаком — девять.
-    const long = ledStripHeight(250, 9);
-
-    assert.equal(short, 90);
-    assert.equal(long, 64, 'строка длиннее — полоса ниже: ширину задаёт масштаб, а не содержимое');
-});
-
-test('высота полосы пропорциональна ширине', () => {
-    // Допуск 1 px: высота округляется до целого — setBounds дробей не принимает.
-    assert.ok(Math.abs(ledStripHeight(500, 6) - 2 * ledStripHeight(250, 6)) <= 1,
-        `${ledStripHeight(500, 6)} против ${2 * ledStripHeight(250, 6)}`);
-});
-
-test('кегль и поля считаются от МЕНЬШЕЙ из двух посадок', () => {
-    // Окно ровно той формы, которую даёт ledStripHeight: посадки совпадают.
-    const m = ledStripMetrics(250, 90, 6);
-    assert.equal(Math.round(m.fontSize), 53);
-    assert.equal(Math.round(m.padY), 18);
-    assert.equal(Math.round(m.padX), 24);
-
-    // Окно ниже нужного — решает высота.
-    const low = ledStripMetrics(250, 60, 6);
-    assert.equal(Math.round(low.fontSize), 35);
-
-    // Окно уже нужного — решает ширина.
-    const narrow = ledStripMetrics(150, 90, 6);
-    assert.equal(Math.round(narrow.fontSize), 32);
-});
-
-test('мусор даёт 0, а не NaN и не Infinity', () => {
-    // Любое из двух, попав в font-size, схлопывает цифры до невидимых —
-    // тот же принцип, что в digits-style.js.
-    for (const bad of [[0, 90, 6], [250, 0, 6], [250, 90, 0], ['x', 90, 6], [250, 90, -3]]) {
-        const m = ledStripMetrics(bad[0], bad[1], bad[2]);
-        assert.equal(m.fontSize, 0, `${JSON.stringify(bad)} → ${m.fontSize}`);
-        assert.equal(m.padX, 0);
-        assert.equal(m.padY, 0);
-    }
-    assert.equal(ledStripHeight(0, 6), 0);
-    assert.equal(ledStripHeight(250, 0), 0);
-});
-
-test('поля и радиус — доли КЕГЛЯ, а не окна', () => {
-    // Значение этого: рамка обнимает цифры одинаково на любом масштабе.
-    const small = ledStripMetrics(250, 90, 6);
-    const big = ledStripMetrics(1000, 360, 6);
-
-    assert.equal(Math.round(big.fontSize / small.fontSize), 4);
-    assert.equal(Math.round(big.padX / small.padX), 4);
-    assert.equal(Math.round(big.radius / small.radius), 4);
-});
+// Тесты полосы LED удалены вместе с самой полосой: стиль слит с «Цифрами»
+// 13.08.2026, ledStripHeight/ledStripMetrics больше нет ни в модуле, ни в окнах.
+// Проверять их отсутствие незачем — на несуществующий экспорт упадёт любой
+// вызов. То, что рамка объединённого стиля растёт от КЕГЛЯ, а не от окна,
+// проверяет tests/digits-style.test.js.

@@ -483,7 +483,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         // the state loop above exercises, so drive the other three explicitly:
         // poison with overtime, then recover, then look.
         log.info('[screenshot] style sweep (stuck-colour check)');
-        const STYLES = ['circle', 'digital', 'flip', 'analog', 'digits'];
+        const STYLES = ['circle', 'flip', 'analog', 'digits'];
         const poison = { totalSeconds: 300, presetSeconds: 300, remainingSeconds: -47,
             isRunning: true, isPaused: false, finished: false };
         const recover = { totalSeconds: 300, presetSeconds: 300, remainingSeconds: 300,

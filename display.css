@@ -288,10 +288,13 @@ body .info-block:not(.visible) {
                 text-shadow var(--tw-dur-base) var(--tw-ease);
 }
 
-/* ===== Per-style overrides for info-blocks ===== */
+/* Flip style */
+/* ===== Оформление блоков информации по стилям ===== */
 
-/* LED style */
-body.style-digital .info-block {
+/* «Цифры». Правила пришли из стиля LED вместе с ним самим (стили слиты
+   13.08.2026): у объединённого стиля тот же тёмный блок и та же зелёная
+   подпись. Контраст подписи считает tests/contrast.test.js. */
+body.style-digits .info-block {
     background: var(--tw-bg-led);
     border: none;
     border-radius: var(--tw-r-lg);
@@ -301,21 +304,19 @@ body.style-digital .info-block {
         inset 0 0 20px rgba(0, 0, 0, 0.6),
         0 4px 20px rgba(0, 0, 0, 0.4);
 }
-body.style-digital .info-label {
+body.style-digits .info-label {
     /* 0.65, а не 0.55: на --tw-bg-led (#08080b) зелёный при 0.55 давал
        3.57:1, а подпись идёт 12px uppercase 600 — нужно 4.5:1.
        При 0.65 выходит 4.60:1. Проверяется tests/contrast.test.js. */
     color: var(--info-color-dim, rgba(48, 209, 88, 0.65));
 }
-body.style-digital .info-value {
-    font-family: var(--tw-font-mono);
+body.style-digits .info-value {
     font-weight: 700;
     color: var(--info-color, var(--tw-led-green));
     /* Неон снят редизайном 2026-08-12. */
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
-/* Flip style */
 body.style-flip .info-block {
     background: linear-gradient(180deg, rgba(42, 42, 53, 0.85) 0%, rgba(26, 26, 37, 0.85) 100%);
     border-radius: var(--tw-r-md);
@@ -684,6 +685,7 @@ margin-right: 0.1em;
 .status-pill.running  .status-glyph::before { content: '▶'; font-size: 0.85rem; }
 .status-pill.paused   .status-glyph::before { content: '‖'; font-size: 1rem; }
 .status-pill.overtime .status-glyph::before { content: '⧗'; font-size: 1rem; }
+
 .status-pill.finished .status-glyph::before { content: '×'; font-size: 1.1rem; }
 
 .status-dot {
@@ -715,6 +717,7 @@ margin-right: 0.1em;
     border-color: rgba(255, 69, 58, 0.38);
     animation: overtime-pulse 0.8s infinite;
 }
+
 @keyframes overtime-pulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.85; }
@@ -733,27 +736,29 @@ margin-right: 0.1em;
     border-color: rgba(255, 69, 58, 0.38);
 }
 
-body.flash-mode { animation: flash-bg 0.3s; }
-@keyframes flash-bg {
-    0%, 100% { filter: brightness(1); }
-    50%      { filter: brightness(1.5); }
-}
-
-/* ===== Per-style status pill ===== */
-body.style-digital .status-pill {
+/* Плашка состояния — тоже из бывшего LED. */
+body.style-digits .status-pill {
     background: transparent;
     border: 1px solid var(--tw-border);
     border-radius: var(--tw-r-md);
     color: var(--tw-led-green);
     box-shadow: none;
 }
-body.style-digital .status-pill.running  { color: var(--tw-led-green); }
-body.style-digital .status-pill.paused   { color: var(--tw-led-warn); }
-body.style-digital .status-pill.finished { color: var(--tw-led-danger); }
-body.style-digital .status-pill.overtime {
+body.style-digits .status-pill.running  { color: var(--tw-led-green); }
+body.style-digits .status-pill.paused   { color: var(--tw-led-warn); }
+body.style-digits .status-pill.finished { color: var(--tw-led-danger); }
+body.style-digits .status-pill.overtime {
     color: var(--tw-led-danger);
     animation: led-overtime-pulse 1s infinite;
 }
+
+
+body.flash-mode { animation: flash-bg 0.3s; }
+@keyframes flash-bg {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.5); }
+}
+
 @keyframes led-overtime-pulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.85; }
@@ -766,77 +771,11 @@ body.style-flip .status-pill {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.45);
 }
 
-/* ============================================================
-   DIGITAL LED STYLE
-   ============================================================ */
-.timer-digital {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--tw-s-10);
-}
-.timer-digital.active { display: flex; }
-
-.digital-display {
-    background: var(--tw-bg-led);
-    border: 1px solid var(--tw-border-strong);
-    border-radius: var(--tw-r-2xl);
-    padding: 40px 60px;
-    /* Зелёный ореол третьим слоем снят, глубина осталась. */
-    box-shadow:
-        inset 0 0 50px rgba(0, 0, 0, 0.75),
-        0 8px 40px rgba(0, 0, 0, 0.55);
-    position: relative;
-    overflow: hidden;
-}
-.digital-display::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 50%;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
-    pointer-events: none;
-    border-radius: 19px 19px 0 0;
-}
-
-.digital-time {
-    font-family: var(--tw-font-mono);
-    font-size: clamp(4rem, 12vw, 12rem);
-    font-weight: 700;
-    /* Цвет темы приходит ПЕРЕМЕННОЙ, а не инлайном: инлайн бьёт правила
-       полос (.warning/.danger) и делал их недостижимыми из CSS. */
-    color: var(--timer-color, var(--tw-led-green));
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-    letter-spacing: 8px;
-    position: relative;
-    font-variant-numeric: tabular-nums;
-    /* Приехало из удалённого components.css. Смена цветовой полосы
-       (норма → внимание → опасность) пишется JS-ом инлайном, и без
-       перехода цифры переключают цвет рывком. Скриншотная сверка это
-       поймать не может — она снимает статичный кадр. */
-    transition: all 0.3s ease;
-}
-
-.digital-time.warning {
-    color: var(--tw-led-warn);
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-}
-.digital-time.danger {
-    color: var(--tw-led-danger);
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-    animation: led-danger-pulse 1s infinite;
-}
-
 @keyframes led-danger-pulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.7; }
 }
 
-.digital-dots {
-    display: inline-block;
-    animation: dots-blink 1s infinite;
-}
 @keyframes dots-blink {
     0%, 50%   { opacity: 1; }
     51%, 100% { opacity: 0.3; }
@@ -966,23 +905,15 @@ body.style-flip .status-pill {
     50%      { box-shadow: inset 0 1px 0 rgba(255,68,68,0.3),  0 4px 30px rgba(255,68,68,0.4); }
 }
 
-.flip-card.flipping .flip-card-inner {
-    animation: flip-animation 0.3s ease-in-out;
-}
-@keyframes flip-animation {
-    0%   { transform: rotateX(0); }
-    50%  { transform: rotateX(-10deg); }
-    100% { transform: rotateX(0); }
-}
+/* Наклона карточки здесь больше нет: перекидывание рисуют створки из
+   flip-card.css — одна копия механики на три окна. */
 
 /* Hide inactive timer styles — all hidden by default */
 .timer-ring,
-.timer-digital,
 .timer-flip,
 .timer-analog { display: none !important; }
 
 .timer-ring.active    { display: block !important; }
-.timer-digital.active { display: flex !important; }
 .timer-flip.active    { display: flex !important; }
 .timer-analog.active  { display: flex !important; }
 
@@ -1218,6 +1149,13 @@ body.style-analog .status-pill {
     width: fit-content;
     margin-inline: auto;
     font-size: var(--digits-font-size, 120px);
+    /* Рамка вокруг цифр — в долях кегля, чтобы расти вместе с ним. Значения
+       совпадают с FRAME_PAD_*_EM в digits-style.js: по ним считается подгонка.
+       Фон полноэкранного окна задаётся отдельно (заливка/градиент/файл),
+       поэтому здесь он прозрачный и рамка не видна — поля всё равно нужны,
+       иначе подгонка кегля разошлась бы между окнами. */
+    padding: 0.18em 0.34em;
+    border-radius: 0.22em;
     line-height: 1;
     white-space: nowrap;
     color: var(--timer-color, var(--tw-fg));

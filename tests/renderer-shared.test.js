@@ -401,3 +401,105 @@ test('backgroundTone: нечитаемый цвет откатывается к 
     assert.equal(backgroundTone({ mode: 'solid', solid: 'чепуха', theme: 'light' }), 'light');
     assert.equal(backgroundTone({ mode: 'gradient', grad1: 'нет', grad2: 'тоже нет', theme: 'dark' }), 'dark');
 });
+
+// ---------------------------------------------------------------------------
+// surfacePaint — цвет подложки виджета и часов (вариант A: одна пара
+// «цвет + прозрачность» на окно, красит подложку ТЕКУЩЕГО стиля)
+// ---------------------------------------------------------------------------
+const { surfacePaint } = require('../renderer-shared');
+
+test('surfacePaint: без цвета подложки нет — владельцем дефолта остаётся CSS', () => {
+    // null означает «сними переменную», а не «покрась прозрачным»: подложка
+    // стиля описана в CSS, и вернуть её можно только удалением переменной.
+    assert.equal(surfacePaint(null), null);
+    assert.equal(surfacePaint(undefined), null);
+    assert.equal(surfacePaint({}), null);
+    assert.equal(surfacePaint({ alpha: 0.5 }), null, 'одна прозрачность без цвета ничего не красит');
+});
+
+test('surfacePaint: мусор вместо цвета не доезжает до CSS', () => {
+    for (const junk of ['red', 'rgb(1,2,3)', '#12345', '#xyzxyz', 'url(x)', '#fff;color:red', 42, {}, '']) {
+        assert.equal(surfacePaint({ color: junk }), null, `цвет ${String(junk)}`);
+    }
+});
+
+test('surfacePaint: цвет без прозрачности красит непрозрачно', () => {
+    assert.equal(surfacePaint({ color: '#1a2b3c' }), 'color-mix(in srgb, #1a2b3c 100%, transparent)');
+    assert.equal(surfacePaint({ color: '#FFF' }), 'color-mix(in srgb, #fff 100%, transparent)');
+});
+
+test('surfacePaint: прозрачность 0 гасит подложку ЛЮБОГО стиля', () => {
+    // Ровно то, ради чего задача и начата: у LED, флипа и аналога своя
+    // непрозрачная подложка, и добиться полной прозрачности иначе нельзя.
+    assert.equal(surfacePaint({ color: '#000000', alpha: 0 }), 'color-mix(in srgb, #000000 0%, transparent)');
+});
+
+test('surfacePaint: прозрачность зажимается в 0…1, мусор читается как 1', () => {
+    assert.equal(surfacePaint({ color: '#ffffff', alpha: 5 }), 'color-mix(in srgb, #ffffff 100%, transparent)');
+    assert.equal(surfacePaint({ color: '#ffffff', alpha: -3 }), 'color-mix(in srgb, #ffffff 0%, transparent)');
+    for (const junk of [NaN, Infinity, 'много', null]) {
+        assert.equal(
+            surfacePaint({ color: '#ffffff', alpha: junk }),
+            'color-mix(in srgb, #ffffff 100%, transparent)',
+            `прозрачность ${String(junk)}`
+        );
+    }
+});
+
+test('surfacePaint: доля пишется с одним знаком, без хвоста double', () => {
+    assert.equal(surfacePaint({ color: '#ffffff', alpha: 0.07 }), 'color-mix(in srgb, #ffffff 7%, transparent)');
+    assert.equal(surfacePaint({ color: '#ffffff', alpha: 1 / 3 }), 'color-mix(in srgb, #ffffff 33.3%, transparent)');
+});
+
+// ---------------------------------------------------------------------------
+// surfaceAlpha — прозрачность БЕЗ выбранного цвета
+// ---------------------------------------------------------------------------
+const { surfaceAlpha } = require('../renderer-shared');
+
+test('surfaceAlpha: не задана — null, чтобы CSS оставил подложку стиля как есть', () => {
+    assert.equal(surfaceAlpha(undefined), null);
+    assert.equal(surfaceAlpha(null), null);
+    assert.equal(surfaceAlpha(''), null);
+    assert.equal(surfaceAlpha('чепуха'), null);
+    assert.equal(surfaceAlpha(NaN), null);
+});
+
+test('surfaceAlpha: 0 — законное значение, а не «не задана»', () => {
+    // Number(null) === 0, поэтому эти два случая обязаны различаться явно:
+    // иначе «фон не настроен» читалось бы как «фон погашен».
+    assert.equal(surfaceAlpha(0), 0);
+    assert.equal(surfaceAlpha('0'), 0);
+});
+
+test('surfaceAlpha: зажимается в 0…1', () => {
+    assert.equal(surfaceAlpha(0.42), 0.42);
+    assert.equal(surfaceAlpha(5), 1);
+    assert.equal(surfaceAlpha(-2), 0);
+});
+
+// ---------------------------------------------------------------------------
+// migrateTimerStyle — стиль LED слит с «Цифрами»
+// ---------------------------------------------------------------------------
+const { migrateTimerStyle } = require('../renderer-shared');
+
+test('migrateTimerStyle: сохранённый LED читается как «Цифры»', () => {
+    // Стиля digital больше нет ни в одном окне. Профиль, где он выбран, обязан
+    // открыться работающим, а не пустым окном без единого активного стиля.
+    assert.equal(migrateTimerStyle('digital'), 'digits');
+});
+
+test('migrateTimerStyle: остальные стили не трогает', () => {
+    for (const style of ['circle', 'flip', 'analog', 'digits']) {
+        assert.equal(migrateTimerStyle(style), style);
+    }
+});
+
+test('migrateTimerStyle: мусор возвращается как есть — решает вызывающий', () => {
+    // Подставлять здесь 'circle' значило бы прятать чужую ошибку: окно, которое
+    // получило неизвестный стиль, должно вести себя одинаково и до, и после
+    // слияния стилей.
+    assert.equal(migrateTimerStyle('чепуха'), 'чепуха');
+    assert.equal(migrateTimerStyle(''), '');
+    assert.equal(migrateTimerStyle(null), null);
+    assert.equal(migrateTimerStyle(undefined), undefined);
+});

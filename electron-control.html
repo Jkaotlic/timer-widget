@@ -209,7 +209,6 @@
                             <span class="toggle-label">Стиль таймера</span>
                             <div class="segmented" id="timerStyle" role="radiogroup" aria-label="Стиль виджета" data-value="circle">
                                 <button type="button" data-val="circle" class="active">Круг</button>
-                                <button type="button" data-val="digital">LED</button>
                                 <button type="button" data-val="flip">Флип</button>
                                 <button type="button" data-val="analog">Аналог</button>
                                 <button type="button" data-val="digits">Цифры</button>
@@ -234,23 +233,12 @@
                                 <span id="timerScaleValue" class="scale-value-text">100%</span>
                             </div>
                         </div>
-                        <!-- Деления на круглом циферблате. Настройка общая для виджета
-                             таймера и виджета часов: SVG-группа .tick-marks и правило
-                             .ticks-on есть в обоих окнах, поэтому обработчик пишет и
-                             widgetShowTicks, и clockShowTicks. -->
-                        <div class="toggle-row">
-                            <label class="toggle-label" for="widgetShowTicks">Деления на циферблате</label>
-                            <label class="toggle-switch" title="Показывать деления на круглом циферблате виджета и часов">
-                                <input type="checkbox" id="widgetShowTicks">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
                         <!-- По умолчанию ВЫКЛЮЧЕНА: состояние уже несёт цвет дуги
                              (зелёный идёт, оранжевый последние минуты, красный
                              перерасход), а на маленьком виджете слово занимает
                              место, которого нет. Тумблер для тех, кому слово
                              нужнее места. -->
-                        <div class="toggle-row">
+                        <div class="toggle-row" id="widgetStatusRow">
                             <label class="toggle-label" for="widgetStatusLabel">Подпись состояния</label>
                             <label class="toggle-switch" title="Показывать «идёт», «пауза», «перерасход» под цифрами виджета">
                                 <input type="checkbox" id="widgetStatusLabel">
@@ -284,6 +272,9 @@
                             <input type="text" class="cp-hex-input" id="widgetCpHex" placeholder="#ffffff" maxlength="7" aria-label="HEX-код цвета виджета">
                         </div>
                     </div>
+                    <!-- Точка монтирования: сам ряд «Фон» строит panel-colors.js. -->
+                    <div id="widgetSurfaceRow"></div>
+                    <div id="widgetResetRow"></div>
                     </div>
                 </div>
 
@@ -519,7 +510,6 @@
                                 <span class="toggle-label">Стиль</span>
                                 <div class="segmented" id="clockStyle" role="radiogroup" aria-label="Стиль часов" data-value="circle">
                                     <button type="button" data-val="circle" class="active">Круг</button>
-                                    <button type="button" data-val="digital">LED</button>
                                     <button type="button" data-val="flip">Флип</button>
                                     <button type="button" data-val="analog">Аналог</button>
                                     <button type="button" data-val="digits">Цифры</button>
@@ -537,6 +527,16 @@
                                     <input type="range" id="clockScale" class="scale-slider" min="30" max="600" value="100" aria-label="Масштаб часов">
                                     <span id="clockScaleValue" class="scale-value-text">100%</span>
                                 </div>
+                            </div>
+                            <!-- Деления круглого циферблата ЧАСОВ. У виджета таймера их
+                                 больше нет: там это кольцо обратного отсчёта, и засечки
+                                 на нём только шумели. -->
+                            <div class="toggle-row" id="clockTicksRow">
+                                <label class="toggle-label" for="clockShowTicks">Деления на циферблате</label>
+                                <label class="toggle-switch" title="Показывать деления на круглом циферблате часов">
+                                    <input type="checkbox" id="clockShowTicks">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
                             <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
                                 <label class="toggle-label" for="clockShowAnalogNumbers">Цифры на циферблате</label>
@@ -562,6 +562,11 @@
                                     <input type="text" class="cp-hex-input" id="clockCpHex" placeholder="#ffffff" maxlength="7" aria-label="HEX-код цвета часов">
                                 </div>
                             </div>
+                            <!-- Фон и сбросы строит panel-colors.js: разметка (свотч,
+                                 вторая пипетка, ползунок прозрачности) собирается в
+                                 модуле, здесь — только точка монтирования. -->
+                            <div id="clockSurfaceRow"></div>
+                            <div id="clockResetRow"></div>
                         </div>
                         <div class="settings-group">
                             <div class="settings-group-title">
@@ -620,7 +625,6 @@
                                 <span class="toggle-label">Стиль</span>
                                 <div class="segmented" id="displayTimerStyle" role="radiogroup" aria-label="Стиль таймера дисплея" data-value="circle">
                                     <button type="button" data-val="circle" class="active">Круг</button>
-                                    <button type="button" data-val="digital">LED</button>
                                     <button type="button" data-val="flip">Флип</button>
                                     <button type="button" data-val="analog">Аналог</button>
                                     <button type="button" data-val="digits">Цифры</button>
@@ -714,6 +718,7 @@
                                     <input type="text" class="cp-hex-input" id="displayCpHex" placeholder="#ffffff" maxlength="7" aria-label="HEX-код цвета дисплея">
                                 </div>
                             </div>
+                            <div id="displayResetRow"></div>
                             <div class="settings-subtitle">Фон</div>
                             <div class="bg-mode-tabs">
                                 <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
@@ -1074,6 +1079,8 @@
     <script src="custom-sounds.js"></script>
     <script src="local-background.js"></script>
     <script src="theme-grid.js"></script>
+    <script src="panel-colors.js"></script>
+    <script src="panel-reset.js"></script>
 
     <script>
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
@@ -1181,7 +1188,7 @@
                 this.timeBlocksScaleValueEl = document.getElementById('timeBlocksScaleValue');
                 this.timerStyleEl = document.getElementById('timerStyle');
                 this._attachSegmented(this.timerStyleEl, 'circle');
-                this.widgetShowTicksEl = document.getElementById('widgetShowTicks');
+                this.clockShowTicksEl = document.getElementById('clockShowTicks');
                 // Два тумблера редизайна. Проводка одинаковая: записать и
                 // отправить ВЕСЬ payload стиля — он собирается в одном месте,
                 // поэтому новое поле уезжает само.
@@ -1193,20 +1200,14 @@
                         this.saveExtSettings();
                     });
                 }
-                if (this.widgetShowTicksEl) {
-                    this.widgetShowTicksEl.checked = localStorage.getItem('widgetShowTicks') === 'true';
-                    this.widgetShowTicksEl.addEventListener('change', () => {
-                        const val = this.widgetShowTicksEl.checked;
-                        localStorage.setItem('widgetShowTicks', val);
-                        localStorage.setItem('clockShowTicks', val);
-                        ipcRenderer.send('widget-style-update', this.widgetStylePayload({ showTicks: val }));
-                        // Деления — общая настройка ДВУХ циферблатов: и виджет
-                        // таймера, и виджет часов имеют SVG-группу .tick-marks и
-                        // правило .ticks-on. Поэтому пушим часам всегда, а не
-                        // только при включённой синхронизации стиля: раньше с
-                        // выключенным syncClockStyle галочка меняла деления только
-                        // на виджете, а часы узнавали о ней случайно — при любой
-                        // следующей правке других настроек часов.
+                if (this.clockShowTicksEl) {
+                    // Деления принадлежат ЧАСАМ и только им. Раньше это была одна
+                    // настройка на два циферблата, и жила она во вкладке виджета:
+                    // у кольца обратного отсчёта засечки только шумели, а к
+                    // делениям часов можно было добраться лишь через чужую вкладку.
+                    this.clockShowTicksEl.checked = localStorage.getItem('clockShowTicks') === 'true';
+                    this.clockShowTicksEl.addEventListener('change', () => {
+                        localStorage.setItem('clockShowTicks', this.clockShowTicksEl.checked);
                         this.pushClockSettings();
                     });
                 }
@@ -1370,6 +1371,8 @@
                         shell.style.transition = '';
                     }
 
+                    // Потолок ширины поднимается ПЕРВЫМ, иначе запрос ниже обрежется (см. main).
+                    ipcRenderer.send('control-drawer', { open: true });
                     // Drawer-операция меняет только ширину — высоту main оставит
                     // как есть (иначе ручная высота, выставленная юзером,
                     // перезаписывалась innerHeight с HiDPI-дрейфом).
@@ -1467,6 +1470,7 @@
                     shell.style.setProperty('--drawer-reserve', '0px');
                 }
                 ipcRenderer.send('resize-control-window', { width: restoreWidth });
+                ipcRenderer.send('control-drawer', { open: false }); // потолок вниз ПОСЛЕ сжатия
                 // Класс снимаем, когда ширина окна вернулась И анимация дорожек
                 // отыграла: в этот момент 1fr уже равен пину, поэтому снятие
                 // визуально ничего не меняет. Сторож по времени — на случай, если
@@ -1667,7 +1671,7 @@
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
                     this.updateClockAnalogNumbersVisibility();
-                    this.updateDigitsFontRowsVisibility();
+                    this.updateStyleDependentRows();
                     this.saveExtSettings();
                 });
 
@@ -1680,7 +1684,7 @@
                 // Display-specific style/scale (Полноэкранный tab)
                 if (this.displayTimerStyleEl) {
                     this.displayTimerStyleEl.addEventListener('change', () => {
-                        this.updateDigitsFontRowsVisibility();
+                        this.updateStyleDependentRows();
                         this.pushDisplaySettings();
                     });
                 }
@@ -1701,7 +1705,7 @@
                         ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
                     }
                     this.updateClockAnalogNumbersVisibility();
-                    this.updateDigitsFontRowsVisibility();
+                    this.updateStyleDependentRows();
                     this.saveExtSettings();
                 });
 
@@ -1713,7 +1717,7 @@
                     }
                     ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
                     this.updateClockAnalogNumbersVisibility();
-                    this.updateDigitsFontRowsVisibility();
+                    this.updateStyleDependentRows();
                     this.saveExtSettings();
                 });
 
@@ -1889,14 +1893,15 @@
 
             loadSettings() {
                 // Загрузка цветов
+                // Старый общий ключ: то, что в нём есть, ДОПОЛНЯЕТ стартовые
+                // цвета, а не пересобирает их. Прежняя версия строила объект из
+                // трёх полей с фиолетовыми запасными значениями — и тем самым
+                // теряла бы всё, чего в ключе нет (фон окна, прозрачность).
                 const savedColors = localStorage.getItem('timerColors');
                 if (savedColors) {
-                    const c = safeJSONParse(savedColors, {});
-                    this.currentColors = {
-                        timer: c.timer || '#667eea',
-                        progress: c.progress || '#764ba2',
-                        bg: c.bg || '#0f0c29'
-                    };
+                    this.currentColors = window.mergeColors(
+                        this.currentColors, safeJSONParse(savedColors, {})
+                    );
                 }
 
                 // Загрузка расширенных настроек
@@ -1908,6 +1913,24 @@
                 // выражается: собственный формат двух ключей, побочные эффекты
                 // (видимость строк, отправка в окна) и поля контроллера.
                 const applied = window.SettingsSchema.applyStoredSettings(ext, document);
+
+                // Слитый стиль. Профиль мог хранить `digital` (LED) — стиля с
+                // таким именем больше нет ни в одном окне, и сегментированный
+                // контрол просто не нашёл бы такой кнопки: пользователь увидел
+                // бы, что стиль «не выбран». Переводим ЗДЕСЬ, в единственном
+                // месте, где панель раскладывает сохранённое по контролам, и
+                // сразу отдаём фон и цвет цифр от прежнего LED — чтобы окно
+                // выглядело так же, как до слияния.
+                for (const [el, target] of [[this.timerStyleEl, 'widget'], [this.clockStyleEl, 'clock'], [this.displayTimerStyleEl, 'display']]) {
+                    if (!el || el.value !== 'digital') { continue; }
+                    el.value = window.RendererShared.migrateTimerStyle('digital');
+                    if (target !== 'display') {
+                        const colors = target === 'widget' ? this.currentColors : this.clockColors;
+                        if (!colors || !colors.surface) {
+                            this.updateColors(target, { surface: '#0a0a0f', surfaceAlpha: 0.85 });
+                        }
+                    }
+                }
 
                 // Лимит перерасхода: в хранилище секунды, в поле «MM:SS».
                 document.getElementById('overrunRow').style.display = applied.allowNegative ? 'flex' : 'none';
@@ -1967,7 +1990,7 @@
                 this.updateClockAnalogNumbersVisibility();
                 // Строки выбора шрифта «Цифры» — видимость зависит от
                 // восстановленного выше стиля каждого из трёх окон.
-                this.updateDigitsFontRowsVisibility();
+                this.updateStyleDependentRows();
 
                 // Отправляем стиль часам при загрузке
                 const clockStyleToSend = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
@@ -2001,8 +2024,10 @@
                     ipcRenderer.send('display-colors-update', savedDisplayColors);
                 }
 
-                // Цвета загружены — показать, какая тема им соответствует.
+                // Цвета загружены — показать, какая тема им соответствует и в
+                // каком состоянии фон окна (до сборки ряда вызов холостой).
                 this.highlightActiveThemes();
+                this.renderSurfaceControls();
             }
 
             saveColors(target = 'all') {
@@ -2113,18 +2138,6 @@
             // Строка выбора шрифта видна только при стиле «Цифры» — у остальных
             // четырёх стилей начертание задаёт сам стиль, выбирать нечего.
             // Три независимых проверки: у каждого окна свой активный стиль.
-            updateDigitsFontRowsVisibility() {
-                const clockStyle = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
-                const rows = [
-                    [this.widgetDigitsFontRowEl, this.timerStyleEl.value],
-                    [this.clockDigitsFontRowEl, clockStyle],
-                    [this.displayDigitsFontRowEl, this.displayTimerStyleEl ? this.displayTimerStyleEl.value : 'circle']
-                ];
-                for (const [row, style] of rows) {
-                    if (row) { row.style.display = style === 'digits' ? 'flex' : 'none'; }
-                }
-            }
-
             // Адаптер: div.segmented притворяется форм-контролем с .value.
             //
             // КРИТИЧНО: присваивание .value НЕ порождает 'change' — ровно как у
@@ -2196,7 +2209,7 @@
                 // восстанавливают её сами окна. Поэтому в хранилище часов она не
                 // идёт (вторая копия настройки рано или поздно разойдётся), а по
                 // IPC идёт: там её ждут прямо сейчас.
-                const settings = { ...persisted, showTicks: this.widgetShowTicksEl?.checked ?? false };
+                const settings = { ...persisted, showTicks: this.clockShowTicksEl?.checked ?? false };
 
                 // СЛИЯНИЕ, а не перезапись: ключ пишут двое — эта панель и сам
                 // виджет часов (у него там ещё clockStyle). Прямая перезапись
@@ -2665,40 +2678,29 @@
         Object.assign(TimerController.prototype, window.LocalBackgroundMixin);
         Object.assign(TimerController.prototype, window.ThemeGridMixin);
         Object.assign(TimerController.prototype, window.PanelStateMixin);
+        Object.assign(TimerController.prototype, window.PanelColorsMixin);
+        Object.assign(TimerController.prototype, window.PanelResetMixin);
 
         window.timerController = new TimerController();
+        // Ряд «Фон» строится ПОСЛЕ конструктора: ему нужны загруженные цвета.
+        window.timerController.initSurfaceControls();
+        window.timerController.initResetButtons();
 
-        // Widget picker
-        addPickerToggle('themesGrid', 'widgetColorPickerPanel', {
-            sv: 'widgetCpSv', hue: 'widgetCpHue', hex: 'widgetCpHex', preview: 'widgetCpPreview',
-            onChange: (hex) => {
-                document.querySelectorAll('#themesGrid .theme-btn').forEach(b => b.classList.remove('active'));
-                const tc = window.timerController;
-                tc.currentColors = { timer: hex, progress: hex };
-                tc.saveColors('widget');
-            }
-        });
-
-        // Clock picker
-        addPickerToggle('clockThemesGrid', 'clockColorPickerPanel', {
-            sv: 'clockCpSv', hue: 'clockCpHue', hex: 'clockCpHex', preview: 'clockCpPreview',
-            onChange: (hex) => {
-                document.querySelectorAll('#clockThemesGrid .theme-btn').forEach(b => b.classList.remove('active'));
-                const tc = window.timerController;
-                tc.clockColors = { timer: hex, progress: hex };
-                tc.saveColors('clock');
-            }
-        });
-
-        // Display picker
-        addPickerToggle('displayThemesGrid', 'displayColorPickerPanel', {
-            sv: 'displayCpSv', hue: 'displayCpHue', hex: 'displayCpHex', preview: 'displayCpPreview',
-            onChange: (hex) => {
-                document.querySelectorAll('#displayThemesGrid .theme-btn').forEach(b => b.classList.remove('active'));
-                const tc = window.timerController;
-                tc.displayColors = { timer: hex, progress: hex };
-                tc.saveColors('display');
-            }
+        // Пипетки трёх окон. Объект цветов НЕ пересобирается здесь: раньше
+        // каждая писала `{ timer: hex, progress: hex }` целиком и вместе с
+        // цветом цифр стирала бы выбранный фон окна. Сборка одна — updateColors.
+        [
+            { target: 'widget', grid: 'themesGrid', panel: 'widgetColorPickerPanel', ids: ['widgetCpSv', 'widgetCpHue', 'widgetCpHex', 'widgetCpPreview'] },
+            { target: 'clock', grid: 'clockThemesGrid', panel: 'clockColorPickerPanel', ids: ['clockCpSv', 'clockCpHue', 'clockCpHex', 'clockCpPreview'] },
+            { target: 'display', grid: 'displayThemesGrid', panel: 'displayColorPickerPanel', ids: ['displayCpSv', 'displayCpHue', 'displayCpHex', 'displayCpPreview'] }
+        ].forEach(({ target, grid, panel, ids }) => {
+            addPickerToggle(grid, panel, {
+                sv: ids[0], hue: ids[1], hex: ids[2], preview: ids[3],
+                onChange: (hex) => {
+                    document.querySelectorAll(`#${grid} .theme-btn`).forEach(b => b.classList.remove('active'));
+                    window.timerController.updateColors(target, { timer: hex, progress: hex });
+                }
+            });
         });
 
         // Отслеживание состояния окон

@@ -384,7 +384,6 @@ test('восстановление цвета не зависит от нали�
     );
     // И положительная сторона: правила полос действительно объявлены.
     for (const selector of [
-        /\.widget-digital-time\[data-status="danger"\]/,
         /\.widget-digits-time\[data-status="danger"\]/,
         /\.widget-flip-card\[data-status="danger"\]/
     ]) {
@@ -432,7 +431,6 @@ test('дисплей не пишет цвет полосы инлайном ни
     const displayCss = readDisplaySource();
     for (const selector of [
         /\.time-text\.danger/,
-        /\.digital-time\.danger/,
         /\.digits-time\.danger/,
         /\.flip-card\.danger \.flip-digit/,
         /\.flip-separator\.danger/,
@@ -484,12 +482,13 @@ test('у виджета есть собственный красный клас�
     assert.doesNotMatch(widgetHtml, /textContent = 'Перерасход';\s*\n\s*this\.statusBadge\.classList\.add\('running'\)/);
 });
 
-test('скриншот-прогон проверяет выход из перерасхода и все 4 стиля', () => {
+test('скриншот-прогон проверяет выход из перерасхода и все стили', () => {
     const runner = read('scripts/screenshot-runner.js');
     // Состояние recovered обязано идти СРАЗУ после overtime — иначе оно не ловит
     // залипшие инлайновые цвета.
     assert.match(runner, /name: 'overtime'[\s\S]{0,600}?name: 'recovered'/);
-    assert.match(runner, /const STYLES = \['circle', 'digital', 'flip', 'analog', 'digits'\]/);
+    // Стилей стало четыре: LED слит с «Цифрами» 13.08.2026.
+    assert.match(runner, /const STYLES = \['circle', 'flip', 'analog', 'digits'\]/);
 });
 
 // ---------------------------------------------------------------------------

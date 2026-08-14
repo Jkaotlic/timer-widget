@@ -14,6 +14,7 @@ const {
     measureDigits,
     clearProbeCache
 } = require('../digits-style');
+const DigitsStyle = require('../digits-style');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -72,24 +73,50 @@ test('resolveFont: мусор откатывается к умолчанию, а
 // ---------------------------------------------------------------------------
 // Арифметика подгонки
 // ---------------------------------------------------------------------------
-test('fitScale: ограничение по ширине', () => {
-    // Эталон 200×50 при доступных 400×500 → упираемся в ширину: 400/200 = 2.
+// Поля рамки входят в габарит: цифры подгоняются ВМЕСТЕ с ней. При базовом
+// кегле 100 это +2*0.34*100 по ширине и +2*0.18*100 по высоте.
+const FRAME_X = 2 * DigitsStyle.FRAME_PAD_X_EM * PROBE_FONT_SIZE;
+const FRAME_Y = 2 * DigitsStyle.FRAME_PAD_Y_EM * PROBE_FONT_SIZE;
+
+test('fitScale: ограничение по ширине — с полями рамки', () => {
+    // Эталон 200×50 плюс поля рамки при доступных 400×5000 → упираемся в ширину.
     assert.equal(fitScale({
-        availableWidth: 400, availableHeight: 500, probeWidth: 200, probeHeight: 50
-    }), 2);
+        availableWidth: 400, availableHeight: 5000, probeWidth: 200, probeHeight: 50
+    }), 400 / (200 + FRAME_X));
 });
 
-test('fitScale: ограничение по высоте', () => {
+test('fitScale: ограничение по высоте — тоже с полями', () => {
     assert.equal(fitScale({
-        availableWidth: 4000, availableHeight: 100, probeWidth: 200, probeHeight: 50
-    }), 2);
+        availableWidth: 40000, availableHeight: 100, probeWidth: 200, probeHeight: 50
+    }), 100 / (50 + FRAME_Y));
 });
 
 test('fitScale: запас под знак минуса сужает доступную ширину', () => {
     // Знак вынесен из потока и в ширину блока не входит, но за край вылезти может.
     assert.equal(fitScale({
         availableWidth: 400, availableHeight: 5000, probeWidth: 150, probeHeight: 50, signWidth: 50
-    }), 2);
+    }), 400 / (150 + 50 + FRAME_X));
+});
+
+test('поля рамки в CSS совпадают с теми, по которым считается подгонка', () => {
+    // Разойдутся — подогнанные цифры вылезут за собственную рамку, и увидеть
+    // это можно будет только глазом на конкретном размере окна.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const expected = `padding: ${DigitsStyle.FRAME_PAD_Y_EM}em ${DigitsStyle.FRAME_PAD_X_EM}em`;
+    for (const [file, selector] of [
+        ['electron-widget.html', '.widget-digits-time'],
+        ['electron-clock-widget.html', '.clock-digits-time'],
+        ['display.css', '.digits-time']
+    ]) {
+        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const rule = src.match(new RegExp(`^\\s*\\${selector} \\{[^}]*\\}`, 'm'));
+        assert.ok(rule, `${file}: не найдено правило ${selector}`);
+        assert.ok(
+            rule[0].includes(expected),
+            `${file}: поля рамки ${selector} разошлись с подгонкой (${expected})`
+        );
+    }
 });
 
 test('fitScale: нулевые и мусорные размеры дают 0, а не Infinity и не NaN', () => {
@@ -108,8 +135,8 @@ test('fitScale: нулевые и мусорные размеры дают 0, а
 test('fitFontSize: кегль — это базовый кегль эталона, умноженный на масштаб', () => {
     assert.equal(PROBE_FONT_SIZE, 100);
     assert.equal(fitFontSize({
-        availableWidth: 400, availableHeight: 500, probeWidth: 200, probeHeight: 50
-    }), 200);
+        availableWidth: 400, availableHeight: 5000, probeWidth: 200, probeHeight: 50
+    }), PROBE_FONT_SIZE * (400 / (200 + FRAME_X)));
 });
 
 test('эталонные строки: минуты и часы — самые широкие комбинации цифр', () => {

@@ -34,12 +34,11 @@ async function findClock(app) {
     return null;
 }
 
-// Часы «живы», если ровно один из четырёх стилей отрисован и на body стоит
+// Часы «живы», если ровно один из стилей отрисован и на body стоит
 // ровно один класс style-*.
 function measureStyleState() {
     const panes = {
         circle: document.querySelector('.circular-widget'),
-        digital: document.getElementById('widgetDigital'),
         flip: document.getElementById('widgetFlip'),
         analog: document.getElementById('widgetAnalog')
     };

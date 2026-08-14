@@ -246,9 +246,12 @@ test('таблицы стилей дисплея подключены в пра�
     const displayHtml = fs.readFileSync(path.join(repoRoot, 'display.html'), 'utf8');
     const order = [...displayHtml.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)]
         .map((m) => m[1]);
+    // flip-card.css встал ТРЕТЬИМ, а не последним, и это то же требование, а не
+    // исключение из него: механика перекидыша общая на три окна, а display.css
+    // по-прежнему обязан переопределять всё при равной специфичности.
     assert.deepEqual(
         order,
-        ['fonts.css', 'design-tokens.css', 'display.css'],
+        ['fonts.css', 'design-tokens.css', 'flip-card.css', 'display.css'],
         'порядок таблиц стилей дисплея изменился — проверьте, что понимаете, зачем'
     );
 });

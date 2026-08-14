@@ -7,6 +7,7 @@
     <title>Clock Widget</title>
     <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
+    <link rel="stylesheet" href="flip-card.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
@@ -28,8 +29,12 @@
 
         body {
             font-family: var(--tw-font-sans);
-            /* Near-transparent background enables drag/hit-testing on Windows transparent windows */
-            background: rgba(0, 0, 0, 0.01);
+            /* Подложки НЕТ — по тем же причинам, что и в electron-widget.html:
+               это она была «еле заметным прямоугольником» вокруг круга и
+               «Цифр». Цена на Windows (клик проваливается сквозь полностью
+               прозрачные пиксели, тащить окно можно только за сами часы)
+               принята сознательно. Свой фон окна задаётся --surface-paint. */
+            background: transparent;
             overflow: hidden;
             color: var(--tw-fg);
             -webkit-font-smoothing: antialiased;
@@ -72,9 +77,16 @@
             max-height: 100%;
         }
 
+        /* Градиент секундного кольца: дефолт здесь, пользовательский цвет —
+           переменной с documentElement, сброс — её удалением. */
+        #clockGradient stop:first-child { stop-color: var(--timer-color-stop, #0a84ff); }
+        #clockGradient stop:last-child { stop-color: var(--progress-color-stop, #30d158); }
+
         /* Фоновый круг с градиентом */
         .bg-circle {
-            fill: var(--tw-bg-timer);
+            /* Пользовательский фон приходит переменной, дефолт остаётся здесь:
+               сброс фона в панели удаляет переменную, а не пишет токен обратно. */
+            fill: var(--surface-paint, color-mix(in srgb, var(--tw-bg-timer) calc(var(--surface-alpha, 1) * 100%), transparent));
             stroke: var(--tw-border-strong);
             stroke-width: 1.5;
         }
@@ -242,8 +254,9 @@
             margin-top: 0;
         }
 
-        /* Digital: LED-style date plate on dark enclosure */
-        body.style-digital .date-badge {
+        /* «Цифры»: табличка даты в тон цифрам (пришла из стиля LED вместе с
+           самим стилем). */
+        body.style-digits .date-badge {
             background: var(--tw-bg-led);
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-sm);
@@ -289,7 +302,7 @@
             display: inline-block;
         }
 
-        body.style-digital .timezone-badge {
+        body.style-digits .timezone-badge {
             background: var(--tw-bg-led);
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-xs);
@@ -308,81 +321,11 @@
             box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.3);
         }
 
-        /* ============================================
-           СТИЛЬ: ЦИФРОВОЙ LED (Digital)
-           ============================================ */
-        .widget-digital {
-            display: none;
-            width: 100%;
-            height: 100%;
-            align-items: center;
-            justify-content: center;
-            padding: 5%;
-            overflow: hidden;
-        }
-
-        .widget-digital.active {
-            display: flex;
-        }
-
-        /* LED enclosure — dark panel with top highlight */
-        .widget-digital-display {
-            background: var(--tw-bg-led);
-            -webkit-backdrop-filter: var(--tw-blur-sm);
-            backdrop-filter: var(--tw-blur-sm);
-            border: 1px solid var(--tw-border);
-            border-radius: var(--tw-r-lg);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-height: 60%;
-            gap: 4px;
-            padding: 5% 8%;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .widget-digital-display::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 50%;
-            background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 100%);
-            pointer-events: none;
-            border-radius: var(--tw-r-md) var(--tw-r-md) 0 0;
-        }
-
-        .widget-digital-time {
-            font-family: var(--tw-font-mono);
-            font-size: var(--digital-font-size, 24px);
-            font-weight: 700;
-            color: var(--tw-led-green);
-            /* Неон снят: один приём тени на все пять стилей. */
-            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-            letter-spacing: 0.02em;
-            white-space: nowrap;
-            line-height: 1;
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* Дата и timezone пропорционально размеру времени в digital */
-        .widget-digital-display .date-badge {
-            margin-top: 0;
-            padding: calc(var(--digital-font-size, 24px) * 0.1) calc(var(--digital-font-size, 24px) * 0.3);
-            font-size: calc(var(--digital-font-size, 24px) * 0.18);
-            border-radius: calc(var(--digital-font-size, 24px) * 0.1);
-        }
-
-        .widget-digital-display .timezone-badge {
-            margin-top: 0;
-            padding: calc(var(--digital-font-size, 24px) * 0.06) calc(var(--digital-font-size, 24px) * 0.2);
-            font-size: calc(var(--digital-font-size, 24px) * 0.14);
-            border-radius: calc(var(--digital-font-size, 24px) * 0.08);
-        }
+        /* Стиля LED больше нет: он был теми же цифрами в коробке, а после того,
+           как фон окна стал настройкой, отличался от «Цифр» только рамкой и
+           отсутствием выбора шрифта. Оба свойства теперь у «Цифр»
+           (.clock-digits-time), дата и пояс переехали туда же. Старое значение
+           в профиле переводит RendererShared.migrateTimerStyle. */
 
         /* ============================================
            СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip)
@@ -463,17 +406,20 @@
             position: relative;
             width: 50px;
             height: 70px;
+            /* Без перспективы rotateX не виден вовсе — см. разбор в
+               electron-widget.html. Значение меньше: карточка меньше. */
+            perspective: 200px;
         }
 
         .widget-flip-inner {
             position: relative;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg,
-                rgba(42,42,53,0.85) 0%,
-                rgba(26,26,37,0.85) 49.9%,
-                rgba(10,10,15,0.90) 50%,
-                rgba(21,21,32,0.85) 100%);
+            background: var(--surface-paint, linear-gradient(180deg,
+                rgba(42,42,53,calc(0.85 * var(--surface-alpha, 1))) 0%,
+                rgba(26,26,37,calc(0.85 * var(--surface-alpha, 1))) 49.9%,
+                rgba(10,10,15,calc(0.90 * var(--surface-alpha, 1))) 50%,
+                rgba(21,21,32,calc(0.85 * var(--surface-alpha, 1))) 100%));
             border-radius: var(--tw-r-xs);
             border: 1px solid var(--tw-border);
             overflow: hidden;
@@ -491,17 +437,10 @@
             z-index: 10;
         }
 
-        /* Перекидывание карточки. Раньше анимация была только в полноэкранном
-           режиме, а виджет и часы меняли цифру рывком — вернули везде.
-           Длительность обязана совпадать с FLIP_DURATION_MS в flip-card.js. */
-        .widget-flip-card.flipping .widget-flip-inner {
-            animation: widget-flip-animation 0.3s ease-in-out;
-        }
-        @keyframes widget-flip-animation {
-            0%   { transform: rotateX(0); }
-            50%  { transform: rotateX(-12deg); }
-            100% { transform: rotateX(0); }
-        }
+        /* Наклона карточки здесь БОЛЬШЕ НЕТ: перекидывание рисуют створки из
+           flip-card.css (одна копия на три окна), а этот блок был имитацией —
+           поворот всей карточки на 12° без перспективы давал 0.79 пикселя
+           движения, то есть не давал ничего. */
         @media (prefers-reduced-motion: reduce) {
             .widget-flip-card.flipping .widget-flip-inner { animation: none; }
         }
@@ -536,7 +475,6 @@
 
         /* Скрытие неактивных стилей - все скрыты по умолчанию */
         .circular-widget,
-        .widget-digital,
         .widget-flip,
         .widget-analog,
         .clock-digits {
@@ -545,7 +483,6 @@
 
         /* Показываем только активный */
         .circular-widget.active { display: flex !important; }
-        .widget-digital.active { display: flex !important; }
         .widget-flip.active { display: flex !important; }
         .widget-analog.active { display: flex !important; }
         .clock-digits.active { display: flex !important; }
@@ -578,7 +515,7 @@
             width: 200px;
             height: 200px;
             border-radius: 50%;
-            background: var(--tw-bg-timer);
+            background: var(--surface-paint, color-mix(in srgb, var(--tw-bg-timer) calc(var(--surface-alpha, 1) * 100%), transparent));
             -webkit-backdrop-filter: var(--tw-blur-sm);
             backdrop-filter: var(--tw-blur-sm);
             border: 1px solid var(--tw-border-strong);
@@ -825,6 +762,8 @@
             justify-content: center;
             width: 100%;
             height: 100%;
+            /* Фон живёт на самих цифрах (.clock-digits-time): он обнимает
+               время, а не заливает окно. */
         }
         .clock-digits.active { display: flex !important; }
 
@@ -833,6 +772,16 @@
             width: fit-content;
             margin-inline: auto;
             font-size: var(--digits-font-size, 40px);
+            /* Рамка вокруг цифр: поля и скругление в долях КЕГЛЯ, чтобы расти
+               вместе с ним. Фон по умолчанию прозрачный — рамка появляется
+               ровно тогда, когда пользователь задал цвет. Это и есть бывший
+               стиль LED: те же цифры в тёмной коробке, только коробка теперь
+               настраивается, а шрифт выбирается.
+               Значения совпадают с FRAME_PAD_*_EM в digits-style.js — по ним
+               считается подгонка кегля (проверяется тестом). */
+            background: var(--surface-paint, transparent);
+            padding: 0.18em 0.34em;
+            border-radius: 0.22em;
             line-height: 1;
             white-space: nowrap;
             color: var(--tw-fg);
@@ -916,9 +865,12 @@
             <svg class="widget-svg" viewBox="0 0 200 200">
                 <defs>
                     <!-- Градиент для часов -->
+                    <!-- Цвета стопов живут в CSS (#clockGradient stop):
+                         презентационный атрибут был бы вторым владельцем
+                         значения по умолчанию, и снять его нечем. -->
                     <linearGradient id="clockGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#0a84ff" />
-                        <stop offset="100%" stop-color="#30d158" />
+                        <stop offset="0%" />
+                        <stop offset="100%" />
                     </linearGradient>
                     <!-- Свечение -->
                     <filter id="glow">
@@ -975,14 +927,6 @@
         </div>
 
         <!-- Стиль: Цифровой LED -->
-        <div class="widget-digital" id="widgetDigital">
-            <div class="widget-digital-display">
-                <div class="widget-digital-time" id="widgetDigitalTime">00:00</div>
-                <div class="date-badge" id="digitalDateBadge" style="display: none;"></div>
-                <div class="timezone-badge" id="digitalTimezoneBadge"></div>
-            </div>
-        </div>
-
         <!-- Стиль: Перекидные часы -->
         <div class="widget-flip" id="widgetFlip">
             <div class="widget-flip-content" id="widgetFlipContent">
@@ -1093,6 +1037,11 @@
         <div class="clock-digits" id="clockDigits">
             <div class="clock-digits-time" id="clockDigitsTime"><span class="clock-digits-value" id="clockDigitsValue">00:00</span></div>
             <span class="clock-digits-probe" id="clockDigitsProbe" aria-hidden="true"></span>
+            <!-- Дата и пояс переехали сюда из стиля LED вместе с самим стилем:
+                 тумблеры «Дата» и «Часовой пояс» обязаны работать и здесь,
+                 иначе объединённый стиль обещал бы то, чего не делает. -->
+            <div class="date-badge" id="digitsDateBadge" style="display: none;"></div>
+            <div class="timezone-badge" id="digitsTimezoneBadge"></div>
         </div>
     </div>
 
@@ -1181,16 +1130,14 @@
                 this.showNumbersRow = null;
                 
                 // Дополнительные элементы для стилей
-                this.digitalDateBadge = document.getElementById('digitalDateBadge');
-                this.digitalTimezoneBadge = document.getElementById('digitalTimezoneBadge');
+                this.digitsDateBadge = document.getElementById('digitsDateBadge');
+                this.digitsTimezoneBadge = document.getElementById('digitsTimezoneBadge');
                 this.flipDateBadge = document.getElementById('flipDateBadge');
                 this.flipTimezoneBadge = document.getElementById('flipTimezoneBadge');
                 
                 // Элементы для разных стилей
                 this.circularWidget = document.querySelector('.circular-widget');
-                this.widgetDigital = document.getElementById('widgetDigital');
                 this.widgetFlip = document.getElementById('widgetFlip');
-                this.widgetDigitalTime = document.getElementById('widgetDigitalTime');
                 this.widgetFlipContent = document.getElementById('widgetFlipContent');
                 
                 // Flip карточки
@@ -1234,7 +1181,7 @@
                 if (this.circularWidget) {this.circularWidget.classList.add('active');}
                 document.body.classList.add('style-circle');
                 
-                // Настраиваем масштабирование для digital и flip
+                // Настраиваем масштабирование флипа и «Цифр»
                 this.updateScaling();
                 this._handlers.onResizeScaling = () => this.updateScaling();
                 window.addEventListener('resize', this._handlers.onResizeScaling);
@@ -1244,15 +1191,7 @@
                 const containerWidth = this.container.offsetWidth;
                 const containerHeight = this.container.offsetHeight;
                 
-                // Размер шрифта для digital - подбираем чтобы текст вместился
-                // Для времени HH:MM:SS нужно ~8 символов, для HH:MM - ~5
                 const showSeconds = this.showSeconds;
-                const charCount = showSeconds ? 8 : 5;
-                // Ширина символа примерно 0.6 от размера шрифта для моноширинного
-                const maxFontByWidth = (containerWidth * 0.85) / (charCount * 0.6);
-                const maxFontByHeight = containerHeight * 0.7;
-                const digitalFontSize = Math.min(maxFontByWidth, maxFontByHeight);
-                this.container.style.setProperty('--digital-font-size', digitalFontSize + 'px');
                 
                 // Масштаб для flip:
                 // С секундами (HH:MM:SS): 6 карт×40 + 2×4 gap + 2 сеп×~20 + 4×8 flex gap ≈ 320
@@ -1329,69 +1268,65 @@
                     const saved = localStorage.getItem('clockColors');
                     colors = saved ? window.SecurityUtils.safeJSONParse(saved, null) : null;
                 }
-                if (!colors) { return; }
+                // Пустой объект вместо выхода: сброс цвета в панели приходит
+                // сюда как ОТСУТСТВИЕ поля, и ранний return делал его пустой
+                // кнопкой — снятый цвет оставался на экране до перезапуска.
+                colors = colors || {};
 
                 const isSafeColor = window.SecurityUtils.isSafeColor;
                 const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
                 const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
+                // Пустая строка снимает инлайн и возвращает управление CSS —
+                // ровно так же, как removeProperty у переменных.
+                const paint = (el, prop, value) => { if (el) { el.style[prop] = value || ''; } };
+
+                // Подложка — одна пара «цвет + прозрачность» на окно; каждая
+                // подложка в CSS записана как var(--surface-paint, <своё>),
+                // поэтому красится ровно тот стиль, который сейчас на экране.
+                const surface = window.RendererShared.surfacePaint({
+                    color: colors.surface,
+                    alpha: colors.surfaceAlpha
+                });
+                const root = document.documentElement;
+                if (surface) { root.style.setProperty('--surface-paint', surface); }
+                else { root.style.removeProperty('--surface-paint'); }
+                // Прозрачность действует и без выбранного цвета: её множитель
+                // вплетён в альфу подложки КАЖДОГО стиля (см. <style> выше).
+                const alphaValue = window.RendererShared.surfaceAlpha(colors.surfaceAlpha);
+                if (alphaValue === null) { root.style.removeProperty('--surface-alpha'); }
+                else { root.style.setProperty('--surface-alpha', String(alphaValue)); }
 
                 // Circle style
-                if (timerColor && this.timeDisplay) {
-                    this.timeDisplay.style.color = timerColor;
-                }
-                if (progressColor && this.secondsBar) {
-                    this.secondsBar.style.stroke = progressColor;
-                }
-                // Update SVG gradient stops
-                const gradStops = document.querySelectorAll('#clockGradient stop');
-                if (gradStops.length >= 2) {
-                    if (timerColor) { gradStops[0].setAttribute('stop-color', timerColor); }
-                    if (progressColor) { gradStops[1].setAttribute('stop-color', progressColor); }
-                }
-
-                // Digital style
-                if (timerColor && this.widgetDigitalTime) {
-                    this.widgetDigitalTime.style.color = timerColor;
-                    this.widgetDigitalTime.style.textShadow =
-                        `0 0 10px ${timerColor}, 0 0 20px ${timerColor}, 0 0 40px ${timerColor}66`;
-                }
+                paint(this.timeDisplay, 'color', timerColor);
+                paint(this.secondsBar, 'stroke', progressColor);
+                // Стопы градиента красит КАСКАД (#clockGradient stop в <style>):
+                // stop-color из CSS сильнее презентационного атрибута, а снять
+                // атрибут, поставленный setAttribute, было нечем.
+                if (timerColor) { root.style.setProperty('--timer-color-stop', timerColor); }
+                else { root.style.removeProperty('--timer-color-stop'); }
+                if (progressColor) { root.style.setProperty('--progress-color-stop', progressColor); }
+                else { root.style.removeProperty('--progress-color-stop'); }
 
                 // Цифры — у часов нет полос срочности (danger/overtime), красим
                 // безусловно, без гейта по data-status, в отличие от таймера.
-                if (timerColor && this.clockDigitsTime) {
-                    this.clockDigitsTime.style.color = timerColor;
-                }
+                paint(this.clockDigitsTime, 'color', timerColor);
 
                 // Flip style
-                if (timerColor) {
-                    document.querySelectorAll('.widget-flip-digit').forEach(el => {
-                        el.style.color = timerColor;
-                    });
-                    document.querySelectorAll('.widget-flip-separator').forEach(el => {
-                        el.style.color = timerColor;
-                    });
-                }
+                document.querySelectorAll('.widget-flip-digit, .widget-flip-separator')
+                    .forEach(el => paint(el, 'color', timerColor));
 
                 // Analog style
-                if (progressColor && this.clockAnalogSecond) {
-                    this.clockAnalogSecond.style.background =
-                        `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`;
-                    this.clockAnalogSecond.style.boxShadow = '';
-                }
-                if (timerColor) {
-                    const center = document.querySelector('.widget-analog-center');
-                    if (center) { center.style.background = timerColor; }
-                }
+                paint(this.clockAnalogSecond, 'background', progressColor
+                    ? `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`
+                    : null);
+                paint(this.clockAnalogSecond, 'boxShadow', null);
+                paint(document.querySelector('.widget-analog-center'), 'background', timerColor);
 
                 // Date & timezone badges — all styles
-                if (timerColor) {
-                    [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
-                        if (el) { el.style.color = timerColor; }
-                    });
-                    [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
-                        if (el) { el.style.color = timerColor; }
-                    });
-                }
+                [
+                    this.dateBadge, this.digitsDateBadge, this.flipDateBadge, this.analogDateBadge,
+                    this.timezoneBadge, this.digitsTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge
+                ].forEach(el => paint(el, 'color', timerColor));
 
                 localStorage.setItem('clockColors', JSON.stringify(colors));
             }
@@ -1530,16 +1465,18 @@
                 // Виджет и дисплей кладут литералы в ветках switch и такой
                 // дырки не имеют. Мусор нельзя и запоминать: this.clockStyle
                 // уезжает обратно в localStorage при сохранении настроек.
-                const safeStyle = ['circle', 'digital', 'flip', 'analog', 'digits'].includes(style) ? style : 'circle';
+                // Сохранённый LED переводится в «Цифры» ДО проверки списка:
+                // иначе профиль со слитым стилем откатывался бы к кругу.
+                const wanted = window.RendererShared.migrateTimerStyle(style);
+                const safeStyle = ['circle', 'flip', 'analog', 'digits'].includes(wanted) ? wanted : 'circle';
                 this.clockStyle = safeStyle;
 
                 // Применяем класс стиля к body
-                document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
+                document.body.classList.remove('style-circle', 'style-flip', 'style-analog', 'style-digits');
                 document.body.classList.add('style-' + safeStyle);
 
                 // Скрываем все стили
                 if (this.circularWidget) {this.circularWidget.classList.remove('active');}
-                if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
                 if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
                 if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
                 if (this.clockDigits) {this.clockDigits.classList.remove('active');}
@@ -1548,9 +1485,6 @@
                 switch (safeStyle) {
                     case 'circle':
                         if (this.circularWidget) {this.circularWidget.classList.add('active');}
-                        break;
-                    case 'digital':
-                        if (this.widgetDigital) {this.widgetDigital.classList.add('active');}
                         break;
                     case 'flip':
                         if (this.widgetFlip) {this.widgetFlip.classList.add('active');}
@@ -1569,7 +1503,7 @@
                 }
 
                 // Раньше здесь стояло принудительное `this.showSeconds = true` и
-                // `this.format24h = true` для digital/flip — с последующим
+                // `this.format24h = true` для LED и флипа — с последующим
                 // saveSettings(). То есть смена стиля МОЛЧА затирала выбор
                 // пользователя и сохраняла подмену: снял галочку «Секунды»,
                 // переключил стиль — секунды вернулись навсегда, а чекбокс в
@@ -1612,7 +1546,7 @@
 
             updateDateTimezoneVisibility() {
                 // Обновляем видимость даты во всех стилях
-                [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
+                [this.dateBadge, this.digitsDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
                     if (el) {
                         el.style.display = this.showDate ? 'block' : 'none';
                     }
@@ -1621,7 +1555,7 @@
                 // Обновляем видимость часового пояса во всех стилях
                 const tzString = this.formatTimezoneString();
                 
-                [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
+                [this.timezoneBadge, this.digitsTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
                     if (el) {
                         el.textContent = tzString;
                         el.style.display = this.showTimezone ? 'block' : 'none';
@@ -1931,7 +1865,7 @@
                 if (this.showDate) {
                     const options = { weekday: 'short', day: 'numeric', month: 'short' };
                     const dateStr = now.toLocaleDateString('ru-RU', options);
-                    [this.dateBadge, this.digitalDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
+                    [this.dateBadge, this.digitsDateBadge, this.flipDateBadge, this.analogDateBadge].forEach(el => {
                         if (el) {el.textContent = dateStr;}
                     });
                 }
@@ -1939,7 +1873,7 @@
                 // Обновляем часовой пояс во всех стилях
                 if (this.showTimezone) {
                     const tzStr = this.formatTimezoneString();
-                    [this.timezoneBadge, this.digitalTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
+                    [this.timezoneBadge, this.digitsTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge].forEach(el => {
                         if (el) {el.textContent = tzStr;}
                     });
                 }

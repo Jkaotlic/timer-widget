@@ -71,7 +71,6 @@ const PanelStateMixin = {
             timerStyle: this.timerStyleEl.value,
             timerScale: parseInt(this.timerScaleEl.value, 10),
             digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
-            showTicks: this.widgetShowTicksEl?.checked ?? false,
             // Подпись состояния («идёт / пауза / перерасход») по умолчанию
             // ВЫКЛЮЧЕНА: её работу делает цвет дуги, а на маленьком виджете
             // слово занимает место, которого нет.
@@ -420,6 +419,48 @@ const PanelStateMixin = {
         }
         if (this.pauseBtn) {
             this.pauseBtn.firstChild.nodeValue = isOvertime ? 'Стоп' : 'Пауза';
+        }
+    },
+
+    // Ряды настроек, применимых не ко всем стилям. Настройка, которая
+    // ничего не делает при выбранном стиле, — это обещание без
+    // исполнения: тумблер щёлкает, на экране не меняется ничего.
+    updateStyleDependentRows() {
+        const widgetStyle = this.timerStyleEl.value;
+        const clockStyle = this.syncClockStyle ? widgetStyle : this.clockStyleEl.value;
+        const rows = [
+            [this.widgetDigitsFontRowEl, widgetStyle],
+            [this.clockDigitsFontRowEl, clockStyle],
+            [this.displayDigitsFontRowEl, this.displayTimerStyleEl ? this.displayTimerStyleEl.value : 'circle']
+        ];
+        for (const [row, style] of rows) {
+            if (row) { row.style.display = style === 'digits' ? 'flex' : 'none'; }
+        }
+
+        // Подпись состояния живёт ВНУТРИ круга (.circular-widget), у
+        // остальных стилей виджета её в разметке нет вовсе.
+        const statusRow = document.getElementById('widgetStatusRow');
+        if (statusRow) {
+            statusRow.style.display = widgetStyle === 'circle' ? 'flex' : 'none';
+        }
+        // Деления — настройка ЧАСОВ: круглый циферблат есть только у их стиля
+        // «Круг». У виджета таймера делений больше нет вовсе — там это кольцо
+        // обратного отсчёта, и засечки на нём только шумели.
+        const ticksRow = document.getElementById('clockTicksRow');
+        if (ticksRow) {
+            ticksRow.style.display = clockStyle === 'circle' ? 'flex' : 'none';
+        }
+
+        // Прозрачность фона — не для флипа: карточки перекидыша читаются как
+        // физические, и просвечивающая карточка выглядит поломкой, а не
+        // настройкой. Сам ЦВЕТ фона у флипа остаётся.
+        const alphaRows = [
+            ['widgetAlphaLine', widgetStyle],
+            ['clockAlphaLine', clockStyle]
+        ];
+        for (const [id, style] of alphaRows) {
+            const row = document.getElementById(id);
+            if (row) { row.style.display = style === 'flip' ? 'none' : 'flex'; }
         }
     }
 };
