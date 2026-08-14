@@ -796,13 +796,24 @@ body.style-flip .status-pill {
 
 .flip-group { display: flex; gap: 8px; }
 
+/* Разделитель — ДВЕ ТОЧКИ, а не глиф, как в виджете и в часах. Текст ':' в
+   разметке остаётся и гасится нулевым шрифтом: он нужен экранному диктору.
+
+   До 14.08.2026 здесь жил живой глиф в `clamp(3rem, 10vw, 8rem)` весом 200 и
+   цветом `--tw-fg-muted` — то есть СЕРОЕ двоеточие рядом с белыми цифрами, и
+   вдобавок единственное из трёх окон, куда правило «разделитель это точки»
+   так и не дошло: тест, который его закреплял, находит окно по
+   `#wFlipHoursGroup` и меряет ровно виджет таймера. */
 .flip-separator {
-    font-size: clamp(3rem, 10vw, 8rem);
-    font-weight: 200;
-    font-family: var(--tw-font-display);
-    color: var(--timer-color, var(--tw-fg-muted));
+    font-size: 0;
+    line-height: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 2vw, 26px);
+    /* Высота колонки равна высоте карточки — те же значения, что у .flip-card. */
+    height: clamp(80px, 16vw, 200px);
     padding: 0 10px;
     /* Приехало из удалённого components.css и это ЕДИНСТВЕННОЕ, что
        оттуда меняло геометрию: без этих полей ряд карточек ужимался
@@ -810,11 +821,24 @@ body.style-flip .status-pill {
     margin: 0 8px;
 }
 
+.flip-separator::before,
+.flip-separator::after {
+    content: '';
+    width: clamp(5px, 1vw, 12px);
+    height: clamp(5px, 1vw, 12px);
+    border-radius: 50%;
+    /* Тот же цвет, что у цифр, включая значение по умолчанию. */
+    background: var(--timer-color, var(--tw-fg));
+}
+
 /* Полосы разделителя. Этих правил не было: в полосе разделитель красил
    ТОЛЬКО инлайновый JS, то есть состояние существовало, но в стилях
-   выражено не было. Значения перенесены из того кода дословно. */
-.flip-separator.warning { color: var(--tw-band-warning); }
-.flip-separator.danger  { color: var(--tw-band-danger); }
+   выражено не было. Значения перенесены из того кода дословно, но красят
+   теперь ФОН точек: `color` до псевдоэлементов не доезжает. */
+.flip-separator.warning::before,
+.flip-separator.warning::after { background: var(--tw-band-warning); }
+.flip-separator.danger::before,
+.flip-separator.danger::after  { background: var(--tw-band-danger); }
 
 .flip-minus {
     position: relative;
