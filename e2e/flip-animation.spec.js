@@ -107,8 +107,8 @@ test('перекидывание ВИДНО в виджете, часах и п�
                     bottomText: leafBottom.textContent,
                     staticText: wrap.querySelector('.fc-static').textContent,
                     digitAfter: node.textContent,
-                    fall: frames(leafTop, [0, 0.5, 0.995]),
-                    rise: frames(leafBottom, [0.005, 0.5, 1]),
+                    fall: frames(leafTop, [0, 0.25, 0.5, 0.75, 0.995]),
+                    rise: frames(leafBottom, [0.005, 0.25, 0.5, 0.75, 1]),
                     // Ширина по всей дуге падения: максимум обязан превысить
                     // ширину покоя, иначе это не поворот, а сжатие.
                     fallWide: frames(leafTop, [0, 0.3, 0.6, 0.85, 0.995]).map((f) => f.w)
@@ -127,14 +127,14 @@ test('перекидывание ВИДНО в виджете, часах и п�
             // Падение: половина карточки складывается ДО НУЛЯ. Прежняя, невидимая
             // анимация давала 2% высоты — этот порог её не пропустит.
             const fallStart = res.fall[0].h;
-            const fallEnd = res.fall[2].h;
+            const fallEnd = res.fall[4].h;
             console.log(`${part}: падение ${fallStart.toFixed(1)} → ${fallEnd.toFixed(1)} px`);
             expect(fallStart, `${part}: створка обязана иметь высоту`).toBeGreaterThan(5);
             expect(fallEnd / fallStart, `${part}: створка не сложилась`).toBeLessThan(0.05);
 
             // Подъём — зеркально: от нуля до полной половины карточки.
             const riseStart = res.rise[0].h;
-            const riseEnd = res.rise[2].h;
+            const riseEnd = res.rise[4].h;
             console.log(`${part}: подъём ${riseStart.toFixed(1)} → ${riseEnd.toFixed(1)} px`);
             expect(riseStart / fallStart, `${part}: вторая створка не начинается с ребра`).toBeLessThan(0.05);
             expect(riseEnd / fallStart, `${part}: вторая створка не встала на место`).toBeGreaterThan(0.9);
@@ -150,6 +150,34 @@ test('перекидывание ВИДНО в виджете, часах и п�
                 wideMax / wideStart,
                 `${part}: ширина створки не растёт — перспектива не доезжает, это сжатие, а не поворот`
             ).toBeGreaterThan(1.05);
+
+            // Движение обязано быть РАЗМАЗАНО по фазе, а не собрано в её конец.
+            // Замер 14.08.2026 после первой правки темпа: створка виджета на
+            // отметке 55 % фазы имела высоту 31.0 px при стартовых 30.9 — то
+            // есть больше половины времени стояла неподвижно, а потом
+            // схлопывалась за оставшиеся 90 мс. Пользователь назвал это
+            // «дёрганым», и он был прав: проверки «упало до нуля» и «ширина
+            // выросла» обе были зелёными, потому что обе смотрят на КОНЦЫ.
+            //
+            // Порог по концам такое не ловит принципиально — нужен замер
+            // середины хода. Доли высоты, а не пиксели: три окна различаются
+            // размером карточки втрое.
+            const spread = (frames, label, lo, hi) => {
+                const full = Math.max(frames[0].h, frames[4].h);
+                const mid = frames[2].h / full;
+                console.log(`${part}: ${label} по четвертям ${frames.map((f) => (f.h / full).toFixed(2)).join(' → ')}`);
+                expect(mid, `${part}: на середине ${label} створка ещё не тронулась (${mid.toFixed(2)} от хода)`)
+                    .toBeLessThan(hi);
+                expect(mid, `${part}: на середине ${label} створка уже приехала (${mid.toFixed(2)} от хода)`)
+                    .toBeGreaterThan(lo);
+            };
+
+            // Падение: к середине фазы створка обязана уйти заметно вниз, но не
+            // сложиться целиком. 0.88 — это прежний ease-in, он тоже читался
+            // рывком; 1.00 — та самая неподвижность.
+            spread(res.fall, 'падения', 0.5, 0.86);
+            // Подъём зеркален и чуть «догоняет» к концу: допуск выше.
+            spread(res.rise, 'подъёма', 0.45, 0.93);
         }
     } finally {
         await app.close();

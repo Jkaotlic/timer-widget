@@ -48,6 +48,56 @@ function measure() {
     };
 }
 
+test('flip-часы: разделитель — тоже точки, а не глиф', async () => {
+    // 14.08.2026, жалоба «опять двоеточие флипа странное». Правило «разделитель
+    // это ТОЧКИ» было применено только к виджету таймера, а окно часов всё это
+    // время рисовало живой глиф ':' в 48px цветом --tw-fg-muted: мелкий, серый,
+    // к геометрии карточек не привязанный и НЕ принимающий цвет пользователя,
+    // хотя цифры рядом его принимают. Тест выше меряет только виджет таймера,
+    // поэтому расхождение двух окон никто не видел.
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        await control.waitForTimeout(1500);
+        await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'flip'));
+        await control.waitForTimeout(800);
+
+        let clock = null;
+        for (const w of app.windows()) {
+            if ((await w.url()).includes('electron-clock-widget')) { clock = w; }
+        }
+        expect(clock, 'окно часов не найдено').not.toBeNull();
+
+        const res = await clock.evaluate(() => {
+            const seps = [...document.querySelectorAll('.widget-flip-separator')]
+                .filter((el) => el.getBoundingClientRect().height > 0);
+            const card = [...document.querySelectorAll('.widget-flip-card')]
+                .find((c) => c.getBoundingClientRect().height > 0);
+            return {
+                count: seps.length,
+                fontSizePx: seps.map((el) => parseFloat(getComputedStyle(el).fontSize)),
+                dotWidthPx: seps.map((el) => parseFloat(getComputedStyle(el, '::before').width)),
+                heightPx: seps.map((el) => parseFloat(getComputedStyle(el).height)),
+                cardHeightPx: card ? parseFloat(getComputedStyle(card).height) : null
+            };
+        });
+        console.log('часы →', JSON.stringify(res));
+
+        expect(res.count, 'у часов должен быть хотя бы один видимый разделитель').toBeGreaterThan(0);
+        for (const size of res.fontSizePx) {
+            expect(size, 'часы рисуют глиф ":" вместо точек').toBe(0);
+        }
+        for (const w of res.dotWidthPx) {
+            expect(w, 'точки разделителя не нарисованы псевдоэлементом').toBeGreaterThan(0);
+        }
+        for (const h of res.heightPx) {
+            expect(h, 'колонка точек обязана совпадать по высоте с карточкой').toBe(res.cardHeightPx);
+        }
+    } finally {
+        await app.close();
+    }
+});
+
 test('flip-виджет: разделитель остаётся точками и в режиме с часами', async () => {
     const { app, control } = await launchApp();
 
