@@ -406,9 +406,12 @@
             position: relative;
             width: 50px;
             height: 70px;
-            /* Без перспективы rotateX не виден вовсе — см. разбор в
-               electron-widget.html. Значение меньше: карточка меньше. */
-            perspective: 200px;
+            /* Без перспективы rotateX не виден вовсе — разбор в flip-card.css.
+               Это ПЕРЕМЕННАЯ: сам `perspective` стоит на `.fc-flip`, прямом
+               родителе створок. Прежнее `perspective: 200px` здесь не
+               действовало — створки этой карточке внуки.
+               Значение ≈2.8 высоты карточки. */
+            --fc-perspective: 195px;
         }
 
         .widget-flip-inner {
@@ -463,6 +466,8 @@
         .widget-flip.has-seconds .widget-flip-card {
             width: 40px;
             height: 56px;
+            /* Карточка ниже — перспектива вместе с ней. */
+            --fc-perspective: 155px;
         }
 
         .widget-flip.has-seconds .widget-flip-separator {
