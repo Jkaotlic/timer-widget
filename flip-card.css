@@ -36,6 +36,31 @@
     /* Слои принадлежат карточке и обрезаются её рамкой. */
     border-radius: inherit;
     overflow: hidden;
+
+    /* Перспектива объявлена ЗДЕСЬ, на ПРЯМОМ родителе створок, и это не
+       вкусовщина.
+
+       До 14.08.2026 она стояла в каждом окне на самой карточке (`.flip-card`,
+       `.widget-flip-card`), а створки — её ВНУКИ. `perspective` действует
+       только на прямых детей; чтобы она доставала глубже, промежуточный узел
+       должен нести `transform-style: preserve-3d`, а он этого не может: у
+       `.flip-card-inner` / `.widget-flip-inner` стоит `overflow: hidden`, и по
+       спецификации это принудительно возвращает `flat`.
+
+       Итог — поворота не было вовсе: `rotateX` без перспективы рисуется как
+       плоское сжатие по вертикали. Замер на живых окнах: ширина створки
+       42.19 → 42.19 → 42.19 px по всей дуге падения при «правильной» матрице.
+       Высота при этом честно падала до нуля, поэтому проверка высоты этого не
+       ловила — ширину теперь меряет e2e/flip-animation.spec.js.
+
+       Значение приходит из окна: перспектива обязана быть пропорциональна
+       ВЫСОТЕ карточки (здесь ≈2.8 высоты), а карточки трёх окон различаются
+       втрое, да ещё и меняют размер в режимах «с часами» / «с секундами».
+       Запасное значение — на случай, если окно переменную не объявило. */
+    perspective: var(--fc-perspective, 240px);
+    /* Центр совпадает с линией сгиба: слой накрывает карточку целиком, значит
+       50% его высоты — это ровно та ось, вокруг которой ходят створки. */
+    perspective-origin: 50% 50%;
 }
 
 .fc-layer {
@@ -67,51 +92,88 @@
 .fc-top .fc-face { top: 0; }
 .fc-bottom .fc-face { bottom: 0; }
 
+/* Темп. Обе фазы длились по 180 мс с жёсткой передачей эстафеты, и это
+   читалось как рывок: 14.08.2026 пользователь назвал перекидыш «дёрганым».
+   Причина была двойная — плоское сжатие вместо поворота (см. `.fc-flip` выше)
+   и одинаковый, ничем не мотивированный темп у падения и подъёма.
+
+   Теперь фазы разные, как у настоящей пластины: падение короче и с разгоном
+   (тяжесть), подъём длиннее и с доводкой (упор). Сумма 200 + 240 = 440 мс —
+   она обязана укладываться в FLIP_DURATION_MS из flip-card.js, иначе слои
+   снимутся посреди движения; это сверяет tests/flip-card.test.js. */
 .fc-leaf-top {
     transform-origin: bottom center;
-    animation: fc-fall 0.18s ease-in forwards;
+    /* Разгон: почти без начальной скорости, быстро к упору. */
+    animation: fc-fall 0.2s cubic-bezier(0.45, 0, 0.85, 0.4) forwards;
     z-index: 2;
 }
 
 .fc-leaf-bottom {
     transform-origin: top center;
     transform: rotateX(90deg);
-    animation: fc-rise 0.18s ease-out 0.18s forwards;
+    /* Темп задают САМИ кадры (в них свои animation-timing-function), поэтому
+       здесь linear: иначе доводка получила бы плавность дважды. */
+    animation: fc-rise 0.24s linear 0.2s forwards;
     z-index: 3;
 }
 
 /* Тень падения: створка темнеет к концу движения и светлеет, когда встаёт на
    место. Без неё поворот читается как подмена картинки, а не как движение
-   физической пластины. */
+   физической пластины.
+
+   Тень ГРАДИЕНТНАЯ, гуще у линии сгиба и в ноль к дальнему краю — так ложится
+   тень на повёрнутую к зрителю пластину. Прежняя версия красила створку
+   РАВНОМЕРНЫМ чёрным на 35%: раз в секунду по карточке мигал сплошной тёмный
+   прямоугольник, и вторая половина жалобы 14.08.2026 — «мельтешит, отвлекает» —
+   была именно про него. Средняя затемнённость упала примерно вдвое, а объёма
+   стало больше: тень теперь показывает, ГДЕ ось поворота. */
 .fc-leaf-top::after,
 .fc-leaf-bottom::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: #000;
     pointer-events: none;
 }
 
-.fc-leaf-top::after { animation: fc-shade-in 0.18s ease-in forwards; }
-.fc-leaf-bottom::after { animation: fc-shade-out 0.18s ease-out 0.18s forwards; opacity: 0.35; }
+/* Падающая створка: сгиб — её НИЖНИЙ край. */
+.fc-leaf-top::after {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.5) 100%);
+    animation: fc-shade-in 0.2s cubic-bezier(0.45, 0, 0.85, 0.4) forwards;
+}
+
+/* Поднимающаяся — зеркально: сгиб — её ВЕРХНИЙ край. */
+.fc-leaf-bottom::after {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 100%);
+    opacity: 1;
+    animation: fc-shade-out 0.24s ease-out 0.2s forwards;
+}
 
 @keyframes fc-fall {
     from { transform: rotateX(0); }
     to { transform: rotateX(-90deg); }
 }
 
+/* Проскок за ноль и возврат — «щелчок» пластины об упор. Без него конец
+   движения — просто остановка, и подъём читается как выезд картинки. */
 @keyframes fc-rise {
-    from { transform: rotateX(90deg); }
-    to { transform: rotateX(0); }
+    0% {
+        transform: rotateX(90deg);
+        animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1);
+    }
+    70% {
+        transform: rotateX(-6deg);
+        animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1);
+    }
+    100% { transform: rotateX(0); }
 }
 
 @keyframes fc-shade-in {
     from { opacity: 0; }
-    to { opacity: 0.35; }
+    to { opacity: 1; }
 }
 
 @keyframes fc-shade-out {
-    from { opacity: 0.35; }
+    from { opacity: 1; }
     to { opacity: 0; }
 }
 

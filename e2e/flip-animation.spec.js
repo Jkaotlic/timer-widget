@@ -18,10 +18,21 @@ const { launchApp } = require('./launch');
  *    цифры падает, нижняя половина новой поднимается (flip-card.css +
  *    flip-card.js). Тест меряет обе створки покадрово по их собственной
  *    временной шкале — от полной высоты до нуля и обратно.
+ * 4. И этого оказалось мало. 14.08.2026 пользователь сказал, что перекидыш
+ *    «дёрганый». Замер объяснил почему: ШИРИНА створки не менялась ни на
+ *    пиксель (часы 24.82 → 24.82 → 24.82, полноэкранное 158 → 158 → 158) при
+ *    внешне правильной матрице rotateX. `perspective` стояла на `.flip-card`,
+ *    а створки — её ВНУКИ: перспектива до них не доезжала, и поворот рисовался
+ *    как плоское сжатие по вертикали. Высота при этом честно падала до нуля,
+ *    поэтому проверка из пункта 3 была зелёной.
  *
- * Почему высота, а не матрица трансформации: высота — это то, что видно.
- * Матрица может быть «правильной» и при нулевой перспективе, ровно как в
- * пункте 2.
+ * Почему высота И ширина: высота отличает движение от неподвижности, ширина —
+ * поворот от сжатия. Матрица не годится ни для того, ни для другого: она может
+ * быть «правильной» при нулевой перспективе, ровно как в пунктах 2 и 4.
+ *
+ * Кадры берутся из САМОЙ анимации (`getTiming()`), а не из зашитых чисел: темп
+ * правился уже дважды, и зашитые миллисекунды молча уехали бы в заливку —
+ * тест мерил бы конечное положение вместо середины движения.
  */
 
 const WINDOWS = [
@@ -69,9 +80,23 @@ test('перекидывание ВИДНО в виджете, часах и п�
 
                 const leafTop = wrap.querySelector('.fc-leaf-top');
                 const leafBottom = wrap.querySelector('.fc-leaf-bottom');
-                const at = (leaf, t) => {
-                    leaf.getAnimations().forEach((a) => { a.currentTime = t; });
-                    return leaf.getBoundingClientRect().height;
+
+                // Собственная шкала створки: старт = её задержка, конец = старт
+                // плюс длительность. Доли, а не миллисекунды, поэтому смена
+                // темпа тест не ломает.
+                const scale = (leaf) => {
+                    const anim = leaf.getAnimations()
+                        .find((a) => a.effect.getTiming().duration > 0);
+                    const t = anim.effect.getTiming();
+                    return { delay: Number(t.delay) || 0, dur: Number(t.duration) };
+                };
+                const frames = (leaf, fracs) => {
+                    const { delay, dur } = scale(leaf);
+                    return fracs.map((f) => {
+                        leaf.getAnimations().forEach((a) => { a.currentTime = delay + f * dur; });
+                        const r = leaf.getBoundingClientRect();
+                        return { w: +r.width.toFixed(2), h: +r.height.toFixed(2) };
+                    });
                 };
 
                 return {
@@ -82,8 +107,11 @@ test('перекидывание ВИДНО в виджете, часах и п�
                     bottomText: leafBottom.textContent,
                     staticText: wrap.querySelector('.fc-static').textContent,
                     digitAfter: node.textContent,
-                    fall: [0, 90, 180].map((t) => at(leafTop, t)),
-                    rise: [180, 270, 360].map((t) => at(leafBottom, t))
+                    fall: frames(leafTop, [0, 0.5, 0.995]),
+                    rise: frames(leafBottom, [0.005, 0.5, 1]),
+                    // Ширина по всей дуге падения: максимум обязан превысить
+                    // ширину покоя, иначе это не поворот, а сжатие.
+                    fallWide: frames(leafTop, [0, 0.3, 0.6, 0.85, 0.995]).map((f) => f.w)
                 };
             }, [card, digit]);
 
@@ -98,16 +126,30 @@ test('перекидывание ВИДНО в виджете, часах и п�
 
             // Падение: половина карточки складывается ДО НУЛЯ. Прежняя, невидимая
             // анимация давала 2% высоты — этот порог её не пропустит.
-            const [fallStart, , fallEnd] = res.fall;
+            const fallStart = res.fall[0].h;
+            const fallEnd = res.fall[2].h;
             console.log(`${part}: падение ${fallStart.toFixed(1)} → ${fallEnd.toFixed(1)} px`);
             expect(fallStart, `${part}: створка обязана иметь высоту`).toBeGreaterThan(5);
             expect(fallEnd / fallStart, `${part}: створка не сложилась`).toBeLessThan(0.05);
 
             // Подъём — зеркально: от нуля до полной половины карточки.
-            const [riseStart, , riseEnd] = res.rise;
+            const riseStart = res.rise[0].h;
+            const riseEnd = res.rise[2].h;
             console.log(`${part}: подъём ${riseStart.toFixed(1)} → ${riseEnd.toFixed(1)} px`);
             expect(riseStart / fallStart, `${part}: вторая створка не начинается с ребра`).toBeLessThan(0.05);
             expect(riseEnd / fallStart, `${part}: вторая створка не встала на место`).toBeGreaterThan(0.9);
+
+            // Поворот, а не сжатие. Створка наклоняется К ЗРИТЕЛЮ вокруг линии
+            // сгиба, значит её ближний край обязан быть КРУПНЕЕ — ширина
+            // габаритного прямоугольника растёт. При плоском сжатии она
+            // константа с точностью до сотых: это и был замер 14.08.2026.
+            const wideMax = Math.max(...res.fallWide);
+            const wideStart = res.fallWide[0];
+            console.log(`${part}: ширина ${res.fallWide.join(' → ')} px (рост ${(wideMax / wideStart).toFixed(3)}×)`);
+            expect(
+                wideMax / wideStart,
+                `${part}: ширина створки не растёт — перспектива не доезжает, это сжатие, а не поворот`
+            ).toBeGreaterThan(1.05);
         }
     } finally {
         await app.close();

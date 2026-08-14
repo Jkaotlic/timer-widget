@@ -845,7 +845,11 @@ body.style-flip .status-pill {
     position: relative;
     width: clamp(60px, 12vw, 160px);
     height: clamp(80px, 16vw, 200px);
-    perspective: 1000px;
+    /* Сам `perspective` стоит на `.fc-flip` (flip-card.css) — прямом родителе
+       створок; прежнее `perspective: 1000px` здесь не действовало, створки
+       карточке внуки. Значение — те же ≈2.8 высоты, поэтому и оно clamp:
+       высота карточки на этом окне зависит от ширины экрана. */
+    --fc-perspective: clamp(224px, 45vw, 560px);
 }
 
 .flip-card-inner {

@@ -104,8 +104,21 @@ test('длительность в JS покрывает ОБЕ фазы пере
     assert.ok(fall, 'не найдено правило падающей створки');
     assert.ok(rise, 'не найдено правило поднимающейся створки');
 
-    const total = (Number(rise[1]) + Number(rise[2])) * 1000;
-    assert.equal(Number(fall[1]) * 1000, Number(rise[1]) * 1000, 'фазы обязаны быть равной длины');
+    const fallMs = Number(fall[1]) * 1000;
+    const riseMs = Number(rise[1]) * 1000;
+    const riseDelayMs = Number(rise[2]) * 1000;
+    const total = riseDelayMs + riseMs;
+
+    // Равной длины фазы БЫТЬ НЕ ОБЯЗАНЫ, и раньше здесь стояло именно это
+    // требование. Оно и держало прежний темп 180 + 180, который пользователь
+    // 14.08.2026 назвал дёрганым: у настоящей пластины падение короче подъёма.
+    // Настоящее условие другое — вторая створка не начинает подниматься
+    // РАНЬШЕ, чем легла первая, иначе на карточке одновременно живут две
+    // половины одной цифры.
+    assert.ok(
+        riseDelayMs >= fallMs,
+        `подъём стартует на ${riseDelayMs} мс, а падение длится ${fallMs} мс — створки перекроются`
+    );
     assert.ok(
         FLIP_DURATION_MS >= total,
         `FLIP_DURATION_MS=${FLIP_DURATION_MS} мс меньше движения в ${total} мс — слои снимутся посреди анимации`
@@ -126,6 +139,46 @@ test('наклона карточки в окнах больше нет — ме
     for (const file of ['display.html', 'electron-widget.html', 'electron-clock-widget.html']) {
         const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
         assert.match(src, /<link rel="stylesheet" href="flip-card\.css">/, `${file}: не подключена общая таблица`);
+    }
+});
+
+test('перспектива объявлена на прямом родителе створок, а окна дают ей значение', () => {
+    // 14.08.2026: `perspective` стояла в каждом окне на самой карточке, а
+    // створки ей ВНУКИ — свойство действует только на прямых детей, и достать
+    // глубже нельзя: промежуточный узел несёт `overflow: hidden`, что по
+    // спецификации возвращает `transform-style: flat`. Поворота не было вовсе,
+    // рисовалось плоское сжатие: ширина створки 42.19 px по всей дуге падения.
+    // Движение меряет e2e; здесь проверяется, что владелец свойства ОДИН и что
+    // ни одно окно не осталось без значения.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+
+    const css = read('flip-card.css');
+    assert.match(
+        css,
+        /\.fc-flip \{[^}]*perspective: var\(--fc-perspective/s,
+        'flip-card.css: perspective обязана стоять на .fc-flip — прямом родителе створок'
+    );
+
+    // Проверка ОТСУТСТВИЯ обязана проверить сама себя: зелёная строка ниже
+    // иначе значит и «мёртвой копии нет», и «регулярка не работает».
+    const dead = /^\s*perspective:/m;
+    assert.match('.card {\n    perspective: 260px;\n}', dead, 'регулярка мёртвой копии не ловит саму себя');
+    assert.doesNotMatch('.fc-flip {\n    perspective-origin: 50% 50%;\n}', dead, 'регулярка путает perspective-origin с perspective');
+
+    // Каждое окно объявляет значение: карточки различаются высотой втрое, а
+    // перспектива обязана быть ей пропорциональна.
+    for (const file of ['display.css', 'electron-widget.html', 'electron-clock-widget.html']) {
+        const src = read(file);
+        assert.match(src, /--fc-perspective:/, `${file}: окно не задало --fc-perspective`);
+        // И не держит мёртвую копию на карточке: она вводила в заблуждение
+        // ровно до тех пор, пока кто-то не померил ширину.
+        assert.doesNotMatch(
+            src.replace(/\/\*[\s\S]*?\*\//g, ''),
+            dead,
+            `${file}: вернулась недействующая perspective на карточке`
+        );
     }
 });
 
