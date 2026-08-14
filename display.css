@@ -847,7 +847,10 @@ body.style-flip .status-pill {
     display: none;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(180deg, #2a2a35 0%, #1a1a25 100%);
+    /* ТА ЖЕ подложка, что у .flip-card-inner: минус — карточка того же табло.
+       Здесь стоял свой двухстоповый градиент, из-за которого карточка минуса
+       читалась как деталь от другого стиля. */
+    background: linear-gradient(180deg, #2a2a35 0%, #1a1a25 49.9%, #151520 50%, #0a0a15 100%);
     border-radius: var(--tw-r-md);
     border: 1px solid var(--tw-border);
     box-shadow:
@@ -860,7 +863,10 @@ body.style-flip .status-pill {
     font-family: var(--tw-font-display);
     font-size: clamp(2rem, 7vw, 5rem);
     font-weight: 700;
-    color: var(--tw-red);
+    /* ТА ЖЕ полоса, что у цифр в перерасходе (.flip-card.danger .flip-digit).
+       Здесь стоял `--tw-red` — другой красный, и в светлой палитре дисплея он
+       становился тёмным, тогда как полоса состояния от палитры не зависит. */
+    color: var(--tw-band-danger);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 .flip-minus.visible { display: flex; }
