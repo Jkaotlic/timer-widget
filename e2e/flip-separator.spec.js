@@ -53,6 +53,98 @@ const WINDOWS = [
     }
 ];
 
+test('минус перерасхода — часть табло, а не отдельная деталь', async () => {
+    // Жалоба 14.08.2026: «минус для всех стилей считается видимо как-то
+    // отдельно и никак вместе со стилем не изменяется».
+    //
+    // Замер это подтвердил буквально: минус красился токеном `--tw-red`
+    // (#ff453a), а цифры рядом — полосой `--tw-band-danger` (#ff4444). Два
+    // разных красных в сантиметре друг от друга. Хуже в светлой теме, где
+    // `--tw-red` становится #b31025 — тёмно-красный на тёмной карточке, при
+    // том что полоса состояния от темы не зависит вовсе. Плюс в полноэкранном
+    // подложка карточки минуса была зашита литералами и за стилем не следовала.
+    //
+    // Минус — знак ЧИСЛА, а не самостоятельный индикатор: его цвет обязан
+    // приходить оттуда же, откуда цвет цифр.
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => {
+            window.ipcRenderer.send('open-widget');
+            window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
+        });
+        await control.waitForTimeout(2500);
+        await control.evaluate(() => {
+            window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' });
+            window.ipcRenderer.send('display-settings-update', { timerStyle: 'flip' });
+        });
+        await control.waitForTimeout(2000);
+
+        const CASES = [
+            {
+                part: 'electron-widget',
+                name: 'виджет',
+                minus: '.widget-flip-minus-sign',
+                card: '.widget-flip-minus',
+                digit: '.widget-flip-digit',
+                inner: '.widget-flip-inner'
+            },
+            {
+                part: 'display.html',
+                name: 'полноэкранное',
+                minus: '.flip-minus-sign',
+                card: '.flip-minus',
+                digit: '.flip-digit',
+                inner: '.flip-card-inner'
+            }
+        ];
+
+        for (const c of CASES) {
+            let page = null;
+            for (const p of app.windows()) {
+                if ((await p.url()).includes(c.part)) { page = p; }
+            }
+            expect(page, `окно ${c.name} не открыто`).toBeTruthy();
+
+            const res = await page.evaluate((sel) => {
+                const vis = (n) => n.getBoundingClientRect().height > 0;
+                // Минус виден только в перерасходе — показываем его руками:
+                // ждать настоящего перерасхода значило бы гонять таймер.
+                const card = document.querySelector(sel.card);
+                card.classList.add('visible');
+                // И ставим цифрам полосу перерасхода, чтобы сравнивать с тем
+                // цветом, который рядом с минусом реально окажется.
+                const digitNode = [...document.querySelectorAll(sel.digit)].find(vis);
+                const owner = digitNode.closest('.widget-flip-card, .flip-card');
+                owner.setAttribute('data-status', 'overtime');
+                owner.classList.add('danger', 'overtime');
+
+                const norm = (c) => {
+                    const m = document.createElement('div');
+                    m.style.color = c;
+                    document.body.appendChild(m);
+                    const out = getComputedStyle(m).color;
+                    m.remove();
+                    return out;
+                };
+                return {
+                    minusColor: norm(getComputedStyle(document.querySelector(sel.minus)).color),
+                    digitColor: norm(getComputedStyle(digitNode).color),
+                    cardBg: getComputedStyle(card).backgroundImage,
+                    innerBg: getComputedStyle(document.querySelector(sel.inner)).backgroundImage
+                };
+            }, c);
+
+            console.log(`${c.name} →`, JSON.stringify(res));
+            expect(res.minusColor, `${c.name}: минус красится не тем красным, что цифры рядом`)
+                .toBe(res.digitColor);
+            expect(res.cardBg, `${c.name}: подложка минуса разошлась с подложкой карточек`)
+                .toBe(res.innerBg);
+        }
+    } finally {
+        await app.close();
+    }
+});
+
 test('разделитель флипа — точки цвета цифр во всех трёх окнах', async () => {
     const { app, control } = await launchApp();
     try {

@@ -452,6 +452,40 @@ test('surfacePaint: доля пишется с одним знаком, без �
 });
 
 // ---------------------------------------------------------------------------
+// surfaceSolid — тот же цвет БЕЗ прозрачности, для перекидыша
+// ---------------------------------------------------------------------------
+const { surfaceSolid } = require('../renderer-shared');
+
+test('surfaceSolid: отдаёт цвет и ИГНОРИРУЕТ прозрачность — в этом весь смысл', () => {
+    // Карточка перекидыша — пластина, с которой створки берут свой фон.
+    // Полупрозрачная означала бы, что сквозь падающую створку видно цифру под
+    // ней. Поэтому прозрачность здесь не приглушается, а не учитывается вовсе.
+    assert.equal(surfaceSolid({ color: '#1a2b3c' }), '#1a2b3c');
+    for (const alpha of [0, 0.5, 1, null, undefined, NaN, 'чепуха']) {
+        assert.equal(
+            surfaceSolid({ color: '#1a2b3c', alpha }),
+            '#1a2b3c',
+            `прозрачность ${String(alpha)} обязана быть проигнорирована`
+        );
+    }
+});
+
+test('surfaceSolid: цвета нет — null, то есть подложка стиля остаётся за CSS', () => {
+    assert.equal(surfaceSolid(undefined), null);
+    assert.equal(surfaceSolid({}), null);
+    assert.equal(surfaceSolid({ color: '' }), null);
+    assert.equal(surfaceSolid({ color: 'red' }), null);
+    // Та же строгая проверка, что в surfacePaint: значение уходит в CSS-объявление.
+    assert.equal(surfaceSolid({ color: '#fff; background: url(x)' }), null);
+    assert.equal(surfaceSolid({ color: 123 }), null);
+});
+
+test('surfaceSolid: регистр и пробелы нормализуются, как в surfacePaint', () => {
+    assert.equal(surfaceSolid({ color: '  #AABBCC  ' }), '#aabbcc');
+    assert.equal(surfaceSolid({ color: '#ABC' }), '#abc');
+});
+
+// ---------------------------------------------------------------------------
 // surfaceAlpha — прозрачность БЕЗ выбранного цвета
 // ---------------------------------------------------------------------------
 const { surfaceAlpha } = require('../renderer-shared');

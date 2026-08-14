@@ -217,6 +217,69 @@ test.describe('фон виджета и часов', () => {
             'сброс обязан вернуть родную подложку').toBe(ledDefault);
     });
 
+    test('у ФЛИПА фона нельзя сделать прозрачным — ни ползунком, ни цветом', async () => {
+        // Решение пользователя 14.08.2026: «убрать полностью у флипа
+        // возможность делать фон сзади прозрачным». Причина видна в устройстве
+        // стиля: карточка перекидыша — это ПЛАСТИНА, поверх которой ходят
+        // створки. Стоит подложке стать прозрачной, и сквозь падающую створку
+        // видно и цифру под ней, и рабочий стол; стиль читается как поломка,
+        // а не как настройка. Ползунок для флипа в панели и так спрятан — но
+        // спрятанный контрол не мешает значению, сохранённому при другом
+        // стиле, приехать в CSS. Поэтому проверяется САМА подложка.
+        await setStyle(control, 'flip');
+        await widget.waitForTimeout(900);
+
+        /**
+         * Меряем ТУ заливку, которая реально рисуется, а не шорткод.
+         *
+         * Первая версия читала `background` целиком и падала всегда: в шорткод
+         * входит `background-color: rgba(0, 0, 0, 0)`, который у элемента с
+         * градиентом прозрачен ВСЕГДА и к прозрачности подложки отношения не
+         * имеет. Поэтому: есть градиент — проверяем его стопы, нет градиента —
+         * проверяем сплошной цвет.
+         */
+        const opaque = async (why) => {
+            const { image, color } = await widget.evaluate(() => {
+                const s = getComputedStyle(document.querySelector('.widget-flip-inner'));
+                return { image: s.backgroundImage, color: s.backgroundColor };
+            });
+            const source = image !== 'none' ? image : color;
+            const stops = source.match(/rgba?\([^)]*\)|color\([^)]*\)/g) || [source];
+            const alphas = stops.map((s) => {
+                const m = s.match(/\/\s*([\d.]+)\s*\)/);            // color(srgb r g b / a)
+                if (m) { return Number(m[1]); }
+                const p = parseColor(s);
+                return p ? p.a : 1;
+            });
+            const min = Math.min(...alphas);
+            console.log(`флип (${why}): min alpha ${min} из [${alphas.join(', ')}]`);
+            expect(min, `${why}: подложка флипа ${source} обязана остаться непрозрачной`).toBe(1);
+        };
+
+        await opaque('по умолчанию');
+
+        // Ползунок в ноль — тем же жестом, что гасит подложку у «Цифр».
+        await control.focus('#widgetSurfaceAlpha');
+        await control.press('#widgetSurfaceAlpha', 'Home');
+        await control.waitForTimeout(700);
+        await opaque('после прозрачности 0');
+
+        // И с выбранным цветом: цвет обязан приехать, прозрачность — нет.
+        const hex = await pickSurface(control, 'widget', 0.6, 0.8);
+        await control.waitForTimeout(600);
+        await opaque('с выбранным цветом и прозрачностью 0');
+        const painted = await paintOf(widget, '.widget-flip-inner', 'backgroundColor');
+        const [r, g, b] = hexToRgb(hex);
+        expect(painted, `выбранный цвет ${hex} обязан доехать до карточки флипа`)
+            .toBe(`rgb(${r}, ${g}, ${b})`);
+
+        // Возвращаем состояние: профиль e2e общий на весь прогон.
+        await control.click('#widgetSurfaceRow .surface-reset-bg');
+        await control.waitForTimeout(600);
+        await setStyle(control, 'digits');
+        await widget.waitForTimeout(700);
+    });
+
     test('выбор темы НЕ стирает выбранный фон окна', async () => {
         // Раньше каждая тема и каждая пипетка пересобирали объект цветов
         // целиком — то есть первый же клик по теме уносил бы фон.

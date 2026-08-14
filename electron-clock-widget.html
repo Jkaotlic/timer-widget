@@ -440,11 +440,14 @@
             position: relative;
             width: 100%;
             height: 100%;
-            background: var(--surface-paint, linear-gradient(180deg,
-                rgba(42,42,53,calc(0.85 * var(--surface-alpha, 1))) 0%,
-                rgba(26,26,37,calc(0.85 * var(--surface-alpha, 1))) 49.9%,
-                rgba(10,10,15,calc(0.90 * var(--surface-alpha, 1))) 50%,
-                rgba(21,21,32,calc(0.85 * var(--surface-alpha, 1))) 100%));
+            /* НЕПРОЗРАЧНАЯ по построению — разбор в electron-widget.html и в
+               flip-card.css: створки берут фон с этой пластины, и сквозь
+               полупрозрачную было бы видно цифру под падающей створкой. */
+            background: var(--surface-solid, linear-gradient(180deg,
+                rgb(42,42,53) 0%,
+                rgb(26,26,37) 49.9%,
+                rgb(10,10,15) 50%,
+                rgb(21,21,32) 100%));
             border-radius: var(--tw-r-xs);
             border: 1px solid var(--tw-border);
             overflow: hidden;
@@ -1344,6 +1347,12 @@
                 else { root.style.removeProperty('--surface-paint'); }
                 // Прозрачность действует и без выбранного цвета: её множитель
                 // вплетён в альфу подложки КАЖДОГО стиля (см. <style> выше).
+                // Непрозрачный вариант того же цвета — для перекидыша: его
+                // карточка это пластина, с которой створки берут свой фон.
+                const solid = window.RendererShared.surfaceSolid({ color: colors.surface });
+                if (solid) { root.style.setProperty('--surface-solid', solid); }
+                else { root.style.removeProperty('--surface-solid'); }
+
                 const alphaValue = window.RendererShared.surfaceAlpha(colors.surfaceAlpha);
                 if (alphaValue === null) { root.style.removeProperty('--surface-alpha'); }
                 else { root.style.setProperty('--surface-alpha', String(alphaValue)); }

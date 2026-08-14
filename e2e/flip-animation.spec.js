@@ -105,7 +105,11 @@ test('перекидывание ВИДНО в виджете, часах и п�
                     // Верхняя створка несёт СТАРУЮ цифру, нижняя — НОВУЮ.
                     topText: leafTop.textContent,
                     bottomText: leafBottom.textContent,
-                    staticText: wrap.querySelector('.fc-static').textContent,
+                    staticText: wrap.querySelector('.fc-static.fc-bottom').textContent,
+                    // Верх, который открывается из-под падающей створки. Пока
+                    // слои были прозрачны, его роль играла статичная цифра
+                    // карточки; с непрозрачными слоями он обязан быть СВОИМ.
+                    staticTopText: wrap.querySelector('.fc-static.fc-top').textContent,
                     digitAfter: node.textContent,
                     fall: frames(leafTop, [0, 0.25, 0.5, 0.75, 0.995]),
                     rise: frames(leafBottom, [0.005, 0.25, 0.5, 0.75, 1]),
@@ -130,6 +134,8 @@ test('перекидывание ВИДНО в виджете, часах и п�
             expect(res.topText, `${part}: падает СТАРАЯ цифра`).toBe(res.prev);
             expect(res.bottomText, `${part}: поднимается НОВАЯ цифра`).toBe(next);
             expect(res.staticText, `${part}: нижнюю половину до конца закрывает старая`).toBe(res.prev);
+            expect(res.staticTopText, `${part}: из-под падающей створки обязана открыться НОВАЯ цифра, а не фон`)
+                .toBe(next);
 
             // Падение: половина карточки складывается ДО НУЛЯ. Прежняя, невидимая
             // анимация давала 2% высоты — этот порог её не пропустит.
