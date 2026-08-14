@@ -391,15 +391,37 @@
             gap: 4px;
         }
 
+        /* Разделитель — ДВЕ ТОЧКИ, а не глиф. Текст ':' в разметке остаётся и
+           гасится нулевым шрифтом: он нужен экранному диктору, рисуют же его
+           псевдоэлементы.
+
+           До 14.08.2026 здесь стоял живой глиф в 48px цветом --tw-fg-muted.
+           Виджет таймера перевели на точки ещё в июле, а часы забыли, и два
+           окна одного стиля рисовали разделитель по-разному: у часов он был
+           мелкий, серый, не связанный с высотой карточки и — единственная
+           часть флипа — не принимал выбранный пользователем цвет. */
         .widget-flip-separator {
-            font-family: var(--tw-font-display);
-            font-size: 48px;
-            font-weight: 600;
-            color: var(--tw-fg-muted);
-            display: flex;
-            align-items: center;
-            margin: 0 2px;
+            font-size: 0;
             line-height: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 0 4px;
+            height: 70px;
+        }
+
+        .widget-flip-separator::before,
+        .widget-flip-separator::after {
+            content: "";
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            /* Цвет приходит ПЕРЕМЕННОЙ, фирменный градиент — значение по
+               умолчанию. Инлайновый `color` сюда не дошёл бы вовсе: точки
+               рисуют псевдоэлементы, а у них своё правило. */
+            background: var(--timer-color, linear-gradient(135deg, var(--tw-blue), var(--tw-green)));
         }
 
         .widget-flip-card {
@@ -470,8 +492,20 @@
             --fc-perspective: 155px;
         }
 
+        /* Шесть цифр — карточка ниже, значит и колонка точек ниже, и сами
+           точки мельче. Шрифт обязан остаться нулевым: ровно на этом месте у
+           виджета таймера адаптив когда-то вернул `font-size: 36px`, и глиф
+           нарисовался ПОВЕРХ точек (см. e2e/flip-hours-layout.spec.js). */
         .widget-flip.has-seconds .widget-flip-separator {
-            font-size: 36px;
+            height: 56px;
+            gap: 8px;
+            margin: 0 3px;
+        }
+
+        .widget-flip.has-seconds .widget-flip-separator::before,
+        .widget-flip.has-seconds .widget-flip-separator::after {
+            width: 4px;
+            height: 4px;
         }
 
         .widget-flip.has-seconds .widget-flip-digit {
@@ -1309,6 +1343,13 @@
                 // атрибут, поставленный setAttribute, было нечем.
                 if (timerColor) { root.style.setProperty('--timer-color-stop', timerColor); }
                 else { root.style.removeProperty('--timer-color-stop'); }
+                // Виджет и дисплей ставят эту переменную давно, часы — нет: их
+                // флип красился инлайновым `color`. Точкам разделителя такой
+                // цвет недоступен в принципе (их рисуют псевдоэлементы), и до
+                // 14.08.2026 они были единственной частью стиля, до которой
+                // выбранный цвет не доходил.
+                if (timerColor) { root.style.setProperty('--timer-color', timerColor); }
+                else { root.style.removeProperty('--timer-color'); }
                 if (progressColor) { root.style.setProperty('--progress-color-stop', progressColor); }
                 else { root.style.removeProperty('--progress-color-stop'); }
 
@@ -1316,8 +1357,11 @@
                 // безусловно, без гейта по data-status, в отличие от таймера.
                 paint(this.clockDigitsTime, 'color', timerColor);
 
-                // Flip style
-                document.querySelectorAll('.widget-flip-digit, .widget-flip-separator')
+                // Flip style. Разделитель здесь НЕ красится: он рисует точки
+                // псевдоэлементами, и цвет до них доезжает переменной
+                // --timer-color, выставленной выше. Инлайновый `color` на нём
+                // не делал ничего и только выглядел как рабочая покраска.
+                document.querySelectorAll('.widget-flip-digit')
                     .forEach(el => paint(el, 'color', timerColor));
 
                 // Analog style

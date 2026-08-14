@@ -103,17 +103,26 @@
    снимутся посреди движения; это сверяет tests/flip-card.test.js. */
 .fc-leaf-top {
     transform-origin: bottom center;
-    /* Разгон: почти без начальной скорости, быстро к упору. */
-    animation: fc-fall 0.2s cubic-bezier(0.45, 0, 0.85, 0.4) forwards;
+    /* Кривая ПОЧТИ ЛИНЕЙНАЯ с лёгким разгоном — и это результат замера, а не
+       вкуса. Предыдущая версия, `cubic-bezier(0.45, 0, 0.85, 0.4)`, выглядела
+       разумно («тяжесть»), но покадровый замер дал ход по четвертям
+       1.00 → 1.01 → 1.01 → 0.87 → 0.04: три четверти фазы створка стоит
+       неподвижно, потом складывается за оставшуюся. Пользователь назвал это
+       дёрганым, и это было хуже прежнего `ease-in` (тот давал 0.88 на
+       середине). Крайние точки у обеих кривых одинаковые, поэтому проверки
+       «сложилась до нуля» и «ширина выросла» были зелёными: РЫВОК ВИДЕН
+       ТОЛЬКО В СЕРЕДИНЕ ХОДА, и меряет её теперь e2e. */
+    animation: fc-fall 0.2s cubic-bezier(0.35, 0.2, 0.65, 0.9) forwards;
     z-index: 2;
 }
 
 .fc-leaf-bottom {
     transform-origin: top center;
     transform: rotateX(90deg);
-    /* Темп задают САМИ кадры (в них свои animation-timing-function), поэтому
-       здесь linear: иначе доводка получила бы плавность дважды. */
-    animation: fc-rise 0.24s linear 0.2s forwards;
+    /* Тоже почти линейная, с мягким приходом к упору. Проскок за ноль убран:
+       на карточке виджета он давал 0.5 пикселя — то есть был невидим, но
+       съедал последние 30 % фазы, за которые ничего не происходило. */
+    animation: fc-rise 0.24s cubic-bezier(0.35, 0.25, 0.6, 0.95) 0.2s forwards;
     z-index: 3;
 }
 
@@ -138,7 +147,7 @@
 /* Падающая створка: сгиб — её НИЖНИЙ край. */
 .fc-leaf-top::after {
     background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.5) 100%);
-    animation: fc-shade-in 0.2s cubic-bezier(0.45, 0, 0.85, 0.4) forwards;
+    animation: fc-shade-in 0.2s cubic-bezier(0.35, 0.2, 0.65, 0.9) forwards;
 }
 
 /* Поднимающаяся — зеркально: сгиб — её ВЕРХНИЙ край. */
@@ -153,18 +162,9 @@
     to { transform: rotateX(-90deg); }
 }
 
-/* Проскок за ноль и возврат — «щелчок» пластины об упор. Без него конец
-   движения — просто остановка, и подъём читается как выезд картинки. */
 @keyframes fc-rise {
-    0% {
-        transform: rotateX(90deg);
-        animation-timing-function: cubic-bezier(0.25, 0.6, 0.3, 1);
-    }
-    70% {
-        transform: rotateX(-6deg);
-        animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1);
-    }
-    100% { transform: rotateX(0); }
+    from { transform: rotateX(90deg); }
+    to { transform: rotateX(0); }
 }
 
 @keyframes fc-shade-in {
