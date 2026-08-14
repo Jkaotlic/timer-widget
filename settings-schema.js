@@ -78,19 +78,19 @@ const SETTINGS_DESCRIPTORS = [
     },
 
     // --- фон полноэкранного режима (сам режим — руками, это кнопки) ---
-    { key: 'bgSolid', el: 'bgSolidColor', kind: 'value', def: '#0f0c29' },
-    { key: 'bgGrad1', el: 'bgGrad1', kind: 'value', def: '#0f0c29' },
-    { key: 'bgGrad2', el: 'bgGrad2', kind: 'value', def: '#302b63' },
+    { key: 'bgSolid', el: 'bgSolidColor', kind: 'value', def: '#0f0c29', owner: 'display' },
+    { key: 'bgGrad1', el: 'bgGrad1', kind: 'value', def: '#0f0c29', owner: 'display' },
+    { key: 'bgGrad2', el: 'bgGrad2', kind: 'value', def: '#302b63', owner: 'display' },
 
     // --- блоки времени на полноэкранном ---
-    { key: 'showCurrentTime', el: 'showCurrentTime', kind: 'checkbox', def: true },
-    { key: 'showTimeBlocks', el: 'showTimeBlocks', kind: 'checkbox', def: false },
-    { key: 'timeLayoutPreset', el: 'timeLayoutPreset', kind: 'value', def: 'frame' },
-    { key: 'eventTime', el: 'eventTimeInput', kind: 'value', def: '10:00' },
-    { key: 'endTime', el: 'endTimeInput', kind: 'value', def: '12:00' },
+    { key: 'showCurrentTime', el: 'showCurrentTime', kind: 'checkbox', def: true, owner: 'display' },
+    { key: 'showTimeBlocks', el: 'showTimeBlocks', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'timeLayoutPreset', el: 'timeLayoutPreset', kind: 'value', def: 'frame', owner: 'display' },
+    { key: 'eventTime', el: 'eventTimeInput', kind: 'value', def: '10:00', owner: 'display' },
+    { key: 'endTime', el: 'endTimeInput', kind: 'value', def: '12:00', owner: 'display' },
     {
         key: 'timeBlocksScale', el: 'timeBlocksScale', kind: 'value', def: 100,
-        label: 'timeBlocksScaleValue', numeric: true
+        label: 'timeBlocksScaleValue', numeric: true, owner: 'display'
     },
 
     // --- стиль и масштаб: у виджета и дисплея свои ключи ---
@@ -99,39 +99,39 @@ const SETTINGS_DESCRIPTORS = [
     // предыдущую версию потеряет настройку.
     {
         key: 'widgetTimerStyle', el: 'timerStyle', kind: 'value', def: 'circle',
-        legacy: ['timerStyle'], alsoWrite: ['timerStyle']
+        legacy: ['timerStyle'], alsoWrite: ['timerStyle'], owner: 'widget'
     },
     {
         key: 'widgetTimerScale', el: 'timerScale', kind: 'value', def: 100,
         legacy: ['timerScale'], label: 'timerScaleValue', numeric: true,
-        alsoWrite: ['timerScale']
+        alsoWrite: ['timerScale'], owner: 'widget'
     },
     // Подпись состояния выключена по умолчанию: её работу делает цвет дуги, а
     // на маленьком виджете слово занимает место, которого нет.
-    { key: 'widgetStatusLabel', el: 'widgetStatusLabel', kind: 'checkbox', def: false },
+    { key: 'widgetStatusLabel', el: 'widgetStatusLabel', kind: 'checkbox', def: false, owner: 'widget' },
     // Уровень окна был прибит в главном процессе; теперь им управляет
     // пользователь. По умолчанию включено — это прежнее поведение.
-    { key: 'widgetAlwaysOnTop', el: 'widgetAlwaysOnTop', kind: 'checkbox', def: true },
+    { key: 'widgetAlwaysOnTop', el: 'widgetAlwaysOnTop', kind: 'checkbox', def: true, owner: 'widget' },
     {
         key: 'displayTimerStyle', el: 'displayTimerStyle', kind: 'value', def: 'circle',
-        legacy: ['timerStyle'], fallbackEl: 'timerStyle'
+        legacy: ['timerStyle'], fallbackEl: 'timerStyle', owner: 'display'
     },
     {
         key: 'displayTimerScale', el: 'displayTimerScale', kind: 'value', def: 100,
         legacy: ['timerScale'], label: 'displayTimerScaleValue', numeric: true,
-        fallbackEl: 'timerScale'
+        fallbackEl: 'timerScale', owner: 'display'
     },
 
     // --- часы ---
-    { key: 'syncClockStyle', el: 'syncClockStyle', kind: 'checkbox', def: false },
-    { key: 'clockStyle', el: 'clockStyle', kind: 'value', def: 'circle', legacy: ['timerStyle'] },
+    { key: 'syncClockStyle', el: 'syncClockStyle', kind: 'checkbox', def: false, owner: 'clock' },
+    { key: 'clockStyle', el: 'clockStyle', kind: 'value', def: 'circle', legacy: ['timerStyle'], owner: 'clock' },
 
     // Шрифт стиля «Цифры». Три РАЗНЫХ имени с самого начала: общее имя
     // `timerStyle` в этом проекте уже означало разные окна в разных наборах
     // и стоило отдельного бага, где дисплей рисовал стиль виджета.
-    { key: 'widgetDigitsFont', el: 'widgetDigitsFont', kind: 'value', def: 'inter' },
-    { key: 'displayDigitsFont', el: 'displayDigitsFont', kind: 'value', def: 'inter' },
-    { key: 'clockDigitsFont', el: 'clockDigitsFont', kind: 'value', def: 'inter' }
+    { key: 'widgetDigitsFont', el: 'widgetDigitsFont', kind: 'value', def: 'inter', owner: 'widget' },
+    { key: 'displayDigitsFont', el: 'displayDigitsFont', kind: 'value', def: 'inter', owner: 'display' },
+    { key: 'clockDigitsFont', el: 'clockDigitsFont', kind: 'value', def: 'inter', owner: 'clock' }
 ];
 
 // Ключи, которые панель пишет в `displayExtSettings` МИМО таблицы. Держим списком,
@@ -248,12 +248,52 @@ function collectSettings(doc) {
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// Сброс настроек ОДНОГО окна
+// ---------------------------------------------------------------------------
+/**
+ * Возвращает контролы указанного окна к значениям по умолчанию.
+ *
+ * Владелец строки (`owner`) — то же знание в той же таблице: третьего списка
+ * «что относится к виджету» не заводим. Ровно из-за таких вторых списков в этом
+ * файле и появилась таблица.
+ *
+ * Функция трогает ТОЛЬКО контролы: сохранение, отправку в окно и цвета делает
+ * панель. Здесь нет ни localStorage, ни IPC — поэтому её поведение проверяется
+ * на поддельном документе.
+ *
+ * @param {'widget'|'clock'|'display'} owner
+ * @param {Document} [doc]
+ * @returns {Object} применённые значения (ключ → значение по умолчанию)
+ */
+function resetOwnedSettings(owner, doc) {
+    const target = doc || (typeof document !== 'undefined' ? document : null);
+    const applied = {};
+
+    for (const descriptor of SETTINGS_DESCRIPTORS) {
+        if (descriptor.owner !== owner) { continue; }
+        const el = elementById(target, descriptor.el);
+        if (!el) { continue; }
+
+        if (descriptor.kind === 'checkbox') { el.checked = !!descriptor.def; }
+        else { el.value = descriptor.def; }
+
+        const label = descriptor.label ? elementById(target, descriptor.label) : null;
+        if (label) { label.textContent = descriptor.def + '%'; }
+
+        applied[descriptor.key] = descriptor.def;
+    }
+
+    return applied;
+}
+
 const SettingsSchema = {
     SETTINGS_DESCRIPTORS,
     MANUAL_KEYS,
     settingValue,
     applyStoredSettings,
-    collectSettings
+    collectSettings,
+    resetOwnedSettings
 };
 
 // Node.js (тесты)

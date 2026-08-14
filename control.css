@@ -148,14 +148,26 @@ body::after {
     box-shadow: none;
     min-width: 0;
     width: 100%;
-    max-width: 560px;
+    /* Колонка контента. 720 — ширина, до которой окно вообще может вырасти без
+       ящика (CONTROL_WINDOW_MAX_WIDTH минус поля), поэтому панель на любом
+       допустимом размере занимает окно почти целиком. Раньше здесь стояло 560
+       при потолке окна 1200: панель тонула в поле шириной 640px, и поле это
+       пытались оправдать второй оболочкой — см. удалённый @media ниже. */
+    max-width: 720px;
     justify-self: center;
-    align-self: center;
+    /* Панель растягивается на ВСЮ высоту окна. Было `height: max-content` +
+       `align-self: center`: на окне 1000px высоты панель занимала 678px и
+       висела в середине — по 161px мёртвого поля сверху и снизу (замер
+       e2e/panel-shell.spec.js). Свободную высоту забирает .hero (flex: 1),
+       поэтому растёт блок с цифрами, а список окон и футер остаются прижаты
+       книзу. max-height оставлен: панель не должна перерастать окно, внутри
+       у неё overflow: hidden. */
+    align-self: stretch;
     margin: 0;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: max-content;
+    height: auto;
     max-height: 100vh;
     position: relative;
     z-index: 1;
@@ -193,29 +205,25 @@ body::after {
    панель снова растягивалась. Правило одно, и оно выше. */
 
 /* ============ Растянутое окно ============
-   Панель нарисована прозрачной: фон, рамку и тень окна берёт на себя
-   .app-shell::before, растянутый на ВСЁ окно. При ширине окна по умолчанию
-   (400px) это одно и то же, и панель читается как само окно. Но стоит окно
-   растянуть — колонка контента остаётся узкой, а раскрашенное поле вокруг неё
-   разрастается, и вид становится такой, будто панель забыли доверстать:
-   горстка кнопок в середине пустого прямоугольника.
+   Здесь стоял @media (min-width: 620px), который на широком окне выдавал
+   .control-panel собственные фон, рамку 1px и тень — «настоящую карточку».
+   Замысел был такой: панель нарисована прозрачной, фон и тень окна несёт
+   .app-shell::before, и на растянутом окне колонка контента оставалась узкой
+   посреди раскрашенного поля — вид, «будто панель забыли доверстать».
 
-   На широком окне панель становится настоящей карточкой: обретает собственную
-   подложку, рамку и тень, а поле вокруг превращается в осознанное поле. Колонка
-   при этом немного шире (640 против 560) — на 1200px окне пустоты вдвое меньше.
-   Порог 620px выбран так, чтобы при ширине по умолчанию не менялось НИЧЕГО.
+   Лекарство оказалось хуже болезни. Оболочек стало ДВЕ, каждая со своим фоном,
+   скруглением и тенью, вложенные друг в друга, — и окно читалось как окно
+   внутри окна (жалоба пользователя, замер: панель 640×678 с рамкой 1px и тенью
+   0 24px 64px посреди окна 1200×1000). Поле при этом никуда не делось.
 
-   Только для закрытого ящика: с открытым панель и ящик стоят рядом и делят одно
-   поле — карточка там разрезала бы пару пополам. */
-@media (min-width: 620px) {
-    .app-shell:not(.drawer-open) .control-panel {
-        max-width: 640px;
-        background: var(--tw-bg-glass);
-        border: 1px solid var(--tw-border);
-        border-radius: var(--tw-r-2xl);
-        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
-    }
-}
+   Оболочка теперь одна — окно. Исходная болезнь лечится с другого конца: панель
+   растягивается на всю высоту окна, колонка контента поднята до 720px, а само
+   окно без ящика не может стать шире 760px (CONTROL_WINDOW_MAX_WIDTH), так что
+   поля вокруг панели — 20px с каждой стороны, а не 280.
+
+   Инвариант закреплён e2e/panel-shell.spec.js: он меряет вычисленные фон,
+   рамку и тень панели на живом окне и проверяет сам себя контрольным образцом
+   (.app-shell::before, у которого фон и тень быть ОБЯЗАНЫ). */
 
 /* ============ Settings drawer (slide-out right) ============
    Styled after TimerWidget Design System v2 — sound-tab reference:
@@ -547,16 +555,23 @@ body::after {
    Роли ступеней те же, что в тёмной: 1 — крупные блоки, 2 — контролы,
    3 — наведение. На светлом «выше» значит темнее. */
 [data-theme="light"] .app-shell::before {
-    background: var(--tw-bg-surface-solid);
+    /* Белый «лист» — это САМО ОКНО, а не панель поверх него. Раньше окно красили
+       в --tw-bg-surface-solid (#f2f2f7), а белым был .control-panel — то есть в
+       светлой теме двухслойность жила в палитре и не зависела от ширины окна.
+       Пока панель занимала окно целиком, разницы не было видно; стоило окну
+       стать шире колонки контента — и белый лист со скруглением оказывался
+       нарисован внутри серого окна со скруглением. Владелец фона один: окно. */
+    background: var(--tw-bg-glass);
     border-color: var(--tw-border);
 }
 [data-theme="light"] body::after { display: none; }         /* шумовая текстура */
 [data-theme="light"] .settings-drawer { background: var(--tw-bg-surface-solid); }
-/* Панель — белый «лист» на сером фоне окна, ящик — серый с белыми карточками.
-   Это раскладка светлых системных интерфейсов: фон приложения серый, содержимое
-   белое. Обратный порядок (серая панель с ещё более серыми кнопками) читался
-   вяло: контрол отличался от подложки на три единицы яркости. */
-[data-theme="light"] .control-panel,
+/* Белый «лист», серый ящик с белыми карточками — раскладка светлых системных
+   интерфейсов. Обратный порядок (серая панель с ещё более серыми кнопками)
+   читался вяло: контрол отличался от подложки на три единицы яркости.
+   Лист теперь красит .app-shell::before (см. выше): .control-panel прозрачна в
+   ОБЕИХ темах, иначе она вторая оболочка поверх окна. Ящик остаётся
+   --tw-bg-surface-solid и по-прежнему отделяется от листа. */
 [data-theme="light"] .timer-header {
     background: var(--tw-bg-glass);
 }
@@ -3648,7 +3663,11 @@ body.collapsed .control-panel {
    вообще считает изменением. Радиус уменьшен по той же причине: 20px на
    52px высоты съедают углы почти до овала. */
 body.collapsed .app-shell::before {
-    background: var(--tw-bg-surface-solid);
+    /* Токен без суффикса -solid: полоса — то же окно, и подложка у неё та же,
+       что у развёрнутой панели. В тёмной теме значения совпадают (#1e1e22), в
+       светлой развёрнутое окно стало белым — полоса обязана стать белой вместе
+       с ним, иначе одно окно меняет цвет от того, свёрнуто оно или нет. */
+    background: var(--tw-bg-surface);
     border-radius: var(--tw-r-lg);
 }
 
@@ -3782,6 +3801,14 @@ body.collapsed .toast {
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    /* Свободную высоту окна забирает ГЕРОЙ, а не список окон и не футер: панель
+       растянута на всё окно (см. .control-panel выше), и без этого правила
+       содержимое встало бы встык сверху, а внизу осталась бы дыра. Цифры при
+       этом центрируются в своей зоне — на окне минимальной высоты (660) зона
+       равна прежней и не меняется НИЧЕГО. */
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 0;
 }
 .hero-label {
     display: inline-flex;
@@ -4426,3 +4453,121 @@ body.state-overtime #miniBarPause {
    модуль полосы (mini-bar.js): панель отдаёт ему признак, а не разметку. */
 body.paused #miniBarPause { display: none; }
 body.paused #miniBarStart { display: block; }
+
+/* ===========================================================================
+   Ряд «Фон» — цвет подложки виджета и часов (см. panel-colors.js).
+   Разметку строит модуль, здесь только оформление. Цвет свотча приходит
+   переменной --surface-swatch: инлайновый background означал бы второго
+   владельца значения, а состояние «фон не задан» — класс .is-empty.
+   =========================================================================== */
+.surface-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--tw-divider);
+}
+
+.surface-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.surface-label {
+    font-size: var(--tw-t-tiny);
+    color: var(--tw-fg-secondary);
+    min-width: 92px;
+}
+
+.surface-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 1px solid var(--tw-border-strong);
+    background: var(--surface-swatch, transparent);
+    transition: box-shadow var(--tw-dur-base) var(--tw-ease);
+}
+
+/* Шахматка — «фона нет», а не «фон прозрачный»: два разных состояния, и
+   различать их по одной лишь пустоте нельзя. */
+.surface-swatch.is-empty {
+    background-image:
+        linear-gradient(45deg, var(--tw-divider) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--tw-divider) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--tw-divider) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--tw-divider) 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}
+
+.surface-swatch:focus-visible,
+.surface-reset:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.55);
+}
+
+.surface-swatch.active {
+    box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.55);
+}
+
+.surface-reset {
+    margin-left: auto;
+    padding: 3px 10px;
+    font-size: var(--tw-t-tiny);
+    color: var(--tw-fg-secondary);
+    background: var(--tw-overlay-light);
+    border: 1px solid var(--tw-border);
+    border-radius: var(--tw-r-xs);
+    cursor: pointer;
+}
+
+.surface-reset:hover:not(:disabled) {
+    color: var(--tw-fg);
+    background: var(--tw-overlay-medium);
+}
+
+.surface-reset:disabled,
+.surface-alpha:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.surface-alpha {
+    flex: 1;
+    accent-color: var(--tw-blue);
+}
+
+.surface-alpha-value {
+    font-size: var(--tw-t-tiny);
+    color: var(--tw-fg-secondary);
+    font-variant-numeric: tabular-nums;
+    min-width: 38px;
+    text-align: right;
+}
+
+/* Кнопка «Сбросить всё» — своя строка под цветами (см. panel-reset.js).
+   Подпись рядом обязательна: кнопка сброса без границы действия читается как
+   «сотрёт вообще всё», включая положение окна, которого она не трогает. */
+.reset-line {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--tw-divider);
+}
+
+.reset-hint {
+    min-width: 0;
+    flex: 1;
+}
+
+.surface-reset.reset-all {
+    color: var(--tw-red);
+    border-color: color-mix(in srgb, var(--tw-red) 35%, transparent);
+}
+
+.surface-reset.reset-all:hover:not(:disabled) {
+    color: var(--tw-red);
+    background: color-mix(in srgb, var(--tw-red) 12%, transparent);
+}

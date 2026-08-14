@@ -569,17 +569,19 @@ test('подписи info-блоков читаемы во всех темах (
     console.log('   ' + report.join('\n   '));
 });
 
-test('подпись LED-стиля читаема на своём тёмном фоне', () => {
+test('подпись стиля «Цифры» читаема на своём тёмном фоне', () => {
     // Отдельный fallback: зелёный по --tw-bg-led. При alpha 0.55 давал 3.57:1.
+    // Правило пришло из стиля LED вместе с ним самим: стили слиты 13.08.2026,
+    // но фон блока информации и его подпись остались теми же.
     const display = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
-    const m = /body\.style-digital \.info-label \{[\s\S]*?color: var\(--info-color-dim, (rgba\([^)]+\))\)/.exec(display);
-    assert.ok(m, 'не найден fallback подписи LED-стиля');
+    const m = /body\.style-digits \.info-label \{[\s\S]*?color: var\(--info-color-dim, (rgba\([^)]+\))\)/.exec(display);
+    assert.ok(m, 'не найден fallback подписи стиля «Цифры»');
 
     const ledBg = composite(darkToken('tw-bg-led'), [0, 0, 0]);
     const r = contrast(composite(m[1], ledBg), ledBg);
     assert.ok(
         r >= AA_NORMAL,
-        `подпись LED (${m[1]}) на --tw-bg-led: ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+        `подпись «Цифр» (${m[1]}) на --tw-bg-led: ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
     );
 });
 

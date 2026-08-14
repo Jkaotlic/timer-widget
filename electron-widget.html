@@ -7,6 +7,7 @@
     <title>Timer Widget</title>
     <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
+    <link rel="stylesheet" href="flip-card.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
@@ -83,8 +84,17 @@
 
         body {
             font-family: var(--tw-font-sans);
-            /* Near-transparent background enables drag/hit-testing on Windows transparent windows */
-            background: rgba(0, 0, 0, 0.01);
+            /* Подложки НЕТ. Здесь стояло `rgba(0, 0, 0, 0.01)` с объяснением
+               «near-transparent background enables drag/hit-testing on Windows»,
+               и она же была той «еле заметной прямоугольной плёнкой», которую
+               видно у круга и «Цифр»: своего фона у этих двух стилей нет вовсе,
+               так что единственное, что там красилось, — это окно.
+               Цена снятия принята сознательно: на Windows клики проваливаются
+               сквозь ПОЛНОСТЬЮ прозрачные пиксели, то есть тащить виджет за
+               пустоту вокруг цифр больше нельзя — только за сам таймер. Взамен
+               появилась настоящая полная прозрачность и настраиваемый фон:
+               --surface-paint (см. surfacePaint в renderer-shared.js). */
+            background: transparent;
             overflow: hidden;
             -webkit-font-smoothing: antialiased;
         }
@@ -129,8 +139,18 @@
            цифры, тонкая дуга и мягкая тень под текстом. Заливка круга шла из
            настроек фона ДИСПЛЕЯ (своего контрола «фон виджета» в панели нет
            вообще) — то есть она ещё и была чужой. */
+        /* Градиент кольца. Владелец значения по умолчанию — это правило;
+           пользовательский цвет приходит переменной с documentElement, и его
+           сброс — удаление переменной, а не запись «обратно синего». */
+        #widgetGradient stop:first-child { stop-color: var(--timer-color-stop, #0a84ff); }
+        #widgetGradient stop:last-child { stop-color: var(--progress-color-stop, #30d158); }
+
         .bg-circle {
-            fill: none;
+            /* Своей заливки у круга нет — но теперь есть пользовательская.
+               Значение приходит переменной с documentElement, дефолт (её
+               отсутствие) принадлежит этому правилу: сброс фона в панели просто
+               удаляет переменную. */
+            fill: var(--surface-paint, none);
             stroke: none;
         }
 
@@ -208,19 +228,10 @@
             50%     { opacity: 0.6; }
         }
 
-        /* Tick marks */
-        .tick-marks {
-            display: none;
-            stroke: rgba(255, 255, 255, 0.15);
-            stroke-width: 1;
-        }
-
-        .ticks-on .tick-marks { display: inline; }
-
-        .tick-marks-major {
-            stroke: rgba(255, 255, 255, 0.3);
-            stroke-width: 2;
-        }
+        /* Делений на кольце виджета БОЛЬШЕ НЕТ — ни разметки, ни правил, ни
+           тумблера. Это кольцо обратного отсчёта, а не циферблат: засечки на нём
+           не сообщали ничего и только шумели. Настройка осталась у ЧАСОВ, где
+           круглый циферблат настоящий, и живёт теперь в их вкладке. */
 
         /* Centered time + status */
         .center-content {
@@ -311,17 +322,10 @@
         margin-right: 0.1em;
         }
 
-        /* Перекидывание карточки. Раньше анимация была только в полноэкранном
-           режиме, а виджет и часы меняли цифру рывком — вернули везде.
-           Длительность обязана совпадать с FLIP_DURATION_MS в flip-card.js. */
-        .widget-flip-card.flipping .widget-flip-inner {
-            animation: widget-flip-animation 0.3s ease-in-out;
-        }
-        @keyframes widget-flip-animation {
-            0%   { transform: rotateX(0); }
-            50%  { transform: rotateX(-12deg); }
-            100% { transform: rotateX(0); }
-        }
+        /* Наклона карточки здесь БОЛЬШЕ НЕТ: перекидывание рисуют створки из
+           flip-card.css (одна копия на три окна), а этот блок был имитацией —
+           поворот всей карточки на 12° без перспективы давал 0.79 пикселя
+           движения, то есть не давал ничего. */
         @media (prefers-reduced-motion: reduce) {
             .widget-flip-card.flipping .widget-flip-inner { animation: none; }
         }
@@ -399,93 +403,11 @@
             50%     { opacity: 0.6; }
         }
 
-        /* ============================================
-           СТИЛЬ: ЦИФРОВОЙ LED (Digital)
-           — Dark enclosure + JetBrains Mono green glow
-           ============================================ */
-        .widget-digital {
-            display: none;
-            width: 100%;
-            height: 100%;
-            align-items: center;
-            justify-content: center;
-            /* Зазор до края окна — только чтобы не срезать свечение и границу
-               рамки: сама рамка размером с цифры, поля живут внутри неё. */
-            padding: 2%;
-            overflow: hidden;
-        }
-
-        .widget-digital.active {
-            display: flex;
-        }
-
-        /* Рамка растёт от СОДЕРЖИМОГО, а не от окна.
-           Прежде здесь стояло width/height: 100% и padding: 10%: рамка занимала
-           окно, окно было квадратом при любом стиле — и вокруг строки «00:00»
-           оставалась пустая тёмная коробка, на минимальном размере (120×140)
-           бывшая основной частью виджета. Поля и скругление приходят долями
-           КЕГЛЯ из ledStripMetrics() (window-geometry.js) — один владелец
-           пропорции на рендерер и главный процесс. */
-        .widget-digital-display {
-            background: rgba(10, 10, 15, 0.85);
-            -webkit-backdrop-filter: var(--tw-blur-sm);
-            backdrop-filter: var(--tw-blur-sm);
-            border: 1px solid var(--tw-border);
-            border-radius: var(--digital-radius, 14px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            max-width: 100%;
-            max-height: 100%;
-            padding: var(--digital-pad-y, 10px) var(--digital-pad-x, 12px);
-            position: relative;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-            overflow: hidden;
-        }
-
-        .widget-digital-display::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 50%;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
-            pointer-events: none;
-            border-radius: var(--digital-radius, 14px) var(--digital-radius, 14px) 0 0;
-        }
-
-        .widget-digital-time {
-            font-family: var(--tw-font-mono);
-            font-size: var(--digital-font-size, 24px);
-            font-weight: 700;
-            /* Цвет темы приходит переменной --timer-color; правила
-               [data-status] ниже перекрывают её каскадом. Свечение построено
-               на currentColor, поэтому следует за цветом само. */
-            color: var(--timer-color, var(--tw-led-green));
-            /* Неон снят. Цвет LED остался цветом состояния, но светиться
-               перестал: макет держит один приём тени на все пять стилей. */
-            text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-            letter-spacing: 0.04em;
-            white-space: nowrap;
-            line-height: 1;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .widget-digital-time[data-status="warning"] {
-            color: var(--tw-led-warn);
-        }
-
-        .widget-digital-time[data-status="danger"],
-        .widget-digital-time[data-status="overtime"] {
-            color: var(--tw-led-danger);
-            animation: widget-led-pulse 1s ease-in-out infinite;
-        }
-
-        @keyframes widget-led-pulse {
-            0%, 100% { opacity: 1; }
-            50%     { opacity: 0.65; }
-        }
+        /* Стиля LED больше нет: он был теми же цифрами в тёмной коробке, и
+           после того, как фон окна стал настройкой, отличался от «Цифр» только
+           рамкой и отсутствием выбора шрифта. Оба свойства теперь у «Цифр»
+           (см. .widget-digits-time), а профили со старым значением переводит
+           RendererShared.migrateTimerStyle. */
 
         /* ============================================
            СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip)
@@ -541,7 +463,12 @@
             width: 6px;
             height: 6px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--tw-blue), var(--tw-green));
+            /* Цвет пользователя приходит переменной, фирменный градиент остаётся
+               значением ПО УМОЛЧАНИЮ. Раньше градиент стоял здесь безусловно, и
+               двоеточие было единственной частью флипа, до которой выбранный
+               цвет не доходил вообще: цифры красились, точки — нет. Красить их
+               через `color` нельзя, точки рисуют псевдоэлементы. */
+            background: var(--timer-color, linear-gradient(135deg, var(--tw-blue), var(--tw-green)));
         }
         /* Status colors for separator dots — must override background, not color,
            because the dots are painted by pseudo-elements. data-status is set by
@@ -564,7 +491,14 @@
             display: none;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(180deg, #2a2a35 0%, #1a1a25 50%, #151520 50%, #0a0a15 100%);
+            /* Карточка минуса — такая же подложка флипа, как у цифр, и красится
+               той же переменной. Без этой строки при выбранном фоне минус
+               оставался тёмным рядом с перекрашенными карточками. */
+            background: var(--surface-paint, linear-gradient(180deg,
+                rgba(42, 42, 53, var(--surface-alpha, 1)) 0%,
+                rgba(26, 26, 37, var(--surface-alpha, 1)) 50%,
+                rgba(21, 21, 32, var(--surface-alpha, 1)) 50%,
+                rgba(10, 10, 21, var(--surface-alpha, 1)) 100%));
             border-radius: var(--tw-r-sm);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
                         inset 0 -2px 4px rgba(0, 0, 0, 0.4);
@@ -587,6 +521,13 @@
             position: relative;
             width: 62px;
             height: 90px;
+            /* Перспектива обязательна, иначе перекидывания НЕ ВИДНО: rotateX без
+               неё — это плоское сжатие по вертикали на cos(угол). Замер до
+               правки: карточка 36.6px в середине анимации становилась 35.8px,
+               то есть всё «перекидывание» составляло 0.8 пикселя. Анимация при
+               этом честно шла, класс навешивался, и e2e-тест был зелёным —
+               он проверял КЛАСС, а не движение. */
+            perspective: 260px;
         }
 
         .widget-flip-inner {
@@ -601,11 +542,11 @@
                backdrop-filter заводит собственный контекст композитинга и на
                3D ведёт себя по-разному на платформах.
                Все тени только inset: окно transparent + hasShadow: false. */
-            background: linear-gradient(180deg,
-                rgba(42, 42, 53, 0.85) 0%,
-                rgba(26, 26, 37, 0.85) 49.9%,
-                rgba(10, 10, 15, 0.90) 50%,
-                rgba(21, 21, 32, 0.85) 100%);
+            background: var(--surface-paint, linear-gradient(180deg,
+                rgba(42, 42, 53, calc(0.85 * var(--surface-alpha, 1))) 0%,
+                rgba(26, 26, 37, calc(0.85 * var(--surface-alpha, 1))) 49.9%,
+                rgba(10, 10, 15, calc(0.90 * var(--surface-alpha, 1))) 50%,
+                rgba(21, 21, 32, calc(0.85 * var(--surface-alpha, 1))) 100%));
             border-radius: var(--tw-r-sm);
             border: 1px solid var(--tw-border-strong);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
@@ -685,7 +626,6 @@
 
         /* Скрытие неактивных стилей - все скрыты по умолчанию */
         .circular-widget,
-        .widget-digital,
         .widget-flip,
         .widget-analog,
         .widget-digits {
@@ -694,7 +634,6 @@
 
         /* Показываем только активный */
         .circular-widget.active { display: flex !important; }
-        .widget-digital.active { display: flex !important; }
         .widget-flip.active { display: flex !important; }
         .widget-analog.active { display: flex !important; }
         .widget-digits.active { display: flex !important; }
@@ -728,10 +667,10 @@
             width: 150px;
             height: 150px;
             border-radius: 50%;
-            background:
+            background: var(--surface-paint,
                 radial-gradient(circle at 50% 50%,
-                    rgba(28, 28, 30, 0.82) 0%,
-                    rgba(10, 10, 15, 0.95) 100%);
+                    rgba(28, 28, 30, calc(0.82 * var(--surface-alpha, 1))) 0%,
+                    rgba(10, 10, 15, calc(0.95 * var(--surface-alpha, 1))) 100%));
             -webkit-backdrop-filter: var(--tw-blur-sm);
             backdrop-filter: var(--tw-blur-sm);
             border: 1px solid var(--tw-border-strong);
@@ -920,6 +859,8 @@
             justify-content: center;
             width: 100%;
             height: 100%;
+            /* Фон живёт на самих цифрах (.widget-digits-time), а не здесь:
+               он обязан ОБНИМАТЬ время, а не заливать окно целиком. */
         }
         .widget-digits.active { display: flex !important; }
 
@@ -930,6 +871,17 @@
             width: fit-content;
             margin-inline: auto;
             font-size: var(--digits-font-size, 40px);
+            /* Рамка вокруг цифр: поля и скругление в долях КЕГЛЯ, чтобы расти
+               вместе с ним. Фон по умолчанию прозрачный — рамка появляется
+               ровно тогда, когда пользователь задал цвет. Это и есть бывший
+               стиль LED: те же цифры в тёмной коробке, только коробка теперь
+               настраивается, а шрифт выбирается.
+               Значения совпадают с FRAME_PAD_*_EM в digits-style.js — по ним
+               считается подгонка кегля (проверяется тестом). */
+            background: var(--surface-paint, transparent);
+            padding: 0.18em 0.34em;
+            border-radius: 0.22em;
+
             line-height: 1;
             white-space: nowrap;
             color: var(--timer-color, var(--tw-fg));
@@ -1037,9 +989,12 @@
             <svg class="widget-svg" viewBox="0 0 200 200">
                 <defs>
                     <!-- Основной градиент -->
+                    <!-- Цвета стопов живут в CSS (см. #widgetGradient stop):
+                         презентационный атрибут stop-color здесь означал бы
+                         второго владельца значения по умолчанию. -->
                     <linearGradient id="widgetGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#0a84ff" />
-                        <stop offset="100%" stop-color="#30d158" />
+                        <stop offset="0%" />
+                        <stop offset="100%" />
                     </linearGradient>
                     <!-- Предупреждение -->
                     <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1068,20 +1023,6 @@
                 <circle class="inner-glow" cx="100" cy="100" r="70" />
 
                 <!-- Деления (12 шт) -->
-                <g class="tick-marks" transform="rotate(-90, 100, 100)">
-                    <line x1="100" y1="15" x2="100" y2="22" class="tick-marks-major" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(30, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(60, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="22" transform="rotate(90, 100, 100)" class="tick-marks-major" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(120, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(150, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="22" transform="rotate(180, 100, 100)" class="tick-marks-major" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(210, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(240, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="22" transform="rotate(270, 100, 100)" class="tick-marks-major" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(300, 100, 100)" />
-                    <line x1="100" y1="15" x2="100" y2="20" transform="rotate(330, 100, 100)" />
-                </g>
 
                 <!-- Трек прогресса -->
                 <circle class="progress-track" cx="100" cy="100" r="82" 
@@ -1102,12 +1043,6 @@
         </div>
 
         <!-- Стиль: Цифровой LED -->
-        <div class="widget-digital" id="widgetDigital">
-            <div class="widget-digital-display">
-                <div class="widget-digital-time" id="widgetDigitalTime">00:00</div>
-            </div>
-        </div>
-
         <!-- Стиль: Перекидные часы -->
         <div class="widget-flip" id="widgetFlip">
             <div class="widget-flip-content" id="widgetFlipContent">
@@ -1218,11 +1153,6 @@
 
         // safeJSONParse доступна глобально из security.js
 
-        function applyShowTicks(showTicks) {
-            const el = document.querySelector('.widget-container') || document.body;
-            el.classList.toggle('ticks-on', !!showTicks);
-        }
-
         // Размер окна при масштабе 100%. Раньше жил внутри setupEventListeners,
         // а восстановление геометрии считало от той же цифры, вписанной
         // отдельным литералом — то есть база существовала в двух местах.
@@ -1271,10 +1201,6 @@
                     console.warn('Widget init warning:', e.message);
                 }
 
-                // Деления восстанавливаем из хранилища, а не гасим наглухо: панель
-                // управления досылает showTicks только через ~600 мс после своей
-                // загрузки, и до этого момента включённые деления мигали отсутствием.
-                applyShowTicks(localStorage.getItem('widgetShowTicks') === 'true');
                 this.setupIPC();
                 this.setupEventListeners();
                 this.setupSettings();
@@ -1291,10 +1217,8 @@
                 
                 // Элементы для разных стилей
                 this.circularWidget = document.querySelector('.circular-widget');
-                this.widgetDigital = document.getElementById('widgetDigital');
                 this.widgetFlip = document.getElementById('widgetFlip');
                 this.widgetAnalog = document.getElementById('widgetAnalog');
-                this.widgetDigitalTime = document.getElementById('widgetDigitalTime');
                 this.widgetFlipContent = document.getElementById('widgetFlipContent');
                 
                 // Аналоговые элементы
@@ -1350,22 +1274,7 @@
                 const containerWidth = this.container.offsetWidth;
                 const containerHeight = this.container.offsetHeight;
                 
-                // LED: кегль и поля рамки — из общей арифметики полосы
-                // (ledStripMetrics в window-geometry.js). Здесь стояла формула
-                // «ширина символа примерно 0.6 кегля» с двумя эмпирическими
-                // множителями (0.85 по ширине, 0.7 по высоте): они отмеряли
-                // воздух ОТ ОКНА, а рамка была размером с окно — то есть пустая
-                // коробка вокруг цифр была прямым следствием этой формулы.
-                // Теперь воздух отмеряется от КЕГЛЯ и уходит в поля самой рамки.
                 const hasHours = this.wFlipHoursGroup && this.wFlipHoursGroup.style.display !== 'none';
-                const charCount = (hasHours ? 8 : 5) + 1; // +1 — знак минуса при перерасходе
-                const led = window.WindowGeometry.ledStripMetrics(containerWidth, containerHeight, charCount);
-                if (led.fontSize > 0) {
-                    this.container.style.setProperty('--digital-font-size', led.fontSize + 'px');
-                    this.container.style.setProperty('--digital-pad-x', led.padX + 'px');
-                    this.container.style.setProperty('--digital-pad-y', led.padY + 'px');
-                    this.container.style.setProperty('--digital-radius', led.radius + 'px');
-                }
 
                 // Масштаб для flip (базовая ширина с запасом для возможного знака минуса:
                 // карточка минуса 25px + margin 4px ≈ 30px + буфер)
@@ -1580,7 +1489,11 @@
                     const saved = localStorage.getItem('timerColors');
                     colors = saved ? safeJSONParse(saved, null) : null;
                 }
-                if (!colors) { return; }
+                // Пустой объект вместо выхода: у каждого цвета в панели своя
+                // кнопка сброса, и сброс приходит сюда как ОТСУТСТВИЕ поля.
+                // Ранний `return` делал сброс невозможным — снятый цвет
+                // оставался на экране до перезапуска окна.
+                colors = colors || {};
 
                 // Валидация цветов
                 // Проверка цвета одна на всё приложение: своя регулярка
@@ -1590,24 +1503,42 @@
                 const isSafeColor = window.SecurityUtils.isSafeColor;
                 const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
                 const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
+                const root = document.documentElement;
+                // Переменная либо ставится, либо УДАЛЯЕТСЯ: удаление возвращает
+                // значение по умолчанию его владельцу — CSS.
+                const setVar = (name, value) => {
+                    if (value) { root.style.setProperty(name, value); }
+                    else { root.style.removeProperty(name); }
+                };
 
-                // Circle style — SVG gradient + text glow
-                const gradient = document.getElementById('widgetGradient');
-                if (gradient) {
-                    const stops = gradient.querySelectorAll('stop');
-                    if (stops.length >= 2) {
-                        if (timerColor) { stops[0].setAttribute('stop-color', timerColor); }
-                        if (progressColor) { stops[1].setAttribute('stop-color', progressColor); }
-                    }
-                }
+                // Подложка — одна пара «цвет + прозрачность» на окно, красит
+                // подложку ТОГО стиля, который сейчас на экране: каждая
+                // подложка в CSS записана как var(--surface-paint, <своё>).
+                setVar('--surface-paint', window.RendererShared.surfacePaint({
+                    color: colors.surface,
+                    alpha: colors.surfaceAlpha
+                }));
+                // Прозрачность работает и БЕЗ выбранного цвета: подложка каждого
+                // стиля вплетает эту переменную в свою собственную альфу, так что
+                // ползунок гасит родной фон стиля, а не только заливку
+                // пользователя. Отдельной переменной — потому что множитель нужен
+                // именно CSS, где живут сами значения по умолчанию.
+                const alphaValue = window.RendererShared.surfaceAlpha(colors.surfaceAlpha);
+                setVar('--surface-alpha', alphaValue === null ? null : String(alphaValue));
+
+                // Circle style — стопы градиента красит КАСКАД: правила
+                // #widgetGradient stop живут в <style>, а stop-color из CSS
+                // сильнее презентационного атрибута. Раньше здесь стоял
+                // setAttribute, и снять поставленный им цвет было нечем:
+                // атрибут — не инлайновый стиль, removeProperty его не видит.
+                setVar('--timer-color-stop', timerColor);
+                setVar('--progress-color-stop', progressColor);
                 // --timer-glow, а НЕ --glow-color инлайном на .time-display:
                 // инлайновая переменная перебивала правила [data-status] и
                 // делала красное/жёлтое свечение полос недостижимым из CSS.
                 // Теперь это только ЗАПАСНОЕ значение — полоса, когда она есть,
                 // переопределяет --glow-color своим правилом.
-                if (timerColor) {
-                    document.documentElement.style.setProperty('--timer-glow', `${timerColor}80`);
-                }
+                setVar('--timer-glow', timerColor ? `${timerColor}80` : null);
 
                 // LED, «Цифры» и флип берут цвет темы из ОДНОЙ переменной.
                 //
@@ -1621,21 +1552,15 @@
                 //
                 // Заодно ушла и гонка: applyColors и updateDisplay больше не
                 // пишут в одно и то же свойство одного и того же элемента.
-                if (timerColor) {
-                    document.documentElement.style.setProperty('--timer-color', timerColor);
-                }
+                setVar('--timer-color', timerColor);
 
-                if (timerColor) {
-                    // Separator dots are pseudo-elements with a fixed brand
-                    // gradient; user color themes don't apply to them. Status
-                    // overrides (warning/danger/overtime) are handled via CSS
-                    // rules keyed on data-status.
-                }
+                // Точки-разделители флипа — псевдоэлементы с фирменным
+                // градиентом: цвет темы на них не распространяется, полосы
+                // (warning/danger/overtime) рисуют правила [data-status].
 
                 // Analog style
                 const secondHand = document.getElementById('widgetHandSecond');
                 const clockCenter = document.getElementById('widgetClockCenter');
-                const analogDigital = document.getElementById('widgetAnalogDigital');
                 // Секундная стрелка отдана CSS. Раньше она красилась ТЕМ ЖЕ
                 // градиентом, что и минутная: две стрелки становились
                 // неразличимы по цвету, а CSS-правило с красной секундной было
@@ -1651,24 +1576,18 @@
                 // выходе из полосы — восстанавливать сохранённый в _base*.
                 // Переменная живёт на documentElement и служит лишь ЗАПАСНЫМ
                 // значением, которое правило полосы перекрывает каскадом.
-                if (timerColor && clockCenter) {
-                    document.documentElement.style.setProperty(
-                        '--timer-center-bg',
-                        `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`
-                    );
-                    clockCenter.style.boxShadow = '';
-                }
-                if (timerColor && analogDigital) {
-                    // Альфа b3 давала 2.95:1 при кегле 14px. Цвет и так
-                    // вторичен по кеглю и положению — приглушать его ещё и
-                    // прозрачностью незачем.
-                    document.documentElement.style.setProperty('--timer-analog-color', timerColor);
-                    // Свечение — тоже переменной. Инлайновый text-shadow бил бы
-                    // text-shadow правила [data-status="danger"] ровно так же,
-                    // как это делал инлайновый color: в перерасходе цифры стали
-                    // бы красными, а ореол вокруг них остался бы цвета темы.
-                    document.documentElement.style.setProperty('--timer-analog-glow', `${timerColor}4d`);
-                }
+                setVar('--timer-center-bg', timerColor
+                    ? `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`
+                    : null);
+                if (clockCenter) { clockCenter.style.boxShadow = ''; }
+                // Альфа b3 давала 2.95:1 при кегле 14px. Цвет и так вторичен по
+                // кеглю и положению — приглушать его ещё и прозрачностью незачем.
+                setVar('--timer-analog-color', timerColor);
+                // Свечение — тоже переменной. Инлайновый text-shadow бил бы
+                // text-shadow правила [data-status="danger"] ровно так же, как
+                // это делал инлайновый color: в перерасходе цифры стали бы
+                // красными, а ореол вокруг них остался бы цвета темы.
+                setVar('--timer-analog-glow', timerColor ? `${timerColor}4d` : null);
             }
 
             /**
@@ -1816,7 +1735,6 @@
                             this._lastPushedTimerScale = incoming;
                         }
                     }
-                    applyShowTicks(settings?.showTicks ?? false);
                 };
 
                 // Границы окна от ГЛАВНОГО процесса — источник для записи
@@ -1894,44 +1812,16 @@
             }
             
             /**
-             * Приводит ФОРМУ окна к стилю: LED — полоса по размеру цифр,
-             * остальные стили — квадрат.
+             * Высота окна для заданной ширины. Окно квадратное при ЛЮБОМ стиле.
              *
-             * Ширину не трогаем НИКОГДА: из неё считается сохраняемый процент
-             * масштаба (см. save() в window-geometry.js), и окно, менявшее
-             * ширину под содержимое, наращивало бы этот процент с каждым
-             * переоткрытием. Под длину строки подстраивается высота.
-             *
-             * Минимальную высоту окна снимает главный процесс, когда получает
-             * стиль: рендереру она недоступна, а с полом в 140 px полоса
-             * недостижима.
-             */
-            syncWindowShape() {
-                const width = window.outerWidth;
-                if (!(width > 0)) { return; }
-                const height = this.windowHeightFor(width);
-
-                // Порог в 1 px: запрос, ничего не меняющий, всё равно вызвал бы
-                // setBounds, событие resize и отложенную запись геометрии.
-                if (Math.abs(window.outerHeight - height) <= 1) { return; }
-                ipcRenderer.send('widget-resize', { width, height });
-            }
-
-            /**
-             * Высота окна для заданной ширины — ЕДИНСТВЕННОЕ место, где она
-             * выводится. Прежде размер окна собирался в трёх местах отдельно
-             * (Ctrl+колесо, ползунок панели, восстановление геометрии), и все
-             * три считали окно квадратом: полоса LED, выставленная сменой
-             * стиля, схлопывалась обратно в квадрат от первого же поворота
-             * колеса — замерено зондом (окно 120×95 вместо 120×43).
+             * Полоса была только у LED, а он слит с «Цифрами»: у объединённого
+             * стиля рамка обнимает цифры сама, и подстраивать под неё форму
+             * окна больше незачем. Метод оставлен одним владельцем размера —
+             * прежде он собирался в трёх местах отдельно (Ctrl+колесо, ползунок
+             * панели, восстановление геометрии), и копии разошлись.
              */
             windowHeightFor(width) {
-                if (this.timerStyle !== 'digital') { return width; }
-                // Знакоместа СТРОКИ, что сейчас на табло, плюс запас на знак
-                // минуса при перерасходе.
-                const charCount = (Math.abs(Math.floor(this.remainingSeconds)) >= 3600 ? 8 : 5) + 1;
-                const height = window.WindowGeometry.ledStripHeight(width, charCount);
-                return height > 0 ? height : width;
+                return width;
             }
 
             /** Меняет масштаб окна: ширину задаёт процент, высоту — стиль. */
@@ -1950,19 +1840,16 @@
             }
 
             setTimerStyle(style) {
-                // Форму окна меняет не всякая смена стиля, а только переход
-                // В полосу LED или ИЗ неё. Прочие стили делят одну форму
-                // (квадрат), и навязывать её заново нельзя: окно растягивают и
-                // за край рамки, а переключение, скажем, «Флип» → «Цифры»
-                // схлопывало бы растянутое обратно — поймано визуальной
-                // сверкой, кадры hours-*-digits/flip уехали с 320×260 на 320×320.
-                const wasLed = this.timerStyle === 'digital';
-                this.timerStyle = style;
-                const ledChanged = wasLed !== (style === 'digital');
+                // Стиль больше НЕ трогает форму окна. Полоса была только у LED,
+                // а его больше нет; навязывать форму на каждой смене стиля
+                // нельзя — окно растягивают за край рамки, и переключение
+                // «Флип» → «Цифры» схлопывало бы растянутое обратно (поймано
+                // визуальной сверкой: кадры уехали с 320×260 на 320×320).
+                this.timerStyle = window.RendererShared.migrateTimerStyle(style);
+                style = this.timerStyle;
                 
                 // Скрываем все стили
                 if (this.circularWidget) {this.circularWidget.classList.remove('active');}
-                if (this.widgetDigital) {this.widgetDigital.classList.remove('active');}
                 if (this.widgetFlip) {this.widgetFlip.classList.remove('active');}
                 if (this.widgetAnalog) {this.widgetAnalog.classList.remove('active');}
                 if (this.widgetDigits) {this.widgetDigits.classList.remove('active');}
@@ -1971,9 +1858,6 @@
                 switch (style) {
                     case 'circle':
                         if (this.circularWidget) {this.circularWidget.classList.add('active');}
-                        break;
-                    case 'digital':
-                        if (this.widgetDigital) {this.widgetDigital.classList.add('active');}
                         break;
                     case 'flip':
                         if (this.widgetFlip) {this.widgetFlip.classList.add('active');}
@@ -1986,8 +1870,6 @@
                         break;
                 }
                 
-                // Форма окна принадлежит стилю: LED — полоса, остальные — квадрат.
-                if (ledChanged) { this.syncWindowShape(); }
 
                 // Обновляем масштабирование после смены стиля
                 if (this._scalingTimer) { clearTimeout(this._scalingTimer); }
@@ -2012,9 +1894,6 @@
                 }
                 
                 // Обновляем цифровой стиль
-                if (this.widgetDigitalTime) {
-                    this.widgetDigitalTime.textContent = formatted;
-                }
 
                 // Цифры: знак и цифры — РАЗНЫЕ узлы, знак вне потока.
                 if (this.widgetDigitsValue) {
@@ -2034,7 +1913,6 @@
                         // hours-h1-circle/digits/flip уехали с 320×260 на
                         // 320×320. Форму НЕ-LED стилей возвращает смена стиля,
                         // и только она.
-                        if (this.timerStyle === 'digital') { this.syncWindowShape(); }
                         this.updateScaling();
                     }
                 }
@@ -2088,9 +1966,6 @@
                 // Свечение LED в CSS построено на currentColor, поэтому оно
                 // следует за цветом само — отдельная строка textShadow здесь
                 // была третьей копией одного и того же значения.
-                if (this.widgetDigitalTime) {
-                    this.widgetDigitalTime.dataset.status = status;
-                }
                 if (this.widgetDigitsTime) {
                     this.widgetDigitsTime.dataset.status = status;
                 }

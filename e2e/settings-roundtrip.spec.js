@@ -14,7 +14,7 @@ const { launchApp } = require('./launch');
  * Настройки живут в ЧЕТЫРЁХ хранилищах, и тест обязан покрыть все:
  *   - `displayExtSettings` — звуки, фон, блоки времени, стили и масштабы;
  *   - `clockWidgetSettings` — секунды, 24 часа, дата, пояс, цифры циферблата;
- *   - отдельные ключи `widgetShowTicks` / `clockShowTicks` (одна галочка на два окна);
+ *   - отдельный ключ `clockShowTicks` (деления круглого циферблата ЧАСОВ);
  *   - `widgetColors` / `clockColors` / `displayColors` — по ключу на окно, общего
  *     вещания цветов в проекте нет намеренно.
  *
@@ -37,14 +37,14 @@ const PLAN = [
     // --- вкладка «Виджет» ---
     { id: 'timerStyle', kind: 'segmented', value: 'flip' },
     { id: 'timerScale', kind: 'range', value: '150' },
-    { id: 'widgetShowTicks', kind: 'checkbox', value: true },
+    { id: 'clockShowTicks', kind: 'checkbox', value: true },
     // Список шрифта живёт в displayExtSettings ровно как стиль/масштаб выше —
     // читается и пишется независимо от того, каким стилем сейчас выставлен
     // timerStyle в этом же плане (строка «скрыта», но контрол в DOM остаётся).
     { id: 'widgetDigitsFont', kind: 'fontselect', value: 'bebas' },
 
     // --- вкладка «Часы» ---
-    { id: 'clockStyle', kind: 'segmented', value: 'digital' },
+    { id: 'clockStyle', kind: 'segmented', value: 'digits' },
     { id: 'clockShowSeconds', kind: 'checkbox', value: false },
     { id: 'clockFormat24h', kind: 'checkbox', value: false },
     { id: 'clockShowDate', kind: 'checkbox', value: true },
@@ -164,7 +164,7 @@ function applyPlan(plan) {
 const TOUCHED_KEYS = [
     'displayExtSettings',
     'clockWidgetSettings',
-    'widgetShowTicks',
+    'clockShowTicks',
     'clockShowTicks',
     // Мастер-выключатель звука пишет ещё и сюда; выключенным он заглушил бы
     // sound-events.spec.js, который идёт следом.
@@ -228,7 +228,6 @@ test('все настройки панели переживают перезаг
     const stored = await control.evaluate(() => ({
         ext: localStorage.getItem('displayExtSettings'),
         clock: localStorage.getItem('clockWidgetSettings'),
-        widgetTicks: localStorage.getItem('widgetShowTicks'),
         clockTicks: localStorage.getItem('clockShowTicks')
     }));
     expect(stored.ext, 'displayExtSettings не записан вовсе').toBeTruthy();
@@ -247,7 +246,7 @@ test('все настройки панели переживают перезаг
     expect(
         mismatches,
         `настройки не дожили до перезагрузки:\n  ${mismatches.join('\n  ')}\n`
-        + `Хранилища: ticks=${stored.widgetTicks}/${stored.clockTicks}, `
+        + `Хранилища: ticks=${stored.clockTicks}, `
         + `clockWidgetSettings=${stored.clock ? 'есть' : 'НЕТ'}`
     ).toEqual([]);
 
@@ -277,7 +276,7 @@ test('синхронизация стиля часов переживает пе
         document.querySelector('#timerStyle button[data-val="flip"]').click();
         // Затем ручной выбор стиля часов: он гарантированно выключает синхронизацию,
         // чтобы следующий шаг включал её с заведомо выключенного состояния.
-        document.querySelector('#clockStyle button[data-val="digital"]').click();
+        document.querySelector('#clockStyle button[data-val="analog"]').click();
         const sync = document.getElementById('syncClockStyle');
         sync.checked = true;
         sync.dispatchEvent(new Event('change'));

@@ -222,7 +222,7 @@ class DisplayTimer {
      */
     applyTimerScale() {
         const scale = (this.timerScale || 100) / 100;
-        const blocks = [this.timerRing, this.timerDigital, this.timerFlip, this.timerAnalog, this.timerDigits];
+        const blocks = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits];
         for (const block of blocks) {
             if (block) { block.style.transform = `scale(${scale})`; }
         }
@@ -249,13 +249,7 @@ class DisplayTimer {
         this.closeBtn = document.getElementById('closeBtn');
 
         // Элементы для разных стилей
-        this.timerDigital = document.getElementById('timerDigital');
         this.timerFlip = document.getElementById('timerFlip');
-        this.digitalTime = document.getElementById('digitalTime');
-        this.digitalHoursGroup = document.getElementById('digitalHoursGroup');
-        this.digitalHours = document.getElementById('digitalHours');
-        this.digitalMinutes = document.getElementById('digitalMinutes');
-        this.digitalSeconds = document.getElementById('digitalSeconds');
 
         // Flip карточки
         this.flipMinus = document.getElementById('flipMinus');
@@ -628,11 +622,10 @@ class DisplayTimer {
         this._cachedFlipSeparators = null;
 
         // Удаляем все классы стилей с body
-        document.body.classList.remove('style-circle', 'style-digital', 'style-flip', 'style-analog', 'style-digits');
+        document.body.classList.remove('style-circle', 'style-flip', 'style-analog', 'style-digits');
 
         // Скрываем все стили таймера
         if (this.timerRing) {this.timerRing.classList.remove('active');}
-        if (this.timerDigital) {this.timerDigital.classList.remove('active');}
         if (this.timerFlip) {this.timerFlip.classList.remove('active');}
         if (this.timerAnalog) {this.timerAnalog.classList.remove('active');}
         if (this.timerDigits) {this.timerDigits.classList.remove('active');}
@@ -642,10 +635,6 @@ class DisplayTimer {
             case 'circle':
                 if (this.timerRing) {this.timerRing.classList.add('active');}
                 document.body.classList.add('style-circle');
-                break;
-            case 'digital':
-                if (this.timerDigital) {this.timerDigital.classList.add('active');}
-                document.body.classList.add('style-digital');
                 break;
             case 'flip':
                 if (this.timerFlip) {this.timerFlip.classList.add('active');}
@@ -1077,7 +1066,6 @@ class DisplayTimer {
 
         // Обновляем цифровой стиль (только если изменилось)
         if (hasFormattedChanged || this.cache.lastDigitalUpdate !== secs) {
-            this.updateDigitalDisplay(secs, formatted);
             this.cache.lastDigitalUpdate = secs;
         }
 
@@ -1101,7 +1089,7 @@ class DisplayTimer {
         // покраситься на каждое реальное изменение секунд, а не только когда
         // сменился формат ЧЧ (то, чем гейтится updateDigitsDisplay выше).
         if (this.digitsTime) {
-            // Снимаем классы на каждый реальный тик — как в updateDigitalDisplay/
+            // Снимаем классы на каждый реальный тик — как в
             // updateFlipDisplay. Без remove() здесь danger/overtime, добавленные
             // _enforceOvertimeColors(), никогда не снимались бы: сейчас это
             // безвредно (ни одно правило CSS на .digits-time не завязано на эти
@@ -1197,54 +1185,6 @@ class DisplayTimer {
         if (secs === 0 && this.totalSeconds > 0) {return 'danger';}
         if (secs <= 60 && secs > 0) {return 'warning';}
         return 'normal';
-    }
-
-    updateDigitalDisplay(secs, _formatted) {
-        if (!this.digitalMinutes || !this.digitalSeconds) {return;}
-
-        const { hours, minutes: mins, seconds } = window.RendererShared
-            ? window.RendererShared.breakdown(secs)
-            : (() => {
-                const absSecs = Math.abs(secs);
-                return {
-                    hours: Math.floor(absSecs / 3600),
-                    minutes: Math.floor((absSecs % 3600) / 60),
-                    seconds: absSecs % 60
-                };
-            })();
-
-        const prefix = secs < 0 ? '-' : '';
-
-        // Show/hide hours group
-        if (this.digitalHoursGroup && this.digitalHours) {
-            if (hours > 0) {
-                this.digitalHoursGroup.style.display = '';
-                this.digitalHours.textContent = prefix + String(hours);
-                this.digitalMinutes.textContent = String(mins).padStart(2, '0');
-            } else {
-                this.digitalHoursGroup.style.display = 'none';
-                this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
-            }
-        } else {
-            this.digitalMinutes.textContent = prefix + String(mins).padStart(2, '0');
-        }
-        this.digitalSeconds.textContent = String(seconds).padStart(2, '0');
-
-        // Классы предупреждения + inline color override (applyColors sets inline style)
-        this.digitalTime.classList.remove('warning', 'danger', 'overtime');
-        const band = this._colorBand(secs);
-        // Цвет и свечение полосы задают правила .digital-time.warning /
-        // .digital-time.danger — значения сверены до удаления инлайна:
-        // --tw-led-warn === #ffcc00, --tw-led-danger === #ff3333, тени те же
-        // 20/40/80px. Классов достаточно; снимать при возврате в норму нечего,
-        // потому что инлайн больше не ставится.
-        if (band === 'overtime') {
-            this.digitalTime.classList.add('danger', 'overtime');
-        } else if (band === 'danger') {
-            this.digitalTime.classList.add('danger');
-        } else if (band === 'warning') {
-            this.digitalTime.classList.add('warning');
-        }
     }
 
     updateFlipDisplay(secs) {

@@ -87,35 +87,61 @@ test('отсутствующая карточка или цифра не рон�
     assert.equal(flipCardTo(empty, '.нет-такого', '1'), null);
 });
 
-test('длительность в JS совпадает с длительностью анимации в CSS', () => {
-    // Разъедутся — класс снимется раньше конца анимации и её оборвёт.
+test('длительность в JS покрывает ОБЕ фазы перекидывания из CSS', () => {
+    // Разъедутся — слои снимутся раньше конца движения и оборвут его на
+    // полукадре: створка исчезнет, не доехав.
+    //
+    // Механика теперь одна на три окна и живёт в flip-card.css: падение
+    // верхней створки, затем подъём нижней с той же задержкой. Прежние
+    // «правила на окно» проверять больше нечего — их нет, и это проверяется
+    // отдельно ниже.
     const fs = require('node:fs');
     const path = require('node:path');
-    const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'flip-card.css'), 'utf8');
 
-    const seconds = (FLIP_DURATION_MS / 1000).toFixed(1).replace(/\.0$/, '');
-    for (const [file, rule] of [
-        ['display.css', /\.flip-card\.flipping \.flip-card-inner \{[^}]*animation: flip-animation ([\d.]+)s/s],
-        ['electron-widget.html', /\.widget-flip-card\.flipping \.widget-flip-inner \{[^}]*animation: widget-flip-animation ([\d.]+)s/s],
-        ['electron-clock-widget.html', /\.widget-flip-card\.flipping \.widget-flip-inner \{[^}]*animation: widget-flip-animation ([\d.]+)s/s]
-    ]) {
-        const m = read(file).match(rule);
-        assert.ok(m, `${file}: правило анимации перекидывания не найдено`);
-        assert.equal(m[1], seconds, `${file}: длительность разошлась с FLIP_DURATION_MS`);
+    const fall = css.match(/\.fc-leaf-top \{[^}]*animation: fc-fall ([\d.]+)s/s);
+    const rise = css.match(/\.fc-leaf-bottom \{[^}]*animation: fc-rise ([\d.]+)s [^;]*?([\d.]+)s forwards/s);
+    assert.ok(fall, 'не найдено правило падающей створки');
+    assert.ok(rise, 'не найдено правило поднимающейся створки');
+
+    const total = (Number(rise[1]) + Number(rise[2])) * 1000;
+    assert.equal(Number(fall[1]) * 1000, Number(rise[1]) * 1000, 'фазы обязаны быть равной длины');
+    assert.ok(
+        FLIP_DURATION_MS >= total,
+        `FLIP_DURATION_MS=${FLIP_DURATION_MS} мс меньше движения в ${total} мс — слои снимутся посреди анимации`
+    );
+    // И не «на всякий случай втрое больше»: лишнее время держит лишние узлы.
+    assert.ok(FLIP_DURATION_MS <= total + 100, `FLIP_DURATION_MS=${FLIP_DURATION_MS} мс заметно больше движения`);
+});
+
+test('наклона карточки в окнах больше нет — механика перекидывания одна', () => {
+    // Он и был «анимацией, которой не видно»: rotateX всей карточки без
+    // перспективы даёт плоское сжатие на cos(угол), замерено 0.79 px.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    for (const file of ['display.css', 'electron-widget.html', 'electron-clock-widget.html']) {
+        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        assert.doesNotMatch(src, /@keyframes (widget-)?flip-animation/, `${file}: вернулся собственный наклон`);
+    }
+    for (const file of ['display.html', 'electron-widget.html', 'electron-clock-widget.html']) {
+        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        assert.match(src, /<link rel="stylesheet" href="flip-card\.css">/, `${file}: не подключена общая таблица`);
     }
 });
 
-test('анимация выключается при prefers-reduced-motion во всех окнах', () => {
+test('«меньше движения» гасит перекидывание, и не только в CSS', () => {
     const fs = require('node:fs');
     const path = require('node:path');
-    for (const file of ['electron-widget.html', 'electron-clock-widget.html']) {
-        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-        assert.match(
-            src,
-            /@media \(prefers-reduced-motion: reduce\) \{[^}]*\.widget-flip-card\.flipping[^}]*animation: none/s,
-            `${file}: перекидывание обязано отключаться при reduced-motion`
-        );
-    }
+    const css = fs.readFileSync(path.join(__dirname, '..', 'flip-card.css'), 'utf8');
+    assert.match(
+        css,
+        /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none/,
+        'створки обязаны отключаться при reduced-motion'
+    );
+    // Одного CSS мало: неподвижный слой со СТАРОЙ цифрой висел бы поверх новой
+    // всё время жизни слоёв. Поэтому модуль их вообще не строит.
+    const js = fs.readFileSync(path.join(__dirname, '..', 'flip-card.js'), 'utf8');
+    assert.match(js, /prefers-reduced-motion: reduce/, 'модуль обязан проверять предпочтение сам');
 });
 
 test('все три окна используют общую реализацию, а не свою копию', () => {
@@ -127,4 +153,93 @@ test('все три окна используют общую реализаци�
         assert.match(src, /window\.FlipCard\.flipCardTo\(/, `${file} должен звать общий flipCardTo`);
         assert.doesNotMatch(src, /classList\.add\('flipping'\)/, `${file} не должен навешивать класс сам`);
     }
+});
+
+/* ─────────────────── створки: сборка слоёв на поддельном DOM ──────────────── */
+
+// Минимальный документ: модулю нужны createElement, appendChild и querySelector
+// внутри карточки. Так же, как и остальные модули рендерера, он проверяется на
+// подделке — настоящий DOM здесь ничего не добавил бы, кроме браузера.
+function fakeDom(reducedMotion) {
+    const make = (tag) => {
+        const node = {
+            tagName: tag, className: '', textContent: '', children: [], attrs: {},
+            appendChild(child) { this.children.push(child); child.parentNode = this; return child; },
+            removeChild(child) { this.children = this.children.filter((c) => c !== child); },
+            setAttribute(k, v) { this.attrs[k] = v; },
+            removeAttribute(k) { delete this.attrs[k]; },
+            cloneNode() { const copy = make(tag); copy.className = this.className; copy.textContent = this.textContent; return copy; },
+            querySelector(sel) {
+                const cls = sel.replace('.', '');
+                const walk = (n) => {
+                    for (const c of n.children) {
+                        if (String(c.className).split(' ').includes(cls)) { return c; }
+                        const deep = walk(c);
+                        if (deep) { return deep; }
+                    }
+                    return null;
+                };
+                return walk(this);
+            }
+        };
+        return node;
+    };
+    global.document = { createElement: make };
+    global.window = { matchMedia: () => ({ matches: !!reducedMotion }) };
+    return make;
+}
+
+function cleanupDom() {
+    delete global.document;
+    delete global.window;
+}
+
+test('створки строятся из КЛОНОВ цифры — стиль окна не переписывается', () => {
+    const make = fakeDom(false);
+    try {
+        const inner = make('div');
+        const digit = make('span');
+        digit.className = 'widget-flip-digit';
+        digit.textContent = '3';
+        inner.appendChild(digit);
+        const card = {
+            querySelector: () => digit,
+            classList: { add() {}, remove() {}, contains: () => false }
+        };
+
+        const id = flipCardTo(card, '.widget-flip-digit', '4');
+        clearTimeout(id);
+
+        const wrap = inner.querySelector('.fc-flip');
+        assert.ok(wrap, 'слои перекидыша не построились');
+        assert.equal(wrap.children.length, 3, 'слоёв должно быть ровно три');
+        // Старая цифра падает и прикрывает низ, новая поднимается.
+        const texts = wrap.children.map((c) => c.children[0].children[0].textContent);
+        assert.deepEqual(texts, ['3', '3', '4']);
+        // Клон несёт КЛАСС оригинала: шрифт, кегль и цвет приезжают из CSS окна.
+        assert.equal(wrap.children[0].children[0].children[0].className, 'widget-flip-digit');
+        assert.equal(digit.textContent, '4', 'статичная цифра обязана стать новой сразу');
+    } finally { cleanupDom(); }
+});
+
+test('«меньше движения» — слоёв нет вовсе, а не «есть, но без анимации»', () => {
+    const make = fakeDom(true);
+    try {
+        const inner = make('div');
+        const digit = make('span');
+        digit.className = 'widget-flip-digit';
+        digit.textContent = '3';
+        inner.appendChild(digit);
+        const card = {
+            querySelector: () => digit,
+            classList: { add() {}, remove() {}, contains: () => false }
+        };
+
+        const id = flipCardTo(card, '.widget-flip-digit', '4');
+        clearTimeout(id);
+
+        assert.equal(inner.querySelector('.fc-flip'), null,
+            'неподвижный слой со старой цифрой закрыл бы новую на всё время жизни слоёв');
+        assert.equal(digit.textContent, '4', 'гасится движение, а не информация');
+    } finally { cleanupDom(); }
 });

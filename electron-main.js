@@ -434,8 +434,10 @@ function createControlWindow() {
         minHeight: CONFIG.CONTROL_WINDOW_MIN_HEIGHT,
         // Потолок один и тот же для главного процесса и для панели: панель
         // вычитает из него ширину ящика, когда считает свою колонку.
+        // Стартовый уровень потолка — «без ящика». Открытие ящика поднимает его
+        // каналом control-drawer, закрытие возвращает обратно.
         maxWidth: CONFIG.CONTROL_WINDOW_MAX_WIDTH,
-        maxHeight: 1100,
+        maxHeight: CONFIG.CONTROL_WINDOW_MAX_HEIGHT,
         // Keep the control window visually rounded. The dark glass is painted
         // by electron-control.html inside a rounded shell; the native
         // BrowserWindow surface must stay transparent so the corners do not
@@ -540,9 +542,7 @@ function createWidgetWindow() {
             safelySendToWindow(win, 'widget-colors-update', lastWidgetColors);
         }
         if (lastWidgetStyle) {
-            // Пол размера — до досылки стиля: окно создаётся квадратным полом
-            // (WIDGET_MIN_HEIGHT), и полоса LED без этого не поместится.
-            applyWidgetMinimumSize(lastWidgetStyle.timerStyle);
+            applyWidgetMinimumSize();
             safelySendToWindow(win, 'widget-style-update', lastWidgetStyle);
         }
     });
@@ -1072,9 +1072,22 @@ ipcMain.on('resize-control-window', (event, size) => {
     const [curW, curH] = controlWindow.getSize();
     const w = Number.isFinite(size.width) ? size.width : curW;
     const h = Number.isFinite(size.height) ? size.height : curH;
-    // Нижний clamp = BrowserWindow min (см. createControlWindow).
-    const targetWidth = Math.max(CONFIG.CONTROL_WINDOW_MIN_WIDTH, Math.min(w, screenWidth - 50));
-    const targetHeight = Math.max(CONFIG.CONTROL_WINDOW_MIN_HEIGHT, Math.min(h, screenHeight - 50));
+    // Нижний clamp = BrowserWindow min (см. createControlWindow). Верхний —
+    // ДЕЙСТВУЮЩИЙ потолок окна, а не константа: он двухуровневый и зависит от
+    // того, открыт ли ящик (канал control-drawer). Без этого слагаемого запрос
+    // «дай 3000» проходил бы мимо потолка в setSize и обрезался уже Electron'ом,
+    // а вычисленный тут targetWidth расходился бы с фактическим размером.
+    const [ceilingW, ceilingH] = controlWindow.getMaximumSize();
+    const maxW = ceilingW > 0 ? ceilingW : CONFIG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER;
+    const maxH = ceilingH > 0 ? ceilingH : CONFIG.CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER;
+    const targetWidth = Math.max(
+        CONFIG.CONTROL_WINDOW_MIN_WIDTH,
+        Math.min(w, screenWidth - 50, maxW)
+    );
+    const targetHeight = Math.max(
+        CONFIG.CONTROL_WINDOW_MIN_HEIGHT,
+        Math.min(h, screenHeight - 50, maxH)
+    );
 
     // No-op если ничего не меняется — избегаем лишнего setSize (WM на Windows
     // иногда округляет outer на 1px при каждом вызове, что даёт дрейф).
@@ -1085,6 +1098,43 @@ ipcMain.on('resize-control-window', (event, size) => {
 
     if (y + targetHeight > screenHeight) {
         controlWindow.setPosition(x, Math.max(0, screenHeight - targetHeight - 20));
+    }
+});
+
+// Ящик настроек — ВТОРОЙ уровень потолка ширины окна управления.
+//
+// Потолок задан при создании окна и из рендерера не снимается — та же причина,
+// по которой отдельным каналом живёт режим «полоса». Уровней два: без ящика
+// окно не шире колонки контента с полями (CONTROL_WINDOW_MAX_WIDTH), с ящиком —
+// плюс его 336px. Иначе окно растягивалось до 1200 при колонке 720, панель
+// тонула в поле, и ради оправдания этого поля в CSS жила вторая оболочка.
+//
+// Уровень НЕ выводится из ширины в запросе resize-control-window: тогда потолок
+// поднимал бы любой запрос, то есть потолка не было бы вовсе. Сообщает о нём
+// та единственная сторона, которая про ящик знает, — панель.
+ipcMain.on('control-drawer', (_event, payload) => {
+    if (!controlWindow || controlWindow.isDestroyed() || !payload || typeof payload !== 'object') { return; }
+    const open = payload.open === true;
+    const ceilingW = open
+        ? CONFIG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER
+        : CONFIG.CONTROL_WINDOW_MAX_WIDTH;
+    const ceilingH = open
+        ? CONFIG.CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER
+        : CONFIG.CONTROL_WINDOW_MAX_HEIGHT;
+    const [curMaxW] = controlWindow.getMaximumSize();
+    if (curMaxW === ceilingW) { return; }
+
+    controlWindow.setMaximumSize(ceilingW, ceilingH);
+
+    // setMaximumSize НЕ сжимает уже растянутое окно — оно останется больше
+    // нового потолка до первого ручного ресайза. Подтягиваем сами, иначе после
+    // закрытия ящика окно осталось бы 1096px шириной при панели 720px, то есть
+    // ровно в том состоянии, ради устранения которого потолок и опускается.
+    const [curW, curH] = controlWindow.getSize();
+    if (curW > ceilingW || curH > ceilingH) {
+        const [x, y] = controlWindow.getPosition();
+        controlWindow.setSize(Math.min(curW, ceilingW), Math.min(curH, ceilingH));
+        controlWindow.setPosition(x, y);
     }
 });
 
@@ -1157,13 +1207,10 @@ ipcMain.on('display-colors-update', (_event, colors) => {
 // Widget style update (independent from display style)
 ipcMain.on('widget-style-update', (_event, settings) => {
     lastWidgetStyle = settings;
-    // Минимальную высоту окна задаёт СТИЛЬ, и сделать это может только главный
-    // процесс. Форму окна выбирает рендерер (syncWindowShape), но пол в
-    // WIDGET_MIN_HEIGHT = 140 делает полосу LED недостижимой: запрошенные ~90 px
-    // подожмутся обратно до 140, и рамка снова окажется в пустой коробке.
-    // Порядок здесь важен: минимум снимается ДО того, как стиль уйдёт в окно,
-    // иначе ответный widget-resize придёт к ещё не опущенному полу.
-    applyWidgetMinimumSize(isPayloadObject(settings) ? settings.timerStyle : null);
+    // Пол размера окна одинаков для всех стилей: полоса была только у LED, а
+    // он слит с «Цифрами». Вызов оставлен здесь, потому что окно могло быть
+    // создано раньше — пол ставится ровно один раз и в одном месте.
+    applyWidgetMinimumSize();
     applyWidgetAlwaysOnTop(isPayloadObject(settings) ? settings.alwaysOnTop : undefined);
     safelySendToWindow(widgetWindow, 'widget-style-update', settings);
 });
@@ -1192,13 +1239,13 @@ function applyWidgetAlwaysOnTop(on) {
     widgetWindow.setAlwaysOnTop(on, on ? WINDOW_LEVEL_ABOVE_MENU_BAR : undefined);
 }
 
-// Пол размера окна виджета для текущего стиля.
-function applyWidgetMinimumSize(style) {
+// Пол размера окна виджета. Раньше он зависел от стиля: у LED окно
+// превращалось в полосу, и общий пол в 140 px делал её недостижимой. Стиля LED
+// больше нет (он слит с «Цифрами», где рамка обнимает цифры сама), поэтому пол
+// снова один на все стили.
+function applyWidgetMinimumSize() {
     if (!widgetWindow || widgetWindow.isDestroyed()) { return; }
-    const minHeight = style === 'digital'
-        ? CONFIG.WIDGET_LED_MIN_HEIGHT
-        : CONFIG.WIDGET_MIN_HEIGHT;
-    widgetWindow.setMinimumSize(CONFIG.WIDGET_MIN_WIDTH, minHeight);
+    widgetWindow.setMinimumSize(CONFIG.WIDGET_MIN_WIDTH, CONFIG.WIDGET_MIN_HEIGHT);
 }
 
 // Рассылка настроек отображения fullscreen и widget (clockStyle/background)

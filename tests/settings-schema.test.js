@@ -335,3 +335,53 @@ test('ключи, оставленные панели, названы явно',
         assert.match(controlHtml, new RegExp(key), `${key} нигде не сохраняется`);
     }
 });
+
+/* ─────────────────────── сброс настроек одного окна ──────────────────────── */
+
+test('resetOwnedSettings: трогает контролы ТОЛЬКО своего окна', () => {
+    // Знание «чьё это окно» живёт в той же таблице (поле owner). Второй список
+    // ровно этого знания — то, из-за чего настройки уже однажды молча
+    // возвращались к умолчанию после перезапуска.
+    const doc = fakeDoc();
+    doc._get('timerStyle').value = 'flip';
+    doc._get('timerScale').value = '160';
+    doc._get('widgetStatusLabel').checked = true;
+    doc._get('clockStyle').value = 'flip';
+    doc._get('displayTimerStyle').value = 'flip';
+
+    const applied = Schema.resetOwnedSettings('widget', doc);
+
+    assert.equal(doc._get('timerStyle').value, 'circle');
+    assert.equal(doc._get('timerScale').value, 100);
+    assert.equal(doc._get('widgetStatusLabel').checked, false);
+    assert.equal(applied.widgetTimerStyle, 'circle');
+
+    assert.equal(doc._get('clockStyle').value, 'flip', 'часы трогать нельзя');
+    assert.equal(doc._get('displayTimerStyle').value, 'flip', 'дисплей трогать нельзя');
+});
+
+test('resetOwnedSettings: подпись процентов обновляется вместе со значением', () => {
+    const doc = fakeDoc();
+    doc._get('timerScale').value = '160';
+    doc._get('timerScaleValue').textContent = '160%';
+    Schema.resetOwnedSettings('widget', doc);
+    assert.equal(doc._get('timerScaleValue').textContent, '100%');
+});
+
+test('resetOwnedSettings: отсутствующий контрол не роняет сброс', () => {
+    const doc = fakeDoc();
+    doc._drop('displayTimerStyle');
+    assert.doesNotThrow(() => Schema.resetOwnedSettings('display', doc));
+});
+
+test('у каждого ряда есть известный владелец, и у каждого окна он есть', () => {
+    const known = new Set(['widget', 'clock', 'display', undefined]);
+    for (const row of SETTINGS_DESCRIPTORS) {
+        assert.ok(known.has(row.owner), `неизвестный владелец у ${row.key}: ${row.owner}`);
+    }
+    // Пустой владелец означал бы кнопку сброса, которая ничего не делает.
+    for (const owner of ['widget', 'clock', 'display']) {
+        const count = SETTINGS_DESCRIPTORS.filter((r) => r.owner === owner).length;
+        assert.ok(count > 0, `у окна ${owner} нет ни одной своей настройки`);
+    }
+});

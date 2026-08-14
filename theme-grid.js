@@ -77,22 +77,17 @@ const ThemeGridMixin = {
                     btn.setAttribute('aria-checked', 'true');
                     this[activeKey] = btn;
 
-                    const colors = { timer: theme.t1, progress: theme.t2, bg: theme.bg };
+                    // Патч, а не новый объект: тема задаёт цвет цифр и полосы,
+                    // и не должна стирать выбранный пользователем фон окна.
+                    // Сборка объекта цветов одна на панель — panel-colors.js.
+                    this.updateColors(target, { timer: theme.t1, progress: theme.t2, bg: theme.bg });
                     if (target === 'widget') {
-                        this.currentColors = colors;
                         document.getElementById('bgSolidColor').value = theme.bg;
                         document.getElementById('bgGrad1').value = theme.bg;
-                        this.saveColors('widget');
                         // Модуль подключается классическим <script>, поэтому
                         // кросс-модульные ссылки идут через window.X: голое имя
                         // резолвится только случайно и ломает линт.
-                        window.ipcRenderer.send('widget-style-update', { timerStyle: this.timerStyleEl.value, showTicks: this.widgetShowTicksEl?.checked ?? false });
-                    } else if (target === 'clock') {
-                        this.clockColors = colors;
-                        this.saveColors('clock');
-                    } else if (target === 'display') {
-                        this.displayColors = colors;
-                        this.saveColors('display');
+                        window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                     }
                 });
                 grid.appendChild(btn);

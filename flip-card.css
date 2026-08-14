@@ -1,0 +1,129 @@
+/* ===========================================================================
+   flip-card.css — перекидывание цифры «как на вокзале» (split-flap).
+   Одна копия на все три окна: виджет, часы, полноэкранное. Слои строит
+   flip-card.js, здесь только их геометрия и движение.
+
+   Что было до 13.08.2026: `@keyframes` наклоняли ВСЮ карточку на 12° по
+   rotateX. Перспективы у виджета и часов не было вовсе, поэтому наклон
+   вырождался в плоское сжатие по вертикали на cos(12°) — замер показал 0.79
+   пикселя на карточке 36.6px. Пользователь сообщил об этом словами «анимации
+   нет нигде», и это была правда: класс навешивался, кадры отрабатывали, видно
+   ничего не было.
+
+   Как устроен настоящий перекидыш. Карточка делится пополам, и в момент смены
+   цифры одновременно живут ТРИ временных слоя поверх статичной цифры (она
+   становится новой сразу):
+
+     1. `.fc-static.fc-bottom` — СТАРАЯ нижняя половина. Она закрывает уже
+        обновлённую статичную цифру, пока не приедет поднимающаяся створка.
+        Без неё нижняя половина показывала бы новую цифру с первого кадра, и
+        перекидывание читалось бы как рывок;
+     2. `.fc-leaf-top` — СТАРАЯ верхняя половина, падает вокруг линии раздела
+        (transform-origin: bottom) от 0° до −90°;
+     3. `.fc-leaf-bottom` — НОВАЯ нижняя половина, поднимается от +90° до 0°,
+        стартуя ровно тогда, когда первая створка легла.
+
+   Обе половины — это ОДНА И ТА ЖЕ цифра, обрезанная по высоте: `.fc-face`
+   вдвое выше своего слоя и прижата к его краю, поэтому глиф стоит там же, где
+   в статичной карточке. Считать смещения вручную не нужно и нечему разойтись
+   с версткой окна.
+   =========================================================================== */
+
+.fc-flip {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Слои принадлежат карточке и обрезаются её рамкой. */
+    border-radius: inherit;
+    overflow: hidden;
+}
+
+.fc-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    overflow: hidden;
+    /* Собственный фон карточки: створка обязана быть непрозрачной, иначе
+       сквозь неё видно то, что она должна закрывать. Наследуется от подложки
+       стиля — включая выбранный пользователем цвет (--surface-paint). */
+    background: inherit;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.fc-top { top: 0; height: 50%; }
+.fc-bottom { top: 50%; bottom: 0; }
+
+.fc-face {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 200%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fc-top .fc-face { top: 0; }
+.fc-bottom .fc-face { bottom: 0; }
+
+.fc-leaf-top {
+    transform-origin: bottom center;
+    animation: fc-fall 0.18s ease-in forwards;
+    z-index: 2;
+}
+
+.fc-leaf-bottom {
+    transform-origin: top center;
+    transform: rotateX(90deg);
+    animation: fc-rise 0.18s ease-out 0.18s forwards;
+    z-index: 3;
+}
+
+/* Тень падения: створка темнеет к концу движения и светлеет, когда встаёт на
+   место. Без неё поворот читается как подмена картинки, а не как движение
+   физической пластины. */
+.fc-leaf-top::after,
+.fc-leaf-bottom::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #000;
+    pointer-events: none;
+}
+
+.fc-leaf-top::after { animation: fc-shade-in 0.18s ease-in forwards; }
+.fc-leaf-bottom::after { animation: fc-shade-out 0.18s ease-out 0.18s forwards; opacity: 0.35; }
+
+@keyframes fc-fall {
+    from { transform: rotateX(0); }
+    to { transform: rotateX(-90deg); }
+}
+
+@keyframes fc-rise {
+    from { transform: rotateX(90deg); }
+    to { transform: rotateX(0); }
+}
+
+@keyframes fc-shade-in {
+    from { opacity: 0; }
+    to { opacity: 0.35; }
+}
+
+@keyframes fc-shade-out {
+    from { opacity: 0.35; }
+    to { opacity: 0; }
+}
+
+/* «Меньше движения» гасит именно ДВИЖЕНИЕ: створки не строятся вовсе (это
+   решает flip-card.js), а если слои всё же есть — они мгновенно в конечном
+   положении, без промежуточных кадров. */
+@media (prefers-reduced-motion: reduce) {
+    .fc-leaf-top,
+    .fc-leaf-bottom,
+    .fc-leaf-top::after,
+    .fc-leaf-bottom::after {
+        animation: none;
+    }
+    .fc-flip { display: none; }
+}

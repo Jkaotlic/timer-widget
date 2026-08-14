@@ -37,7 +37,7 @@ const BANDS = [
     { name: 'overtime', total: 100, remaining: -10, allowNegative: true }
 ];
 
-const STYLES = ['circle', 'digital', 'flip', 'analog', 'digits'];
+const STYLES = ['circle', 'flip', 'analog', 'digits'];
 
 // Главный носитель времени в каждом стиле.
 //
@@ -49,14 +49,12 @@ const STYLES = ['circle', 'digital', 'flip', 'analog', 'digits'];
 const TARGET = {
     widget: {
         circle: '#timeDisplay',
-        digital: '#widgetDigitalTime',
         flip: '#wFlipMin1 .widget-flip-digit',
         analog: '#widgetAnalogDigital',
         digits: '#widgetDigitsTime'
     },
     display: {
         circle: '#timeDisplay',
-        digital: '#digitalTime',
         flip: '#flipMin1 .flip-digit',
         analog: '#analogDigitalTime',
         digits: '#digitsTime'
@@ -89,14 +87,6 @@ const BASELINE = {
     'display.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.4) 0px 4px 8px' },
     'widget.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 12px' },
     'display.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.4) 0px 4px 8px' },
-    'widget.digital.normal': { color: 'rgb(48, 209, 88)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'display.digital.normal': { color: 'rgb(48, 209, 88)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'widget.digital.warning': { color: 'rgb(255, 204, 0)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'display.digital.warning': { color: 'rgb(255, 204, 0)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'widget.digital.danger': { color: 'rgb(255, 51, 51)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'display.digital.danger': { color: 'rgb(255, 51, 51)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'widget.digital.overtime': { color: 'rgb(255, 51, 51)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
-    'display.digital.overtime': { color: 'rgb(255, 51, 51)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 14px' },
     'widget.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.6) 0px 2px 8px' },
     'display.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.flip.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.6) 0px 2px 8px' },

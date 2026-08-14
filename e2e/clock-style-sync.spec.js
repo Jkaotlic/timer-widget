@@ -72,14 +72,14 @@ test('строка «Стиль часов» видна всегда и под �
     // --- Синхронизация ВЫКЛючена: выбор стиля часов доступен ---
     await setSync(control, false);
     await control.evaluate(() => {
-        document.querySelector('#clockStyle button[data-val="digital"]').click();
+        document.querySelector('#clockStyle button[data-val="digits"]').click();
     });
     await control.waitForTimeout(400);
     const off = await readState(control);
     console.log('sync выкл →', JSON.stringify(off));
     expect(off.syncChecked).toBe(false);
     expect(off.pickerVisible, 'без синхронизации стиль часов выбирается вручную').toBe(true);
-    expect(off.clockValue).toBe('digital');
+    expect(off.clockValue).toBe('digits');
 
     // --- Синхронизация ВКЛючена: выбор остаётся ВИДНЫМ и берёт стиль виджета ---
     await setSync(control, true);

@@ -303,7 +303,13 @@ test('дефолтный цвет таймера — один на все окн
     // било любое правило: зелёный --tw-led-green не срабатывал никогда.
     const widget = codeOnly(read('electron-widget.html'));
     assert.ok(!/timer:\s*'#0a84ff'/.test(widget), 'в виджете остался захардкоженный дефолт');
-    assert.match(widget, /if \(!colors\) \{ return; \}/);
+    // Раньше здесь стоял ранний `if (!colors) { return; }`. Он держал ту же
+    // мысль («окно не подставляет свой дефолт»), но с появлением сброса цвета
+    // стал вредным: сброс приходит как ОТСУТСТВИЕ поля, и выход по нему
+    // означал бы, что снятый цвет висит до перезапуска окна. Теперь дефолт
+    // возвращается удалением переменной — владельцем остаётся CSS.
+    assert.ok(!/if \(!colors\) \{ return; \}/.test(widget), 'ранний выход мешает сбросу цвета');
+    assert.match(widget, /removeProperty/, 'сброс цвета обязан УДАЛЯТЬ переменную');
 
     const display = codeOnly(read('display-script.js'));
     assert.ok(!/DEFAULT_TIMER_COLORS/.test(display), 'дисплей снова подставляет дефолт');
@@ -338,7 +344,11 @@ test('карточки флипа — полупрозрачные, без вн�
     // `.widget-flip-card.flipping .widget-flip-inner { animation: … }` и
     // проверяет не то правило. Та же ловушка, что и с .theme-btn.active.
     const rule = WIDGET_CODE.match(/^\s*\.widget-flip-inner \{[^}]*\}/m)[0];
-    assert.match(rule, /rgba\(42,\s*42,\s*53,\s*0\.85\)/);
+    // Альфа осталась 0.85, но теперь её умножает ползунок прозрачности:
+    // `calc(0.85 * var(--surface-alpha, 1))`. Проверяется по-прежнему
+    // ПОЛУПРОЗРАЧНОСТЬ подложки, а не форма записи — множитель по умолчанию
+    // равен 1, то есть вид без настроек прежний.
+    assert.match(rule, /rgba\(42,\s*42,\s*53,\s*calc\(0\.85 \* var\(--surface-alpha, 1\)\)\)/);
     // Окно transparent + hasShadow: false — внешняя тень даёт видимый тёмный
     // прямоугольник вокруг окна.
     // \s+, а не \s*: при \s* регулярка отступает на ноль пробелов, проверяет
@@ -370,28 +380,25 @@ test('reduced-motion гасит движение, а не информацию',
 const DISPLAY_JS = codeOnly(read('display-script.js'));
 const DISPLAY_HTML = codeOnly(read('display.html') + '\n' + read('display.css'));
 
-test('LED-«внимание» на дисплее совпадает с собственным CSS дисплея', () => {
+test('цвет полосы у «Цифр» на дисплее принадлежит CSS, а не JS', () => {
     // Исходный дефект: JS писал #ffc107 инлайном, а CSS говорил
-    // --tw-led-warn = #ffcc00. Правило .digital-time.warning не применялось
-    // НИКОГДА, потому что инлайн бьёт класс, и пользователь видел цвет, которого
-    // в стилях не было.
+    // --tw-led-warn = #ffcc00. Правило не применялось НИКОГДА, потому что инлайн
+    // бьёт класс, и пользователь видел цвет, которого в стилях не было.
     //
-    // Раньше тест требовал, чтобы в ветке LED стоял #ffcc00 (то есть чтобы две
-    // копии значения совпадали). С 11.08.2026 копий нет: цвет полосы задаёт
-    // ТОЛЬКО CSS, а JS ставит класс. Совпадать нечему — источник один.
-    // Проверяем именно это, иначе тест требовал бы вернуть вторую копию.
-    const from = DISPLAY_JS.indexOf('updateDigitalDisplay(secs, _formatted) {');
-    const to = DISPLAY_JS.indexOf('updateFlipDisplay(secs) {');
-    assert.ok(from > 0 && to > from, 'ветка LED не найдена');
-    const led = DISPLAY_JS.slice(from, to);
-    assert.ok(!/#ffc107|#ffcc00|#ff3333/.test(led),
-        'в ветку LED вернулся цветовой литерал — цвет полосы принадлежит CSS');
-    assert.match(led, /classList\.add\('warning'\)/, 'ветка LED обязана ставить класс полосы');
+    // 11.08.2026 копий не стало: цвет полосы задаёт ТОЛЬКО CSS, JS ставит класс.
+    // 13.08.2026 стиль LED слит с «Цифрами», и проверка переехала на них —
+    // ветка updateDigitalDisplay удалена вместе со стилем.
+    const from = DISPLAY_JS.indexOf('updateDigitsDisplay(');
+    assert.ok(from > 0, 'ветка «Цифр» не найдена');
+    const to = DISPLAY_JS.indexOf('updateAnalogDisplay(', from);
+    const digits = DISPLAY_JS.slice(from, to > from ? to : from + 4000);
+    assert.ok(!/#ffc107|#ffcc00|#ff3333/.test(digits),
+        'в ветку «Цифр» вернулся цветовой литерал — цвет полосы принадлежит CSS');
 
     // Единственный источник значения — правило CSS, и оно берёт токен.
     const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
-    assert.match(css, /\.digital-time\.warning \{[^}]*color: var\(--tw-led-warn\)/,
-        '.digital-time.warning обязано красить токеном --tw-led-warn');
+    assert.match(css, /\.digits-time\.warning \{[^}]*color: var\(--tw-band-warning\)/,
+        '.digits-time.warning обязано красить ТОКЕНОМ полосы, а не литералом');
 });
 
 test('глиф статуса имеет ОДНОГО владельца', () => {

@@ -158,7 +158,9 @@ test('у делений циферблата один владелец в хра
     const push = control.slice(control.indexOf('pushClockSettings()'));
     const body = push.slice(0, push.indexOf('loadClockSettings()'));
 
-    assert.match(body, /showTicks: this\.widgetShowTicksEl/, 'в IPC-пакете showTicks обязан остаться');
+    // Тумблер переехал во вкладку ЧАСОВ вместе с самой настройкой: у виджета
+    // таймера делений больше нет, там кольцо обратного отсчёта.
+    assert.match(body, /showTicks: this\.clockShowTicksEl/, 'в IPC-пакете showTicks обязан остаться');
     assert.match(
         body,
         /JSON\.stringify\(\{ \.\.\.prevClock, \.\.\.persisted \}\)/,

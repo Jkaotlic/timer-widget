@@ -24,7 +24,10 @@
  */
 
 const FLIP_CLASS = 'flipping';
-const FLIP_DURATION_MS = 300; // должно совпадать с длительностью анимации в CSS
+// Две фазы по 180 мс: створка падает, затем встаёт следующая. Должно совпадать
+// с длительностями в flip-card.css — по этому времени снимаются слои.
+const FLIP_DURATION_MS = 380;
+const FLIP_LAYERS_CLASS = 'fc-flip';
 
 // Незавершённые таймеры снятия класса. Модуль ведёт их САМ и вычёркивает каждый
 // по срабатыванию, поэтому набор всегда размером с число одновременно
@@ -36,6 +39,63 @@ const FLIP_DURATION_MS = 300; // должно совпадать с длител
 // неограниченный рост, а в cleanup() потом впустую вызывался clearTimeout на
 // мёртвых идентификаторах.
 const _pending = new Set();
+
+/**
+ * Строит три временных слоя перекидыша поверх статичной цифры.
+ *
+ * Цифры не рисуются заново: каждый слой получает КЛОН существующего узла, то
+ * есть автоматически те же шрифт, кегль, цвет и тень, что в этом окне. Три
+ * окна отличаются размерами карточек и начертанием, и любая попытка описать
+ * эти значения здесь была бы четвёртой копией того, что уже есть в CSS.
+ *
+ * Геометрия — в flip-card.css: слой обрезает половину карточки, а лежащая в
+ * нём `.fc-face` вдвое выше слоя и прижата к его краю, поэтому глиф стоит
+ * ровно там же, где в статичной карточке.
+ *
+ * @param {HTMLElement} digit — узел цифры (уже с НОВЫМ значением)
+ * @param {string} prev — прежняя цифра
+ * @param {string} next — новая цифра
+ * @returns {HTMLElement|null} контейнер слоёв (его снимает вызывающий) или null
+ */
+function buildFlipLayers(digit, prev, next) {
+    const host = digit.parentNode;
+    if (!host || typeof document === 'undefined' || !document.createElement) { return null; }
+
+    // «Меньше движения» — движения нет вовсе: слои не строятся, цифра просто
+    // сменилась. Гасить их анимацию в CSS недостаточно, иначе на экране на
+    // 380 мс зависал бы неподвижный слой со СТАРОЙ цифрой.
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return null;
+    }
+
+    const stale = host.querySelector('.' + FLIP_LAYERS_CLASS);
+    if (stale) { host.removeChild(stale); }
+
+    const layer = (classes, text) => {
+        const box = document.createElement('div');
+        box.className = 'fc-layer ' + classes;
+        const face = document.createElement('div');
+        face.className = 'fc-face';
+        const copy = digit.cloneNode(true);
+        copy.textContent = text;
+        copy.removeAttribute('id');
+        face.appendChild(copy);
+        box.appendChild(face);
+        return box;
+    };
+
+    const wrap = document.createElement('div');
+    wrap.className = FLIP_LAYERS_CLASS;
+    wrap.setAttribute('aria-hidden', 'true');
+    // Порядок = порядок наложения: старая нижняя половина, падающая верхняя,
+    // поднимающаяся новая нижняя.
+    wrap.appendChild(layer('fc-bottom fc-static', prev));
+    wrap.appendChild(layer('fc-top fc-leaf-top', prev));
+    wrap.appendChild(layer('fc-bottom fc-leaf-bottom', next));
+    host.appendChild(wrap);
+    return wrap;
+}
 
 /**
  * Ставит цифру в карточку и, если значение изменилось, запускает перекидывание.
@@ -52,14 +112,20 @@ function flipCardTo(card, digitSelector, value, opts = {}) {
     if (!digit) { return null; }
 
     const next = String(value);
-    if (digit.textContent === next) { return null; }
+    const prev = digit.textContent;
+    if (prev === next) { return null; }
 
+    // Статичная цифра становится новой СРАЗУ: верхняя половина карточки обязана
+    // показывать её с первого кадра — именно она открывается из-под падающей
+    // створки. Нижнюю половину до конца движения закрывает слой со старой.
     digit.textContent = next;
+    const layers = buildFlipLayers(digit, prev, next);
     card.classList.add(FLIP_CLASS);
 
     const id = setTimeout(() => {
         _pending.delete(id);
         card.classList.remove(FLIP_CLASS);
+        if (layers && layers.parentNode) { layers.parentNode.removeChild(layers); }
     }, FLIP_DURATION_MS);
     _pending.add(id);
 
@@ -80,7 +146,7 @@ function cancelPending() {
     return count;
 }
 
-const FlipCard = { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS };
+const FlipCard = { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS, FLIP_LAYERS_CLASS };
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FlipCard;

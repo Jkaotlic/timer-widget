@@ -332,7 +332,11 @@ test('стиль часов приводится к белому списку п
     const clockHtml = readCode('electron-clock-widget.html');
     const JS_CODE = clockHtml.replace(/\/\/[^\n]*/g, '');
 
-    assert.match(JS_CODE, /const safeStyle = \['circle', 'digital', 'flip', 'analog', 'digits'\]\.includes\(style\)/);
+    // LED слит с «Цифрами»: список стилей стал короче, а перед ним появился
+    // перевод сохранённого значения (migrateTimerStyle) — иначе профиль со
+    // старым стилем откатывался бы к кругу.
+    assert.match(JS_CODE, /migrateTimerStyle\(style\)/);
+    assert.match(JS_CODE, /const safeStyle = \['circle', 'flip', 'analog', 'digits'\]\.includes\(wanted\)/);
     assert.match(JS_CODE, /classList\.add\('style-' \+ safeStyle\)/);
     // Сырое значение больше не должно доходить ни до класса, ни до поля.
     assert.doesNotMatch(JS_CODE, /classList\.add\('style-' \+ style\)/);
