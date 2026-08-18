@@ -167,7 +167,15 @@ test('подпись над таймером и плашка состояния:
         expect(before.labelShown && before.pillShown, 'подпись и плашка должны вернуться').toBe(true);
 
         // 2. Тащатся. Замер сдвига — по РАЗНИЦЕ координат: она и есть предмет.
-        const DX = -600, DY = 80;
+        //
+        // Дельта считается ОТ ОКНА, а не прибита числом. Прежние −600 px были
+        // безобидны на здешнем экране (3440 в ширину) и невозможны под xvfb на
+        // CI (1280): подпись стоит по центру, слева от неё ~520 px, и жест
+        // упирался в поле у края — сдвиг выходил 539 вместо 600, тест падал с
+        // разницей 61. Это проверка на разрешение монитора, а не на
+        // перетаскивание.
+        const view = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+        const DX = -Math.round(view.w * 0.12), DY = Math.round(view.h * 0.06);
         await display.evaluate(([id, dx, dy]) => {
             const el = document.getElementById(id);
             const r = el.getBoundingClientRect();

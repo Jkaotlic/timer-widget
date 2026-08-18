@@ -195,6 +195,17 @@ test('блок времени повторяет стиль: у флипа — �
             () => getComputedStyle(document.getElementById('eventTime')).fontFamily
         );
         expect(backToCircle.toLowerCase(), 'шрифт «Цифр» залип на блоке после смены стиля').not.toContain('orbitron');
+
+        // Возвращаем и шрифт, и тумблер блока: профиль общий на весь прогон.
+        await control.click('#displayTimerStyle button[data-val="digits"]');
+        await control.click('#displayDigitsFont .font-option[data-val="inter"]');
+        await control.click('#displayTimerStyle button[data-val="circle"]');
+        await control.evaluate(() => {
+            const el = document.getElementById('showEventTime');
+            el.checked = false;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await display.waitForTimeout(500);
     } finally {
         await app.close();
     }
@@ -229,6 +240,14 @@ test('аналог: стрелки мини-часов в блоке — те ж
         // красился токеном.
         expect(m.mini, 'стрелка мини-часов разошлась с большой').toBe(m.big);
         expect(m.miniTick, 'деление мини-часов разошлось с большим').toBe(m.bigTick);
+
+        // Профиль e2e общий на весь прогон, и стиль — глобальное состояние.
+        // Оставленный «Аналог» уронил ui-pass-2026-08: тот ждёт ВИДИМОЕ
+        // `.timer-ring` (у waitForSelector состояние по умолчанию 'visible'), а
+        // в аналоге кольцо скрыто `display: none` — 30 секунд ожидания и
+        // таймаут. В одиночку обе спеки при этом зелёные.
+        await control.click('#displayTimerStyle button[data-val="circle"]');
+        await display.waitForTimeout(500);
     } finally {
         await app.close();
     }
