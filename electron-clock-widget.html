@@ -8,11 +8,12 @@
     <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
     <link rel="stylesheet" href="flip-card.css">
+    <link rel="stylesheet" href="surface-tones.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
     <script src="ui-theme.js"></script>
-    <script>window.UITheme.initTheme();</script>
+    <script>window.UITheme.initTheme(); window.UITheme.initTone();</script>
     <style>
         * {
             margin: 0;
@@ -154,7 +155,7 @@
             font-variant-numeric: tabular-nums;
             /* Ореол снят редизайном 2026-08-12; мягкая тень осталась — она
                отделяет цифры от произвольного фона, а не красит их. */
-            text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+            text-shadow: var(--style-ink-shadow);
             transition: color var(--tw-dur-base) var(--tw-ease),
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
@@ -163,18 +164,6 @@
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
-        }
-
-        /* Тень гасится ЯВНО, а не побочным эффектом.
-           text-shadow выше — СПИСОК, и вторым элементом в нём стоит
-           var(--tw-glow-blue). В светлой теме этот токен равен `none`, а `none`
-           внутри списка теней — невалидное значение: подстановка сделала бы всё
-           объявление invalid at computed-value time и сняла тень целиком.
-           Результат нужный, механизм — случайный, поэтому пишем правило.
-           По существу: жёсткая чёрная тень под почти чёрным текстом на белом
-           читается как грязное тиснение. */
-        [data-theme="light"] .time-display {
-            text-shadow: none;
         }
 
         /* Superscript seconds — kit recipe for circle style.
@@ -261,21 +250,21 @@
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-sm);
             color: var(--tw-led-green);
-            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+            box-shadow: inset 0 0 15px var(--style-hinge);
             font-family: var(--tw-font-mono);
         }
 
         /* Flip: split-flap style date card */
         body.style-flip .date-badge {
-            background: linear-gradient(180deg, rgba(42,42,53,0.85) 0%, rgba(26,26,37,0.85) 100%);
-            border: 1px solid var(--tw-border);
+            background: var(--style-plate);
+            border: 1px solid var(--style-edge);
             border-radius: var(--tw-r-xs);
             color: var(--tw-fg-secondary);
             font-family: var(--tw-font-sans);
             font-weight: 700;
             letter-spacing: 1px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+            text-shadow: var(--style-ink-shadow);
+            box-shadow: inset 0 2px 8px var(--style-hinge);
         }
 
         /* Часовой пояс */
@@ -307,18 +296,18 @@
             border: 1px solid var(--tw-border);
             border-radius: var(--tw-r-xs);
             color: var(--tw-led-green);
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+            box-shadow: inset 0 0 10px var(--style-hinge);
             font-family: var(--tw-font-mono);
         }
 
         body.style-flip .timezone-badge {
-            background: linear-gradient(180deg, rgba(34,34,42,0.85) 0%, rgba(26,26,32,0.85) 100%);
-            border: 1px solid var(--tw-border);
+            background: var(--style-plate);
+            border: 1px solid var(--style-edge);
             border-radius: var(--tw-r-xs);
             color: var(--tw-fg-muted);
             font-family: var(--tw-font-mono);
             font-weight: 500;
-            box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 1px 4px var(--style-hinge);
         }
 
         /* Стиля LED больше нет: он был теми же цифрами в коробке, а после того,
@@ -443,15 +432,11 @@
             /* НЕПРОЗРАЧНАЯ по построению — разбор в electron-widget.html и в
                flip-card.css: створки берут фон с этой пластины, и сквозь
                полупрозрачную было бы видно цифру под падающей створкой. */
-            background: var(--surface-solid, linear-gradient(180deg,
-                rgb(42,42,53) 0%,
-                rgb(26,26,37) 49.9%,
-                rgb(10,10,15) 50%,
-                rgb(21,21,32) 100%));
+            background: var(--surface-solid, var(--style-plate));
             border-radius: var(--tw-r-xs);
             border: 1px solid var(--tw-border);
             overflow: hidden;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+            box-shadow: inset 0 1px 0 var(--style-edge);
         }
 
         .widget-flip-inner::before {
@@ -461,7 +446,7 @@
             left: 0;
             right: 0;
             height: 2px;
-            background: rgba(0, 0, 0, 0.85);
+            background: var(--style-hinge);
             z-index: 10;
         }
 
@@ -484,7 +469,7 @@
             color: var(--tw-fg);
             line-height: 1;
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            text-shadow: var(--style-ink-shadow);
         }
 
         /* Адаптивные размеры для 6 цифр (ЧЧ:ММ:СС) */
@@ -564,7 +549,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+            box-shadow: inset 0 1px 0 var(--style-edge);
         }
 
         .widget-analog-clock::before {
@@ -572,7 +557,7 @@
             position: absolute;
             inset: 5%;
             border-radius: 50%;
-            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.04), transparent 60%);
+            background: radial-gradient(circle at 30% 30%, var(--style-gloss), transparent 60%);
             pointer-events: none;
         }
 
@@ -623,7 +608,7 @@
             font-size: 18px;
             font-weight: 500;
             color: var(--tw-fg-secondary);
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            text-shadow: var(--style-ink-shadow);
             transform: translate(-50%, -50%);
             font-variant-numeric: tabular-nums;
         }
@@ -654,7 +639,7 @@
         .widget-analog-hour {
             width: 5px;
             height: 44px;
-            background: linear-gradient(180deg, #ffffff 0%, #cccccc 100%);
+            background: var(--style-hand);
             margin-left: -2.5px;
             z-index: 2;
         }
@@ -663,74 +648,29 @@
         .widget-analog-minute {
             width: 3px;
             height: 64px;
-            background: linear-gradient(180deg, #ffffff 0%, #dddddd 100%);
+            background: var(--style-hand);
             margin-left: -1.5px;
             z-index: 3;
         }
 
         /* ───────────────────────────────────────────────────────────────
-           СВЕТЛАЯ ТЕМА.
-           Часы — единственное из двух малых окон, которое теме СЛЕДУЕТ:
-           свой фон они рисуют сами, пользователь его не красит. Виджет и
-           полноэкранное окно, наоборот, прибивают тёмный набор у себя.
+           СВЕТЛОГО ТОНА здесь больше нет отдельным списком.
 
-           Ниже — места, где подложка задана тёмным литералом, а текст рядом
-           берётся из токена: в светлой теме выходило тёмное по тёмному либо
-           белое по белому. Проявлялось на профиле, где цвета часов ни разу не
-           выбирались, то есть на свежей установке — applyColors при
-           отсутствии clockColors выходит по раннему return.
+           Тут стояли шесть правил под `[data-theme="light"]`: белые стрелки на
+           белом циферблате, чёрная тень под чёрным текстом, светлые цифры,
+           закреплённые на карточке флипа, и два цвета подписей. Все шесть
+           существовали по одной причине: подложка была задана ТЁМНЫМ ЛИТЕРАЛОМ,
+           а текст рядом брался из токена, который тема переворачивала. Литерал
+           стал токеном (`--style-plate`, `--style-hand`, `--style-ink-shadow`),
+           и переворачиваются они теперь ВМЕСТЕ — исправлять после этого нечего.
+
+           Одно решение при этом отменено сознательно. Правило про карточку
+           говорило: «карточку флипа НЕ перекрашиваем в белую — механический вид
+           и есть смысл стиля, у настоящих перекидных часов табло тёмное».
+           18.08.2026 пользователь попросил обратного и прямо: «чтобы все стили
+           по умолчанию в светлой теме были светлыми, а в тёмной тёмными
+           везде». Табло светлеет вместе с окном.
            ─────────────────────────────────────────────────────────────── */
-
-        /* Стрелки были залиты жёстко белым градиентом: на белом циферблате их
-           просто нет. Для минутной берём --tw-fg-secondary, а не -muted: 0.58
-           против нынешних ≈0.87 заметно гасит кончик в тёмной теме, а сверка
-           снимков часов этого не поймает — кадры clock-* исключены из неё как
-           зависящие от живого времени. */
-        [data-theme="light"] .widget-analog-hour,
-        [data-theme="light"] .widget-analog-minute {
-            background: linear-gradient(180deg, var(--tw-fg) 0%, var(--tw-fg-secondary) 100%);
-        }
-
-        /* Жёсткая чёрная тень под почти чёрным текстом на белом читается как
-           грязное тиснение. */
-        [data-theme="light"] .widget-analog-number,
-        [data-theme="light"] .widget-flip-digit {
-            text-shadow: none;
-        }
-
-        /* Карточку флипа НЕ перекрашиваем в белую: механический вид — это и
-           есть смысл стиля, у настоящих перекидных часов табло тёмное. Вместо
-           этого закрепляем светлые цифры на тёмной карточке.
-           Замер: #ffffff на [74,74,83] = 8.77:1, на нижней половине 11.6:1.
-           Правило скоупнуто на КЛАСС, а не на :root — иначе регулярка
-           tests/ui-theme.test.js приняла бы его за подмену --tw-fg и решила,
-           что окно перестало следовать теме.
-           Инлайновый цвет из applyColors по-прежнему бьёт это правило, то есть
-           поведение окрашенного профиля не меняется вовсе. */
-        [data-theme="light"] .widget-flip-digit {
-            color: #ffffff;
-        }
-
-        /* Точки разделителя — по тому же правилу и по той же причине: карточка
-           остаётся тёмной, значит и разделитель на ней обязан быть светлым.
-           Отличие одно, и оно существенное: у цифр выбранный пользователем цвет
-           приходит ИНЛАЙНОМ и бьёт это правило сам, а точки инлайном не
-           красятся вовсе (их рисуют псевдоэлементы), поэтому переменная стоит
-           прямо здесь. Забыть её — значит в светлой теме получить почти чёрные
-           точки на тёмной карточке: замер 14.08.2026 дал rgb(29,29,31) при
-           белых цифрах рядом. */
-        [data-theme="light"] .widget-flip-separator::before,
-        [data-theme="light"] .widget-flip-separator::after {
-            background: var(--timer-color, #ffffff);
-        }
-
-        [data-theme="light"] body.style-flip .date-badge {
-            color: rgba(255, 255, 255, 0.78);
-        }
-
-        [data-theme="light"] body.style-flip .timezone-badge {
-            color: rgba(255, 255, 255, 0.72);
-        }
 
         /* Секундная стрелка */
         .widget-analog-second {
@@ -1318,6 +1258,22 @@
                 this.secondsBar.style.strokeDashoffset = this.circumference;
             }
 
+
+            /**
+             * Пересчитать тон окна. Отдельный метод, потому что поводов два:
+             * пришли цвета (сменилась подложка) и сменилась тема (сменился фон
+             * ПО УМОЛЧАНИЮ). Второй повод до 18.08.2026 не существовал вовсе —
+             * окно тему не принимало, палитра была прибита.
+             */
+            refreshTone() {
+                const s = this._surface || {};
+                window.UITheme.applyTone(window.RendererShared.surfaceTone({
+                    color: s.color,
+                    alpha: s.alpha,
+                    theme: document.documentElement.getAttribute('data-theme')
+                }));
+            }
+
             applyColors(colors = null) {
                 if (!colors) {
                     const saved = localStorage.getItem('clockColors');
@@ -1356,6 +1312,13 @@
                 const alphaValue = window.RendererShared.surfaceAlpha(colors.surfaceAlpha);
                 if (alphaValue === null) { root.style.removeProperty('--surface-alpha'); }
                 else { root.style.setProperty('--surface-alpha', String(alphaValue)); }
+
+                // Тон окна — тот же расчёт, что у виджета. Часы теме следовали
+                // и раньше, но через `data-theme` напрямую: выбранная ТЁМНАЯ
+                // подложка при светлой теме давала тёмный текст на тёмном.
+                // Теперь решает яркость того, что реально под цифрами.
+                this._surface = { color: colors.surface, alpha: colors.surfaceAlpha };
+                this.refreshTone();
 
                 // Circle style
                 paint(this.timeDisplay, 'color', timerColor);
@@ -1464,12 +1427,18 @@
                             break;
                     }
 
-                    // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
-                    if (e.code >= 'Digit1' && e.code <= 'Digit8') {
-                        e.preventDefault();
+                    // Пресеты. Комментарий «1-8 (5,10,15,20,25,30,45,60 минут)»
+                    // остался от прежнего набора длительностей: их четыре
+                    // (CONFIG.PRESET_DURATIONS), и клавиши 5–8 слали
+                    // `seconds: undefined`, что движок приводит к нулю — то есть
+                    // СБРАСЫВАЛИ ТАЙМЕР. Диапазон выводится из реестра.
+                    if (e.code >= 'Digit1' && e.code <= 'Digit9') {
                         const presets = window.CONFIG.PRESET_DURATIONS;
                         const idx = parseInt(e.code.replace('Digit', '')) - 1;
-                        ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                        if (idx < presets.length) {
+                            e.preventDefault();
+                            ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                        }
                     }
                 };
                 document.addEventListener('keydown', this._handlers.onKeyDown);
@@ -1482,7 +1451,11 @@
                     if (!e.ctrlKey) { return; }
                     e.preventDefault();
                     const step = window.CONFIG.SCALE_STEP;
-                    const delta = e.deltaY < 0 ? step : -step;
+                    // Та же причина, что у виджета и дисплея: ноль — это не
+                    // «уменьшить», а «ничего не произошло».
+                    const raw = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+                    if (!raw) { return; }
+                    const delta = raw < 0 ? step : -step;
                     const newPct = window.RendererShared.clampScale(clockScalePct + delta, CLOCK_MIN_SCALE, CLOCK_MAX_SCALE);
                     if (newPct === clockScalePct) { return; }
                     clockScalePct = newPct;
@@ -1802,6 +1775,14 @@
                         if (font.id !== this.digitsFont) {
                             this.digitsFont = font.id;
                             this.updateScaling();
+                            // И ещё раз, когда доедет woff2. Знака минуса у
+                            // часов нет, но подгонка КЕГЛЯ мерит тем же
+                            // measureDigits() и так же попадает на запасное
+                            // начертание (см. isFontLoaded в digits-style.js).
+                            window.DigitsStyle.ensureFont(font.id).then(() => {
+                                window.DigitsStyle.clearProbeCache();
+                                this.updateScaling();
+                            });
                         }
                     }
                     this.updateDateTimezoneVisibility();
@@ -2018,7 +1999,10 @@
             localStorage.setItem('clockHintShown', 'v2');
         }
 
+        // На window — по той же причине, что и в виджете таймера: слушатель
+        // темы стоит отдельным <script> и в эту область не заглядывает.
         const clockWidget = new ClockWidget();
+        window.clockWidget = clockWidget;
 
         // Cleanup при закрытии окна
         window.addEventListener('beforeunload', () => {
@@ -2026,6 +2010,6 @@
         });
     </script>
     <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script>window.UITheme.bindThemeSync(window.ipcRenderer);</script>
+    <script>window.UITheme.bindThemeSync(window.ipcRenderer, () => window.clockWidget && window.clockWidget.refreshTone());</script>
 </body>
 </html>

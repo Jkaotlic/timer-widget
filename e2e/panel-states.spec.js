@@ -330,6 +330,51 @@ test.describe('панель: строки окон', () => {
         await control.waitForTimeout(900);
     });
 
+    /**
+     * Строка дисплея — такой же отчёт, как строки виджета и часов.
+     *
+     * Жалоба 17.08.2026: «в окне настроек в дисплей не отображается полная
+     * информация о том, какой стиль и тд как в остальных окнах». Так и было:
+     * строке дисплея передавался только монитор, хотя стиль и масштаб у неё
+     * свои и настраиваются в том же ящике. Сокращённый отчёт у одной строки из
+     * трёх читается как «у дисплея этих настроек нет».
+     */
+    test('строка дисплея сообщает стиль и масштаб, а не только монитор', async () => {
+        await control.click('#openDisplayBtn');
+        await control.waitForTimeout(1800);
+        await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
+        await control.waitForTimeout(700);
+
+        await control.click('#displayTimerStyle button[data-val="flip"]');
+        await control.waitForTimeout(600);
+        // Стиль — как у соседних строк, теми же словами.
+        await expect(control.locator('#subDisplay')).toHaveText(/показан · флип/);
+
+        // Масштаб появляется, когда он о чём-то говорит (100 % не пишется).
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerScale');
+            el.value = '150';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await control.waitForTimeout(700);
+        await expect(control.locator('#subDisplay')).toHaveText(/флип · 150%/);
+
+        // Убираем за собой: профиль e2e общий на весь прогон.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerScale');
+            el.value = '100';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await control.click('#displayTimerStyle button[data-val="circle"]');
+        await control.waitForTimeout(500);
+        await control.click('#drawerClose');
+        await control.waitForTimeout(600);
+        await control.click('#openDisplayBtn');
+        await control.waitForTimeout(900);
+    });
+
     test('строка «Звуки» ведёт в свой раздел', async () => {
         await control.click('.wrow:has(#soundMasterToggle) .wrow-chevron');
         await control.waitForTimeout(700);

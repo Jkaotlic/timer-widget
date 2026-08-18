@@ -17,7 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { codeOnly } = require('./helpers/source-scan');
+const { codeOnly, styleToken } = require('./helpers/source-scan');
 
 const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
@@ -333,10 +333,12 @@ test('трек кольца виджета — шкала, а не намёк', 
     const rule = WIDGET_CODE.match(/^\s*\.progress-track \{[^}]*\}/m)[0];
     assert.ok(!/0\.08/.test(rule), 'вернулась невидимая альфа 0.08');
     assert.match(rule, /stroke:\s*var\(--tw-track\)/);
-    // Окно светлую тему не принимает, поэтому токен обязан быть ПРИБИТ в его
-    // собственном блоке — иначе он приедет из design-tokens.css со светлым
-    // значением #949499 на тёмном циферблате.
-    assert.match(WIDGET_CODE, /\[data-theme="light"\][^}]*--tw-track:\s*rgba\(255, 255, 255, 0\.35\)/);
+    // Токен обязан быть объявлен для ТЁМНОГО тона — иначе он приедет из
+    // design-tokens.css со светлым значением #949499 на тёмном циферблате.
+    // С 18.08.2026 объявление живёт в surface-tones.css (одна копия на три
+    // окна), поэтому проверка ходит туда, а не ищет пин внутри виджета.
+    assert.equal(styleToken('tw-track', 'dark'), 'rgba(255, 255, 255, 0.35)');
+    assert.equal(styleToken('tw-track', 'light'), '#949499', 'на светлом тоне трек обязан темнеть');
 });
 
 test('карточки флипа — НЕПРОЗРАЧНЫЕ, без внешних теней и без backdrop-filter', () => {
@@ -352,10 +354,16 @@ test('карточки флипа — НЕПРОЗРАЧНЫЕ, без внеш�
     // Сужаем до объявления background: в том же правиле лежит box-shadow с
     // rgba(), к прозрачности подложки отношения не имеющий, — без этого
     // проверка падала бы на внутренней тени, которая обязана остаться.
+    // Значение приехало в токен --style-plate, и проверка идёт ПО ССЫЛКЕ:
+    // иначе она стерегла бы строку `var(--style-plate)`, то есть ничего.
     const bg = rule.match(/background:[^;]*;/)[0];
-    assert.match(bg, /rgb\(42,\s*42,\s*53\)/, 'верхний стоп подложки флипа обязан быть непрозрачным');
-    assert.ok(!/rgba\(/.test(bg), 'в подложке флипа снова появилась альфа');
-    assert.ok(!/--surface-alpha/.test(bg), 'подложка флипа снова читает ползунок прозрачности');
+    assert.match(bg, /var\(--surface-solid, var\(--style-plate\)\)/, 'подложка флипа перестала читать пластину');
+    for (const tone of ['dark', 'light']) {
+        const plate = styleToken('style-plate', tone);
+        assert.match(plate, /^linear-gradient/, `${tone}: пластина перестала быть градиентом`);
+        assert.ok(!/rgba\(/.test(plate), `${tone}: в подложке флипа снова появилась альфа`);
+        assert.ok(!/--surface-alpha/.test(plate), `${tone}: подложка флипа снова читает ползунок прозрачности`);
+    }
     // Окно transparent + hasShadow: false — внешняя тень даёт видимый тёмный
     // прямоугольник вокруг окна.
     // \s+, а не \s*: при \s* регулярка отступает на ноль пробелов, проверяет

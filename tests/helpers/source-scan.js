@@ -207,4 +207,37 @@ function codeOnly(src) {
         .replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-module.exports = { maskNonCode, balancedBlockAt, functionBody, constructorBlocks, ipcHandlerBody, codeOnly };
+/**
+ * Значение токена поверхности из `surface-tones.css` для указанного ТОНА.
+ *
+ * Зачем в общем модуле. С 18.08.2026 пластина перекидыша, циферблат, деления и
+ * стрелки записаны не литералами в трёх окнах, а токенами `--style-*` в одном
+ * файле. Source-level тесты, которые эти литералы стерегли (непрозрачность
+ * карточки, множитель --surface-alpha у циферблата, толщина трека), обязаны
+ * ходить по той же ссылке, иначе они стерегут строку `var(--style-plate)` —
+ * то есть ничего.
+ *
+ * @param {string} name  имя без `--`, например 'style-plate'
+ * @param {'dark'|'light'} [tone]
+ * @returns {string} значение объявления
+ */
+function styleToken(name, tone = 'dark') {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    // Комментарии срезаются ДО поиска селектора, и это не гигиена, а
+    // задокументированная ловушка этого проекта: в шапке surface-tones.css оба
+    // селектора названы прозой, и срез по подстроке уезжал на комментарий —
+    // `styleToken('style-dial-inner', 'light')` возвращал ТЁМНОЕ значение.
+    // Ровно так же однажды уехал срез тем в tests/contrast.test.js.
+    const css = fs.readFileSync(path.join(__dirname, '..', '..', 'surface-tones.css'), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+    const selector = tone === 'light' ? ':root.on-light-bg' : ':root:not(.on-light-bg)';
+    const at = css.indexOf(selector);
+    if (at === -1) { throw new Error(`surface-tones.css: не найден блок ${selector}`); }
+    const body = css.slice(css.indexOf('{', at) + 1, css.indexOf('\n}', at));
+    const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(body);
+    if (!m) { throw new Error(`surface-tones.css: в блоке ${selector} нет --${name}`); }
+    return m[1].trim().replace(/\s+/g, ' ');
+}
+
+module.exports = { maskNonCode, balancedBlockAt, functionBody, constructorBlocks, ipcHandlerBody, codeOnly, styleToken };

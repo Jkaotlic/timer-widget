@@ -141,6 +141,61 @@ function clampScale(value, min, max) {
 }
 
 // ---------------------------------------------------------------------------
+// fitBlockScale({width, height, centerX, centerY, free, requested}) → проценты
+// ---------------------------------------------------------------------------
+/**
+ * Потолок масштаба блока, растущего `transform: scale` вокруг своего центра.
+ *
+ * Зачем. Трансформация НЕ участвует в раскладке: соседи о новом размере не
+ * знают и с места не двигаются. Поэтому увеличенный блок сначала наезжает на
+ * них, а потом уходит за край окна — замер на дисплее 3440×1320: при 150 %
+ * круг перекрывал подпись «Осталось» на 148px и плашку статуса на 22px, при
+ * 300 % выходил за окно на 429px сверху и снизу. Раскладку это не чинит (у
+ * подписи сверху и плашки снизу своих запасов нет), поэтому ограничивается
+ * масштаб — и ограничивается по САМОЙ ТЕСНОЙ стороне: наезжает ведь она.
+ *
+ * Блок растёт от ЦЕНТРА, поэтому по каждой стороне помещается вдвое больше,
+ * чем расстояние от центра до границы: половина блока приходится на эту
+ * сторону.
+ *
+ * Уменьшение не ограничивается никогда: оно ни на что не наезжает.
+ *
+ * Мусор на входе возвращает ЗАПРОШЕННОЕ значение, а не 0: замер мог не
+ * состояться (окно ещё не разложено), и схлопнуть таймер в точку — худший из
+ * возможных ответов.
+ *
+ * @param {{width: number, height: number, centerX: number, centerY: number,
+ *          free: {left: number, right: number, top: number, bottom: number},
+ *          requested: number}} p
+ * @returns {number} проценты
+ */
+function fitBlockScale(p) {
+    const opts = p || {};
+    const requested = Number(opts.requested);
+    if (!Number.isFinite(requested)) { return 100; }
+    if (requested <= 100) { return requested; }
+
+    const width = Number(opts.width);
+    const height = Number(opts.height);
+    const free = opts.free;
+    if (!(width > 0) || !(height > 0) || !free) { return requested; }
+
+    const sides = [
+        (Number(opts.centerX) - Number(free.left)) / (width / 2),
+        (Number(free.right) - Number(opts.centerX)) / (width / 2),
+        (Number(opts.centerY) - Number(free.top)) / (height / 2),
+        (Number(free.bottom) - Number(opts.centerY)) / (height / 2)
+    ];
+    if (!sides.every(Number.isFinite)) { return requested; }
+
+    const ceiling = Math.min(...sides) * 100;
+    if (!Number.isFinite(ceiling)) { return requested; }
+    // Ниже 100 % потолок не опускаем: место под НЕувеличенный блок отводит
+    // раскладка, и спорить с ней здесь не о чем.
+    return Math.max(100, Math.min(requested, Math.floor(ceiling)));
+}
+
+// ---------------------------------------------------------------------------
 // timerLifecycleStatus(state) → 'paused' | 'overtime' | 'finished' | 'running' | 'idle'
 // ---------------------------------------------------------------------------
 /**
@@ -362,6 +417,39 @@ function backgroundTone(bg) {
 }
 
 // ---------------------------------------------------------------------------
+// surfaceTone({ color, alpha, theme }) → 'light' | 'dark'
+// ---------------------------------------------------------------------------
+/**
+ * Тот же страж, что backgroundTone, но для окна, у которого ФОНА НЕТ ВОВСЕ.
+ *
+ * Виджет и часы лежат поверх чужого рабочего стола. Единственное, что там
+ * красится, — подложка стиля: пара «цвет + прозрачность» из панели. Значит и
+ * вход другой, а развилка та же — решает ЯРКОСТЬ того, что реально под
+ * цифрами, а тема выбирает фон по умолчанию.
+ *
+ * Прозрачность здесь не украшение, а условие применимости замера: сквозь
+ * подложку с alpha 0.2 видно обои пользователя, и «померить подложку» означало
+ * бы измерить не тот слой. У фотографии обоев одной яркости нет — гадать по
+ * ней хуже, чем вернуться к теме, ровно как backgroundTone поступает с
+ * картинкой на фоне дисплея. Порог 0.5: при нём подложка и стол вносят
+ * поровну, выше — подложка перевешивает.
+ *
+ * @param {{color?: string, alpha?: number, theme?: string}} surface
+ * @returns {'light'|'dark'} какой ФОН получился под цифрами
+ */
+function surfaceTone(surface) {
+    const s = surface || {};
+    const byTheme = s.theme === 'light' ? 'light' : 'dark';
+
+    const alpha = surfaceAlpha(s.alpha);
+    if (alpha !== null && alpha < 0.5) { return byTheme; }
+
+    const lum = relativeLuminance(typeof s.color === 'string' ? s.color : null);
+    if (lum === null) { return byTheme; }
+    return lum > 0.179 ? 'light' : 'dark';
+}
+
+// ---------------------------------------------------------------------------
 // surfacePaint({ color, alpha }) → строка для CSS или null
 // ---------------------------------------------------------------------------
 /**
@@ -477,18 +565,99 @@ function migrateTimerStyle(style) {
 }
 
 // ---------------------------------------------------------------------------
+// secondsUntilClock(nowSeconds, 'HH:MM') → секунды до этого времени сегодня
+// ---------------------------------------------------------------------------
+/**
+ * Сколько осталось до времени окончания мероприятия — для блока «До
+ * завершения» на дисплее.
+ *
+ * Величина НЕ связана с таймером доклада: тот отсчитывает заданную
+ * длительность, а эта — расстояние от системных часов до момента «Конец».
+ * На кадре у пользователя обе величины стоят рядом и расходятся между собой,
+ * поэтому считать одну из другой нельзя.
+ *
+ * Уже прошедшее время даёт НОЛЬ, а не перенос на следующие сутки: в 15:01
+ * после мероприятия, кончившегося в 15:00, «до завершения 23:59:00» — не
+ * ответ. Плата за это — мероприятие через полночь, у которого блок замрёт на
+ * нуле; для докладов и совещаний это редкий случай, а неверная подпись в
+ * обычном — ежедневный.
+ *
+ * @param {number} nowSeconds — секунды с начала суток
+ * @param {string} clock — 'HH:MM'
+ * @returns {number} секунды, не меньше нуля
+ */
+function secondsUntilClock(nowSeconds, clock) {
+    const now = Number(nowSeconds);
+    if (!Number.isFinite(now)) { return 0; }
+    if (typeof clock !== 'string') { return 0; }
+
+    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
+    if (!match) { return 0; }
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) { return 0; }
+
+    const target = hours * 3600 + minutes * 60;
+    return Math.max(0, target - now);
+}
+
+// ---------------------------------------------------------------------------
+// migrateDisplayBlocks(settings) → настройки с личными тумблерами блоков
+// ---------------------------------------------------------------------------
+/**
+ * Общий тумблер блоков дисплея (`showTimeBlocks`) заменён личным у каждого
+ * блока (17.08.2026).
+ *
+ * Почему заменён: с личными тумблерами общий даёт ДВА уровня состояния, где
+ * выключенный верхний делает вид, что нижние не работают. Ровно это уже было
+ * внутри самих блоков — «Текущее время» имело свою галочку, но гасилось общим
+ * тумблером, и её выключение при выключенных блоках ничего не меняло.
+ *
+ * Почему нужна функция: значения лежат в профиле пользователя
+ * (`displayExtSettings`). Без перевода профиль, где блоки были ВКЛЮЧЕНЫ,
+ * открылся бы пустым дисплеем: новых ключей в нём нет, а их умолчание —
+ * «выключено».
+ *
+ * Уже переведённый профиль не трогается: новый ключ, если он есть, главнее
+ * старого. Иначе выключенный уже в новой версии блок возвращался бы к жизни при
+ * каждом чтении, пока в профиле лежит старый `showTimeBlocks: true`.
+ *
+ * @param {object} settings
+ * @returns {object} копия с проставленными новыми ключами
+ */
+function migrateDisplayBlocks(settings) {
+    const out = Object.assign({}, settings || {});
+    if (out.showTimeBlocks === undefined) { return out; }
+
+    const blocksOn = out.showTimeBlocks === true;
+    // `showCurrentTime` — единственный ключ, чьё ИМЯ перевод пережило, а смысл
+    // сменило: был вторым уровнем поверх общего тумблера, стал личным тумблером
+    // блока. Поэтому он пересчитывается произведением, а не берётся как есть.
+    out.showCurrentTime = blocksOn && out.showCurrentTime !== false;
+    // У этих двух в старом профиле своего ключа не было вовсе. Если он есть —
+    // его записала новая версия, и она главнее старого общего тумблера.
+    if (out.showEventTime === undefined) { out.showEventTime = blocksOn; }
+    if (out.showEndTime === undefined) { out.showEndTime = blocksOn; }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 // Exports — dual pattern identical to utils.js
 // ---------------------------------------------------------------------------
 const RendererShared = {
     breakdown,
     flipCells,
     clampScale,
+    fitBlockScale,
+    secondsUntilClock,
+    migrateDisplayBlocks,
     timerLifecycleStatus,
     timerColorBand,
     pickOwnSetting,
     endsAt,
     relativeLuminance,
     backgroundTone,
+    surfaceTone,
     surfacePaint,
     surfaceSolid,
     surfaceAlpha,

@@ -620,6 +620,14 @@
                                 <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><rect x="7.5" y="7.5" width="6.5" height="6.5" rx="1.5"/></svg></span>
                                 Стиль таймера
                             </div>
+                            <!-- Подсказка стоит ПЕРВОЙ в настройках дисплея, а не в конце
+                                 группы «Блоки времени»: она описывает жесты, которыми
+                                 пользуются В САМОМ ОКНЕ, и прочесть её надо до того, как
+                                 полез крутить колесо, а не после. -->
+                            <div class="settings-hint" role="note">
+                                <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
+                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо над элементом — масштаб ЭТОГО элемента · <kbd>Ctrl</kbd>+колесо мимо всех — масштаб таймера · <kbd>Shift</kbd>+колесо — все блоки сразу · <kbd>Alt</kbd> — перетащить блок или закрыть его крестиком · <kbd>1</kbd>–<kbd>4</kbd> — пресеты, <kbd>Space</kbd> — старт/пауза, <kbd>R</kbd> — сброс</span>
+                            </div>
                             <!-- .setting-block по той же причине, что и у виджета. -->
                             <div class="setting-block">
                                 <span class="toggle-label">Стиль</span>
@@ -643,6 +651,13 @@
                                     <span id="displayTimerScaleValue" class="scale-value-text">100%</span>
                                 </div>
                             </div>
+                            <!-- Кнопки раскладок строит panel-display.js по реестру
+                                 display-layouts.js: перечень раскладок обязан жить в
+                                 ОДНОМ месте, здесь только точка монтирования. -->
+                            <div class="setting-block">
+                                <span class="toggle-label">Раскладка</span>
+                                <div class="layout-grid" id="displayLayoutGrid"></div>
+                            </div>
                             <div class="settings-divider"></div>
                             <div class="toggle-row">
                                 <span class="toggle-label">Монитор</span>
@@ -651,9 +666,16 @@
                                 </select>
                             </div>
                             <div class="toggle-row">
-                                <label class="toggle-label" for="showCurrentTime">Текущее время</label>
+                                <label class="toggle-label" for="showHeroLabel">Подпись над таймером</label>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="showCurrentTime" checked>
+                                    <input type="checkbox" id="showHeroLabel" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="showStatusPill">Плашка состояния</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showStatusPill" checked>
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
@@ -664,26 +686,41 @@
                                 Блоки времени
                             </div>
                             <div class="toggle-row">
-                                <label class="toggle-label" for="showTimeBlocks">Показывать блоки</label>
+                                <label class="toggle-label" for="showCurrentTime">Текущее время</label>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="showTimeBlocks">
+                                    <input type="checkbox" id="showCurrentTime">
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
-                            <div class="settings-hint" role="note">
-                                <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо — масштаб таймера · <kbd>Ctrl</kbd>+колесо над блоком — масштаб блока · <kbd>Alt</kbd>+перетащить блок — переместить</span>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="showEventTime">Начало</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showEventTime">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
-                            <div id="timeBlocksSettings" style="display: none;">
-                                <div class="toggle-row">
-                                    <span class="toggle-label">Расположение</span>
-                                    <select id="timeLayoutPreset" class="settings-select" aria-label="Пресет расположения блоков">
-                                        <option value="frame">Рамка</option>
-                                        <option value="top-line">Сверху</option>
-                                        <option value="bottom-line">Снизу</option>
-                                        <option value="corners">По углам</option>
-                                    </select>
-                                </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="showEndTime">Окончание</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showEndTime">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="showTimeLeft">До завершения</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showTimeLeft">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-label" for="showEventTitle">Название мероприятия</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="showEventTitle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div id="timeBlocksSettings">
                                 <div class="toggle-row">
                                     <span class="toggle-label">Размер блоков</span>
                                     <div class="scale-control">
@@ -698,6 +735,11 @@
                                 <div class="toggle-row">
                                     <span class="toggle-label">Конец</span>
                                     <input type="time" id="endTimeInput" class="settings-time-input" value="12:00" aria-label="Время окончания события">
+                                </div>
+                                <div class="toggle-row">
+                                    <label class="toggle-label" for="eventTitleInput">Название</label>
+                                    <input type="text" id="eventTitleInput" class="srow-input" maxlength="60"
+                                           placeholder="Оперативное совещание" aria-label="Название мероприятия">
                                 </div>
                             </div>
                         </div>
@@ -721,11 +763,20 @@
                             <div id="displayResetRow"></div>
                             <div class="settings-subtitle">Фон</div>
                             <div class="bg-mode-tabs">
-                                <button class="bg-mode-btn active" data-mode="solid">Заливка</button>
+                                <button class="bg-mode-btn active" data-mode="theme">По теме</button>
+                                <button class="bg-mode-btn" data-mode="solid">Заливка</button>
                                 <button class="bg-mode-btn" data-mode="gradient">Градиент</button>
                                 <button class="bg-mode-btn" data-mode="local">Файл</button>
                             </div>
-                            <div class="bg-controls active" id="bgSolidControls">
+                            <!-- У режима «По теме» контролов нет и быть не должно:
+                                 значения выбирает тема. Но контейнер обязан
+                                 существовать — переключение режимов ищет его по
+                                 id (`bg{Режим}Controls`), и на отсутствующем
+                                 элементе обработчик падал бы молча. -->
+                            <div class="bg-controls active" id="bgThemeControls">
+                                <div class="settings-hint">Светлый холст в светлой теме, тёмный — в тёмной.</div>
+                            </div>
+                            <div class="bg-controls" id="bgSolidControls">
                                 <input type="color" class="color-picker" id="bgSolidColor" value="#0f0c29" aria-label="Цвет сплошной заливки фона">
                             </div>
                             <div class="bg-controls" id="bgGradientControls">
@@ -891,10 +942,11 @@
                             <p>Таймер на весь экран — для презентаций, стримов и мероприятий. Настраивается на вкладке <strong>Дисплей</strong></p>
                             <ul>
                                 <li>Выбор монитора, если их несколько</li>
-                                <li><strong>Ctrl</strong> + колесо — масштаб таймера 30–300 %; то же над информационным блоком — масштаб блока</li>
-                                <li><strong>Shift</strong> + колесо — масштаб блоков времени 50–600 %</li>
-                                <li><strong>Alt</strong> + перетаскивание — переместить блок куда угодно; позиции сохраняются</li>
-                                <li>Блоки времени: текущее время, начало и конец мероприятия</li>
+                                <li><strong>Ctrl</strong> + колесо над элементом — масштаб ИМЕННО ЭТОГО элемента 50–600 %; мимо всех — масштаб таймера 30–300 %</li>
+                                <li><strong>Shift</strong> + колесо — масштаб всех блоков времени сразу</li>
+                                <li><strong>Alt</strong> + перетаскивание — переместить элемент куда угодно; позиции сохраняются. <strong>Alt</strong> + крестик — убрать его с экрана</li>
+                                <li><strong>Раскладка</strong> — пять готовых видов: «Классика», «Совещание», «Сцена», «Сводка», «Минимум». Кнопка расставляет элементы и подгоняет масштабы так, чтобы всё поместилось</li>
+                                <li>Элементы: текущее время, начало и окончание мероприятия, «до завершения», название, подпись над таймером и плашка состояния</li>
                                 <li>Горячие клавиши: <strong>D</strong> — открыть / закрыть, <strong>Esc</strong> — закрыть все окна</li>
                             </ul>
                         </div>
@@ -1005,9 +1057,9 @@
                         <div class="faq-answer">
                             <div class="faq-shortcuts">
                                 <div class="shortcut"><span class="key">Ctrl</span> + колесо <span class="shortcut-desc">Виджет и часы — масштаб 30–600 %</span></div>
-                                <div class="shortcut"><span class="key">Ctrl</span> + колесо <span class="shortcut-desc">Полноэкранный — масштаб таймера 30–300 %, над блоком — масштаб блока</span></div>
-                                <div class="shortcut"><span class="key">Shift</span> + колесо <span class="shortcut-desc">Полноэкранный — масштаб блоков 50–600 %</span></div>
-                                <div class="shortcut"><span class="key">Alt</span> + перетаскивание <span class="shortcut-desc">Полноэкранный — переместить блок времени</span></div>
+                                <div class="shortcut"><span class="key">Ctrl</span> + колесо <span class="shortcut-desc">Полноэкранный — над элементом его масштаб 50–600 %, мимо всех — таймер 30–300 %</span></div>
+                                <div class="shortcut"><span class="key">Shift</span> + колесо <span class="shortcut-desc">Полноэкранный — все блоки времени сразу</span></div>
+                                <div class="shortcut"><span class="key">Alt</span> + перетаскивание <span class="shortcut-desc">Полноэкранный — переместить элемент (крестик — убрать)</span></div>
                             </div>
                             <p>Перетаскивание без модификаторов перемещает само окно виджета или часов.</p>
                         </div>
@@ -1067,6 +1119,7 @@
     <script src="font-select.js"></script>
     <script src="settings-schema.js"></script>
     <script src="clock-settings-schema.js"></script>
+    <script src="display-layouts.js"></script>
     <script src="sound-bank.js"></script>
     <script src="ui-feedback.js"></script>
     <script src="scale-input.js"></script>
@@ -1080,6 +1133,7 @@
     <script src="local-background.js"></script>
     <script src="theme-grid.js"></script>
     <script src="panel-colors.js"></script>
+    <script src="panel-display.js"></script>
     <script src="panel-reset.js"></script>
 
     <script>
@@ -1118,7 +1172,7 @@
                 this.inputMode = false;
                 this.lastUpdateCounter = -1;
                 this.wasFinished = false;
-                this.currentBgMode = 'solid';
+                this.currentBgMode = 'theme';
                 // Stored handler refs for cleanup
                 this._handlers = {};
 
@@ -1179,10 +1233,8 @@
                 
                 // Настройки полноэкранного режима
                 this.displaySelectEl = document.getElementById('displaySelect');
-                this.showCurrentTimeEl = document.getElementById('showCurrentTime');
-                this.showTimeBlocksEl = document.getElementById('showTimeBlocks');
-                this.timeLayoutPresetEl = document.getElementById('timeLayoutPreset');
                 this.eventTimeInputEl = document.getElementById('eventTimeInput');
+                this.eventTitleInputEl = document.getElementById('eventTitleInput');
                 this.endTimeInputEl = document.getElementById('endTimeInput');
                 this.timeBlocksScaleEl = document.getElementById('timeBlocksScale');
                 this.timeBlocksScaleValueEl = document.getElementById('timeBlocksScaleValue');
@@ -1246,9 +1298,6 @@
                 // Синхронизация стиля часов. ВЫКЛЮЧЕНА по умолчанию — то же
                 // значение стоит строкой в settings-schema.js.
                 this.syncClockStyle = false;
-                
-                // Пресет расположения по умолчанию - "Рамка"
-                this.timeLayoutPreset = 'frame';
             }
 
             initSettingsDrawer() {
@@ -1637,23 +1686,10 @@
                     this.pushOverrunLimit();
                 });
 
-                // Настройка текущего времени
-                this.showCurrentTimeEl.addEventListener('change', () => this.pushDisplaySettings());
-
-                // Настройки блоков времени
-                this.showTimeBlocksEl.addEventListener('change', () => {
-                    const show = this.showTimeBlocksEl.checked;
-                    document.getElementById('timeBlocksSettings').style.display = show ? 'block' : 'none';
-                    this.pushDisplaySettings();
-                });
-                
-                this.timeLayoutPresetEl.addEventListener('change', () => {
-                    this.timeLayoutPreset = this.timeLayoutPresetEl.value;
-                    this.pushDisplaySettings();
-                });
-                
-                this.eventTimeInputEl.addEventListener('change', () => this.pushDisplaySettings());
-                this.endTimeInputEl.addEventListener('change', () => this.pushDisplaySettings());
+                // Тумблеры блоков, поля времени и название — panel-display.js.
+                this.bindDisplayBlockControls();
+                // Кнопки готовых раскладок — оттуда же.
+                this.bindDisplayLayouts();
                 
                 this.timeBlocksScaleEl.addEventListener('input', () => {
                     this.timeBlocksScaleValueEl.textContent = this.timeBlocksScaleEl.value + '%';
@@ -1814,6 +1850,11 @@
                         document.getElementById('bgSolidColor').value = '#0f0c29';
                         document.getElementById('bgGrad1').value = '#0f0c29';
                         document.getElementById('bgGrad2').value = '#302b63';
+                        // «По умолчанию» — это то, что стоит на чистом профиле,
+                        // а там теперь «По теме». Кнопка, возвращающая не то же
+                        // самое, что новая установка, — это две разные правды.
+                        const themeModeBtn = document.querySelector('.bg-mode-btn[data-mode="theme"]');
+                        if (themeModeBtn) { themeModeBtn.click(); }
                         // FIX BUG-023: Optimize - clear active button reference
                         if (this.activeThemeButton) {
                             this.activeThemeButton.classList.remove('active');
@@ -1905,7 +1946,13 @@
                 }
 
                 // Загрузка расширенных настроек
-                const ext = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
+                // Профиль прежней версии: общий тумблер блоков переводится в
+                // личные ДО раскладки по контролам, иначе дисплей, у которого
+                // блоки были включены, откроется пустым — новых ключей в таком
+                // профиле нет, а их умолчание «выключено».
+                const ext = window.RendererShared.migrateDisplayBlocks(
+                    safeJSONParse(localStorage.getItem('displayExtSettings'), {})
+                );
 
                 // Значения раскладывает таблица (settings-schema.js): ключ, контрол
                 // и значение по умолчанию описаны там ОДИН раз — и для загрузки, и
@@ -1951,7 +1998,13 @@
 
                 // Режим фона — не поле ввода, а три кнопки (image-по-URL удалён,
                 // legacy-значения маппим в solid).
-                let bgMode = ext.bgMode || 'solid';
+                // Умолчание — «По теме» (18.08.2026). Раньше здесь стояла
+                // тёмная ЗАЛИВКА, то есть на чистом профиле дисплей был тёмным
+                // в любой теме, и светлая тема окна существовала, но добраться
+                // до неё можно было только выбрав светлый цвет руками.
+                // Профили, где фон уже настраивали, значение хранят и его же и
+                // получат: saveExtSettings пишет bgMode всегда.
+                let bgMode = ext.bgMode || 'theme';
                 if (bgMode === 'image') { bgMode = 'solid'; }
                 this.currentBgMode = bgMode;
                 document.querySelectorAll('.bg-mode-btn').forEach(b => {
@@ -1960,9 +2013,6 @@
                 document.querySelectorAll('.bg-controls').forEach(c => c.classList.remove('active'));
                 document.getElementById(`bg${this.capitalize(bgMode)}Controls`).classList.add('active');
 
-                // Блоки времени: строка настроек видна только при включённых блоках.
-                document.getElementById('timeBlocksSettings').style.display = applied.showTimeBlocks ? 'block' : 'none';
-                this.timeLayoutPreset = applied.timeLayoutPreset;
 
                 // Синхронизация: переключатель часов показывает стиль виджета.
                 // Присваивание лечит и профили прежней версии, где в хранилище
@@ -2084,47 +2134,6 @@
                 });
             }
 
-            pushDisplaySettings() {
-                this.saveExtSettings();
-                
-                // Получаем локальный фон и его настройки
-                const localBgImage = localStorage.getItem('localBgImage') || '';
-                const localBgSettings = safeJSONParse(localStorage.getItem('localBgSettings'), {});
-                
-                const settings = {
-                    clockStyle: this.syncClockStyle ? this.timerStyleEl.value : (this.clockStyleEl ? this.clockStyleEl.value : 'circle'),
-                    bgMode: this.currentBgMode,
-                    bgSolid: document.getElementById('bgSolidColor').value,
-                    bgGrad1: document.getElementById('bgGrad1').value,
-                    bgGrad2: document.getElementById('bgGrad2').value,
-                    // Локальный фон
-                    bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
-                    bgLocalFit: localBgSettings.fit || 'cover',
-                    bgLocalOverlay: localBgSettings.overlay || 30,
-                    // Текущее время
-                    showCurrentTime: this.showCurrentTimeEl.checked,
-                    // Настройки блоков времени
-                    showTimeBlocks: this.showTimeBlocksEl.checked,
-                    timeLayoutPreset: this.timeLayoutPreset,
-                    eventTime: this.eventTimeInputEl.value,
-                    endTime: this.endTimeInputEl.value,
-                    timeBlocksScale: parseInt(this.timeBlocksScaleEl.value),
-                    // Стиль и масштаб полноэкранного режима идут ПОД СВОИМИ
-                    // именами. Общие `timerStyle`/`timerScale` остаются рядом:
-                    // на них опирается откат на предыдущую версию приложения и
-                    // существующие e2e-спеки, которые шлют голое общее имя.
-                    // В localStorage под общим именем лежит стиль ВИДЖЕТА
-                    // (settings-schema.js, alsoWrite), поэтому дисплей выбирает
-                    // своё имя первым — см. pickDisplaySetting в display-script.js.
-                    displayTimerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
-                    displayTimerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
-                    timerStyle: this.displayTimerStyleEl ? this.displayTimerStyleEl.value : this.timerStyleEl.value,
-                    timerScale: this.displayTimerScaleEl ? parseInt(this.displayTimerScaleEl.value) : parseInt(this.timerScaleEl.value),
-                    // Шрифт стиля «Цифры» дисплея — своё имя, свой список (Task 7).
-                    displayDigitsFont: this.displayDigitsFontEl ? this.displayDigitsFontEl.value : 'inter'
-                };
-                ipcRenderer.send('display-settings-update', settings);
-            }
 
             updateClockAnalogNumbersVisibility() {
                 // Определяем текущий стиль часов
@@ -2316,6 +2325,13 @@
                 };
                 ipcRenderer.on('scale-report', this._onScaleReport);
 
+                // Блок дисплея закрыли крестиком прямо в окне. Панель — владелец
+                // настроек, поэтому снимает тумблер у себя и рассылает настройки:
+                // иначе состояние жило бы в двух местах и разошлось бы при первом
+                // же переоткрытии дисплея.
+                this._onBlockHidden = (_event, payload) => this.onDisplayBlockHidden(payload);
+                ipcRenderer.on('block-hidden', this._onBlockHidden);
+
                 this._onTimerMinute = () => {
                     if (this.soundMinuteEl.checked) {
                         this.playSound('minute');
@@ -2366,6 +2382,7 @@
                 if (this._onTimerReachedZero) {ipcRenderer.removeListener('timer-reached-zero', this._onTimerReachedZero);}
                 if (this._onTimerOverrun) {ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);}
                 if (this._onScaleReport) {ipcRenderer.removeListener('scale-report', this._onScaleReport);}
+                if (this._onBlockHidden) {ipcRenderer.removeListener('block-hidden', this._onBlockHidden);}
                 if (this._onRecoveryAvailable) {ipcRenderer.removeListener('timer-recovery-available', this._onRecoveryAvailable);}
 
                 // Удаляем глобальные DOM и IPC handlers из _handlers
@@ -2679,6 +2696,8 @@
         Object.assign(TimerController.prototype, window.ThemeGridMixin);
         Object.assign(TimerController.prototype, window.PanelStateMixin);
         Object.assign(TimerController.prototype, window.PanelColorsMixin);
+        // Настройки дисплея: сборка payload, тумблеры блоков, приём «закрыли крестиком».
+        Object.assign(TimerController.prototype, window.PanelDisplayMixin);
         Object.assign(TimerController.prototype, window.PanelResetMixin);
 
         window.timerController = new TimerController();

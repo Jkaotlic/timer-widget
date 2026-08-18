@@ -157,7 +157,11 @@ const CONFIG = {
         CLOCK_SHOW_TICKS: 'clockShowTicks',
         // Полноэкранный режим: масштабы и позиции info-блоков
         DISPLAY_TIMER_SCALE: 'displayTimerScale',
+        // Общий масштаб карточек. Ключ ОСТАЁТСЯ: у каждого элемента теперь свой
+        // масштаб (DISPLAY_BLOCK_SCALES), а этот читается как запасной — профиль,
+        // переживший обновление, обязан открыться прежним.
         DISPLAY_BLOCK_SCALE: 'displayBlockScale',
+        DISPLAY_BLOCK_SCALES: 'displayBlockScales',
         DISPLAY_BLOCK_POSITIONS: 'displayBlockPositions',
         SELECTED_DISPLAY: 'selectedDisplay',
         // Фон полноэкранного режима

@@ -119,6 +119,87 @@ test('поля рамки в CSS совпадают с теми, по котор
     }
 });
 
+// ---------------------------------------------------------------------------
+// Вертикаль знака
+// ---------------------------------------------------------------------------
+// Знак центрируется по своему БОКСУ, а видно чернила. Насколько центр чернил
+// отстоит от центра бокса, решает шрифт: у Playfair Display минус сидит высоко,
+// и знак уезжал вверх на 0.119 кегля (замер 17.08.2026, жалоба пользователя).
+// У остальных пяти шрифтов расхождение того же происхождения, только мельче:
+// от −0.061 (Inter, знак НИЖЕ середины) до +0.027.
+test('inkCenterOffset: центр чернил ниже центра бокса на полуразность метрик', () => {
+    // Восходящая 80, нисходящая 20 → центр бокса на 30 ниже базовой линии.
+    // Чернила от 70 над линией до 0 под ней → их центр на 35 ВЫШЕ линии.
+    // Значит центр чернил на 65 выше центра бокса.
+    const offset = DigitsStyle.inkCenterOffset({
+        fontBoundingBoxAscent: 80, fontBoundingBoxDescent: 20,
+        actualBoundingBoxAscent: 70, actualBoundingBoxDescent: 0
+    });
+    assert.equal(offset, 30 - 35);
+});
+
+test('signShiftRatio: сдвиг — разность двух смещений, в долях кегля цифр', () => {
+    const digits = {
+        fontBoundingBoxAscent: 80, fontBoundingBoxDescent: 20,
+        actualBoundingBoxAscent: 70, actualBoundingBoxDescent: 0
+    };
+    // Тот же шрифт вдвое мельче: все метрики вдвое меньше.
+    const sign = {
+        fontBoundingBoxAscent: 40, fontBoundingBoxDescent: 10,
+        actualBoundingBoxAscent: 35, actualBoundingBoxDescent: 0
+    };
+    // Смещения: −5 у цифр, −2.5 у знака. Знак надо опустить на 2.5.
+    assert.equal(DigitsStyle.signShiftRatio(digits, sign, 100), -0.025);
+});
+
+test('signShiftRatio: мусор даёт 0, а не NaN — иначе знак уезжает из окна', () => {
+    // Тот же закон, что у fitScale: NaN в transform не сдвигает, а ломает
+    // раскладку молча.
+    const ok = {
+        fontBoundingBoxAscent: 80, fontBoundingBoxDescent: 20,
+        actualBoundingBoxAscent: 70, actualBoundingBoxDescent: 0
+    };
+    for (const [d, s, size] of [
+        [null, ok, 100], [ok, null, 100], [ok, ok, 0], [ok, ok, NaN], [{}, ok, 100], [ok, {}, 100]
+    ]) {
+        const value = DigitsStyle.signShiftRatio(d, s, size);
+        assert.equal(value, 0, `ожидался 0, получено ${value}`);
+    }
+});
+
+test('посадка знака минуса в CSS совпадает с той, по которой считается запас', () => {
+    // Знак стоит абсолютом от ПАДДИНГ-бокса рамки, поэтому к зазору
+    // прибавляется её левое поле — его надо вычесть, иначе минус отъезжает от
+    // числа на FRAME_PAD_X_EM (замер 17.08.2026: 0.40 кегля вместо 0.10, знак
+    // целиком снаружи рамки и обрезан краем окна). Деление на SIGN_FONT_RATIO
+    // переводит обе величины из кегля цифр в собственный кегль знака: `em` в
+    // свойствах знака считается от него.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const expected = `margin-right: calc((${DigitsStyle.SIGN_GAP_EM}em - ${DigitsStyle.FRAME_PAD_X_EM}em) / ${DigitsStyle.SIGN_FONT_RATIO})`;
+    for (const [file, selector] of [
+        ['electron-widget.html', '.widget-digits-sign'],
+        ['display.css', '.digits-sign']
+    ]) {
+        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const rule = src.match(new RegExp(`^\\s*\\${selector} \\{[^}]*\\}`, 'm'));
+        assert.ok(rule, `${file}: не найдено правило ${selector}`);
+        assert.ok(
+            rule[0].includes(expected),
+            `${file}: посадка знака ${selector} разошлась с подгонкой (${expected})`
+        );
+        // Старая запись возвращает свес: она НЕ вычитает поле рамки.
+        const oldForm = /margin-right:\s*0\.1em/;
+        // Проверка проверки: зелёное «чисто» и зелёное «регулярка не работает»
+        // выглядят одинаково, поэтому регулярка обязана ловить образец.
+        assert.ok(oldForm.test('margin-right: 0.1em;'), 'регулярка старой записи не ловит образец');
+        assert.ok(
+            !oldForm.test(rule[0]),
+            `${file}: в ${selector} вернулся зазор без вычета поля рамки`
+        );
+    }
+});
+
 test('fitScale: нулевые и мусорные размеры дают 0, а не Infinity и не NaN', () => {
     const bad = [
         { availableWidth: 0, availableHeight: 100, probeWidth: 10, probeHeight: 10 },
@@ -208,6 +289,42 @@ test('measureDigits: повторный вызов с тем же (шрифт, �
         probe.rectCalls, callsAfterFirst,
         'повторный вызов с тем же (шрифт, эталон) не должен трогать DOM — обязан быть кэш-хит'
     );
+});
+
+test('замер НЕ кэшируется, пока woff2 не доехал (CRITICAL)', () => {
+    // Замер с ЗАПАСНОГО начертания неотличим от настоящего по «ширина > 0» —
+    // именно так чужие метрики Georgia оседали в кэше на всю сессию, стоило
+    // переключить шрифт после старта: `document.fonts.ready` разрешился один раз
+    // и о новом шрифте не знал. Проверка проверяет и себя: сначала показывает,
+    // что при загруженном шрифте кэш ЕСТЬ, иначе зелёный ничего не значил бы.
+    const fakeDoc = (loaded) => ({
+        fonts: { check: () => loaded },
+        createElement: () => ({ getContext: () => null })
+    });
+    const original = global.document;
+    try {
+        global.document = fakeDoc(true);
+        clearProbeCache();
+        const probeLoaded = makeFakeProbe();
+        measureDigits(probeLoaded, 'playfair', '88:88');
+        const afterFirst = probeLoaded.rectCalls;
+        measureDigits(probeLoaded, 'playfair', '88:88');
+        assert.equal(probeLoaded.rectCalls, afterFirst, 'загруженный шрифт обязан кэшироваться');
+
+        global.document = fakeDoc(false);
+        clearProbeCache();
+        const probeCold = makeFakeProbe();
+        measureDigits(probeCold, 'playfair', '88:88');
+        const coldFirst = probeCold.rectCalls;
+        measureDigits(probeCold, 'playfair', '88:88');
+        assert.ok(
+            probeCold.rectCalls > coldFirst,
+            'замер незагруженного шрифта обязан делаться заново, а не оседать в кэше'
+        );
+    } finally {
+        if (original === undefined) { delete global.document; } else { global.document = original; }
+        clearProbeCache();
+    }
 });
 
 test('measureDigits: кэш различает эталоны по ТЕКСТУ, а не только по шрифту (CRITICAL)', () => {

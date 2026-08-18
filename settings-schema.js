@@ -36,6 +36,23 @@
 // Таблица
 // ---------------------------------------------------------------------------
 /**
+ * Тумблеры полноэкранного окна: пять БЛОКОВ и две ПОДПИСИ.
+ *
+ * Список живёт здесь, а не рядом с проводкой, потому что нужен в трёх местах и
+ * в двух процессах: панель по нему навешивает обработчики и собирает payload
+ * (panel-display.js), а главный процесс проверяет по нему имя блока, пришедшее
+ * из окна при закрытии крестиком. Три копии одного перечня — это ровно тот
+ * дефект, ради которого написан этот файл.
+ *
+ * Ключ совпадает с id контрола, как во всей таблице ниже; что каждый из них в
+ * таблице ОПИСАН, проверяет tests/settings-schema.test.js.
+ */
+const DISPLAY_BLOCK_KEYS = [
+    'showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle'
+];
+const DISPLAY_LABEL_KEYS = ['showHeroLabel', 'showStatusPill'];
+
+/**
  * Поля строки:
  *   key      — ключ в `displayExtSettings`;
  *   el       — id контрола;
@@ -82,12 +99,24 @@ const SETTINGS_DESCRIPTORS = [
     { key: 'bgGrad1', el: 'bgGrad1', kind: 'value', def: '#0f0c29', owner: 'display' },
     { key: 'bgGrad2', el: 'bgGrad2', kind: 'value', def: '#302b63', owner: 'display' },
 
-    // --- блоки времени на полноэкранном ---
-    { key: 'showCurrentTime', el: 'showCurrentTime', kind: 'checkbox', def: true, owner: 'display' },
-    { key: 'showTimeBlocks', el: 'showTimeBlocks', kind: 'checkbox', def: false, owner: 'display' },
-    { key: 'timeLayoutPreset', el: 'timeLayoutPreset', kind: 'value', def: 'frame', owner: 'display' },
+    // --- блоки на полноэкранном ---
+    // У КАЖДОГО блока свой тумблер. Общий `showTimeBlocks` и пресет
+    // `timeLayoutPreset` удалены 17.08.2026: общий тумблер поверх личных давал
+    // два уровня состояния (см. RendererShared.migrateDisplayBlocks — там же
+    // перевод старых профилей), а расположение задаётся перетаскиванием, и
+    // список из четырёх пресетов только спорил с ним.
+    //
+    // Умолчание «выключено» у всех: прежде блоки были выключены общим
+    // тумблером (`showTimeBlocks: def false`), и включённое «Текущее время»
+    // (`def: true`) на пустом профиле всё равно ничего не показывало.
+    { key: 'showCurrentTime', el: 'showCurrentTime', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'showEventTime', el: 'showEventTime', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'showEndTime', el: 'showEndTime', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'showEventTitle', el: 'showEventTitle', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'showTimeLeft', el: 'showTimeLeft', kind: 'checkbox', def: false, owner: 'display' },
     { key: 'eventTime', el: 'eventTimeInput', kind: 'value', def: '10:00', owner: 'display' },
     { key: 'endTime', el: 'endTimeInput', kind: 'value', def: '12:00', owner: 'display' },
+    { key: 'eventTitle', el: 'eventTitleInput', kind: 'value', def: '', owner: 'display' },
     {
         key: 'timeBlocksScale', el: 'timeBlocksScale', kind: 'value', def: 100,
         label: 'timeBlocksScaleValue', numeric: true, owner: 'display'
@@ -131,6 +160,12 @@ const SETTINGS_DESCRIPTORS = [
     // и стоило отдельного бага, где дисплей рисовал стиль виджета.
     { key: 'widgetDigitsFont', el: 'widgetDigitsFont', kind: 'value', def: 'inter', owner: 'widget' },
     { key: 'displayDigitsFont', el: 'displayDigitsFont', kind: 'value', def: 'inter', owner: 'display' },
+    // Подпись над таймером («Осталось» / «Сверх времени») и плашка состояния
+    // («Перерасход времени») — два отдельных тумблера. Скрывают ВСЕГДА, а не
+    // только в перерасходе: элемент, который то есть, то нет, читается как сбой,
+    // а не как настройка. По умолчанию включены — это прежний вид дисплея.
+    { key: 'showHeroLabel', el: 'showHeroLabel', kind: 'checkbox', def: true, owner: 'display' },
+    { key: 'showStatusPill', el: 'showStatusPill', kind: 'checkbox', def: true, owner: 'display' },
     { key: 'clockDigitsFont', el: 'clockDigitsFont', kind: 'value', def: 'inter', owner: 'clock' }
 ];
 
@@ -289,6 +324,8 @@ function resetOwnedSettings(owner, doc) {
 
 const SettingsSchema = {
     SETTINGS_DESCRIPTORS,
+    DISPLAY_BLOCK_KEYS,
+    DISPLAY_LABEL_KEYS,
     MANUAL_KEYS,
     settingValue,
     applyStoredSettings,

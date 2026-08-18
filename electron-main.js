@@ -1446,6 +1446,38 @@ ipcMain.on('report-scale', (_event, payload) => {
     safelySendToWindow(controlWindow, 'scale-report', { source, scalePct });
 });
 
+// Блок дисплея закрыт крестиком прямо в окне. Пересылается ТОЛЬКО в панель — она
+// владелец настроек: снимет тумблер и разошлёт настройки обратно. Имя блока
+// проверяется по списку, как источник у report-scale: значение идёт из рендерера
+// и попадает в поиск элемента по id.
+// Список — из таблицы настроек: он же используется в панели для проводки и
+// сборки payload. Своя копия здесь означала бы, что новый блок надо не забыть
+// в двух процессах. Подписи (`DISPLAY_LABEL_KEYS`) тоже здесь: у них такой же
+// крестик, как у блоков.
+const DISPLAY_SCHEMA = require('./settings-schema');
+const DISPLAY_BLOCK_TOGGLES = new Set(
+    DISPLAY_SCHEMA.DISPLAY_BLOCK_KEYS.concat(DISPLAY_SCHEMA.DISPLAY_LABEL_KEYS)
+);
+ipcMain.on('display-block-hidden', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { block } = payload;
+    if (typeof block !== 'string' || !DISPLAY_BLOCK_TOGGLES.has(block)) { return; }
+    safelySendToWindow(controlWindow, 'block-hidden', { block });
+});
+
+// Готовая раскладка дисплея. Имя проверяется по тому же реестру, что и в
+// рендерерах: пришедшее из окна значение уходит в `classList` и в разбор
+// раскладки, и принимать здесь произвольную строку незачем.
+// Ответ НЕ запоминается в lastDisplaySettings намеренно — это действие, а не
+// состояние: досланное при открытии окна, оно затирало бы перетаскивания.
+const DISPLAY_LAYOUT_IDS = new Set(require('./display-layouts').LAYOUT_IDS);
+ipcMain.on('display-layout', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const { layout } = payload;
+    if (typeof layout !== 'string' || !DISPLAY_LAYOUT_IDS.has(layout)) { return; }
+    safelySendToWindow(displayWindow, 'display-layout', { layout });
+});
+
 // Тема интерфейса. Переключается только из панели, но применяется во ВСЕХ окнах,
 // поэтому здесь именно рассылка, а не адресная отправка (в отличие от цветов,
 // которые у каждого окна свои и разослать их всем нельзя).

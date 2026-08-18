@@ -34,7 +34,14 @@ const { launchApp } = require('./launch');
 
 // Блок LED (#timerDigital) ушёл вместе со стилем: он слит с «Цифрами».
 const BLOCK_IDS = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits'];
-const RESTORE_SCALE_PCT = 200;
+// Значения ниже ПОТОЛКА по свободному месту (17.08.2026): масштаб, который не
+// помещается между подписью и плашкой статуса, теперь обрезается — см.
+// отдельный тест ниже и RendererShared.fitBlockScale. Здесь проверяется не
+// потолок, а доставка значения во все четыре блока, поэтому величины взяты
+// заведомо влезающие. Прежние 150/200 сюда больше не годятся: на кольце они
+// обрезаются до ~142 %, и тест мерил бы потолок, а не доставку.
+const PUSH_SCALE_PCT = 120;
+const RESTORE_SCALE_PCT = 130;
 const DEFAULT_SCALE_PCT = 100;
 
 function readScales(ids) {
@@ -87,14 +94,15 @@ test('масштаб дисплея применяется ко всем бло�
 
         // Точка входа 1: приход настроек от панели.
         await display.evaluate(() => window.ipcRenderer.send('get-timer-state'));
-        await control.evaluate(() => {
-            window.ipcRenderer.send('display-settings-update', { displayTimerScale: 150 });
-        });
+        await control.evaluate((pct) => {
+            window.ipcRenderer.send('display-settings-update', { displayTimerScale: pct });
+        }, PUSH_SCALE_PCT);
         await display.waitForTimeout(500);
 
         const afterPush = await display.evaluate(readScales, BLOCK_IDS);
         for (const id of BLOCK_IDS) {
-            expect(afterPush[id], `${id} должен быть отмасштабирован приходом настроек`).toContain('scale(1.5)');
+            expect(afterPush[id], `${id} должен быть отмасштабирован приходом настроек`)
+                .toContain(`scale(${PUSH_SCALE_PCT / 100})`);
         }
 
         // Точка входа 2: Ctrl+колесо.
@@ -176,6 +184,88 @@ test('масштаб дисплея применяется ко всем бло�
             expect(settled[id], `${id} должен остаться отмасштабированным после полной загрузки`)
                 .toContain(`scale(${RESTORE_SCALE_PCT / 100})`);
         }
+    } finally {
+        await resetDisplayScale(display, DEFAULT_SCALE_PCT);
+        await app.close();
+    }
+});
+
+/**
+ * Потолок масштаба: увеличенный таймер остаётся ВНУТРИ окна и не наезжает на
+ * подпись «Осталось» и плашку статуса.
+ *
+ * Жалоба 17.08.2026: «при увеличении масштаба круг наезжает на осталось и
+ * готов к запуску и может уехать за пределы окна». Так и было: рост задаётся
+ * `transform: scale`, а трансформация в раскладке не участвует — соседи о новом
+ * размере не знают. Замер до правки на окне 3440×1320: 150 % — перекрытие
+ * подписи на 148px и плашки на 22px, 200 % — вылет за окно на 66px, 300 % — на
+ * 429px.
+ *
+ * Меряются ПРЯМОУГОЛЬНИКИ, а не значение transform: величина масштаба сама по
+ * себе ничего не обещает, а обещание тут геометрическое.
+ */
+test('масштаб дисплея не выпускает таймер за окно и не кладёт его на подпись', async () => {
+    const { app, control } = await launchApp();
+    let display = null;
+    try {
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await control.waitForTimeout(1500);
+        display = await findDisplay(app);
+        expect(display, 'полноэкранное окно должно открыться').not.toBeNull();
+
+        const measure = () => {
+            const active = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']
+                .map((id) => document.getElementById(id))
+                .find((el) => el && el.classList.contains('active'));
+            const box = active.getBoundingClientRect();
+            const label = document.getElementById('heroLabel').getBoundingClientRect();
+            const pill = document.querySelector('.status-pill').getBoundingClientRect();
+            return {
+                style: active.id,
+                transform: getComputedStyle(active).transform,
+                gapTop: Math.round(box.top - label.bottom),
+                gapBottom: Math.round(pill.top - box.bottom),
+                outTop: Math.round(-box.top),
+                outBottom: Math.round(box.bottom - window.innerHeight)
+            };
+        };
+
+        for (const style of ['circle', 'analog', 'digits', 'flip']) {
+            await control.evaluate(([s, pct]) => {
+                window.ipcRenderer.send('display-settings-update', { timerStyle: s, displayTimerScale: pct });
+            }, [style, 300]);
+            await display.waitForTimeout(700);
+
+            const m = await display.evaluate(measure);
+            console.log(`${style} при запрошенных 300% →`, JSON.stringify(m));
+
+            expect(m.gapTop, `${style}: таймер лёг на подпись «Осталось»`).toBeGreaterThanOrEqual(0);
+            expect(m.gapBottom, `${style}: таймер лёг на плашку статуса`).toBeGreaterThanOrEqual(0);
+            expect(m.outTop, `${style}: таймер вышел за верхний край окна`).toBeLessThanOrEqual(0);
+            expect(m.outBottom, `${style}: таймер вышел за нижний край окна`).toBeLessThanOrEqual(0);
+            // Проверка проверки: масштаб ВООБЩЕ применился. Без этого зелёный
+            // цвет значил бы и «обрезали правильно», и «масштаб не работает».
+            expect(m.transform, `${style}: масштаб не применился вовсе`).not.toBe('matrix(1, 0, 0, 1, 0, 0)');
+        }
+
+        // И ползунок панели узнаёт РЕАЛЬНОЕ значение, а не запрошенное:
+        // два источника правды здесь уже расходились.
+        //
+        // Сверяется КРУГ, и отдельным пушем: потолок у каждого стиля свой (у
+        // флипа блок низкий, ему 300 % помещаются целиком), поэтому сравнивать
+        // ползунок с хранилищем имеет смысл только после посылки, относящейся к
+        // одному стилю. Цикл выше гонял стили подряд напрямую по IPC, минуя
+        // ползунок, — там расхождение означает лишь «панель показывает ответ
+        // про предыдущий стиль».
+        await control.evaluate(() => {
+            window.ipcRenderer.send('display-settings-update', { timerStyle: 'circle', displayTimerScale: 300 });
+        });
+        await display.waitForTimeout(800);
+
+        const shown = await control.evaluate(() => Number(document.getElementById('displayTimerScale').value));
+        const applied = await display.evaluate(() => Number(localStorage.getItem('displayTimerScale')));
+        console.log(`ползунок ${shown} %, применено ${applied} %`);
+        expect(shown, 'ползунок обязан показывать применённый масштаб').toBe(applied);
     } finally {
         await resetDisplayScale(display, DEFAULT_SCALE_PCT);
         await app.close();

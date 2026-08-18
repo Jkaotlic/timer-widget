@@ -71,11 +71,20 @@ test('пустое хранилище даёт документированны�
     // Галочки, включённые по умолчанию.
     assert.equal(applied.soundMasterEnabled, true);
     assert.equal(applied.soundEndEnabled, true);
-    assert.equal(applied.showCurrentTime, true);
+    // Подписи дисплея включены — это его прежний вид.
+    assert.equal(applied.showHeroLabel, true);
+    assert.equal(applied.showStatusPill, true);
     // Галочки, выключенные по умолчанию.
     assert.equal(applied.allowNegative, false);
     assert.equal(applied.soundStartEnabled, false);
-    assert.equal(applied.showTimeBlocks, false);
+    // Блоки дисплея — каждый со своим тумблером, и все выключены (17.08.2026:
+    // прежде их гасил общий `showTimeBlocks`, и включённое «Текущее время» на
+    // пустом профиле всё равно ничего не показывало).
+    assert.equal(applied.showCurrentTime, false);
+    assert.equal(applied.showEventTime, false);
+    assert.equal(applied.showEndTime, false);
+    assert.equal(applied.showTimeLeft, false);
+    assert.equal(applied.showEventTitle, false);
     assert.equal(applied.syncClockStyle, false, 'синхронизация стиля часов по умолчанию ВЫКЛЮЧЕНА');
     // Значения.
     assert.equal(applied.soundOverrunPreset, 'triple');
@@ -223,15 +232,20 @@ test('круговой рейс: собранное раскладывается
     doc._get('endTimeInput').value = '18:45';
     doc._get('bgSolidColor').value = '#123456';
     doc._get('timeBlocksScale').value = '250';
-    doc._get('timeLayoutPreset').value = 'corners';
+    doc._get('eventTitleInput').value = 'Оперативное совещание';
     doc._get('soundEndPreset').value = 'gong';
     doc._get('overrunIntervalMinutes').value = '5';
     doc._get('allowNegative').checked = true;
     doc._get('soundEndEnabled').checked = false;
     doc._get('soundMasterEnabled').checked = false;
     doc._get('syncClockStyle').checked = true;
-    doc._get('showTimeBlocks').checked = true;
     doc._get('showCurrentTime').checked = false;
+    doc._get('showEventTime').checked = true;
+    doc._get('showEndTime').checked = true;
+    doc._get('showTimeLeft').checked = true;
+    doc._get('showEventTitle').checked = true;
+    doc._get('showHeroLabel').checked = false;
+    doc._get('showStatusPill').checked = false;
 
     const saved = collectSettings(doc);
     const fresh = fakeDoc();
@@ -295,8 +309,9 @@ test('панель не сохранила у себя вторую копию �
     assert.deepEqual(ladder, [], `в панели снова заведена лесенка дефолтов: ${ladder.join(', ')}`);
 
     // Ручные ключи — исключение, и оно ровно одно: bgMode читается лесенкой,
-    // потому что за ним стоят кнопки, а не поле ввода.
-    assert.match(inline, /ext\.bgMode \|\| 'solid'/);
+    // потому что за ним стоят кнопки, а не поле ввода. Умолчание с 18.08.2026 —
+    // 'theme': фон дисплея по умолчанию следует теме окна.
+    assert.match(inline, /ext\.bgMode \|\| 'theme'/);
 });
 
 test('шрифт цифр: три ключа, у каждого свой контрол и умолчание inter', () => {

@@ -20,7 +20,8 @@ const { launchApp } = require('./launch');
 
 const MARKERS = {
     clock: () => !!document.getElementById('wFlipSecGroup'),
-    widget: () => !!document.getElementById('wFlipHoursGroup')
+    widget: () => !!document.getElementById('wFlipHoursGroup'),
+    display: () => !!document.getElementById('progressRing')
 };
 
 async function findWindow(app, kind) {
@@ -91,6 +92,44 @@ test('деления включаются и выключаются у часо�
     expect(clockOff.groupDisplay, 'часы: деления должны скрыться').toBe('none');
 
     await app.close();
+});
+
+test('у кольца дисплея делений нет — как и у кольца виджета', async () => {
+    // Продолжение истории 13.08.2026: засечки убрали с кольца ВИДЖЕТА с
+    // обоснованием «это не циферблат, а доля произвольной длительности», а на
+    // полноэкранном кольце оставили — то есть решение применили к одному окну
+    // из двух. Пользователь 17.08.2026 сказал про них «непонятные деления».
+    // Проверяется ОТСУТСТВИЕ РАЗМЕТКИ, а не скрытие: спрятанная группа — это
+    // ровно первая половина той же истории, где контрол убрали, а мёртвый код
+    // остался.
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await control.waitForTimeout(2200);
+        const display = await findWindow(app, 'display');
+        expect(display, 'окно дисплея не найдено').not.toBeNull();
+
+        const state = await display.evaluate(() => ({
+            // Сама группа засечек кольца.
+            hasGroup: !!document.querySelector('.timer-svg .tick-marks'),
+            hasLines: document.querySelectorAll('.tick-line').length,
+            // Проверка проверки: кольцо на месте, то есть селекторы ищут в
+            // живом окне, а не в пустоте.
+            hasRing: !!document.getElementById('progressRing'),
+            // Циферблаты, где засечки ОСМЫСЛЕННЫ, не тронуты.
+            clockTicks: document.querySelectorAll('.clock-tick').length,
+            miniTicks: document.querySelectorAll('.mini-tick').length
+        }));
+        console.log('дисплей →', JSON.stringify(state));
+
+        expect(state.hasRing, 'кольцо дисплея должно быть в разметке').toBe(true);
+        expect(state.hasGroup, 'у кольца дисплея не должно остаться группы делений').toBe(false);
+        expect(state.hasLines, 'у кольца дисплея не должно остаться линий делений').toBe(0);
+        expect(state.clockTicks, 'засечки аналогового циферблата трогать было нельзя').toBeGreaterThan(0);
+        expect(state.miniTicks, 'засечки мини-часов в блоках трогать было нельзя').toBeGreaterThan(0);
+    } finally {
+        await app.close();
+    }
 });
 
 test('включённые деления переживают переоткрытие часов', async () => {

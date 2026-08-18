@@ -58,9 +58,16 @@ const PLAN = [
     { id: 'displayTimerStyle', kind: 'segmented', value: 'analog' },
     { id: 'displayTimerScale', kind: 'range', value: '180' },
     { id: 'displayDigitsFont', kind: 'fontselect', value: 'orbitron' },
+    // Блоки дисплея — по тумблеру на блок (17.08.2026: общий «Показывать блоки»
+    // и пресет расположения убраны, см. RendererShared.migrateDisplayBlocks).
     { id: 'showCurrentTime', kind: 'checkbox', value: false },
-    { id: 'showTimeBlocks', kind: 'checkbox', value: true },
-    { id: 'timeLayoutPreset', kind: 'select', value: 'corners' },
+    { id: 'showEventTime', kind: 'checkbox', value: true },
+    { id: 'showEndTime', kind: 'checkbox', value: true },
+    { id: 'showTimeLeft', kind: 'checkbox', value: true },
+    { id: 'showEventTitle', kind: 'checkbox', value: true },
+    { id: 'showHeroLabel', kind: 'checkbox', value: false },
+    { id: 'showStatusPill', kind: 'checkbox', value: false },
+    { id: 'eventTitleInput', kind: 'text', value: 'Оперативное совещание' },
     { id: 'timeBlocksScale', kind: 'range', value: '250' },
     { id: 'eventTimeInput', kind: 'text', value: '09:15' },
     { id: 'endTimeInput', kind: 'text', value: '18:45' },

@@ -130,6 +130,15 @@ test.describe('фон виджета и часов', () => {
         await control.waitForTimeout(1500);
         widget = await findWindow(app, 'electron-widget');
         expect(widget, 'окно виджета должно открыться').toBeTruthy();
+        // Весь этот describe меряет ТЁМНЫЙ тон, и это не удобство, а предмет:
+        // «у круга и „Цифр“ своей подложки нет» — правило редизайна 12.08.2026,
+        // и оно про светлые чернила на чужих обоях. С 18.08.2026 у окна два
+        // тона, и на СВЕТЛОМ подложка обязана быть (иначе тёмные цифры пропадают
+        // на тёмном рабочем столе — замер в e2e/style-tone.spec.js). Тема
+        // шлётся по IPC, а не кликом: клик пишет выбор в localStorage, а профиль
+        // e2e один на весь прогон.
+        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' }));
+        await widget.waitForTimeout(500);
         // Эталон подложки LED снимаем ДО первой покраски: сброс обязан вернуть
         // именно её, а не «прозрачный по умолчанию».
         await setStyle(control, 'digits');
@@ -147,6 +156,8 @@ test.describe('фон виджета и часов', () => {
 
     test.afterAll(async () => {
         // Профиль e2e общий на весь прогон: глобальное состояние возвращаем.
+        // Тема — тоже глобальное состояние, и умолчание приложения светлое.
+        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'light' })).catch(() => {});
         if (widget) {
             await widget.evaluate(() => {
                 localStorage.removeItem('timerColors');

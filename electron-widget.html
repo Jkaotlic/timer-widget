@@ -8,66 +8,25 @@
     <link rel="stylesheet" href="fonts.css">
     <link rel="stylesheet" href="design-tokens.css">
     <link rel="stylesheet" href="flip-card.css">
+    <link rel="stylesheet" href="surface-tones.css">
     <!-- Тема интерфейса ставится ДО первого кадра, поэтому скрипт в <head>, а не
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
     <script src="ui-theme.js"></script>
-    <script>window.UITheme.initTheme();</script>
+    <script>window.UITheme.initTheme(); window.UITheme.initTone();</script>
     <style>
-        /* ============ Светлая тема сюда НЕ приходит — и это осознанно ============
-           Фон этого окна красит ПОЛЬЗОВАТЕЛЬ: режим «Заливка / Градиент / Файл»
-           из вкладки «Полноэкранный» применяется инлайном, то есть поверх любой
-           темы. Значение по умолчанию тёмное (#0f0c29).
+        /* Палитра этого окна живёт в surface-tones.css.
 
-           Когда светлая тема переворачивала здесь текстовые токены, получалось
-           ровно то, ради чего темы и делаются наоборот: почти чёрные цифры на
-           тёмно-синем фоне. На панели это некрасиво, а на проекторе — время
-           нечитаемо вообще.
+           Здесь стоял ПИН «светлое по тёмному» под [data-theme="light"] — 40
+           строк перечисления, третья копия одного и того же набора (вторая — в
+           display.css, первая — светлая тема в design-tokens.css). Он означал
+           «виджет светлую тему не принимает», и просьба 18.08.2026 звучала
+           ровно наоборот: «чтобы вид тёмной и светлой темы отражался на виджет».
 
-           Поэтому окно, не владеющее своим фоном, оставляет палитру «светлое по
-           тёмному» в обеих темах. Окно часов фон держит само, поэтому оно за
-           темой следует и в светлой становится белым. */
-        [data-theme="light"] {
-            --tw-fg:            #ffffff;
-            --tw-fg-secondary:  rgba(255, 255, 255, 0.78);
-            --tw-fg-muted:      rgba(255, 255, 255, 0.58);
-            --tw-fg-dim:        rgba(255, 255, 255, 0.48);
-            --tw-fg-faint:      rgba(255, 255, 255, 0.1);
-            --tw-border:        rgba(255, 255, 255, 0.08);
-            --tw-border-strong: rgba(255, 255, 255, 0.14);
-            --tw-divider:       rgba(255, 255, 255, 0.06);
-            --tw-bg-timer:      rgba(15, 15, 25, 0.7);
-            --tw-bg-led:        rgba(10, 10, 15, 0.75);
-            --tw-bg-surface:    rgba(28, 28, 30, 0.72);
-            --tw-bg-glass:      rgba(20, 20, 35, 0.95);
-            --tw-overlay-light:  rgba(255, 255, 255, 0.05);
-            --tw-overlay-medium: rgba(255, 255, 255, 0.10);
-            --tw-on-accent:     #ffffff;
-            /* Шкала под дугой: окно не принимает светлую тему, поэтому токен
-               прибивается вместе с остальными. tests/contrast.test.js берёт
-               список используемых токенов грепом по файлу и упадёт на любом
-               неприбитом var(--tw-…). */
-            --tw-track:         rgba(255, 255, 255, 0.35);
-
-            /* Акценты прибиваются по той же причине, и это ровно тот случай,
-               когда «перечисление» подвело: до 2.4.2 здесь стояли только
-               текстовые токены, а акценты приходили из design-tokens.css, где
-               светлая тема специально ЗАТЕМНЯЕТ их под белый фон
-               (--tw-green: #12652f). Тёмный акцент на прибитом тёмном фоне —
-               статус «идёт» в LED-стиле 2.73:1 вместо 9.69:1, «пауза» 2.86:1.
-               Значения скопированы из :root, поэтому обе темы здесь совпадают.
-               --tw-led-green и --tw-ring не перечислены намеренно: они
-               объявлены через var(--tw-green)/var(--tw-blue) и чинятся вместе
-               с ними. */
-            --tw-blue:          #0a84ff;
-            --tw-green:         #30d158;
-            --tw-red:           #ff453a;
-            --tw-orange:        #ff9f0a;
-            --tw-yellow:        #ffc107;
-            --tw-led-warn:      #ffcc00;
-            --tw-led-danger:    #ff3333;
-            color-scheme: dark;
-        }
+           Пин снят не в пользу темы, а в пользу ТОНА: решает яркость того, что
+           реально под цифрами, — подложка стиля, если пользователь её задал,
+           иначе тема. Считает RendererShared.surfaceTone(), класс ставит
+           UITheme.applyTone(). */
 
         * {
             margin: 0;
@@ -150,7 +109,7 @@
                Значение приходит переменной с documentElement, дефолт (её
                отсутствие) принадлежит этому правилу: сброс фона в панели просто
                удаляет переменную. */
-            fill: var(--surface-paint, none);
+            fill: var(--surface-paint, var(--style-face));
             stroke: none;
         }
 
@@ -274,7 +233,10 @@
                Ореол снят редизайном 2026-08-12: цвет уже несёт состояние.
                Осталась мягкая тень — она не красит, а отделяет цифры от
                произвольного фона. */
-            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+            /* Токеном: на светлом тоне тёмная тень под тёмными цифрами не
+               помогает вовсе, а нужен наоборот светлый ореол — окно прозрачно
+               и лежит на чужих обоях. См. --style-ink-shadow. */
+            text-shadow: var(--style-ink-shadow);
             transition: color var(--tw-dur-base) var(--tw-ease),
                         text-shadow var(--tw-dur-base) var(--tw-ease);
             white-space: nowrap;
@@ -505,14 +467,10 @@
                переставленными местами (21,21,32 / 10,10,21 против 10,10,15 /
                21,21,32), и карточка минуса была темнее соседних сверху и
                светлее снизу. На глаз это выглядело просто «другой карточкой». */
-            background: var(--surface-solid, linear-gradient(180deg,
-                rgb(42, 42, 53) 0%,
-                rgb(26, 26, 37) 49.9%,
-                rgb(10, 10, 15) 50%,
-                rgb(21, 21, 32) 100%));
+            background: var(--surface-solid, var(--style-plate));
             border-radius: var(--tw-r-sm);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08),
-                        inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+            box-shadow: inset 0 1px 0 var(--style-edge),
+                        inset 0 -2px 4px var(--style-hinge);
             margin-right: 4px;
         }
 
@@ -527,7 +485,7 @@
                красный на тёмной карточке, тогда как полоса состояния от темы
                не зависит вовсе. Минус — знак ЧИСЛА, и цвет берёт у числа. */
             color: var(--tw-band-danger);
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            text-shadow: var(--style-ink-shadow);
         }
 
         .widget-flip-minus.visible {
@@ -575,14 +533,10 @@
                спрятан, но спрятанный контрол не мешает значению, выставленному
                при другом стиле, доехать сюда, — поэтому запрет живёт ЗДЕСЬ, а
                не в панели. Закреплено e2e/window-surface-color.spec.js. */
-            background: var(--surface-solid, linear-gradient(180deg,
-                rgb(42, 42, 53) 0%,
-                rgb(26, 26, 37) 49.9%,
-                rgb(10, 10, 15) 50%,
-                rgb(21, 21, 32) 100%));
+            background: var(--surface-solid, var(--style-plate));
             border-radius: var(--tw-r-sm);
             border: 1px solid var(--tw-border-strong);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+            box-shadow: inset 0 1px 0 var(--style-edge);
             overflow: hidden;
         }
 
@@ -595,10 +549,10 @@
             right: 0;
             height: 2px;
             background: linear-gradient(180deg,
-                rgba(0, 0, 0, 0.9) 0%,
-                rgba(0, 0, 0, 0.9) 50%,
-                rgba(255, 255, 255, 0.04) 50%,
-                rgba(255, 255, 255, 0.04) 100%);
+                var(--style-hinge) 0%,
+                var(--style-hinge) 50%,
+                var(--style-gloss) 50%,
+                var(--style-gloss) 100%);
             z-index: 10;
         }
 
@@ -613,14 +567,27 @@
             color: var(--timer-color, var(--tw-fg));
             line-height: 1;
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            text-shadow: var(--style-ink-shadow);
         }
 
         .widget-flip-card[data-status="warning"] .widget-flip-digit { color: var(--tw-band-warning); }
         .widget-flip-card[data-status="danger"]   .widget-flip-digit,
         .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: var(--tw-band-danger); }
-        .widget-flip-card[data-status="danger"],
-        .widget-flip-card[data-status="overtime"] {
+        /* Мигание перерасхода принадлежит ВСЕМУ табло, а не каждой карточке
+           по отдельности.
+
+           Правило стояло на `.widget-flip-card[data-status]`, и карточка минуса
+           (у неё свой класс, и `data-status` ей никто не ставил) не мигала
+           вовсе — знак жил рядом с мигающими цифрами своей жизнью.
+
+           Просто выдать ей ту же анимацию мало: карточки начинают мигать уже на
+           `danger`, а минус ПОЯВЛЯЕТСЯ только в перерасходе, и его анимация
+           стартовала бы позже — с собственной фазой. Совпадение фаз даёт только
+           общий владелец: ОДНА анимация на контейнере, под которым и цифры, и
+           разделители, и знак. Замер до правки: размах прозрачности цифр 0.30,
+           минуса 0.00, расхождение фаз 0.30 — e2e/overtime-minus.spec.js. */
+        .widget-flip-content[data-status="danger"],
+        .widget-flip-content[data-status="overtime"] {
             animation: widget-flip-pulse 1s ease-in-out infinite;
         }
 
@@ -703,10 +670,14 @@
             width: 150px;
             height: 150px;
             border-radius: 50%;
+            /* Заливка циферблата — токен тона, но с СОБСТВЕННОЙ прозрачностью:
+               --style-dial её не несёт, а окно прозрачно, и ползунок «Фон»
+               обязан гасить циферблат и без выбранного цвета. Поэтому стопы
+               остаются здесь, а тон меняет только их цвет. */
             background: var(--surface-paint,
                 radial-gradient(circle at 50% 50%,
-                    rgba(28, 28, 30, calc(0.82 * var(--surface-alpha, 1))) 0%,
-                    rgba(10, 10, 15, calc(0.95 * var(--surface-alpha, 1))) 100%));
+                    var(--style-dial-inner) 0%,
+                    var(--style-dial-outer) 100%));
             -webkit-backdrop-filter: var(--tw-blur-sm);
             backdrop-filter: var(--tw-blur-sm);
             border: 1px solid var(--tw-border-strong);
@@ -720,7 +691,7 @@
             position: absolute;
             width: 2px;
             height: 6px;
-            background: rgba(255, 255, 255, 0.3);
+            background: var(--style-tick);
             left: 50%;
             top: 8%;
             transform-origin: 50% 63px;
@@ -735,7 +706,7 @@
         .widget-clock-tick.major {
             width: 2px;
             height: 10px;
-            background: rgba(255, 255, 255, 0.6);
+            background: var(--style-tick-strong);
         }
 
         .widget-clock-tick.quarter {
@@ -761,7 +732,7 @@
         .widget-hand-hour {
             width: 4px;
             height: 32px;
-            background: linear-gradient(180deg, var(--tw-fg) 0%, var(--tw-fg-secondary) 100%);
+            background: var(--style-hand);
             margin-left: -2px;
             z-index: 2;
         }
@@ -771,7 +742,7 @@
             height: 48px;
             /* Была залита фирменным сине-зелёным, тогда как на дисплее и в
                часах минутная белая: расходился ровно этот один элемент. */
-            background: linear-gradient(180deg, #ffffff 0%, #dddddd 100%);
+            background: var(--style-hand);
             margin-left: -1.5px;
             z-index: 3;
         }
@@ -792,7 +763,7 @@
                правило [data-status="danger"] ниже могло его перебить каскадом. */
             background: var(--timer-center-bg, var(--tw-ring));
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.92);
+            border: 2px solid var(--style-center-rim);
             z-index: 5;
         }
 
@@ -810,7 +781,7 @@
                не инлайном: инлайн бил бы правило [data-status] ниже. */
             color: var(--timer-analog-color, var(--tw-fg-muted));
             font-variant-numeric: tabular-nums;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+            text-shadow: var(--style-ink-shadow);
         }
 
         /* Numerals 12/3/6/9 */
@@ -869,7 +840,7 @@
                когда-то имел в виду, но пользователь никогда не видел.
                Приводим правило к отрисованному, инлайн убираем. */
             color: rgba(255, 69, 58, 0.7);
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+            text-shadow: var(--style-ink-shadow);
             animation: widget-analog-text-pulse 1s ease-in-out infinite;
         }
 
@@ -914,7 +885,7 @@
                настраивается, а шрифт выбирается.
                Значения совпадают с FRAME_PAD_*_EM в digits-style.js — по ним
                считается подгонка кегля (проверяется тестом). */
-            background: var(--surface-paint, transparent);
+            background: var(--surface-paint, var(--style-face));
             padding: 0.18em 0.34em;
             border-radius: 0.22em;
 
@@ -932,13 +903,29 @@
         .widget-digits-time[data-status="danger"],
         .widget-digits-time[data-status="overtime"] { color: var(--tw-band-danger); }
 
+        /* Знак стоит абсолютом, поэтому его точка отсчёта — ПАДДИНГ-бокс рамки,
+           а не сами цифры: `right: 100%` уносит его ещё и за левое поле рамки.
+           Замер до правки: зазор 0.40 кегля вместо задуманных 0.10, знак
+           целиком снаружи рамки и обрезан краем окна (запас под него подгонка
+           считает по SIGN_GAP_EM = 0.1, а не по 0.4). Поле надо вычесть.
+
+           Числа поделены на 0.62 потому, что `em` в свойствах ЭТОГО элемента
+           считается от его собственного кегля, а зазор и поле заданы в кегле
+           ЦИФР. Все три константы — SIGN_GAP_EM, FRAME_PAD_X_EM и
+           SIGN_FONT_RATIO из digits-style.js, там же по ним считается подгонка;
+           совпадение проверяет tests/digits-style.test.js. */
         .widget-digits-sign {
             position: absolute;
             right: 100%;
             top: 50%;
-            transform: translateY(-50%);
+            /* Центрируется БОКС, а глаз видит чернила: где чернила минуса сидят
+               внутри бокса, решает шрифт. Поправку меряет `measureSignShift()`
+               (digits-style.js) и отдаёт долей кегля — в пикселях она зависела
+               бы и от подгонки, и от масштаба окна. Без неё Playfair Display
+               уводил знак вверх на 0.119 кегля. */
+            transform: translateY(calc(-50% + var(--digits-font-size, 40px) * var(--digits-sign-shift, 0)));
             font-size: 0.62em;
-            margin-right: 0.1em;
+            margin-right: calc((0.1em - 0.34em) / 0.62);
         }
 
         .widget-digits-probe {
@@ -1270,6 +1257,7 @@
                 this.wFlipHr2 = document.getElementById('wFlipHr2');
                 this.wFlipHoursGroup = document.getElementById('wFlipHoursGroup');
                 this.wFlipHoursSep = document.getElementById('wFlipHoursSep');
+                this.wFlipContent = document.getElementById('widgetFlipContent');
                 this.wFlipMinus = document.getElementById('wFlipMinus');
                 this.wFlipMin1 = document.getElementById('wFlipMin1');
                 this.wFlipMin2 = document.getElementById('wFlipMin2');
@@ -1354,8 +1342,35 @@
                         if (size > 0) {
                             this.widgetDigitsTime.style.setProperty('--digits-font-size', size + 'px');
                         }
+                        // Вертикаль знака минуса — своя у каждого шрифта, см.
+                        // measureSignShift(). Ставится здесь же, потому что
+                        // считается по тем же метрикам и меняется вместе со
+                        // шрифтом, а не со временем на табло.
+                        this.widgetDigitsTime.style.setProperty(
+                            '--digits-sign-shift',
+                            window.DigitsStyle.measureSignShift(this.digitsFont)
+                        );
                     }
                 }
+            }
+
+            /**
+             * Пересчитать раскладку под НОВЫЙ шрифт «Цифр» — дважды.
+             *
+             * Первый раз сразу, чтобы цифры не ждали сети (её здесь нет, но
+             * woff2 всё равно читается с диска асинхронно), второй — когда шрифт
+             * доехал. Без второго раза замер остаётся снятым с ЗАПАСНОГО
+             * начертания: `document.fonts.ready` в окне разрешился один раз на
+             * старте и о шрифте, выбранном позже, ничего не знал. Замер
+             * 17.08.2026: сразу после переключения на Playfair Display вертикаль
+             * знака мерилась по Georgia — 0.044 кегля вместо 0.094.
+             */
+            applyDigitsFont(fontId) {
+                this.updateScaling();
+                window.DigitsStyle.ensureFont(fontId).then(() => {
+                    window.DigitsStyle.clearProbeCache();
+                    this.updateScaling();
+                });
             }
 
             initProgress() {
@@ -1419,11 +1434,18 @@
                     }
 
                     // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
-                    if (e.code >= 'Digit1' && e.code <= 'Digit8') {
-                        e.preventDefault();
+                    // Диапазон клавиш выводится ИЗ реестра, а не пишется числом.
+                    // Прежде здесь стояло Digit8 при четырёх длительностях, и
+                    // клавиши 5–8 слали `seconds: undefined` — движок приводит
+                    // это к нулю, то есть НАЖАТИЕ СБРАСЫВАЛО ТАЙМЕР В 00:00.
+                    // Панель этот же дефект у себя уже закрыла; окна остались.
+                    if (e.code >= 'Digit1' && e.code <= 'Digit9') {
                         const presets = window.CONFIG.PRESET_DURATIONS;
                         const idx = parseInt(e.code.replace('Digit', '')) - 1;
-                        ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                        if (idx < presets.length) {
+                            e.preventDefault();
+                            ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                        }
                     }
                 };
                 document.addEventListener('keydown', this._handlers.onKeyDown);
@@ -1436,7 +1458,13 @@
                     if (!e.ctrlKey) { return; }
                     e.preventDefault();
                     const step = window.CONFIG.SCALE_STEP;
-                    const delta = e.deltaY < 0 ? step : -step;
+                    // Ось берётся та, по которой пришло движение, а событие без
+                    // движения не решает за пользователя. `e.deltaY < 0 ? … : …`
+                    // относит НОЛЬ к «уменьшить» — на дисплее это сделало
+                    // Shift+колесо односторонним (см. display-script.js).
+                    const raw = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+                    if (!raw) { return; }
+                    const delta = raw < 0 ? step : -step;
                     const newPct = window.RendererShared.clampScale(widgetScalePct + delta, WIDGET_MIN_SCALE, WIDGET_MAX_SCALE);
                     if (newPct === widgetScalePct) { return; }
                     widgetScalePct = newPct;
@@ -1512,6 +1540,22 @@
             // FIX BUG-020: Removed checkColorChanges() - dead code
             // Colors are updated via the per-window 'widget-colors-update' IPC event, no polling needed
 
+
+            /**
+             * Пересчитать тон окна. Отдельный метод, потому что поводов два:
+             * пришли цвета (сменилась подложка) и сменилась тема (сменился фон
+             * ПО УМОЛЧАНИЮ). Второй повод до 18.08.2026 не существовал вовсе —
+             * окно тему не принимало, палитра была прибита.
+             */
+            refreshTone() {
+                const s = this._surface || {};
+                window.UITheme.applyTone(window.RendererShared.surfaceTone({
+                    color: s.color,
+                    alpha: s.alpha,
+                    theme: document.documentElement.getAttribute('data-theme')
+                }));
+            }
+
             applyColors(colors = null) {
                 // Владельцем дефолта остаётся CSS — ровно так уже работают часы
                 // (electron-clock-widget.html:1168-1173) и полноэкранное окно.
@@ -1568,6 +1612,14 @@
                 // именно CSS, где живут сами значения по умолчанию.
                 const alphaValue = window.RendererShared.surfaceAlpha(colors.surfaceAlpha);
                 setVar('--surface-alpha', alphaValue === null ? null : String(alphaValue));
+
+                // Тон окна. Своего фона у виджета нет вовсе — он лежит поверх
+                // чужого рабочего стола, — поэтому под цифрами оказывается либо
+                // подложка стиля, которую задал пользователь, либо обои. Первое
+                // можно измерить, второе нет: значит решает яркость подложки, а
+                // когда её нет — тема. Палитра обоих тонов в surface-tones.css.
+                this._surface = { color: colors.surface, alpha: colors.surfaceAlpha };
+                this.refreshTone();
 
                 // Circle style — стопы градиента красит КАСКАД: правила
                 // #widgetGradient stop живут в <style>, а stop-color из CSS
@@ -1690,7 +1742,7 @@
                             const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.widgetDigitsFont);
                             if (font.id !== this.digitsFont) {
                                 this.digitsFont = font.id;
-                                this.updateScaling();
+                                this.applyDigitsFont(font.id);
                             }
                         }
                     }
@@ -1761,7 +1813,7 @@
                         const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.digitsFont);
                         if (font.id !== this.digitsFont) {
                             this.digitsFont = font.id;
-                            this.updateScaling();
+                            this.applyDigitsFont(font.id);
                         }
                     }
                     // Панель управления повторно шлёт timerScale и при смене стиля,
@@ -2085,6 +2137,13 @@
                     card.dataset.status = status;
                 });
 
+                // Мигание перерасхода живёт на контейнере (см. правило
+                // `.widget-flip-content[data-status]`): у карточек и знака минуса
+                // фаза общая только тогда, когда анимация одна на всех.
+                if (this.wFlipContent) {
+                    this.wFlipContent.dataset.status = status;
+                }
+
                 // Separator dots are painted by ::before/::after backgrounds, so
                 // color/background on the element itself is ignored — we drive
                 // them through data-status and matching CSS rules instead.
@@ -2187,7 +2246,10 @@
             localStorage.setItem('widgetHintShown', 'v2');
         }
 
+        // На window — чтобы до окна дотянулся слушатель темы, который стоит
+        // ОТДЕЛЬНЫМ <script> после ipc-compat.js и в эту область не заглядывает.
         const widgetTimer = new WidgetTimer();
+        window.timerWidget = widgetTimer;
 
         // Cleanup при закрытии окна
         window.addEventListener('beforeunload', () => {
@@ -2195,6 +2257,6 @@
         });
     </script>
     <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script>window.UITheme.bindThemeSync(window.ipcRenderer);</script>
+    <script>window.UITheme.bindThemeSync(window.ipcRenderer, () => window.timerWidget && window.timerWidget.refreshTone());</script>
 </body>
 </html>
