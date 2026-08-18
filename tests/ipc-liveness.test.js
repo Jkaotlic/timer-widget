@@ -51,6 +51,9 @@ const RENDERER_FILES = [
     'flip-card.js',
     'window-geometry.js',
     'settings-schema.js',
+    'panel-state.js',
+    'panel-colors.js',
+    'panel-display.js',
     'ipc-compat.js'
 ];
 

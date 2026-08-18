@@ -416,23 +416,6 @@ function readWindowCss(file) {
         .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-// Токены прибитого блока окна. Отсутствие блока — само по себе провал: без него
-// светлая тема переворачивает текст и цифры становятся чёрными по тёмно-синему.
-function readPin(css, file) {
-    // Виджет по-прежнему прибивает палитру темой: он лежит поверх ЧУЖОГО
-    // рабочего стола и своего фона не имеет вообще. Дисплей после редизайна
-    // 2026-08-12 решает по ЯРКОСТИ своего фона, поэтому у него палитра
-    // «светлое по тёмному» объявлена как body:not(.on-light-bg) — тот же
-    // набор токенов, другое условие. Проверка одна: важен НАБОР, а не селектор.
-    const m = /\[data-theme="light"\]\s*\{([\s\S]*?)\n\s*\}/.exec(css)
-        || /:root:not\(\.on-light-bg\)[^{]*\{([\s\S]*?)\n\}/.exec(css);
-    assert.ok(m, `${file}: не найден ни блок [data-theme="light"], ни body:not(.on-light-bg)`);
-    const pin = new Map();
-    for (const decl of m[1].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
-        pin.set(decl[1], decl[2].trim());
-    }
-    return pin;
-}
 
 // Значение токена так, как его вычислит браузер В ЭТОМ окне: пин перекрывает
 // design-tokens.css, непокрытое наследуется оттуда, а var(--x) внутри значения
@@ -455,60 +438,125 @@ function colorStops(value) {
         : [value];
 }
 
-// Виджет держит стили инлайном, у дисплея они в display.css — окно то же,
-// файл другой.
-const OWNS_NO_BACKGROUND = ['electron-widget.html', 'display.css'];
+// Три окна, чей фон принадлежит пользователю, а не теме. Палитра у них ОДНА и
+// лежит в surface-tones.css — до 18.08.2026 она была тремя копиями, и одна из
+// них (пин виджета) целый релиз не перечисляла ни одного акцента.
+const OWNS_NO_BACKGROUND = ['electron-widget.html', 'electron-clock-widget.html', 'display.css'];
+const TONES_CSS = readWindowCss('surface-tones.css');
 
-test('виджет и дисплей: акценты читаемы на своей прибитой подложке в светлой теме', () => {
+// Токены одного ТОНА. Блок режется по селектору, а не по порядку: перепутать
+// два блока местами — ровно та ошибка, на которой в этом файле уже спотыкались
+// (см. шапку про срез по подстроке).
+function readTone(selector) {
+    const at = TONES_CSS.indexOf(selector);
+    assert.ok(at !== -1, `surface-tones.css: не найден блок ${selector}`);
+    const body = TONES_CSS.slice(TONES_CSS.indexOf('{', at) + 1, TONES_CSS.indexOf('\n}', at));
+    const map = new Map();
+    for (const decl of body.matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
+        map.set(decl[1], decl[2].trim());
+    }
+    assert.ok(map.size > 10, `surface-tones.css: блок ${selector} подозрительно пуст`);
+    return map;
+}
+
+const DARK_TONE = readTone(':root:not(.on-light-bg)');
+const LIGHT_TONE = readTone(':root.on-light-bg');
+// Срез по подстроке обязан проверить сам себя: `:root.on-light-bg` встречается
+// в этом файле и прозой, и один такой промах уже случился в helpers/source-scan
+// (светлый токен возвращался тёмным). Две палитры, совпавшие целиком, — это не
+// «одинаковые темы», а срез, уехавший на один и тот же блок.
+assert.notEqual(DARK_TONE.get('tw-fg'), LIGHT_TONE.get('tw-fg'), 'срез тонов уехал на один блок');
+
+// Какие акценты эти три окна реально используют. Список берётся ИЗ ФАЙЛОВ:
+// новое var(--tw-...), которое никто не объявил в обоих тонах, обязано ронять
+// тест, а не тихо приезжать из design-tokens.css в чужой палитре.
+const USED_ACCENTS = ACCENT_NAMES.filter((name) =>
+    OWNS_NO_BACKGROUND.some((file) => readWindowCss(file).includes(`var(--${name})`)));
+
+test('окна без своего фона: на ТЁМНОМ тоне акценты читаемы на своих подложках', () => {
+    const resolve = makeResolver((name) => (DARK_TONE.has(name) ? DARK_TONE.get(name) : hcToken(name)));
+    const backdrops = PINNED_BACKDROPS
+        .filter((name) => DARK_TONE.has(name))
+        .map((name) => [name, composite(DARK_TONE.get(name), USER_BG)]);
+    assert.ok(backdrops.length, 'в тёмном тоне нет ни одной подложки');
+    assert.ok(USED_ACCENTS.length, 'не найдено ни одного акцента — регулярка разошлась с разметкой');
+
     const report = [];
-    for (const file of OWNS_NO_BACKGROUND) {
-        const css = readWindowCss(file);
-        const pin = readPin(css, file);
-        const resolve = makeResolver((name) => (pin.has(name) ? pin.get(name) : hcToken(name)));
-
-        // Подложки берутся из пина и кладутся на пользовательский фон: считать
-        // акцент на белом было бы враньём — белого в этом окне нет.
-        const backdrops = PINNED_BACKDROPS
-            .filter((name) => pin.has(name))
-            .map((name) => [name, composite(pin.get(name), USER_BG)]);
-        assert.ok(backdrops.length, `${file}: в пине нет ни одной подложки`);
-
-        const used = ACCENT_NAMES.filter((name) => css.includes(`var(--${name})`));
-        assert.ok(used.length, `${file}: не найдено ни одного акцента — регулярка разошлась с разметкой`);
-
-        for (const token of used) {
-            for (const stop of colorStops(resolve(token))) {
-                for (const [bgName, bg] of backdrops) {
-                    const ratio = contrast(composite(stop, bg), bg);
-                    report.push(`${file} --${token} (${stop}) на --${bgName}: ${ratio.toFixed(2)}:1`);
-                    assert.ok(
-                        ratio >= AA_NORMAL,
-                        `${file}: --${token} (${stop}) на --${bgName} даёт ${ratio.toFixed(2)}:1, `
-                        + `нужно ${AA_NORMAL}:1. Окно не владеет фоном — акцент обязан быть прибит `
-                        + `к тёмному значению внутри [data-theme="light"] этого файла`
-                    );
-                }
+    for (const token of USED_ACCENTS) {
+        for (const stop of colorStops(resolve(token))) {
+            for (const [bgName, bg] of backdrops) {
+                const ratio = contrast(composite(stop, bg), bg);
+                report.push(`тёмный тон --${token} (${stop}) на --${bgName}: ${ratio.toFixed(2)}:1`);
+                assert.ok(
+                    ratio >= AA_NORMAL,
+                    `--${token} (${stop}) на --${bgName} даёт ${ratio.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+                );
             }
         }
     }
     console.log('   ' + report.join('\n   '));
 });
 
-test('виджет и дисплей: прибитая палитра совпадает с тёмной, а не изобретена заново', () => {
-    // Контраст можно вытянуть и третьей палитрой — и тогда одно и то же
-    // состояние таймера будет разного цвета в разных темах. Инвариант жёстче:
-    // окно, не владеющее фоном, живёт в тёмной палитре В ОБЕИХ темах.
-    const dark = makeResolver(darkToken);
-    for (const file of OWNS_NO_BACKGROUND) {
-        const css = readWindowCss(file);
-        const pin = readPin(css, file);
-        const light = makeResolver((name) => (pin.has(name) ? pin.get(name) : hcToken(name)));
-        for (const token of ACCENT_NAMES.filter((name) => css.includes(`var(--${name})`))) {
-            assert.equal(
-                light(token), dark(token),
-                `${file}: --${token} в светлой теме разошёлся с тёмной`
-            );
+test('окна без своего фона: на СВЕТЛОМ тоне акценты читаемы на белом', () => {
+    // Светлый тон — не «тёмный наоборот»: акценты Apple посчитаны под тёмный
+    // фон, и #30d158 на белом даёт 1.9:1. Здесь считается их затемнённый набор.
+    const resolve = makeResolver((name) => (LIGHT_TONE.has(name) ? LIGHT_TONE.get(name) : hcToken(name)));
+    const backdrops = PINNED_BACKDROPS
+        .filter((name) => LIGHT_TONE.has(name))
+        .map((name) => [name, composite(LIGHT_TONE.get(name), [255, 255, 255])]);
+    assert.ok(backdrops.length, 'в светлом тоне нет ни одной подложки');
+
+    const report = [];
+    for (const token of USED_ACCENTS) {
+        for (const stop of colorStops(resolve(token))) {
+            for (const [bgName, bg] of backdrops) {
+                const ratio = contrast(composite(stop, bg), bg);
+                report.push(`светлый тон --${token} (${stop}) на --${bgName}: ${ratio.toFixed(2)}:1`);
+                assert.ok(
+                    ratio >= AA_NORMAL,
+                    `--${token} (${stop}) на --${bgName} даёт ${ratio.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+                );
+            }
         }
+    }
+    console.log('   ' + report.join('\n   '));
+});
+
+test('тон не изобретает третью палитру: тёмный совпадает с dark, светлый — с light', () => {
+    // Контраст можно вытянуть и собственным набором цветов — и тогда одно и то
+    // же состояние таймера будет разного цвета в панели и в дисплее. Инвариант
+    // жёстче: тон ВЫБИРАЕТ одну из двух тем приложения, а не пишет свою.
+    const dark = makeResolver(darkToken);
+    const light = makeResolver(hcToken);
+    const fromDarkTone = makeResolver((name) => (DARK_TONE.has(name) ? DARK_TONE.get(name) : hcToken(name)));
+    const fromLightTone = makeResolver((name) => (LIGHT_TONE.has(name) ? LIGHT_TONE.get(name) : hcToken(name)));
+    for (const token of USED_ACCENTS) {
+        assert.equal(fromDarkTone(token), dark(token), `--${token}: тёмный тон разошёлся с тёмной темой`);
+        assert.equal(fromLightTone(token), light(token), `--${token}: светлый тон разошёлся со светлой темой`);
+    }
+});
+
+test('текстовые токены светлого тона держат AAA на белом', () => {
+    // Тот же счёт, что и для светлой темы панели: тон обязан быть не просто
+    // «другим», а измеренно читаемым. Раньше эта проверка смотрела в display.css
+    // — единственное окно, у которого светлая палитра тогда была.
+    const report = [];
+    for (const token of TEXT_TOKENS) {
+        assert.ok(LIGHT_TONE.has(token), `--${token} не объявлен для светлого тона`);
+        const value = LIGHT_TONE.get(token);
+        const ratio = contrast(composite(value, [255, 255, 255]), [255, 255, 255]);
+        report.push(`--${token} (${value}): ${ratio.toFixed(2)}:1`);
+        assert.ok(ratio >= AA_NORMAL, `светлый тон: --${token} (${value}) на белом даёт ${ratio.toFixed(2)}:1`);
+    }
+    console.log('   [светлый тон] ' + report.join('\n   [светлый тон] '));
+});
+
+test('каждое из трёх окон подключает surface-tones.css', () => {
+    // Гейт считает ОКНА, а не совпадения: файл, потерявший ссылку, тихо
+    // получил бы палитру панели — светлый текст на светлом или наоборот.
+    for (const file of ['electron-widget.html', 'electron-clock-widget.html', 'display.html']) {
+        const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        assert.match(html, /<link rel="stylesheet" href="surface-tones\.css">/, `${file}: нет surface-tones.css`);
     }
 });
 
@@ -569,20 +617,28 @@ test('подписи info-блоков читаемы во всех темах (
     console.log('   ' + report.join('\n   '));
 });
 
-test('подпись стиля «Цифры» читаема на своём тёмном фоне', () => {
+test('подпись стиля «Цифры» читаема в ОБОИХ тонах', () => {
     // Отдельный fallback: зелёный по --tw-bg-led. При alpha 0.55 давал 3.57:1.
-    // Правило пришло из стиля LED вместе с ним самим: стили слиты 13.08.2026,
-    // но фон блока информации и его подпись остались теми же.
+    // Правило пришло из стиля LED вместе с ним самим (стили слиты 13.08.2026).
+    // Литерал стал токеном --style-led-label, потому что на светлой панели
+    // #30d158 при любой альфе нечитаем — и считать теперь надо оба тона.
     const display = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
-    const m = /body\.style-digits \.info-label \{[\s\S]*?color: var\(--info-color-dim, (rgba\([^)]+\))\)/.exec(display);
-    assert.ok(m, 'не найден fallback подписи стиля «Цифры»');
-
-    const ledBg = composite(darkToken('tw-bg-led'), [0, 0, 0]);
-    const r = contrast(composite(m[1], ledBg), ledBg);
-    assert.ok(
-        r >= AA_NORMAL,
-        `подпись «Цифр» (${m[1]}) на --tw-bg-led: ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+    assert.match(
+        display,
+        /body\.style-digits \.info-label \{[\s\S]*?color: var\(--info-color-dim, var\(--style-led-label\)\)/,
+        'подпись «Цифр» перестала читать --style-led-label'
     );
+
+    for (const [name, tone, base] of [['тёмный', DARK_TONE, [0, 0, 0]], ['светлый', LIGHT_TONE, [255, 255, 255]]]) {
+        const label = tone.get('style-led-label');
+        assert.ok(label, `${name} тон: нет --style-led-label`);
+        const ledBg = composite(tone.get('tw-bg-led'), base);
+        const r = contrast(composite(label, ledBg), ledBg);
+        assert.ok(
+            r >= AA_NORMAL,
+            `${name} тон: подпись «Цифр» (${label}) на --tw-bg-led даёт ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+        );
+    }
 });
 
 test('тема красит ЗНАЧЕНИЕ info-блока, но не подпись', () => {
@@ -688,35 +744,3 @@ test('расчёт контраста сверен с эталонными па�
     assert.ok(ratio > 4.45 && ratio < 4.6, `#767676 на белом должен давать ≈4.5:1, вышло ${ratio.toFixed(2)}`);
 });
 
-test('дисплей на СВЕТЛОМ фоне: текст и акценты держат AA', () => {
-    // Редизайн 2026-08-12 разрешил дисплею быть светлым — «для белой аудитории
-    // и стрима». Это вторая палитра одного окна, и без счёта она повторила бы
-    // историю светлой темы: та была недостижима, её контраст никто не
-    // настраивал, и подписи давали 2.70:1.
-    //
-    // Фон здесь БЕЛЫЙ и известен: класс .on-light-bg ставится ровно тогда,
-    // когда backgroundTone() намерил светлый фон.
-    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
-    const m = /:root\.on-light-bg\s*\{([\s\S]*?)\n\}/.exec(css);
-    assert.ok(m, 'блок :root.on-light-bg не найден — светлый дисплей остался без палитры');
-
-    const pin = new Map();
-    for (const decl of m[1].matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
-        pin.set(decl[1], decl[2].trim());
-    }
-
-    const WHITE = [255, 255, 255];
-    const report = [];
-    const checked = [...TEXT_TOKENS, 'tw-blue', 'tw-green', 'tw-red', 'tw-orange'];
-    for (const token of checked) {
-        assert.ok(pin.has(token), `--${token} не объявлен для светлого дисплея`);
-        const ratio = contrast(composite(pin.get(token), WHITE), WHITE);
-        report.push(`--${token} (${pin.get(token)}): ${ratio.toFixed(2)}:1`);
-        assert.ok(
-            ratio >= AA_NORMAL,
-            `светлый дисплей: --${token} (${pin.get(token)}) на белом даёт `
-            + `${ratio.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
-        );
-    }
-    console.log('   [светлый дисплей] ' + report.join('\n   [светлый дисплей] '));
-});

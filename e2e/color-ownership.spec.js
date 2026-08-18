@@ -72,6 +72,14 @@ const TARGET = {
  * 10.08.2026 — 8 → 0 → 5 → 0 регрессий на неизменённом main) и вдобавок имеет
  * порог в 8/255 на канал, то есть мелкую подмену цвета он просто не заметит.
  */
+// Эталон пересобран 18.08.2026: ТЕНЬ стала одна на все пять стилей в обоих
+// окнах. До этого их было три — 0.45/12px в виджете, 0.4/8px в дисплее,
+// 0.6/8px у флипа, — и различия не были ничьим решением: это три копии одного
+// намерения «мягкая тень под цифрами», написанные в разное время. Теперь она
+// приезжает токеном --style-ink-shadow, потому что на СВЕТЛОМ тоне тень
+// обязана стать светлым ореолом, а три литерала перевернуть нечем.
+// ЦВЕТА не двинулись ни в одной из 40 ячеек — это и проверяется.
+//
 // Эталон пересобран 12.08.2026 вместе с редизайном. Изменились ТОЛЬКО тени:
 // цветные ореолы сняты во всех окнах, осталась одна нейтральная тень на все
 // пять стилей. ЦВЕТА не двинулись ни в одной из 40 ячеек — и это ровно то,
@@ -79,29 +87,29 @@ const TARGET = {
 // «заодно поменяли палитру». Два расхождения по цвету, всплывшие по дороге,
 // были настоящими дефектами страж-яркости и починены, а не вписаны в эталон.
 const BASELINE = {
-    'widget.circle.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 12px' },
-    'display.circle.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.4) 0px 4px 8px' },
-    'widget.circle.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 12px' },
-    'display.circle.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.4) 0px 4px 8px' },
-    'widget.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 12px' },
-    'display.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.4) 0px 4px 8px' },
-    'widget.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 12px' },
-    'display.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.4) 0px 4px 8px' },
-    'widget.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.6) 0px 2px 8px' },
+    'widget.circle.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.circle.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.circle.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.circle.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.flip.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.6) 0px 2px 8px' },
+    'widget.flip.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.flip.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.flip.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.6) 0px 2px 8px' },
+    'widget.flip.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.flip.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.flip.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.6) 0px 2px 8px' },
+    'widget.flip.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.flip.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.analog.normal': { color: 'rgba(255, 255, 255, 0.58)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 8px' },
+    'widget.analog.normal': { color: 'rgba(255, 255, 255, 0.58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.analog.normal': { color: 'rgba(255, 255, 255, 0.78)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.analog.warning': { color: 'rgba(255, 255, 255, 0.58)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 8px' },
+    'widget.analog.warning': { color: 'rgba(255, 255, 255, 0.58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.analog.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.analog.danger': { color: 'rgba(255, 69, 58, 0.7)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 8px' },
+    'widget.analog.danger': { color: 'rgba(255, 69, 58, 0.7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.analog.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.analog.overtime': { color: 'rgba(255, 69, 58, 0.7)', textShadow: 'rgba(0, 0, 0, 0.45) 0px 2px 8px' },
+    'widget.analog.overtime': { color: 'rgba(255, 69, 58, 0.7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.analog.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.digits.normal': { color: 'rgb(255, 255, 255)', textShadow: 'none' },
     'display.digits.normal': { color: 'rgb(255, 255, 255)', textShadow: 'none' },
@@ -188,6 +196,14 @@ test.beforeAll(async () => {
         if (url.includes('display.html')) { display = page; }
     }
     expect(widget, 'виджет должен открыться').toBeTruthy();
+    // Эталон снят в ТЁМНОМ тоне, и меряться обязан он же. С 18.08.2026 у окон
+    // два тона (surface-tones.css), а умолчание приложения — светлая тема:
+    // без этой строки спека сверяла бы светлую палитру с тёмным эталоном и
+    // рапортовала «окраска изменилась» о правке, которая её и вводила.
+    // Светлый тон меряет e2e/style-tone.spec.js — отдельно и по своим числам.
+    // Тема шлётся по IPC, а не кликом: клик пишет её в общий профиль прогона.
+    await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' }));
+    await control.waitForTimeout(600);
     expect(display, 'полноэкранное окно должно открыться').toBeTruthy();
 });
 
@@ -200,6 +216,8 @@ test.afterAll(async () => {
     await setWidgetStyle('circle').catch(() => {});
     await setDisplayStyle('circle').catch(() => {});
     await sendCommand({ type: 'set', seconds: 300, allowNegative: false }).catch(() => {});
+    // Тема — тоже глобальное состояние прогона, и умолчание приложения светлое.
+    await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'light' })).catch(() => {});
     await app.close();
 });
 

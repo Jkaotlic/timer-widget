@@ -92,12 +92,15 @@ test('дисплей больше не читает общий timerStyle нап
 });
 
 test('панель шлёт стиль и масштаб дисплея под собственными именами', () => {
-    const code = codeOnly(read('electron-control.html'));
+    // Сборка payload живёт в panel-display.js (вынесена 17.08.2026: список
+    // тумблеров блоков понадобился в трёх местах панели, и потолок
+    // electron-control.html выгнал её наружу). Предмет проверки тот же.
+    const code = codeOnly(read('panel-display.js'));
 
     assert.match(code, /displayTimerStyle:/, 'пакет display-settings-update должен нести displayTimerStyle');
     assert.match(code, /displayTimerScale:/, 'пакет display-settings-update должен нести displayTimerScale');
     // Общие имена остаются — на них опираются откат версии и существующие e2e.
-    assert.match(code, /timerStyle:\s*this\.displayTimerStyleEl/);
+    assert.match(code, /timerStyle:\s*styleEl\.value/);
 });
 
 test('виджет не применяет стиль из настроек полноэкранного режима', () => {

@@ -119,6 +119,19 @@ const PROBE_FONT_SIZE = 100;
 const PROBE_MINUTES = '88:88';
 const PROBE_HOURS = '8:88:88';
 const PROBE_SIGN = '−';
+// Эталон ВЕРТИКАЛИ — весь набор цифр, а не одна и не '88:88'.
+//
+// Одной цифрой обойтись нельзя: у Playfair Display цифры СТАРОСТИЛЬНЫЕ, они
+// разной высоты, и ответ зависит от того, какую взять — замер 17.08.2026 дал
+// 0.028 кегля по «8» (она восходящая), 0.124 по «0» (она в высоту строчной) и
+// 0.096 по всему набору. Набор описывает ПОЛОСУ, которую цифры занимают в
+// принципе, поэтому не зависит от того, что сейчас на табло, — а зависеть от
+// этого нельзя, иначе знак дёргался бы каждую секунду. У шрифтов с обычными
+// цифрами все три ответа совпадают (Inter: −0.048 / −0.048 / −0.049).
+//
+// Двоеточие в эталон не входит: оно ниже цифр и утянуло бы знак вниз (по
+// строке «00:03» получалось 0.192 — знак заметно ниже середины числа).
+const PROBE_FIGURES = '0123456789';
 
 // Знак меньше цифр и отделён отступом — те же значения стоят в CSS всех трёх
 // окон. Держим их здесь, потому что запас под знак считает эта арифметика.
@@ -198,14 +211,158 @@ function fitFontSize(options) {
 }
 
 // ---------------------------------------------------------------------------
+// Вертикаль знака
+// ---------------------------------------------------------------------------
+/**
+ * Насколько центр ЧЕРНИЛ ниже центра бокса (в тех же пикселях, что метрики).
+ *
+ * Знак минуса стоит абсолютом и центрируется по своему боксу, а глаз видит
+ * чернила. Где чернила сидят внутри бокса, решает шрифт, и для минуса это
+ * особенно своевольно: он висит на математической оси, а не занимает высоту
+ * прописной. Замер 17.08.2026 по шести шрифтам стиля: от −0.061 кегля (Inter,
+ * знак ниже середины цифр) до +0.119 (Playfair Display, знак заметно выше —
+ * с этой жалобы всё и началось).
+ */
+function hasInkMetrics(metrics) {
+    return !!metrics && [
+        metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent,
+        metrics.actualBoundingBoxAscent, metrics.actualBoundingBoxDescent
+    ].every((v) => Number.isFinite(Number(v)));
+}
+
+function inkCenterOffset(metrics) {
+    if (!hasInkMetrics(metrics)) { return 0; }
+    return (Number(metrics.fontBoundingBoxAscent) - Number(metrics.fontBoundingBoxDescent)) / 2
+        - (Number(metrics.actualBoundingBoxAscent) - Number(metrics.actualBoundingBoxDescent)) / 2;
+}
+
+/**
+ * На сколько ДОЛЕЙ КЕГЛЯ ЦИФР опустить знак, чтобы его чернила встали по центру
+ * чернил цифр. Отрицательное — поднять.
+ *
+ * Доля, а не пиксели: метрики шрифта линейны по кеглю, поэтому величина
+ * считается один раз на шрифт и переживает и подгонку кегля, и масштабирование
+ * окна колесом. Мусор на входе даёт 0 по тому же закону, что и `fitScale`:
+ * NaN, попав в `transform`, не сдвигает знак, а ломает раскладку молча.
+ *
+ * @param {TextMetrics|object} digitsMetrics — замер цифры в кегле цифр
+ * @param {TextMetrics|object} signMetrics — замер знака в ЕГО кегле
+ * @param {number} fontSize — кегль цифр, в котором сделан первый замер
+ */
+function signShiftRatio(digitsMetrics, signMetrics, fontSize) {
+    const size = Number(fontSize);
+    // Неизмеренная СТОРОНА обнуляет весь сдвиг, а не свою половину: принять её
+    // за ноль значило бы подвинуть знак на смещение одних только цифр — то есть
+    // увезти его дальше, чем он стоял.
+    if (!hasInkMetrics(digitsMetrics) || !hasInkMetrics(signMetrics)) { return 0; }
+    if (!Number.isFinite(size) || size <= 0) { return 0; }
+    const shift = inkCenterOffset(digitsMetrics) - inkCenterOffset(signMetrics);
+    return Number.isFinite(shift) ? shift / size : 0;
+}
+
+// ---------------------------------------------------------------------------
 // Замер (DOM)
 // ---------------------------------------------------------------------------
 // Кэш живёт на модуль, а модуль — на окно: у каждого рендерера свой realm.
 const probeCache = new Map();
 
+// Кэш вертикали знака — своя карта, ключ только шрифт: величина в ДОЛЯХ кегля,
+// то есть от эталонной строки и от размера окна не зависит.
+const signShiftCache = new Map();
+
 /** Сбросить кэш замеров. Зовётся после document.fonts.ready и из тестов. */
 function clearProbeCache() {
     probeCache.clear();
+    signShiftCache.clear();
+}
+
+/**
+ * Собственное семейство шрифта, без запасных.
+ *
+ * `document.fonts.check()` отвечает «да», если может отрисовать ЛЮБЫМ
+ * семейством из списка, а у каждой строки реестра запасное семейство системное
+ * и есть всегда. Со списком проверка была бы вечнозелёной и не проверяла бы
+ * ничего.
+ */
+function primaryFamily(font) {
+    return String(font.family).split(',')[0].trim();
+}
+
+function fontSpec(font, size) {
+    return `${font.weight} ${size}px ${primaryFamily(font)}`;
+}
+
+/**
+ * Загружен ли woff2 этого шрифта ПРЯМО СЕЙЧАС.
+ *
+ * `document.fonts.ready` отвечает на другой вопрос — «догрузилось всё, что
+ * документ запросил К ЭТОМУ МОМЕНТУ». Шрифт, выбранный пользователем позже,
+ * запрашивается только при применении, и первый замер после переключения
+ * попадает на запасное начертание. Замер 17.08.2026: сразу после переключения на
+ * Playfair Display `check()` даёт false, вертикаль знака меряется по Georgia
+ * (0.044 вместо 0.094) — и, что хуже, КЭШИРУЕТСЯ на всю сессию.
+ */
+function isFontLoaded(fontId) {
+    if (typeof document === 'undefined' || !document.fonts || typeof document.fonts.check !== 'function') {
+        // Нет API — считаем шрифт готовым: иначе замеры не кэшировались бы
+        // никогда, а это дороже, чем разовая ошибка на экзотической платформе.
+        return true;
+    }
+    try {
+        return document.fonts.check(fontSpec(resolveFont(fontId), PROBE_FONT_SIZE));
+    } catch {
+        return true;
+    }
+}
+
+/**
+ * Дождаться шрифта. Возвращает промис, который ВСЕГДА успешен: вызывающему нужно
+ * знать не причину, а момент, когда замер снова имеет смысл.
+ */
+function ensureFont(fontId) {
+    const font = resolveFont(fontId);
+    if (typeof document === 'undefined' || !document.fonts || typeof document.fonts.load !== 'function') {
+        return Promise.resolve(false);
+    }
+    return Promise.all([
+        document.fonts.load(fontSpec(font, PROBE_FONT_SIZE), PROBE_FIGURES),
+        document.fonts.load(fontSpec(font, PROBE_FONT_SIZE * SIGN_FONT_RATIO), PROBE_SIGN)
+    ]).then(() => true).catch(() => false);
+}
+
+/**
+ * Вертикаль знака для шрифта — доля кегля цифр, на которую знак опускается.
+ *
+ * Меряется по `TextMetrics`, а не по прямоугольникам в раскладке: чернила
+ * рисуются шрифтом, и в `getBoundingClientRect()` их положения внутри бокса не
+ * видно вовсе — знак может стоять «ровно по центру» и выглядеть уехавшим.
+ *
+ * ВАЖНО: как и measureDigits(), звать только после `document.fonts.ready` —
+ * до загрузки woff2 замеряется запасное начертание и кэшируется чужая вертикаль.
+ */
+function measureSignShift(fontId) {
+    const font = resolveFont(fontId);
+    const cached = signShiftCache.get(font.id);
+    if (cached !== undefined) { return cached; }
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') { return 0; }
+
+    const canvas = document.createElement('canvas');
+    const ctx = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
+    if (!ctx) { return 0; }
+
+    ctx.font = `${font.weight} ${PROBE_FONT_SIZE}px ${font.family}`;
+    const digits = ctx.measureText(PROBE_FIGURES);
+    ctx.font = `${font.weight} ${PROBE_FONT_SIZE * SIGN_FONT_RATIO}px ${font.family}`;
+    const sign = ctx.measureText(PROBE_SIGN);
+
+    const ratio = signShiftRatio(digits, sign, PROBE_FONT_SIZE);
+    // Кэшируем только замер СВОЕГО шрифта: вырожденный (окно ещё не разложено)
+    // и снятый с запасного начертания (woff2 не доехал) остались бы в кэше на
+    // всю сессию, а второй при этом выглядит как совершенно нормальное число.
+    if (digits.width > 0 && sign.width > 0 && isFontLoaded(font.id)) {
+        signShiftCache.set(font.id, ratio);
+    }
+    return ratio;
 }
 
 /**
@@ -261,8 +418,15 @@ function measureDigits(probeEl, fontId, probeText) {
         signWidth: signRect.width * SIGN_FONT_RATIO + PROBE_FONT_SIZE * SIGN_GAP_EM
     };
 
-    // Нулевой замер не кэшируем: окно могло быть ещё не разложено.
-    if (measured.width > 0 && measured.height > 0) { probeCache.set(key, measured); }
+    // Не кэшируем ни нулевой замер (окно могло быть ещё не разложено), ни
+    // снятый с ЗАПАСНОГО начертания: `document.fonts.ready` в окне разрешился
+    // один раз на старте и о шрифте, выбранном позже, ничего не знает — первый
+    // замер после переключения приходится на подмену. Ширина при этом честно
+    // больше нуля, поэтому прежнее условие такой замер пропускало и кэшировало
+    // чужие метрики на всю сессию: подогнанный кегль оставался чужим.
+    if (measured.width > 0 && measured.height > 0 && isFontLoaded(font.id)) {
+        probeCache.set(key, measured);
+    }
     return measured;
 }
 
@@ -286,6 +450,7 @@ const DigitsStyle = {
     PROBE_MINUTES,
     PROBE_HOURS,
     PROBE_SIGN,
+    PROBE_FIGURES,
     SIGN_FONT_RATIO,
     SIGN_GAP_EM,
     FRAME_PAD_X_EM,
@@ -293,6 +458,11 @@ const DigitsStyle = {
     resolveFont,
     fitScale,
     fitFontSize,
+    inkCenterOffset,
+    signShiftRatio,
+    measureSignShift,
+    isFontLoaded,
+    ensureFont,
     measureDigits,
     clearProbeCache,
     applyFont

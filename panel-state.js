@@ -123,7 +123,14 @@ const PanelStateMixin = {
         const ROWS = [
             { btn: 'openWidgetBtn',  sub: 'subWidget',  style: styleOf('timerStyle'), scale: num('timerScale') },
             { btn: 'openClockBtn',   sub: 'subClock',   style: styleOf(clockStyleId), scale: num('clockScale') },
-            { btn: 'openDisplayBtn', sub: 'subDisplay', where }
+            // Дисплей сообщал ТОЛЬКО монитор, хотя стиль и масштаб у него свои
+            // и настраиваются в том же ящике, что у виджета и часов. Строка
+            // окна — отчёт о состоянии окна; сокращённый отчёт у одной строки
+            // из трёх читается как «у дисплея этих настроек нет».
+            {
+                btn: 'openDisplayBtn', sub: 'subDisplay',
+                style: styleOf('displayTimerStyle'), scale: num('displayTimerScale'), where
+            }
         ];
 
         for (const row of ROWS) {

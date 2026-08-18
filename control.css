@@ -2314,6 +2314,39 @@ select optgroup,
     color: var(--tw-blue);
 }
 
+/* Кнопки готовых раскладок дисплея.
+   Сетка, а не ряд: раскладок пять, в одну строку они превратились бы в пять
+   нечитаемых огрызков при ширине панели 400px (замер: 62px на кнопку при
+   длиннейшем имени «Совещание»).
+   Состояния «выбрана» у кнопки НЕТ намеренно: раскладка — это действие, и
+   отметка врала бы уже после первого перетаскивания блока на дисплее. */
+.layout-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    width: 100%;
+}
+
+.layout-btn {
+    padding: 7px 6px;
+    border: 1px solid var(--tw-border);
+    background: var(--tw-overlay-light);
+    border-radius: var(--tw-r-sm);
+    cursor: pointer;
+    font-size: var(--tw-t-tiny);
+    font-weight: 500;
+    color: var(--tw-fg-secondary);
+    transition: background var(--tw-dur-base) var(--tw-ease),
+                color var(--tw-dur-base) var(--tw-ease),
+                border-color var(--tw-dur-base) var(--tw-ease);
+}
+
+.layout-btn:hover {
+    color: var(--tw-fg);
+    background: var(--tw-overlay-medium);
+    border-color: var(--tw-border-strong);
+}
+
 .bg-controls { display: none; }
 .bg-controls.active { display: block; }
 

@@ -320,6 +320,135 @@ test('endsAt: мусор даёт null, а не NaN в подписи', () => {
 // windowRowSubtitle — подпись строки окна (panel-state.js, редизайн 2026-08-12)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// secondsUntilClock — блок «До завершения» (17.08.2026)
+// ---------------------------------------------------------------------------
+const { secondsUntilClock } = require('../renderer-shared');
+
+test('secondsUntilClock: считает от текущего момента до времени «Конец»', () => {
+    // 12:55:39 → 15:00 = 2 ч 4 мин 21 с (числа с фотографии пользователя).
+    assert.equal(secondsUntilClock(12 * 3600 + 55 * 60 + 39, '15:00'), 2 * 3600 + 4 * 60 + 21);
+});
+
+test('secondsUntilClock: время уже прошло — ноль, а не сутки до завтра', () => {
+    // Перенос на следующие сутки дал бы в 15:01 бодрое «23:59:00» сразу после
+    // окончания мероприятия. Ноль читается как «закончилось».
+    assert.equal(secondsUntilClock(15 * 3600 + 60, '15:00'), 0);
+});
+
+test('secondsUntilClock: ровно в момент окончания — ноль', () => {
+    assert.equal(secondsUntilClock(15 * 3600, '15:00'), 0);
+});
+
+test('secondsUntilClock: мусор даёт 0, а не NaN', () => {
+    for (const bad of [undefined, null, '', 'abc', '25:00', '12:99', '12', 12]) {
+        assert.equal(secondsUntilClock(3600, bad), 0, `вход ${JSON.stringify(bad)}`);
+    }
+    assert.equal(secondsUntilClock(NaN, '15:00'), 0);
+});
+
+// ---------------------------------------------------------------------------
+// migrateDisplayBlocks — общий тумблер блоков стал личным у каждого (17.08.2026)
+// ---------------------------------------------------------------------------
+// Было: один `showTimeBlocks` на все три блока плюс `showCurrentTime` вторым
+// уровнем поверх него. Стало: свой тумблер у каждого блока. Без перевода
+// профиль, где блоки были ВКЛЮЧЕНЫ, открылся бы пустым дисплеем — новые ключи
+// в нём отсутствуют, а их значение по умолчанию «выключено».
+const { migrateDisplayBlocks } = require('../renderer-shared');
+
+test('migrateDisplayBlocks: включённые блоки старого профиля остаются включёнными', () => {
+    const out = migrateDisplayBlocks({ showTimeBlocks: true, showCurrentTime: true });
+    assert.equal(out.showCurrentTime, true);
+    assert.equal(out.showEventTime, true);
+    assert.equal(out.showEndTime, true);
+});
+
+test('migrateDisplayBlocks: выключенные блоки остаются выключенными — все три', () => {
+    // Прежний общий тумблер гасил и «Текущее время», что бы ни стояло в его
+    // собственной галочке: она была ВТОРЫМ уровнем поверх общего.
+    const out = migrateDisplayBlocks({ showTimeBlocks: false, showCurrentTime: true });
+    assert.equal(out.showCurrentTime, false);
+    assert.equal(out.showEventTime, false);
+    assert.equal(out.showEndTime, false);
+});
+
+test('migrateDisplayBlocks: «Текущее время» могло быть выключено при включённых блоках', () => {
+    const out = migrateDisplayBlocks({ showTimeBlocks: true, showCurrentTime: false });
+    assert.equal(out.showCurrentTime, false);
+    assert.equal(out.showEventTime, true);
+    assert.equal(out.showEndTime, true);
+});
+
+test('migrateDisplayBlocks: новый профиль НЕ трогается — иначе перевод сработал бы дважды', () => {
+    // Пользователь выключил «Начало» уже в новой версии; старый ключ при этом
+    // остался в профиле от прошлой. Перевод обязан уступить новым ключам.
+    const out = migrateDisplayBlocks({
+        showTimeBlocks: true, showCurrentTime: true, showEventTime: false, showEndTime: true
+    });
+    assert.equal(out.showEventTime, false);
+    assert.equal(out.showEndTime, true);
+});
+
+test('migrateDisplayBlocks: чистый профиль остаётся чистым', () => {
+    assert.deepEqual(migrateDisplayBlocks({}), {});
+    assert.deepEqual(migrateDisplayBlocks(null), {});
+});
+
+// ---------------------------------------------------------------------------
+// fitBlockScale — потолок масштаба таймера дисплея (17.08.2026)
+// ---------------------------------------------------------------------------
+// Блок таймера увеличивается `transform: scale`, а трансформация раскладку не
+// двигает: подпись «Осталось» сверху и плашка статуса снизу остаются на месте,
+// и круг просто наезжает на них, а потом уходит за край окна. Замер до правки
+// на окне 3440×1320: при 150 % круг перекрывал подпись на 148px и плашку на
+// 22px, при 200 % выходил за окно на 66px сверху и снизу, при 300 % — на 429px.
+const { fitBlockScale } = require('../renderer-shared');
+
+// Блок 100×100 с центром в (100, 100); свободно 50px в каждую сторону.
+const BOX = { width: 100, height: 100, centerX: 100, centerY: 100 };
+const FREE = { left: 50, right: 150, top: 50, bottom: 150 };
+
+test('fitBlockScale: запрошенный масштаб проходит, если помещается', () => {
+    assert.equal(fitBlockScale({ ...BOX, free: FREE, requested: 100 }), 100);
+});
+
+test('fitBlockScale: не помещается — обрезается до влезающего', () => {
+    // Свободно 50px от центра вверх, полублок 50px → потолок ровно 100 %.
+    assert.equal(fitBlockScale({ ...BOX, free: FREE, requested: 300 }), 100);
+});
+
+test('fitBlockScale: потолок берётся по САМОЙ ТЕСНОЙ стороне', () => {
+    // По горизонтали влезает 150 %, по вертикали 120 % — ответ 120.
+    // Сторона, а не среднее: наезжает именно тесная.
+    const free = { left: 25, right: 175, top: 40, bottom: 160 };
+    assert.equal(fitBlockScale({ ...BOX, free, requested: 300 }), 120);
+});
+
+test('fitBlockScale: ниже 100 % потолок не опускается — это дело раскладки', () => {
+    // Тесная сторона дала бы 40 %, но уменьшать блок, которого никто не
+    // увеличивал, здесь не наше дело: место под 100 % отводит раскладка.
+    assert.equal(fitBlockScale({ ...BOX, free: { ...FREE, top: 80 }, requested: 300 }), 100);
+});
+
+test('fitBlockScale: уменьшение НИКОГДА не ограничивается', () => {
+    assert.equal(fitBlockScale({ ...BOX, free: { left: 99, right: 101, top: 99, bottom: 101 }, requested: 30 }), 30);
+});
+
+test('fitBlockScale: мусор возвращает запрошенное, а не 0 и не NaN', () => {
+    // Замер мог не состояться (окно не разложено) — тогда лучше показать
+    // масштаб как есть, чем схлопнуть таймер в точку.
+    for (const bad of [
+        { width: 0, height: 100, centerX: 100, centerY: 100, free: FREE, requested: 250 },
+        { width: 100, height: NaN, centerX: 100, centerY: 100, free: FREE, requested: 250 },
+        { ...BOX, free: null, requested: 250 },
+        { ...BOX, free: FREE, requested: NaN }
+    ]) {
+        const out = fitBlockScale(bad);
+        assert.ok(Number.isFinite(out), `ожидалось число, получено ${out}`);
+    }
+    assert.equal(fitBlockScale({ width: 0, height: 100, centerX: 100, centerY: 100, free: FREE, requested: 250 }), 250);
+});
+
 const { windowRowSubtitle } = require('../panel-state');
 
 test('windowRowSubtitle: закрытое окно описывает себя', () => {
@@ -536,4 +665,49 @@ test('migrateTimerStyle: мусор возвращается как есть —
     assert.equal(migrateTimerStyle(''), '');
     assert.equal(migrateTimerStyle(null), null);
     assert.equal(migrateTimerStyle(undefined), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// surfaceTone — тон окна, чей фон задан ПОДЛОЖКОЙ, а не режимом фона
+// ---------------------------------------------------------------------------
+// Виджет и часы фона окна не имеют: они лежат поверх чужого рабочего стола, и
+// единственное, что там красится, — подложка стиля (пара «цвет + прозрачность»
+// из panel-colors.js). Отсюда та же развилка, что у дисплея, но с другим
+// входом: решает ЯРКОСТЬ подложки, а тема выбирает её по умолчанию.
+const { surfaceTone } = require('../renderer-shared');
+
+test('surfaceTone: без подложки решает тема', () => {
+    assert.equal(surfaceTone({ theme: 'light' }), 'light');
+    assert.equal(surfaceTone({ theme: 'dark' }), 'dark');
+    assert.equal(surfaceTone({}), 'dark', 'без темы — прежнее поведение окна');
+    assert.equal(surfaceTone(), 'dark', 'без аргумента тоже');
+});
+
+test('surfaceTone: непрозрачная подложка решает сама, вопреки теме', () => {
+    assert.equal(surfaceTone({ color: '#ffffff', theme: 'dark' }), 'light');
+    assert.equal(surfaceTone({ color: '#0b0b0d', theme: 'light' }), 'dark');
+});
+
+test('surfaceTone: сквозь полупрозрачную подложку виден чужой стол — решает тема', () => {
+    // Ровно тот случай, где «померить подложку» было бы враньём: при alpha 0.2
+    // цвет под цифрами задаёт не подложка, а обои пользователя. Гадать по ним
+    // нельзя, поэтому возвращаемся к теме — так же, как дисплей поступает с
+    // картинкой на фоне.
+    assert.equal(surfaceTone({ color: '#ffffff', alpha: 0.2, theme: 'dark' }), 'dark');
+    assert.equal(surfaceTone({ color: '#000000', alpha: 0.2, theme: 'light' }), 'light');
+    assert.equal(surfaceTone({ color: '#ffffff', alpha: 0, theme: 'dark' }), 'dark',
+        'полностью погашенная подложка не красит ничего');
+});
+
+test('surfaceTone: плотная подложка решает сама', () => {
+    // Порог — половина: при 0.5 цвет подложки и цвет стола вносят поровну, и
+    // дальше уже подложка перевешивает.
+    assert.equal(surfaceTone({ color: '#ffffff', alpha: 0.9, theme: 'dark' }), 'light');
+    assert.equal(surfaceTone({ color: '#0b0b0d', alpha: 0.5, theme: 'light' }), 'dark');
+});
+
+test('surfaceTone: нечитаемый цвет откатывается к теме, а не роняет окно', () => {
+    for (const junk of ['чепуха', '', 'rgb(1,2,3)', null, undefined, 42]) {
+        assert.equal(surfaceTone({ color: junk, theme: 'light' }), 'light', `цвет ${String(junk)}`);
+    }
 });

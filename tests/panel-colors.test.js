@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { codeOnly } = require('./helpers/source-scan');
+const { codeOnly, styleToken } = require('./helpers/source-scan');
 
 const { mergeColors, PanelColorsMixin, SURFACE_TARGETS } = require('../panel-colors');
 
@@ -203,10 +203,18 @@ test('подложка стиля умножает свою альфу на --su
             return bg[0];
         };
 
-        assert.match(bgOf('widget-analog-clock'), /var\(--surface-alpha, 1\)/,
+        // У виджета таймера стопы циферблата уехали в токены --style-dial-*
+        // (18.08.2026): множитель --surface-alpha остался, но живёт теперь в
+        // surface-tones.css. Проверка идёт ПО ССЫЛКЕ, иначе она стерегла бы
+        // строку `var(--style-dial-inner)`, то есть ничего.
+        const analogBg = bgOf('widget-analog-clock');
+        const resolvedAnalog = analogBg.replace(/var\(--(style-[a-z-]+)\)/g,
+            (_, name) => styleToken(name, 'dark'));
+        assert.match(resolvedAnalog, /var\(--surface-alpha, 1\)/,
             `${file}: подложка аналога не читает прозрачность`);
 
-        const flipBg = bgOf('widget-flip-inner');
+        const flipBg = bgOf('widget-flip-inner').replace(/var\(--(style-[a-z-]+)\)/g,
+            (_, name) => styleToken(name, 'dark'));
         // Проверка ОТСУТСТВИЯ обязана проверить сама себя.
         const alpha = /--surface-alpha|rgba\(/;
         assert.match('background: rgba(1, 2, 3, calc(0.85 * var(--surface-alpha, 1)));', alpha,

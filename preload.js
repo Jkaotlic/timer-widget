@@ -39,6 +39,8 @@ const ALLOWED_CHANNELS = {
         'widget-resize',
         'widget-move',
         'report-scale',
+        'display-block-hidden',
+        'display-layout',
         'display-move',
         // Дубль из channel-validator.js — sandbox запрещает здесь require().
         // Оба списка обязаны совпадать, это проверяет channel-validator.test.js.
@@ -66,6 +68,8 @@ const ALLOWED_CHANNELS = {
         'widget-window-state',
         'clock-window-state',
         'scale-report',
+        'block-hidden',
+        'display-layout',
         'window-geometry',
         'ui-theme-update',
         'timer-recovery-available'

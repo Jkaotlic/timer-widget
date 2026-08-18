@@ -758,26 +758,54 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         // подмешивать его во все предыдущие кадры. Снимаем два стиля: круг (базовая
         // раскладка карточек) и аналог (там у блоков свой круглый вид с мини-часами).
         log.info('[screenshot] info blocks');
-        for (const style of ['circle', 'analog']) {
-            const w = ctx();
-            if (!w.display || w.display.isDestroyed()) { break; }
-            try {
-                w.display.setSize(1280, 720);
-                w.display.webContents.send('display-settings-update', {
-                    timerStyle: style,
-                    showTimeBlocks: true,
-                    showCurrentTime: true,
-                    timeLayoutPreset: 'frame',
-                    eventTime: '10:00',
-                    endTime: '12:00'
-                });
-            } catch (e) {
-                log.warn(`[screenshot] info blocks (${style}) failed: ${e.message}`);
-                continue;
+        // Все ЧЕТЫРЕ стиля, а не два. С 18.08.2026 блок повторяет стиль
+        // таймера: у флипа значение стало пластиной со сгибом, у «Цифр» оно
+        // набирается выбранным шрифтом стиля. Снимать при этом только круг и
+        // аналог означало бы не иметь визуального покрытия ровно у того, что и
+        // менялось.
+        const blockStyles = ['circle', 'flip', 'analog', 'digits'];
+        const shootBlocks = async (suffix) => {
+            for (const style of blockStyles) {
+                const w = ctx();
+                if (!w.display || w.display.isDestroyed()) { break; }
+                try {
+                    w.display.setSize(1280, 720);
+                    w.display.webContents.send('display-settings-update', {
+                        timerStyle: style,
+                        // Фон — «По теме»: он и есть умолчание чистого профиля,
+                        // и без явной посылки кадр зависел бы от того, что
+                        // осталось в профиле съёмки от прошлых прогонов.
+                        bgMode: 'theme',
+                        // Тумблер на блок: общий «Показывать блоки» убран 17.08.2026.
+                        // ВСЕ ПЯТЬ, а не три: «До завершения» и название
+                        // мероприятия не попадали ни в один кадр, и ровно на
+                        // них 18.08.2026 нашлась жалоба «название мероприятия в
+                        // круге» — блок без циферблата получал круглую форму.
+                        showCurrentTime: true,
+                        showEventTime: true,
+                        showEndTime: true,
+                        showTimeLeft: true,
+                        showEventTitle: true,
+                        eventTime: '10:00',
+                        endTime: '12:00',
+                        eventTitle: 'Ежегодная конференция'
+                    });
+                } catch (e) {
+                    log.warn(`[screenshot] info blocks (${style}) failed: ${e.message}`);
+                    continue;
+                }
+                await sleep(600);
+                await capture(ctx().display, path.join(outDir, `display-blocks-${suffix}${style}.png`), log);
             }
-            await sleep(600);
-            await capture(ctx().display, path.join(outDir, `display-blocks-${style}.png`), log);
-        }
+        };
+        await shootBlocks('');
+
+        // Те же четыре стиля на СВЕТЛОМ тоне. До 18.08.2026 такого кадра быть не
+        // могло: фон дисплея по умолчанию был тёмным в любой теме.
+        log.info('[screenshot] info blocks (light)');
+        await sendTheme('light');
+        await shootBlocks('light-');
+        await sendTheme('dark');
 
         // Выдвижной ящик настроек.
         //

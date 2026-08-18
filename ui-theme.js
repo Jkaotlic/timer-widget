@@ -84,15 +84,54 @@ function initTheme() {
 }
 
 /**
+ * Ставит класс ТОНА ФОНА на <html>.
+ *
+ * Второй владелец в этом же модуле, и это не расширение обязанностей, а та же
+ * обязанность. Панель следует теме напрямую: её фон принадлежит теме. У
+ * виджета, часов и дисплея фон задаёт ПОЛЬЗОВАТЕЛЬ, и цвет текста там решает
+ * измеренная яркость фактического фона (RendererShared.backgroundTone /
+ * surfaceTone), а тема лишь выбирает фон по умолчанию. Палитру под этот класс
+ * держит surface-tones.css.
+ *
+ * Класс висит на <html> по той же причине, что и `data-theme`: токены вида
+ * `--tw-led-green: var(--tw-green)` вычисляются на :root, и палитра, объявленная
+ * ниже по дереву, до них не доедет.
+ *
+ * @param {'light'|'dark'} tone
+ * @returns {'light'|'dark'} что реально выставлено
+ */
+function applyTone(tone) {
+    const t = tone === 'light' ? 'light' : 'dark';
+    if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.classList.toggle('on-light-bg', t === 'light');
+    }
+    return t;
+}
+
+/**
+ * Первое приближение тона ДО прихода настроек: своего фона окно ещё не знает,
+ * значит решает тема. Вызывается из <head> рядом с initTheme(), чтобы первый
+ * кадр не мигнул чужой палитрой; уточняет его окно, когда доедут цвета.
+ */
+function initTone() {
+    return applyTone(readTheme() === 'light' ? 'light' : 'dark');
+}
+
+/**
  * Подписка на смену темы из другого окна. Слушатель — `on`, а НЕ `once`:
  * окно может быть перезагружено (bindRenderCrashHandler), и подписка обязана
  * работать снова — та же причина, по которой снимок состояния окон отправляется
  * на каждый did-finish-load.
  */
-function bindThemeSync(ipc) {
+function bindThemeSync(ipc, onThemeChange) {
     if (!ipc || typeof ipc.on !== 'function') { return; }
     ipc.on('ui-theme-update', (_event, payload) => {
-        applyTheme(payload && payload.theme);
+        const theme = applyTheme(payload && payload.theme);
+        // Колбэк — для окон, чей фон теме не принадлежит: сменилась тема, а
+        // значит могло смениться и то, какой фон стоит ПО УМОЛЧАНИЮ, то есть
+        // тон, то есть палитра. Без него смена темы в панели меняла атрибут и
+        // не меняла ни одного пикселя дисплея.
+        if (typeof onThemeChange === 'function') { onThemeChange(theme); }
     });
 }
 
@@ -107,6 +146,8 @@ const UITheme = {
     storeTheme,
     applyTheme,
     initTheme,
+    applyTone,
+    initTone,
     bindThemeSync
 };
 

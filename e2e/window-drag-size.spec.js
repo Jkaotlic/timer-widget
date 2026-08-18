@@ -118,3 +118,71 @@ for (const target of WINDOWS) {
         }
     });
 }
+
+/**
+ * То же правило, третье окно — и здесь оно нарушалось БЕЗ всякого вмешательства
+ * системы.
+ *
+ * Жалоба 17.08.2026: «выхожу из полноэкранного режима дисплея, меняю размер,
+ * потом тяну — размер сбрасывается». Причина не в перетаскивании, а в том, что
+ * дисплей не помечал НАЧАЛО жеста: главный процесс задаёт размер на каждом шаге
+ * (иначе окно «дышит» при переходе на монитор с другим масштабом), а какой
+ * именно — запоминает по флагу `first`. Виджет и часы шлют его из
+ * WindowGeometry.bindWindowDrag, у дисплея своя реализация перетаскивания, и
+ * флага в ней не было: размер запоминался при ПЕРВОМ в жизни окна
+ * перетаскивании и потом навязывался всем последующим. Замер до правки:
+ * 900×600 → перетащили → 1200×800, то есть размер часовой давности.
+ */
+test('дисплей: размер, заданный между жестами, переживает следующее перетаскивание', async () => {
+    const { app, control } = await launchApp();
+    const URL_PART = 'display.html';
+    const setBounds = (bounds) => app.evaluate(({ BrowserWindow }, b) => {
+        const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('display.html'));
+        if (win) { win.setBounds(b); }
+    }, bounds);
+    const drag = (page) => page.evaluate(() => {
+        const target = document.querySelector('.display-container');
+        const opts = (x, y) => ({ bubbles: true, cancelable: true, button: 0, screenX: x, screenY: y });
+        target.dispatchEvent(new MouseEvent('mousedown', opts(600, 600)));
+        for (let i = 1; i <= 4; i++) {
+            document.dispatchEvent(new MouseEvent('mousemove', opts(600 + i * 10, 600 + i * 6)));
+        }
+        document.dispatchEvent(new MouseEvent('mouseup', opts(640, 624)));
+    });
+
+    try {
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        const page = await findWindow(app, URL_PART);
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(1200);
+
+        // Из полноэкранного режима выходим: перетаскивание в нём запрещено.
+        await page.evaluate(() => window.ipcRenderer.send('toggle-fullscreen'));
+        await page.waitForTimeout(1000);
+
+        await setBounds({ x: 200, y: 150, width: 1200, height: 800 });
+        await page.waitForTimeout(600);
+
+        // Первый жест — он и запоминал размер «на всю жизнь окна».
+        await drag(page);
+        await page.waitForTimeout(600);
+        const afterFirst = await boundsOf(app, URL_PART);
+        expect(afterFirst.x, 'первое перетаскивание должно было сдвинуть окно').not.toBe(200);
+        expect(afterFirst.width, 'первое перетаскивание не должно менять ширину').toBe(1200);
+
+        // Пользователь меняет размер МЕЖДУ жестами — обычное действие.
+        await setBounds({ x: afterFirst.x, y: afterFirst.y, width: 900, height: 600 });
+        await page.waitForTimeout(600);
+        expect((await boundsOf(app, URL_PART)).width, 'размер должен был примениться').toBe(900);
+
+        // Второй жест обязан этот размер сохранить.
+        await drag(page);
+        await page.waitForTimeout(800);
+        const afterSecond = await boundsOf(app, URL_PART);
+        expect(afterSecond.width, `ширина ${afterSecond.width} вместо 900 — вернулся размер прошлого жеста`).toBe(900);
+        expect(afterSecond.height, `высота ${afterSecond.height} вместо 600 — вернулся размер прошлого жеста`).toBe(600);
+        expect(afterSecond.x, 'второе перетаскивание должно было сдвинуть окно').not.toBe(afterFirst.x);
+    } finally {
+        await app.close();
+    }
+});

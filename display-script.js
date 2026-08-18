@@ -83,6 +83,7 @@ class DisplayTimer {
         // две активные панели — до следующего пуша от панели управления.
         this.initDefaultStyle();
         this.loadColors();
+        this.initMovableElements();
         this.setupIPCIfAvailable();
         this.startCurrentTimeClock();
         this.setupResizeHandler();
@@ -118,6 +119,377 @@ class DisplayTimer {
         }
     }
 
+    /**
+     * Реестр подвижных элементов: id из display-layouts.js → узел этого окна.
+     *
+     * Список ОДИН на всё окно: по нему вешается перетаскивание, крестик и
+     * колесо, по нему же раскладываются раскладки и сохраняются позиции с
+     * масштабами. Раньше он был написан трижды — в setupBlockControls, в
+     * restoreBlockPositions и в applyDisplaySettings, — и блок «До завершения»
+     * успел появиться в двух копиях из трёх: масштаб его не касался вовсе.
+     */
+    initMovableElements() {
+        const nodes = {
+            currentTime: this.currentTimeBlock,
+            eventTime: this.eventTimeBlock,
+            endTime: this.endTimeBlock,
+            timeLeft: this.timeLeftBlock,
+            eventTitle: this.eventTitleBlock,
+            heroLabel: this.heroLabel,
+            statusPill: this.statusPill
+        };
+        // Подпись и плашка масштабируются кеглем через переменную на <body>
+        // (см. display.css): они набраны в em и `transform` им не годится —
+        // подпись стоит в потоке, а трансформация в раскладке не участвует.
+        const labelVars = { heroLabel: '--hero-label-scale', statusPill: '--status-pill-scale' };
+        const registry = (window.DisplayLayouts && window.DisplayLayouts.DISPLAY_ELEMENTS) || [];
+        this.movableElements = registry
+            .map((row) => Object.assign({}, row, {
+                el: nodes[row.id],
+                cssVar: labelVars[row.id] || null,
+                // Подпись стоит В ПОТОКЕ над таймером, и колонка держит под неё
+                // место. Ушла из потока — компенсация обязана уйти следом.
+                flowClass: row.id === 'heroLabel' ? 'hero-label-moved' : null
+            }))
+            .filter((row) => row.el);
+        this.elementScales = {};
+        // Доля окна для КАЖДОГО сдвинутого элемента — по ней он переставляется
+        // при смене размера окна (см. reflowElements).
+        this.elementFractions = {};
+    }
+
+    movableRow(id) {
+        return (this.movableElements || []).find((row) => row.id === id) || null;
+    }
+
+    /**
+     * Масштаб ОДНОГО элемента. Возвращает применённое значение.
+     *
+     * Масштабов теперь семь, по одному на элемент. Общего больше нет: он двигал
+     * три карточки из семи элементов, и пользователь, увеличивший «Текущее
+     * время», получал заодно увеличенные «Начало» и «Окончание».
+     */
+    applyElementScale(id, pct) {
+        const row = this.movableRow(id);
+        if (!row) { return null; }
+        const value = window.DisplayLayouts.clampScale(pct);
+        if (value === null) { return null; }
+        this.elementScales[id] = value;
+        if (row.cssVar) {
+            document.body.style.setProperty(row.cssVar, String(value / 100));
+        } else {
+            row.el.style.setProperty('--info-scale', String(value / 100));
+        }
+        return value;
+    }
+
+    saveElementScales() {
+        this._safeSetItem('displayBlockScales', JSON.stringify(this.elementScales));
+    }
+
+    /**
+     * Масштабы из хранилища. Старый общий ключ `displayBlockScale` читается как
+     * запасной: профиль, переживший обновление, обязан открыться таким же.
+     */
+    restoreElementScales() {
+        const parse = window.SecurityUtils && window.SecurityUtils.safeJSONParse;
+        let stored = null;
+        try {
+            const raw = localStorage.getItem('displayBlockScales');
+            stored = parse ? parse(raw, null) : null;
+        } catch { /* ok */ }
+        let legacy = null;
+        try {
+            const raw = parseInt(localStorage.getItem('displayBlockScale'), 10);
+            if (Number.isFinite(raw)) { legacy = raw; }
+        } catch { /* ok */ }
+        const scales = window.DisplayLayouts.normalizeScales(stored, legacy);
+        for (const [id, pct] of Object.entries(scales)) { this.applyElementScale(id, pct); }
+    }
+
+    /**
+     * Позиции ВСЕХ сдвинутых элементов — одна запись в хранилище.
+     *
+     * Пишутся И пиксели, И доля окна. Доля — то, чем пользуются: пиксель верен
+     * ровно для того окна, в котором его записали, и в оконном режиме, где
+     * размер меняют мышью, блоки по пикселям разъезжаются. Пиксель остаётся
+     * ради отката на предыдущую версию, которая доли не понимает.
+     */
+    saveElementPositions() {
+        const positions = {};
+        const viewport = { width: window.innerWidth, height: window.innerHeight };
+        for (const row of (this.movableElements || [])) {
+            if (!row.el.classList.contains('custom-position')) { continue; }
+            const record = {
+                left: parseInt(row.el.style.left) || 0,
+                top: parseInt(row.el.style.top) || 0
+            };
+            const rect = row.el.getBoundingClientRect();
+            const fraction = rect.width > 0
+                ? window.DisplayLayouts.positionToFraction(rect, viewport)
+                : null;
+            if (fraction) {
+                record.cx = Math.round(fraction.cx * 10000) / 10000;
+                record.cy = Math.round(fraction.cy * 10000) / 10000;
+                this.elementFractions[row.id] = fraction;
+            }
+            positions[row.id] = record;
+        }
+        if (Object.keys(positions).length > 0) {
+            this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
+        }
+    }
+
+    /**
+     * Переложить сдвинутые элементы под НОВЫЙ размер окна.
+     *
+     * Жалоба 17.08.2026: «сворачиваю окно, начинаю масштабировать — все плашки
+     * разъезжаются». Так и было: позиция хранилась в пикселях, а в оконном
+     * режиме размер окна меняет пользователь. Блок, стоявший у нижнего края,
+     * оказывался в середине, стоявший у правого — за краем. Вдобавок сами
+     * блоки набраны от `vw` и при смене ширины меняют габарит, так что даже
+     * «неподвижная» координата переставала означать то же место.
+     *
+     * Пересчёт идёт по ДОЛЕ, запомненной при постановке, а не по прежним
+     * пикселям: доля не зависит от того, каким окно было в прошлый раз.
+     */
+    reflowElements() {
+        // Тот же замер коробок, что и в раскладке, — значит та же оговорка про
+        // едущий `transform`: ресайз окна может прийти посреди перехода.
+        return this.withSettledTransforms(() => this._reflowPass());
+    }
+
+    _reflowPass() {
+        if (!this.movableElements || !this.elementFractions) { return; }
+        const viewport = { width: window.innerWidth, height: window.innerHeight };
+        if (!viewport.width || !viewport.height) { return; }
+        let moved = false;
+        for (const row of this.movableElements) {
+            if (!row.el.classList.contains('custom-position')) { continue; }
+            const fraction = this.elementFractions[row.id];
+            if (!fraction) { continue; }
+            const rect = row.el.getBoundingClientRect();
+            if (!rect.width || !rect.height) { continue; }
+            const pos = window.DisplayLayouts.fractionToPosition(
+                fraction, viewport, { width: rect.width, height: rect.height }
+            );
+            if (!pos) { continue; }
+            this.placeElementAt(row, pos.left, pos.top);
+            moved = true;
+        }
+        // Доли НЕ пересобираются из нового положения: у прижатого к краю
+        // элемента доля изменилась бы, и следующий ресайз считал бы уже от
+        // сдвинутой точки — окно «съедало» бы композицию шаг за шагом.
+        // Поэтому в хранилище уходят прежние доли с новыми пикселями.
+        if (moved) { this.saveElementPositionsKeepingFractions(); }
+    }
+
+    /** Записать позиции, оставив доли такими, какими они были. */
+    saveElementPositionsKeepingFractions() {
+        const positions = {};
+        for (const row of (this.movableElements || [])) {
+            if (!row.el.classList.contains('custom-position')) { continue; }
+            const record = {
+                left: parseInt(row.el.style.left) || 0,
+                top: parseInt(row.el.style.top) || 0
+            };
+            const fraction = this.elementFractions[row.id];
+            if (fraction) {
+                record.cx = Math.round(fraction.cx * 10000) / 10000;
+                record.cy = Math.round(fraction.cy * 10000) / 10000;
+            }
+            positions[row.id] = record;
+        }
+        if (Object.keys(positions).length > 0) {
+            this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
+        }
+    }
+
+    /**
+     * Поставить элемент так, чтобы его ВИДИМАЯ коробка встала в (left, top).
+     *
+     * Второй проход обязателен: `left`/`top` задают НЕотмасштабированную
+     * коробку, а видно отмасштабированную, и расходятся они на величину,
+     * зависящую от `transform-origin`. Тот же приём уже стоит в перетаскивании
+     * блоков — там его пришлось завести после замера «блок прыгает под курсором
+     * на 32px ещё до первого движения мыши».
+     */
+    markCustomPosition(row) {
+        row.el.classList.remove(
+            'top-left', 'top-center', 'top-right',
+            'bottom-left', 'bottom-center', 'bottom-right',
+            'top-left-third', 'top-right-third',
+            'bottom-left-third', 'bottom-right-third'
+        );
+        row.el.classList.add('custom-position');
+        if (row.flowClass) { document.body.classList.add(row.flowClass); }
+        row.el.style.right = '';
+        row.el.style.bottom = '';
+        row.el.style.marginLeft = '';
+        row.el.style.marginRight = '';
+    }
+
+    /**
+     * Выполнить расчёт раскладки на ОСЕВШИХ трансформациях.
+     *
+     * Всё, что здесь считается, опирается на замер коробок, а масштаб элемента
+     * едет переходом: `--info-scale` меняется мгновенно, `transform` — 400 мс.
+     * Замер в этом промежутке возвращает ПРОШЛЫЙ масштаб, и дальше он врёт
+     * дважды — в натуральном габарите и в доводке позиции.
+     *
+     * Класс снимается в requestAnimationFrame, а не сразу: значения к концу
+     * расчёта уже конечные, и вернувшийся переход анимировать не станет.
+     */
+    withSettledTransforms(fn) {
+        const body = document.body;
+        body.classList.add('layout-settling');
+        // Чтение форсирует пересчёт стилей: без него класс мог бы примениться
+        // уже ПОСЛЕ того, как браузер завёл переход на новое значение.
+        void body.offsetWidth;
+        try {
+            return fn();
+        } finally {
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => body.classList.remove('layout-settling'));
+            } else {
+                body.classList.remove('layout-settling');
+            }
+        }
+    }
+
+    placeElementAt(row, left, top) {
+        this.markCustomPosition(row);
+        row.el.style.left = left + 'px';
+        row.el.style.top = top + 'px';
+        const shifted = row.el.getBoundingClientRect();
+        row.el.style.left = (left + (left - shifted.left)) + 'px';
+        row.el.style.top = (top + (top - shifted.top)) + 'px';
+    }
+
+    /** Вернуть элемент на его место в раскладке окна (подпись, плашка). */
+    releaseToFlow(row) {
+        // Доля принадлежит СДВИНУТОМУ элементу. Оставь её здесь — и при первом
+        // же изменении размера окна вернувшийся в поток элемент снова выдернуло
+        // бы в старую точку.
+        if (this.elementFractions) { delete this.elementFractions[row.id]; }
+        row.el.classList.remove('custom-position');
+        if (row.flowClass) { document.body.classList.remove(row.flowClass); }
+        row.el.style.left = '';
+        row.el.style.top = '';
+        row.el.style.right = '';
+        row.el.style.bottom = '';
+        row.el.style.marginLeft = '';
+        row.el.style.marginRight = '';
+    }
+
+    /**
+     * Применить готовую раскладку.
+     *
+     * Порядок шагов несущий:
+     *   1. масштабы подписи и плашки — по ним считается свободное место;
+     *   2. подпись и плашка возвращаются в поток, если раскладка их там держит;
+     *   3. масштаб таймера — он ограничен свободным местом (fitTimerScale);
+     *   4. НАТУРАЛЬНЫЕ габариты карточек (замер делится на текущий масштаб);
+     *   5. раскладка считает координаты и, если надо, УМЕНЬШАЕТ масштаб;
+     *   6. запись позиций и масштабов.
+     *
+     * Тумблеры блоков здесь не трогаются вовсе: ими владеет панель, и она
+     * присылает их обычными настройками ДО этого канала. Вторая копия
+     * состояния видимости в этом окне уже была источником дефекта.
+     */
+    applyLayout(layoutId) {
+        const DL = window.DisplayLayouts;
+        const layout = DL && DL.layoutById(layoutId);
+        if (!layout || !this.movableElements) { return false; }
+
+        return this.withSettledTransforms(() => this._layoutPass(DL, layout));
+    }
+
+    /** Сам расчёт раскладки. Вызывается только из applyLayout, на осевших трансформациях. */
+    _layoutPass(DL, layout) {
+        const scales = DL.layoutScales(layout);
+        for (const [id, pct] of Object.entries(scales)) { this.applyElementScale(id, pct); }
+
+        for (const row of this.movableElements) {
+            const entry = layout.elements[row.id];
+            if (!entry || entry.flow) {
+                // Выключенный элемент тоже возвращается в поток: включённый
+                // потом руками, он иначе появился бы там, где его оставила
+                // позапрошлая раскладка.
+                if (row.cssVar) { this.releaseToFlow(row); }
+            }
+        }
+
+        this.timerScale = layout.timerScale;
+        const effective = this.applyTimerScale();
+        this.updateDigitsScale();
+        if (Number.isFinite(effective)) {
+            this.timerScale = effective;
+            this._safeSetItem('displayTimerScale', String(effective));
+            this._lastPushedTimerScale = effective;
+            if (this.ipcRenderer) {
+                this.ipcRenderer.send('report-scale', { source: 'display', scalePct: effective });
+            }
+        }
+
+        // Натуральный габарит — это НЕОТМАСШТАБИРОВАННАЯ коробка, и берётся она
+        // из offsetWidth/offsetHeight, а не из getBoundingClientRect() с
+        // делением на текущий масштаб.
+        //
+        // Почему деление не работало. Масштаб элемента живёт в `transform:
+        // scale(var(--info-scale))`, а на `transform` у `.info-block` висит
+        // переход в 400 мс. Переменная меняется мгновенно, матрица едет.
+        // Замер на живом окне ровно в этой точке: `--info-scale` уже `0.95`, а
+        // `transform` ещё `matrix(1.2, …)`, `getBoundingClientRect().width` =
+        // 255.8 при настоящих 213 — то есть замер отдавал ПРОШЛЫЙ масштаб, а
+        // делился на НОВЫЙ, и габарит выходил завышенным в (прошлый/новый) раз.
+        //
+        // На позицию это не влияло, и потому дефект дожил до жалобы: ошибка
+        // гасилась второй, симметричной — `placeElementAt` доводит видимую
+        // коробку до места ТЕМ ЖЕ устаревшим замером, и по арифметике обе
+        // сокращаются точно. А вот поджатие масштаба к свободной полосе внутри
+        // placeElements считается от высоты, и там гасить нечем: раскрученные
+        // колесом блоки, которые пересекают коробку таймера, приезжали на 62 %
+        // при 95 % у соседей — ряд из четырёх карточек ДВУХ разных размеров.
+        // Это и есть «пресеты ставят элементы неровно при масштабировании».
+        //
+        // offsetWidth/offsetHeight трансформацию не видят вовсе — ни текущую,
+        // ни промежуточную, — поэтому делить больше не на что и ждать
+        // нечего. Замер подтверждён: во всех состояниях перехода offsetWidth
+        // держался на 213.
+        const naturalSizes = {};
+        for (const row of this.movableElements) {
+            const entry = layout.elements[row.id];
+            if (!entry || entry.flow) { continue; }
+            const width = row.el.offsetWidth;
+            const height = row.el.offsetHeight;
+            if (!width || !height) { continue; }
+            naturalSizes[row.id] = { width, height };
+        }
+
+        const timerBlock = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
+            .find((b) => b && b.classList.contains('active'));
+        const timerBox = timerBlock ? timerBlock.getBoundingClientRect() : null;
+
+        const placed = DL.placeElements(
+            layout,
+            { width: window.innerWidth, height: window.innerHeight },
+            naturalSizes,
+            timerBox ? { timer: { left: timerBox.left, right: timerBox.right, top: timerBox.top, bottom: timerBox.bottom } } : {}
+        );
+
+        for (const [id, pos] of Object.entries(placed)) {
+            const row = this.movableRow(id);
+            if (!row) { continue; }
+            this.applyElementScale(id, pos.scale);
+            this.placeElementAt(row, pos.left, pos.top);
+        }
+
+        this.saveElementPositions();
+        this.saveElementScales();
+        return true;
+    }
+
     setupResizeHandler() {
         // Пересчитываем размеры при изменении окна с debounce.
         //
@@ -130,6 +502,10 @@ class DisplayTimer {
         const recalc = () => {
             this.applyTimerScale();
             this.updateDigitsScale();
+            // Сдвинутые элементы переставляются по своей доле окна: в оконном
+            // режиме размер меняет пользователь, и позиция в пикселях означала
+            // бы разъезжающуюся композицию.
+            this.reflowElements();
         };
         const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
             ? window.TimeUtils.debounce(recalc, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
@@ -198,13 +574,20 @@ class DisplayTimer {
                     break;
             }
 
-            // 1-8: Quick timer presets (5, 10, 15, 20, 25, 30, 45, 60 minutes)
-            if (e.code >= 'Digit1' && e.code <= 'Digit8') {
-                e.preventDefault();
+            // Пресеты. Комментарий «1-8 (5,10,15,20,25,30,45,60 минут)» остался
+            // от прежнего набора длительностей: их четыре
+            // (CONFIG.PRESET_DURATIONS), и клавиши 5–8 слали
+            // `seconds: undefined`, что движок приводит к нулю — то есть
+            // СБРАСЫВАЛИ ТАЙМЕР. Диапазон выводится из реестра, а не пишется
+            // числом: второе число разъедется с реестром при первой же правке.
+            if (e.code >= 'Digit1' && e.code <= 'Digit9') {
                 const presets = window.CONFIG.PRESET_DURATIONS;
                 const idx = parseInt(e.code.replace('Digit', '')) - 1;
-                if (this.ipcRenderer) {
-                    this.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                if (idx < presets.length) {
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                    }
                 }
             }
         };
@@ -221,11 +604,123 @@ class DisplayTimer {
      * пятую строку в трёх местах, и пропуск в одном из них не виден ничем.
      */
     applyTimerScale() {
-        const scale = (this.timerScale || 100) / 100;
+        const requested = this.timerScale || 100;
+        // Потолок по свободному месту: `transform` раскладку не двигает, и без
+        // него увеличенный блок наезжает на подпись «Осталось» и плашку
+        // статуса, а дальше уходит за край окна (замер: 150 % — перекрытие
+        // подписи на 148px, 300 % — вылет на 429px). Считается по АКТИВНОМУ
+        // блоку: у стилей разные габариты, и общий потолок был бы либо
+        // бессмысленно тесным для одних, либо бесполезным для других.
+        const effective = this.fitTimerScale(requested);
+        const scale = effective / 100;
         const blocks = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits];
         for (const block of blocks) {
-            if (block) { block.style.transform = `scale(${scale})`; }
+            if (!block) { continue; }
+            block.style.transform = `scale(${scale})`;
+            // Место под прирост РЕЗЕРВИРУЕТСЯ полями: `transform` в раскладке
+            // не участвует, поэтому подпись «Осталось» оставалась стоять
+            // вплотную к невыросшему габариту и круг наезжал на неё уже на
+            // 106 %. С полями подпись отъезжает вверх ровно на столько, на
+            // сколько блок вырос, и потолок по свободному месту поднимается
+            // (замер на 3440×1320: 106 % → 142 %).
+            // Поля симметричны, иначе центр блока поехал бы вниз — а он общий
+            // с центром окна и на нём держится вся композиция.
+            const grow = Math.max(0, (block.offsetHeight * (scale - 1)) / 2);
+            block.style.marginTop = grow ? grow + 'px' : '';
+            block.style.marginBottom = grow ? grow + 'px' : '';
         }
+        return effective;
+    }
+
+    /**
+     * ЧТО именно не даёт таймеру расти дальше.
+     *
+     * Потолок считается по свободной полосе (см. fitTimerScale), а полосу
+     * задают подпись сверху и плашка снизу. Молчаливый упор читается как
+     * «колесо только уменьшает» — жалоба пользователя 17.08.2026, и он был
+     * прав: вверх ничего не происходит, вниз работает. Ответ на жест обязан
+     * называть ПРИЧИНУ, иначе это неисправность, а не ограничение.
+     *
+     * @returns {string} человеческое имя помехи
+     */
+    timerScaleBlocker() {
+        const labelH = this.heroLabel ? this.heroLabel.getBoundingClientRect().height : 0;
+        const pillRect = this.statusPill ? this.statusPill.getBoundingClientRect() : null;
+        const pill = pillRect && pillRect.height > 0 ? pillRect : null;
+        const centerY = window.innerHeight / 2;
+        const topSlack = centerY - labelH;
+        const bottomSlack = (pill ? pill.top : window.innerHeight) - centerY;
+        if (bottomSlack <= topSlack) {
+            return pill ? 'мешает плашка состояния' : 'дальше край экрана';
+        }
+        return labelH > 0 ? 'мешает подпись над таймером' : 'дальше край экрана';
+    }
+
+    /**
+     * Короткая надпись поверх окна: почему жест ничего не сделал.
+     *
+     * Живёт ровно столько, сколько нужно прочесть. В презентации на экране не
+     * должно оставаться служебных надписей, поэтому она не липнет.
+     */
+    showScaleNote(text) {
+        if (!this.scaleNote) { this.scaleNote = document.getElementById('scaleNote'); }
+        if (!this.scaleNote) { return; }
+        this.scaleNote.textContent = text;
+        this.scaleNote.classList.add('visible');
+        if (this._scaleNoteTimer) { clearTimeout(this._scaleNoteTimer); }
+        this._scaleNoteTimer = setTimeout(() => {
+            this.scaleNote.classList.remove('visible');
+            this._scaleNoteTimer = null;
+        }, 2200);
+    }
+
+    /**
+     * Сколько процентов из запрошенных реально помещается.
+     *
+     * Свободное место — это полоса между подписью над таймером и плашкой
+     * статуса, обрезанная краями окна: обе стоят на своих местах и при
+     * увеличении блока никуда не двигаются, потому что трансформация в
+     * раскладке не участвует. Арифметика — в `RendererShared.fitBlockScale`,
+     * чтобы проверяться в Node.
+     */
+    fitTimerScale(requested) {
+        const blocks = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits];
+        const active = blocks.find((b) => b && b.classList.contains('active'));
+        if (!active || !window.RendererShared || !window.RendererShared.fitBlockScale) { return requested; }
+
+        // Габарит БЕЗ трансформации: offsetWidth/offsetHeight её не видят,
+        // а getBoundingClientRect() вернул бы уже увеличенный блок — то есть
+        // подал бы собственный выход себе на вход.
+        const width = active.offsetWidth;
+        const height = active.offsetHeight;
+        const rect = active.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        const GAP = 8;
+        // Сверху ограничивает не ТЕКУЩЕЕ положение подписи, а место, которое ей
+        // нужно: подпись стоит в потоке над блоком и при росте уезжает вверх
+        // вместе с полями (см. applyTimerScale). Считать по её нынешнему
+        // нижнему краю значило бы мерить собственный выход: чем больше блок,
+        // тем выше подпись, тем «теснее» она выглядит.
+        const labelH = this.heroLabel ? this.heroLabel.getBoundingClientRect().height : 0;
+        // Снизу — плашка статуса: она прижата к краю окна и не уступает.
+        // ВЫКЛЮЧЕННАЯ плашка не ограничивает ничего: у скрытого элемента
+        // прямоугольник нулевой, и без проверки высоты `pill.top` дал бы 0 —
+        // то есть «свободного места нет вовсе», и таймер схлопнулся бы.
+        const pillRect = this.statusPill ? this.statusPill.getBoundingClientRect() : null;
+        const pill = pillRect && pillRect.height > 0 ? pillRect : null;
+
+        return window.RendererShared.fitBlockScale({
+            width, height, centerX, centerY,
+            free: {
+                left: 0,
+                right: window.innerWidth,
+                top: labelH + GAP,
+                bottom: pill ? pill.top - GAP : window.innerHeight
+            },
+            requested
+        });
     }
 
     initDefaultStyle() {
@@ -239,6 +734,13 @@ class DisplayTimer {
         this.progressRing = document.getElementById('progressRing');
         this.statusPill = document.getElementById('statusPill');
         this.statusText = document.getElementById('statusText');
+        // Подпись над таймером. Её нижний край — верхняя граница свободного
+        // места для блока таймера (см. fitTimerScale). Раньше её доставали
+        // getElementById прямо в updateChipState — единственном месте, где она
+        // была нужна.
+        this.heroLabel = document.getElementById('heroLabel');
+        // Текст подписи живёт в отдельном span: в самом блоке ещё крестик.
+        this.heroLabelText = document.getElementById('heroLabelText');
         this.timerRing = document.getElementById('timerRing');
         this.currentTimeBlock = document.getElementById('currentTimeBlock');
         this.eventTimeBlock = document.getElementById('eventTimeBlock');
@@ -250,6 +752,12 @@ class DisplayTimer {
 
         // Элементы для разных стилей
         this.timerFlip = document.getElementById('timerFlip');
+
+        // Блоки, добавленные 17.08.2026: «До завершения» и название мероприятия.
+        this.timeLeftBlock = document.getElementById('timeLeftBlock');
+        this.timeLeftValueEl = document.getElementById('timeLeftValue');
+        this.eventTitleBlock = document.getElementById('eventTitleBlock');
+        this.eventTitleValueEl = document.getElementById('eventTitleValue');
 
         // Flip карточки
         this.flipMinus = document.getElementById('flipMinus');
@@ -309,6 +817,16 @@ class DisplayTimer {
             }
             // Обновляем стрелки мини-часов для текущего времени
             this.updateMiniClockHands(this.currentTimeBlock, now.getHours(), now.getMinutes(), now.getSeconds());
+
+            // «До завершения» — расстояние от системных часов до времени
+            // «Конец». С таймером доклада не связано: тот считает заданную
+            // длительность, а это — сколько идти до конца мероприятия.
+            if (this.timeLeftValueEl) {
+                const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+                const left = window.RendererShared.secondsUntilClock(nowSeconds, this.endTime);
+                // formatTime всегда даёт HH:MM:SS — «02:04:21» с фотографии.
+                this.timeLeftValueEl.textContent = window.TimeUtils.formatTime(left);
+            }
         };
         updateClock();
 
@@ -445,10 +963,20 @@ class DisplayTimer {
             this.applyDisplaySettings(settings);
         };
 
+        // Готовая раскладка. Приходит ПОСЛЕ настроек с тумблерами (панель шлёт
+        // их первыми): раскладка меряет живые габариты элементов, а у
+        // выключенного элемента прямоугольник нулевой — разложить его было бы
+        // не по чему.
+        this.ipcHandlers.displayLayout = (event, payload) => {
+            if (!payload || typeof payload.layout !== 'string') { return; }
+            this.applyLayout(payload.layout);
+        };
+
         // Регистрируем обработчики
         this.ipcRenderer.on('timer-state', this.ipcHandlers.timerState);
         this.ipcRenderer.on('display-colors-update', this.ipcHandlers.colorsUpdate);
         this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
+        this.ipcRenderer.on('display-layout', this.ipcHandlers.displayLayout);
     }
 
     applyDisplaySettings(settings) {
@@ -472,74 +1000,87 @@ class DisplayTimer {
         // шрифт только ПРИМЕНЯЕТСЯ, ничего никуда не пишет.
         if (settings.displayDigitsFont !== undefined) {
             const font = window.DigitsStyle.applyFont(this.digitsTime, settings.displayDigitsFont);
+            // Тот же шрифт — и блокам времени: в стиле «Цифры» блок обязан
+            // повторять сам стиль, а не оставаться набранным интерфейсным sans.
+            //
+            // ПЕРЕМЕННЫЕ, а не inline на каждом .info-value: инлайн сильнее
+            // любого правила и остался бы на блоках после переключения стиля,
+            // то есть «Цифры» красили бы блоки круга и аналога. Правило
+            // `body.style-digits .info-value` читает эти переменные, поэтому
+            // выбор шрифта действует ровно там, где выбран стиль.
+            const root = document.documentElement.style;
+            root.setProperty('--digits-font-family', font.family);
+            root.setProperty('--digits-font-weight', String(font.weight));
             if (font.id !== this.digitsFont) {
                 this.digitsFont = font.id;
                 this.updateDigitsScale();
+                // И ещё раз, когда доедет woff2: первый замер после
+                // переключения снимается с ЗАПАСНОГО начертания —
+                // `document.fonts.ready` разрешился на старте и об этом шрифте
+                // ничего не знал (см. isFontLoaded в digits-style.js).
+                window.DigitsStyle.ensureFont(font.id).then(() => {
+                    window.DigitsStyle.clearProbeCache();
+                    this.updateDigitsScale();
+                });
             }
         }
 
-        // Пресет расположения блоков времени
-        const showBlocks = settings.showTimeBlocks !== undefined ? settings.showTimeBlocks : false;
-        const preset = settings.timeLayoutPreset || 'frame';
-
-        // Определяем позиции по пресету
-        const presetPositions = {
-            'frame': {
-                current: 'top-center',
-                start: 'bottom-left',
-                end: 'bottom-right'
-            },
-            'top-line': {
-                current: 'top-center',
-                start: 'top-left-third',
-                end: 'top-right-third'
-            },
-            'bottom-line': {
-                current: 'bottom-center',
-                start: 'bottom-left-third',
-                end: 'bottom-right-third'
-            },
-            'corners': {
-                current: 'top-left',
-                start: 'top-right',
-                end: 'bottom-right'
-            }
-        };
-
-        const positions = presetPositions[preset] || presetPositions['frame'];
-
-        // Only reapply positions when preset changes — preserve custom drag positions
-        const presetChanged = this._lastPreset !== undefined && this._lastPreset !== preset;
-        const firstLoad = this._lastPreset === undefined;
-        this._lastPreset = preset;
-
-        // Check if blocks have custom positions (from Alt+drag)
+        // Блоки: у каждого свой тумблер. Общий `showTimeBlocks` и выбор пресета
+        // расположения убраны 17.08.2026 — перевод старых профилей делает
+        // RendererShared.migrateDisplayBlocks в панели, а расположение задаётся
+        // перетаскиванием (Alt) и живёт в displayBlockPositions.
+        //
+        // Место по умолчанию — прежняя «рамка»: она применяется ОДИН раз, на
+        // первой раскладке, и только к блоку, которого пользователь ещё не
+        // двигал. Раньше эти позиции переставлялись при смене пресета и тогда же
+        // стиралось сохранённое расположение; менять положение блока теперь
+        // некому, кроме самого пользователя.
+        const migrated = window.RendererShared.migrateDisplayBlocks(settings);
+        const firstLoad = this._blocksLaidOut !== true;
+        this._blocksLaidOut = true;
         const hasCustomPositions = (block) => block && block.classList.contains('custom-position');
 
-        // Показ/скрытие всех блоков времени
-        const showCurrentTime = settings.showCurrentTime !== false;
-        if (this.currentTimeBlock) {
-            this.currentTimeBlock.classList.toggle('visible', showBlocks && showCurrentTime);
-            if (presetChanged || (firstLoad && !hasCustomPositions(this.currentTimeBlock))) {
-                this.applyPosition(this.currentTimeBlock, positions.current);
+        const BLOCKS = [
+            { el: this.currentTimeBlock, key: 'showCurrentTime', home: 'top-center' },
+            { el: this.eventTimeBlock, key: 'showEventTime', home: 'bottom-left' },
+            { el: this.endTimeBlock, key: 'showEndTime', home: 'bottom-right' },
+            { el: this.timeLeftBlock, key: 'showTimeLeft', home: 'top-left' },
+            // Название НЕ ставится по центру снизу, хотя на образце у
+            // пользователя оно там: там же стоит плашка состояния, и на замере
+            // они наложились друг на друга. Пять блоков — пять разных углов;
+            // передвинуть в центр можно перетаскиванием, и это уже выбор
+            // пользователя, а вид по умолчанию не должен выглядеть сломанным.
+            { el: this.eventTitleBlock, key: 'showEventTitle', home: 'top-right' }
+        ];
+        for (const block of BLOCKS) {
+            if (!block.el) { continue; }
+            if (migrated[block.key] !== undefined) {
+                block.el.classList.toggle('visible', migrated[block.key] === true);
             }
-        }
-        if (this.eventTimeBlock) {
-            this.eventTimeBlock.classList.toggle('visible', showBlocks);
-            if (presetChanged || (firstLoad && !hasCustomPositions(this.eventTimeBlock))) {
-                this.applyPosition(this.eventTimeBlock, positions.start);
-            }
-        }
-        if (this.endTimeBlock) {
-            this.endTimeBlock.classList.toggle('visible', showBlocks);
-            if (presetChanged || (firstLoad && !hasCustomPositions(this.endTimeBlock))) {
-                this.applyPosition(this.endTimeBlock, positions.end);
+            if (firstLoad && !hasCustomPositions(block.el)) {
+                this.applyPosition(block.el, block.home);
             }
         }
 
-        // Clear saved positions only on explicit preset change
-        if (presetChanged) {
-            try { localStorage.removeItem('displayBlockPositions'); } catch { /* ok */ }
+        // Название мероприятия — единственное значение блока, которое вводит
+        // пользователь. Только textContent: разметка из настроек в окно не
+        // попадает, и экранировать нечего.
+        if (settings.eventTitle !== undefined && this.eventTitleValueEl) {
+            this.eventTitleValueEl.textContent = String(settings.eventTitle);
+        }
+
+        // Подпись над таймером и плашка состояния — по тумблеру на каждую.
+        // Скрывают всегда, а не только в перерасходе: элемент, который то есть,
+        // то нет, читается как сбой окна, а не как настройка.
+        // Класс на <body>, а не на самих элементах: подпись мало убрать — вместе
+        // с ней обязан уйти и нижний отступ колонки, которым её высота
+        // компенсируется (иначе таймер уедет вверх на половину подписи). Такое
+        // «одно состояние — два правила» и есть работа каскада.
+        if (settings.showHeroLabel !== undefined) {
+            document.body.classList.toggle('no-hero-label', settings.showHeroLabel === false);
+        }
+        if (settings.showStatusPill !== undefined) {
+            document.body.classList.toggle('no-status-pill', settings.showStatusPill === false);
         }
 
         // Время начала
@@ -585,8 +1126,19 @@ class DisplayTimer {
                 this._lastPushedTimerScale = incoming;
             }
         }
-        // Всегда применяем текущий масштаб
-        this.applyTimerScale();
+        // Всегда применяем текущий масштаб. Если он не поместился, ползунок
+        // панели обязан узнать РЕАЛЬНОЕ значение: два источника правды здесь
+        // уже расходились (см. комментарий выше), и молча показывать 300 % при
+        // видимых 130 % — тот же дефект с другой стороны.
+        const effectiveScale = this.applyTimerScale();
+        if (Number.isFinite(effectiveScale) && effectiveScale !== this.timerScale) {
+            this.timerScale = effectiveScale;
+            this._safeSetItem('displayTimerScale', String(effectiveScale));
+            this._lastPushedTimerScale = effectiveScale;
+            if (this.ipcRenderer) {
+                this.ipcRenderer.send('report-scale', { source: 'display', scalePct: effectiveScale });
+            }
+        }
 
         // Показ цифр на аналоговом циферблате
         if (settings.showAnalogNumbers !== undefined && this.clockNumbers) {
@@ -598,17 +1150,27 @@ class DisplayTimer {
         if (settings.timeBlocksScale !== undefined) {
             const incoming = parseInt(settings.timeBlocksScale, 10);
             if (Number.isFinite(incoming) && incoming !== this._lastPushedBlockScale) {
-                let effectivePct = incoming;
-                if (this._lastPushedBlockScale === undefined) {
-                    const localBlockScale = parseInt(localStorage.getItem('displayBlockScale'), 10);
-                    if (Number.isFinite(localBlockScale)) { effectivePct = localBlockScale; }
-                } else {
+                // ПЕРВАЯ посылка после открытия окна не применяется вовсе:
+                // масштабы уже восстановлены из хранилища, и каждый свой. Одно
+                // число ползунка перебило бы все пять — замер до правки:
+                // раскладка «Сводка» ставила карточкам 110 %, а хидрейт при
+                // следующем открытии окна возвращал им 100 % и СОХРАНЯЛ это,
+                // так что позиции переставали совпадать с сохранёнными на 10px.
+                // Та же логика уже стоит у масштаба таймера выше.
+                if (this._lastPushedBlockScale !== undefined) {
                     this._safeSetItem('displayBlockScale', String(incoming));
+                    // Ползунок панели — команда «поставить ВСЕМ карточкам
+                    // сразу», а не зеркало: масштабов семь, по одному на
+                    // элемент, и одним числом их не отобразить. Свой масштаб
+                    // элемента задаётся на дисплее (Ctrl+колесо над ним) и
+                    // панели не сообщается — иначе ползунок дёргался бы от
+                    // каждого элемента.
+                    for (const row of (this.movableElements || [])) {
+                        if (row.kind !== 'block') { continue; }
+                        this.applyElementScale(row.id, incoming);
+                    }
+                    this.saveElementScales();
                 }
-                const effectiveScale = effectivePct / 100;
-                if (this.currentTimeBlock) {this.currentTimeBlock.style.setProperty('--info-scale', effectiveScale);}
-                if (this.eventTimeBlock) {this.eventTimeBlock.style.setProperty('--info-scale', effectiveScale);}
-                if (this.endTimeBlock) {this.endTimeBlock.style.setProperty('--info-scale', effectiveScale);}
                 this._lastPushedBlockScale = incoming;
             }
         }
@@ -822,6 +1384,11 @@ class DisplayTimer {
         const mode = settings.bgMode || 'gradient';
         let bg = '';
 
+        // Последний применённый набор нужен на смену темы: в режиме «По теме»
+        // фон обязан перекраситься, а перекрашивать нечем, если настройки
+        // приходили один раз при открытии окна.
+        this._bgSettings = settings;
+
         // Страж яркости: цвет текста решает ФОН, а не тема. Режим передаётся уже
         // РАЗРЕШЁННЫЙ: первая версия отдавала сырой settings.bgMode, и на
         // профиле без сохранённого фона страж видел undefined, откатывался к
@@ -841,6 +1408,20 @@ class DisplayTimer {
             const c1 = this._isSafeColor(settings.bgGrad1) ? settings.bgGrad1 : '#0f0c29';
             const c2 = this._isSafeColor(settings.bgGrad2) ? settings.bgGrad2 : '#302b63';
             bg = `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`;
+        } else if (mode === 'theme') {
+            // «По теме» — умолчание чистого профиля. До 18.08.2026 умолчанием
+            // была тёмная ЗАЛИВКА, то есть фон дисплея не зависел от темы
+            // вовсе: светлая тема на дисплее существовала, но добраться до неё
+            // можно было только выбрав светлую заливку руками.
+            //
+            // Это по-прежнему НАСТРОЙКА, а не магия: выбравший заливку получит
+            // заливку. Цвета зашиты здесь, а не приходят полями, ровно
+            // поэтому: у режима нет пользовательских значений, которые можно
+            // было бы забыть сохранить.
+            document.body.classList.remove('custom-bg');
+            bg = this._themeIsLight()
+                ? 'linear-gradient(135deg, #ffffff 0%, #ececf3 100%)'
+                : 'linear-gradient(135deg, #0f0c29 0%, #302b63 100%)';
         } else if (mode === 'local' && settings.bgLocalImage) {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';
@@ -881,7 +1462,24 @@ class DisplayTimer {
         // на <body> переопределяла --tw-green уже после того, как
         // --tw-led-green вычислился из html-овского значения, и LED-зелёный
         // оставался светлым на тёмном фоне. Поймал это снимок окраски.
-        document.documentElement.classList.toggle('on-light-bg', tone === 'light');
+        window.UITheme.applyTone(tone);
+    }
+
+    /** Тема окна как булево — единственное место, где читается атрибут. */
+    _themeIsLight() {
+        return document.documentElement.getAttribute('data-theme') === 'light';
+    }
+
+    /**
+     * Смена темы в панели. Тема выбирает фон ПО УМОЛЧАНИЮ, а фон решает цвет
+     * текста — значит перекрасить надо и то и другое, и именно в этом порядке.
+     * Без этого переключатель темы менял атрибут и ни одного пикселя дисплея.
+     */
+    onThemeChanged() {
+        // Запасной набор — именно `{ bgMode: 'theme' }`, а не пустой объект:
+        // пустой разрешается в 'gradient' с тёмными умолчаниями, то есть смена
+        // темы ДО прихода настроек залила бы окно тёмным вопреки самой теме.
+        this.applyBackground(this._bgSettings || { bgMode: 'theme' });
     }
 
     applyLocalBackground(imageData, fit, overlay) {
@@ -1391,6 +1989,12 @@ class DisplayTimer {
             signWidth: probe.signWidth
         });
         if (size > 0) { this.digitsTime.style.setProperty('--digits-font-size', size + 'px'); }
+        // Вертикаль знака минуса — своя у каждого шрифта (см. measureSignShift):
+        // центрируется бокс, а видно чернила.
+        this.digitsTime.style.setProperty(
+            '--digits-sign-shift',
+            window.DigitsStyle.measureSignShift(this.digitsFont)
+        );
     }
 
     /**
@@ -1511,7 +2115,7 @@ class DisplayTimer {
     // показывал красный минус.
     updateChipState(status) {
         const pill = this.statusPill;
-        const label = document.getElementById('heroLabel');
+        const label = this.heroLabelText;
         if (!pill) { return; }
 
         // ЦВЕТ плашки задают только семантические классы (running / paused /
@@ -1582,7 +2186,6 @@ class DisplayTimer {
         const BLOCK_MAX_SCALE = 600;
         const TIMER_MIN_SCALE = window.CONFIG.MIN_TIMER_SCALE;
         const TIMER_MAX_SCALE = window.CONFIG.MAX_TIMER_SCALE;
-        const STORAGE_KEY = 'displayBlockPositions';
         const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
 
@@ -1607,10 +2210,25 @@ class DisplayTimer {
             : (value, min, max) => Math.max(min, Math.min(max, value));
         const scaleTimer = (delta) => {
             const cur = this.timerScale || 100;
-            const newPct = clampScale(cur + delta, TIMER_MIN_SCALE, TIMER_MAX_SCALE);
+            let newPct = clampScale(cur + delta, TIMER_MIN_SCALE, TIMER_MAX_SCALE);
             if (newPct !== cur) {
                 this.timerScale = newPct;
-                this.applyTimerScale();
+                // Колесо упирается в ПОТОЛОК по месту, а не крутится вхолостую
+                // до 300 %: иначе сохранённое значение и ползунок панели
+                // говорили бы одно, а окно показывало другое.
+                const effective = this.applyTimerScale();
+                if (effective !== newPct) {
+                    newPct = effective;
+                    this.timerScale = effective;
+                    if (effective === cur) {
+                        // Упор в потолок. Раньше здесь был молчаливый выход, и
+                        // жест выглядел сломанным: вверх ничего, вниз работает.
+                        if (delta > 0) {
+                            this.showScaleNote(`Таймер уже во всю высоту — ${this.timerScaleBlocker()}`);
+                        }
+                        return;
+                    }
+                }
                 this._safeSetItem(STORAGE_TIMER_SCALE_KEY, String(newPct));
                 // Сообщаем панели управления — иначе её ползунок останется на
                 // старом значении, и два источника правды снова разойдутся.
@@ -1620,22 +2238,39 @@ class DisplayTimer {
                 }
             }
         };
-        const scaleBlocks = (delta) => {
-            const raw = this.currentTimeBlock
-                ? getComputedStyle(this.currentTimeBlock).getPropertyValue('--info-scale')
-                : '1.2';
-            const cur = Math.round(parseFloat(raw) * 100) || 120;
-            const newPct = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
-            if (newPct !== cur) {
-                const scale = newPct / 100;
-                [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
-                    if (b) { b.style.setProperty('--info-scale', scale); }
-                });
-                this._safeSetItem(STORAGE_BLOCK_SCALE_KEY, String(newPct));
-                this._lastPushedBlockScale = newPct;
-                if (this.ipcRenderer) {
-                    this.ipcRenderer.send('report-scale', { source: 'display-blocks', scalePct: newPct });
-                }
+        // Масштаб ОДНОГО элемента. Панели он не сообщается намеренно: у неё
+        // один ползунок на все блоки, и семью значениями он не управляет.
+        // Ползунок остаётся командой «поставить всем сразу», а не зеркалом —
+        // зеркалом семи величин одно число быть не может.
+        const scaleOne = (id, delta) => {
+            const cur = this.elementScales[id];
+            const next = clampScale((cur || 100) + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
+            if (next === cur) {
+                // Тот же принцип, что у таймера: упор объясняется, а не молчит.
+                this.showScaleNote(delta > 0
+                    ? `Больше некуда: предел ${BLOCK_MAX_SCALE} %`
+                    : `Меньше некуда: предел ${BLOCK_MIN_SCALE} %`);
+                return;
+            }
+            this.applyElementScale(id, next);
+            this.saveElementScales();
+        };
+
+        // Масштаб ВСЕХ карточек сразу — Shift+колесо и ползунок панели.
+        // Подпись и плашка сюда не входят: у них своя пара, и «все блоки» на
+        // экране означает именно карточки.
+        const scaleAllBlocks = (delta) => {
+            const blocks = this.movableElements.filter((row) => row.kind === 'block');
+            if (!blocks.length) { return; }
+            const cur = this.elementScales[blocks[0].id] || 120;
+            const next = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
+            if (next === cur) { return; }
+            for (const row of blocks) { this.applyElementScale(row.id, next); }
+            this.saveElementScales();
+            this._safeSetItem(STORAGE_BLOCK_SCALE_KEY, String(next));
+            this._lastPushedBlockScale = next;
+            if (this.ipcRenderer) {
+                this.ipcRenderer.send('report-scale', { source: 'display-blocks', scalePct: next });
             }
         };
 
@@ -1643,19 +2278,40 @@ class DisplayTimer {
             if (!e.ctrlKey && !e.shiftKey) { return; }
             e.preventDefault();
             const step = window.CONFIG.SCALE_STEP;
-            const delta = e.deltaY < 0 ? step : -step;
+            // Ось берётся ТА, ПО КОТОРОЙ ПРИШЛО ДВИЖЕНИЕ, а не всегда вертикаль.
+            //
+            // Shift на macOS перекладывает колесо на горизонтальную ось: в
+            // событии приходит deltaX, а deltaY РАВЕН НУЛЮ. Прежняя строка
+            // `e.deltaY < 0 ? step : -step` относила ноль к «иначе», то есть
+            // ЛЮБОЙ поворот колеса со Shift означал уменьшение. Колесо со Shift
+            // умело только уменьшать и упиралось в предел 50 % — жалоба
+            // пользователя 17.08.2026, в его профиле все пять блоков лежали
+            // ровно на пятидесяти.
+            //
+            // Синтетическое событие этого не ловит: в тесте deltaY задаётся
+            // руками и нулём не бывает. Ось перекладывает СИСТЕМА, поэтому
+            // проверка обязана подавать deltaX — см. e2e/display-layouts.spec.js.
+            const raw = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+            if (!raw) { return; }
+            const delta = raw < 0 ? step : -step;
 
-            // Shift+Wheel always scales blocks
+            // Shift+колесо — всем карточкам сразу, где бы ни стоял курсор.
             if (e.shiftKey) {
-                scaleBlocks(delta);
+                scaleAllBlocks(delta);
                 return;
             }
 
-            // Ctrl+Wheel — context-sensitive: hover over info block → block scale, else → timer scale
+            // Ctrl+колесо — тому элементу, над которым курсор: карточке,
+            // подписи или плашке. Мимо всех — таймеру.
             const target = e.target;
-            const isOverBlock = target.closest('.info-block');
-            if (isOverBlock) {
-                scaleBlocks(delta);
+            const hovered = target && typeof target.closest === 'function'
+                ? target.closest('.display-movable')
+                : null;
+            const row = hovered
+                ? this.movableElements.find((r) => r.el === hovered)
+                : null;
+            if (row) {
+                scaleOne(row.id, delta);
             } else {
                 scaleTimer(delta);
             }
@@ -1663,28 +2319,47 @@ class DisplayTimer {
         document.addEventListener('wheel', this._handlers.wheel, { passive: false });
 
         // --- Alt+Drag blocks ---
-        const infoBlocks = [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].filter(Boolean);
-        const blockIds = ['currentTime', 'eventTime', 'endTime'];
+        // Реестр подвижных элементов — ОДИН на окно, он собран в
+        // initMovableElements по таблице display-layouts.js. Здесь он только
+        // читается: имя элемента уходит в панель при закрытии крестиком и в
+        // хранилище при перетаскивании, и второй список этих пар неизбежно
+        // разъехался бы с первым (в этом проекте так уже было).
+        // Особенность у подписи одна, и она в CSS: пока она в потоке, колонка
+        // компенсирует её высоту нижним отступом, а сдвинутая подпись
+        // становится `position: fixed` — тогда компенсацию надо снять, иначе
+        // таймер уедет вверх. За это отвечает класс `hero-label-moved`.
+        const BLOCK_REGISTRY = this.movableElements;
 
-        const saveBlockPositions = () => {
-            const positions = {};
-            infoBlocks.forEach((block, i) => {
-                if (block.classList.contains('custom-position')) {
-                    positions[blockIds[i]] = {
-                        left: parseInt(block.style.left) || 0,
-                        top: parseInt(block.style.top) || 0
-                    };
+        const saveBlockPositions = () => this.saveElementPositions();
+
+        // Крестик блока: гасит блок здесь же и сообщает панели, чтобы та сняла
+        // его тумблер. Владелец настроек — панель, и второй копии состояния тут
+        // не заводится: локальное скрытие нужно лишь для того, чтобы блок исчез
+        // в тот же кадр, а не через круг «дисплей → панель → дисплей».
+        this._handlers.blockCloses = [];
+        for (const row of BLOCK_REGISTRY) {
+            const button = row.el.querySelector('.info-close');
+            if (!button) { continue; }
+            const onClose = (e) => {
+                // stopPropagation обязателен: клик по крестику идёт сквозь блок,
+                // а на блоке висит начало перетаскивания.
+                e.preventDefault();
+                e.stopPropagation();
+                row.el.classList.remove('visible');
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('display-block-hidden', { block: row.toggle });
                 }
-            });
-            if (Object.keys(positions).length > 0) {
-                this._safeSetItem(STORAGE_KEY, JSON.stringify(positions));
-            }
-        };
+            };
+            this._handlers.blockCloses.push({ button, handler: onClose });
+            button.addEventListener('click', onClose);
+            // Нажатие мышью на крестике не должно начинать жест перетаскивания.
+            button.addEventListener('mousedown', (e) => e.stopPropagation());
+        }
 
         // Храним ссылки на mousedown handlers блоков для cleanup
         this._handlers.blockMousedowns = [];
 
-        infoBlocks.forEach((block) => {
+        BLOCK_REGISTRY.forEach(({ el: block, flowClass }) => {
             const blockMousedown = (e) => {
                 if (!e.altKey) { return; }
                 e.preventDefault();
@@ -1694,6 +2369,10 @@ class DisplayTimer {
                 // If block uses preset positioning, switch to absolute left/top
                 if (!block.classList.contains('custom-position')) {
                     const rect = block.getBoundingClientRect();
+                    // Элемент, стоявший В ПОТОКЕ (подпись над таймером),
+                    // уходит из него — и колонка обязана перестать держать под
+                    // него место, иначе таймер съедет.
+                    if (flowClass) { document.body.classList.add(flowClass); }
                     // Remove all position classes
                     block.classList.remove(
                         'top-left', 'top-center', 'top-right',
@@ -1709,6 +2388,19 @@ class DisplayTimer {
                     block.style.marginRight = '';
                     block.style.left = rect.left + 'px';
                     block.style.top = rect.top + 'px';
+
+                    // ВТОРОЙ проход — иначе блок прыгает под курсором в момент
+                    // нажатия. `left`/`top` задают положение НЕотмасштабированной
+                    // коробки, а `getBoundingClientRect()` возвращает видимую, то
+                    // есть увеличенную на --info-scale; насколько они разъезжаются,
+                    // зависит от `transform-origin`, а он у каждого места свой
+                    // (`top right` у правых, `center` у свободных). Замер: блок
+                    // названия уезжал на 32px влево и 7px вверх ещё до первого
+                    // движения мыши. Считать это в уме не нужно — достаточно
+                    // померить остаток и вычесть его.
+                    const shifted = block.getBoundingClientRect();
+                    block.style.left = (rect.left + (rect.left - shifted.left)) + 'px';
+                    block.style.top = (rect.top + (rect.top - shifted.top)) + 'px';
                 }
 
                 const startScreenX = e.screenX;
@@ -1716,25 +2408,49 @@ class DisplayTimer {
                 const startLeft = parseInt(block.style.left) || 0;
                 const startTop = parseInt(block.style.top) || 0;
                 let rafId = 0;
+                // Последнее ДВИЖЕНИЕ помнится отдельно от кадра отрисовки.
+                // Раньше `mouseup` отменял незавершённый кадр — и то, что
+                // произошло между последней отрисовкой и отпусканием мыши,
+                // пропадало: блок оставался чуть позади курсора, а в хранилище
+                // уходила эта же отставшая позиция. Заметно это ровно тогда,
+                // когда движение и отпускание попали в один кадр (быстрый
+                // короткий рывок) — то есть при аккуратной подгонке на пиксель.
+                let pending = null;
+
+                // Границы считаются по ВИДИМОЙ коробке и в её координатах, а
+                // `left`/`top` задают неотмасштабированную: между ними
+                // постоянный сдвиг, который здесь и замеряется. Прежний расчёт
+                // брал `offsetWidth` (без масштаба) и потому при --info-scale
+                // 1.2 позволял блоку вылезти за край на десятую его ширины.
+                const visual = block.getBoundingClientRect();
+                const offsetX = visual.left - (parseFloat(block.style.left) || 0);
+                const offsetY = visual.top - (parseFloat(block.style.top) || 0);
+
+                const place = () => {
+                    if (!pending) { return; }
+                    const dx = pending.x - startScreenX;
+                    const dy = pending.y - startScreenY;
+                    // Clamp so the block always keeps ~20px breathing room
+                    // from every viewport edge — a card flush against the
+                    // edge reads as a line on the side of the screen.
+                    const MARGIN = 20;
+                    const minLeft = MARGIN - offsetX;
+                    const minTop = MARGIN - offsetY;
+                    const maxLeft = Math.max(minLeft, window.innerWidth - visual.width - MARGIN - offsetX);
+                    const maxTop  = Math.max(minTop, window.innerHeight - visual.height - MARGIN - offsetY);
+                    const nextLeft = Math.min(maxLeft, Math.max(minLeft, startLeft + dx));
+                    const nextTop  = Math.min(maxTop,  Math.max(minTop, startTop + dy));
+                    block.style.left = nextLeft + 'px';
+                    block.style.top  = nextTop  + 'px';
+                };
 
                 const onMove = (ev) => {
                     ev.preventDefault();
+                    pending = { x: ev.screenX, y: ev.screenY };
                     if (rafId) { cancelAnimationFrame(rafId); }
                     rafId = requestAnimationFrame(() => {
-                        const dx = ev.screenX - startScreenX;
-                        const dy = ev.screenY - startScreenY;
-                        // Clamp so the block always keeps ~20px breathing room
-                        // from every viewport edge — a card flush against the
-                        // edge reads as a line on the side of the screen.
-                        const MARGIN = 20;
-                        const bw = block.offsetWidth || 0;
-                        const bh = block.offsetHeight || 0;
-                        const maxLeft = Math.max(MARGIN, window.innerWidth - bw - MARGIN);
-                        const maxTop  = Math.max(MARGIN, window.innerHeight - bh - MARGIN);
-                        const nextLeft = Math.min(maxLeft, Math.max(MARGIN, startLeft + dx));
-                        const nextTop  = Math.min(maxTop,  Math.max(MARGIN, startTop + dy));
-                        block.style.left = nextLeft + 'px';
-                        block.style.top  = nextTop  + 'px';
+                        rafId = 0;
+                        place();
                     });
                 };
 
@@ -1742,7 +2458,9 @@ class DisplayTimer {
                     block.classList.remove('dragging-block');
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
-                    if (rafId) { cancelAnimationFrame(rafId); }
+                    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+                    // Кадр мог не успеть — доводим руками, ПОТОМ сохраняем.
+                    place();
                     saveBlockPositions();
                 };
 
@@ -1755,6 +2473,7 @@ class DisplayTimer {
 
         // --- Window drag in windowed (non-fullscreen) mode ---
         let isWindowDrag = false;
+        let isFirstDragMove = true;
         let winDragStartX = 0, winDragStartY = 0;
 
         this._handlers.windowDragMousedown = (e) => {
@@ -1764,6 +2483,7 @@ class DisplayTimer {
             // Check if window is NOT fullscreen (body width === screen width as heuristic)
             if (window.innerWidth === screen.width && window.innerHeight === screen.height) { return; }
             isWindowDrag = true;
+            isFirstDragMove = true;
             winDragStartX = e.screenX;
             winDragStartY = e.screenY;
         };
@@ -1773,7 +2493,17 @@ class DisplayTimer {
             const dx = e.screenX - winDragStartX;
             const dy = e.screenY - winDragStartY;
             if (dx !== 0 || dy !== 0) {
-                this.ipcRenderer.send('display-move', { deltaX: dx, deltaY: dy });
+                // `first` помечает НАЧАЛО жеста, и без него окно теряет свой
+                // размер. Главный процесс задаёт размер на каждом шаге (иначе
+                // на мониторе с другим масштабом окно «дышит» — см. разбор про
+                // WM_DPICHANGED), а какой именно — запоминает по этому флагу.
+                // Дисплей его не слал вовсе: размер запоминался при ПЕРВОМ в
+                // жизни окна перетаскивании и потом навязывался всем
+                // последующим. Замер: окно 900×600 после перетаскивания
+                // становилось 1200×800 — тем, каким было час назад.
+                // Виджет и часы шлют этот флаг из WindowGeometry.bindWindowDrag.
+                this.ipcRenderer.send('display-move', { deltaX: dx, deltaY: dy, first: isFirstDragMove });
+                isFirstDragMove = false;
                 winDragStartX = e.screenX;
                 winDragStartY = e.screenY;
             }
@@ -1786,14 +2516,10 @@ class DisplayTimer {
         document.addEventListener('mousedown', this._handlers.windowDragMousedown);
         document.addEventListener('mousemove', this._handlers.windowDragMousemove);
         document.addEventListener('mouseup', this._handlers.windowDragMouseup);
-
-        // Store references for preset reset
-        this._blockControlRefs = { infoBlocks, blockIds, STORAGE_KEY, STORAGE_BLOCK_SCALE_KEY };
     }
 
     restoreBlockPositions() {
         const STORAGE_KEY = 'displayBlockPositions';
-        const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
 
         // Restore timer scale
@@ -1808,19 +2534,9 @@ class DisplayTimer {
             }
         } catch { /* ok */ }
 
-        // Restore block scale
-        try {
-            const savedScale = localStorage.getItem(STORAGE_BLOCK_SCALE_KEY);
-            if (savedScale) {
-                const pct = parseInt(savedScale);
-                if (pct >= 50 && pct <= 600) {
-                    const scale = pct / 100;
-                    [this.currentTimeBlock, this.eventTimeBlock, this.endTimeBlock].forEach(b => {
-                        if (b) { b.style.setProperty('--info-scale', scale); }
-                    });
-                }
-            }
-        } catch { /* ok */ }
+        // Масштабы: свой у каждого элемента, со старым общим ключом как
+        // запасным (см. restoreElementScales и normalizeScales).
+        this.restoreElementScales();
 
         // Restore positions (with JSON structure validation)
         try {
@@ -1830,12 +2546,45 @@ class DisplayTimer {
             try { positions = JSON.parse(saved); } catch { return; }
             if (typeof positions !== 'object' || positions === null) { return; }
 
-            const blocks = { currentTime: this.currentTimeBlock, eventTime: this.eventTimeBlock, endTime: this.endTimeBlock };
-            for (const [key, block] of Object.entries(blocks)) {
-                if (!block) { continue; }
+            // Имена берутся из ТОГО ЖЕ реестра, что и при сохранении
+            // (initMovableElements). Прежде здесь стоял его третий по счёту
+            // список, и блок, забытый в нём, терял сохранённое место при
+            // каждом открытии окна, молча возвращаясь в исходный угол.
+            for (const row of this.movableElements) {
+                const key = row.id;
+                const block = row.el;
                 const pos = positions[key];
                 if (!pos || typeof pos !== 'object') { continue; }
                 if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) { continue; }
+
+                // Доля окна главнее пикселя: окно могли открыть на другом
+                // мониторе или другого размера, и пиксель означал бы место в
+                // ПРОШЛОМ окне. Пиксель остаётся запасным путём для записей,
+                // сделанных версией, которая долей ещё не знала.
+                const fraction = (Number.isFinite(pos.cx) && Number.isFinite(pos.cy))
+                    ? { cx: pos.cx, cy: pos.cy }
+                    : null;
+
+                // Классы места снимает общий метод — он же снимает компенсацию
+                // потока у подписи (см. row.flowClass).
+                this.markCustomPosition(row);
+
+                if (fraction) {
+                    this.elementFractions[key] = fraction;
+                    const rect = block.getBoundingClientRect();
+                    const placed = rect.width > 0
+                        ? window.DisplayLayouts.fractionToPosition(
+                            fraction,
+                            { width: window.innerWidth, height: window.innerHeight },
+                            { width: rect.width, height: rect.height }
+                        )
+                        : null;
+                    if (placed) {
+                        this.placeElementAt(row, placed.left, placed.top);
+                        continue;
+                    }
+                }
+
                 // Pull saved positions into the viewport with a 20px margin so
                 // old coordinates (from before the clamp was enforced) don't
                 // leave blocks flush against the screen edges.
@@ -1846,19 +2595,19 @@ class DisplayTimer {
                 const maxTop  = Math.max(MARGIN, window.innerHeight - bh - MARGIN);
                 const left = Math.min(maxLeft, Math.max(MARGIN, pos.left));
                 const top  = Math.min(maxTop,  Math.max(MARGIN, pos.top));
-                block.classList.remove(
-                    'top-left', 'top-center', 'top-right',
-                    'bottom-left', 'bottom-center', 'bottom-right',
-                    'top-left-third', 'top-right-third',
-                    'bottom-left-third', 'bottom-right-third'
-                );
-                block.classList.add('custom-position');
-                block.style.right = '';
-                block.style.bottom = '';
-                block.style.marginLeft = '';
-                block.style.marginRight = '';
+                // Координата кладётся КАК СОХРАНЕНА. Не placeElementAt: тот
+                // приводит к цели ВИДИМУЮ коробку, а в хранилище лежит
+                // неотмасштабированная — поправка накапливалась бы при каждом
+                // открытии окна.
                 block.style.left = left + 'px';
                 block.style.top = top + 'px';
+                // Доли у старой записи нет — берём из фактического места, чтобы
+                // следующий ресайз уже умел пересчитывать.
+                const restored = block.getBoundingClientRect();
+                const own = restored.width > 0
+                    ? window.DisplayLayouts.positionToFraction(restored, { width: window.innerWidth, height: window.innerHeight })
+                    : null;
+                if (own) { this.elementFractions[key] = own; }
             }
         } catch { /* ok */ }
     }
@@ -1868,6 +2617,12 @@ class DisplayTimer {
         if (this.flashInterval) {
             clearInterval(this.flashInterval);
             this.flashInterval = null;
+        }
+
+        // Надпись про упор в предел могла не догореть.
+        if (this._scaleNoteTimer) {
+            clearTimeout(this._scaleNoteTimer);
+            this._scaleNoteTimer = null;
         }
 
         // Самокорректирующийся таймер часов «Текущее время»
@@ -1896,6 +2651,9 @@ class DisplayTimer {
             }
             if (this.ipcHandlers.displaySettingsUpdate) {
                 this.ipcRenderer.removeListener('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
+            }
+            if (this.ipcHandlers.displayLayout) {
+                this.ipcRenderer.removeListener('display-layout', this.ipcHandlers.displayLayout);
             }
             if (this.ipcHandlers.widgetWindowState) {
                 this.ipcRenderer.removeListener('widget-window-state', this.ipcHandlers.widgetWindowState);
@@ -2002,6 +2760,9 @@ let displayTimer;
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', () => {
         displayTimer = new DisplayTimer();
+        // На window — слушатель темы стоит отдельным <script> в display.html и
+        // в область этого модуля не заглядывает.
+        window.displayTimer = displayTimer;
 
         // Hint-strip: показываем первые 5 секунд, затем навсегда скрываем
         // (без возврата на mousemove/keydown — чтобы не мешала в презентации)
