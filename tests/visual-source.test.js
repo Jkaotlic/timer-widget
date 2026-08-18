@@ -125,11 +125,23 @@ test('колонка панели при открытом ящике счита�
     // Первая версия правки вычитала ящик из CONTROL_WINDOW_MAX_WIDTH и падала на
     // Windows: там главный процесс обрезает ширину ещё и по размеру экрана
     // (`screenWidth - 50`), поэтому эффективный потолок ниже константы, и колонка
-    // снова оказывалась шире доступного места. Предсказать это из рендерера нельзя.
+    // снова оказывалась шире доступного места.
+    //
+    // 18.08.2026 арифметика уехала в panel-drawer.js — обе её половины сразу:
+    // и пересчёт по факту (`columnFromWindow`), и предсказание финальной ширины
+    // (`drawerColumnWidth`, оно же чинит прыжок панели на узком экране). Пол у
+    // них общий, и держать его в двух местах было нельзя. Проверка ходит туда
+    // же: тут — что панель зовёт модуль по ФАКТИЧЕСКОЙ ширине окна, числа — в
+    // tests/panel-drawer.test.js.
     assert.match(
         controlHtml,
-        /const available = \(window\.innerWidth \|\| baseDefault\) - this\._drawerExtraWidth/,
+        /columnFromWindow\(\s*window\.innerWidth \|\| baseDefault, this\._drawerExtraWidth\)/,
         'колонка панели снова считается не от фактической ширины окна'
+    );
+    assert.match(
+        controlHtml,
+        /drawerColumnWidth\(\{[\s\S]{0,200}availWidth: window\.screen && window\.screen\.availWidth/,
+        'пин колонки перестал учитывать ширину экрана — на узком мониторе панель снова дёрнется'
     );
     assert.match(
         controlHtml,
