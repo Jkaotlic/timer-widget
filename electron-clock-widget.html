@@ -753,8 +753,19 @@
            ============================================ */
         .clock-digits {
             display: none;
+            /* КОЛОНКОЙ, а не строкой. Дата и пояс лежат тут прямыми детьми, и
+               без этой строки они вставали в один ряд со временем: замер на
+               окне 220×220 давал время `left: -84` (за левым краем), дату
+               122..220 и пояс 220..304 — целиком за окном. Пользователь описал
+               это как «неправильно позиционируются и всё смешивается».
+
+               У трёх остальных стилей часов у шильдиков своя колонка
+               (`.center-badges`, `.widget-flip-info`, `.widget-analog-info`);
+               у «Цифр» обёртки нет, и её роль играет сам контейнер стиля. */
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: clamp(2px, 1vh, 8px);
             width: 100%;
             height: 100%;
             /* Фон живёт на самих цифрах (.clock-digits-time): он обнимает
@@ -1238,10 +1249,23 @@
                 if (this.clockDigitsTime && this.clockDigitsProbe && this._digitsFontsReady) {
                     const sample = (showSeconds ? '88:88:88' : '88:88') + (this._uses24h() ? '' : ' PM');
                     const probe = window.DigitsStyle.measureDigits(this.clockDigitsProbe, this.digitsFont, sample);
+                    // Место, занятое датой и поясом, вычитается из доступной
+                    // ВЫСОТЫ. Они лежат в той же колонке, что и цифры, и без
+                    // этого кегль подбирался бы под всё окно, а шильдики
+                    // выдавливались бы за нижний край — тот же дефект, что
+                    // строка вместо колонки, только по другой оси.
+                    //
+                    // Замер шильдиков собственным выходом подгонки НЕ является:
+                    // их кегль задан clamp() от размера ОКНА и от
+                    // --digits-font-size не зависит вовсе. Иначе это была бы
+                    // подача замера себе на вход (см. разбор про подгонку).
+                    const badgesHeight = [this.digitsDateBadge, this.digitsTimezoneBadge]
+                        .filter((el) => el && el.offsetParent !== null)
+                        .reduce((sum, el) => sum + el.offsetHeight + 8, 0);
                     if (probe) {
                         const size = window.DigitsStyle.fitFontSize({
                             availableWidth: containerWidth * 0.9,
-                            availableHeight: containerHeight * 0.9,
+                            availableHeight: Math.max(0, containerHeight * 0.9 - badgesHeight),
                             probeWidth: probe.width,
                             probeHeight: probe.height,
                             signWidth: 0
