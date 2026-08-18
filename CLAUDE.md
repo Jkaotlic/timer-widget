@@ -57,8 +57,9 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `modal-manager.js` | `openModal`/`closeModal` with focus trap and focus return |
 | `shortcuts-help.js` | The F1 shortcuts overlay |
 | `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown` ставится ДО показа) и кнопка «Проверить обновления». Зависимости внедряются |
-| `mini-bar.js` | Режим «полоса» (400×52). Класс `collapsed` на `<body>` — всё, что модуль знает о вёрстке; панель отдаёт ЗНАЧЕНИЯ через `render({text, band})`, размер окна меняет main каналом `control-collapse` |
+| `mini-bar.js` | Режим «полоса» (400×52). Класс `collapsed` на `<body>` — всё, что модуль знает о вёрстке; панель отдаёт ЗНАЧЕНИЯ через `render({text, band})`, размер меняет main |
 | `panel-colors.js` | Цвета окон — **примесь**: ОДНА сборка объекта цветов (`updateColors(target, patch)`, `null` = сброс поля) и ряд «Фон». Разметку ряда строит сам модуль |
+| `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main, включая экран) и пересчёт по факту. Чистая — узкий экран проверяется числами |
 | `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, семь тумблеров, кнопки раскладок, приём «закрыли крестиком». Перечень тумблеров — в `settings-schema.js` |
 | `display-layouts.js` | Реестр семи подвижных элементов дисплея (id → тумблер → вид), масштабы и пять раскладок. Координаты — доли экрана для ЦЕНТРА; `placeElements` переводит их в пиксели и ужимает масштаб |
 | `panel-state.js` | Четыре состояния панели — **примесь**. Класс `state-*` на `<body>`, видимость решает CSS. Здесь же сборка payload `widget-style-update` и ручной ввод |
@@ -78,7 +79,7 @@ Rules when working here:
 - `constants.js` — all magic numbers, IPC channel names, storage keys, theme definitions, dimension limits
 - `utils.js` — `formatTime()`, `formatTimeShort()`, `parseTime()`, `debounce()`, `getTimerStatus()`, `calculateProgress()`, `safelySendToWindow()`
 - `security.js` — input validation (`isValidDataURL`, `isValidURL`, `validateImageSource`), `escapeHTML()`, `safeJSONParse()`
-- `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt` (подпись «закончится в 14:50»), `relativeLuminance` + `backgroundTone` + `surfaceTone` (страж яркости: по фону дисплея и по подложке виджета), `surfacePaint` + `surfaceAlpha` (цвет и прозрачность подложки), `migrateTimerStyle` (сохранённый LED читается как «Цифры»)
+- `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt`, `relativeLuminance` + `backgroundTone` + `surfaceTone` (страж яркости: по фону дисплея и по подложке виджета), `surfacePaint` + `surfaceAlpha`, `migrateTimerStyle` (сохранённый LED = «Цифры»)
 - `surface-tones.css` — ОДНА палитра на виджет, часы и дисплей: блоки `:root:not(.on-light-bg)` / `:root.on-light-bg` плюс поверхности стилей `--style-*` (пластина флипа, циферблат, деления, стрелки, тени). Класс ставит `UITheme.applyTone()` по измеренной яркости
 - `window-geometry.js` — перетаскивание, размер и позиция виджета и часов плюс арифметика восстановления позиции (`fitRestoredBounds`). Двойной экспорт, проверяется в Node на внедрённых хранилище и DOM
 - `clock-settings-schema.js` — the clock's settings table (key → control → default) plus `collectClockSettings` / `applyClockSettings`
@@ -206,9 +207,9 @@ Two flavours of test live here:
 | `validation-utils.test.js` | `isValidNumber`, `clamp` |
 | `debounce-send.test.js` | `debounce`, `safelySendToWindow` |
 | `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS`, preload/validator sync |
-| `ipc-liveness.test.js` | Every whitelisted channel has BOTH ends — a sender and a receiver. The whitelist is a permission, not proof of life |
+| `ipc-liveness.test.js` | Every whitelisted channel has BOTH ends. The whitelist is a permission, not proof of life |
 | `edge-cases.test.js` | Edge cases for all utils |
-| `constants.test.js` | CONFIG immutability and structure, plus the orphan check — every key must have a reader outside `constants.js` and outside this test, and `WARNING_THRESHOLD` is pinned by the behavioural boundary of `getTimerStatus`, not by comparing the registry to itself |
+| `constants.test.js` | CONFIG immutability and structure, plus the orphan check — every key needs a reader outside `constants.js` and outside this test; `WARNING_THRESHOLD` is pinned by the behaviour of `getTimerStatus`, not by the registry |
 | `timer-engine.test.js` | `tick`/`adjust`/`reset`/`setPreset` arithmetic + boundary events |
 | `timer-controller.test.js` | State machine with a fake clock (start/pause/reset/reconcile) |
 | `recovery.test.js` | Crash-recovery persist/load/validate |
@@ -224,19 +225,19 @@ Two flavours of test live here:
 | `electron-main-source.test.js` | IPC payload hardening, DevTools gating, icon path |
 | `visual-source.test.js` | Layout/centering invariants, release-doc freshness |
 | `audit-2026-07-fixes.test.js` | Regressions from the July 2026 audit (sound, Esc, scales, geometry) |
-| `audit-2026-07-30-fixes.test.js` | Regressions from the 30 Jul 2026 pass (flip separator, finish flash, geometry persistence, modifier guard, flip timers, sound deletion, F1 overlay, scale input, display clock, clock style source, window-state snapshot) |
-| `storage-keys.test.js` | `CONFIG.STORAGE_KEYS` matches the keys the code actually uses — both directions — and no key is write-only or read-only |
-| `contrast.test.js` | WCAG contrast of text tokens WITH alpha compositing, for BOTH themes (dark ≥ AA, light ≥ AAA), plus the light surface ladder, its accents and the label on accent fills |
+| `audit-2026-07-30-fixes.test.js` | Regressions from the 30 Jul 2026 pass (flip separator, finish flash, geometry, modifier guard, flip timers, sound deletion, F1 overlay, scale input, display clock, window-state snapshot) |
+| `storage-keys.test.js` | `CONFIG.STORAGE_KEYS` matches the keys the code uses — both directions — and no key is write- or read-only |
+| `contrast.test.js` | WCAG contrast WITH alpha compositing for BOTH themes (dark ≥ AA, light ≥ AAA), the light surface ladder, its accents and labels on accent fills |
 | `ui-theme.test.js` | Theme logic + the whole wiring: module → all four windows' `<head>` → channel in both whitelists → main's relay → panel button |
-| `faq-and-hidden-controls.test.js` | Clock settings are reachable (no `display:none`), exactly ONE accordion handler, help text matches the real UI, footer version == package.json, every checkbox has an accessible name, dead CSS stays deleted |
-| `release-notes.test.js` | Заметки к релизу берутся из CHANGELOG, таблица загрузок совпадает с `build.target`, обещания в шапке и подвале не протухли |
-| `window-geometry.test.js` | Drag + geometry BEHAVIOUR on fake storage/DOM: restore, save, scale bounds, quota, modifier guard, drag-target selector |
+| `faq-and-hidden-controls.test.js` | Clock settings reachable (no `display:none`), exactly ONE accordion handler, help text matches the UI, footer version == package.json, every checkbox named, dead CSS stays deleted |
+| `release-notes.test.js` | Заметки к релизу берутся из CHANGELOG, таблица загрузок совпадает с `build.target`, обещания в шапке не протухли |
+| `window-geometry.test.js` | Drag + geometry BEHAVIOUR on fake storage/DOM: restore, save, scale bounds, quota, modifier guard, drag target |
 | `window-top-edge.test.js` | Три условия верхнего края: `enableLargerThanScreen` у обоих окон, уровень `status`, поджатие по границам экрана, а не рабочей области |
-| `clock-settings-schema.test.js` | The clock settings table: collect/apply roundtrip, defaults, stored `false` vs missing |
-| `window-open-ownership.test.js` | Every create-function announces its own window and hydrates it; tray binding lives in `createControlWindow`; renderer payloads are normalised |
-| `settings-key-ownership.test.js` | `pickOwnSetting` behaviour + the wiring: display/widget read their OWN key, ticks have one owner in storage |
-| `color-validation-single-owner.test.js` | One colour validator (`SecurityUtils.isSafeColor`); the weaker copies stay gone |
-| `release-gates.test.js` | Release gates: DevTools guarded on EVERY window, isolation on every window, no external URLs in shipped files, local fonts, no auto-update, CSP per window, Linux sandbox scoped to AppImage only |
+| `clock-settings-schema.test.js` | Clock settings table: collect/apply roundtrip, defaults, stored `false` vs missing |
+| `window-open-ownership.test.js` | Every create-function announces and hydrates its own window; tray binding lives in `createControlWindow`; payloads normalised |
+| `settings-key-ownership.test.js` | `pickOwnSetting` + wiring: display/widget read their OWN key, ticks have one owner in storage |
+| `color-validation-single-owner.test.js` | One colour validator (`SecurityUtils.isSafeColor`); weaker copies stay gone |
+| `release-gates.test.js` | DevTools guarded on EVERY window, isolation everywhere, no external URLs in shipped files, local fonts, no auto-update, CSP per window, Linux sandbox scoped to AppImage |
 | `docs-integrity.test.js` | Связность `CLAUDE.md` ↔ `docs/lessons.md`: ссылка ведёт в разбор, разбор достижим или помечен устаревшим; плюс потолок размера |
 | `onboarding.test.js` | Подсказка первого запуска на поддельном хранилище: один раз, флаг ДО показа, сломанное хранилище не роняет; канал релизов БЕЗ payload |
 | `flat-surfaces.test.js` | Инвариант «плоско»: блюра нет, тёмные поверхности непрозрачны, внешних цветных свечений нет ни через `box-shadow`, ни через `text-shadow`. Пятая проверка проверяет САМ разбор |
@@ -258,10 +259,10 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
 | `sound-events.spec.js` | Every sound event fires EXACTLY once: minute warning, zero (with and without overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls over real time |
 | `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s on purpose: faking the main-process snapshot interval would test the fake |
-| `settings-roundtrip.spec.js` | Настройки всех четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы по окнам |
+| `settings-roundtrip.spec.js` | Настройки четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы по окнам |
 | `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and buttons do not. Written BEFORE the geometry extraction |
-| `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the returned clock toggles actually change the clock window; style-sync hides the style row. Everything by CLICK on visible elements only |
-| `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ; кегль реально подогнан (не CSS-фоллбэк); шрифт попадает в СВОЁ окно и не трогает два других; ряд шрифта виден только у этого стиля; `.value` молчит, а клик шлёт `change`; подгонка **идемпотентна** |
+| `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the clock toggles really change the clock window; style-sync hides the style row. By CLICK on visible elements only |
+| `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ; кегль подогнан (не CSS-фоллбэк); шрифт попадает в СВОЁ окно; ряд шрифта виден только у этого стиля; `.value` молчит, клик шлёт `change`; подгонка **идемпотентна** |
 | `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED) играет `win.setSize()` из main: воспроизводится следствие, а не причина |
 | `window-scale-fit.spec.js` | После масштабирования окно виджета и часов целиком в рабочей области СВОЕГО экрана (замер на живом окне); потерянное возвращается |
 | `window-top-edge.spec.js` | Виджет и часы доезжают до САМОГО верха экрана (y = 0, а не y рабочей области) и остаются там после переоткрытия. Красный до правки с замером `30` вместо `0` |
@@ -272,7 +273,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `window-surface-color.spec.js` | Фон виджета и часов ПО КЛИКУ (тёмный тон): подложка стиля, прозрачность 0, сброс, тема не стирает фон, окна не красят друг друга |
 | `display-blocks.spec.js` | Блоки дисплея: тумблер гасит СВОЙ блок, крестик снимает СВОЙ тумблер, подпись и плашка тащатся; в аналоге круг только у циферблата, длинное название переносится |
 | `display-timer-scale.spec.js` | Characterization of the display's timer scale across every style block — settings push, Ctrl+wheel, restore on load. Written BEFORE folding three copies into `applyTimerScale()` |
-| `style-tone.spec.js` | Тон ПО КЛИКУ: светлая тема — светлые виджет и дисплей, тёмная — тёмные; тёмная заливка при светлой теме держит текст светлым. Блок повторяет стиль: пластина флипа ТА ЖЕ, что у карточки, шрифт «Цифр» доезжает и уходит со стилем, стрелки мини-часов = большому циферблату |
+| `style-tone.spec.js` | Тон ПО КЛИКУ: светлая тема — светлые виджет и дисплей, тёмная заливка при светлой теме держит текст светлым. Блок повторяет стиль: пластина флипа ТА ЖЕ, шрифт «Цифр» уходит вместе со стилем, стрелки мини-часов = большому циферблату |
 | `display-layouts.spec.js` | Масштаб семи элементов порознь (крутим один — меряем все), пять раскладок ПО КЛИКУ, раскладка не зависит от прошлого масштаба |
 
 ## CI
@@ -318,6 +319,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Раскладка меряет ОСЕВШИЙ `transform`: габарит из `offsetWidth`, переходы снимает `layout-settling` (CRITICAL)** — [разбор](docs/lessons.md#a-layout-must-measure-a-settled-transform)
 - **Форму даёт содержимое: круг у `.mini-clock`, а не у блока; название переносится, время — нет** — [разбор](docs/lessons.md#the-circle-belongs-to-the-dial-not-to-the-block)
 - **Число в e2e берётся из окна, а не с твоего монитора; спека возвращает глобальное состояние** — [разбор](docs/lessons.md#a-test-that-passes-only-on-your-monitor)
+- **Пин — это предсказание: считать его арифметикой подтверждающей стороны (CRITICAL)** — [разбор](docs/lessons.md#a-pin-is-a-prediction-and-predictions-must-copy-the-arithmetic)
 - **У окна РОВНО ОДНА оболочка, а размер окна задаёт содержимое (CRITICAL)** — [разбор](docs/lessons.md#a-window-has-exactly-one-shell)
 - **Тест, утверждающий ОТСУТСТВИЕ, обязан проверять сам себя — иначе зелёный значит и «чисто», и «регулярка не работает» (CRITICAL)** — [разбор](docs/lessons.md#an-invariant-test-must-be-verified-against-itself)
 - **Долг, не закрываемый сегодня, фиксируется храповиком: число может только убывать, и в нём записано условие превращения в запрет** — [разбор](docs/lessons.md#a-ratchet-beats-a-ban-when-the-debt-spans-stages)

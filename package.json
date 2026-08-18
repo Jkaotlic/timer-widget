@@ -142,6 +142,7 @@
     "theme-grid.js",
       "panel-colors.js",
       "panel-display.js",
+      "panel-drawer.js",
       "display-layouts.js",
       "panel-reset.js",
       "electron-widget.html",

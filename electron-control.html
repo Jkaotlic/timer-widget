@@ -1134,6 +1134,7 @@
     <script src="theme-grid.js"></script>
     <script src="panel-colors.js"></script>
     <script src="panel-display.js"></script>
+    <script src="panel-drawer.js"></script>
     <script src="panel-reset.js"></script>
 
     <script>
@@ -1389,30 +1390,31 @@
                     // при открытом ящике.
                     const syncColumn = () => {
                         if (!shell) { return; }
-                        const minWidth = (window.CONFIG && CONFIG.CONTROL_WINDOW_MIN_WIDTH) || 380;
-                        const available = (window.innerWidth || baseDefault) - this._drawerExtraWidth;
-                        shell.style.setProperty(
-                            '--control-panel-width',
-                            `${Math.round(Math.max(minWidth, available))}px`
-                        );
+                        shell.style.setProperty('--control-panel-width', `${window.PanelDrawer.columnFromWindow(
+                            window.innerWidth || baseDefault, this._drawerExtraWidth)}px`);
                     };
                     this._syncDrawerColumn = syncColumn;
                     window.addEventListener('resize', syncColumn);
 
-                    // ПИН колонки к текущей ширине окна — ДО роста окна.
-                    // Окно растёт мгновенно, колонка едет 240ms; пока колонка была
-                    // 1fr, в этот зазор она успевала стать во всю новую ширину и
-                    // панель перецентровывалась в неё — замер по кадрам давал бросок
-                    // ВПРАВО (150px при потолке 1200, 37px при 974) и возврат влево.
-                    // Пин обязан встать БЕЗ перехода: иначе переход стартует от 1fr,
-                    // а это значение пересчитывается по новой ширине и тащит панель
-                    // за собой (замер: колонка `974px 0px` при уже выставленных 638).
-                    // Гасим переход, коммитим рефлоу, возвращаем переход.
+                    // ПИН колонки ДО роста окна: пока колонка была 1fr, в зазор
+                    // между мгновенным ростом окна и её переходом в 240ms панель
+                    // успевала перецентроваться и вернуться. Пин обязан встать БЕЗ
+                    // перехода — иначе тот стартует от 1fr и тащит панель за собой.
+                    // Гасим переход, коммитим рефлоу, возвращаем. Разбор и числа —
+                    // в panel-drawer.js.
                     this._baseInnerBeforeDrawer = window.innerWidth || baseDefault;
+                    // Пин — по ПРЕДСКАЗАННОЙ финальной ширине, а не по текущей:
+                    // на узком экране окно вырастает не на всю ширину ящика, и
+                    // пин оказывался шире правды (разбор — в panel-drawer.js).
+                    const pinnedColumn = window.PanelDrawer.drawerColumnWidth({
+                        innerWidth: this._baseInnerBeforeDrawer,
+                        drawerWidth: this._drawerExtraWidth,
+                        availWidth: window.screen && window.screen.availWidth
+                    });
                     if (shell) {
                         shell.style.setProperty(
                             '--control-panel-width',
-                            `${Math.round(this._baseInnerBeforeDrawer)}px`
+                            `${pinnedColumn}px`
                         );
                         shell.style.transition = 'none';
                         shell.classList.add('drawer-open');
