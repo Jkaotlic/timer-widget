@@ -215,7 +215,7 @@ Two flavours of test live here:
 | `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint` |
 | `renderer-storage.test.js` | Quota-safe localStorage helpers |
 | `display-layouts.test.js` | Реестр элементов ↔ тумблеры настроек в оба конца, разбор масштабов, доли в пиксели, непересечение раскладок при четырёх разрешениях |
-| `panel-colors.test.js` | Сборка объекта цветов (патч дополняет, `null` удаляет), проводка модуля и подложка в обоих окнах: `var(--surface-paint, …)` у всех пяти стилей |
+| `panel-colors.test.js` | Сборка объекта цветов (патч дополняет, `null` удаляет), проводка модуля и подложка в обоих окнах: `var(--surface-paint, …)` у пяти стилей |
 | `color-utils.test.js` | HSV↔RGB↔HEX conversion |
 | `settings-schema.test.js` | The settings table: defaults, legacy-key fallbacks, collect/apply roundtrip, on a fake document |
 | `display-timer.test.js` | `validateBlockPositions`, `canSafelyStore` |
@@ -257,13 +257,13 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `ui-theme.spec.js` | Светлая тема доезжает до всех четырёх окон (замер ВЫЧИСЛЕННЫХ токенов), переживает перезагрузку, возвращается; и красит НАСТОЯЩИЕ контролы — подпись активного пресета меряется против ОБОИХ стопов градиента |
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
 | `sound-events.spec.js` | Every sound event fires EXACTLY once: minute warning, zero (with and without overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls over real time |
-| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s on purpose: the snapshot interval lives in the main process and faking it would test the fake |
+| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s on purpose: faking the main-process snapshot interval would test the fake |
 | `settings-roundtrip.spec.js` | Настройки всех четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы по окнам |
-| `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and button targets do not. Written BEFORE the geometry extraction |
+| `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and buttons do not. Written BEFORE the geometry extraction |
 | `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the returned clock toggles actually change the clock window; style-sync hides the style row. Everything by CLICK on visible elements only |
 | `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ; кегль реально подогнан (не CSS-фоллбэк); шрифт попадает в СВОЁ окно и не трогает два других; ряд шрифта виден только у этого стиля; `.value` молчит, а клик шлёт `change`; подгонка **идемпотентна** |
 | `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED) играет `win.setSize()` из main: воспроизводится следствие, а не причина |
-| `window-scale-fit.spec.js` | После масштабирования окно виджета и часов целиком в рабочей области СВОЕГО экрана (замер на живом `BrowserWindow`); потерянное возвращается |
+| `window-scale-fit.spec.js` | После масштабирования окно виджета и часов целиком в рабочей области СВОЕГО экрана (замер на живом окне); потерянное возвращается |
 | `window-top-edge.spec.js` | Виджет и часы доезжают до САМОГО верха экрана (y = 0, а не y рабочей области) и остаются там после переоткрытия. Красный до правки с замером `30` вместо `0` |
 | `color-ownership.spec.js` | Характеризация окраски: 5 стилей × 4 полосы × 2 окна, сверка ВЫЧИСЛЕННЫХ цвета и тени на ТЁМНОМ тоне. Написан ДО перевода цвета на каскад |
 | `onboarding-reachable.spec.js` | Кнопка «Проверить обновления» ВИДИМА и не схлопнута. Намеренно не кликается: обработчик открыл бы браузер на машине с прогоном |
@@ -317,6 +317,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Блок дисплея повторяет стиль теми же токенами, что и таймер: пластина флипа общая, шрифт «Цифр» приходит переменной, а не инлайном** — [разбор](docs/lessons.md#a-block-repeats-the-style-with-the-same-tokens)
 - **Раскладка меряет ОСЕВШИЙ `transform`: габарит из `offsetWidth`, переходы снимает `layout-settling` (CRITICAL)** — [разбор](docs/lessons.md#a-layout-must-measure-a-settled-transform)
 - **Форму даёт содержимое: круг у `.mini-clock`, а не у блока; название переносится, время — нет** — [разбор](docs/lessons.md#the-circle-belongs-to-the-dial-not-to-the-block)
+- **Число в e2e берётся из окна, а не с твоего монитора; спека возвращает глобальное состояние** — [разбор](docs/lessons.md#a-test-that-passes-only-on-your-monitor)
 - **У окна РОВНО ОДНА оболочка, а размер окна задаёт содержимое (CRITICAL)** — [разбор](docs/lessons.md#a-window-has-exactly-one-shell)
 - **Тест, утверждающий ОТСУТСТВИЕ, обязан проверять сам себя — иначе зелёный значит и «чисто», и «регулярка не работает» (CRITICAL)** — [разбор](docs/lessons.md#an-invariant-test-must-be-verified-against-itself)
 - **Долг, не закрываемый сегодня, фиксируется храповиком: число может только убывать, и в нём записано условие превращения в запрет** — [разбор](docs/lessons.md#a-ratchet-beats-a-ban-when-the-debt-spans-stages)

@@ -163,9 +163,18 @@ test('«Цифры»: чернила минуса по центру чернил
 
             console.log(`${font.padEnd(9)} смещение ${offsetEm.toFixed(4)} кегля`);
             if (Math.abs(offsetEm) > Math.abs(worst.value)) { worst.font = font; worst.value = offsetEm; }
-            // Порог 0.02 при прежнем максимуме 0.119: остаток — расхождение
-            // центров боксов (≤0.013 кегля), его правка не трогает.
-            expect(Math.abs(offsetEm), `${font}: минус уехал по вертикали на ${offsetEm.toFixed(3)} кегля`).toBeLessThan(0.02);
+            // Порог 0.03 при прежнем максимуме 0.119.
+            //
+            // Остаток — расхождение центров боксов, и величина его ЗАВИСИТ ОТ
+            // ПЛАТФОРМЫ: считается он из `fontBoundingBoxAscent/Descent`, а их
+            // отдаёт системный движок шрифтов — CoreText, FreeType и DirectWrite
+            // расходятся. Замер: macOS ≤0.013, ubuntu и windows дают 0.023 у
+            // Orbitron. Порог 0.02 был снят на одной машине и на CI означал
+            // «здесь другой растеризатор», а не «знак уехал».
+            //
+            // Запас до настоящего дефекта остаётся четырёхкратным: до правки
+            // Playfair Display давал 0.119.
+            expect(Math.abs(offsetEm), `${font}: минус уехал по вертикали на ${offsetEm.toFixed(3)} кегля`).toBeLessThan(0.03);
         }
         console.log(`худший шрифт: ${worst.font} (${worst.value.toFixed(4)})`);
     } finally {

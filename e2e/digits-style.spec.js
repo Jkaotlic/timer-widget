@@ -284,19 +284,25 @@ test('масштаб дисплея действует и на стиль «Ци
         const before = await display.evaluate(readTransform);
 
         // Ползунок «Масштаб таймера» во вкладке «Дисплей» (data-tab="display").
-        // 130 %, а не 150: с 17.08.2026 масштаб обрезается по свободному месту
-        // между подписью и плашкой статуса (потолок стиля «Цифры» ≈142 %), и
-        // 150 приехало бы сюда как 1.42. Предмет теста — что значение ДОХОДИТ
-        // до блока «Цифр» обоими путями; сам потолок меряет
-        // e2e/display-timer-scale.spec.js, прямоугольниками.
+        //
+        // 80 %, а не 130: с 17.08.2026 масштаб ОБРЕЗАЕТСЯ по свободному месту
+        // между подписью и плашкой статуса, и потолок зависит от РАЗРЕШЕНИЯ.
+        // На здешнем экране (1440 в высоту) он ≈142 %, и 130 доезжало целиком;
+        // под xvfb на CI экран 1280×1024, потолок падает до 114 %, и тест
+        // требовал `scale(1.3)`, получая `scale(1.14)` — то есть проверял не
+        // доставку значения, а разрешение монитора.
+        //
+        // Значение ниже 100 % не поджимается никогда: обрезание только
+        // уменьшает. Предмет теста — что значение ДОХОДИТ до блока «Цифр»
+        // обоими путями; сам потолок меряет e2e/display-timer-scale.spec.js.
         await control.evaluate(() => {
             const slider = document.getElementById('displayTimerScale');
-            slider.value = '130';
+            slider.value = '80';
             slider.dispatchEvent(new Event('input', { bubbles: true }));
         });
         await display.waitForTimeout(500);
         const afterSlider = await display.evaluate(readTransform);
-        expect(afterSlider).toContain('scale(1.3)');
+        expect(afterSlider).toContain('scale(0.8)');
         expect(afterSlider).not.toBe(before);
 
         // Ctrl+колесо.
