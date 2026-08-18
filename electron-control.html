@@ -1509,15 +1509,14 @@
                     window.removeEventListener('resize', this._syncDrawerColumn);
                     this._syncDrawerColumn = null;
                 }
-                // Зеркало пина. Колонку возвращаем к ширине окна ДО открытия, а
-                // резерв под ящик схлопываем ОТДЕЛЬНОЙ ручкой — обе дорожки едут
-                // те же 240ms, что и уезжающий ящик. Резерв обязан обнулиться
-                // ЗАРАНЕЕ: снятие drawer-open возвращает первую дорожку к 1fr, а
-                // 1fr = окно минус вторая дорожка. Пока резерв схлопывался вместе
-                // с классом, панель в этот кадр отскакивала назад на 64px (замер).
+                // Схлопываем ТОЛЬКО резерв: он обязан обнулиться ЗАРАНЕЕ, иначе
+                // снятие drawer-open вернёт первую дорожку к 1fr = «окно минус
+                // вторая дорожка», и панель отскочит назад (замер: 64px).
+                // Колонку НЕ трогаем: здесь стояло зеркало пина, и оно повторяло
+                // его ошибку — на узком экране колонка уже узкая, а возврат её
+                // расширял при ещё широком окне (замер CI: откат 40px).
                 const baseInner = this._baseInnerBeforeDrawer;
-                if (shell && baseInner) {
-                    shell.style.setProperty('--control-panel-width', `${Math.round(baseInner)}px`);
+                if (shell) {
                     shell.style.setProperty('--drawer-reserve', '0px');
                 }
                 ipcRenderer.send('resize-control-window', { width: restoreWidth });
