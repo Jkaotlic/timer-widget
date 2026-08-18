@@ -70,16 +70,33 @@ test('деления циферблата виджета стоят на одн�
     await widget.waitForSelector('#widgetAnalog.active');
     await widget.waitForTimeout(400);
 
-    const delta = await widget.evaluate(() => {
+    const m = await widget.evaluate(() => {
         // Деление на 3 часах (rotate(90deg)) и центр циферблата обязаны
         // совпадать по вертикали.
         const q = document.querySelector('.widget-clock-tick.quarter[style*="90deg"]');
         const c = document.getElementById('widgetClockCenter');
         const qr = q.getBoundingClientRect();
         const cr = c.getBoundingClientRect();
-        return Math.abs((qr.top + qr.height / 2) - (cr.top + cr.height / 2));
+        // Замер делится на МАСШТАБ: циферблат нарисован в 150px и растянут
+        // трансформацией под окно, поэтому расхождение в экранных пикселях
+        // растёт вместе с окном. Абсолютный порог здесь и был проверкой на
+        // размер окна: 0.83px исходного сдвига давали 0.84px на окне 180 и
+        // 3.60px на раннере CI — тест падал там и проходил тут при одном и
+        // том же коде.
+        const t = getComputedStyle(document.querySelector('.widget-analog-content')).transform;
+        const scale = t && t !== 'none' ? (parseFloat(t.slice(t.indexOf('(') + 1)) || 1) : 1;
+        return {
+            screen: Math.abs((qr.top + qr.height / 2) - (cr.top + cr.height / 2)),
+            scale
+        };
     });
-    expect(delta).toBeLessThan(2);
+    const unscaled = m.screen / m.scale;
+    console.log(`   ось делений: ${m.screen.toFixed(2)}px на экране при масштабе ${m.scale.toFixed(2)} → ${unscaled.toFixed(2)}px в исходном циферблате`);
+    // Порог по НЕмасштабированному циферблату. Источник прежнего сдвига —
+    // два разных способа сказать «середина»: деления шли от `top: 8%` (11.83px)
+    // плюс origin 63px = 74.83, а центральная точка стояла на 74. Правило:
+    // `top` + вертикаль transform-origin = ровно половина padding-бокса.
+    expect(unscaled, `деления смещены относительно центра на ${unscaled.toFixed(2)}px`).toBeLessThan(0.25);
 
     await app.close();
 });
