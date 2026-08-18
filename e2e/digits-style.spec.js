@@ -1102,3 +1102,86 @@ test('выбор шрифта доходит до СВОЕГО окна клик
         await app.close();
     }
 });
+
+test('часы «Цифры»: дата и пояс встают ПОД временем, а не в строку с ним', async () => {
+    // Жалоба 18.08.2026: «в часах в стиле цифры при включении даты и часового
+    // пояса неправильно позиционируются они и всё смешивается».
+    //
+    // Причина видна в замере, а не в описании: `.clock-digits` — это flex БЕЗ
+    // `flex-direction: column`, то есть время, дата и пояс встают в один РЯД.
+    // Замер на окне 220×220 до правки: время `left: -84` (уехало за левый край),
+    // дата 122..220 (прижата к правому), пояс 220..304 — ЦЕЛИКОМ за окном.
+    // Наложения при этом нет: элементы не смешиваются, они выстраиваются в
+    // строку и выдавливают друг друга наружу.
+    //
+    // У остальных трёх стилей часов дата и пояс лежат в своей колонке
+    // (`.center-badges`, `.widget-flip-info`, `.widget-analog-info`); у «Цифр»
+    // обёртки нет, и её роль обязан играть сам контейнер стиля.
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForLoadState('domcontentloaded');
+        await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        await control.waitForTimeout(2000);
+        const clock = await findWindow(app, IS_CLOCK);
+        expect(clock, 'окно часов не найдено').not.toBeNull();
+
+        await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'digits'));
+        await clock.waitForTimeout(900);
+        await control.evaluate(() => window.ipcRenderer.send('clock-widget-settings', {
+            showDate: true, showTimezone: true, showSeconds: false
+        }));
+        await clock.waitForTimeout(1200);
+
+        const m = await clock.evaluate(() => {
+            const box = (id) => {
+                const el = document.getElementById(id);
+                if (!el || getComputedStyle(el).display === 'none') { return null; }
+                const r = el.getBoundingClientRect();
+                return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height };
+            };
+            return {
+                dir: getComputedStyle(document.getElementById('clockDigits')).flexDirection,
+                time: box('clockDigitsTime'),
+                date: box('digitsDateBadge'),
+                tz: box('digitsTimezoneBadge'),
+                win: { w: window.innerWidth, h: window.innerHeight }
+            };
+        });
+        console.log('   часы «Цифры» с датой и поясом: ' + JSON.stringify(m));
+
+        // Проверка проверки: оба шильдика обязаны быть НА ЭКРАНЕ, иначе всё
+        // ниже зеленело бы на выключенных тумблерах.
+        expect(m.date, 'дата не показалась — тумблер не сработал').not.toBeNull();
+        expect(m.tz, 'пояс не показался — тумблер не сработал').not.toBeNull();
+
+        // 1. Ничто не вылезает за окно — это и есть жалоба.
+        for (const [name, b] of [['время', m.time], ['дата', m.date], ['пояс', m.tz]]) {
+            expect(Math.round(b.l), `${name}: вылезает за левый край окна`).toBeGreaterThanOrEqual(-1);
+            expect(Math.round(b.r), `${name}: вылезает за правый край окна`).toBeLessThanOrEqual(m.win.w + 1);
+            expect(Math.round(b.t), `${name}: вылезает за верхний край окна`).toBeGreaterThanOrEqual(-1);
+            expect(Math.round(b.b), `${name}: вылезает за нижний край окна`).toBeLessThanOrEqual(m.win.h + 1);
+        }
+
+        // 2. Порядок сверху вниз: время, дата, пояс — колонкой, как в трёх
+        //    остальных стилях часов.
+        expect(m.dir, 'контейнер «Цифр» обязан выкладывать содержимое колонкой').toBe('column');
+        expect(m.time.b, 'дата не под временем').toBeLessThanOrEqual(m.date.t + 1);
+        expect(m.date.b, 'пояс не под датой').toBeLessThanOrEqual(m.tz.t + 1);
+
+        // 3. И ничто ни на что не наезжает.
+        const pairs = [['время', m.time, 'дата', m.date], ['дата', m.date, 'пояс', m.tz], ['время', m.time, 'пояс', m.tz]];
+        for (const [an, a, bn, b] of pairs) {
+            const over = a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1;
+            expect(over, `${an} и ${bn} накладываются`).toBe(false);
+        }
+
+        // Профиль e2e общий на прогон: возвращаем тумблеры и стиль.
+        await control.evaluate(() => window.ipcRenderer.send('clock-widget-settings', {
+            showDate: false, showTimezone: false, showSeconds: false
+        }));
+        await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'circle'));
+        await clock.waitForTimeout(500);
+    } finally {
+        await app.close();
+    }
+});

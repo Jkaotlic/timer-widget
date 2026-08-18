@@ -249,7 +249,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 |------|--------|
 | `app.spec.js` | Boot, presets, start/pause/reset round trip |
 | `status-and-colors.spec.js` | Colour bands, status priority, Esc layering, overrun limit, module wiring |
-| `flip-animation.spec.js` | Перекидывание ВИДНО в трёх окнах: створки меряются покадрово (падение до нуля, подъём обратно), а не по классу |
+| `flip-animation.spec.js` | Перекидывание ВИДНО в трёх окнах: створки меряются покадрово, а не по классу |
 | `flip-hours-layout.spec.js` | Flip separator stays dots (never a glyph) in H:MM:SS, measured |
 | `window-state-sync.spec.js` | A window loaded second knows which windows are already open |
 | `dial-ticks.spec.js` | Dial tick marks toggle reaches widget + clock and survives reopen |
@@ -257,18 +257,18 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `analog-hour-hand.spec.js` | Display's analog hour hand angle at 5 min / 1 h / 1:30 / 6 h |
 | `ui-theme.spec.js` | Светлая тема доезжает до всех четырёх окон (замер ВЫЧИСЛЕННЫХ токенов), переживает перезагрузку, возвращается; и красит НАСТОЯЩИЕ контролы — подпись активного пресета меряется против ОБОИХ стопов градиента |
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
-| `sound-events.spec.js` | Every sound event fires EXACTLY once: minute warning, zero (with and without overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls over real time |
-| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s on purpose: faking the main-process snapshot interval would test the fake |
+| `sound-events.spec.js` | Every sound event fires EXACTLY once: minute, zero (with and without overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls over real time |
+| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s: faking the snapshot interval would test the fake |
 | `settings-roundtrip.spec.js` | Настройки четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы по окнам |
 | `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and buttons do not. Written BEFORE the geometry extraction |
 | `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the clock toggles really change the clock window; style-sync hides the style row. By CLICK on visible elements only |
-| `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ; кегль подогнан (не CSS-фоллбэк); шрифт попадает в СВОЁ окно; ряд шрифта виден только у этого стиля; `.value` молчит, клик шлёт `change`; подгонка **идемпотентна** |
-| `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED) играет `win.setSize()` из main: воспроизводится следствие, а не причина |
+| `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ; кегль подогнан (не CSS-фоллбэк); шрифт попадает в СВОЁ окно; `.value` молчит, клик шлёт `change`; подгонка **идемпотентна**; дата и пояс часов встают колонкой |
+| `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED) играет `win.setSize()` из main |
 | `window-scale-fit.spec.js` | После масштабирования окно виджета и часов целиком в рабочей области СВОЕГО экрана (замер на живом окне); потерянное возвращается |
-| `window-top-edge.spec.js` | Виджет и часы доезжают до САМОГО верха экрана (y = 0, а не y рабочей области) и остаются там после переоткрытия. Красный до правки с замером `30` вместо `0` |
+| `window-top-edge.spec.js` | Виджет и часы доезжают до САМОГО верха экрана (y = 0, а не y рабочей области) и остаются там после переоткрытия |
 | `color-ownership.spec.js` | Характеризация окраски: 5 стилей × 4 полосы × 2 окна, сверка ВЫЧИСЛЕННЫХ цвета и тени на ТЁМНОМ тоне. Написан ДО перевода цвета на каскад |
 | `onboarding-reachable.spec.js` | Кнопка «Проверить обновления» ВИДИМА и не схлопнута. Намеренно не кликается: обработчик открыл бы браузер на машине с прогоном |
-| `color-band-reset.spec.js` | Выход из полосы снимает ВСЁ, что полоса нарисовала — на чистом профиле (там залипал красный ореол) и с выбранным цветом (там полоса обязана этот цвет перебивать) |
+| `color-band-reset.spec.js` | Выход из полосы снимает ВСЁ, что полоса нарисовала: на чистом профиле и с выбранным цветом |
 | `panel-states.spec.js` | Четыре состояния панели ПО КЛИКУ: какая кнопка и каким словом названа, есть ли пресеты и ряд ±; ящик открывает шеврон, тумблер — окно |
 | `window-surface-color.spec.js` | Фон виджета и часов ПО КЛИКУ (тёмный тон): подложка стиля, прозрачность 0, сброс, тема не стирает фон, окна не красят друг друга |
 | `display-blocks.spec.js` | Блоки дисплея: тумблер гасит СВОЙ блок, крестик снимает СВОЙ тумблер, подпись и плашка тащатся; в аналоге круг только у циферблата, длинное название переносится |
@@ -318,6 +318,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Блок дисплея повторяет стиль теми же токенами, что и таймер: пластина флипа общая, шрифт «Цифр» приходит переменной, а не инлайном** — [разбор](docs/lessons.md#a-block-repeats-the-style-with-the-same-tokens)
 - **Раскладка меряет ОСЕВШИЙ `transform`: габарит из `offsetWidth`, переходы снимает `layout-settling` (CRITICAL)** — [разбор](docs/lessons.md#a-layout-must-measure-a-settled-transform)
 - **Форму даёт содержимое: круг у `.mini-clock`, а не у блока; название переносится, время — нет** — [разбор](docs/lessons.md#the-circle-belongs-to-the-dial-not-to-the-block)
+- **Контейнер стиля — это раскладка: `flex` по умолчанию СТРОКА** — [разбор](docs/lessons.md#a-style-container-is-also-a-layout-and-flex-defaults-to-a-row)
 - **Число в e2e берётся из окна, а не с твоего монитора; спека возвращает глобальное состояние** — [разбор](docs/lessons.md#a-test-that-passes-only-on-your-monitor)
 - **Пин — это предсказание: считать его арифметикой подтверждающей стороны (CRITICAL)** — [разбор](docs/lessons.md#a-pin-is-a-prediction-and-predictions-must-copy-the-arithmetic)
 - **У окна РОВНО ОДНА оболочка, а размер окна задаёт содержимое (CRITICAL)** — [разбор](docs/lessons.md#a-window-has-exactly-one-shell)
