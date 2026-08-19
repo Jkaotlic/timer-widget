@@ -2812,7 +2812,26 @@ class DisplayTimer {
         document.addEventListener('mouseup', this._handlers.windowDragMouseup);
     }
 
+    /**
+     * Восстановление мест ПОСЛЕ открытия окна.
+     *
+     * Идёт на ОСЕВШИХ трансформациях — та же оговорка, что у раскладки и
+     * пересчёта по ресайзу, и найдена она была третьей по счёту. Место
+     * доводится по замеру видимой коробки (`placeElementAt`), а на элементах
+     * висит переход в 400 мс: замер посреди него отдаёт коробку, которой уже
+     * нет, и поправка выходит неверной ровно на остаток перехода. Значение
+     * записывается в `style.left`, поэтому промах не рассасывается — он
+     * остаётся сохранённым местом.
+     *
+     * Замер на раннере Windows 19.08.2026 (окно 1024×720, машина медленнее
+     * локальной): центр подписи 388,189 → 392,187 после переоткрытия при
+     * НЕИЗМЕННОЙ ширине 135 — то есть уехала не метрика шрифта, а сам замер.
+     */
     restoreBlockPositions() {
+        return this.withSettledTransforms(() => this._restoreBlockPositionsPass());
+    }
+
+    _restoreBlockPositionsPass() {
         const STORAGE_KEY = 'displayBlockPositions';
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
 

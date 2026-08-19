@@ -152,6 +152,12 @@ test('подпись над таймером и плашка состояния:
                 };
             };
             return {
+                // Размер окна — не украшение отчёта: место элемента хранится
+                // ДОЛЕЙ окна, и при другом размере тот же самый элемент обязан
+                // стоять в других пикселях. Без этих двух чисел «сдвинулся на
+                // 4px» и «окно другого размера» неразличимы.
+                vw: window.innerWidth,
+                vh: window.innerHeight,
                 label: box('#heroLabel'),
                 pill: box('#statusPill'),
                 ring: box('#timerRing'),
@@ -224,8 +230,9 @@ test('подпись над таймером и плашка состояния:
         await control.waitForTimeout(2500);
         display = await findDisplay(app);
         const reopened = await display.evaluate(geometry);
-        console.log(`после переоткрытия: центр ${reopened.label.cx},${reopened.label.cy} `
-            + `(было ${g.label.cx},${g.label.cy}); ширина ${g.label.w} → ${reopened.label.w}`);
+        console.log(`после переоткрытия: окно ${g.vw}×${g.vh} → ${reopened.vw}×${reopened.vh}; `
+            + `центр ${g.label.cx},${g.label.cy} → ${reopened.label.cx},${reopened.label.cy}; `
+            + `ширина ${g.label.w} → ${reopened.label.w}`);
         // Сверяется ЦЕНТР, а не левый край, и это не послабление, а предмет
         // договора: в хранилище лежит доля окна для ЦЕНТРА элемента
         // (positionToFraction / fractionToPosition). Ширина подписи между
@@ -234,10 +241,22 @@ test('подпись над таймером и плашка состояния:
         // таймера, — и тогда левый край честно уезжает на половину разницы,
         // хотя элемент стоит там же. Замер на раннере Windows 19.08.2026:
         // левый край 4px, из-за чего проверка и покраснела.
-        expect(Math.abs(reopened.label.cx - g.label.cx), 'центр подписи не восстановился по горизонтали')
-            .toBeLessThanOrEqual(2);
-        expect(Math.abs(reopened.label.cy - g.label.cy), 'центр подписи не восстановился по вертикали')
-            .toBeLessThanOrEqual(2);
+        if (reopened.vw === g.vw && reopened.vh === g.vh) {
+            expect(Math.abs(reopened.label.cx - g.label.cx), 'центр подписи не восстановился по горизонтали')
+                .toBeLessThanOrEqual(2);
+            expect(Math.abs(reopened.label.cy - g.label.cy), 'центр подписи не восстановился по вертикали')
+                .toBeLessThanOrEqual(2);
+        } else {
+            // Окно переоткрылось другого размера (на раннерах это обычное дело:
+            // 1024×720 против полноэкранного). Тогда предмет проверки — ДОЛЯ, а
+            // не пиксель: пиксель при другом размере обязан быть другим, и
+            // требовать его совпадения значило бы проверять неизменность окна.
+            const was = { cx: g.label.cx / g.vw, cy: g.label.cy / g.vh };
+            const now = { cx: reopened.label.cx / reopened.vw, cy: reopened.label.cy / reopened.vh };
+            console.log(`   доли: ${was.cx.toFixed(4)},${was.cy.toFixed(4)} → ${now.cx.toFixed(4)},${now.cy.toFixed(4)}`);
+            expect(Math.abs(now.cx - was.cx), 'доля подписи по горизонтали не восстановилась').toBeLessThan(0.005);
+            expect(Math.abs(now.cy - was.cy), 'доля подписи по вертикали не восстановилась').toBeLessThan(0.005);
+        }
     } finally {
         // Профиль e2e общий на весь прогон — возвращаем расположение.
         await control.evaluate(() => localStorage.removeItem('displayBlockPositions')).catch(() => {});
