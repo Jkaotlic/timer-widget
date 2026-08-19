@@ -150,11 +150,17 @@ test('кнопка переключения темы в панели: состо
     assert.match(btn[0], /aria-label=/, 'у кнопки нет доступного имени: её содержимое — глиф');
 
     // Обработчик обязан делать все четыре вещи: применить, сохранить, обновить
-    // состояние кнопки и разослать остальным окнам.
-    assert.match(html, /window\.UITheme\.applyTheme\(theme\)/, 'тема не применяется локально');
-    assert.match(html, /window\.UITheme\.storeTheme\(theme\)/, 'тема не сохраняется');
-    assert.match(html, /setAttribute\('aria-pressed', String\(isLight\)\)/, 'aria-pressed не обновляется');
-    assert.match(html, /send\('ui-theme-update', \{ theme \}\)/, 'смена темы не рассылается в другие окна');
+    // состояние кнопки и разослать остальным окнам. С 19.08.2026 он живёт в
+    // panel-titlebar.js — вместе с кнопкой замка, у которой ровно та же
+    // природа: величина общая для всех окон, кнопка одна, в титлбаре. В
+    // разметке панели осталась кнопка и один вызов проводки.
+    assert.match(html, /<script src="panel-titlebar\.js"><\/script>/, 'панель не подключает panel-titlebar.js');
+    assert.match(html, /window\.PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
+    const titlebar = fs.readFileSync(path.join(ROOT, 'panel-titlebar.js'), 'utf8');
+    assert.match(titlebar, /theme\.applyTheme\(value\)/, 'тема не применяется локально');
+    assert.match(titlebar, /theme\.storeTheme\(value\)/, 'тема не сохраняется');
+    assert.match(titlebar, /setAttribute\('aria-pressed', String\(isLight\)\)/, 'aria-pressed не обновляется');
+    assert.match(titlebar, /send\('ui-theme-update', \{ theme: value \}\)/, 'смена темы не рассылается в другие окна');
 });
 
 test('светлая тема гасит декорации, заданные литералами', () => {

@@ -59,6 +59,8 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown` ставится ДО показа) и кнопка «Проверить обновления» |
 | `mini-bar.js` | Режим «полоса» (400×52). Класс `collapsed` на `<body>` — всё, что модуль знает о вёрстке; панель отдаёт ЗНАЧЕНИЯ через `render()`, размер меняет main |
 | `panel-colors.js` | Цвета окон — **примесь**: ОДНА сборка объекта цветов (`updateColors(target, patch)`, `null` = сброс поля) и ряд «Фон». Разметку ряда строит сам модуль |
+| `panel-titlebar.js` | Кнопки темы и замка «Закрепить положение»: обе величины ОБЩИЕ для четырёх окон, поэтому в титлбаре, а не в ящике |
+| `panel-presets.js` | Четыре ячейки вида: клик применяет, Shift+клик пишет, Ctrl+1…4 то же с клавиатуры. Применение — ТЕМ ЖЕ путём, что запуск панели |
 | `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) и пересчёт |
 | `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, семь тумблеров, кнопки раскладок, приём «закрыли крестиком» |
 | `display-layouts.js` | Реестр семи подвижных элементов дисплея (id → тумблер → вид), масштабы и пять раскладок. Координаты — доли экрана для ЦЕНТРА; в пиксели их переводит `placeElements` |
@@ -84,6 +86,8 @@ Rules when working here:
 - `window-geometry.js` — перетаскивание, размер и позиция виджета и часов плюс арифметика восстановления позиции (`fitRestoredBounds`). Двойной экспорт, проверяется в Node на внедрённых хранилище и DOM
 - `clock-settings-schema.js` — the clock's settings table (key → control → default) plus `collectClockSettings` / `applyClockSettings`
 - `digits-style.js` — стиль «Цифры»: реестр шрифтов, `resolveFont()` и подгонка (`fitScale` / `fitFontSize` / `measureDigits` / `applyFont`). Кегль — ЗАМЕР строки `88:88` на пробе 100px, не константа на символ. Поля рамки `FRAME_PAD_*_EM` сверяются с CSS трёх окон
+- `ui-lock.js` — замок «Закрепить положение»: ключ `uiLocked`, класс `ui-locked` на `<html>`, подписка на канал. Запрещает ЖЕСТЫ (перетаскивание, Ctrl+колесо, крестик), но не настройки
+- `presets.js` — четыре ячейки вида: снимок ЗНАЧЕНИЙ ключей профиля (`PRESET_KEYS`). Без картинки фона и геометрии окон — почему, написано в модуле
 - `ui-theme.js` — the only owner of `data-theme` and of the tone class `on-light-bg` (`applyTone` / `initTone` / `bindThemeSync`). Pure part (`normalizeTheme`, `nextTheme`, `themeLabel`) is unit-tested; the DOM/storage part is loaded by all four windows from `<head>`
 
 ### Key Patterns
@@ -112,61 +116,12 @@ Rules when working here:
 - CSS injection prevented: color values validated with regex, URLs validated with `URL()` constructor
 - Timer state: `presetSeconds` tracks original preset for correct reset after on-the-fly adjustments
 
-## IPC Channels Reference
+## IPC
 
-Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
-
-### Send (renderer → main)
-
-| Channel | Purpose |
-|---------|---------|
-| `timer-command` | Start/pause/reset/set timer with payload `{ type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes }` |
-| `timer-control` | Keyboard shortcuts from display: `'start'` / `'pause'` / `'reset'` (plain string) |
-| `widget-colors-update` | `{ timer: '#hex', progress: '#hex' }` — widget only |
-| `clock-colors-update` | `{ timer: '#hex', progress: '#hex' }` — clock only |
-| `display-colors-update` | `{ timer: '#hex', progress: '#hex' }` — display only |
-| `widget-style-update` | `{ timerStyle, timerScale }` — widget style/scale |
-| `display-settings-update` | Display style, background, clock settings. `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local` |
-| `get-timer-state` | Request current timer state |
-| `get-displays` | Request list of available displays |
-| `open-releases-page` | Без payload: main открывает страницу релизов через `shell.openExternal`, адрес — КОНСТАНТА в main. URL из рендерера означал бы выполнение произвольного адреса руками ОС |
-| `open-widget` / `close-widget` | Toggle widget window |
-| `open-display` / `close-display` | Toggle display window |
-| `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
-| `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
-| `control-drawer` | `{ open }` — ящик настроек. Отдельный канал: потолок окна двухуровневый (760×740 по содержимому, 1096×1100 с ящиком), и из ширины запроса уровень не выводится |
-| `control-collapse` | `{ collapsed, height }` — свернуть панель в полосу. Отдельный канал: `resize-control-window` зажимает высоту минимумом окна (660). Снимает и возвращает пол `minHeight`, держит ВЕРХНИЙ край, `height` в 36…120 |
-| `widget-resize` / `widget-move` / `widget-set-position` | Геометрия виджета. `widget-move` несёт `{deltaX, deltaY, first}`: `first` помечает начало жеста, и main держит размер окна до конца перетаскивания |
-| `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
-| `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
-| `clock-widget-set-position` | `{ x, y }` — restore saved clock position (clamped to a live display) |
-| `display-move` | `{ deltaX, deltaY }` — move display window in windowed mode |
-| `display-layout` | `{ layout }` — применить раскладку (имя проверяется по реестру `display-layouts.js`). Отдельный канал: раскладка — действие, а не состояние; шлётся ПОСЛЕ тумблеров |
-| `ui-theme-update` | `{ theme: 'dark' \| 'light' }` — sent by the panel only; main validates against a whitelist and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide) |
-| `toggle-fullscreen` | Toggle fullscreen on the sender's window |
-| `reset-and-relaunch` | Clear all storage and quit |
-| `minimize-window` / `quit-app` | Window management |
-
-### Receive (main → renderer)
-
-| Channel | Payload |
-|---------|---------|
-| `timer-state` | Full `timerState` object (see below) — broadcast every second |
-| `widget-colors-update` | `{ timer, progress }` — per-window |
-| `clock-colors-update` | `{ timer, progress }` — per-window |
-| `display-colors-update` | `{ timer, progress }` — per-window |
-| `widget-style-update` | `{ timerStyle, timerScale }` |
-| `timer-minute` | Fired when 1 minute remains |
-| `timer-reached-zero` | Fired at 00:00 |
-| `timer-overrun-minute` | Fired every N minutes in overrun mode |
-| `display-settings-update` | Display settings object |
-| `display-layout` | `{ layout }` — дисплею: разложить элементы по готовой раскладке |
-| `displays-list` | Array of available displays |
-| `set-clock-style` / `clock-settings` | Clock widget settings |
-| `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
-| `ui-theme-update` | `{ theme }` — applied by `UITheme.bindThemeSync()` in every window |
-| `window-geometry` | `{x, y, width, height}` — НАСТОЯЩИЕ границы окна от главного процесса. Виджет и часы пишут в `localStorage` их, а не свои `outerWidth`/`screenX`: на мониторе с масштабом ≠ 100 % это разные единицы |
-| `timer-recovery-available` | The crash snapshot (`{ presetSeconds, totalSeconds, remainingSeconds, savedAt }`), sent to the control window once on `did-finish-load`. Main restores the time itself; this only tells the panel to say so (a toast) |
+Каналы, их направление и payload — в [docs/ipc.md](docs/ipc.md). Правило: новый
+канал объявляется в `channel-validator.js` И `preload.js`, у него обязаны быть
+ОБА конца (`tests/ipc-liveness.test.js` проверяет), а сама таблица живёт в
+`docs/ipc.md`, чтобы не занимать контекст каждого разговора.
 
 ## Timer State Structure
 
@@ -228,6 +183,8 @@ Two flavours of test live here:
 | `audit-2026-07-30-fixes.test.js` | Regressions from the 30 Jul 2026 pass (flip separator, finish flash, geometry, modifier guard, flip timers, sound deletion, F1 overlay) |
 | `storage-keys.test.js` | `CONFIG.STORAGE_KEYS` matches the keys the code uses — both directions — and no key is write- or read-only |
 | `contrast.test.js` | WCAG contrast WITH alpha compositing for BOTH themes (dark ≥ AA, light ≥ AAA), the light surface ladder, its accents and labels on accent fills |
+| `ui-lock.test.js` | Замок: логика на поддельном хранилище, модуль в четырёх окнах, канал в оба конца, рассылка, кнопка и вопрос к замку в КАЖДОМ жесте |
+| `presets.test.js` | Пресеты вида: состав снимка, круговой рейс, мусор и квота, проводка кнопок и клавиш на поддельном документе |
 | `ui-theme.test.js` | Theme logic + wiring: module → four windows' `<head>` → channel in both whitelists → main's relay → panel button |
 | `faq-and-hidden-controls.test.js` | Clock settings reachable (no `display:none`), ONE accordion handler, help text matches the UI, footer version == package.json, dead CSS stays deleted |
 | `release-notes.test.js` | Заметки к релизу берутся из CHANGELOG, таблица загрузок совпадает с `build.target`, обещания в шапке не протухли |
@@ -256,6 +213,8 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `dial-ticks.spec.js` | Dial tick marks toggle reaches widget + clock and survives reopen |
 | `overtime-palette.spec.js` | Overtime is red in display + widget — digits, glow and status chip |
 | `analog-hour-hand.spec.js` | Display's analog hour hand angle at 5 min / 1 h / 1:30 / 6 h |
+| `ui-lock.spec.js` | Замок ПО КЛИКУ: карточка и окно виджета не двигаются, колесо не масштабирует, панель управляет по-прежнему, замок снимается |
+| `presets.spec.js` | Пресеты ПО КЛИКУ и с клавиатуры: записали вид, перенастроили, вернули; панель показывает то же, что окно |
 | `ui-theme.spec.js` | Светлая тема доезжает до всех четырёх окон (замер ВЫЧИСЛЕННЫХ токенов), переживает перезагрузку и красит настоящие контролы |
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
 | `sound-events.spec.js` | Every sound event fires EXACTLY once: minute, zero (± overrun), overrun interval, start from a click and from another window |
@@ -316,6 +275,9 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 разбор: правило говорит ЧТО делать, разбор — почему все предыдущие попытки
 сделали иначе.
 
+- **Замок «Закрепить положение» запрещает ЖЕСТЫ, а не настройки: спрашивать его обязан КАЖДЫЙ жест — перетаскивание, колесо, крестик** — [разбор](docs/lessons.md#a-lock-forbids-gestures-not-settings)
+- **Пресет вида хранит ЗНАЧЕНИЯ ключей профиля и применяется тем же путём, что запуск панели; второй дороги до окон нет** — [разбор](docs/lessons.md#a-preset-is-the-profile-not-a-second-description-of-it)
+- **Смена стиля меняет ГАБАРИТ карточек, а место хранится долей ЦЕНТРА: после стиля, шрифта и масштаба — пересчёт мест** — [разбор](docs/lessons.md#a-style-switch-changes-the-size-and-the-position-is-a-centre)
 - **Фон окна — настройка, а не подпорка: подложки 1% нет, подложку стиля красит `var(--surface-paint, …)`, а сброс её УДАЛЯЕТ (CRITICAL)** — [разбор](docs/lessons.md#the-window-background-is-a-setting-not-a-hit-test-hack)
 - **Палитра окон без своего фона — ОДНА, в `surface-tones.css`, и выбирает её ТОН, а не тема; поверхности стилей записаны токенами `--style-*`, а не литералами (CRITICAL)** — [разбор](docs/lessons.md#one-palette-chosen-by-tone-not-three-pins)
 - **Блок дисплея повторяет стиль теми же токенами, что и таймер: пластина флипа общая, шрифт «Цифр» приходит переменной, а не инлайном** — [разбор](docs/lessons.md#a-block-repeats-the-style-with-the-same-tokens)
@@ -328,6 +290,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Контейнер стиля — это раскладка: `flex` по умолчанию СТРОКА** — [разбор](docs/lessons.md#a-style-container-is-also-a-layout-and-flex-defaults-to-a-row)
 - **`top` + вертикаль `transform-origin` = половина padding-бокса; порог в экранных пикселях меряет окно** — [разбор](docs/lessons.md#two-ways-to-say-the-middle-and-a-threshold-that-measures-the-window)
 - **Число в e2e берётся из окна, а не с твоего монитора; спека возвращает глобальное состояние** — [разбор](docs/lessons.md#a-test-that-passes-only-on-your-monitor)
+- **«За краем экрана» — утверждение о СОЮЗЕ мониторов: точка «потеряно» берётся у внешнего края самого правого дисплея** — [разбор](docs/lessons.md#a-second-monitor-is-a-hidden-parameter-too)
 - **Пин — это предсказание: считать его арифметикой подтверждающей стороны (CRITICAL)** — [разбор](docs/lessons.md#a-pin-is-a-prediction-and-predictions-must-copy-the-arithmetic)
 - **У окна РОВНО ОДНА оболочка, а размер окна задаёт содержимое (CRITICAL)** — [разбор](docs/lessons.md#a-window-has-exactly-one-shell)
 - **Тест, утверждающий ОТСУТСТВИЕ, обязан проверять сам себя — иначе зелёный значит и «чисто», и «регулярка не работает» (CRITICAL)** — [разбор](docs/lessons.md#an-invariant-test-must-be-verified-against-itself)

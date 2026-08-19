@@ -4308,6 +4308,50 @@ body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-r
 .wrow-toggle[aria-checked="true"] .wrow-knob { transform: translateX(17px); }
 
 /* ---------- ФУТЕР ---------- */
+/* ============================================================
+   ПРЕСЕТЫ ВИДА — четыре ячейки над подсказкой клавиш
+   ============================================================
+   Ячейка показывает СОСТОЯНИЕ формой и цветом сразу: пустая — контур,
+   записанная — заливка акцентом. Индикатор, отличимый только цветом, в этом
+   проекте уже был отдельным дефектом контраста. */
+.preset-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 20px 0;
+}
+.preset-caption {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--tw-fg-dim);
+    margin-right: 2px;
+}
+.preset-slot {
+    flex: 1;
+    height: 30px;
+    border: 1px solid var(--tw-border);
+    border-radius: var(--tw-r-md);
+    background: transparent;
+    color: var(--tw-fg-muted);
+    font-family: var(--tw-font-mono);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background var(--tw-dur-base) var(--tw-ease),
+                color var(--tw-dur-base) var(--tw-ease),
+                border-color var(--tw-dur-base) var(--tw-ease);
+}
+.preset-slot:hover { border-color: var(--tw-blue); color: var(--tw-fg); }
+.preset-slot:focus-visible { box-shadow: var(--tw-focus-ring); }
+/* Записанная ячейка — залита и набрана жирным: два признака вместо одного. */
+.preset-slot.filled {
+    background: var(--tw-bg-surface);
+    border-color: var(--tw-blue);
+    color: var(--tw-fg);
+    font-weight: 600;
+}
+body.state-input .preset-row { display: none; }
+
 .panel-footer {
     padding: 20px 20px 18px;
     text-align: center;

@@ -172,7 +172,14 @@ test('control window keeps a reliable drag region after frameless shell changes'
     // кнопок теперь две (переключатель темы и справка) — проверяем, что ПЕРВЫЙ
     // элемент внутри контейнера именно кнопка титлбара, а не что-то ещё.
     assert.match(controlHtml, /<div class="titlebar-right">(?:\s*<!--[\s\S]*?-->)?\s*<button class="titlebar-help"/s);
-    assert.match(controlHtml, /id="contrastToggle"[^>]*>[\s\S]{0,200}?id="faqBtn"/s);
+    // Кнопок в контейнере три: тема, замок «Закрепить положение» (19.08.2026) и
+    // справка. Проверяется, что все они остались ВНУТРИ no-drag-контейнера, то
+    // есть между первой и последней нет закрывающего </div>.
+    const rightCluster = /<div class="titlebar-right">([\s\S]*?)<\/div>/.exec(controlHtml);
+    assert.ok(rightCluster, 'контейнер .titlebar-right не найден');
+    for (const id of ['miniBarToggle', 'contrastToggle', 'lockToggle', 'faqBtn']) {
+        assert.ok(rightCluster[1].includes(`id="${id}"`), `кнопка ${id} вышла из no-drag-контейнера титлбара`);
+    }
     assert.match(controlHtml, /\.custom-titlebar \.titlebar-help\s*\{/);
 });
 

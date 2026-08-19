@@ -271,6 +271,30 @@ class DisplayTimer {
      * Пересчёт идёт по ДОЛЕ, запомненной при постановке, а не по прежним
      * пикселям: доля не зависит от того, каким окно было в прошлый раз.
      */
+    /**
+     * Пересчёт мест на СЛЕДУЮЩЕМ кадре.
+     *
+     * Габарит карточки меняется не в тот же миг, когда меняется её причина:
+     * шрифт «Цифр» применяется переменной и перерисовывается после загрузки
+     * woff2, длинное название мероприятия переносится по новым метрикам, стиль
+     * приходит раньше шрифта. Замер 19.08.2026: пересчёт, сделанный сразу,
+     * видел название шириной 595px, а через кадр оно стало 617px — и центр,
+     * который пересчёт только что выставил, уехал на 0.003 ширины окна.
+     *
+     * Кадр здесь — не «подождать на всякий случай»: браузер к его началу уже
+     * пересчитал раскладку с новыми метриками. Повторные вызовы схлопываются в
+     * один: пересчёт идемпотентен, но делать его четыре раза подряд незачем.
+     */
+    reflowSoon() {
+        if (this._reflowScheduled) { return; }
+        this._reflowScheduled = true;
+        const run = () => {
+            this._reflowScheduled = false;
+            this.reflowElements();
+        };
+        if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(run); } else { run(); }
+    }
+
     reflowElements() {
         // Тот же замер коробок, что и в раскладке, — значит та же оговорка про
         // едущий `transform`: ресайз окна может прийти посреди перехода.
@@ -672,6 +696,18 @@ class DisplayTimer {
                     break;
             }
 
+            // Ctrl+1…4 — пресеты ВИДА. Само окно применить их не может: ключи
+            // профиля раскладывает по контролам и рассылает панель, поэтому
+            // отсюда уезжает только НОМЕР ячейки. Голые 1…4 остаются за
+            // пресетами времени — отбирать работающий жест ради нового нельзя.
+            if ((e.ctrlKey || e.metaKey) && /^Digit[1-4]$/.test(e.code)) {
+                e.preventDefault();
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('preset-apply', { slot: Number(e.code.replace('Digit', '')) });
+                }
+                return;
+            }
+
             // Пресеты. Комментарий «1-8 (5,10,15,20,25,30,45,60 минут)» остался
             // от прежнего набора длительностей: их четыре
             // (CONFIG.PRESET_DURATIONS), и клавиши 5–8 слали
@@ -1063,6 +1099,11 @@ class DisplayTimer {
                 this._digitsFontsReady = true;
                 window.DigitsStyle.clearProbeCache();
                 this.updateDigitsScale();
+                // Шрифт меняет ширину не только таймера, но и КАРТОЧЕК: в
+                // стиле «Цифры» значение блока набрано тем же шрифтом. А место
+                // карточки хранится долей окна для центра, и изменившийся
+                // габарит уводит центр, если её не переставить.
+                this.reflowSoon();
             });
         } else {
             this._digitsFontsReady = true;
@@ -1259,6 +1300,19 @@ class DisplayTimer {
         this.ipcRenderer.on('display-colors-update', this.ipcHandlers.colorsUpdate);
         this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
         this.ipcRenderer.on('display-layout', this.ipcHandlers.displayLayout);
+
+        // Пресет вернул в профиль другие места и масштабы карточек. Окно
+        // перечитывает их ТЕМ ЖЕ путём, что и при открытии: два восстановления
+        // — это две копии знания о том, что такое «место карточки».
+        this.ipcHandlers.displayRestoreState = () => {
+            this.restoreElementScales();
+            this.restoreBlockPositions();
+            this.reflowSoon();
+        };
+        this.ipcRenderer.on('display-restore-state', this.ipcHandlers.displayRestoreState);
+        // Замок приходит тем же способом, что и тема: панель шлёт, главный
+        // процесс рассылает всем окнам.
+        if (window.UILock) { window.UILock.bindLockSync(this.ipcRenderer); }
     }
 
     applyDisplaySettings(settings) {
@@ -1303,6 +1357,10 @@ class DisplayTimer {
                 window.DigitsStyle.ensureFont(font.id).then(() => {
                     window.DigitsStyle.clearProbeCache();
                     this.updateDigitsScale();
+                    // Тот же довод, что и у document.fonts.ready: приехавший
+                    // woff2 меняет ширину карточек, а место у них — доля
+                    // окна для центра.
+                    this.reflowSoon();
                 });
             }
         }
@@ -1456,6 +1514,22 @@ class DisplayTimer {
                 this._lastPushedBlockScale = incoming;
             }
         }
+
+        // Пересчёт мест — ПОСЛЕДНИМ шагом набора, а не внутри отдельных его
+        // частей. Всё выше меняет ГАБАРИТ карточек: стиль (у аналога карточка
+        // с циферблатом на 20px выше, у флипа пластина шире), шрифт «Цифр»
+        // (значение блока набрано им же), масштаб. Место хранится долей окна
+        // для ЦЕНТРА, поэтому изменившийся габарит обязан переставить
+        // карточку, иначе она растёт из своего левого верхнего угла и уносит
+        // центр — это и есть «раскладки съезжают при перещёлкивании стилей».
+        //
+        // Почему именно здесь, а не в setTimerStyle: в этом наборе стиль
+        // применяется РАНЬШЕ шрифта, и пересчёт, сделанный внутри смены стиля,
+        // мерил бы карточки, которым шрифт ещё не поставили (замер: название
+        // мероприятия 634 → 617px уже ПОСЛЕ пересчёта, доля центра 0.500 →
+        // 0.503). В setTimerStyle вызов тоже остался — он покрывает прямые
+        // смены стиля, а повторный пересчёт идемпотентен.
+        this.reflowElements();
     }
 
     setTimerStyle(style) {
@@ -1504,6 +1578,22 @@ class DisplayTimer {
 
         // Обновляем отображение
         this.updateDisplay();
+
+        // Смена стиля меняет РАЗМЕР карточек, а место у них хранится долей
+        // окна для ЦЕНТРА. Без пересчёта карточка остаётся стоять прежним
+        // ЛЕВЫМ ВЕРХНИМ углом и растёт (или сжимается) из него — то есть её
+        // центр уезжает, и разложенная композиция расползается.
+        //
+        // Замер 19.08.2026 («при перещёлкивании стилей раскладки съезжают»),
+        // раскладка «Совещание» на 3440×1440: «Текущее время» 245×121 в круге,
+        // 262×136 во флипе и 190×144 в аналоге; доля центра 0.783/0.120 →
+        // 0.785/0.124 → 0.776/0.127. По вертикали у аналога уезжало на 0.007
+        // высоты окна, и в ряду из четырёх карточек это видно сразу.
+        //
+        // reflowElements переставляет по ТОЙ ЖЕ доле, что и ресайз окна:
+        // отдельной арифметики здесь нет и быть не должно.
+        this.reflowElements();
+        this.reflowSoon();
     }
 
     applyPosition(element, position) {
@@ -2476,6 +2566,10 @@ class DisplayTimer {
 
         // --- Alt key tracking (for block drag) ---
         this._handlers.altKeydown = (e) => {
+            // Под замком подсветка не зажигается вовсе: она ОБЕЩАЕТ жест
+            // (пунктир вокруг карточек и крестики), а жеста нет. Интерфейс,
+            // обещающий то, чего не делает, читается как поломка.
+            if (window.UILock && window.UILock.isLocked()) { return; }
             if (e.key === 'Alt') { e.preventDefault(); document.body.classList.add('alt-active'); }
         };
         this._handlers.altKeyup = (e) => {
@@ -2561,6 +2655,15 @@ class DisplayTimer {
 
         this._handlers.wheel = (e) => {
             if (!e.ctrlKey && !e.shiftKey) { return; }
+            // Замок запрещает ЖЕСТЫ, а не настройки: масштаб продолжает
+            // меняться из панели, но не колесом над окном, где это происходит
+            // мимоходом (см. ui-lock.js). Ответ на упёршийся жест обязан
+            // называть причину — молчание читается как неисправность.
+            if (window.UILock && window.UILock.isLocked()) {
+                e.preventDefault();
+                this.showScaleNote('Закреплено: снимите замок в панели');
+                return;
+            }
             e.preventDefault();
             const step = window.CONFIG.SCALE_STEP;
             // Ось берётся ТА, ПО КОТОРОЙ ПРИШЛО ДВИЖЕНИЕ, а не всегда вертикаль.
@@ -2651,6 +2754,7 @@ class DisplayTimer {
         BLOCK_REGISTRY.forEach(({ el: block, flowClass }) => {
             const blockMousedown = (e) => {
                 if (!e.altKey) { return; }
+                if (window.UILock && window.UILock.isLocked()) { return; }
                 e.preventDefault();
                 e.stopPropagation();
                 block.classList.add('dragging-block');

@@ -142,21 +142,37 @@ const measure = () => {
 test('карточка сверху не ложится на подпись «Осталось» ни в одном стиле', async () => {
     const { app, control } = await launchApp();
     try {
+        // Позиции от соседних спек стираем ДО открытия окна, а не после.
+        //
+        // Профиль прогона общий, и сдвинутая мышью карточка лежит в нём своими
+        // координатами. Стереть их в уже ОТКРЫТОМ окне мало: оно восстановило
+        // их при загрузке, элемент помечен `custom-position` и остаётся стоять
+        // где стоял — а спека проверяет место ПО УМОЛЧАНИЮ. Ловится это не
+        // главной проверкой, а проверкой проверки: «карточка и подпись не в
+        // одном столбце — проверка холостая».
+        await control.evaluate(() => {
+            localStorage.removeItem('displayBlockPositions');
+            localStorage.removeItem('displayBlockScales');
+        });
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         await control.waitForTimeout(2000);
         const display = await findDisplay(app);
         expect(display, 'полноэкранное окно должно открыться').not.toBeNull();
-
-        // Профиль прогона общий, поэтому позиции от соседних спек стираем:
-        // сдвинутая мышью карточка стоит по своим координатам, и место по
-        // умолчанию — именно то, что здесь проверяется.
-        await display.evaluate(() => {
-            localStorage.removeItem('displayBlockPositions');
-            localStorage.removeItem('displayBlockScales');
+        // И масштаб таймера — тоже к умолчанию. Профиль общий на весь прогон, а
+        // соседняя спека (display-timer-scale) оставляет его увеличенным: при
+        // 150 % колонка героя выше, и «карточка легла на подпись» означает не
+        // дефект полосы, а чужой масштаб. Проверка здесь — про КОМПОЗИЦИЮ ПО
+        // УМОЛЧАНИЮ, и начинать её надо от умолчания.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerScale');
+            if (!el) { return; }
+            el.value = '100';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
         });
         await setToggle(control, 'showCurrentTime', true);
         await setToggle(control, 'showHeroLabel', true);
-        await display.waitForTimeout(600);
+        await display.waitForTimeout(900);
 
         // Экран может не вместить крупные размеры. Тогда они не подменяются
         // молча тем, что влезло: список либо сокращается до помещающихся, либо

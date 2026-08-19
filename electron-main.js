@@ -1471,6 +1471,23 @@ ipcMain.on('display-block-hidden', (_event, payload) => {
 // Ответ НЕ запоминается в lastDisplaySettings намеренно — это действие, а не
 // состояние: досланное при открытии окна, оно затирало бы перетаскивания.
 const DISPLAY_LAYOUT_IDS = new Set(require('./display-layouts').LAYOUT_IDS);
+// Пресет вида, нажатый Ctrl+1…4 в окне, где профиля нет. Применяет его ПАНЕЛЬ:
+// она единственная раскладывает ключи по контролам и рассылает их окнам, и
+// вторая дорога до окон разошлась бы с первой на первой же новой настройке.
+ipcMain.on('preset-apply', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const slot = Number(payload.slot);
+    if (!Number.isInteger(slot) || slot < 1 || slot > 4) { return; }
+    safelySendToWindow(controlWindow, 'preset-apply', { slot });
+});
+
+// Перечитать места и масштабы карточек. Payload нет: профиль общий для всех
+// окон приложения, и всё, что нужно окну, уже лежит в нём — это сигнал
+// «перечитай», а не передача данных.
+ipcMain.on('display-restore-state', () => {
+    safelySendToWindow(displayWindow, 'display-restore-state');
+});
+
 ipcMain.on('display-layout', (_event, payload) => {
     if (!isPayloadObject(payload)) { return; }
     const { layout } = payload;
@@ -1490,6 +1507,19 @@ ipcMain.on('ui-theme-update', (_event, payload) => {
     if (typeof theme !== 'string' || !UI_THEME_VALUES.has(theme)) { return; }
     for (const win of [controlWindow, widgetWindow, displayWindow, clockWidgetWindow]) {
         safelySendToWindow(win, 'ui-theme-update', { theme });
+    }
+});
+
+// Замок «Закрепить положение». Та же природа, что у темы: величина одна на всё
+// приложение, ставится панелью, применяется ВЕЗДЕ — значит рассылка, а не
+// адресная отправка. Отправителя не исключаем: применение замка ничего обратно
+// не шлёт, а повторное применение того же значения идемпотентно.
+ipcMain.on('ui-lock-update', (_event, payload) => {
+    if (!isPayloadObject(payload)) { return; }
+    const locked = payload.locked;
+    if (typeof locked !== 'boolean') { return; }
+    for (const win of [controlWindow, widgetWindow, displayWindow, clockWidgetWindow]) {
+        safelySendToWindow(win, 'ui-lock-update', { locked });
     }
 });
 

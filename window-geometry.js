@@ -343,7 +343,7 @@ function fitRestoredBounds(target, displays, minVisible, fallbackArea, min) {
  * @param {object} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
  * @returns {object} тот же объект handlers
  */
-function bindWindowDrag({ container, doc, onMove, onDrop, handlers }) {
+function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) {
     let isDragging = false;
     // Первое движение ЖЕСТА помечается флагом: по нему главный процесс
     // запоминает размер окна и держит его неизменным до конца перетаскивания.
@@ -353,6 +353,12 @@ function bindWindowDrag({ container, doc, onMove, onDrop, handlers }) {
     let dragStartY = 0;
 
     handlers.onContainerMouseDown = (e) => {
+        // Замок «Закрепить положение» (ui-lock.js) отменяет ЖЕСТ, а не
+        // возможность двигать окно вообще: панель и главный процесс двигают
+        // его по-прежнему. Предикат ВНЕДРЯЕТСЯ, потому что этот модуль
+        // проверяется в Node на поддельных DOM и хранилище и не должен знать
+        // ни про класс на документе, ни про localStorage.
+        if (typeof isLocked === 'function' && isLocked()) { return; }
         // Модификаторы зарезервированы за другими жестами (Ctrl+колесо —
         // масштаб), поэтому перетаскивание с ними обязано молчать, иначе окно
         // дёргается при попытке отмасштабировать.
