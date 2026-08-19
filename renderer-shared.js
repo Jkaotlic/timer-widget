@@ -196,6 +196,153 @@ function fitBlockScale(p) {
 }
 
 // ---------------------------------------------------------------------------
+// topBandReserve({column, boxes, gap, floor}) → px
+// ---------------------------------------------------------------------------
+/**
+ * Насколько колонка героя (подпись «Осталось» + таймер) обязана уступить
+ * прижатым к верху карточкам.
+ *
+ * Зачем. Карточки дисплея стоят `position: fixed` от верхнего края, а подпись с
+ * таймером центрируются по ОКНУ. Это два независимых способа сказать, где
+ * элемент, и на высоком окне они не спорят, а на низком сходятся в одной точке.
+ * Замер 18.08.2026 на позиции по умолчанию («Текущее время» — сверху по центру):
+ * 3440×1440 — зазор 108px, 1600×900 — уже перекрытие 21px в «Аналоге»,
+ * 1280×720 — 14/58/15px в «Круге», «Аналоге» и «Цифрах», 1100×620 — 28/2/81/29,
+ * то есть во ВСЕХ четырёх стилях. Готовые раскладки такого не допускают, потому
+ * что считают координаты от свободной полосы; вид по умолчанию не считал ничего.
+ *
+ * Ответ — не двигать карточку (выше 20px от края ей некуда) и не уменьшать её
+ * (на 1100×620 понадобилось бы вдвое), а сдвинуть колонку ровно настолько,
+ * чтобы её верхняя грань встала под нижней гранью карточки.
+ *
+ * Считаются только те карточки, что реально СТОЯТ НА ПУТИ: полоса берётся по
+ * пересечению с горизонтальным габаритом колонки. Карточка в углу низкого
+ * широкого окна колонке не мешает, и уступать ей высоту — значит без причины
+ * сдвинуть таймер вниз.
+ *
+ * Сдвиг ограничен снизу: плашка состояния прижата к нижнему краю и не уступает,
+ * а починить верх ценой низа — это перенос дефекта, а не починка. Если места не
+ * хватает даже так, отдаётся ВЕСЬ доступный сдвиг: часть перекрытия лучше, чем
+ * всё оно.
+ *
+ * Возвращается УДВОЕННЫЙ сдвиг — величина верхнего отступа колонки. Колонку
+ * центрирует флексбокс, поэтому отступ сверху в N пикселей сдвигает её на N/2
+ * (см. `.display-container` в display.css). Коэффициент живёт здесь, рядом с
+ * разбором, а не в CSS-выражении, где его никто не проверит.
+ *
+ * Обе вертикальные величины на входе — при НУЛЕВОЙ полосе. Поэтому функция не
+ * зависит от результата собственного применения: пересчёт идемпотентен и не
+ * может разогнать сам себя.
+ *
+ * @param {{column: {left: number, right: number, top: number, bottom?: number},
+ *          boxes: Array<{left: number, right: number, bottom: number}>,
+ *          gap: number, floor?: number}} p
+ * @returns {number} верхний отступ колонки в пикселях (0 — уступать нечего)
+ */
+/**
+ * Нижняя граница САМОЙ НИЖНЕЙ карточки, стоящей на пути колонки, плюс зазор.
+ *
+ * Общая часть двух ответов на одно и то же затруднение: сдвинуть колонку
+ * (topBandReserve) и ужать раму героя (heroFrameShrink). Два вычисления «кто
+ * мешает» разошлись бы при первой правке — например, при уточнении, что такое
+ * «на пути».
+ *
+ * @returns {number|null} null — мешать некому
+ */
+function blockingBottom(column, boxes, gap) {
+    const left = Number(column.left);
+    const right = Number(column.right);
+    if (!Number.isFinite(left) || !Number.isFinite(right) || !(right > left)) { return null; }
+    const list = Array.isArray(boxes) ? boxes : [];
+
+    let bottom = -Infinity;
+    for (const box of list) {
+        if (!box) { continue; }
+        const bl = Number(box.left);
+        const br = Number(box.right);
+        const bb = Number(box.bottom);
+        if (!Number.isFinite(bl) || !Number.isFinite(br) || !Number.isFinite(bb)) { continue; }
+        // Строгое неравенство: касание краями — не перекрытие.
+        if (br <= left || bl >= right) { continue; }
+        bottom = Math.max(bottom, bb + gap);
+    }
+    return Number.isFinite(bottom) ? bottom : null;
+}
+
+// ---------------------------------------------------------------------------
+// heroFrameShrink({column, boxes, gap, floor, limit}) → px
+// ---------------------------------------------------------------------------
+/**
+ * На сколько ужать раму героя, чтобы колонка ВООБЩЕ поместилась.
+ *
+ * Сдвиг колонки (topBandReserve) решает задачу, пока места хватает. Когда не
+ * хватает — а это не редкость: «Аналог» на 1280×720 просит 479px при полосе в
+ * 463px, на 1100×620 — 427 при 363, — двигать больше некуда, и без второго
+ * шага остаётся перекрытие, то есть дефект «наполовину починен».
+ *
+ * Уступает ГЕРОЙ, а не карточка, и это выбор с обоснованием: карточка набрана
+ * фиксированным мини-циферблатом 100px и подписью, ниже ~80 % она выглядит
+ * сломанной, а круг и циферблат ужимаются непрерывно. Кроме того, ужимать
+ * пришлось бы только МЕШАЮЩИЕ карточки, и в кадре встали бы плашки двух разных
+ * размеров — ровно тот артефакт, за который уже ругали расчёт раскладок.
+ *
+ * ВСЕ величины на входе — при НУЛЕВОЙ уступке (вызывающая сторона обнуляет её и
+ * меряет заново). Иначе это была бы подача собственного выхода себе на вход:
+ * высота колонки зависит от рамы, рама — от этого ответа.
+ *
+ * `limit` — предохранитель на случай стиля, чья высота от рамы не зависит:
+ * ответ тогда бесполезен, но обязан быть ОГРАНИЧЕННЫМ, а не расти от вызова к
+ * вызову.
+ *
+ * @param {{column: {left:number, right:number, top:number, bottom:number},
+ *          boxes: Array<{left:number, right:number, bottom:number}>,
+ *          gap: number, floor: number, limit?: number}} p
+ * @returns {number} пиксели (0 — ужимать не за чем)
+ */
+function heroFrameShrink(p) {
+    const opts = p || {};
+    const column = opts.column;
+    if (!column) { return 0; }
+    const top = Number(column.top);
+    const bottom = Number(column.bottom);
+    const floor = Number(opts.floor);
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || !Number.isFinite(floor)) { return 0; }
+
+    const gapRaw = Number(opts.gap);
+    const gap = Number.isFinite(gapRaw) ? gapRaw : 0;
+    const blocking = blockingBottom(column, opts.boxes, gap);
+    if (blocking === null) { return 0; }
+
+    const room = floor - blocking;
+    const shortfall = (bottom - top) - room;
+    if (!(shortfall > 0)) { return 0; }
+
+    const limit = Number(opts.limit);
+    return Number.isFinite(limit) ? Math.min(shortfall, Math.max(0, limit)) : shortfall;
+}
+
+function topBandReserve(p) {
+    const opts = p || {};
+    const column = opts.column;
+    if (!column) { return 0; }
+    const top = Number(column.top);
+    if (!Number.isFinite(top)) { return 0; }
+
+    const gapRaw = Number(opts.gap);
+    const gap = Number.isFinite(gapRaw) ? gapRaw : 0;
+    const obstacle = blockingBottom(column, opts.boxes, gap);
+    if (obstacle === null) { return 0; }
+
+    let shift = Math.max(0, obstacle - top);
+    const bottom = Number(column.bottom);
+    const floor = Number(opts.floor);
+    if (Number.isFinite(bottom) && Number.isFinite(floor)) {
+        shift = Math.min(shift, Math.max(0, floor - bottom));
+    }
+    return shift * 2;
+}
+
+// ---------------------------------------------------------------------------
 // timerLifecycleStatus(state) → 'paused' | 'overtime' | 'finished' | 'running' | 'idle'
 // ---------------------------------------------------------------------------
 /**
@@ -649,6 +796,8 @@ const RendererShared = {
     flipCells,
     clampScale,
     fitBlockScale,
+    topBandReserve,
+    heroFrameShrink,
     secondsUntilClock,
     migrateDisplayBlocks,
     timerLifecycleStatus,

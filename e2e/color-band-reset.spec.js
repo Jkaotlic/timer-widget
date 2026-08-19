@@ -29,9 +29,18 @@ const { launchApp } = require('./launch');
  *     [data-status="danger"].
  */
 
-const RED_GLOW = /255,\s*68,\s*68/;
+// Цвет полосы НЕ прибит числом: с 18.08.2026 он следует тону окна (на светлом
+// фоне красный затемняется до #b31025 — см. разбор «полоса следует тону»), и
+// литерал #ff4444 здесь означал бы проверку темы, а не проверку сброса.
+// Спрашиваем у окна его собственную полосу и сверяем цифры с НЕЙ.
 const USER_COLOR_GLOW = /48,\s*209,\s*88/;   // #30d158 в rgb
 const USER_COLOR = '#30d158';
+
+/** '#b31025' → 'rgb(179, 16, 37)' — в том виде, в каком его печатает браузер. */
+function hexToRgbString(hex) {
+    const n = parseInt(String(hex).trim().slice(1), 16);
+    return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}
 
 let app;
 let control;
@@ -61,7 +70,9 @@ function readGlow() {
     return {
         status: el.dataset.status,
         shadow: getComputedStyle(el).textShadow,
-        color: getComputedStyle(el).color
+        color: getComputedStyle(el).color,
+        // Полоса этого окна — какой её вычислил браузер в действующем тоне.
+        band: getComputedStyle(document.documentElement).getPropertyValue('--tw-band-danger').trim()
     };
 }
 
@@ -97,13 +108,15 @@ test('на чистом профиле выход из danger снимает В�
     await enterDanger();
     const danger = await widget.evaluate(readGlow);
     expect(danger.status).toBe('danger');
-    expect(danger.color, 'в danger цифры должны быть красными').toMatch(RED_GLOW);
+    expect(danger.band, 'полоса опасности не объявлена').toMatch(/^#[0-9a-f]{6}$/i);
+    expect(danger.color, 'в danger цифры должны быть цвета полосы').toBe(hexToRgbString(danger.band));
     expect(danger.shadow, 'тень обязана остаться нейтральной').toMatch(NEUTRAL_SHADOW);
 
     await backToNormal();
     const normal = await widget.evaluate(readGlow);
     expect(normal.status).toBe('normal');
-    expect(normal.color, 'после выхода из danger красный обязан исчезнуть').not.toMatch(RED_GLOW);
+    expect(normal.color, 'после выхода из danger цвет полосы обязан исчезнуть')
+        .not.toBe(hexToRgbString(normal.band));
     expect(normal.shadow, 'тень обязана остаться нейтральной').toMatch(NEUTRAL_SHADOW);
 });
 
@@ -121,7 +134,8 @@ test('выбранный пользователем цвет виден в но�
     await enterDanger();
     const danger = await widget.evaluate(readGlow);
     expect(danger.status).toBe('danger');
-    expect(danger.color, 'danger обязан перебивать пользовательский цвет').toMatch(RED_GLOW);
+    expect(danger.color, 'danger обязан перебивать пользовательский цвет')
+        .toBe(hexToRgbString(danger.band));
     expect(danger.color, 'в danger не должно остаться пользовательского цвета')
         .not.toMatch(USER_COLOR_GLOW);
 

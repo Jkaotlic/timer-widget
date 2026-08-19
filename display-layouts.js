@@ -51,10 +51,15 @@ const ELEMENT_IDS = DISPLAY_ELEMENTS.map((el) => el.id);
 const MIN_ELEMENT_SCALE = 50;
 const MAX_ELEMENT_SCALE = 600;
 
-// Умолчания взяты из display.css и обязаны совпадать с ним: `--info-scale: 1.2`
+// Умолчания взяты из display.css и обязаны совпадать с ним: `--info-scale: 1.5`
 // у карточки и обычный кегль у подписи с плашкой. Разъедься они — на чистом
 // профиле окно показывало бы одно, а сохранённые значения означали другое.
-const DEFAULT_BLOCK_SCALE = 120;
+// Равенство проверяет tests/display-layouts.test.js, читая само правило CSS.
+//
+// 120 → 150 (19.08.2026, просьба «подними размер всех функциональных блоков»):
+// блоки смотрят из зала вместе с таймером, и прежний кегль читался с задних
+// рядов хуже, чем подпись на слайде.
+const DEFAULT_BLOCK_SCALE = 150;
 const DEFAULT_LABEL_SCALE = 100;
 
 // Поле от края экрана: карточка вплотную к краю читается как полоска сбоку
@@ -117,9 +122,9 @@ const LAYOUTS = [
         hint: 'Таймер по центру, текущее время сверху, начало и окончание снизу',
         timerScale: 100,
         elements: {
-            currentTime: { cx: 0.50, cy: 0.10, scale: 120 },
-            eventTime: { cx: 0.14, cy: 0.90, scale: 120 },
-            endTime: { cx: 0.86, cy: 0.90, scale: 120 },
+            currentTime: { cx: 0.50, cy: 0.10, scale: 150 },
+            eventTime: { cx: 0.14, cy: 0.90, scale: 150 },
+            endTime: { cx: 0.86, cy: 0.90, scale: 150 },
             heroLabel: { flow: true, scale: 100 },
             statusPill: { flow: true, scale: 100 }
         }
@@ -130,11 +135,18 @@ const LAYOUTS = [
         hint: 'Название сверху, все четыре блока времени по углам',
         timerScale: 92,
         elements: {
+            // «Совещание» — самая плотная раскладка: пять элементов вокруг
+            // таймера. Масштабы здесь ПОТОЛОК, а не вкус: на 1280×720 карточки
+            // по углам упираются в название сверху, и проверка непересечения
+            // (tests/display-layouts.test.js, шесть разрешений) не пропускает
+            // больше 115 % у углов при 120 % у названия. Общий подъём блоков до
+            // 150 % живёт в умолчании, а раскладка — это обещание «всё
+            // вмещается», и обещание сильнее.
             eventTitle: { cx: 0.50, cy: 0.07, scale: 120 },
-            timeLeft: { cx: 0.12, cy: 0.12, scale: 110 },
-            currentTime: { cx: 0.88, cy: 0.12, scale: 110 },
-            eventTime: { cx: 0.13, cy: 0.89, scale: 110 },
-            endTime: { cx: 0.87, cy: 0.89, scale: 110 },
+            timeLeft: { cx: 0.12, cy: 0.12, scale: 115 },
+            currentTime: { cx: 0.88, cy: 0.12, scale: 115 },
+            eventTime: { cx: 0.13, cy: 0.89, scale: 115 },
+            endTime: { cx: 0.87, cy: 0.89, scale: 115 },
             heroLabel: { flow: true, scale: 100 },
             statusPill: { flow: true, scale: 100 }
         }
@@ -158,11 +170,13 @@ const LAYOUTS = [
         // нижнего края, ровно там, где здесь идёт полоса блоков. Состояние
         // при этом не теряется — его показывают цвет кольца и полоса прогресса.
         elements: {
-            eventTitle: { cx: 0.50, cy: 0.07, scale: 115 },
-            eventTime: { cx: 0.13, cy: 0.89, scale: 95 },
-            currentTime: { cx: 0.37, cy: 0.89, scale: 95 },
-            timeLeft: { cx: 0.63, cy: 0.89, scale: 95 },
-            endTime: { cx: 0.87, cy: 0.89, scale: 95 },
+            // Четыре карточки ПОЛОСОЙ по нижнему краю: их потолок задаёт не
+            // таймер, а соседи справа и слева — 100 % на 1280×720.
+            eventTitle: { cx: 0.50, cy: 0.07, scale: 140 },
+            eventTime: { cx: 0.13, cy: 0.89, scale: 100 },
+            currentTime: { cx: 0.37, cy: 0.89, scale: 100 },
+            timeLeft: { cx: 0.63, cy: 0.89, scale: 100 },
+            endTime: { cx: 0.87, cy: 0.89, scale: 100 },
             heroLabel: { flow: true, scale: 100 }
         }
     },

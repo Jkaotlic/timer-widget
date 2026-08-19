@@ -1,4 +1,22 @@
 // Display Timer - Полноэкранное отображение таймера
+
+// Зазор между колонкой героя (подпись «Осталось» + таймер) и всем, что стоит
+// у неё на пути. Владелец ОДИН: его просит и потолок масштаба (fitTimerScale),
+// и полоса под верхними карточками (updateTopBand). Два числа разъехались бы
+// при первой же правке, и таймер упирался бы в один зазор, а отодвигался на
+// другой.
+const HERO_GAP = 8;
+
+// Места по умолчанию, прижатые к ВЕРХУ окна. Только они спорят с колонкой:
+// нижние карточки стоят под таймером, а сдвинутая мышью карточка — выбор
+// пользователя, и место ей уступать не за что.
+const TOP_HOME_POSITIONS = ['top-left', 'top-center', 'top-right', 'top-left-third', 'top-right-third'];
+
+// Больше этой доли своей высоты рама героя не уступает никогда. Предохранитель,
+// а не настройка: он срабатывает только там, где уступка всё равно бесполезна
+// (стиль, чья высота от рамы не зависит), и не даёт ответу уехать в бесконечность.
+const MAX_FRAME_SHRINK_SHARE = 0.45;
+
 class DisplayTimer {
     constructor() {
         // Радиус дуги прогресса во вьюбоксе 400×400. Дублируется в display.html
@@ -342,17 +360,26 @@ class DisplayTimer {
      */
     withSettledTransforms(fn) {
         const body = document.body;
+        // Счётчик, а не голый класс: вложенный вызов (полоса сверху считается
+        // ВНУТРИ раскладки) снял бы класс на своём выходе, и внешний расчёт
+        // домеривал бы уже едущие трансформации — ровно тот дефект, ради
+        // которого класс и заведён.
+        this._settleDepth = (this._settleDepth || 0) + 1;
         body.classList.add('layout-settling');
         // Чтение форсирует пересчёт стилей: без него класс мог бы примениться
         // уже ПОСЛЕ того, как браузер завёл переход на новое значение.
         void body.offsetWidth;
+        const release = () => {
+            this._settleDepth = Math.max(0, (this._settleDepth || 1) - 1);
+            if (this._settleDepth === 0) { body.classList.remove('layout-settling'); }
+        };
         try {
             return fn();
         } finally {
             if (typeof requestAnimationFrame === 'function') {
-                requestAnimationFrame(() => body.classList.remove('layout-settling'));
+                requestAnimationFrame(release);
             } else {
-                body.classList.remove('layout-settling');
+                release();
             }
         }
     }
@@ -407,6 +434,14 @@ class DisplayTimer {
 
     /** Сам расчёт раскладки. Вызывается только из applyLayout, на осевших трансформациях. */
     _layoutPass(DL, layout) {
+        // Раскладка ставит карточки САМА и считает координаты от коробки
+        // таймера. Полоса по умолчанию здесь не действует и обнуляется ДО
+        // расчёта: иначе сдвинутый ею таймер увёл бы за собой все семь
+        // координат, а после раскладки полоса всё равно стала бы нулевой —
+        // каждая карточка получает custom-position. Уступка рамы обнуляется по
+        // той же причине: раскладка задаёт масштаб героя сама.
+        this.setTopBand(0);
+        this.setTimerShrink(0);
         const scales = DL.layoutScales(layout);
         for (const [id, pct] of Object.entries(scales)) { this.applyElementScale(id, pct); }
 
@@ -487,6 +522,9 @@ class DisplayTimer {
 
         this.saveElementPositions();
         this.saveElementScales();
+        // Пересчёт честный, а не формальный ноль: раскладка перечисляет не все
+        // семь элементов, и оставшийся на месте по умолчанию всё ещё на пути.
+        this.updateTopBand();
         return true;
     }
 
@@ -603,7 +641,179 @@ class DisplayTimer {
      * блока каждый раз масштабировал вызывающий. Добавление стиля означало
      * пятую строку в трёх местах, и пропуск в одном из них не виден ничем.
      */
+    /**
+     * Полоса сверху, которую колонка героя уступает прижатым к верху карточкам.
+     *
+     * Дефект (жалоба 18.08.2026). Карточки стоят `position: fixed` в 20px от
+     * верхнего края, а подпись «Осталось» с таймером центрируются ПО ОКНУ. Это
+     * два независимых способа сказать, где элемент: на высоком окне они
+     * расходятся, на низком сходятся в одной точке. Замер на позиции по
+     * умолчанию («Текущее время» — сверху по центру): 3440×1440 — зазор 108px,
+     * 1600×900 — перекрытие 21px в «Аналоге», 1280×720 — 14/58/15px в «Круге»,
+     * «Аналоге» и «Цифрах», 1100×620 — 28/2/81/29px во ВСЕХ четырёх стилях.
+     *
+     * Готовые раскладки такого не допускают, потому что считают координаты от
+     * свободной полосы. Вид по умолчанию не считал ничего — отсюда правка:
+     * колонка центрируется не по окну, а по тому, что от окна осталось.
+     * Величина уезжает в `--top-band`, а складывает её с отступом CSS
+     * (см. `.display-container`) — ровно так же, как `--hero-block` держит
+     * место под подпись.
+     *
+     * Полоса не зависит от того, где колонка оказалась: считается по карточкам,
+     * а они `fixed` и от отступа колонки не двигаются. Поэтому пересчёт
+     * идемпотентен и не может разогнать сам себя.
+     *
+     * @returns {number} применённая высота полосы в пикселях
+     */
+    updateTopBand() {
+        const shared = window.RendererShared;
+        const active = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
+            .find((b) => b && b.classList.contains('active'));
+        if (!shared || !shared.topBandReserve || !active) { return 0; }
+
+        // Замер коробок — на ОСЕВШИХ трансформациях: масштаб карточки живёт в
+        // `transform: scale(var(--info-scale))` с переходом в 400 мс, и замер
+        // в этом промежутке вернул бы ПРОШЛЫЙ масштаб (тот же разбор, что у
+        // раскладки).
+        return this.withSettledTransforms(() => {
+            const boxes = this.topAnchoredBoxes();
+            if (boxes.length === 0) {
+                // Мешать некому — и оба ответа заведомо нулевые. Выход здесь не
+                // оптимизация, а отказ от двух принудительных пересчётов
+                // раскладки в самом частом случае: карточки выключены по
+                // умолчанию, а метод зовётся на каждой посылке настроек.
+                this.setTimerShrink(0);
+                this.setTopBand(0);
+                return 0;
+            }
+
+            // Ниже плашки состояния колонке нельзя: она прижата к краю окна и
+            // не уступает. Зазора здесь НЕТ, в отличие от потолка масштаба:
+            // там блок растёт и ему нужен запас, а тут колонка стоит. Каждый
+            // отданный плашке пиксель — это пиксель перекрытия, оставшийся
+            // наверху, а жалоба была именно про верх.
+            // Выключенная плашка не ограничивает ничего: у скрытого элемента
+            // прямоугольник нулевой, и её `top` дал бы 0, то есть «ехать некуда».
+            const pillRect = this.statusPill ? this.statusPill.getBoundingClientRect() : null;
+            const pill = pillRect && pillRect.height > 0 ? pillRect : null;
+            const floor = pill ? pill.top : window.innerHeight;
+
+            // --- Шаг 1: уступка рамы, если колонка не помещается ВООБЩЕ ---
+            //
+            // Меряется при НУЛЕВОЙ уступке, а не «от текущей минус дельта»:
+            // высота колонки зависит от рамы, рама — от этого ответа, и
+            // считать одно через другое значило бы подать собственный выход
+            // себе на вход. Обнулили, заставили пересчитать раскладку,
+            // померили натуральную величину — ответ абсолютный и одинаковый
+            // при любом числе повторов.
+            this.setTimerShrink(0);
+            void document.body.offsetWidth;
+            const natural = this.heroColumnBox(active);
+            const shrink = shared.heroFrameShrink({
+                column: natural,
+                boxes,
+                gap: HERO_GAP,
+                floor,
+                // Предохранитель на случай стиля, чья высота от рамы не зависит
+                // (флип строит высоту из карточек): уступка тогда ничего не
+                // исправит, но обязана остаться ограниченной.
+                limit: active.offsetHeight * MAX_FRAME_SHRINK_SHARE
+            });
+            // Пересчёт раскладки форсируем, только если уступка НЕНУЛЕВАЯ:
+            // ноль уже применён строкой выше, и второй раз мерить нечего.
+            if (this.setTimerShrink(shrink) > 0) { void document.body.offsetWidth; }
+
+            // --- Шаг 2: сдвиг колонки под карточку ---
+            //
+            // Грани приводятся к НУЛЕВОЙ полосе: применённую вычитаем, потому
+            // что знаем её точно — её ставит setTopBand, и сдвиг от неё ровно
+            // половина. Это не замер собственного выхода, а замер, приведённый
+            // к общей точке отсчёта: повторный вызов даёт то же число.
+            const shift = (this._topBand || 0) / 2;
+            const column = this.heroColumnBox(active);
+            const band = shared.topBandReserve({
+                column: { ...column, top: column.top - shift, bottom: column.bottom - shift },
+                boxes,
+                gap: HERO_GAP,
+                floor
+            });
+            this.setTopBand(band);
+            return band;
+        });
+    }
+
+    /**
+     * Прямоугольники карточек, прижатых к ВЕРХУ окна в местах по умолчанию.
+     *
+     * Сдвинутая мышью карточка сюда не попадает: её положение — выбор
+     * пользователя, и таймер не должен ездить за ней прямо во время
+     * перетаскивания.
+     */
+    topAnchoredBoxes() {
+        const boxes = [];
+        for (const row of (this.movableElements || [])) {
+            const el = row.el;
+            if (!el || !el.classList.contains('info-block')) { continue; }
+            if (!el.classList.contains('visible')) { continue; }
+            if (el.classList.contains('custom-position')) { continue; }
+            if (!TOP_HOME_POSITIONS.some((cls) => el.classList.contains(cls))) { continue; }
+            const rect = el.getBoundingClientRect();
+            if (!rect.width || !rect.height) { continue; }
+            boxes.push({ left: rect.left, right: rect.right, bottom: rect.bottom });
+        }
+        return boxes;
+    }
+
+    /**
+     * Габарит колонки героя: таймер И подпись над ним.
+     *
+     * Шире то один, то другая (у «Цифр» подпись уже блока, у «Круга» на узком
+     * окне — наоборот), поэтому берётся объединение. Подпись, вытащенную из
+     * потока, колонка уже не содержит.
+     */
+    heroColumnBox(active) {
+        const timerRect = active.getBoundingClientRect();
+        let left = timerRect.left;
+        let right = timerRect.right;
+        let top = timerRect.top;
+        const label = this.heroLabel;
+        if (label && !label.classList.contains('custom-position')) {
+            const labelRect = label.getBoundingClientRect();
+            if (labelRect.width > 0) {
+                left = Math.min(left, labelRect.left);
+                right = Math.max(right, labelRect.right);
+                top = Math.min(top, labelRect.top);
+            }
+        }
+        return { left, right, top, bottom: timerRect.bottom };
+    }
+
+    /**
+     * Единственная запись `--timer-shrink` — уступки рамы героя.
+     *
+     * @returns {number} применённое значение в пикселях
+     */
+    setTimerShrink(px) {
+        const value = Number.isFinite(px) ? Math.max(0, Math.round(px)) : 0;
+        if (value === this._timerShrink) { return value; }
+        this._timerShrink = value;
+        document.body.style.setProperty('--timer-shrink', value + 'px');
+        return value;
+    }
+
+    /** Единственная запись `--top-band`: раскладка обнуляет полосу тем же ключом. */
+    setTopBand(px) {
+        const value = Number.isFinite(px) ? Math.max(0, Math.round(px)) : 0;
+        this._topBand = value;
+        document.body.style.setProperty('--top-band', value + 'px');
+        return value;
+    }
+
     applyTimerScale() {
+        // Полоса считается ПЕРВОЙ: она двигает колонку, а потолок масштаба
+        // меряется уже по сдвинутой — иначе таймер подгонялся бы под место,
+        // которого у него в следующее мгновение не будет.
+        this.updateTopBand();
         const requested = this.timerScale || 100;
         // Потолок по свободному месту: `transform` раскладку не двигает, и без
         // него увеличенный блок наезжает на подпись «Осталось» и плашку
@@ -697,7 +907,6 @@ class DisplayTimer {
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
 
-        const GAP = 8;
         // Сверху ограничивает не ТЕКУЩЕЕ положение подписи, а место, которое ей
         // нужно: подпись стоит в потоке над блоком и при росте уезжает вверх
         // вместе с полями (см. applyTimerScale). Считать по её нынешнему
@@ -716,8 +925,8 @@ class DisplayTimer {
             free: {
                 left: 0,
                 right: window.innerWidth,
-                top: labelH + GAP,
-                bottom: pill ? pill.top - GAP : window.innerHeight
+                top: labelH + HERO_GAP,
+                bottom: pill ? pill.top - HERO_GAP : window.innerHeight
             },
             requested
         });
@@ -826,6 +1035,19 @@ class DisplayTimer {
                 const left = window.RendererShared.secondsUntilClock(nowSeconds, this.endTime);
                 // formatTime всегда даёт HH:MM:SS — «02:04:21» с фотографии.
                 this.timeLeftValueEl.textContent = window.TimeUtils.formatTime(left);
+                // Стрелки мини-циферблата этого блока крутит ДЛИТЕЛЬНОСТЬ, а не
+                // момент: час за 12 часов остатка, минута за 60 минут — та же
+                // арифметика, что у большого циферблата стиля «Аналог»
+                // (updateAnalogDisplay). Разложение на части делается здесь, а
+                // не второй формулой в updateMiniClockHands: у той на входе
+                // часы/минуты/секунды, и для длительности они значат ровно то
+                // же самое.
+                this.updateMiniClockHands(
+                    this.timeLeftBlock,
+                    Math.floor(left / 3600),
+                    Math.floor(left / 60) % 60,
+                    left % 60
+                );
             }
         };
         updateClock();
@@ -1291,15 +1513,18 @@ class DisplayTimer {
         const timerColor = colors.timer && this._isSafeColor(colors.timer) ? colors.timer : null;
         const progressColor = colors.progress && this._isSafeColor(colors.progress) ? colors.progress : null;
 
-        // Circle style — SVG gradient stops + text glow
+        // Circle style — стопы градиента кольца.
+        //
+        // Свечения здесь больше нет. `--text-glow` и `--glow-color` писались
+        // на каждый приход цвета и не читались НИ ОДНИМ правилом: редизайн
+        // 12.08.2026 снял внешние ореолы (инвариант держит
+        // tests/flat-surfaces.test.js), а записи пережили своих читателей.
+        // Мёртвая переменная опаснее отсутствующей: она выглядит как рабочий
+        // механизм, и следующая правка цвета честно тащит её за собой.
         const stop1 = document.querySelector('.grad-stop-1');
         const stop2 = document.querySelector('.grad-stop-2');
         if (stop1 && timerColor) { stop1.setAttribute('stop-color', timerColor); }
         if (stop2 && progressColor) { stop2.setAttribute('stop-color', progressColor); }
-        if (timerColor) {
-            document.documentElement.style.setProperty('--text-glow', `${timerColor}80`);
-            document.documentElement.style.setProperty('--glow-color', `${timerColor}80`);
-        }
 
         // Цвет темы для цифр КРУГА, LED, «Цифр» и ФЛИПА — одна переменная.
         //
@@ -2346,6 +2571,10 @@ class DisplayTimer {
                 e.preventDefault();
                 e.stopPropagation();
                 row.el.classList.remove('visible');
+                // Закрытая карточка больше никому не мешает: полосу, которую
+                // под неё держала колонка, надо вернуть таймеру сразу, а не
+                // ждать следующей посылки настроек.
+                this.updateTopBand();
                 if (this.ipcRenderer) {
                     this.ipcRenderer.send('display-block-hidden', { block: row.toggle });
                 }
@@ -2462,6 +2691,11 @@ class DisplayTimer {
                     // Кадр мог не успеть — доводим руками, ПОТОМ сохраняем.
                     place();
                     saveBlockPositions();
+                    // Карточка ушла из места по умолчанию (или пришла в
+                    // верхнюю часть окна) — полоса, которую держит колонка,
+                    // пересчитывается по факту, а не в следующей посылке
+                    // настроек.
+                    this.updateTopBand();
                 };
 
                 document.addEventListener('mousemove', onMove);
