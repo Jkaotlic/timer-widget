@@ -409,6 +409,18 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Adaptive window height** — [разбор](docs/lessons.md#adaptive-window-height)
 - **Reset settings** — [разбор](docs/lessons.md#reset-settings)
 
+## Работа с контекстом
+
+Разговор в этом проекте длинный по своей природе: правка → замер → e2e → CI →
+следующая жалоба. Когда контекст подходит к концу, **скажи об этом вслух** и
+предложи сохранить память и продолжить в новом чате — не жди молчаливого
+сжатия. После сжатия теряются именно замеры («было 140px при хорде 135»), а
+без них следующий шаг делается на глаз.
+
+Перед переходом в новый чат: обнови файлы памяти проекта (что сделано, что
+запушено, что осталось), допиши `SESSION.md` и убедись, что незакоммиченного не
+осталось.
+
 ## Automation
 
 - **Hooks** (`.claude/settings.json`): Auto-lint on Edit/Write, block `.env` file edits
