@@ -526,6 +526,43 @@ test('аналог: круг — у циферблата, подписи не в
         //    Без неё всё выше зеленело бы и на разметке вообще без мини-часов.
         expect(seen.filter((b) => b.hasDial).length, 'мини-циферблатов не осталось вовсе').toBeGreaterThanOrEqual(3);
 
+        // 4. Значение помещается в ХОРДУ круга, а не в его габаритную коробку.
+        //
+        // Жалоба 19.08.2026: «в аналоге цифры в функциональных блоках выезжают
+        // за часы». Значение стоит ВНУТРИ циферблата, ниже центра, поэтому
+        // ширина, которая ему доступна, — это хорда на его высоте, а не
+        // диаметр. Замер до правки: «17:02:24» занимало 140px против хорды
+        // 135 — цифры пересекали окружность на 3px с каждой стороны. Проверка
+        // по коробке этого не видит вовсе: текст лежал внутри неё.
+        const chords = await disp.evaluate(() => {
+            const out = [];
+            for (const el of document.querySelectorAll('.info-block')) {
+                if (getComputedStyle(el).display === 'none') { continue; }
+                const dial = el.querySelector('.mini-clock');
+                const value = el.querySelector('.info-value');
+                if (!dial || !value) { continue; }
+                const d = dial.getBoundingClientRect();
+                const v = value.getBoundingClientRect();
+                // Ширина ТЕКСТА, а не бокса: бокс растянут на всю карточку.
+                const range = document.createRange();
+                range.selectNodeContents(value);
+                const t = range.getBoundingClientRect();
+                const r = d.width / 2;
+                const dy = Math.abs((v.top + v.height / 2) - (d.top + d.height / 2));
+                const chord = dy >= r ? 0 : 2 * Math.sqrt(r * r - dy * dy);
+                out.push({ id: el.id, text: value.textContent, textW: Math.round(t.width), chord: Math.round(chord) });
+            }
+            return out;
+        });
+        console.log('   хорды: ' + JSON.stringify(chords));
+        expect(chords.length, 'блоков с циферблатом не нашлось — проверка холостая').toBeGreaterThanOrEqual(3);
+        for (const c of chords) {
+            expect(
+                c.textW,
+                `${c.id}: «${c.text}» шириной ${c.textW}px не помещается в хорду ${c.chord}px — цифры вылезают за круг`
+            ).toBeLessThanOrEqual(c.chord);
+        }
+
         await control.click('#displayTimerStyle button[data-val="circle"]');
         await disp.waitForTimeout(400);
     } finally {

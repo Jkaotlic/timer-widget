@@ -305,3 +305,101 @@ test('панель не прыгает горизонтально при отк�
 
     await app.close();
 });
+
+/**
+ * УЗКОЕ окно: ящик НАКРЫВАЕТ панель целиком, а не делит с ней место.
+ *
+ * Жалоба 19.08.2026: «когда уменьшаю окно настроек, всё съезжается и налезает
+ * друг на друга».
+ *
+ * Раскладка «панель слева, ящик справа» верна, пока окно шире их суммы: панель
+ * минимум 380px плюс ящик 336px плюс поля — около 720px. Комментарий в CSS
+ * утверждал, что узкий режим недостижим, потому что главный процесс делает
+ * окно достаточно широким ПЕРЕД открытием ящика. Это правда ровно до первого
+ * перетаскивания рамки окна — и до маленького экрана, где 1096px просто нет.
+ *
+ * Замер до правки (ящик открыт): при 700×700 прямоугольники пересекались, а
+ * содержимое вкладки ложилось на список окон, ряд пресетов и подвал.
+ *
+ * Проверяется РАЗНИЦА поведения по обе стороны порога, а не одно из состояний:
+ * широкое окно — колонки не пересекаются; узкое — ящик накрывает панель
+ * ПОЛНОСТЬЮ и непрозрачен. Половина этой проверки зеленела бы и на сломанной
+ * вёрстке: «пересекаются» верно и для накрывшего, и для наехавшего.
+ */
+const NARROW_THRESHOLD = 720;
+
+test('узкое окно: ящик накрывает панель целиком и остаётся непрозрачным', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await openDrawer(control, 'display');
+
+        const setSize = (w, h) => app.evaluate(({ BrowserWindow }, size) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((x) => x.webContents.getURL().includes('electron-control.html'));
+            // Минимум окна снимается: пользователь тянет рамку сам, а спека
+            // обязана проверить то состояние, в которое он попадёт.
+            win.setMinimumSize(320, 400);
+            win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
+        }, [w, h]);
+
+        const probe = () => control.evaluate(() => {
+            const panelEl = document.querySelector('.control-panel');
+            const drawerEl = document.querySelector('.settings-drawer');
+            const p = panelEl.getBoundingClientRect();
+            const d = drawerEl.getBoundingClientRect();
+            const cs = getComputedStyle(drawerEl);
+            const alpha = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor);
+            const parts = alpha ? alpha[1].split(',').map((v) => parseFloat(v)) : [];
+            return {
+                vw: window.innerWidth,
+                panel: { left: Math.round(p.left), right: Math.round(p.right), top: Math.round(p.top), bottom: Math.round(p.bottom) },
+                drawer: { left: Math.round(d.left), right: Math.round(d.right), top: Math.round(d.top), bottom: Math.round(d.bottom) },
+                bg: cs.backgroundColor,
+                bgAlpha: parts.length === 4 ? parts[3] : 1,
+                headHeight: Math.round(drawerEl.querySelector('.drawer-head').getBoundingClientRect().height),
+                closeVisible: !!drawerEl.querySelector('#drawerClose')?.getBoundingClientRect().height
+            };
+        });
+
+        // --- широкое окно: две колонки, пересечения нет ---
+        await setSize(1000, 760);
+        await control.waitForTimeout(900);
+        const wide = await probe();
+        console.log(`   широкое ${wide.vw}: панель ${wide.panel.left}…${wide.panel.right}, ящик ${wide.drawer.left}…${wide.drawer.right}`);
+        expect(wide.vw, 'окно не приняло широкий размер').toBeGreaterThanOrEqual(NARROW_THRESHOLD);
+        expect(wide.panel.right, 'широкое окно: панель заходит на ящик').toBeLessThanOrEqual(wide.drawer.left + 1);
+
+        // --- узкое окно: ящик накрывает панель ЦЕЛИКОМ ---
+        for (const [w, h] of [[700, 700], [560, 660], [420, 640]]) {
+            await setSize(w, h);
+            await control.waitForTimeout(900);
+            const narrow = await probe();
+            console.log(`   узкое ${narrow.vw}: панель ${narrow.panel.left}…${narrow.panel.right}, `
+                + `ящик ${narrow.drawer.left}…${narrow.drawer.right}, фон ${narrow.bg}`);
+
+            expect(narrow.drawer.left, `${w}: ящик не накрыл панель слева`).toBeLessThanOrEqual(narrow.panel.left + 1);
+            expect(narrow.drawer.right, `${w}: ящик не накрыл панель справа`).toBeGreaterThanOrEqual(narrow.panel.right - 1);
+            expect(narrow.drawer.top, `${w}: ящик не накрыл панель сверху`).toBeLessThanOrEqual(narrow.panel.top + 1);
+            expect(narrow.drawer.bottom, `${w}: ящик не накрыл панель снизу`).toBeGreaterThanOrEqual(narrow.panel.bottom - 1);
+
+            // Накладка обязана быть НЕПРОЗРАЧНОЙ: сквозь полупрозрачный ящик
+            // панель просвечивает, и «налезает друг на друга» возвращается —
+            // только теперь глазами, а не прямоугольниками.
+            expect(narrow.bgAlpha, `${w}: ящик просвечивает (${narrow.bg})`).toBe(1);
+
+            // И из накладки должен быть выход: шапка с крестиком видна.
+            expect(narrow.headHeight, `${w}: шапка ящика схлопнулась`).toBeGreaterThan(0);
+            expect(narrow.closeVisible, `${w}: из накладки нечем выйти`).toBe(true);
+        }
+
+        // --- и обратно: вернули ширину, вернулись колонки ---
+        await setSize(1000, 760);
+        await control.waitForTimeout(900);
+        const back = await probe();
+        expect(back.panel.right, 'после возврата ширины колонки не разъехались').toBeLessThanOrEqual(back.drawer.left + 1);
+    } finally {
+        await control.click('#drawerClose').catch(() => {});
+        await app.close();
+    }
+});

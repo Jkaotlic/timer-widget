@@ -192,3 +192,73 @@ test('при закрытом ящике окно не растягиваетс�
 
     await app.close();
 });
+
+/**
+ * НИЗКОЕ окно: панель прокручивается, а не теряет низ молча.
+ *
+ * Вторая половина жалобы 19.08.2026 («когда уменьшаю окно, всё съезжается»).
+ * У панели стояло `overflow: hidden` с комментарием «панель не должна
+ * перерастать окно». Верно, но неполно: когда окно ниже содержимого, скрытым
+ * оказывается не лишнее поле, а ряд пресетов, список окон и подвал. Замер до
+ * правки при окне 520px: содержимое 606px, за краем ряд «Вид» (482…554) и
+ * подвал (554…606) — и добраться до них было нечем.
+ *
+ * Проверяется ПАРА условий, иначе половина проверки зеленела бы на любой
+ * вёрстке: на обычном размере прокрутки НЕТ вовсе, на низком низ ДОСТИЖИМ.
+ */
+test('низкое окно: низ панели достижим прокруткой, на обычном размере прокрутки нет', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForTimeout(1000);
+
+        const setSize = (w, h) => app.evaluate(({ BrowserWindow }, size) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((x) => x.webContents.getURL().includes('electron-control.html'));
+            // Минимум снимается намеренно: на маленьком экране главный процесс
+            // и сам не может дать окну 660px, и это ровно тот случай, который
+            // проверяется.
+            win.setMinimumSize(320, 380);
+            win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
+        }, [w, h]);
+
+        const probe = () => control.evaluate(() => {
+            const panel = document.querySelector('.control-panel');
+            const footer = panel.querySelector('.panel-footer');
+            const before = footer.getBoundingClientRect();
+            panel.scrollTop = panel.scrollHeight;
+            const after = footer.getBoundingClientRect();
+            const reachable = after.bottom <= window.innerHeight + 1 && after.top >= -1;
+            panel.scrollTop = 0;
+            return {
+                vh: window.innerHeight,
+                client: panel.clientHeight,
+                content: panel.scrollHeight,
+                scrollable: panel.scrollHeight > panel.clientHeight + 1,
+                footerVisibleWithoutScroll: before.bottom <= window.innerHeight + 1,
+                reachable
+            };
+        });
+
+        // Обычный размер: содержимое умещается, прокрутки нет.
+        await setSize(400, 740);
+        await control.waitForTimeout(700);
+        const normal = await probe();
+        console.log(`   обычное окно ${normal.vh}: содержимое ${normal.content} при ${normal.client}, прокрутка=${normal.scrollable}`);
+        expect(normal.scrollable, 'на обычном размере панель зачем-то прокручивается').toBe(false);
+        expect(normal.footerVisibleWithoutScroll, 'на обычном размере подвал не виден').toBe(true);
+
+        // Низкое окно: прокрутка появилась, и низ достижим.
+        for (const h of [600, 520, 440]) {
+            await setSize(380, h);
+            await control.waitForTimeout(700);
+            const low = await probe();
+            console.log(`   низкое окно ${low.vh}: содержимое ${low.content} при ${low.client}, `
+                + `прокрутка=${low.scrollable}, низ достижим=${low.reachable}`);
+            expect(low.scrollable, `${h}: содержимое не помещается, а прокрутки нет`).toBe(true);
+            expect(low.reachable, `${h}: до подвала панели нельзя добраться — часть интерфейса потеряна`).toBe(true);
+        }
+    } finally {
+        await app.close();
+    }
+});
