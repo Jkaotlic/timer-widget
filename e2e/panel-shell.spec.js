@@ -297,25 +297,40 @@ test('низкое окно: время не наезжает на пресет�
             const panel = document.querySelector('.control-panel');
             const timeEl = document.getElementById('controlTime') || document.querySelector('.timer-display-main');
             const presets = document.getElementById('presetsRow');
+            const footer = panel.querySelector('.panel-footer');
+            const hint = panel.querySelector('.preset-hint');
             const range = document.createRange();
             range.selectNodeContents(timeEl);
             const t = range.getBoundingClientRect();
             const p = presets.getBoundingClientRect();
+            const f = footer.getBoundingClientRect();
+            const hi = hint.getBoundingClientRect();
             return {
                 vh: window.innerHeight,
+                compact: document.body.classList.contains('compact-panel'),
                 fontSize: getComputedStyle(timeEl).fontSize,
                 textTop: Math.round(t.top),
                 gapToPresets: Math.round(p.top - t.bottom),
                 content: panel.scrollHeight,
-                client: panel.clientHeight
+                client: panel.clientHeight,
+                // Обе нижние подсказки обязаны быть ВИДНЫ целиком: компактный
+                // режим сжимает воздух, а не текст.
+                footerFits: f.height > 0 && f.bottom <= window.innerHeight + 1,
+                hintFits: hi.height > 0 && hi.bottom <= window.innerHeight + 1
             };
         });
 
-        for (const [w, h] of [[400, 740], [380, 700], [380, 660], [376, 650]]) {
+        // Размеры подобраны по жалобам: 761×737 — кадр пользователя, где
+        // подсказка внизу была обрезана наполовину (в порог по высоте окно не
+        // попадало, а содержимое в него не влезало); 1000×800 — проверка, что
+        // из компактного режима есть ВЫХОД: панель, однажды сжавшаяся, обязана
+        // разжаться, когда места снова хватает.
+        for (const [w, h] of [[400, 740], [761, 737], [380, 700], [380, 660], [376, 650], [1000, 800]]) {
             await setSize(w, h);
             await control.waitForTimeout(700);
             const m = await probe();
-            console.log(`   ${w}×${h}: кегль ${m.fontSize}, зазор до пресетов ${m.gapToPresets}px, содержимое ${m.content}/${m.client}`);
+            console.log(`   ${w}×${h}: компакт=${m.compact}, кегль ${m.fontSize}, зазор до пресетов ${m.gapToPresets}px, `
+                + `содержимое ${m.content}/${m.client}`);
 
             expect(m.gapToPresets, `${h}: время наезжает на ряд пресетов`).toBeGreaterThan(0);
             expect(m.textTop, `${h}: верх цифр ушёл за окно`).toBeGreaterThanOrEqual(0);
@@ -331,6 +346,16 @@ test('низкое окно: время не наезжает на пресет�
                     m.content,
                     `${h}: панель прокручивается на размере, который приложение считает допустимым`
                 ).toBeLessThanOrEqual(m.client + 1);
+                expect(m.footerFits, `${w}×${h}: строка клавиш обрезана`).toBe(true);
+                expect(m.hintFits, `${w}×${h}: подсказка под ячейками «Вид» обрезана`).toBe(true);
+            }
+
+            // Компактный режим — по НУЖДЕ, а не навсегда: на просторном окне
+            // цифры обязаны вернуться к полному кеглю. Без этой пары чисел
+            // проверка зеленела бы и на панели, которая сжалась однажды и
+            // осталась сжатой (так и вышло с первой версией правки).
+            if (h >= 800) {
+                expect(m.compact, `${w}×${h}: панель осталась сжатой на просторном окне`).toBe(false);
             }
         }
     } finally {
