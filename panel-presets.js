@@ -53,11 +53,11 @@ function bindPresets({ doc, storage, presets, onApplied, notify }) {
             const filled = presets.hasPreset(slot, storage);
             el.classList.toggle('filled', filled);
             el.setAttribute('aria-label', filled
-                ? `Пресет ${slot}: применить (Shift+клик — перезаписать)`
-                : `Пресет ${slot}: пусто, клик сохранит текущий вид`);
+                ? `Пресет ${slot}: применить сохранённый вид. Shift+клик — заменить его текущим`
+                : `Пресет ${slot}: пусто. Клик запомнит текущий вид`);
             el.title = filled
-                ? `Применить пресет ${slot} · Ctrl+${slot}\nShift+клик — записать текущий вид`
-                : `Пусто. Клик запишет текущий вид в пресет ${slot}`;
+                ? `Применить вид из ячейки ${slot} (или Ctrl+${slot})\nShift+клик — заменить его текущим видом`
+                : `Ячейка ${slot} пуста.\nКлик запомнит в неё текущий вид: стили окон, блоки и их места, цвета, масштабы`;
         }
     };
 
