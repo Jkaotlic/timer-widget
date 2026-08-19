@@ -250,15 +250,24 @@ test('низкое окно: низ панели достижим прокрут
         expect(normal.scrollable, 'на обычном размере панель зачем-то прокручивается').toBe(false);
         expect(normal.footerVisibleWithoutScroll, 'на обычном размере подвал не виден').toBe(true);
 
-        // Низкое окно: прокрутка появилась, и низ достижим.
+        // Низкое окно: НИЧЕГО НЕ ТЕРЯЕТСЯ. Либо содержимое помещается (панель
+        // сжалась сама — см. panel-compact.js), либо прокручивается и низ
+        // достижим. Требовать именно прокрутку нельзя: с появлением
+        // компактного режима панель на 600 стала помещаться целиком, и старая
+        // формулировка проверяла способ, а не результат.
         for (const h of [600, 520, 440]) {
             await setSize(380, h);
             await control.waitForTimeout(700);
             const low = await probe();
             console.log(`   низкое окно ${low.vh}: содержимое ${low.content} при ${low.client}, `
                 + `прокрутка=${low.scrollable}, низ достижим=${low.reachable}`);
-            expect(low.scrollable, `${h}: содержимое не помещается, а прокрутки нет`).toBe(true);
-            expect(low.reachable, `${h}: до подвала панели нельзя добраться — часть интерфейса потеряна`).toBe(true);
+            expect(
+                low.reachable,
+                `${h}: до подвала панели нельзя добраться ни прокруткой, ни без неё — часть интерфейса потеряна`
+            ).toBe(true);
+            if (!low.scrollable) {
+                expect(low.footerVisibleWithoutScroll, `${h}: прокрутки нет, а подвал не виден`).toBe(true);
+            }
         }
     } finally {
         await app.close();
@@ -359,6 +368,71 @@ test('низкое окно: время не наезжает на пресет�
             }
         }
     } finally {
+        await app.close();
+    }
+});
+
+/**
+ * ВТОРАЯ ступень сжатия: «Считать ниже нуля» показывает ещё две строки, и на
+ * окне минимальной высоты первой ступени не хватает.
+ *
+ * Замер 19.08.2026 (кадр пользователя, окно 383×660 с включённым минусом):
+ * содержимое 700px при окне 660 — подсказка под ячейками обрезана наполовину,
+ * строки клавиш не видно вовсе.
+ *
+ * Здесь же проверяется, что пересчёт вообще СРАБАТЫВАЕТ на такое изменение:
+ * первая версия наблюдала панель и её первого ребёнка, а строки настроек
+ * появляются В СЕРЕДИНЕ — высота панели при этом не меняется, и режим не
+ * переключался (ручной вызов давал 660, автоматический — нет).
+ */
+test('«Считать ниже нуля» на минимальном окне: подсказки целы, панель влезает', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForTimeout(1000);
+        await app.evaluate(({ BrowserWindow }, h) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((x) => x.webContents.getURL().includes('electron-control.html'));
+            win.setBounds({ x: 40, y: 40, width: 383, height: h });
+        }, MIN_PANEL_HEIGHT);
+        await control.waitForTimeout(900);
+
+        await control.evaluate(() => {
+            const el = document.getElementById('allowNegative');
+            el.checked = true;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        await control.waitForTimeout(1200);
+
+        const m = await control.evaluate(() => {
+            const panel = document.querySelector('.control-panel');
+            const hint = panel.querySelector('.preset-hint').getBoundingClientRect();
+            const footer = panel.querySelector('.panel-footer').getBoundingClientRect();
+            const overrun = document.getElementById('overrunRow');
+            return {
+                vh: window.innerHeight,
+                content: panel.scrollHeight,
+                client: panel.clientHeight,
+                font: getComputedStyle(panel.querySelector('.timer-display-main')).fontSize,
+                level2: document.body.classList.contains('compact-panel-2'),
+                overrunShown: !!overrun && getComputedStyle(overrun).display !== 'none',
+                hintFits: hint.height > 0 && hint.bottom <= window.innerHeight + 1,
+                footerFits: footer.height > 0 && footer.bottom <= window.innerHeight + 1
+            };
+        });
+        console.log(`   383×${m.vh} с минусом: ступень2=${m.level2}, кегль ${m.font}, содержимое ${m.content}/${m.client}`);
+
+        // Проверка проверки: строка «Остановить на» действительно появилась,
+        // иначе всё ниже зеленело бы на прежнем составе панели.
+        expect(m.overrunShown, 'строка лимита не появилась — проверять нечего').toBe(true);
+        expect(m.content, 'панель не помещается на своём минимуме даже сжатой').toBeLessThanOrEqual(m.client + 1);
+        expect(m.hintFits, 'подсказка под ячейками «Вид» обрезана').toBe(true);
+        expect(m.footerFits, 'строка клавиш обрезана').toBe(true);
+    } finally {
+        await control.evaluate(() => {
+            const el = document.getElementById('allowNegative');
+            if (el) { el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         await app.close();
     }
 });

@@ -4685,7 +4685,12 @@ body.paused #miniBarStart { display: block; }
    (.app-shell.drawer-open), и геометрию ящика (.settings-drawer.open), и его
    фон (правила светлой темы ниже по файлу) — специфичность у них равная, и
    решает порядок. */
-@media (max-width: 719px) {
+/* Порог — СУММА минимумов, а не круглое число: панель не уже
+   CONTROL_WINDOW_MIN_WIDTH (380) плюс ящик 336 = 716. При 719px места хватает
+   (панель 383), и накладка там не нужна — а первая версия ставила порог 719 и
+   ловила ровно этот случай: пользователь с окном 383 открывал ящик, главный
+   процесс расширял окно до 383+336=719, и панель пропадала под накладкой. */
+@media (max-width: 715px) {
     .app-shell.drawer-open {
         /* Колонки больше нет: панель занимает окно целиком, ящик ложится
            поверх. Иначе панель осталась бы шириной 380px в левой дорожке, а
@@ -4813,4 +4818,39 @@ body.compact-panel .wrow {
    режиме цифры и так ближе. */
 body.compact-panel .presets {
     padding-top: 14px;
+}
+
+/* Вторая ступень сжатия: включается, когда первой не хватило (например,
+   «Считать ниже нуля» показывает ещё две строки настроек — замер 19.08.2026:
+   содержимое 700px при окне 660). Убирается то, без чего интерфейс остаётся
+   понятным: подсказка под цифрами (по цифрам и так кликают), ещё немного кегля
+   и высоты транспорта. Подсказки ВНИЗУ не трогаются ни на одной ступени. */
+body.compact-panel-2 .control-panel .timer-display-main {
+    font-size: 44px;
+}
+
+body.compact-panel-2 .hero-hint {
+    display: none;
+}
+
+body.compact-panel-2 .transport-row {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+body.compact-panel-2 .presets {
+    padding-top: 10px;
+}
+
+body.compact-panel-2 .wrow {
+    padding: 6px 8px;
+}
+
+body.compact-panel-2 .group-title {
+    margin: 0 0 3px;
+}
+
+body.compact-panel-2 .main-btn,
+body.compact-panel-2 .transport-main {
+    height: 46px;
 }
