@@ -290,6 +290,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Контейнер стиля — это раскладка: `flex` по умолчанию СТРОКА** — [разбор](docs/lessons.md#a-style-container-is-also-a-layout-and-flex-defaults-to-a-row)
 - **`top` + вертикаль `transform-origin` = половина padding-бокса; порог в экранных пикселях меряет окно** — [разбор](docs/lessons.md#two-ways-to-say-the-middle-and-a-threshold-that-measures-the-window)
 - **Число в e2e берётся из окна, а не с твоего монитора; спека возвращает глобальное состояние** — [разбор](docs/lessons.md#a-test-that-passes-only-on-your-monitor)
+- **Запрошенный размер окна ≠ выданный: условия считать по ФАКТИЧЕСКОМУ, пороги брать из `CONFIG`, расхождение печатать** — [разбор](docs/lessons.md#a-second-monitor-is-a-hidden-parameter-too)
 - **«За краем экрана» — утверждение о СОЮЗЕ мониторов: точка «потеряно» берётся у внешнего края самого правого дисплея** — [разбор](docs/lessons.md#a-second-monitor-is-a-hidden-parameter-too)
 - **Пин — это предсказание: считать его арифметикой подтверждающей стороны (CRITICAL)** — [разбор](docs/lessons.md#a-pin-is-a-prediction-and-predictions-must-copy-the-arithmetic)
 - **У окна РОВНО ОДНА оболочка, а размер окна задаёт содержимое (CRITICAL)** — [разбор](docs/lessons.md#a-window-has-exactly-one-shell)
