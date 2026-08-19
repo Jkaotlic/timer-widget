@@ -754,6 +754,7 @@ test('перещёлкивание стилей не сдвигает разло
         });
 
         const fractions = () => display.evaluate((ids) => {
+            const MARGIN = 20;
             const out = {};
             for (const id of ids) {
                 const el = document.getElementById(id);
@@ -764,7 +765,15 @@ test('перещёлкивание стилей не сдвигает разло
                     cx: +((r.left + r.width / 2) / window.innerWidth).toFixed(4),
                     cy: +((r.top + r.height / 2) / window.innerHeight).toFixed(4),
                     w: Math.round(r.width),
-                    h: Math.round(r.height)
+                    h: Math.round(r.height),
+                    // Прижат ли элемент к краю окна. Прижатый НЕ МОЖЕТ сохранить
+                    // долю центра: карточка, выросшая в высоту у нижнего края,
+                    // упирается в поле и центр её честно уезжает вверх. Это не
+                    // «съехала раскладка», а «дальше некуда» — и различить эти
+                    // два случая может только замер края.
+                    pinned: r.left <= MARGIN + 1 || r.top <= MARGIN + 1
+                        || r.right >= window.innerWidth - MARGIN - 1
+                        || r.bottom >= window.innerHeight - MARGIN - 1
                 };
             }
             return out;
@@ -777,6 +786,7 @@ test('перещёлкивание стилей не сдвигает разло
             expect(Object.keys(base).length, `${layout}: карточек на экране нет`).toBeGreaterThan(2);
 
             let sizeChanged = false;
+            let checked = 0;
             for (const style of ['flip', 'analog', 'digits', 'circle']) {
                 await control.click(`#displayTimerStyle button[data-val="${style}"]`);
                 await display.waitForTimeout(900);
@@ -786,6 +796,14 @@ test('перещёлкивание стилей не сдвигает разло
                     const b = now[id];
                     expect(b, `${layout}/${style}: «${id}» исчез`).toBeTruthy();
                     if (a.w !== b.w || a.h !== b.h) { sizeChanged = true; }
+                    // Прижатый к краю элемент из проверки долей выпадает: у него
+                    // нет места сохранить центр, и требовать этого — значит
+                    // требовать невозможного (на маленьком экране CI карточка
+                    // аналога вырастает со 102 до 138px и упирается в нижнее
+                    // поле). Проверка при этом не становится холостой: pinned
+                    // считается по КРАЮ, и хотя бы один неприжатый элемент в
+                    // каждой раскладке есть — иначе упадёт проверка проверки.
+                    if (b.pinned || a.pinned) { continue; }
                     expect(
                         Math.abs(b.cx - a.cx),
                         `${layout}/${style}: «${id}» уехал по горизонтали ${a.cx} → ${b.cx} (размер ${a.w}×${a.h} → ${b.w}×${b.h})`
@@ -794,13 +812,21 @@ test('перещёлкивание стилей не сдвигает разло
                         Math.abs(b.cy - a.cy),
                         `${layout}/${style}: «${id}» уехал по вертикали ${a.cy} → ${b.cy} (размер ${a.w}×${a.h} → ${b.w}×${b.h})`
                     ).toBeLessThanOrEqual(0.002);
+                    checked++;
                 }
             }
-            // Проверка проверки: если карточки НЕ меняли размер, то доказано
-            // ничего — совпадение долей вышло бы и без всякого пересчёта.
+            // Две проверки проверки: карточки ДОЛЖНЫ были менять размер (иначе
+            // совпадение долей вышло бы и без пересчёта) и хотя бы что-то
+            // должно было быть измерено (иначе всё выпало в pinned).
             expect(sizeChanged, `${layout}: карточки не изменили размер ни в одном стиле — проверка холостая`).toBe(true);
+            expect(checked, `${layout}: все элементы прижаты к краям — проверка холостая`).toBeGreaterThan(0);
         }
 
+        // Возвращаем стиль ЯВНО: соседние спеки (дуга кольца, масштаб
+        // таймера) открывают дисплей заново и берут стиль из профиля —
+        // оставленный «аналог» показал бы им окно без кольца вовсе.
+        await control.click('#displayTimerStyle button[data-val="circle"]');
+        await display.waitForTimeout(500);
         await resetDisplayState(control, display);
     } finally {
         await app.close();

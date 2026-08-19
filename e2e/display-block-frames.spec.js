@@ -138,7 +138,15 @@ test('ни один блок не носит заднюю рамку — чет�
     } finally {
         // Профиль e2e общий: возвращаем тему и стиль по умолчанию.
         await control.click('#contrastToggle').catch(() => {});
-        await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
+        // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
+        // настроек, и если он закрылся, клик ждёт видимости и молча падает по
+        // таймауту (в `finally` это ещё и незаметно). Соседние спеки открывают
+        // дисплей заново и берут стиль ИЗ ПРОФИЛЯ — оставленный «аналог»
+        // показал бы им окно вообще без кольца.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerStyle');
+            if (el) { el.value = 'circle'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, false).catch(() => {}); }
         await app.close();
     }
@@ -233,7 +241,15 @@ test('аналог: «До завершения» показывает ОСТА�
             const el = document.getElementById('endTimeInput');
             if (el) { el.value = '12:00'; el.dispatchEvent(new Event('change', { bubbles: true })); }
         }).catch(() => {});
-        await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
+        // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
+        // настроек, и если он закрылся, клик ждёт видимости и молча падает по
+        // таймауту (в `finally` это ещё и незаметно). Соседние спеки открывают
+        // дисплей заново и берут стиль ИЗ ПРОФИЛЯ — оставленный «аналог»
+        // показал бы им окно вообще без кольца.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerStyle');
+            if (el) { el.value = 'circle'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, false).catch(() => {}); }
         await app.close();
     }
@@ -303,7 +319,15 @@ test('верхний ряд блоков выровнен: подписи на �
             }
         }
     } finally {
-        await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
+        // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
+        // настроек, и если он закрылся, клик ждёт видимости и молча падает по
+        // таймауту (в `finally` это ещё и незаметно). Соседние спеки открывают
+        // дисплей заново и берут стиль ИЗ ПРОФИЛЯ — оставленный «аналог»
+        // показал бы им окно вообще без кольца.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerStyle');
+            if (el) { el.value = 'circle'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, false).catch(() => {}); }
         await app.close();
     }
