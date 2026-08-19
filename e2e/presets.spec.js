@@ -117,7 +117,15 @@ test('ячейка записывает вид и возвращает его К
             const el = document.getElementById('showCurrentTime');
             if (el) { el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); }
         }).catch(() => {});
-        await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
+        // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
+        // настроек, и если он закрылся, клик ждёт видимости и молча падает по
+        // таймауту (в `finally` это ещё и незаметно). Соседние спеки открывают
+        // дисплей заново и берут стиль ИЗ ПРОФИЛЯ — оставленный «аналог»
+        // показал бы им окно вообще без кольца.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerStyle');
+            if (el) { el.value = 'circle'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         await app.close();
     }
 });
@@ -154,7 +162,15 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
         expect((await displayStyle(display)).style, 'Ctrl+2 не применил ячейку').toBe('digits');
     } finally {
         await control.evaluate(() => localStorage.removeItem('uiPresets')).catch(() => {});
-        await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
+        // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
+        // настроек, и если он закрылся, клик ждёт видимости и молча падает по
+        // таймауту (в `finally` это ещё и незаметно). Соседние спеки открывают
+        // дисплей заново и берут стиль ИЗ ПРОФИЛЯ — оставленный «аналог»
+        // показал бы им окно вообще без кольца.
+        await control.evaluate(() => {
+            const el = document.getElementById('displayTimerStyle');
+            if (el) { el.value = 'circle'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         await app.close();
     }
 });
