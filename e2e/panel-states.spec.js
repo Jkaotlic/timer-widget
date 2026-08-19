@@ -341,7 +341,14 @@ test.describe('панель: строки окон', () => {
      */
     test('строка дисплея сообщает стиль и масштаб, а не только монитор', async () => {
         await control.click('#openDisplayBtn');
-        await control.waitForTimeout(1800);
+        // Ждём УСЛОВИЕ, а не паузу. Полноэкранное окно грузит четыре таблицы
+        // стилей и двадцать шрифтов, и на занятой машине (полный прогон e2e,
+        // 14 минут) 1800 мс до прихода `display-window-state` не хватало: строка
+        // честно показывала «закрыт», тест падал на подписи, а причина была в
+        // том, что окна ещё не было. Фиксированная пауза здесь измеряла скорость
+        // машины — тот же дефект, что чинился 18.08.2026 в угле стрелки.
+        await expect(control.locator('#openDisplayBtn'))
+            .toHaveAttribute('aria-checked', 'true', { timeout: 15000 });
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
         await control.waitForTimeout(700);
 
@@ -372,7 +379,10 @@ test.describe('панель: строки окон', () => {
         await control.click('#drawerClose');
         await control.waitForTimeout(600);
         await control.click('#openDisplayBtn');
-        await control.waitForTimeout(900);
+        // Закрытие тоже по условию: профиль общий, и следующая спека не должна
+        // получить чужое открытое окно.
+        await expect(control.locator('#openDisplayBtn'))
+            .toHaveAttribute('aria-checked', 'false', { timeout: 15000 });
     });
 
     test('строка «Звуки» ведёт в свой раздел', async () => {

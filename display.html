@@ -99,11 +99,34 @@
     </div>
     <!-- Блок «До завершения»: сколько осталось до времени «Конец». Считается от
          ТЕКУЩЕГО времени и с таймером доклада не связан — на фотографии
-         пользователя это две разные величины в одном кадре. Мини-часов здесь
-         нет: показывается длительность, а не момент. -->
+         пользователя это две разные величины в одном кадре.
+
+         Мини-часы здесь ЕСТЬ с 19.08.2026. До этого их не было намеренно
+         («показывается длительность, а не момент»), из-за чего в стиле
+         «Аналог» блок оставался единственным набранным строкой — стиля на нём
+         не было видно вовсе. Длительность циферблату не противопоказана: сам
+         таймер этого стиля ровно ею и крутит стрелки (updateAnalogDisplay),
+         и блок повторяет ту же арифметику, а не заводит свою. -->
     <div class="display-movable info-block top-left" id="timeLeftBlock">
         <button class="info-close" type="button" aria-label="Скрыть блок" tabindex="-1">×</button>
         <div class="info-label">До завершения</div>
+        <div class="mini-clock">
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(30deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(60deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(90deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(120deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(150deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(180deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(210deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(240deg);"></div>
+            <div class="mini-tick quarter" style="transform: translateX(-50%) rotate(270deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(300deg);"></div>
+            <div class="mini-tick" style="transform: translateX(-50%) rotate(330deg);"></div>
+            <div class="mini-hand mini-hand-hour"></div>
+            <div class="mini-hand mini-hand-minute"></div>
+            <div class="mini-center"></div>
+        </div>
         <div class="info-value" id="timeLeftValue">00:00:00</div>
     </div>
     <!-- Блок с названием мероприятия — единственный, чьё значение вводит
@@ -111,6 +134,12 @@
          разметка сюда не попадает. -->
     <div class="display-movable info-block top-right" id="eventTitleBlock">
         <button class="info-close" type="button" aria-label="Скрыть блок" tabindex="-1">×</button>
+        <!-- Пустая подпись — не забытый текст, а РЕЗЕРВ строки: у соседей по
+             ряду над значением стоит подпись, и без этой строки название
+             мероприятия вставало выше их значений. Правило
+             `.info-label:empty::before` даёт ей высоту, а все стилевые правила
+             подписи применяются к ней сами. -->
+        <div class="info-label" aria-hidden="true"></div>
         <div class="info-value info-value-title" id="eventTitleValue"></div>
     </div>
 
@@ -127,15 +156,19 @@
                         <stop offset="0%" stop-color="#0a84ff" class="grad-stop-1" />
                         <stop offset="100%" stop-color="#30d158" class="grad-stop-2" />
                     </linearGradient>
-                    <!-- Предупреждение -->
+                    <!-- Предупреждение. Цвета стопов — в CSS (#warningGradient),
+                         по той же причине, что у градиента опасности ниже. -->
                     <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ffc107" />
-                        <stop offset="100%" stop-color="#ff9800" />
+                        <stop offset="0%" />
+                        <stop offset="100%" />
                     </linearGradient>
-                    <!-- Опасность -->
+                    <!-- Опасность. Цвета стопов живут в CSS (#dangerGradient),
+                         как и у основного градиента виджета: полоса опасности
+                         затемняется на светлом тоне, а презентационный атрибут
+                         был бы вторым владельцем значения. -->
                     <linearGradient id="dangerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ff4444" />
-                        <stop offset="100%" stop-color="#cc0000" />
+                        <stop offset="0%" />
+                        <stop offset="100%" />
                     </linearGradient>
                 </defs>
 

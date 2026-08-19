@@ -449,6 +449,161 @@ test('fitBlockScale: мусор возвращает запрошенное, а 
     assert.equal(fitBlockScale({ width: 0, height: 100, centerX: 100, centerY: 100, free: FREE, requested: 250 }), 250);
 });
 
+// ---------------------------------------------------------------------------
+// topBandReserve — сдвиг колонки из-под верхних карточек (18.08.2026)
+// ---------------------------------------------------------------------------
+// Карточки стоят fixed от верхнего края, колонка героя центрируется по окну.
+// На высоком окне они расходятся, на низком — сходятся: замер на позиции по
+// умолчанию дал перекрытие «Текущего времени» с подписью «Осталось» на 14px
+// (1280×720, «Круг»), 58px («Аналог») и 81px на 1100×620.
+//
+// Ответ — УДВОЕННЫЙ сдвиг: возвращается верхний отступ колонки, а отступ
+// сдвигает центрируемую колонку на половину себя.
+const { topBandReserve } = require('../renderer-shared');
+
+// Колонка шириной 400 по центру окна 1000, верхняя грань на 100.
+const COLUMN = { left: 300, right: 700, top: 100 };
+
+test('topBandReserve: колонка уходит ровно под нижнюю грань карточки', () => {
+    // Карточка кончается на 140, зазор 8 → верх колонки должен встать на 148,
+    // то есть сдвинуться на 48; отступ вдвое больше.
+    const boxes = [{ left: 420, right: 580, bottom: 140 }];
+    assert.equal(topBandReserve({ column: COLUMN, boxes, gap: 8 }), 96);
+});
+
+test('topBandReserve: карточка выше колонки ничего не требует', () => {
+    const boxes = [{ left: 420, right: 580, bottom: 60 }];
+    assert.equal(topBandReserve({ column: COLUMN, boxes, gap: 8 }), 0);
+});
+
+test('topBandReserve: карточка мимо колонки не считается вовсе', () => {
+    // Угловая карточка низкого широкого окна: колонке она не мешает, и
+    // уступать ей высоту — значит сдвинуть таймер вниз без причины.
+    const boxes = [{ left: 20, right: 260, bottom: 300 }];
+    assert.equal(topBandReserve({ column: COLUMN, boxes, gap: 8 }), 0);
+});
+
+test('topBandReserve: касание краями перекрытием не считается', () => {
+    assert.equal(topBandReserve({ column: COLUMN, boxes: [{ left: 100, right: 300, bottom: 300 }], gap: 8 }), 0);
+    assert.equal(topBandReserve({ column: COLUMN, boxes: [{ left: 700, right: 900, bottom: 300 }], gap: 8 }), 0);
+});
+
+test('topBandReserve: сдвиг — по САМОЙ НИЖНЕЙ из мешающих карточек', () => {
+    const boxes = [
+        { left: 420, right: 580, bottom: 140 },   // на пути, ниже
+        { left: 320, right: 400, bottom: 90 },    // на пути, выше
+        { left: 20, right: 200, bottom: 400 }     // не на пути, но самая нижняя
+    ];
+    assert.equal(topBandReserve({ column: COLUMN, boxes, gap: 10 }), 100);
+});
+
+test('topBandReserve: сдвиг ограничен тем, куда колонке есть куда ехать', () => {
+    // Нужно 48, но до плашки снизу свободно 30 — отдаём весь доступный сдвиг:
+    // часть перекрытия лучше, чем всё оно.
+    const boxes = [{ left: 420, right: 580, bottom: 140 }];
+    assert.equal(
+        topBandReserve({ column: { ...COLUMN, bottom: 500 }, boxes, gap: 8, floor: 530 }),
+        60
+    );
+});
+
+test('topBandReserve: колонке некуда — сдвига нет вовсе', () => {
+    const boxes = [{ left: 420, right: 580, bottom: 140 }];
+    assert.equal(
+        topBandReserve({ column: { ...COLUMN, bottom: 600 }, boxes, gap: 8, floor: 530 }),
+        0
+    );
+});
+
+test('topBandReserve: запаса хватает — сдвиг остаётся нужным, а не максимальным', () => {
+    const boxes = [{ left: 420, right: 580, bottom: 140 }];
+    assert.equal(
+        topBandReserve({ column: { ...COLUMN, bottom: 400 }, boxes, gap: 8, floor: 900 }),
+        96
+    );
+});
+
+test('topBandReserve: без нижних величин сдвиг не ограничивается', () => {
+    // Замер мог не состояться. Прижать колонку к верху молча — худший ответ.
+    const boxes = [{ left: 420, right: 580, bottom: 140 }];
+    assert.equal(topBandReserve({ column: COLUMN, boxes, gap: 8 }), 96);
+    assert.equal(topBandReserve({ column: { ...COLUMN, bottom: NaN }, boxes, gap: 8, floor: 530 }), 96);
+});
+
+test('topBandReserve: нет карточек — нет сдвига', () => {
+    assert.equal(topBandReserve({ column: COLUMN, boxes: [], gap: 8 }), 0);
+});
+
+// ---------------------------------------------------------------------------
+// heroFrameShrink — уступка рамы, когда сдвига не хватает (18.08.2026)
+// ---------------------------------------------------------------------------
+// «Аналог» на 1280×720 просит колонке 479px при полосе 463px, на 1100×620 —
+// 427 при 363. Двигать некуда: карточка сверху в 20px от края, плашка снизу
+// прижата к краю. Уступает герой — на недостачу и ни пикселем больше.
+const { heroFrameShrink } = require('../renderer-shared');
+
+// Колонка 300..800 (высота 500) в столбце 300..700; карточка кончается на 140.
+const TALL = { left: 300, right: 700, top: 300, bottom: 800 };
+const CARD = [{ left: 420, right: 580, bottom: 140 }];
+
+test('heroFrameShrink: колонка не помещается — уступка равна НЕДОСТАЧЕ', () => {
+    // Полоса: от 148 (карточка + зазор) до 600 (плашка) = 452 при колонке 500.
+    assert.equal(heroFrameShrink({ column: TALL, boxes: CARD, gap: 8, floor: 600 }), 48);
+});
+
+test('heroFrameShrink: помещается — уступки нет вовсе', () => {
+    assert.equal(heroFrameShrink({ column: TALL, boxes: CARD, gap: 8, floor: 700 }), 0);
+    // И ровно впритык — тоже не уступка: 148 + 500 = 648.
+    assert.equal(heroFrameShrink({ column: TALL, boxes: CARD, gap: 8, floor: 648 }), 0);
+});
+
+test('heroFrameShrink: карточка мимо столбца ничего не требует', () => {
+    const aside = [{ left: 20, right: 260, bottom: 400 }];
+    assert.equal(heroFrameShrink({ column: TALL, boxes: aside, gap: 8, floor: 600 }), 0);
+});
+
+test('heroFrameShrink: предохранитель ограничивает ответ', () => {
+    // Стиль, чья высота от рамы не зависит: ответ бесполезен, но обязан быть
+    // ОГРАНИЧЕННЫМ, иначе рама уезжала бы в ноль от вызова к вызову.
+    assert.equal(heroFrameShrink({ column: TALL, boxes: CARD, gap: 8, floor: 600, limit: 30 }), 30);
+    assert.equal(heroFrameShrink({ column: TALL, boxes: CARD, gap: 8, floor: 600, limit: 0 }), 0);
+    assert.equal(heroFrameShrink({ column: TALL, boxes: CARD, gap: 8, floor: 600, limit: -5 }), 0);
+});
+
+test('heroFrameShrink: мусор даёт 0, а не NaN', () => {
+    for (const bad of [
+        { column: null, boxes: CARD, gap: 8, floor: 600 },
+        { column: { ...TALL, bottom: NaN }, boxes: CARD, gap: 8, floor: 600 },
+        { column: TALL, boxes: CARD, gap: 8, floor: NaN },
+        { column: { ...TALL, left: 700, right: 300 }, boxes: CARD, gap: 8, floor: 600 },
+        { column: TALL, boxes: null, gap: 8, floor: 600 }
+    ]) {
+        const out = heroFrameShrink(bad);
+        assert.ok(Number.isFinite(out), `ожидалось число, получено ${out}`);
+        assert.equal(out, 0);
+    }
+});
+
+test('topBandReserve: мусор даёт 0, а не NaN', () => {
+    // Замер мог не состояться: окно ещё не разложено, у скрытого элемента
+    // прямоугольник нулевой. NaN уехал бы в CSS и обнулил бы отступ молча —
+    // но заодно и все остальные, потому что calc() с NaN не считается.
+    for (const bad of [
+        { column: null, boxes: [{ left: 0, right: 10, bottom: 10 }], gap: 8 },
+        { column: { left: NaN, right: 700, top: 100 }, boxes: [{ left: 400, right: 500, bottom: 300 }], gap: 8 },
+        { column: { left: 700, right: 300, top: 100 }, boxes: [{ left: 400, right: 500, bottom: 300 }], gap: 8 },
+        { column: { left: 300, right: 700, top: NaN }, boxes: [{ left: 400, right: 500, bottom: 300 }], gap: 8 },
+        { column: COLUMN, boxes: null, gap: 8 },
+        { column: COLUMN, boxes: [null, { left: 400, right: NaN, bottom: 300 }], gap: 8 }
+    ]) {
+        const out = topBandReserve(bad);
+        assert.ok(Number.isFinite(out), `ожидалось число, получено ${out}`);
+        assert.equal(out, 0);
+    }
+    // Зазор-мусор не роняет расчёт: сдвиг считается без него.
+    assert.equal(topBandReserve({ column: COLUMN, boxes: [{ left: 400, right: 500, bottom: 120 }], gap: NaN }), 40);
+});
+
 const { windowRowSubtitle } = require('../panel-state');
 
 test('windowRowSubtitle: закрытое окно описывает себя', () => {

@@ -122,6 +122,44 @@ async function freezeAnimations(ctx, log) {
     }
 }
 
+/**
+ * Замораживает СТЕННОЕ ВРЕМЯ в кадре.
+ *
+ * Панель печатает под цифрами «закончится в 21:28» — значение, посчитанное от
+ * `new Date()`. Замер 18.08.2026: сразу после записи эталонов сверка давала 10
+ * расхождений из 49, все на кадрах панели, все в одной полоске 104×10 px в
+ * координатах подписи. То есть эталон устаревал через минуту после съёмки, а
+ * «регрессия» означала только то, что сменилась минута.
+ *
+ * Ответ — не выкидывать кадры панели из сверки (это САМОЕ большое окно
+ * приложения, и терять его коверидж ради одной строки нельзя) и не прятать
+ * подпись (тогда из кадра уходит настоящий элемент), а сделать время
+ * ПОСТОЯННЫМ. Заменяется ровно одна чистая функция, и подпись остаётся такой
+ * же по форме и длине, какой её видит пользователь.
+ *
+ * То же правило с другой стороны: кадры, где стенное время показано ЦЕЛИКОМ
+ * (виджет часов, блоки дисплея), из сверки исключены — см. isTimeDependent().
+ */
+const FROZEN_ENDS_AT = '12:34';
+
+async function freezeWallClock(ctx, log) {
+    for (const name of WINDOWS) {
+        const w = ctx()[name];
+        if (!w || w.isDestroyed()) { continue; }
+        try {
+            await w.webContents.executeJavaScript(`
+                (() => {
+                    const S = window.RendererShared;
+                    if (S && typeof S.endsAt === 'function') { S.endsAt = () => '${FROZEN_ENDS_AT}'; }
+                    return true;
+                })();
+            `);
+        } catch (e) {
+            log.warn(`[screenshot] не смог заморозить стенное время в ${name}: ${e.message}`);
+        }
+    }
+}
+
 async function waitForLoad(win, timeoutMs = 6000) {
     if (!win || win.isDestroyed()) { return; }
     if (!win.webContents.isLoading()) { return; }
@@ -341,6 +379,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
 
         // Заморозку ставим ДО первого снимка, иначе фаза пульсации попадает в кадр.
         await freezeAnimations(ctx, log);
+        await freezeWallClock(ctx, log);
         await sleep(200);
 
         // КАНОНИЧЕСКИЕ размеры на входе — иначе прогон зависит от предыдущего.

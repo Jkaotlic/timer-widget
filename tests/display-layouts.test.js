@@ -312,3 +312,26 @@ for (const [vw, vh] of [[1280, 720], [1920, 1080], [3840, 2160], [1440, 900], [3
         }
     });
 }
+
+/**
+ * Умолчание масштаба живёт в ДВУХ местах — и обязано совпадать.
+ *
+ * `--info-scale` в display.css работает до первой посылки настроек (чистый
+ * профиль, окно открыто раньше панели), `DEFAULT_BLOCK_SCALE` — во всём
+ * остальном. Комментарии в обоих файлах требовали равенства с самого начала,
+ * но никто его не проверял: 19.08.2026 при подъёме размера блоков с 120 % до
+ * 150 % разъехаться могли молча, и разница была бы видна только как «блоки
+ * прыгнули, когда пришли настройки».
+ */
+test('умолчание масштаба блока в display.css и в реестре — одно число', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    const m = /\.info-block\s*\{[\s\S]*?--info-scale:\s*([\d.]+)\s*;/.exec(css);
+    assert.ok(m, 'в display.css не найдено объявление --info-scale у .info-block');
+    assert.equal(
+        Math.round(parseFloat(m[1]) * 100),
+        DL.DEFAULT_BLOCK_SCALE,
+        `--info-scale: ${m[1]} против DEFAULT_BLOCK_SCALE = ${DL.DEFAULT_BLOCK_SCALE}`
+    );
+});

@@ -182,6 +182,12 @@
             animation: pulse-glow 1s ease-in-out infinite;
         }
 
+        /* Стопы обоих градиентов — из полос. См. разбор в display.css. */
+        #dangerGradient stop:first-child  { stop-color: var(--tw-band-danger); }
+        #dangerGradient stop:last-child   { stop-color: var(--tw-band-danger-deep); }
+        #warningGradient stop:first-child { stop-color: var(--tw-band-warning); }
+        #warningGradient stop:last-child  { stop-color: var(--tw-band-warning-deep); }
+
         @keyframes pulse-glow {
             0%, 100% { opacity: 1; }
             50%     { opacity: 0.6; }
@@ -244,14 +250,16 @@
         }
 
         .time-display[data-status="warning"] {
-            color: var(--tw-yellow);
-            --glow-color: rgba(255, 193, 7, 0.6);
+            color: var(--tw-band-warning);
         }
 
         .time-display[data-status="danger"],
         .time-display[data-status="overtime"] {
-            color: #ff4444;
-            --glow-color: rgba(255, 68, 68, 0.8);
+            /* Полоса, а не литерал: она ссылка на красный акцент и потому
+               следует тону окна. Переменной `--glow-color` здесь больше нет —
+               её не читало ни одно правило (внешние свечения сняты редизайном
+               12.08.2026, объявления пережили своих читателей). */
+            color: var(--tw-band-danger);
             /* Убираем letter-spacing в перерасходе — «-» + 5 цифр уже шире обычного */
             letter-spacing: 0;
             animation: time-pulse 1s ease-in-out infinite;
@@ -442,13 +450,13 @@
            updateFlipDisplay() alongside the per-card status. */
         .widget-flip-separator[data-status="warning"]::before,
         .widget-flip-separator[data-status="warning"]::after {
-            background: var(--tw-yellow);
+            background: var(--tw-band-warning);
         }
         .widget-flip-separator[data-status="danger"]::before,
         .widget-flip-separator[data-status="danger"]::after,
         .widget-flip-separator[data-status="overtime"]::before,
         .widget-flip-separator[data-status="overtime"]::after {
-            background: #ff4444;
+            background: var(--tw-band-danger);
         }
 
         .widget-flip-minus {
@@ -479,11 +487,11 @@
             font-size: 32px;
             font-weight: 700;
             /* ТА ЖЕ полоса, что у цифр рядом. Здесь стоял `--tw-red` (#ff453a)
-               при цифрах в `--tw-band-danger` (#ff4444) — два разных красных в
-               сантиметре друг от друга, замерено 14.08.2026. В светлой теме
-               расхождение становилось грубым: `--tw-red` там #b31025, тёмно-
-               красный на тёмной карточке, тогда как полоса состояния от темы
-               не зависит вовсе. Минус — знак ЧИСЛА, и цвет берёт у числа. */
+               при цифрах в `--tw-band-danger` (тогда #ff4444) — два разных
+               красных в сантиметре друг от друга, замерено 14.08.2026. Минус —
+               знак ЧИСЛА, и цвет берёт у числа. С 18.08.2026 спорить стало не о
+               чем: полоса САМА объявлена ссылкой на `--tw-red`, так что оба
+               выражения дают один цвет и оба следуют тону окна. */
             color: var(--tw-band-danger);
             text-shadow: var(--style-ink-shadow);
         }
@@ -1030,15 +1038,16 @@
                         <stop offset="0%" />
                         <stop offset="100%" />
                     </linearGradient>
-                    <!-- Предупреждение -->
+                    <!-- Предупреждение. Цвета — в CSS (#warningGradient stop). -->
                     <linearGradient id="warningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ffc107" />
-                        <stop offset="100%" stop-color="#ff9800" />
+                        <stop offset="0%" />
+                        <stop offset="100%" />
                     </linearGradient>
-                    <!-- Опасность -->
+                    <!-- Опасность. Цвета стопов — в CSS (#dangerGradient stop),
+                         по той же причине, что у #widgetGradient выше. -->
                     <linearGradient id="dangerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#ff4444" />
-                        <stop offset="100%" stop-color="#cc0000" />
+                        <stop offset="0%" />
+                        <stop offset="100%" />
                     </linearGradient>
                     <!-- Свечение -->
                     <filter id="glow">
@@ -1639,12 +1648,11 @@
                 // атрибут — не инлайновый стиль, removeProperty его не видит.
                 setVar('--timer-color-stop', timerColor);
                 setVar('--progress-color-stop', progressColor);
-                // --timer-glow, а НЕ --glow-color инлайном на .time-display:
-                // инлайновая переменная перебивала правила [data-status] и
-                // делала красное/жёлтое свечение полос недостижимым из CSS.
-                // Теперь это только ЗАПАСНОЕ значение — полоса, когда она есть,
-                // переопределяет --glow-color своим правилом.
-                setVar('--timer-glow', timerColor ? `${timerColor}80` : null);
+                // `--timer-glow` здесь больше не ставится: ни одно правило его
+                // не читало. Ореолы снял редизайн 12.08.2026 (инвариант держит
+                // tests/flat-surfaces.test.js), а запись пережила читателей —
+                // и выглядела рабочим механизмом ровно до попытки ею
+                // воспользоваться.
 
                 // LED, «Цифры» и флип берут цвет темы из ОДНОЙ переменной.
                 //
@@ -2046,11 +2054,11 @@
                 this.progressBar.dataset.status = status;
                 this.timeDisplay.dataset.status = status;
 
-                // Круг цвет и свечение полосы НЕ пишет: и то и другое уже
-                // задают правила `.time-display[data-status="…"]` выше по файлу
-                // (color: #ff4444 / var(--tw-yellow), --glow-color красный /
-                // жёлтый — значения сверены, они те же самые). Достаточно
-                // выставленного строкой выше data-status.
+                // Круг цвет полосы НЕ пишет: его задают правила
+                // `.time-display[data-status="…"]` выше по файлу, и берут они
+                // токены полос (`--tw-band-warning` / `--tw-band-danger`),
+                // которые следуют тону окна. Достаточно выставленного строкой
+                // выше data-status.
                 //
                 // Здесь стоял инлайновый ладдер, и он был не просто лишним —
                 // он был источником бага. Ветка возврата в норму снимала цвет
@@ -2064,14 +2072,10 @@
                 // и держалось до перезапуска. e2e/color-band-reset.spec.js.
 
                 // LED и «Цифры» цвет полосы не пишут — его задают правила
-                // [data-status] в CSS. Значения сверены до удаления ладдера:
-                // --tw-led-warn === #ffcc00, --tw-led-danger === #ff3333,
-                // --tw-band-warning === #ffc107, --tw-band-danger === #ff4444,
-                // то есть ровно те литералы, что стояли здесь.
-                //
-                // Свечение LED в CSS построено на currentColor, поэтому оно
-                // следует за цветом само — отдельная строка textShadow здесь
-                // была третьей копией одного и того же значения.
+                // [data-status] в CSS. Значения сверялись при удалении ладдера
+                // и с 18.08.2026 не литералы вовсе: полосы объявлены ссылками
+                // на акценты палитры и потому следуют тону окна, чего
+                // инлайновый ладдер не умел в принципе.
                 if (this.widgetDigitsTime) {
                     this.widgetDigitsTime.dataset.status = status;
                 }
@@ -2141,9 +2145,8 @@
 
                 // Карточке достаточно data-status: цвет цифры задают правила
                 // `.widget-flip-card[data-status=…] .widget-flip-digit`, и они
-                // несут ровно те же значения, что стояли в удалённом отсюда
-                // инлайновом ладдере (--tw-band-warning === #ffc107,
-                // --tw-band-danger === #ff4444).
+                // берут токены полос — те же значения, что стояли в удалённом
+                // отсюда инлайновом ладдере, но следующие тону окна.
                 flipCards.forEach(card => {
                     card.dataset.status = status;
                 });

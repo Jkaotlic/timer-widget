@@ -95,10 +95,34 @@ body.custom-bg::before { display: none; }
        Кольцо жило по ней и раньше (`--ring-size` у .timer-ring), стиль
        «Цифры» берёт её же: раскладка эту высоту заведомо вмещает, и
        второй копии литерала, которой предстояло бы разъехаться с
-       первой, не появляется. */
-    --timer-box: min(60vw, 55vh, 1600px);
+       первой, не появляется.
+
+       `--timer-shrink` — НЕ вторая настройка размера и не подпорка к долям
+       вьюпорта: доли остаются ровно теми, какими подобраны (разбор про 4K
+       ниже, у --ring-size). Это уступка, которую герой делает, когда колонка
+       не помещается между прижатой к верху карточкой и плашкой состояния —
+       единственный случай, когда его нечем подвинуть (см. updateTopBand в
+       display-script.js). В обычном окне член равен нулю, и выражение
+       вычисляется байт в байт как прежнее.
+
+       `max(...)` — предохранитель: даже при испорченном замере рама не
+       схлопывается в точку.
+
+       У аналогового стиля своя доля вьюпорта (--analog-size), и уступку он
+       вычитает ТЕМ ЖЕ членом: слагаемое одно на все стили, иначе «уступил»
+       означало бы разное в разных стилях. */
+    --timer-box: max(120px, min(60vw, 55vh, 1600px) - var(--timer-shrink, 0px));
     padding: var(--tw-s-10);
     padding-bottom: calc(var(--tw-s-10) + var(--hero-block));
+    /* Полоса, занятая прижатыми к верху карточками. Ставит её
+       updateTopBand() (display-script.js), там же разбор и замеры.
+       Колонка центрируется по ОСТАВШЕЙСЯ высоте: карточки стоят `fixed` от
+       верхнего края, колонка — по центру окна, и на низком окне эти два
+       способа сказать «где элемент» сходились в одной точке. Отступ сверху
+       ровно на полосу и означает «центрируйся ниже неё»: колонку центрирует
+       флексбокс, поэтому прирост отступа сверху смещает её на половину — то
+       есть в середину полосы [--top-band; низ окна]. */
+    padding-top: calc(var(--tw-s-10) + var(--top-band, 0px));
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -110,32 +134,51 @@ body.custom-bg::before { display: none; }
    INFO BLOCKS — Alt-draggable, per-block localStorage positions
    ============================================================ */
 .info-block {
-    --info-scale: 1.2;
+    /* Умолчание масштаба карточки. Пара к DEFAULT_BLOCK_SCALE в
+       display-layouts.js — разъедься они, чистый профиль показывал бы одно, а
+       сохранённые проценты означали другое (tests/display-layouts.test.js). */
+    --info-scale: 1.5;
     position: fixed;
     text-align: center;
+    /* Колонка «подпись → (циферблат) → значение» — ОДНА на все четыре стиля.
+       До 19.08.2026 её строил только аналог, а остальные полагались на поток
+       блочных детей: у блока без подписи (название мероприятия) значение
+       вставало выше значений соседей, и верхний ряд читался вразнобой. */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     opacity: 0;
     transform: scale(calc(0.9 * var(--info-scale)));
     transition: opacity var(--tw-dur-slow) var(--tw-ease),
                 transform var(--tw-dur-slow) var(--tw-ease);
     z-index: 100;
     padding: 16px 26px;
-    /* Была нейтрально-серая плита, которая гасит синеву фона, тогда как
-       плашка статуса и подложка кольца в том же кадре тон сохраняют.
-       --tw-bg-timer прибит в тёмном наборе этого окна выше, так что
-       инвариант «дисплей не светлеет» не задет. */
-    background: var(--tw-bg-timer);
-    -webkit-backdrop-filter: var(--tw-blur);
-    backdrop-filter: var(--tw-blur);
-    /* Borderless by design — a 1px hairline sitting flush against the
-       viewport edge (happens when a block is Alt-dragged into a
-       corner and persists in custom-position) reads as a "line on
-       the side of the screen". A soft drop-shadow keeps the card
-       feel without painting an edge stripe. */
+    /* Плиты у блока НЕТ НИ В ОДНОМ стиле (просьба 19.08.2026: «заднюю рамку
+       убрать у функциональных блоков»). Раньше здесь стояли заливка
+       --tw-bg-timer, размытие фона и тень карточки; стили «Круг», «Флип» и
+       «Аналог» её гасили каждый у себя, а «Цифры» рисовали поверх неё свою.
+       Гасить заливку тремя правилами было мало: `background: none` не снимает
+       `backdrop-filter`, и размытый прямоугольник оставался виден — на светлом
+       тоне особенно (см. screenshots/display-blocks-light-flip.png до правки).
+       Поэтому плита снята ЗДЕСЬ, в одном месте: стиль рисует фигуру на
+       ЗНАЧЕНИИ (пластина флипа, циферблат аналога), а блок-обёртка фигурой не
+       является.
+
+       Поля НЕ снимаются: ими задан габарит блока, а по габариту считаются
+       раскладки, поджатие к краям экрана и полоса сверху (--top-band). */
+    background: none;
     border: none;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), var(--tw-shadow-inner-top);
+    box-shadow: none;
     border-radius: var(--tw-r-xl);
     max-width: calc(33vw - 40px);
 }
+
+/* Блок без подписи (название мероприятия) РЕЗЕРВИРУЕТ её строку: пустой
+   `.info-label` подчиняется всем тем же правилам стиля, что и настоящий,
+   поэтому значение встаёт ровно на ту же высоту, что у соседей по ряду.
+   Нулевой ширины пробел нужен, чтобы у пустого div появился строчный бокс. */
+.info-label:empty::before { content: '\200B'; }
 
 .info-block.visible {
     opacity: 1;
@@ -201,11 +244,27 @@ body .info-block:not(.visible) {
 
 .info-label {
     font-family: var(--tw-font-sans);
-    font-size: var(--tw-t-caption);
+    /* ОДИН кегль на все четыре стиля. Прежде их было три: 12px в базе,
+       clamp(13…18) у круга и clamp(10…15) у аналога — три разных ответа на
+       вопрос «какого размера подпись блока», и в кадре с блоками разных стилей
+       рядом это читалось как случайность. Кегль растёт вместе с экраном: на
+       3440×1440 прибитые 12px занимали треть высоты значения. */
+    font-size: clamp(13px, 1.4vmin, 18px);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--info-color-dim, var(--tw-fg-dim));
+    /* Тон подписи — ОДИН на все четыре стиля, «вторичный текст».
+       Прежде их было три: --tw-fg-dim в базе (которого не было ни у одного
+       стиля) и --tw-fg-muted у трёх стилей из четырёх. Плиты под подписью
+       больше нет, и считать контраст надо к ХОЛСТУ ОКНА: на самом светлом из
+       встроенных фонов («Мята», #134e5e) dim давал 3,43:1, muted — 4,27:1,
+       то есть оба ниже AA. --tw-fg-secondary даёт 6,32:1 в худшем из десяти
+       фонов; считает tests/contrast.test.js. */
+    color: var(--info-color-dim, var(--tw-fg-secondary));
+    /* Плиты под подписью больше нет ни в одном стиле, а фоном может стоять
+       фотография — тень держит читаемость там же, где её держит тень под
+       значением (она в базовом правиле .info-value). */
+    text-shadow: var(--style-ink-shadow);
     margin-bottom: 10px;
     transition: color var(--tw-dur-base) var(--tw-ease);
 }
@@ -223,53 +282,21 @@ body .info-block:not(.visible) {
                 text-shadow var(--tw-dur-base) var(--tw-ease);
 }
 
-/* Flip style */
 /* ===== Оформление блоков информации по стилям ===== */
 
-/* «Круг»: блоки БЕЗ плиты — только надпись и значение.
-   Проба 17.08.2026 по просьбе пользователя. Три вещи, которые здесь важны:
-   1. Правило висит на стиле, а не на `.info-block`: у «Цифр», «Флипа» и
-      «Аналога» плита своя и осмысленная (у аналога она вообще круглый
-      циферблат), и общее правило погасило бы её всем четырём.
-   2. Поля НЕ снимаются. Их видно не было и без плиты не станет, но ими
-      задан габарит блока, а по габариту считаются раскладки и поджатие к
-      краям экрана — сняв их, мы сдвинули бы все сохранённые позиции.
-   3. Тень текста у значения остаётся (она в базовом правиле): без плиты
-      именно она держит читаемость поверх картинки на фоне. */
-body.style-circle .info-block {
-    background: none;
-    box-shadow: none;
-}
-/* Подпись блока без плиты обязана работать САМА.
-   Контраст к фону при этом не падал — он и на плите, и на градиенте окна
-   выходит 4,8–5,0:1 (замер). Пропала не разница цветов, а ФИГУРА: плита
-   давала подписи локальный контекст, и 12px метка, оставшись на большом
-   тёмном поле, читается как грязь на экране. Поэтому лечится размером и
-   тоном, а не одним тоном:
-   — кегль растёт вместе с экраном, как у значения рядом (то было прибито в
-     12px, и на 3440×1440 подпись занимала треть высоты цифр — на окне,
-     которое смотрят из зала);
-   — тон 0,58 вместо 0,48 — токен «приглушённый текст», а не литерал. */
-body.style-circle .info-label {
-    font-size: clamp(13px, 1.4vmin, 18px);
-    color: var(--info-color-dim, var(--tw-fg-muted));
-}
+/* «Круг» своих правил для блоков БОЛЬШЕ НЕ ИМЕЕТ, и это не пропуск.
+   Проба 17.08.2026 сняла у него плиту, 19.08.2026 плита снята у всех четырёх
+   стилей в базовом `.info-block`, а кегль и тон подписи сведены к одному
+   набору там же. Урок той пробы остался в силе и записан в базе: подпись без
+   плиты держится размером и тоном, растёт вместе с экраном и считается по
+   контрасту к ХОЛСТУ окна, а не к карточке. */
 
-/* «Цифры». Правила пришли из стиля LED вместе с ним самим (стили слиты
-   13.08.2026): у объединённого стиля тот же тёмный блок и та же зелёная
-   подпись. Контраст подписи считает tests/contrast.test.js. */
-body.style-digits .info-block {
-    background: var(--tw-bg-led);
-    border: 1px solid var(--style-edge);
-    border-radius: var(--tw-r-lg);
-    /* Цветной ореол третьим слоем снят. Внутренняя тень и нейтральный подъём
-       остались: они дают глубину, а не свечение. Обе тени — токенами: на
-       светлом тоне `inset 0 0 20px rgba(0,0,0,0.6)` превращает белую панель
-       в грязное пятно. */
-    box-shadow:
-        inset 0 0 20px var(--style-hinge),
-        var(--style-drop);
-}
+/* «Цифры». Плиты у блока НЕТ: до 19.08.2026 он носил тёмную карточку
+   --tw-bg-led с кромкой и двумя тенями — ту самую «заднюю рамку», из-за
+   которой пять блоков читались как пять окон поверх кадра. Стиль остался в
+   том, что и должно его нести: подпись цветом табло и значение выбранным
+   шрифтом «Цифр». Контраст подписи (теперь ПРЯМО НА ХОЛСТЕ окна, а не на
+   карточке) считает tests/contrast.test.js. */
 body.style-digits .info-label {
     color: var(--info-color-dim, var(--style-led-label));
 }
@@ -301,12 +328,11 @@ body.style-digits .info-value {
    Створки не строятся и не анимируются намеренно: блок не тикает
    посекундно, а «Начало» и «Окончание» не меняются вовсе. Перекидывать
    нечего — и падающая створка там, где ничего не происходит, читалась бы
-   как сбой. */
-body.style-flip .info-block {
-    background: none;
-    box-shadow: none;
-}
-body.style-flip .info-label { color: var(--info-color-dim, var(--tw-fg-muted)); }
+   как сбой.
+
+   Плита блока-обёртки снята в базовом правиле: пластина под значением и
+   размытый прямоугольник вокруг неё — это ДВЕ фигуры на одном блоке, и
+   вторая из них ничего не значит. */
 body.style-flip .info-value {
     position: relative;
     display: inline-block;
@@ -369,20 +395,26 @@ body.style-flip .info-value-title::after { content: none; }
      — «Ежегодная конференция» 216.2px в круге 120px — вылезала на 96px.
 
    Отсюда разделение по признаку, а не по списку id: круглый циферблат получает
-   тот блок, у которого циферблат ЕСТЬ (`:has(.mini-clock)`). Остальные —
-   «До завершения» (это длительность, а не момент; мини-часов в разметке нет
-   намеренно) и название мероприятия — идут строкой, как в круговом стиле.
+   тот блок, у которого циферблат ЕСТЬ (`:has(.mini-clock)`). Строкой идёт
+   название мероприятия — оно не показывает времени, и циферблатом ему быть не
+   с чего.
+
+   «До завершения» циферблат ПОЛУЧИЛО 19.08.2026 (просьба: «в полноэкранном
+   аналоге „до завершения“ без стиля аналога»). Раньше мини-часов там не было
+   намеренно — «это длительность, а не момент», — но ровно так же устроен и
+   САМ таймер этого стиля: большой циферблат показывает длительность остатка,
+   и стрелки его считаются из секунд (updateAnalogDisplay). Блок повторяет
+   стиль тем же способом: те же стрелки, та же арифметика — час за 12 часов
+   остатка, минута за 60 минут.
 
    Подпись и значение выведены из круга В ПОТОК, над и под ним. Пока они стояли
    абсолютом внутри окружности, длина подписи была ничем не ограничена, а
    ограничение появлялось только на экране. Теперь блок сам растёт под свою
    подпись, и подгонка раскладок это видит: она меряет offsetWidth/offsetHeight. */
 
-/* Блок-обёртка перестал быть фигурой: у него нет ни фона, ни размера. */
+/* Блок-обёртка перестал быть фигурой: у него нет ни фона (это теперь общее
+   правило базы), ни размера. */
 body.style-analog .info-block {
-    background: none;
-    border: none;
-    box-shadow: none;
     border-radius: 0;
     padding: 0;
     width: auto;
@@ -400,9 +432,11 @@ body.style-analog .info-block {
 /* Подпись и значение — В ПОТОКЕ. Абсолютное позиционирование внутри круга и
    было тем, что позволяло им вылезать: у абсолютного бокса нет обязательства
    поместиться. */
+/* Кегль подписи НЕ переопределяется: он один на все стили (см. `.info-label`).
+   Блок здесь `width: auto` и растёт под свою подпись, поэтому больший кегль
+   расширяет блок, а не вылезает из него — что и проверяет
+   e2e/display-blocks.spec.js замером «шире своего блока на N px». */
 body.style-analog .info-label {
-    color: var(--info-color-dim, var(--tw-fg-muted));
-    font-size: clamp(10px, 1.1vmin, 15px);
     text-transform: uppercase;
     letter-spacing: 0.8px;
     margin-bottom: 0;
@@ -440,6 +474,12 @@ body.style-analog .info-block:has(.mini-clock) .info-value {
    Оно не показывает время, и циферблатом ему быть не с чего. */
 body.style-analog .info-value-title {
     font-family: var(--tw-font-sans);
+    /* Кегль НЕ наследует «значение аналога»: тот занижен, потому что стоит
+       ВНУТРИ циферблата (100px, хорда ≈96px). У названия циферблата нет, и с
+       заниженным кеглем оно выходило мельче подписей соседних блоков — самый
+       крупный текст ряда оказывался самым мелким. Здесь работает общая шкала
+       значения, чуть тише базовой: название длиннее времени и переносится. */
+    font-size: clamp(16px, 1.9vmin, 26px);
 }
 
 /* Вот он, круг: 100×100 и в потоке между подписью и значением. Размер
@@ -561,6 +601,18 @@ body.style-analog .info-block .mini-tick.quarter {
     animation: danger-pulse 1s infinite;
 }
 
+/* Стопы обоих градиентов — из полос, а не из презентационных атрибутов в
+   разметке. Дуга это ГРАФИКА (порог WCAG 3:1), и на белом фоне литералы её
+   почти гасили: красный держался на 3.41:1, а ЖЁЛТЫЙ #ffc107 — на 1.63:1,
+   то есть дуга предупреждения на светлом фоне не читалась вовсе.
+   Правило CSS перебивает атрибут `stop-color`, поэтому в разметке он снят:
+   два владельца одного значения — ровно то, из-за чего разъезжаются копии
+   (тем же приёмом уже живёт #widgetGradient в виджете). */
+#dangerGradient stop:first-child  { stop-color: var(--tw-band-danger); }
+#dangerGradient stop:last-child   { stop-color: var(--tw-band-danger-deep); }
+#warningGradient stop:first-child { stop-color: var(--tw-band-warning); }
+#warningGradient stop:last-child  { stop-color: var(--tw-band-warning-deep); }
+
 /* ПЕРЕРАСХОД красится правилами .danger — отдельных .overtime здесь нет.
    JS всегда навешивает эти классы ПАРОЙ (`classList.add('danger','overtime')`
    в updateProgress / _enforceOvertimeColors / updateDigitalDisplay / …), а
@@ -631,10 +683,13 @@ body.style-analog .info-block .mini-tick.quarter {
     letter-spacing: 0.01em;
 }
 
-.time-text.warning { color: var(--tw-yellow); --text-glow: rgba(255, 193, 7, 0.6); }
+.time-text.warning { color: var(--tw-band-warning); }
 .time-text.danger {
-    color: #ff4444;
-    --text-glow: rgba(255, 68, 68, 0.7);
+    /* Полоса, а не литерал: она ссылка на красный акцент и потому следует тону
+       окна (см. design-tokens.css). Переменной `--text-glow` здесь больше нет:
+       её не читало ни одно правило — редизайн 12.08.2026 снял внешние
+       свечения, а объявление пережило своих читателей. */
+    color: var(--tw-band-danger);
     animation: time-pulse 0.5s infinite;
 }
 
@@ -992,8 +1047,8 @@ body.style-flip .status-pill {
     text-shadow: var(--style-ink-shadow);
 }
 
-.flip-card.warning .flip-digit { color: var(--tw-yellow); }
-.flip-card.danger .flip-digit  { color: #ff4444; }
+.flip-card.warning .flip-digit { color: var(--tw-band-warning); }
+.flip-card.danger .flip-digit  { color: var(--tw-band-danger); }
 .flip-card.danger {
     animation: flip-danger-pulse 1s infinite;
     box-shadow:
@@ -1021,7 +1076,9 @@ body.style-flip .status-pill {
    ANALOG STYLE
    ============================================================ */
 .timer-analog {
-    --analog-size: min(55vw, 50vh, 1400px);
+    /* Своя доля вьюпорта (циферблат чуть меньше кольца) и ОБЩИЙ член уступки —
+       см. --timer-box в .display-container. */
+    --analog-size: max(120px, min(55vw, 50vh, 1400px) - var(--timer-shrink, 0px));
     display: none;
     align-items: center;
     justify-content: center;
@@ -1130,7 +1187,7 @@ body.style-flip .status-pill {
 .hand-second {
     width: 2px;
     height: calc(var(--analog-size) * 0.38);
-    background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+    background: linear-gradient(180deg, var(--tw-band-danger) 0%, var(--tw-band-danger-deep) 100%);
     margin-left: -1px;
     z-index: 4;
 }
@@ -1141,7 +1198,7 @@ body.style-flip .status-pill {
     transform: translateX(-50%);
     width: 2px;
     height: calc(var(--analog-size) * 0.08);
-    background: #ff4444;
+    background: var(--tw-band-danger);
     border-radius: 2px;
 }
 
@@ -1183,9 +1240,9 @@ body.style-flip .status-pill {
     letter-spacing: 2px;
     font-variant-numeric: tabular-nums;
 }
-.analog-digital-time.warning { color: var(--tw-yellow); }
+.analog-digital-time.warning { color: var(--tw-band-warning); }
 .analog-digital-time.danger {
-    color: #ff4444;
+    color: var(--tw-band-danger);
     animation: time-pulse 0.5s infinite;
 }
 
@@ -1349,7 +1406,7 @@ body:hover .window-controls { opacity: 0.45; }
     filter: hue-rotate(-30deg) saturate(1.5);
 }
 .clock-center.warning {
-    background: linear-gradient(135deg, var(--tw-yellow), #ff9800);
+    background: linear-gradient(135deg, var(--tw-band-warning), var(--tw-band-warning-deep));
 }
 .hand-second.danger {
     background: linear-gradient(180deg, var(--tw-band-danger) 0%, var(--tw-band-danger-deep) 100%);

@@ -403,7 +403,24 @@ const USER_BG = parseColor('#0f0c29').rgb;
 const ACCENT_NAMES = [
     'tw-blue', 'tw-green', 'tw-red', 'tw-orange', 'tw-yellow', 'tw-pink',
     'tw-led-green', 'tw-led-warn', 'tw-led-danger',
-    'tw-ring', 'tw-ring-warning', 'tw-ring-danger'
+    // `tw-ring-warning` / `tw-ring-danger` удалены 18.08.2026 вместе с самими
+    // токенами: их не читал никто, а хранили они последнюю копию литералов
+    // полос. Мёртвый токен в списке проверок — это проверка, которой нечего
+    // проверять.
+    'tw-ring',
+    // Полосы состояния. Их тут не было, и это была не мелочь: полосой красятся
+    // САМЫЕ КРУПНЫЕ цифры в окне, минус перерасхода и точки разделителя, а
+    // проверялись только «обычные» акценты. Замер 18.08.2026: #ff4444 на белом
+    // даёт 3.41:1 — предел для крупного текста и ничего сверх; предупреждение
+    // при этом было в порядке само собой (`--tw-band-warning: var(--tw-yellow)`
+    // подставляется на месте использования и на светлом тоне вычисляется в
+    // #7a5600). Разъехались они именно потому, что один был ссылкой, а второй —
+    // литералом; проверка теперь не даёт этому повториться.
+    'tw-band-warning', 'tw-band-danger'
+    // `tw-band-danger-deep` здесь НЕТ намеренно: это нижний стоп градиента
+    // стрелки и кольца, то есть графика (порог WCAG 3:1), а не текст. Ставить
+    // ему текстовый порог значило бы требовать доказательства не того
+    // утверждения.
 ];
 
 // Подложки, объявленные в самом пине: SVG-круг, LED-панель, карточки блоков.
@@ -474,7 +491,11 @@ const USED_ACCENTS = ACCENT_NAMES.filter((name) =>
     OWNS_NO_BACKGROUND.some((file) => readWindowCss(file).includes(`var(--${name})`)));
 
 test('окна без своего фона: на ТЁМНОМ тоне акценты читаемы на своих подложках', () => {
-    const resolve = makeResolver((name) => (DARK_TONE.has(name) ? DARK_TONE.get(name) : hcToken(name)));
+    // Непокрытое тоном наследуется из ТЁМНОЙ темы, а не из светлой. Раньше
+    // здесь стоял hcToken, и это было незаметно ровно до первого токена,
+    // который светлая тема переопределяет, а тёмный тон — нет: полоса
+    // перерасхода (18.08.2026) поехала бы в отчёт значением светлой темы.
+    const resolve = makeResolver((name) => (DARK_TONE.has(name) ? DARK_TONE.get(name) : darkToken(name)));
     const backdrops = PINNED_BACKDROPS
         .filter((name) => DARK_TONE.has(name))
         .map((name) => [name, composite(DARK_TONE.get(name), USER_BG)]);
@@ -528,7 +549,7 @@ test('тон не изобретает третью палитру: тёмный
     // жёстче: тон ВЫБИРАЕТ одну из двух тем приложения, а не пишет свою.
     const dark = makeResolver(darkToken);
     const light = makeResolver(hcToken);
-    const fromDarkTone = makeResolver((name) => (DARK_TONE.has(name) ? DARK_TONE.get(name) : hcToken(name)));
+    const fromDarkTone = makeResolver((name) => (DARK_TONE.has(name) ? DARK_TONE.get(name) : darkToken(name)));
     const fromLightTone = makeResolver((name) => (LIGHT_TONE.has(name) ? LIGHT_TONE.get(name) : hcToken(name)));
     for (const token of USED_ACCENTS) {
         assert.equal(fromDarkTone(token), dark(token), `--${token}: тёмный тон разошёлся с тёмной темой`);
@@ -587,39 +608,77 @@ test('список тем в тесте совпадает с панелью у�
     assert.deepEqual(found, THEMES, 'темы в панели изменились — обнови список в тесте и перемерь контраст');
 });
 
+// Холст полноэкранного окна — то, НА ЧЁМ теперь лежат подписи блоков.
+//
+// С 19.08.2026 плиты под блоком нет ни в одном стиле (просьба «убрать заднюю
+// рамку у функциональных блоков»), поэтому подпись стоит прямо на фоне окна.
+// До этого модель считала контраст к --tw-bg-timer (круг/флип/аналог) и к
+// --tw-bg-led («Цифры») — поверхностям, которых больше не существует. Такой
+// тест зеленеет всегда: он меряет то, чего нет.
+//
+// Режим «По теме» — умолчание чистого профиля, его стопы зашиты в
+// applyBackground(); режим «Градиент» даёт фон выбранной темы панели. Берём
+// СВЕТЛЕЙШИЙ стоп каждого фона: подпись светлая, и худший случай для неё —
+// самое светлое место холста.
+const DISPLAY_CANVAS_DARK = ['#0f0c29', '#302b63'];
+const DISPLAY_CANVAS_LIGHT = ['#ffffff', '#ececf3'];
+
+test('стопы холста дисплея в тесте совпадают с applyBackground()', () => {
+    // Пин — предсказание, и считать его надо по подтверждающей стороне: если
+    // стопы в display-script поменяются, модель обязана упасть, а не тихо
+    // мерить прошлогодний фон.
+    const code = fs.readFileSync(path.join(__dirname, '..', 'display-script.js'), 'utf8');
+    for (const stop of [...DISPLAY_CANVAS_DARK, ...DISPLAY_CANVAS_LIGHT]) {
+        assert.ok(
+            code.includes(stop),
+            `стоп ${stop} исчез из display-script.js — холст дисплея изменился, перемерь контраст подписей`
+        );
+    }
+});
+
 test('подписи info-блоков читаемы во всех темах (значение красится темой, подпись — нет)', () => {
-    // Подпись .info-label идёт 12px uppercase 600 → порог 4.5:1.
+    // Подпись .info-label идёт clamp(13…18)px uppercase 600 → порог 4.5:1.
     // Раньше она красилась в `${timerColor}80` и не проходила НИ В ОДНОЙ теме
     // (2.15:1 у «Синего»). Теперь тема красит только значение, а подпись берёт
     // нейтральный fallback своего стиля.
+    // Тон один на все четыре стиля: --tw-fg-secondary. Прежде их было два —
+    // --tw-fg-dim в базе (им не красился ни один стиль) и --tw-fg-muted у трёх
+    // стилей; на самом светлом встроенном фоне («Мята») они давали 3,43:1 и
+    // 4,27:1. Плита, которая раньше их вытягивала, снята.
     const LABEL_FALLBACK = {
-        'круг/аналог': darkToken('tw-fg-dim'),
-        'флип': darkToken('tw-fg-muted')
+        'все стили (--tw-fg-secondary)': darkToken('tw-fg-secondary')
     };
 
+    // Проверка проверки: модель обязана читать ТУ ЖЕ краску, что и правило.
+    const displayCss = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    assert.match(
+        displayCss,
+        /\.info-label \{[\s\S]*?color: var\(--info-color-dim, var\(--tw-fg-secondary\)\)/,
+        'базовая подпись блока красится не --tw-fg-secondary — перемерь контраст'
+    );
+
+    // Холсты: фон каждой встроенной темы плюс оба стопа режима «По теме».
+    const CANVASES = THEMES.map(([name, , themeBg]) => [name, parseColor(themeBg).rgb])
+        .concat(DISPLAY_CANVAS_DARK.map((c) => [`по теме ${c}`, parseColor(c).rgb]));
+
     const report = [];
-    for (const [name, , themeBg] of THEMES) {
-        // Фон info-блока: --tw-bg-surface поверх фона темы.
-        // Подложка блока — --tw-bg-timer, а не --tw-bg-surface: в UI-проходе
-        // 07.08.2026 инфо-блок переведён на неё, чтобы перестать гасить синеву
-        // фона. Модель обязана следовать за CSS, иначе тест меряет
-        // несуществующую поверхность и его зелёный цвет ничего не значит.
-        const blockBg = composite(darkToken('tw-bg-timer'), parseColor(themeBg).rgb);
+    for (const [name, canvas] of CANVASES) {
         for (const [styleName, color] of Object.entries(LABEL_FALLBACK)) {
-            const r = contrast(composite(color, blockBg), blockBg);
+            const r = contrast(composite(color, canvas), canvas);
             report.push(`${name}/${styleName}: ${r.toFixed(2)}:1`);
             assert.ok(
                 r >= AA_NORMAL,
-                `тема «${name}», стиль ${styleName}: подпись ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+                `фон «${name}», подпись ${styleName}: ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
             );
         }
     }
     console.log('   ' + report.join('\n   '));
 });
 
-test('подпись стиля «Цифры» читаема в ОБОИХ тонах', () => {
-    // Отдельный fallback: зелёный по --tw-bg-led. При alpha 0.55 давал 3.57:1.
-    // Правило пришло из стиля LED вместе с ним самим (стили слиты 13.08.2026).
+test('подпись стиля «Цифры» читаема на холсте дисплея в ОБОИХ тонах', () => {
+    // Отдельный fallback: зелёный цвет табло. При alpha 0.55 давал 3.57:1 ещё
+    // на тёмной карточке блока; карточки больше нет, и считать надо к ФОНУ
+    // ОКНА — он светлее, то есть требование строже.
     // Литерал стал токеном --style-led-label, потому что на светлой панели
     // #30d158 при любой альфе нечитаем — и считать теперь надо оба тона.
     const display = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
@@ -629,16 +688,25 @@ test('подпись стиля «Цифры» читаема в ОБОИХ то
         'подпись «Цифр» перестала читать --style-led-label'
     );
 
-    for (const [name, tone, base] of [['тёмный', DARK_TONE, [0, 0, 0]], ['светлый', LIGHT_TONE, [255, 255, 255]]]) {
+    const report = [];
+    const cases = [
+        ['тёмный', DARK_TONE, DISPLAY_CANVAS_DARK.concat(THEMES.map(([, , bg]) => bg))],
+        ['светлый', LIGHT_TONE, DISPLAY_CANVAS_LIGHT]
+    ];
+    for (const [name, tone, canvases] of cases) {
         const label = tone.get('style-led-label');
         assert.ok(label, `${name} тон: нет --style-led-label`);
-        const ledBg = composite(tone.get('tw-bg-led'), base);
-        const r = contrast(composite(label, ledBg), ledBg);
-        assert.ok(
-            r >= AA_NORMAL,
-            `${name} тон: подпись «Цифр» (${label}) на --tw-bg-led даёт ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
-        );
+        for (const canvas of canvases) {
+            const bg = parseColor(canvas).rgb;
+            const r = contrast(composite(label, bg), bg);
+            report.push(`${name}/${canvas}: ${r.toFixed(2)}:1`);
+            assert.ok(
+                r >= AA_NORMAL,
+                `${name} тон: подпись «Цифр» (${label}) на ${canvas} даёт ${r.toFixed(2)}:1, нужно ${AA_NORMAL}:1`
+            );
+        }
     }
+    console.log('   ' + report.join('\n   '));
 });
 
 test('тема красит ЗНАЧЕНИЕ info-блока, но не подпись', () => {

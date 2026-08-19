@@ -80,6 +80,15 @@ const TARGET = {
 // обязана стать светлым ореолом, а три литерала перевернуть нечем.
 // ЦВЕТА не двинулись ни в одной из 40 ячеек — это и проверяется.
 //
+// Эталон пересобран ВТОРОЙ раз 18.08.2026 — и снова осознанно. Изменился один
+// цвет из сорока ячеек: красный полосы, #ff4444 → #ff453a. Это сведение трёх
+// параллельных красных к одному акценту палитры (полоса, `--tw-red`,
+// `--tw-led-danger`), ради которого полоса стала ССЫЛКОЙ и заодно научилась
+// следовать тону окна. Сама таблица это и показывает: строка
+// `widget.analog.danger` уже стояла на `rgba(255, 69, 58, 0.7)` — то есть в
+// одном кадре жили два разных красных, и характеризация это честно фиксировала.
+// Жёлтый не двинулся ни в одной ячейке: он был ссылкой с самого начала.
+//
 // Эталон пересобран 12.08.2026 вместе с редизайном. Изменились ТОЛЬКО тени:
 // цветные ореолы сняты во всех окнах, осталась одна нейтральная тень на все
 // пять стилей. ЦВЕТА не двинулись ни в одной из 40 ячеек — и это ровно то,
@@ -91,34 +100,34 @@ const BASELINE = {
     'display.circle.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.circle.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.circle.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'display.circle.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'display.circle.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.circle.danger': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.circle.danger': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.circle.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.circle.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.flip.normal': { color: 'rgb(255, 255, 255)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.flip.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.flip.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.flip.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'display.flip.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'widget.flip.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'display.flip.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.flip.danger': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.flip.danger': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'widget.flip.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.flip.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.analog.normal': { color: 'rgba(255, 255, 255, 0.58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.analog.normal': { color: 'rgba(255, 255, 255, 0.78)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.analog.warning': { color: 'rgba(255, 255, 255, 0.58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'display.analog.warning': { color: 'rgb(255, 193, 7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.analog.danger': { color: 'rgba(255, 69, 58, 0.7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'display.analog.danger': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.analog.danger': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.analog.overtime': { color: 'rgba(255, 69, 58, 0.7)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
-    'display.analog.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
+    'display.analog.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'rgba(0, 0, 0, 0.5) 0px 2px 8px' },
     'widget.digits.normal': { color: 'rgb(255, 255, 255)', textShadow: 'none' },
     'display.digits.normal': { color: 'rgb(255, 255, 255)', textShadow: 'none' },
     'widget.digits.warning': { color: 'rgb(255, 193, 7)', textShadow: 'none' },
     'display.digits.warning': { color: 'rgb(255, 193, 7)', textShadow: 'none' },
-    'widget.digits.danger': { color: 'rgb(255, 68, 68)', textShadow: 'none' },
-    'display.digits.danger': { color: 'rgb(255, 68, 68)', textShadow: 'none' },
-    'widget.digits.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'none' },
-    'display.digits.overtime': { color: 'rgb(255, 68, 68)', textShadow: 'none' }
+    'widget.digits.danger': { color: 'rgb(255, 69, 58)', textShadow: 'none' },
+    'display.digits.danger': { color: 'rgb(255, 69, 58)', textShadow: 'none' },
+    'widget.digits.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'none' },
+    'display.digits.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'none' }
 };
 
 async function sendCommand(cmd) {

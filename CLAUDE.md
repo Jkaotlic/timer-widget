@@ -25,7 +25,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 **Main process** (`electron-main.js`) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
-1. **Control Window** (`electron-control.html`) — main management panel (was 7300 lines). Settings live in a slide-out drawer. Default 400px wide (`CONFIG.CONTROL_WINDOW_WIDTH`), min 380; the drawer adds ~336px. Inline there remains only `TimerController` (wiring bound to DOM ids) plus bootstrap — see **Control panel modules**.
+1. **Control Window** (`electron-control.html`) — main management panel. Settings live in a slide-out drawer. Default 400px wide (`CONFIG.CONTROL_WINDOW_WIDTH`), min 380; the drawer adds ~336px. Inline there remains only `TimerController` plus bootstrap — see **Control panel modules**.
 2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, flip, analog, digits (LED слит с «Цифрами» 13.08.2026). Glassmorphism design.
 3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, flip, analog, digits. Has a `DisplayTimer` class.
 4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, flip, analog, digits. Glassmorphism design.
@@ -46,9 +46,9 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 |------|------|
 | `display.css` | Все стили полноэкранного окна (~1500 строк). Подключается ПОСЛЕДНИМ: в нём пин палитры, обязанный переопределять `design-tokens.css`. Порядок закреплён тестом |
 | `control.css` | Все стили панели (~3000 строк). Подключается ПОСЛЕДНИМ из трёх таблиц (порядок несущий, закреплён тестом), здесь же глобальный сброс полей и `box-sizing` |
-| `flip-card.css` | Механика перекидыша (split-flap) — одна копия на три окна. Слои строит `flip-card.js` из КЛОНОВ цифры, поэтому шрифт и цвет приезжают из CSS самого окна |
+| `flip-card.css` | Механика перекидыша (split-flap), одна копия на три окна. Слои строит `flip-card.js` из КЛОНОВ цифры |
 | `fonts.css` | The 20 local `@font-face` declarations, one copy for all four windows. Linked FIRST in every window |
-| `settings-schema.js` | Таблица настроек панели (ключ → контрол → умолчание) плюс `applyStoredSettings()` / `collectSettings()`. Знает только `getElementById`, поэтому проверяется на поддельном документе |
+| `settings-schema.js` | Таблица настроек панели (ключ → контрол → умолчание) плюс `applyStoredSettings()` / `collectSettings()`. Знает только `getElementById` |
 | `sound-bank.js` | 29 built-in sounds synthesised with oscillators. No DOM, no storage |
 | `custom-sounds.js` | User-uploaded sounds: file validation, list, playback, deletion. **Prototype mixin** |
 | `local-background.js` | Fullscreen background image: upload, MIME + magic-byte validation, preview, fit/overlay. **Prototype mixin** |
@@ -56,15 +56,15 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `ui-feedback.js` | `Toast` and `LoadingIndicator` |
 | `modal-manager.js` | `openModal`/`closeModal` with focus trap and focus return |
 | `shortcuts-help.js` | The F1 shortcuts overlay |
-| `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown` ставится ДО показа) и кнопка «Проверить обновления». Зависимости внедряются |
+| `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown` ставится ДО показа) и кнопка «Проверить обновления» |
 | `mini-bar.js` | Режим «полоса» (400×52). Класс `collapsed` на `<body>` — всё, что модуль знает о вёрстке; панель отдаёт ЗНАЧЕНИЯ через `render({text, band})`, размер меняет main |
 | `panel-colors.js` | Цвета окон — **примесь**: ОДНА сборка объекта цветов (`updateColors(target, patch)`, `null` = сброс поля) и ряд «Фон». Разметку ряда строит сам модуль |
-| `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) и пересчёт по факту. Чистая — узкий экран проверяется числами |
-| `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, семь тумблеров, кнопки раскладок, приём «закрыли крестиком». Перечень тумблеров — в `settings-schema.js` |
-| `display-layouts.js` | Реестр семи подвижных элементов дисплея (id → тумблер → вид), масштабы и пять раскладок. Координаты — доли экрана для ЦЕНТРА; `placeElements` переводит их в пиксели и ужимает масштаб |
-| `panel-state.js` | Четыре состояния панели — **примесь**. Класс `state-*` на `<body>`, видимость решает CSS. Здесь же сборка payload `widget-style-update` и ручной ввод |
+| `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) и пересчёт по факту |
+| `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, семь тумблеров, кнопки раскладок, приём «закрыли крестиком» |
+| `display-layouts.js` | Реестр семи подвижных элементов дисплея (id → тумблер → вид), масштабы и пять раскладок. Координаты — доли экрана для ЦЕНТРА; в пиксели их переводит `placeElements` |
+| `panel-state.js` | Четыре состояния панели — **примесь**: класс `state-*` на `<body>`, ОДНА сборка payload `widget-style-update`, ручной ввод |
 | `scale-input.js` | Click-to-edit / double-click-to-reset on scale percentages |
-| `font-select.js` | Список шрифтов «Цифр»: `div.font-select` притворяется форм-контролем с `.value`; три экземпляра в документе, поэтому `id` пункта несёт id контейнера. Нативный `<select>` не годится: попап рисует система |
+| `font-select.js` | Список шрифтов «Цифр»: `div.font-select` притворяется форм-контролем с `.value`; `id` пункта несёт id контейнера (три экземпляра в документе) |
 
 Rules when working here:
 
@@ -79,12 +79,12 @@ Rules when working here:
 - `constants.js` — all magic numbers, IPC channel names, storage keys, theme definitions, dimension limits
 - `utils.js` — `formatTime()`, `formatTimeShort()`, `parseTime()`, `debounce()`, `getTimerStatus()`, `calculateProgress()`, `safelySendToWindow()`
 - `security.js` — input validation (`isValidDataURL`, `isValidURL`, `validateImageSource`), `escapeHTML()`, `safeJSONParse()`
-- `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt`, `relativeLuminance` + `backgroundTone` + `surfaceTone` (страж яркости: по фону дисплея и по подложке виджета), `surfacePaint` + `surfaceAlpha`, `migrateTimerStyle` (сохранённый LED = «Цифры»)
-- `surface-tones.css` — ОДНА палитра на виджет, часы и дисплей: блоки `:root:not(.on-light-bg)` / `:root.on-light-bg` плюс поверхности стилей `--style-*` (пластина флипа, циферблат, деления, стрелки, тени). Класс ставит `UITheme.applyTone()` по измеренной яркости
+- `renderer-shared.js` — pure logic every window would otherwise copy: `breakdown`, `flipCells`, `clampScale`, `fitBlockScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt`, `relativeLuminance` + `backgroundTone` + `surfaceTone`, `surfacePaint` + `surfaceAlpha`, `migrateTimerStyle`, `topBandReserve` + `heroFrameShrink`
+- `surface-tones.css` — ОДНА палитра на виджет, часы и дисплей: два блока тона, поверхности стилей `--style-*` и полосы состояния. Класс тона ставит `UITheme.applyTone()` по яркости фона
 - `window-geometry.js` — перетаскивание, размер и позиция виджета и часов плюс арифметика восстановления позиции (`fitRestoredBounds`). Двойной экспорт, проверяется в Node на внедрённых хранилище и DOM
 - `clock-settings-schema.js` — the clock's settings table (key → control → default) plus `collectClockSettings` / `applyClockSettings`
-- `digits-style.js` — the «Цифры» style: the six-font registry, the `resolveFont()` whitelist and the fit arithmetic (`fitScale` / `fitFontSize` / `measureDigits` with a probe cache / `applyFont`). Size comes from **measuring a reference string** (`88:88`) at a 100px probe, never from a per-character constant. Frame padding (`FRAME_PAD_*_EM`) lives here too; a test compares it with three windows' CSS
-- `ui-theme.js` — the only owner of `data-theme` and of the tone class `on-light-bg` (`applyTone` / `initTone`; `bindThemeSync(ipc, onChange)` даёт окну перекраситься на смену темы). Pure part (`normalizeTheme`, `nextTheme`, `themeLabel`) is unit-tested; the DOM/storage part (`initTheme`, `applyTheme`, `storeTheme`, `bindThemeSync`) is loaded by all four windows from `<head>`
+- `digits-style.js` — стиль «Цифры»: реестр шрифтов, `resolveFont()` и подгонка (`fitScale` / `fitFontSize` / `measureDigits` / `applyFont`). Кегль — ЗАМЕР строки `88:88` на пробе 100px, не константа на символ. Поля рамки `FRAME_PAD_*_EM` сверяются с CSS трёх окон
+- `ui-theme.js` — the only owner of `data-theme` and of the tone class `on-light-bg` (`applyTone` / `initTone` / `bindThemeSync`). Pure part (`normalizeTheme`, `nextTheme`, `themeLabel`) is unit-tested; the DOM/storage part is loaded by all four windows from `<head>`
 
 ### Key Patterns
 
@@ -213,7 +213,7 @@ Two flavours of test live here:
 | `timer-engine.test.js` | `tick`/`adjust`/`reset`/`setPreset` arithmetic + boundary events |
 | `timer-controller.test.js` | State machine with a fake clock (start/pause/reset/reconcile) |
 | `recovery.test.js` | Crash-recovery persist/load/validate |
-| `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint` |
+| `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint`, `fitBlockScale`, `topBandReserve`, `heroFrameShrink` |
 | `renderer-storage.test.js` | Quota-safe localStorage helpers |
 | `display-layouts.test.js` | Реестр элементов ↔ тумблеры настроек в оба конца, разбор масштабов, доли в пиксели, непересечение раскладок при четырёх разрешениях |
 | `panel-colors.test.js` | Сборка объекта цветов (патч дополняет, `null` удаляет), проводка модуля и подложка в обоих окнах: `var(--surface-paint, …)` у пяти стилей |
@@ -241,7 +241,7 @@ Two flavours of test live here:
 | `docs-integrity.test.js` | Связность `CLAUDE.md` ↔ `docs/lessons.md`: ссылка ведёт в разбор, разбор достижим или помечен устаревшим; плюс потолок размера |
 | `onboarding.test.js` | Подсказка первого запуска на поддельном хранилище: один раз, флаг ДО показа, сломанное хранилище не роняет; канал релизов БЕЗ payload |
 | `flat-surfaces.test.js` | Инвариант «плоско»: блюра нет, тёмные поверхности непрозрачны, внешних цветных свечений нет ни через `box-shadow`, ни через `text-shadow`. Пятая проверка проверяет САМ разбор |
-| `digits-style.test.js` | Реестр «Цифр» в ТРИ стороны: у каждого шрифта реестра есть файлы, каждый файл объявлен в `fonts.css`, ни один файл в `fonts/` не осиротел. Плюс белый список `resolveFont` и арифметика подгонки (мусор даёт 0, а не NaN) |
+| `digits-style.test.js` | Реестр «Цифр» в ТРИ стороны: у шрифта есть файлы, файл объявлен в `fonts.css`, в `fonts/` нет сирот. Плюс `resolveFont` и арифметика подгонки |
 
 e2e specs (`npx playwright test`, `workers: 1`):
 
@@ -255,14 +255,14 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `dial-ticks.spec.js` | Dial tick marks toggle reaches widget + clock and survives reopen |
 | `overtime-palette.spec.js` | Overtime is red in display + widget — digits, glow and status chip |
 | `analog-hour-hand.spec.js` | Display's analog hour hand angle at 5 min / 1 h / 1:30 / 6 h |
-| `ui-theme.spec.js` | Светлая тема доезжает до всех четырёх окон (замер ВЫЧИСЛЕННЫХ токенов), переживает перезагрузку, возвращается; и красит НАСТОЯЩИЕ контролы — подпись активного пресета меряется против ОБОИХ стопов градиента |
+| `ui-theme.spec.js` | Светлая тема доезжает до всех четырёх окон (замер ВЫЧИСЛЕННЫХ токенов), переживает перезагрузку и красит настоящие контролы |
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
-| `sound-events.spec.js` | Every sound event fires EXACTLY once: minute, zero (with and without overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls over real time |
-| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s: faking the snapshot interval would test the fake |
+| `sound-events.spec.js` | Every sound event fires EXACTLY once: minute, zero (± overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls |
+| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s by design |
 | `settings-roundtrip.spec.js` | Настройки четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы по окнам |
 | `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and buttons do not. Written BEFORE the geometry extraction |
 | `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the clock toggles really change the clock window; style-sync hides the style row. By CLICK on visible elements only |
-| `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ; кегль подогнан (не фоллбэк); шрифт попадает в СВОЁ окно; `.value` молчит, клик шлёт `change`; подгонка идемпотентна; дата и пояс часов встают колонкой |
+| `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ: кегль подогнан, шрифт в СВОЁМ окне, `.value` молчит, подгонка идемпотентна, шильдики часов встают колонкой |
 | `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED) играет `win.setSize()` из main |
 | `window-scale-fit.spec.js` | После масштабирования окно виджета и часов целиком в рабочей области СВОЕГО экрана (замер на живом окне); потерянное возвращается |
 | `window-top-edge.spec.js` | Виджет и часы доезжают до САМОГО верха экрана (y = 0, а не y рабочей области) и остаются там после переоткрытия |
@@ -273,8 +273,10 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `window-surface-color.spec.js` | Фон виджета и часов ПО КЛИКУ (тёмный тон): подложка стиля, прозрачность 0, сброс, тема не стирает фон, окна не красят друг друга |
 | `display-blocks.spec.js` | Блоки дисплея: тумблер гасит СВОЙ блок, крестик снимает СВОЙ тумблер, подпись и плашка тащатся; в аналоге круг только у циферблата, длинное название переносится |
 | `display-timer-scale.spec.js` | Characterization of the display's timer scale across every style block — settings push, Ctrl+wheel, restore on load. Written BEFORE folding three copies into `applyTimerScale()` |
-| `style-tone.spec.js` | Тон ПО КЛИКУ: светлая тема — светлые виджет и дисплей, тёмная заливка при светлой теме держит текст светлым. Блок повторяет стиль: пластина флипа ТА ЖЕ, шрифт «Цифр» уходит вместе со стилем, стрелки мини-часов = большому циферблату |
+| `style-tone.spec.js` | Тон ПО КЛИКУ: светлая тема — светлые виджет и дисплей, тёмная заливка держит текст светлым; блок повторяет стиль теми же токенами |
 | `display-layouts.spec.js` | Масштаб семи элементов порознь (крутим один — меряем все), пять раскладок ПО КЛИКУ, раскладка не зависит от прошлого масштаба |
+| `display-top-band.spec.js` | Карточка сверху не ложится на подпись «Осталось»: 4 размера окна × 4 стиля, замер прямоугольников; три проверки самого себя до главной |
+| `display-block-frames.spec.js` | Задней рамки у блоков нет: 4 стиля × 2 темы, замер заливки, тени, размытия, кромки; зонд проверяет сам себя. Плюс стрелки «До завершения» и ровный верхний ряд |
 
 ## CI
 
@@ -282,8 +284,8 @@ GitHub Actions (`.github/workflows/nodejs.yml`), Node 22, three jobs:
 
 | Job | Where | What |
 |-----|-------|------|
-| `build` | ubuntu-latest | `npm run ci` (lint + unit), затем неблокирующие `visual:check` под xvfb и `coverage`. **Визуальному шагу нужен `chmod 4755` + root на `node_modules/electron/dist/chrome-sandbox`** — иначе Chromium падает с кодом 133, а `continue-on-error` это прячет: смотреть лог, а не цвет |
-| `e2e` | ubuntu + windows + macos | `npx playwright test` — the ONLY thing that exercises the real Electron runtime. Linux runs under `xvfb-run`; `fail-fast: false` so one platform failing doesn't hide the others; the Playwright report is uploaded per-OS on failure |
+| `build` | ubuntu-latest | `npm run ci` (lint + unit), затем неблокирующие `visual:check` под xvfb и `coverage`. Визуальному шагу нужен `chmod 4755` + root на `chrome-sandbox`, иначе Chromium падает с кодом 133, а `continue-on-error` это прячет |
+| `e2e` | ubuntu + windows + macos | `npx playwright test` — the ONLY thing exercising the real Electron runtime. Linux under `xvfb-run`; `fail-fast: false`; report uploaded per-OS on failure |
 | `pack` | ubuntu + windows | `electron-builder --dir`, then `node scripts/verify-packed.js` (assets + release gates on the real `app.asar`) |
 | `linux-sandbox` | ubuntu-latest | builds deb + AppImage, then `node scripts/verify-linux-sandbox.js`: deb's postinst sets SUID + root owner and its `.desktop` has NO `--no-sandbox`; the AppImage's `.desktop` DOES. This cannot be checked from macOS at all |
 
@@ -316,6 +318,9 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Фон окна — настройка, а не подпорка: подложки 1% нет, подложку стиля красит `var(--surface-paint, …)`, а сброс её УДАЛЯЕТ (CRITICAL)** — [разбор](docs/lessons.md#the-window-background-is-a-setting-not-a-hit-test-hack)
 - **Палитра окон без своего фона — ОДНА, в `surface-tones.css`, и выбирает её ТОН, а не тема; поверхности стилей записаны токенами `--style-*`, а не литералами (CRITICAL)** — [разбор](docs/lessons.md#one-palette-chosen-by-tone-not-three-pins)
 - **Блок дисплея повторяет стиль теми же токенами, что и таймер: пластина флипа общая, шрифт «Цифр» приходит переменной, а не инлайном** — [разбор](docs/lessons.md#a-block-repeats-the-style-with-the-same-tokens)
+- **Плита блока — ТРИ свойства (заливка, тень, `backdrop-filter`), снимается ОДИН раз в базе; сняв её, пересчитай контраст: подпись теперь на ХОЛСТЕ окна (CRITICAL)** — [разбор](docs/lessons.md#a-plate-is-three-properties-and-removing-it-moves-the-backdrop)
+- **Карточка сверху и центрированная колонка — два способа сказать «где»: колонка уступает полосу (отступ сдвигает её на ПОЛОВИНУ себя), а если мало — уступает рама героя (CRITICAL)** — [разбор](docs/lessons.md#a-fixed-card-and-a-centred-column-are-two-ways-to-say-where)
+- **Полоса состояния следует ТОНУ яркостью, а не оттенком: пишется ССЫЛКОЙ на акцент палитры — тогда у неё нет своего значения и разъезжаться нечему** — [разбор](docs/lessons.md#a-state-band-follows-the-tone-too)
 - **Раскладка меряет ОСЕВШИЙ `transform`: габарит из `offsetWidth`, переходы снимает `layout-settling` (CRITICAL)** — [разбор](docs/lessons.md#a-layout-must-measure-a-settled-transform)
 - **Форму даёт содержимое: круг у `.mini-clock`, а не у блока; название переносится, время — нет** — [разбор](docs/lessons.md#the-circle-belongs-to-the-dial-not-to-the-block)
 - **Контейнер стиля — это раскладка: `flex` по умолчанию СТРОКА** — [разбор](docs/lessons.md#a-style-container-is-also-a-layout-and-flex-defaults-to-a-row)
@@ -397,7 +402,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **A segmented control's `.value` setter must NOT fire `change` (CRITICAL)** — [разбор](docs/lessons.md#a-segmented-controls-value-setter-must-not-fire-change-criti)
 - **Ряд выбора стиля часов не прячется: при синхронизации он зеркалит виджет, а клик по нему снимает синхронизацию** — [разбор](docs/lessons.md#clockstylerow-must-be-on-the-real-row)
 - **Segmented controls are `role="radiogroup"` + `role="radio"` + `aria-checked`, not tabs** — [разбор](docs/lessons.md#segmented-controls-are-roleradiogroup-roleradio-aria-checked)
-- **`shell.openExternal` получает КОНСТАНТУ из main, а не адрес из рендерера** — канал `open-releases-page` не принимает payload вообще; исключение в релизном гейте адресное и подпёрто встречной проверкой (адрес не должен попасть ни в `loadURL`, ни в `fetch`)
+- **`shell.openExternal` получает КОНСТАНТУ из main, а не адрес из рендерера** — канал `open-releases-page` payload не принимает вовсе
 - **Цвет — это переменная, состояние — это класс; инлайн НЕ используется (CRITICAL)** — [разбор](docs/lessons.md#color-belongs-to-the-cascade)
 - **Контраст считается для ПАРЫ «цвет × фон, на котором он окажется», в обеих темах; индикатор помечается формой, а не только цветом (CRITICAL)** — [разбор](docs/lessons.md#a-state-indicator-is-colour-too-and-it-has-an-owner)
 - **Съёмочный стенд берёт размеры из реестра, порог `max-height` обязан быть выше минимума окна, медиа-блок кладётся НИЖЕ правил, которые перекрывает** — [разбор](docs/lessons.md#a-frame-from-a-size-the-app-forbids-documents-nothing)
