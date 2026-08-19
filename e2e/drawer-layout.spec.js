@@ -362,6 +362,18 @@ test('узкое окно: ящик накрывает панель целико
             };
         });
 
+        // --- ГРАНИЦА: 716 = минимум панели (380) + ящик (336). ---
+        //
+        // Первая версия ставила порог 719 и ловила самый обычный случай:
+        // окно 383px, пользователь открывает ящик, главный процесс расширяет
+        // окно до 383+336=719 — и панель пропадала под накладкой. Замер:
+        // 716 → панель 380px рядом с ящиком; 715 → накладка во всю ширину.
+        await setSize(716, 760);
+        await control.waitForTimeout(900);
+        const edge = await probe();
+        console.log(`   граница ${edge.vw}: панель ${edge.panel.left}…${edge.panel.right}, ящик ${edge.drawer.left}…${edge.drawer.right}`);
+        expect(edge.panel.right, '716: панель заходит на ящик').toBeLessThanOrEqual(edge.drawer.left + 1);
+
         // --- широкое окно: две колонки, пересечения нет ---
         await setSize(1000, 760);
         await control.waitForTimeout(900);
