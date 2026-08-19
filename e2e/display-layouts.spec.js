@@ -616,3 +616,107 @@ test('раскладка не зависит от того, какой масш�
         await app.close();
     }
 });
+
+/**
+ * Раскладка на НИЗКОМ окне: карточка не ложится на подпись «Осталось».
+ *
+ * Все остальные проверки раскладок идут на полноэкранном окне, то есть на
+ * экране той машины, где прогон. У разработчика это 3440×1440, и дефект
+ * 19.08.2026 там не воспроизводился вовсе: подъём карточек до 150 % положил
+ * «Текущее время» на подпись при 1440×900 и 1280×720, а на 1920×1080 — нет.
+ * Нашла его матрица CI (macOS-раннер 1440×900), и это ровно тот случай, ради
+ * которого размер окна задаётся ЧИСЛОМ, а не берётся с монитора.
+ *
+ * Причина была не в размере карточек, а в том, ЧТО раскладка считала
+ * препятствием: коробку таймера — без подписи, которая стоит НАД ним. Плюс
+ * колонка мерилась со сдвигом от полосы сверху, которую эта же раскладка через
+ * мгновение обнуляла (замер: полоса 44px, hero.top 178 вместо 156).
+ */
+const LOW_SIZES = [{ w: 1440, h: 900 }, { w: 1280, h: 720 }];
+
+test('раскладка на низком окне не кладёт карточку на подпись и не выпускает её за край', async () => {
+    test.setTimeout(180000);
+    const { app, control } = await launchApp();
+    try {
+        const display = await openDisplayWithEverything(control, app);
+        await openDisplayDrawer(control);
+
+        const area = await app.evaluate(({ screen }) => {
+            const wa = screen.getPrimaryDisplay().workAreaSize;
+            return { width: wa.width, height: wa.height };
+        });
+        const sizes = LOW_SIZES.filter((s) => s.w <= area.width - 80 && s.h <= area.height - 80);
+        console.log(`   рабочая область ${area.width}×${area.height}: проверяем ${sizes.length} из ${LOW_SIZES.length}`);
+        expect(sizes.length, 'экран прогона не вмещает ни одного размера — проверка не выполнена').toBeGreaterThan(0);
+
+        for (const size of sizes) {
+            // Размер ставится по УСЛОВИЮ: выход из полноэкранного режима на
+            // macOS анимирован, и setBounds посреди анимации не доезжает.
+            let got = null;
+            for (let attempt = 0; attempt < 6; attempt++) {
+                await app.evaluate(async ({ BrowserWindow }, s) => {
+                    const win = BrowserWindow.getAllWindows()
+                        .find((w) => w.webContents.getURL().includes('display.html'));
+                    if (win.isFullScreen()) {
+                        win.setFullScreen(false);
+                        await new Promise((r) => setTimeout(r, 800));
+                    }
+                    win.setBounds({ x: 20, y: 20, width: s.w, height: s.h });
+                }, size);
+                await display.waitForTimeout(700);
+                got = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+                if (Math.abs(got.w - size.w) <= 2 && Math.abs(got.h - size.h) <= 2) { break; }
+            }
+            expect(`${got.w}×${got.h}`, 'окно не приняло заданный размер — замер относится не к тому кадру')
+                .toBe(`${size.w}×${size.h}`);
+
+            for (const layout of DL.LAYOUTS) {
+                await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout.id}"]`).click();
+                await display.waitForTimeout(1000);
+
+                const seen = await display.evaluate((ids) => {
+                    const out = {};
+                    for (const id of ids.concat(['heroLabel'])) {
+                        const el = document.getElementById(id);
+                        if (!el) { continue; }
+                        const r = el.getBoundingClientRect();
+                        if (!r.width || !r.height || getComputedStyle(el).display === 'none') { continue; }
+                        out[id] = { left: r.left, top: r.top, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
+                    }
+                    return { boxes: out, vw: window.innerWidth, vh: window.innerHeight };
+                }, NODES);
+
+                const ids = Object.keys(seen.boxes);
+                // «Минимум» не показывает ничего, кроме таймера, — мерить в нём
+                // нечего, и требовать элементы значило бы проверять не то.
+                if (Object.keys(layout.elements).length === 0) {
+                    expect(ids.length, `${layout.id}: раскладка обещала пустой кадр, а элементы остались`).toBe(0);
+                    continue;
+                }
+                expect(ids.length, `${size.w}×${size.h}/${layout.id}: на экране нечего мерить`).toBeGreaterThan(1);
+
+                for (const id of ids) {
+                    const b = seen.boxes[id];
+                    expect(b.right, `${size.w}×${size.h}/${layout.id}: «${id}» вылез за правый край`)
+                        .toBeLessThanOrEqual(seen.vw + 1);
+                    expect(b.bottom, `${size.w}×${size.h}/${layout.id}: «${id}» вылез за нижний край`)
+                        .toBeLessThanOrEqual(seen.vh + 1);
+                    expect(b.left, `${size.w}×${size.h}/${layout.id}: «${id}» вылез за левый край`).toBeGreaterThanOrEqual(-1);
+                    expect(b.top, `${size.w}×${size.h}/${layout.id}: «${id}» вылез за верхний край`).toBeGreaterThanOrEqual(-1);
+                }
+                for (let i = 0; i < ids.length; i++) {
+                    for (let j = i + 1; j < ids.length; j++) {
+                        expect(
+                            overlaps(seen.boxes[ids[i]], seen.boxes[ids[j]]),
+                            `${size.w}×${size.h}/${layout.id}: «${ids[i]}» и «${ids[j]}» накладываются`
+                        ).toBe(false);
+                    }
+                }
+            }
+        }
+
+        await resetDisplayState(control, display);
+    } finally {
+        await app.close();
+    }
+});

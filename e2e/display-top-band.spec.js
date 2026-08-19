@@ -49,6 +49,51 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
 
 const HERO_GAP = 8;
 
+/**
+ * Ставит окну РОВНО запрошенный размер и ждёт, пока окно это подтвердит.
+ *
+ * Выход из полноэкранного режима на macOS анимирован: `setBounds`, поданный
+ * посреди анимации, молча не доезжает, и окно остаётся во весь монитор. Пауза
+ * фиксированной длины это не лечит — она лечится ожиданием УСЛОВИЯ, а условие
+ * здесь одно: окно САМО сообщает свой размер.
+ */
+/**
+ * Рабочая область экрана, на котором идёт прогон.
+ *
+ * Размер окна больше экрана поставить нельзя: система обрежет его молча, и
+ * спека будет подписывать кадр «1920×1080», меряя на самом деле 1440×877.
+ * Именно так регрессия 19.08.2026 доехала до CI: на macOS-раннере экран
+ * 1440×900, все четыре «размера» сходились в один, а на мониторе разработчика
+ * (3440×1440) все четыре были настоящими.
+ */
+async function workArea(app) {
+    return app.evaluate(({ screen }) => {
+        const wa = screen.getPrimaryDisplay().workAreaSize;
+        return { width: wa.width, height: wa.height };
+    });
+}
+
+async function resizeDisplay(app, display, size) {
+    const apply = () => app.evaluate(async ({ BrowserWindow }, s) => {
+        const win = BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('display.html'));
+        if (win.isFullScreen()) {
+            win.setFullScreen(false);
+            await new Promise((r) => setTimeout(r, 800));
+        }
+        win.setBounds({ x: 40, y: 40, width: s.w, height: s.h });
+    }, size);
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+        await apply();
+        await display.waitForTimeout(700);
+        const got = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+        if (Math.abs(got.w - size.w) <= 2 && Math.abs(got.h - size.h) <= 2) { return; }
+    }
+    const got = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    throw new Error(`окно не приняло размер ${size.w}×${size.h}: сейчас ${got.w}×${got.h}`);
+}
+
 const measure = () => {
     const block = document.getElementById('currentTimeBlock').getBoundingClientRect();
     const label = document.getElementById('heroLabel').getBoundingClientRect();
@@ -63,6 +108,14 @@ const measure = () => {
     const floor = pill ? pill.top : window.innerHeight;
     return {
         style: active.id,
+        // Размер ОКНА, а не запрошенный: величина, ради которой тест и
+        // существует, зависит от него целиком. Без этих двух чисел спека
+        // подписывала кадр «1920×1080», меряя на самом деле монитор
+        // разработчика (3440×1440 — выход из полноэкранного режима на macOS
+        // анимирован, и setBounds посреди анимации не доезжает). Регрессия
+        // 19.08.2026 была видна на CI и невидима локально ровно поэтому.
+        vw: window.innerWidth,
+        vh: window.innerHeight,
         band: getComputedStyle(document.body).getPropertyValue('--top-band').trim(),
         // Уступка рамы героя: срабатывает, только когда колонка не помещается
         // между карточкой и плашкой ВООБЩЕ.
@@ -104,15 +157,17 @@ test('карточка сверху не ложится на подпись «О
         await setToggle(control, 'showHeroLabel', true);
         await display.waitForTimeout(600);
 
-        for (const size of SIZES) {
-            await app.evaluate(async ({ BrowserWindow }, s) => {
-                const win = BrowserWindow.getAllWindows()
-                    .find((w) => w.webContents.getURL().includes('display.html'));
-                win.setFullScreen(false);
-                await new Promise((r) => setTimeout(r, 600));
-                win.setBounds({ x: 40, y: 40, width: s.w, height: s.h });
-            }, size);
-            await display.waitForTimeout(900);
+        // Экран может не вместить крупные размеры — тогда они не проверяются
+        // вовсе, а не подменяются молча тем, что влезло. Пропуск ВИДЕН в
+        // выводе: «проверено 2 из 4» честнее зелёного цвета без оговорок.
+        const area = await workArea(app);
+        const fits = (s) => s.w <= area.width - 80 && s.h <= area.height - 80;
+        const sizes = SIZES.filter(fits);
+        console.log(`рабочая область ${area.width}×${area.height}: проверяем ${sizes.length} из ${SIZES.length} размеров`);
+        expect(sizes.length, 'экран прогона не вмещает ни одного размера из списка').toBeGreaterThan(0);
+
+        for (const size of sizes) {
+            await resizeDisplay(app, display, size);
 
             for (const style of STYLES) {
                 await control.evaluate((st) => {
@@ -125,6 +180,10 @@ test('карточка сверху не ложится на подпись «О
                 console.log(`${where} →`, JSON.stringify(m));
 
                 // --- проверка проверки ---
+                expect(
+                    `${m.vw}×${m.vh}`,
+                    `${where}: окно другого размера — замер относится не к тому кадру`
+                ).toBe(`${size.w}×${size.h}`);
                 expect(m.blockH, `${where}: карточку никто не показал`).toBeGreaterThan(0);
                 expect(m.labelH, `${where}: подписи «Осталось» нет`).toBeGreaterThan(0);
                 expect(m.overlapX, `${where}: карточка и подпись не в одном столбце — проверка холостая`)
@@ -151,25 +210,30 @@ test('карточка сверху не ложится на подпись «О
         // --- проверка проверки: на просторном окне не сработало НИЧЕГО ---
         // Без этой пары чисел зелёный цвет означал бы и «уступка по нужде», и
         // «уступка всегда»: перекрытия нет в обоих случаях.
-        await app.evaluate(async ({ BrowserWindow }) => {
-            const win = BrowserWindow.getAllWindows()
-                .find((w) => w.webContents.getURL().includes('display.html'));
-            win.setBounds({ x: 40, y: 40, width: 1920, height: 1080 });
-        });
-        await display.waitForTimeout(900);
-        const roomy = await display.evaluate(measure);
-        expect(roomy.shrink, 'на 1920×1080 рама уступать не должна').toBe(0);
-        expect(roomy.band, 'на 1920×1080 сдвигать колонку не за чем').toBe('0px');
+        // Просторным считается окно от 1600×900: на меньшем карточка и колонка
+        // сходятся по делу, и «ничего не сработало» там означало бы не запас, а
+        // сломанный механизм. Экран, который такого окна не вмещает (например
+        // macOS-раннер 1440×900), эту пару чисел не проверяет — и говорит об
+        // этом вслух, а не молчит.
+        const roomySize = sizes.find((s) => s.w >= 1600 && s.h >= 900);
+        if (!roomySize) {
+            console.log(`ПРОПУЩЕНО: экран ${area.width}×${area.height} не вмещает просторное окно (от 1600×900) — `
+                + 'проверка «уступка только по нужде» здесь не выполняется');
+        } else {
+            await resizeDisplay(app, display, roomySize);
+            const roomy = await display.evaluate(measure);
+            console.log('просторное окно →', JSON.stringify(roomy));
+            expect(`${roomy.vw}×${roomy.vh}`, 'окно другого размера — проверка не о том')
+                .toBe(`${roomySize.w}×${roomySize.h}`);
+            expect(roomy.shrink, `на ${roomySize.w}×${roomySize.h} рама уступать не должна`).toBe(0);
+            expect(roomy.band, `на ${roomySize.w}×${roomySize.h} сдвигать колонку не за чем`).toBe('0px');
+        }
 
         // --- и идемпотентность: повторный пересчёт не сдвигает ничего ---
         // Обе величины считаются по ЗАМЕРУ живого окна, и обе меняют то, что
         // меряют. Стабильность при повторе — это и есть доказательство, что
         // замер приведён к общей точке отсчёта, а не подан себе на вход.
-        await app.evaluate(async ({ BrowserWindow }) => {
-            const win = BrowserWindow.getAllWindows()
-                .find((w) => w.webContents.getURL().includes('display.html'));
-            win.setBounds({ x: 40, y: 40, width: 1280, height: 720 });
-        });
+        await resizeDisplay(app, display, sizes[sizes.length - 1]);
         await control.evaluate(() => {
             window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' });
         });
