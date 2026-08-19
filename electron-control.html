@@ -17,8 +17,7 @@
          кадра, иначе окно успевает показать чужое состояние. -->
     <script src="ui-lock.js"></script>
     <script src="panel-titlebar.js"></script>
-    <script src="presets.js"></script>
-    <script src="panel-presets.js"></script>
+    <script src="presets.js"></script><script src="panel-presets.js"></script><script src="panel-compact.js"></script>
     <script>window.UITheme.initTheme(); window.UILock.initLock();</script>
 </head>
 <body class="control-window state-idle">
@@ -2844,6 +2843,7 @@
         window.PanelTitlebar.bindLockToggle({ doc: document, ipc: window.ipcRenderer || null, lock: window.UILock });
 
         // Пресеты вида: снимок ключей профиля и тот же путь применения, что при запуске панели.
+        window.PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
         window.presetsApi = window.PanelPresets.install({
             doc: document, storage: localStorage, presets: window.Presets, ipc: window.ipcRenderer || null,
             controller: () => window.timerController, notify: (msg) => window.Toast && window.Toast.show(msg, 'success', 1600)

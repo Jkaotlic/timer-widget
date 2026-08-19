@@ -128,6 +128,7 @@
       "panel-titlebar.js",
       "presets.js",
       "panel-presets.js",
+      "panel-compact.js",
       "flip-card.js",
       "window-geometry.js",
       "digits-style.js",
