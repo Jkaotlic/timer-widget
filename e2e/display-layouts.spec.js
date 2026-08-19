@@ -725,3 +725,84 @@ test('раскладка на низком окне не кладёт карто
         await app.close();
     }
 });
+
+/**
+ * Перещёлкивание стилей не двигает разложенные карточки.
+ *
+ * Жалоба 19.08.2026: «при перещёлкивании стилей раскладки съезжают в
+ * полноэкранном режиме». Так и было, и причина не в раскладке, а в том, что
+ * место карточки хранится долей окна для ЦЕНТРА, а смена стиля меняет её
+ * РАЗМЕР: карточка оставалась стоять прежним левым верхним углом и росла из
+ * него, унося центр.
+ *
+ * Замер до правки («Совещание», 3440×1440): «Текущее время» 245×121 в круге,
+ * 262×136 во флипе, 190×144 в аналоге; доля центра 0.783/0.120 → 0.785/0.124 →
+ * 0.776/0.127. Четыре карточки ряда разъезжались каждая на своё число.
+ *
+ * Проверяется ДОЛЯ, а не пиксель: пиксель обязан меняться вместе с размером
+ * карточки, а доля — нет, она и есть сохранённое место.
+ */
+test('перещёлкивание стилей не сдвигает разложенные карточки', async () => {
+    test.setTimeout(180000);
+    const { app, control } = await launchApp();
+    try {
+        const display = await openDisplayWithEverything(control, app);
+        await openDisplayDrawer(control);
+        await control.evaluate(() => {
+            const el = document.getElementById('eventTitleInput');
+            if (el) { el.value = 'Ежегодная конференция'; el.dispatchEvent(new Event('input', { bubbles: true })); }
+        });
+
+        const fractions = () => display.evaluate((ids) => {
+            const out = {};
+            for (const id of ids) {
+                const el = document.getElementById(id);
+                if (!el) { continue; }
+                const r = el.getBoundingClientRect();
+                if (!r.width || !r.height || getComputedStyle(el).display === 'none') { continue; }
+                out[id] = {
+                    cx: +((r.left + r.width / 2) / window.innerWidth).toFixed(4),
+                    cy: +((r.top + r.height / 2) / window.innerHeight).toFixed(4),
+                    w: Math.round(r.width),
+                    h: Math.round(r.height)
+                };
+            }
+            return out;
+        }, MOVABLE.filter((m) => m.id !== 'heroLabel' && m.id !== 'statusPill').map((m) => m.node));
+
+        for (const layout of ['conference', 'dashboard']) {
+            await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout}"]`).click();
+            await display.waitForTimeout(1200);
+            const base = await fractions();
+            expect(Object.keys(base).length, `${layout}: карточек на экране нет`).toBeGreaterThan(2);
+
+            let sizeChanged = false;
+            for (const style of ['flip', 'analog', 'digits', 'circle']) {
+                await control.click(`#displayTimerStyle button[data-val="${style}"]`);
+                await display.waitForTimeout(900);
+                const now = await fractions();
+                for (const id of Object.keys(base)) {
+                    const a = base[id];
+                    const b = now[id];
+                    expect(b, `${layout}/${style}: «${id}» исчез`).toBeTruthy();
+                    if (a.w !== b.w || a.h !== b.h) { sizeChanged = true; }
+                    expect(
+                        Math.abs(b.cx - a.cx),
+                        `${layout}/${style}: «${id}» уехал по горизонтали ${a.cx} → ${b.cx} (размер ${a.w}×${a.h} → ${b.w}×${b.h})`
+                    ).toBeLessThanOrEqual(0.002);
+                    expect(
+                        Math.abs(b.cy - a.cy),
+                        `${layout}/${style}: «${id}» уехал по вертикали ${a.cy} → ${b.cy} (размер ${a.w}×${a.h} → ${b.w}×${b.h})`
+                    ).toBeLessThanOrEqual(0.002);
+                }
+            }
+            // Проверка проверки: если карточки НЕ меняли размер, то доказано
+            // ничего — совпадение долей вышло бы и без всякого пересчёта.
+            expect(sizeChanged, `${layout}: карточки не изменили размер ни в одном стиле — проверка холостая`).toBe(true);
+        }
+
+        await resetDisplayState(control, display);
+    } finally {
+        await app.close();
+    }
+});

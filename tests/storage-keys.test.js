@@ -57,8 +57,13 @@ function constBindings(src) {
     return map;
 }
 
-const READ_VIA_CONST = /localStorage\.getItem\(\s*([A-Za-z_$][\w$]*)\s*\)/g;
-const WRITE_VIA_CONST = /(?:localStorage\.(?:setItem|removeItem)|_safeSetItem)\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g;
+// Хранилище может приезжать ПЕРЕМЕННОЙ, а не глобальным localStorage: так
+// устроен ui-lock.js — он принимает store параметром, чтобы юнит-тест мог
+// подсунуть поддельное. Обращение при этом настоящее, поэтому и читатель, и
+// писатель у ключа есть; сузив шаблон до имени `localStorage`, реестр объявил
+// бы такой ключ «объявлен, но не используется».
+const READ_VIA_CONST = /\b[A-Za-z_$][\w$]*\.getItem\(\s*([A-Za-z_$][\w$]*)\s*\)/g;
+const WRITE_VIA_CONST = /(?:\b[A-Za-z_$][\w$]*\.(?:setItem|removeItem)|_safeSetItem)\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g;
 
 function collect() {
     const reads = new Map();

@@ -131,6 +131,29 @@ for (const target of WINDOWS) {
  * только окно, от которого не осталось полосы для захвата мышью
  * (CONFIG.WINDOW_MIN_VISIBLE_PX = 64).
  */
+/** Все дисплеи прогона: на машине с двумя мониторами «за краем» — не край. */
+function allDisplays(app) {
+    return app.evaluate(({ screen }) => screen.getAllDisplays().map((d) => d.bounds));
+}
+
+/**
+ * Прямоугольник, у которого справа НЕТ соседнего монитора.
+ *
+ * Спека проверяет два разных случая — «свисает, но ухватить можно» и
+ * «потеряно». На одном мониторе они различаются шириной видимой полосы, а на
+ * ДВУХ соседних мониторах окно, свисающее с правого края первого, целиком
+ * лежит на втором: приложение честно считает его видимым и не двигает, а
+ * спека, требующая «вернись на СВОЙ экран», падает.
+ *
+ * Замер 19.08.2026 на машине пользователя: дисплеи 3440×1440 (x=0) и
+ * 1366×1024 (x=3440); окно 1000px в точке x=3420 перекрывает второй на 980px.
+ * Утром того же дня второго монитора не было, и спека была зелёной — ровно тот
+ * класс дефекта, когда проверка меряет машину, а не приложение.
+ */
+function rightmostDisplay(displays) {
+    return displays.reduce((best, d) => (d.x + d.width > best.x + best.width ? d : best), displays[0]);
+}
+
 async function restoreFromPoint(app, control, target, point, scalePct) {
     await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
     const win = await findWindow(app, target.url);
@@ -158,9 +181,11 @@ for (const target of WINDOWS) {
         try {
             // 120 px видимой полосы: окно свисает за правый край на три четверти
             // и всё равно остаётся ухватываемым.
+            const displays = await allDisplays(app);
+            const outer = rightmostDisplay(displays);
             const { geo, bounds } = await restoreFromPoint(
                 app, control, target,
-                (area) => ({ x: area.x + area.width - 120, y: area.y + 40 }),
+                () => ({ x: outer.x + outer.width - 120, y: outer.y + 40 }),
                 400
             );
 
@@ -176,18 +201,30 @@ for (const target of WINDOWS) {
     test(`${target.name}: потерянное за краем окно возвращается на экран`, async () => {
         const { app, control } = await launchApp();
         try {
-            // 20 px видимой полосы — это уже не «свисает», а «потеряно».
-            const { area, bounds } = await restoreFromPoint(
+            // 20 px видимой полосы — это уже не «свисает», а «потеряно». Точка
+            // берётся у ВНЕШНЕГО края самого правого монитора: справа от него
+            // соседей нет, значит потеряно по-настоящему, а не «уехало на
+            // второй экран» (см. rightmostDisplay).
+            const displays = await allDisplays(app);
+            const outer = rightmostDisplay(displays);
+            console.log(`   мониторов ${displays.length}, внешний край ${outer.x + outer.width}`);
+            const { bounds } = await restoreFromPoint(
                 app, control, target,
-                (a) => ({ x: a.x + a.width - 20, y: a.y + 40 }),
+                () => ({ x: outer.x + outer.width - 20, y: outer.y + 40 }),
                 400
             );
 
-            expect(bounds.x, `левый край ${bounds.x} левее ${area.x}`).toBeGreaterThanOrEqual(area.x);
-            expect(bounds.x + bounds.width, `правый край ${bounds.x + bounds.width} за пределами ${area.x + area.width}`)
-                .toBeLessThanOrEqual(area.x + area.width);
-            expect(bounds.y + bounds.height, `нижний край ${bounds.y + bounds.height} за пределами ${area.y + area.height}`)
-                .toBeLessThanOrEqual(area.y + area.height);
+            // Вернулось — значит лежит целиком на КАКОМ-ТО мониторе. Именно это
+            // и обещает fitRestoredBounds: у окна должна остаться полоса
+            // захвата, а на каком экране — его дело.
+            const home = displays.find((d) => bounds.x >= d.x && bounds.y >= d.y
+                && bounds.x + bounds.width <= d.x + d.width
+                && bounds.y + bounds.height <= d.y + d.height);
+            expect(
+                home,
+                `окно ${bounds.x},${bounds.y} ${bounds.width}×${bounds.height} не поместилось целиком ни на один монитор: `
+                + JSON.stringify(displays)
+            ).toBeTruthy();
         } finally {
             await control.evaluate((k) => localStorage.removeItem(k), target.storageKey).catch(() => {});
             await app.close();

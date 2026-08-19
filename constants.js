@@ -174,6 +174,10 @@ const CONFIG = {
         SOUND_ENABLED: 'soundEnabled',
         // Тема интерфейса ('dark' | 'light'), владелец — ui-theme.js
         UI_THEME: 'uiTheme',
+        // Замок «Закрепить положение» ('1' | '0'), владелец — ui-lock.js
+        UI_LOCKED: 'uiLocked',
+        // Четыре пресета вида (стили, блоки, раскладка, цвета), владелец — presets.js
+        UI_PRESETS: 'uiPresets',
         // Однократные подсказки при первом открытии окна
         WIDGET_HINT_SHOWN: 'widgetHintShown',
         CLOCK_HINT_SHOWN: 'clockHintShown',

@@ -41,10 +41,13 @@ const ALLOWED_CHANNELS = {
         'report-scale',
         'display-block-hidden',
         'display-layout',
+        'display-restore-state',
+        'preset-apply',
         'display-move',
         // Дубль из channel-validator.js — sandbox запрещает здесь require().
         // Оба списка обязаны совпадать, это проверяет channel-validator.test.js.
         'ui-theme-update',
+        'ui-lock-update',
         'open-releases-page',
     'minimize-window',
         'toggle-fullscreen',
@@ -70,8 +73,11 @@ const ALLOWED_CHANNELS = {
         'scale-report',
         'block-hidden',
         'display-layout',
+        'display-restore-state',
+        'preset-apply',
         'window-geometry',
         'ui-theme-update',
+        'ui-lock-update',
         'timer-recovery-available'
     ]
 };

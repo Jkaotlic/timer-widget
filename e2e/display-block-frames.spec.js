@@ -159,8 +159,30 @@ test('аналог: «До завершения» показывает ОСТА�
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
+
+        // Время окончания задаётся ОТНОСИТЕЛЬНО СЕЙЧАС, а не числом «12:00».
+        // «До завершения» считает расстояние от системных часов до этого
+        // момента, и прошедшее время даёт НОЛЬ (это осознанное поведение, см.
+        // secondsUntilClock). Спека с прибитым «12:00» зеленела утром и падала
+        // вечером: обе стрелки честно стояли на 12 при значении 00:00:00 —
+        // ровно тот класс дефекта, что уже разбирался как «время — скрытый
+        // параметр проверки».
+        const endTime = await control.evaluate(() => {
+            const now = new Date();
+            // +2 часа, но не за полночь: после неё «завтра» снова означает ноль.
+            const end = new Date(now.getTime() + 2 * 3600 * 1000);
+            const value = end.getDate() === now.getDate()
+                ? `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+                : '23:59';
+            const el = document.getElementById('endTimeInput');
+            el.value = value;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return value;
+        });
+        console.log(`   время окончания на сегодня: ${endTime}`);
+
         await control.click('#displayTimerStyle button[data-val="analog"]');
-        await display.waitForTimeout(900);
+        await display.waitForTimeout(1200);
 
         const seen = await display.evaluate(() => {
             const block = document.getElementById('timeLeftBlock');
@@ -197,13 +219,20 @@ test('аналог: «До завершения» показывает ОСТА�
         expect(diff(seen.hour, wantHour), `часовая: ${seen.hour}° вместо ${wantHour}°`).toBeLessThanOrEqual(1.5);
         expect(diff(seen.minute, wantMinute), `минутная: ${seen.minute}° вместо ${wantMinute}°`).toBeLessThanOrEqual(1.5);
 
-        // Проверка проверки: стрелка обязана СТОЯТЬ НЕ НА НУЛЕ хотя бы одна,
-        // иначе совпадение получилось бы и на неподвижной разметке.
+        // Проверка проверки: значение НЕ нулевое (иначе стрелки честно стоят
+        // на 12 и совпадение вышло бы на любой разметке) и хотя бы одна
+        // стрелка сдвинута.
+        expect(h * 3600 + m * 60 + s, `«До завершения» = ${seen.text}: считать нечего`).toBeGreaterThan(60);
         expect(
             Math.max(seen.hour, seen.minute),
-            'обе стрелки на 12 — блок, скорее всего, никто не крутит'
+            'обе стрелки на 12 при ненулевом остатке — блок никто не крутит'
         ).toBeGreaterThan(0);
     } finally {
+        // Профиль общий: возвращаем время окончания к умолчанию.
+        await control.evaluate(() => {
+            const el = document.getElementById('endTimeInput');
+            if (el) { el.value = '12:00'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
         await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, false).catch(() => {}); }
         await app.close();

@@ -13,7 +13,11 @@
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
     <script src="ui-theme.js"></script>
-    <script>window.UITheme.initTheme(); window.UITheme.initTone();</script>
+    <!-- Замок «Закрепить положение» — рядом с темой и по той же причине: обе
+         величины общие для всех окон и обе обязаны быть применены ДО первого
+         кадра, иначе окно успевает показать чужое состояние. -->
+    <script src="ui-lock.js"></script>
+    <script>window.UITheme.initTheme(); window.UITheme.initTone(); window.UILock.initLock();</script>
     <style>
         * {
             margin: 0;
@@ -1403,6 +1407,11 @@
                 window.WindowGeometry.bindWindowDrag({
                     container: this.container,
                     doc: document,
+                    // Замок «Закрепить положение»: окно перестаёт ездить за
+                    // случайно задетой мышью. Предикат, а не проверка внутри
+                    // модуля, — window-geometry.js проверяется в Node на
+                    // внедрённых DOM и хранилище и о состоянии окна не знает.
+                    isLocked: () => !!(window.UILock && window.UILock.isLocked()),
                     onMove: (delta) => ipcRenderer.send('clock-widget-move', delta),
                     onDrop: () => this.saveGeometry(),
                     handlers: this._handlers
@@ -1478,6 +1487,10 @@
                 let clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
                 this._handlers.onWheel = (e) => {
                     if (!e.ctrlKey) { return; }
+                    // Замок «Закрепить положение» запрещает жест, но не
+                    // настройку: масштаб по-прежнему меняется ползунком в
+                    // панели (см. ui-lock.js).
+                    if (window.UILock && window.UILock.isLocked()) { e.preventDefault(); return; }
                     e.preventDefault();
                     const step = window.CONFIG.SCALE_STEP;
                     // Та же причина, что у виджета и дисплея: ноль — это не
@@ -2039,6 +2052,10 @@
         });
     </script>
     <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script>window.UITheme.bindThemeSync(window.ipcRenderer, () => window.clockWidget && window.clockWidget.refreshTone());</script>
+    <script>window.UITheme.bindThemeSync(window.ipcRenderer, () => window.clockWidget && window.clockWidget.refreshTone());
+        // Замок — тем же путём, что и тема: панель шлёт, главный процесс
+        // рассылает всем окнам. Без подписки окно, открытое до включения
+        // замка, осталось бы единственным подвижным.
+        window.UILock.bindLockSync(window.ipcRenderer);</script>
 </body>
 </html>

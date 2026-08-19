@@ -12,7 +12,14 @@
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
     <script src="ui-theme.js"></script>
-    <script>window.UITheme.initTheme();</script>
+    <!-- Замок «Закрепить положение» — рядом с темой и по той же причине: обе
+         величины общие для всех окон и обе обязаны быть применены ДО первого
+         кадра, иначе окно успевает показать чужое состояние. -->
+    <script src="ui-lock.js"></script>
+    <script src="panel-titlebar.js"></script>
+    <script src="presets.js"></script>
+    <script src="panel-presets.js"></script>
+    <script>window.UITheme.initTheme(); window.UILock.initLock();</script>
 </head>
 <body class="control-window state-idle">
     <div class="app-shell">
@@ -30,6 +37,8 @@
                      тема общая для всего приложения. -->
                 <button class="titlebar-help" id="miniBarToggle" type="button" aria-expanded="true" title="Свернуть в полосу (M)" aria-label="Свернуть в полосу">▾</button>
                 <button class="titlebar-help" id="contrastToggle" type="button" aria-pressed="false" title="Высокий контраст" aria-label="Высокий контраст">◐</button>
+                <!-- Замок — рядом с темой: величина общая для ВСЕХ окон. -->
+                <button class="titlebar-help" id="lockToggle" type="button" aria-pressed="false" title="Закрепить положение" aria-label="Закрепить положение">🔓</button>
                 <button class="titlebar-help" id="faqBtn" title="Справка (F1)" aria-label="Справка">?</button>
             </div>
         </div>
@@ -181,6 +190,9 @@
                 <button class="wrow-toggle" id="soundMasterToggle" role="switch" aria-checked="true" title="Звук включён" aria-label="Звук"><span class="wrow-knob" aria-hidden="true"></span></button>
             </div>
         </div>
+
+        <!-- ВИД ЦЕЛИКОМ в четырёх ячейках. Клик применяет, Shift+клик пишет; почему одна кнопка на два действия — в panel-presets.js. -->
+        <div class="preset-row" role="group" aria-label="Пресеты вида"><span class="preset-caption" title="Клик — применить · Shift+клик — записать · Ctrl+1…4 с клавиатуры">Вид</span><button class="preset-slot" id="presetSlot1" type="button">1</button><button class="preset-slot" id="presetSlot2" type="button">2</button><button class="preset-slot" id="presetSlot3" type="button">3</button><button class="preset-slot" id="presetSlot4" type="button">4</button></div>
 
         <!-- Подсказка клавиш моноширинным, по центру — последняя строка панели. -->
         <div class="panel-footer" id="panelFooter">Space — старт · R — сброс · 1–4 — пресеты</div>
@@ -626,7 +638,7 @@
                                  полез крутить колесо, а не после. -->
                             <div class="settings-hint" role="note">
                                 <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо над элементом — масштаб ЭТОГО элемента · <kbd>Ctrl</kbd>+колесо мимо всех — масштаб таймера · <kbd>Shift</kbd>+колесо — все блоки сразу · <kbd>Alt</kbd> — перетащить блок или закрыть его крестиком · <kbd>1</kbd>–<kbd>4</kbd> — пресеты, <kbd>Space</kbd> — старт/пауза, <kbd>R</kbd> — сброс</span>
+                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо над элементом — масштаб ЭТОГО элемента · <kbd>Ctrl</kbd>+колесо мимо всех — масштаб таймера · <kbd>Shift</kbd>+колесо — все блоки сразу · <kbd>Alt</kbd> — перетащить блок или закрыть его крестиком · <kbd>1</kbd>–<kbd>4</kbd> — пресеты времени, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>4</kbd> — пресеты вида, <kbd>Space</kbd> — старт/пауза, <kbd>R</kbd> — сброс</span>
                             </div>
                             <!-- .setting-block по той же причине, что и у виджета. -->
                             <div class="setting-block">
@@ -879,7 +891,8 @@
                         <div class="faq-answer">
                             <ul>
                                 <li><strong>Быстрый выбор</strong> — восемь кнопок: 5, 10, 15, 20, 25, 30, 45 мин и 1 час</li>
-                                <li><strong>Клавиши 1–4</strong> — четыре пресета (5, 15, 25, 45 мин), работают из любого окна; <strong>5</strong> — своё время</li>
+                                <li><strong>Клавиши 1–4</strong> — четыре пресета времени (5, 15, 25, 45 мин), работают из любого окна; <strong>5</strong> — своё время</li>
+                            <li><strong>Ctrl+1–4</strong> — пресеты ВИДА: стили окон, блоки, раскладка и цвета целиком. Клик по ячейке «Вид» в панели применяет, <strong>Shift+клик</strong> — записывает текущий вид</li>
                                 <li><strong>Точное время</strong> — одно поле с умным разбором: <code>90</code> — это 90 секунд, <code>5:30</code> — 5 мин 30 с, <code>1:30:00</code> — 1 ч 30 мин. Максимум 99:59:59. Применить — <strong>Enter</strong> или <strong>✓</strong></li>
                                 <li><strong>± на ходу</strong> — кнопки −1 ч / −5 м / −1 м / +1 м / +5 м / +1 ч меняют время даже во время отсчёта</li>
                             </ul>
@@ -2824,29 +2837,17 @@
         const faqClose = document.getElementById('faqClose');
         const faqQuestions = document.querySelectorAll('.faq-question');
 
-        // Переключатель темы. Панель — единственное место, откуда тема меняется,
-        // но применяется она во всех окнах: локально сразу, остальным — через IPC.
-        const contrastToggle = document.getElementById('contrastToggle');
-        if (contrastToggle) {
-            const syncThemeButton = (theme) => {
-                const isLight = theme === 'light';
-                contrastToggle.setAttribute('aria-pressed', String(isLight));
-                contrastToggle.classList.toggle('active', isLight);
-                contrastToggle.title = window.UITheme.themeLabel(theme);
-                contrastToggle.setAttribute('aria-label', window.UITheme.themeLabel(theme));
-            };
-            syncThemeButton(window.UITheme.readTheme());
-            contrastToggle.addEventListener('click', () => {
-                const theme = window.UITheme.nextTheme(window.UITheme.readTheme());
-                window.UITheme.storeTheme(theme);
-                window.UITheme.applyTheme(theme);
-                syncThemeButton(theme);
-                if (window.ipcRenderer) {
-                    window.ipcRenderer.send('ui-theme-update', { theme });
-                }
-            });
-        }
+        // Переключатель темы и замок «Закрепить положение» — panel-titlebar.js.
+        // Обе величины общие для всех окон: локально применяются сразу,
+        // остальным уезжают по IPC.
+        window.PanelTitlebar.bindThemeToggle({ doc: document, ipc: window.ipcRenderer || null, theme: window.UITheme });
+        window.PanelTitlebar.bindLockToggle({ doc: document, ipc: window.ipcRenderer || null, lock: window.UILock });
 
+        // Пресеты вида: снимок ключей профиля и тот же путь применения, что при запуске панели.
+        window.presetsApi = window.PanelPresets.install({
+            doc: document, storage: localStorage, presets: window.Presets, ipc: window.ipcRenderer || null,
+            controller: () => window.timerController, notify: (msg) => window.Toast && window.Toast.show(msg, 'success', 1600)
+        });
         // Open FAQ modal
         faqBtn.addEventListener('click', () => {
             openModal(faqModal, faqClose);

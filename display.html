@@ -11,23 +11,30 @@
          в конце <body> вместе с остальными: иначе при включённом высоком контрасте
          окно успевало бы отрисоваться в тёмной теме и мигнуть. -->
     <script src="ui-theme.js"></script>
-    <script>window.UITheme.initTheme();</script>
+    <!-- Замок «Закрепить положение» — рядом с темой и по той же причине: обе
+         величины общие для всех окон и обе обязаны быть применены ДО первого
+         кадра, иначе окно успевает показать чужое состояние. -->
+    <script src="ui-lock.js"></script>
+    <script>window.UITheme.initTheme(); window.UILock.initLock();</script>
     <link rel="stylesheet" href="flip-card.css">
     <link rel="stylesheet" href="surface-tones.css">
     <link rel="stylesheet" href="display.css">
 </head>
 <body>
-    <div class="controls-hint" id="controlsHint"><strong>Ctrl</strong>+колесо над элементом — его масштаб · мимо всех — масштаб таймера · <strong>Shift</strong>+колесо — все блоки сразу · <strong>Alt</strong> — перетащить или закрыть крестиком · <strong>1–4</strong> — пресеты · <strong>Space</strong> — старт/пауза · <strong>R</strong> — сброс</div>
+    <div class="controls-hint" id="controlsHint"><strong>Ctrl</strong>+колесо над элементом — его масштаб · мимо всех — масштаб таймера · <strong>Shift</strong>+колесо — все блоки сразу · <strong>Alt</strong> — перетащить или закрыть крестиком · <strong>1–4</strong> — пресеты времени · <strong>Ctrl</strong>+<strong>1–4</strong> — пресеты вида · <strong>Space</strong> — старт/пауза · <strong>R</strong> — сброс</div>
 
     <!-- Ответ на жест, который упёрся в предел: почему ничего не произошло.
          `aria-live` — потому что это сообщение, а не оформление. -->
     <div class="scale-note" id="scaleNote" role="status" aria-live="polite"></div>
 
-    <!-- Кнопки управления окном -->
+    <!-- Кнопки управления окном — в ЛЕВОМ верхнем углу и в порядке macOS:
+         закрыть, свернуть, во весь экран. Просьба 19.08.2026. Порядок здесь
+         несущий: он же задаёт обход табом, поэтому переставлены сами кнопки, а
+         не направление флексбокса. -->
     <div class="window-controls">
+        <button class="window-ctrl-btn close-btn" id="closeBtn" title="Закрыть" aria-label="Закрыть">✕</button>
         <button class="window-ctrl-btn minimize-btn" id="minimizeBtn" title="Свернуть" aria-label="Свернуть">─</button>
         <button class="window-ctrl-btn fullscreen-btn" id="fullscreenBtn" title="Оконный режим" aria-label="Оконный режим">⛶</button>
-        <button class="window-ctrl-btn close-btn" id="closeBtn" title="Закрыть" aria-label="Закрыть">✕</button>
     </div>
 
     <!-- Информационные блоки (независимое позиционирование) -->

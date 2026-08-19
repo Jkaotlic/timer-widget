@@ -1363,7 +1363,9 @@ body.style-analog .status-pill {
 .window-controls {
     position: fixed;
     top: 20px;
-    right: 20px;
+    /* Слева, как в macOS (просьба 19.08.2026) и как в титлбаре панели, где
+       такие же кнопки стоят слева с самого начала. */
+    left: 20px;
     display: flex;
     gap: 8px;
     z-index: 1000;
@@ -1510,6 +1512,11 @@ body.no-status-pill .status-container { display: none; }
     z-index: 102;
 }
 body.alt-active .display-movable > .info-close { display: flex; }
+/* Под замком крестик не показывается ни при каких условиях: замок отменяет
+   жесты, а крестик — жест. Правило-страховка на случай залипшего `alt-active`
+   (класс снимается по keyup, а keyup можно и не получить, если окно потеряло
+   фокус с зажатым Alt). */
+html.ui-locked .info-close { display: none !important; }
 .info-close:hover { color: var(--tw-red); }
 .info-close:focus-visible { box-shadow: var(--tw-focus-ring); }
 
