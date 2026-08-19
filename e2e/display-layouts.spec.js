@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { pickWindowSizes } = require('./window-sizes');
 const DL = require('../display-layouts');
 
 /**
@@ -645,9 +646,13 @@ test('раскладка на низком окне не кладёт карто
             const wa = screen.getPrimaryDisplay().workAreaSize;
             return { width: wa.width, height: wa.height };
         });
-        const sizes = LOW_SIZES.filter((s) => s.w <= area.width - 80 && s.h <= area.height - 80);
-        console.log(`   рабочая область ${area.width}×${area.height}: проверяем ${sizes.length} из ${LOW_SIZES.length}`);
-        expect(sizes.length, 'экран прогона не вмещает ни одного размера — проверка не выполнена').toBeGreaterThan(0);
+        // Размеры — помещающиеся из списка, а если таких меньше двух, то
+        // выведенные из рабочей области: на раннерах CI экран 1024×720…1280×1024,
+        // и фиксированный список не проверял бы там ровно ничего.
+        const sizes = pickWindowSizes(area, LOW_SIZES);
+        console.log(`   рабочая область ${area.width}×${area.height}: проверяем ${JSON.stringify(sizes)}`);
+        expect(sizes.length, 'экран прогона мал даже для выведенных размеров — проверка не выполнена')
+            .toBeGreaterThan(0);
 
         for (const size of sizes) {
             // Размер ставится по УСЛОВИЮ: выход из полноэкранного режима на
