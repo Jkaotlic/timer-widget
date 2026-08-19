@@ -262,3 +262,70 @@ test('низкое окно: низ панели достижим прокрут
         await app.close();
     }
 });
+
+/**
+ * НИЗКОЕ окно: цифры не ложатся на кнопки пресетов.
+ *
+ * Жалоба 19.08.2026 с кадром: на окне ~376×650 крупное время нарисовано ПОВЕРХ
+ * ряда «5 15 25 45». Причина — герой (`.hero`) отдавал высоту ниже своего
+ * содержимого (`flex: 1 1 auto; min-height: 0`): кегль оставался 76px, коробка
+ * сжималась, глифы вылезали из неё и накрывали соседей.
+ *
+ * Замер до правки, текст времени против ряда пресетов: 700 — наезд 3px, 660 —
+ * 19px, 650 — 24px, 600 — 43px (и верх цифр уходил за окно на 2px).
+ *
+ * Меряется ПРЯМОУГОЛЬНИК ТЕКСТА, а не бокса: боксы секций при этом НЕ
+ * пересекались вовсе — наезжал текст, вылезший из сжатой коробки. Проверка по
+ * боксам была бы зелёной на сломанной вёрстке.
+ */
+test('низкое окно: время не наезжает на пресеты, а панель не прокручивается на своём минимуме', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForTimeout(1000);
+
+        const setSize = (w, h) => app.evaluate(({ BrowserWindow }, size) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((x) => x.webContents.getURL().includes('electron-control.html'));
+            win.setMinimumSize(320, 380);
+            win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
+        }, [w, h]);
+
+        const probe = () => control.evaluate(() => {
+            const panel = document.querySelector('.control-panel');
+            const timeEl = document.getElementById('controlTime') || document.querySelector('.timer-display-main');
+            const presets = document.getElementById('presetsRow');
+            const range = document.createRange();
+            range.selectNodeContents(timeEl);
+            const t = range.getBoundingClientRect();
+            const p = presets.getBoundingClientRect();
+            return {
+                vh: window.innerHeight,
+                fontSize: getComputedStyle(timeEl).fontSize,
+                textTop: Math.round(t.top),
+                gapToPresets: Math.round(p.top - t.bottom),
+                content: panel.scrollHeight,
+                client: panel.clientHeight
+            };
+        });
+
+        for (const [w, h] of [[400, 740], [380, 700], [380, 660], [376, 650]]) {
+            await setSize(w, h);
+            await control.waitForTimeout(700);
+            const m = await probe();
+            console.log(`   ${w}×${h}: кегль ${m.fontSize}, зазор до пресетов ${m.gapToPresets}px, содержимое ${m.content}/${m.client}`);
+
+            expect(m.gapToPresets, `${h}: время наезжает на ряд пресетов`).toBeGreaterThan(0);
+            expect(m.textTop, `${h}: верх цифр ушёл за окно`).toBeGreaterThanOrEqual(0);
+            // На своём МИНИМУМЕ (660) и выше панель обязана помещаться целиком:
+            // прокрутка — аварийный выход для окна меньше минимума, а не
+            // обычное состояние.
+            expect(
+                m.content,
+                `${h}: панель прокручивается на размере, который приложение считает допустимым`
+            ).toBeLessThanOrEqual(m.client + 1);
+        }
+    } finally {
+        await app.close();
+    }
+});
