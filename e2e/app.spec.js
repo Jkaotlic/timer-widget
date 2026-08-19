@@ -61,13 +61,16 @@ test('start/pause timer cycle', async () => {
     const startBtn = await controlWindow.locator('#startBtn').first();
     if (await startBtn.isVisible()) {
         await startBtn.click();
-        await controlWindow.waitForTimeout(1500);
 
-        // Timer should be running — display should have changed
+        // Ждём УСЛОВИЕ — что показанное время сдвинулось, — а не фиксированную
+        // паузу. Первый тик приходит из главного процесса, и на медленной
+        // машине (раннер Windows) он опаздывал: тест читал ещё «05:00» и падал,
+        // хотя таймер шёл. Пауза здесь мерила скорость машины — тот же дефект,
+        // что уже чинился в угле стрелки и в строке дисплея.
         const display = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display').first();
+        await expect(display).toHaveText(/4:5[0-9]|04:5[0-9]/, { timeout: 15000 });
         const text = await display.textContent();
-        // Should show time less than 5:00
-        expect(text).toMatch(/4:5[89]|04:5[89]/);
+        expect(text).toMatch(/4:5[0-9]|04:5[0-9]/);
 
         // Pause
         // Кнопка транспорта в панели ОДНА, вторая скрыта состоянием: берём ту,
