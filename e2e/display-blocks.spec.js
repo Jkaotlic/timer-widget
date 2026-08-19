@@ -140,7 +140,16 @@ test('подпись над таймером и плашка состояния:
             const box = (sel) => {
                 const el = document.querySelector(sel);
                 const r = el.getBoundingClientRect();
-                return { x: Math.round(r.left), y: Math.round(r.top), h: Math.round(r.height) };
+                return {
+                    x: Math.round(r.left),
+                    y: Math.round(r.top),
+                    w: Math.round(r.width),
+                    h: Math.round(r.height),
+                    // Центр — то, что приложение и обещает хранить: позиция
+                    // элемента дисплея это ДОЛЯ окна для его ЦЕНТРА.
+                    cx: Math.round(r.left + r.width / 2),
+                    cy: Math.round(r.top + r.height / 2)
+                };
             };
             return {
                 label: box('#heroLabel'),
@@ -215,9 +224,20 @@ test('подпись над таймером и плашка состояния:
         await control.waitForTimeout(2500);
         display = await findDisplay(app);
         const reopened = await display.evaluate(geometry);
-        console.log(`после переоткрытия: ${reopened.label.x},${reopened.label.y}`);
-        expect(Math.abs(reopened.label.x - g.label.x), 'позиция подписи не восстановилась').toBeLessThanOrEqual(2);
-        expect(Math.abs(reopened.label.y - g.label.y), 'позиция подписи не восстановилась').toBeLessThanOrEqual(2);
+        console.log(`после переоткрытия: центр ${reopened.label.cx},${reopened.label.cy} `
+            + `(было ${g.label.cx},${g.label.cy}); ширина ${g.label.w} → ${reopened.label.w}`);
+        // Сверяется ЦЕНТР, а не левый край, и это не послабление, а предмет
+        // договора: в хранилище лежит доля окна для ЦЕНТРА элемента
+        // (positionToFraction / fractionToPosition). Ширина подписи между
+        // сессиями может отличаться на пиксель-другой — метрики шрифта на
+        // Windows не совпадают с macOS, а текст подписи зависит от состояния
+        // таймера, — и тогда левый край честно уезжает на половину разницы,
+        // хотя элемент стоит там же. Замер на раннере Windows 19.08.2026:
+        // левый край 4px, из-за чего проверка и покраснела.
+        expect(Math.abs(reopened.label.cx - g.label.cx), 'центр подписи не восстановился по горизонтали')
+            .toBeLessThanOrEqual(2);
+        expect(Math.abs(reopened.label.cy - g.label.cy), 'центр подписи не восстановился по вертикали')
+            .toBeLessThanOrEqual(2);
     } finally {
         // Профиль e2e общий на весь прогон — возвращаем расположение.
         await control.evaluate(() => localStorage.removeItem('displayBlockPositions')).catch(() => {});
