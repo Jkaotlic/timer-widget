@@ -293,6 +293,7 @@ class DisplayTimer {
             );
             if (!pos) { continue; }
             this.placeElementAt(row, pos.left, pos.top);
+            this.settleAfterResize(row, fraction, viewport, rect);
             moved = true;
         }
         // Доли НЕ пересобираются из нового положения: у прижатого к краю
@@ -389,8 +390,41 @@ class DisplayTimer {
         row.el.style.left = left + 'px';
         row.el.style.top = top + 'px';
         const shifted = row.el.getBoundingClientRect();
-        row.el.style.left = (left + (left - shifted.left)) + 'px';
-        row.el.style.top = (top + (top - shifted.top)) + 'px';
+        const wantLeft = left + (left - shifted.left);
+        const wantTop = top + (top - shifted.top);
+        row.el.style.left = wantLeft + 'px';
+        row.el.style.top = wantTop + 'px';
+    }
+
+
+    /**
+     * Переставить элемент ЕЩЁ РАЗ, если от перестановки изменился его габарит.
+     *
+     * Место считается по коробке, измеренной ДО перестановки, а между замером
+     * и результатом габарит может измениться: кегль подписи и значения задан
+     * долями вьюпорта (`vmin` / `vw`), поэтому при изменении размера окна
+     * карточка меняет ширину сама, а пересчёт приходит по debounce. Замер на
+     * CI 19.08.2026: окно 900×640, правый край карточки 901.7 — вылет на
+     * 1.7px, невидимый глазом и всё же нарушающий инвариант «ничто не выходит
+     * за окно».
+     *
+     * Лечится не поджатием к краю, а ПОВТОРНЫМ счётом по новому габариту: доля
+     * остаётся та же, поджатие к окну делает та же `fractionToPosition`, и
+     * элемент, который в окно помещается, не сдвигается ни на пиксель.
+     * Поджатие «по факту» здесь было бы хуже: окно после открытия доезжает до
+     * своего размера не мгновенно, и элемент, оказавшийся за краем
+     * ПРОМЕЖУТОЧНОГО вьюпорта, уехал бы навсегда (замер: подпись 1188 → 1191).
+     *
+     * Итерация ровно одна: второй замер сделан уже на новом месте, и третий
+     * дал бы то же число.
+     */
+    settleAfterResize(row, fraction, viewport, before) {
+        const after = row.el.getBoundingClientRect();
+        if (Math.abs(after.width - before.width) < 0.5 && Math.abs(after.height - before.height) < 0.5) { return; }
+        const pos = window.DisplayLayouts.fractionToPosition(
+            fraction, viewport, { width: after.width, height: after.height }
+        );
+        if (pos) { this.placeElementAt(row, pos.left, pos.top); }
     }
 
     /** Вернуть элемент на его место в раскладке окна (подпись, плашка). */
@@ -504,13 +538,39 @@ class DisplayTimer {
 
         const timerBlock = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
             .find((b) => b && b.classList.contains('active'));
-        const timerBox = timerBlock ? timerBlock.getBoundingClientRect() : null;
+        // Полоса сверху обнуляется ПОВТОРНО и прямо перед замером колонки.
+        //
+        // Первый ноль стоит в начале метода, но между ним и этой точкой
+        // вызывается applyTimerScale(), а он начинается с updateTopBand() —
+        // и та считает полосу по СТАРЫМ местам карточек (раскладка их ещё не
+        // переставила). Замер 19.08.2026 на 1440×900: полоса 44px, колонка
+        // сдвинута ею на 22px вниз, hero.top 178 вместо 156 — и «Классика»
+        // укладывала карточку впритык к тому месту, где подпись окажется
+        // ЧЕРЕЗ мгновение, когда финальный updateTopBand() вернёт ноль.
+        // Перекрытие 14px, видимое на 1440×900 и 1280×720 и невидимое на
+        // 1920×1080.
+        this.setTopBand(0);
+        void document.body.offsetWidth;
+
+        // Препятствие для карточек — вся КОЛОНКА ГЕРОЯ, а не одно кольцо.
+        //
+        // Подпись «Осталось» стоит НАД таймером, в том же потоке, и ширина её
+        // меньше — из коробки таймера она не выводится никак. Пока сюда
+        // приезжал только таймер, раскладка честно обходила его и ложилась на
+        // подпись: «Классика» ставит «Текущее время» на 0.10 высоты, и на
+        // 1440×900 карточка накрывала подпись (замер 19.08.2026, после подъёма
+        // карточек до 150 %; на 1920×1080 не воспроизводилось — тот самый
+        // случай, когда экран разработчика прячет дефект).
+        //
+        // Та же коробка, что у полосы сверху (`heroColumnBox`): «где герой» —
+        // это один вопрос, и двух ответов у него быть не должно.
+        const heroBox = timerBlock ? this.heroColumnBox(timerBlock) : null;
 
         const placed = DL.placeElements(
             layout,
             { width: window.innerWidth, height: window.innerHeight },
             naturalSizes,
-            timerBox ? { timer: { left: timerBox.left, right: timerBox.right, top: timerBox.top, bottom: timerBox.bottom } } : {}
+            heroBox ? { timer: heroBox } : {}
         );
 
         for (const [id, pos] of Object.entries(placed)) {

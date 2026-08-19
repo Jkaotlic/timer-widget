@@ -44,8 +44,8 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 | File | Owns |
 |------|------|
-| `display.css` | Все стили полноэкранного окна (~1500 строк). Подключается ПОСЛЕДНИМ: в нём пин палитры, обязанный переопределять `design-tokens.css`. Порядок закреплён тестом |
-| `control.css` | Все стили панели (~3000 строк). Подключается ПОСЛЕДНИМ из трёх таблиц (порядок несущий, закреплён тестом), здесь же глобальный сброс полей и `box-sizing` |
+| `display.css` | Все стили полноэкранного окна. Подключается ПОСЛЕДНИМ: в нём пин палитры, переопределяющий `design-tokens.css`; порядок закреплён тестом |
+| `control.css` | Все стили панели. Подключается ПОСЛЕДНИМ из трёх таблиц (порядок несущий, закреплён тестом), здесь же сброс полей и `box-sizing` |
 | `flip-card.css` | Механика перекидыша (split-flap), одна копия на три окна. Слои строит `flip-card.js` из КЛОНОВ цифры |
 | `fonts.css` | The 20 local `@font-face` declarations, one copy for all four windows. Linked FIRST in every window |
 | `settings-schema.js` | Таблица настроек панели (ключ → контрол → умолчание) плюс `applyStoredSettings()` / `collectSettings()`. Знает только `getElementById` |
@@ -57,13 +57,13 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `modal-manager.js` | `openModal`/`closeModal` with focus trap and focus return |
 | `shortcuts-help.js` | The F1 shortcuts overlay |
 | `onboarding.js` | Подсказка про F1 при первом запуске (флаг `onboardingShown` ставится ДО показа) и кнопка «Проверить обновления» |
-| `mini-bar.js` | Режим «полоса» (400×52). Класс `collapsed` на `<body>` — всё, что модуль знает о вёрстке; панель отдаёт ЗНАЧЕНИЯ через `render({text, band})`, размер меняет main |
+| `mini-bar.js` | Режим «полоса» (400×52). Класс `collapsed` на `<body>` — всё, что модуль знает о вёрстке; панель отдаёт ЗНАЧЕНИЯ через `render()`, размер меняет main |
 | `panel-colors.js` | Цвета окон — **примесь**: ОДНА сборка объекта цветов (`updateColors(target, patch)`, `null` = сброс поля) и ряд «Фон». Разметку ряда строит сам модуль |
-| `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) и пересчёт по факту |
+| `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) и пересчёт |
 | `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, семь тумблеров, кнопки раскладок, приём «закрыли крестиком» |
 | `display-layouts.js` | Реестр семи подвижных элементов дисплея (id → тумблер → вид), масштабы и пять раскладок. Координаты — доли экрана для ЦЕНТРА; в пиксели их переводит `placeElements` |
 | `panel-state.js` | Четыре состояния панели — **примесь**: класс `state-*` на `<body>`, ОДНА сборка payload `widget-style-update`, ручной ввод |
-| `scale-input.js` | Click-to-edit / double-click-to-reset on scale percentages |
+| `scale-input.js` | Click-to-edit / double-click-to-reset on scale % |
 | `font-select.js` | Список шрифтов «Цифр»: `div.font-select` притворяется форм-контролем с `.value`; `id` пункта несёт id контейнера (три экземпляра в документе) |
 
 Rules when working here:
@@ -257,11 +257,11 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `analog-hour-hand.spec.js` | Display's analog hour hand angle at 5 min / 1 h / 1:30 / 6 h |
 | `ui-theme.spec.js` | Светлая тема доезжает до всех четырёх окон (замер ВЫЧИСЛЕННЫХ токенов), переживает перезагрузку и красит настоящие контролы |
 | `drawer-layout.spec.js` | Settings drawer never overlaps the panel — measured rectangles at normal AND max window width |
-| `sound-events.spec.js` | Every sound event fires EXACTLY once: minute, zero (± overrun), overrun interval, start from a local click and from another window. Counts real `playSound` calls |
-| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore. Runs >10s by design |
-| `settings-roundtrip.spec.js` | Настройки четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы по окнам |
-| `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`; modifiers and buttons do not. Written BEFORE the geometry extraction |
-| `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; the clock toggles really change the clock window; style-sync hides the style row. By CLICK on visible elements only |
+| `sound-events.spec.js` | Every sound event fires EXACTLY once: minute, zero (± overrun), overrun interval, start from a click and from another window |
+| `crash-recovery.spec.js` | SIGKILL → relaunch restores the in-progress time and does NOT auto-start; a CLEAN quit leaves nothing to restore |
+| `settings-roundtrip.spec.js` | Настройки четырёх хранилищ переживают перезагрузку; отдельно — синхронизация стиля часов и темы |
+| `window-drag-geometry.spec.js` | Characterization: synthetic drag moves the REAL BrowserWindow by the exact delta and persists `{scalePct,x,y}`. Written BEFORE the geometry extraction |
+| `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; clock toggles really change the clock window. By CLICK on visible elements only |
 | `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ: кегль подогнан, шрифт в СВОЁМ окне, `.value` молчит, подгонка идемпотентна, шильдики часов встают колонкой |
 | `window-drag-size.spec.js` | Жест перемещения не наследует размер, изменённый посреди него. Роль системы (WM_DPICHANGED) играет `win.setSize()` из main |
 | `window-scale-fit.spec.js` | После масштабирования окно виджета и часов целиком в рабочей области СВОЕГО экрана (замер на живом окне); потерянное возвращается |
@@ -272,11 +272,11 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `panel-states.spec.js` | Четыре состояния панели ПО КЛИКУ: какая кнопка и каким словом названа, есть ли пресеты и ряд ±; ящик открывает шеврон, тумблер — окно |
 | `window-surface-color.spec.js` | Фон виджета и часов ПО КЛИКУ (тёмный тон): подложка стиля, прозрачность 0, сброс, тема не стирает фон, окна не красят друг друга |
 | `display-blocks.spec.js` | Блоки дисплея: тумблер гасит СВОЙ блок, крестик снимает СВОЙ тумблер, подпись и плашка тащатся; в аналоге круг только у циферблата, длинное название переносится |
-| `display-timer-scale.spec.js` | Characterization of the display's timer scale across every style block — settings push, Ctrl+wheel, restore on load. Written BEFORE folding three copies into `applyTimerScale()` |
+| `display-timer-scale.spec.js` | Characterization of the display's timer scale in every style — settings push, Ctrl+wheel, restore on load. Written BEFORE folding three copies into `applyTimerScale()` |
 | `style-tone.spec.js` | Тон ПО КЛИКУ: светлая тема — светлые виджет и дисплей, тёмная заливка держит текст светлым; блок повторяет стиль теми же токенами |
-| `display-layouts.spec.js` | Масштаб семи элементов порознь (крутим один — меряем все), пять раскладок ПО КЛИКУ, раскладка не зависит от прошлого масштаба |
-| `display-top-band.spec.js` | Карточка сверху не ложится на подпись «Осталось»: 4 размера окна × 4 стиля, замер прямоугольников; три проверки самого себя до главной |
-| `display-block-frames.spec.js` | Задней рамки у блоков нет: 4 стиля × 2 темы, замер заливки, тени, размытия, кромки; зонд проверяет сам себя. Плюс стрелки «До завершения» и ровный верхний ряд |
+| `display-layouts.spec.js` | Масштаб элементов порознь, пять раскладок ПО КЛИКУ, независимость от прошлого масштаба; отдельно — низкое окно ЧИСЛОМ (1440×900, 1280×720) |
+| `display-top-band.spec.js` | Карточка сверху не ложится на подпись «Осталось»: размеры окна ЧИСЛОМ (только те, что вмещает экран) × 4 стиля; три проверки самого себя до главной |
+| `display-block-frames.spec.js` | Задней рамки у блоков нет: 4 стиля × 2 темы, замер заливки, тени, размытия, кромки; зонд проверяет сам себя. Плюс стрелки «До завершения» и ровный ряд |
 
 ## CI
 
@@ -318,7 +318,8 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Фон окна — настройка, а не подпорка: подложки 1% нет, подложку стиля красит `var(--surface-paint, …)`, а сброс её УДАЛЯЕТ (CRITICAL)** — [разбор](docs/lessons.md#the-window-background-is-a-setting-not-a-hit-test-hack)
 - **Палитра окон без своего фона — ОДНА, в `surface-tones.css`, и выбирает её ТОН, а не тема; поверхности стилей записаны токенами `--style-*`, а не литералами (CRITICAL)** — [разбор](docs/lessons.md#one-palette-chosen-by-tone-not-three-pins)
 - **Блок дисплея повторяет стиль теми же токенами, что и таймер: пластина флипа общая, шрифт «Цифр» приходит переменной, а не инлайном** — [разбор](docs/lessons.md#a-block-repeats-the-style-with-the-same-tokens)
-- **Плита блока — ТРИ свойства (заливка, тень, `backdrop-filter`), снимается ОДИН раз в базе; сняв её, пересчитай контраст: подпись теперь на ХОЛСТЕ окна (CRITICAL)** — [разбор](docs/lessons.md#a-plate-is-three-properties-and-removing-it-moves-the-backdrop)
+- **Раскладка знает ВСЮ колонку героя (подпись + таймер) и меряет её НЕСДВИНУТОЙ: величину, которую пересчитывает сам проход, обнуляй перед замером** — [разбор](docs/lessons.md#a-layout-must-know-the-whole-hero-and-measure-it-unshifted)
+- **Плита блока — ТРИ свойства (заливка, тень, `backdrop-filter`), снимается ОДИН раз в базе; сняв её, пересчитай контраст: подпись теперь на ХОЛСТЕ окна** — [разбор](docs/lessons.md#a-plate-is-three-properties-and-removing-it-moves-the-backdrop)
 - **Карточка сверху и центрированная колонка — два способа сказать «где»: колонка уступает полосу (отступ сдвигает её на ПОЛОВИНУ себя), а если мало — уступает рама героя (CRITICAL)** — [разбор](docs/lessons.md#a-fixed-card-and-a-centred-column-are-two-ways-to-say-where)
 - **Полоса состояния следует ТОНУ яркостью, а не оттенком: пишется ССЫЛКОЙ на акцент палитры — тогда у неё нет своего значения и разъезжаться нечему** — [разбор](docs/lessons.md#a-state-band-follows-the-tone-too)
 - **Раскладка меряет ОСЕВШИЙ `transform`: габарит из `offsetWidth`, переходы снимает `layout-settling` (CRITICAL)** — [разбор](docs/lessons.md#a-layout-must-measure-a-settled-transform)
