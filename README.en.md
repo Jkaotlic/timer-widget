@@ -6,7 +6,7 @@
 
 **Transparent timer widget for presentations and desktop**
 
-[![Version](https://img.shields.io/badge/v2.3.2-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.5.0-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)
@@ -43,7 +43,7 @@
 
 - 4 display styles — circle, digital LED, flip clock, analog
 - Overtime with red pulsation, configurable limit and notification interval
-- 8 presets from 5 to 60 minutes + manual input (`sec`, `min:sec`, `hr:min:sec`)
+- 4 time presets — 5, 15, 25, 45 minutes — + manual input (`sec`, `min:sec`, `hr:min:sec`)
 - `H:MM:SS` format automatically when timer exceeds one hour
 - Negative count with notifications every N minutes
 - 30 built-in sounds (Web Audio API) + custom `.mp3` / `.wav` / `.ogg` / `.flac` / `.webm` / `.aac` upload
@@ -82,13 +82,50 @@
 
 <br>
 
-- Keyboard shortcuts work from **any** window (Space, R, 1–8, W, C, D)
+- Keyboard shortcuts work from **any** window (Space, R, 1–4, W, C, D)
 - **Ctrl + wheel** — scale widget / clock / display (30–600%)
 - **Shift + wheel** — separate scaling for info blocks on fullscreen
 - **Alt + drag** — freely move blocks on the fullscreen display
 - **Click the scale percentage** — exact input, double-click resets to 100%
 - All positions, scales and settings persist between sessions
 - Monitor picker for fullscreen mode
+
+</details>
+
+<details>
+<summary><b>Look presets and the position lock</b></summary>
+
+<br>
+
+**Look presets** — four slots labelled «ВИД» at the bottom of the control
+panel. A slot holds the ENTIRE look: styles of all three windows, which display
+blocks are on and where they sit, the layout, colours, fonts, scales, the
+background, the event time and title.
+
+| Action | What happens |
+|:-------|:-------------|
+| Click an **empty** slot | Store the current look |
+| Click a **filled** slot | Apply the stored look |
+| **Shift + click** | Overwrite the slot with the current look |
+| **Ctrl + 1…4** | The same from the keyboard — works from the fullscreen window too |
+| **1 2 3 4** (no Ctrl) | Still TIME presets — 5, 15, 25, 45 min |
+
+A filled slot is tinted and bold, an empty one is just an outline.
+
+Deliberately NOT in a preset: the background image (megabytes — four slots would
+blow the storage quota), the on-screen position and size of the widget and clock
+windows, and the timer duration — a preset owns the look, not the run.
+
+**Position lock** — the 🔓 / 🔒 button in the panel titlebar, next to the theme
+switch. Once everything is set up, the lock cancels the gestures that can move
+the composition by accident:
+
+- dragging blocks on the fullscreen display (Alt) and the widget/clock windows;
+- `Ctrl` + wheel and `Shift` + wheel (scaling);
+- the close cross on a block.
+
+Settings keep working: everything is still configurable from the panel. The lock
+is shared by all windows and survives a restart.
 
 </details>
 
@@ -102,7 +139,8 @@ Work from **any** window.
 |:----|:-------|
 | `Space` | Start / Pause |
 | `R` | Reset |
-| `1` `2` `3` `4` `5` `6` `7` `8` | Presets: 5, 10, 15, 20, 25, 30, 45, 60 min |
+| `1` `2` `3` `4` | TIME presets: 5, 15, 25, 45 min |
+| `Ctrl` + `1`…`4` | LOOK presets: apply a slot (`Ctrl` + `Shift` + `1`…`4` stores it) |
 | `W` | Toggle widget |
 | `C` | Toggle clock |
 | `D` | Toggle fullscreen |
@@ -110,6 +148,9 @@ Work from **any** window.
 | `Ctrl` + wheel | Scale widget / clock / fullscreen |
 | `Shift` + wheel | Scale info blocks on fullscreen |
 | `Alt` + drag | Move info block on fullscreen |
+
+Scaling and dragging gestures are disabled by the position lock (the 🔒 button
+in the panel titlebar).
 
 ---
 

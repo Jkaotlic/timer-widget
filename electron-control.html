@@ -192,7 +192,7 @@
         </div>
 
         <!-- ВИД ЦЕЛИКОМ в четырёх ячейках. Клик применяет, Shift+клик пишет; почему одна кнопка на два действия — в panel-presets.js. -->
-        <div class="preset-row" role="group" aria-label="Пресеты вида"><span class="preset-caption" title="Клик — применить · Shift+клик — записать · Ctrl+1…4 с клавиатуры">Вид</span><button class="preset-slot" id="presetSlot1" type="button">1</button><button class="preset-slot" id="presetSlot2" type="button">2</button><button class="preset-slot" id="presetSlot3" type="button">3</button><button class="preset-slot" id="presetSlot4" type="button">4</button></div>
+        <div class="preset-row" role="group" aria-label="Пресеты вида"><span class="preset-caption" title="Клик — применить · Shift+клик — записать · Ctrl+1…4 с клавиатуры">Вид</span><button class="preset-slot" id="presetSlot1" type="button">1</button><button class="preset-slot" id="presetSlot2" type="button">2</button><button class="preset-slot" id="presetSlot3" type="button">3</button><button class="preset-slot" id="presetSlot4" type="button">4</button><span class="preset-hint">пусто — запишет · клик — применит · Shift+клик — перезапись · Ctrl+1–4</span></div>
 
         <!-- Подсказка клавиш моноширинным, по центру — последняя строка панели. -->
         <div class="panel-footer" id="panelFooter">Space — старт · R — сброс · 1–4 — пресеты</div>
@@ -890,9 +890,9 @@
                         <button class="faq-question" type="button" aria-expanded="false">Как установить время?<span class="arrow" aria-hidden="true">⌄</span></button>
                         <div class="faq-answer">
                             <ul>
-                                <li><strong>Быстрый выбор</strong> — восемь кнопок: 5, 10, 15, 20, 25, 30, 45 мин и 1 час</li>
-                                <li><strong>Клавиши 1–4</strong> — четыре пресета времени (5, 15, 25, 45 мин), работают из любого окна; <strong>5</strong> — своё время</li>
-                            <li><strong>Ctrl+1–4</strong> — пресеты ВИДА: стили окон, блоки, раскладка и цвета целиком. Клик по ячейке «Вид» в панели применяет, <strong>Shift+клик</strong> — записывает текущий вид</li>
+                                                                <li><strong>Клавиши 1–4</strong> — четыре пресета времени (5, 15, 25, 45 мин): те же, что кнопки быстрого выбора, и работают из любого окна; <strong>5</strong> — своё время</li>
+                            <li><strong>Пресеты вида</strong> — ряд «Вид» внизу панели: в ячейке весь вид (стили трёх окон, блоки дисплея и их места, раскладка, цвета, шрифты, масштабы, фон). Клик по <strong>пустой</strong> ячейке записывает текущий вид, по <strong>заполненной</strong> — применяет; <strong>Shift+клик</strong> перезаписывает; <strong>Ctrl+1–4</strong> — то же с клавиатуры и из окна дисплея; голые <strong>1–4</strong> остаются пресетами ВРЕМЕНИ. Картинка фона, положение окон и длительность в пресет не входят</li>
+                                <li><strong>Замок «Закрепить положение»</strong> (🔒 в титлбаре) отменяет случайные жесты: перетаскивание блоков и окон, Ctrl/Shift+колесо, крестик на блоке. Настройки из панели работают по-прежнему</li>
                                 <li><strong>Точное время</strong> — одно поле с умным разбором: <code>90</code> — это 90 секунд, <code>5:30</code> — 5 мин 30 с, <code>1:30:00</code> — 1 ч 30 мин. Максимум 99:59:59. Применить — <strong>Enter</strong> или <strong>✓</strong></li>
                                 <li><strong>± на ходу</strong> — кнопки −1 ч / −5 м / −1 м / +1 м / +5 м / +1 ч меняют время даже во время отсчёта</li>
                             </ul>
