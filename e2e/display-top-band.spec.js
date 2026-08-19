@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { pickWindowSizes } = require('./window-sizes');
 
 /**
  * Карточка, прижатая к верху окна, не ложится на подпись «Осталось».
@@ -157,14 +158,16 @@ test('карточка сверху не ложится на подпись «О
         await setToggle(control, 'showHeroLabel', true);
         await display.waitForTimeout(600);
 
-        // Экран может не вместить крупные размеры — тогда они не проверяются
-        // вовсе, а не подменяются молча тем, что влезло. Пропуск ВИДЕН в
-        // выводе: «проверено 2 из 4» честнее зелёного цвета без оговорок.
+        // Экран может не вместить крупные размеры. Тогда они не подменяются
+        // молча тем, что влезло: список либо сокращается до помещающихся, либо
+        // ВЫВОДИТСЯ из рабочей области (см. pickWindowSizes) — на раннерах CI
+        // экран 1024×720…1280×1024, и фиксированный список не проверял бы там
+        // ничего. Что именно проверяется, печатается перед прогоном.
         const area = await workArea(app);
-        const fits = (s) => s.w <= area.width - 80 && s.h <= area.height - 80;
-        const sizes = SIZES.filter(fits);
-        console.log(`рабочая область ${area.width}×${area.height}: проверяем ${sizes.length} из ${SIZES.length} размеров`);
-        expect(sizes.length, 'экран прогона не вмещает ни одного размера из списка').toBeGreaterThan(0);
+        const sizes = pickWindowSizes(area, SIZES);
+        console.log(`рабочая область ${area.width}×${area.height}: проверяем ${JSON.stringify(sizes)}`);
+        expect(sizes.length, 'экран прогона мал даже для выведенных размеров — проверка не выполнена')
+            .toBeGreaterThan(0);
 
         for (const size of sizes) {
             await resizeDisplay(app, display, size);
