@@ -146,3 +146,33 @@ test('тесты и линт стоят перед сборкой каждой �
         assert.ok(tests !== -1 && tests < buildStep, 'тесты не идут перед сборкой');
     }
 });
+
+test('пока сборки не подписаны, описание релиза об этом ГОВОРИТ', () => {
+    // Связь между конфигурацией и текстом: `identity: null` у macOS и
+    // `signAndEditExecutable: false` у Windows означают, что система при первом
+    // запуске покажет предупреждение. Молчать об этом — значит выдать
+    // ожидаемое поведение за поломку и получить поток вопросов; обещать
+    // подпись, которой нет, — соврать. Появятся сертификаты — тест заставит
+    // переписать и текст.
+    const unsignedMac = PKG.build.mac.identity === null;
+    const unsignedWin = PKG.build.win.signAndEditExecutable === false;
+    const notes = build(PKG.version).replace(/<details>[\s\S]*?<\/details>/g, '');
+
+    if (unsignedMac || unsignedWin) {
+        assert.match(notes, /не подписан/i, 'сборки не подписаны, а описание релиза об этом молчит');
+        assert.match(notes, /Конфиденциальность и безопасность/,
+            'нет действующей инструкции для macOS: без неё приложение выглядит сломанным');
+        assert.match(notes, /SmartScreen/, 'нет предупреждения про SmartScreen у Windows');
+    } else {
+        assert.doesNotMatch(notes, /не подписан/i,
+            'сборки подписаны, а описание всё ещё обещает предупреждение системы');
+    }
+
+    // Ссылка на контрольные суммы — обещание, и оно обязано исполняться
+    // сборкой: файл SHA256SUMS.txt делает шаг в release.yml и прикладывает к
+    // релизу. Обещание без исполнения — тот же дефект, что врущая справка.
+    if (/SHA256SUMS\.txt/.test(notes)) {
+        assert.match(WORKFLOW, /sha256sum/, 'описание обещает контрольные суммы, а workflow их не считает');
+        assert.match(WORKFLOW, /SHA256SUMS\.txt\n/, 'файл сумм не прикладывается к релизу');
+    }
+});

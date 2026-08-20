@@ -169,6 +169,21 @@ jobs:
       - name: Build release notes from CHANGELOG
         run: node scripts/release-notes.js "${{ github.ref_name }}" --out RELEASE_NOTES.md
 
+      # Контрольные суммы прикладываются к релизу, потому что сборки НЕ
+      # ПОДПИСАНЫ: сертификата у проекта нет, система при первом запуске
+      # предупреждает, и единственный способ отличить «просто неподписанный
+      # файл» от «файла, изменённого по дороге» — сверить сумму. Описание
+      # релиза на этот файл ссылается, а обещание без исполнения в этом
+      # репозитории считается дефектом.
+      - name: Checksums for downloads
+        run: |
+          cd artifacts
+          find . -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \
+            -o -name '*.deb' -o -name '*.AppImage' \) -print0 \
+            | sort -z | xargs -0 sha256sum \
+            | sed 's| \./| |' > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -188,6 +203,7 @@ jobs:
             artifacts/**/*.exe
             artifacts/**/*.deb
             artifacts/**/*.AppImage
+            SHA256SUMS.txt
             sbom.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
