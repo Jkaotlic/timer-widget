@@ -33,7 +33,7 @@ Repository: https://github.com/electron/get
 Publisher: Samuel Attard
 
 === @electron/get ===
-Version: 5.0.0
+Version: 5.1.0
 License: MIT
 Repository: https://github.com/electron/get
 Publisher: Samuel Attard
@@ -68,7 +68,7 @@ Repository: https://github.com/electron/windows-sign
 Publisher: Felix Rieseberg
 
 === @eslint-community/eslint-utils ===
-Version: 4.9.1
+Version: 4.10.1
 License: MIT
 Repository: https://github.com/eslint-community/eslint-utils
 Publisher: Toru Nagashima
@@ -114,13 +114,19 @@ Repository: https://github.com/eslint/rewrite
 Publisher: Nicholas C. Zakas
 
 === @humanfs/core ===
-Version: 0.19.1
+Version: 0.19.2
 License: Apache-2.0
 Repository: https://github.com/humanwhocodes/humanfs
 Publisher: Nicholas C. Zakas
 
 === @humanfs/node ===
-Version: 0.16.7
+Version: 0.16.8
+License: Apache-2.0
+Repository: https://github.com/humanwhocodes/humanfs
+Publisher: Nicholas C. Zakas
+
+=== @humanfs/types ===
+Version: 0.15.0
 License: Apache-2.0
 Repository: https://github.com/humanwhocodes/humanfs
 Publisher: Nicholas C. Zakas
@@ -163,14 +169,14 @@ Publisher: Paul Miller
 Homepage: https://paulmillr.com
 
 === @noble/hashes ===
-Version: 2.2.0
+Version: 2.3.0
 License: MIT
 Repository: https://github.com/paulmillr/noble-hashes
 Publisher: Paul Miller
 Homepage: https://paulmillr.com
 
 === @peculiar/asn1-schema ===
-Version: 2.8.0
+Version: 2.9.3
 License: MIT
 Repository: https://github.com/PeculiarVentures/asn1-schema
 Publisher: PeculiarVentures, LLC
@@ -194,7 +200,7 @@ Repository: https://github.com/PeculiarVentures/webcrypto
 Publisher: PeculiarVentures
 
 === @playwright/test ===
-Version: 1.62.0
+Version: 1.62.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
@@ -228,7 +234,7 @@ License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
 === @types/estree ===
-Version: 1.0.8
+Version: 1.0.9
 License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
@@ -258,7 +264,7 @@ License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
 === @types/node ===
-Version: 24.12.2
+Version: 24.13.3
 License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
@@ -268,7 +274,7 @@ License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
 === @xmldom/xmldom ===
-Version: 0.8.13
+Version: 0.8.14
 License: MIT
 Repository: https://github.com/xmldom/xmldom
 
@@ -284,7 +290,7 @@ License: MIT
 Repository: https://github.com/acornjs/acorn-jsx
 
 === acorn ===
-Version: 8.16.0
+Version: 8.18.0
 License: MIT
 Repository: https://github.com/acornjs/acorn
 
@@ -296,7 +302,7 @@ Publisher: Nathan Rajlich
 Homepage: http://n8.io/
 
 === ajv ===
-Version: 6.14.0
+Version: 6.15.0
 License: MIT
 Repository: https://github.com/ajv-validator/ajv
 Publisher: Evgeny Poberezkin
@@ -322,7 +328,7 @@ Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
 
 === app-builder-lib ===
-Version: 26.15.7
+Version: 26.15.3
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -394,7 +400,7 @@ License: MIT
 Repository: https://github.com/thenativeweb/boolean
 
 === brace-expansion ===
-Version: 5.0.8
+Version: 5.0.9
 License: MIT
 Repository: https://github.com/juliangruber/brace-expansion
 
@@ -599,7 +605,7 @@ Repository: https://github.com/gliviu/dir-compare
 Publisher: Liviu Grigorescu
 
 === dmg-builder ===
-Version: 26.15.7
+Version: 26.15.3
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -660,13 +666,13 @@ Publisher: Matthew Eernisse
 Homepage: http://fleegix.org
 
 === electron-builder-squirrel-windows ===
-Version: 26.15.7
+Version: 26.15.3
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
 
 === electron-builder ===
-Version: 26.15.7
+Version: 26.15.3
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -689,7 +695,7 @@ License: MIT
 Repository: https://github.com/electron/windows-installer
 
 === electron ===
-Version: 43.3.0
+Version: 43.4.1
 License: MIT
 Repository: https://github.com/electron/electron
 Publisher: Electron Community
@@ -809,7 +815,7 @@ Publisher: Toru Nagashima
 Homepage: https://github.com/mysticatea
 
 === eslint ===
-Version: 10.8.0
+Version: 10.8.1
 License: MIT
 Repository: https://github.com/eslint/eslint
 Publisher: Nicholas C. Zakas
@@ -868,7 +874,7 @@ Publisher: Ramesh Nair
 Homepage: http://www.hiddentao.com/
 
 === fast-uri ===
-Version: 3.1.4
+Version: 3.1.5
 License: BSD-3-Clause
 Repository: https://github.com/fastify/fast-uri
 Publisher: Vincent Le Goff
@@ -909,7 +915,7 @@ Publisher: Jared Wray
 Homepage: https://jaredwray.com
 
 === flatted ===
-Version: 3.4.2
+Version: 3.4.4
 License: ISC
 Repository: https://github.com/WebReflection/flatted
 Publisher: Andrea Giammarchi
@@ -1022,7 +1028,7 @@ Publisher: Gajus Kuizinas
 Homepage: http://gajus.com
 
 === globals ===
-Version: 17.8.0
+Version: 17.11.0
 License: MIT
 Repository: https://github.com/sindresorhus/globals
 Publisher: Sindre Sorhus
@@ -1215,12 +1221,12 @@ Publisher: Matthew Eernisse
 Homepage: http://fleegix.org
 
 === jiti ===
-Version: 2.6.1
+Version: 2.7.0
 License: MIT
 Repository: https://github.com/unjs/jiti
 
 === js-yaml ===
-Version: 4.3.0
+Version: 4.3.1
 License: MIT
 Repository: https://github.com/nodeca/js-yaml
 Publisher: Vladimir Zapparov
@@ -1366,7 +1372,7 @@ Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
 === minimatch ===
-Version: 10.2.5
+Version: 10.2.6
 License: BlueOak-1.0.0
 Repository: https://github.com/isaacs/minimatch
 Publisher: Isaac Z. Schlueter
@@ -1559,13 +1565,13 @@ Repository: https://github.com/PeculiarVentures/PKI.js
 Publisher: Yury Strozhevsky
 
 === playwright-core ===
-Version: 1.62.0
+Version: 1.62.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
 
 === playwright ===
-Version: 1.62.0
+Version: 1.62.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
@@ -1637,7 +1643,7 @@ Repository: https://github.com/PeculiarVentures/pvtsutils
 Publisher: PeculiarVentures
 
 === pvutils ===
-Version: 1.1.5
+Version: 1.2.0
 License: MIT
 Repository: https://github.com/PeculiarVentures/pvutils
 Publisher: Yury Strozhevsky
@@ -1759,7 +1765,7 @@ Repository: https://github.com/npm/node-semver
 Publisher: GitHub Inc.
 
 === semver ===
-Version: 7.8.1
+Version: 7.8.5
 License: ISC
 Repository: https://github.com/npm/node-semver
 Publisher: GitHub Inc.
@@ -1921,7 +1927,7 @@ Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
 === undici-types ===
-Version: 7.16.0
+Version: 7.18.2
 License: MIT
 Repository: https://github.com/nodejs/undici
 
