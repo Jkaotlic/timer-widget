@@ -4390,6 +4390,14 @@ body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-r
     margin-top: 2px;
 }
 .preset-caption {
+    /* Подпись стала ОТЧЁТОМ («Вид · 2» / «Вид · свой»), то есть длиннее, чем
+       было. В ряду стоит flex-wrap (он нужен подсказке внизу), и на Linux, где
+       шрифт шире, удлинившаяся подпись сталкивала четвёртую ячейку на вторую
+       строку: +30px к высоте панели и залипание в компактном режиме. Подпись
+       не растягивается и не переносится, ячейки ужимаются — переносить в этом
+       ряду разрешено ТОЛЬКО подсказке. */
+    flex: 0 0 auto;
+    white-space: nowrap;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.6px;
@@ -4414,7 +4422,8 @@ body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-r
    окна, и пара посчитана в обеих темах (см. правило .preset-slot.active). */
 .preset-slot {
     position: relative;   /* под мишень-псевдоэлемент ячейки в полосе */
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     height: 30px;
     border: 1px dashed var(--tw-border);
     border-radius: var(--tw-r-md);
@@ -4992,6 +5001,29 @@ body.compact-panel-2 .wrow {
 body.compact-panel-2 .group-title {
     margin: 0 0 3px;
 }
+
+/* ЗАПАС ВЫСОТЫ на самой мелкой ступени.
+   На минимуме 383×660 со строкой лимита панель помещалась ровно в ноль
+   пикселей: `natural == client`. Ноль запаса означает, что панель ломает любая
+   разница метрик шрифта — и она её сломала: на Linux содержимое вышло 675 при
+   660, панель залипла в компактном режиме, а CI покраснел, хотя на macOS всё
+   сходилось. Поэтому здесь не «подгонка под макет», а именно запас: ужимаются
+   отступы, но ни один элемент не прячется — правило «подсказка ВИДНА»
+   действует и тут (её целостность сторожит e2e/panel-shell.spec.js). */
+body.compact-panel-2 .preset-row {
+    padding-top: 0;
+}
+body.compact-panel-2 .preset-hint {
+    font-size: 9.5px;
+    line-height: 1.3;
+}
+body.compact-panel-2 .panel-footer {
+    padding: 6px 20px;
+}
+body.compact-panel-2 .wrow {
+    padding: 5px 8px;
+}
+
 
 body.compact-panel-2 .main-btn,
 body.compact-panel-2 .transport-main {
