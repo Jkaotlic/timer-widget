@@ -189,18 +189,32 @@ test('замок держит ОКНО виджета, а панель прод�
 
         // Замок запрещает ЖЕСТ, а не настройку: панель обязана менять размер
         // по-прежнему, иначе это не защита от случайности, а мёртвый режим.
-        await control.evaluate(() => {
-            const el = document.getElementById('timerScale');
-            if (!el) { return; }
-            el.value = '150';
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        await control.waitForTimeout(900);
-        const scaled = await bounds();
-        console.log(`   ширина окна: ${locked1.width} → ${scaled.width}`);
-        expect(scaled.width, 'под замком панель перестала управлять размером виджета')
-            .toBeGreaterThan(locked1.width);
+        //
+        // Масштабы берутся МАЛЕНЬКИЕ и оба задаются здесь же. Прежняя версия
+        // ставила 150% и сравнивала с тем, что осталось от соседних спек:
+        // профиль e2e общий, и на macOS-раннере окно приходило в тест уже
+        // шириной 1024 — то есть упёртым в экран. Запрошенный размер не равен
+        // выданному: система обрезает по рабочей области, ширина не растёт, и
+        // тест падал не на дефекте, а на размере чужого монитора.
+        const setScale = async (pct) => {
+            await control.evaluate((value) => {
+                const el = document.getElementById('timerScale');
+                if (!el) { return; }
+                el.value = String(value);
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }, pct);
+            await control.waitForTimeout(900);
+            return bounds();
+        };
+
+        const small = await setScale(60);
+        const bigger = await setScale(90);
+        console.log(`   ширина окна: 60% → ${small.width}px, 90% → ${bigger.width}px`);
+        // Оба размера заведомо меньше любого экрана, на котором вообще можно
+        // запустить прогон, поэтому «выдано» здесь равно «запрошено».
+        expect(bigger.width, 'под замком панель перестала управлять размером виджета')
+            .toBeGreaterThan(small.width);
     } finally {
         // Профиль e2e ОБЩИЙ на весь прогон, и замок — глобальное состояние:
         // оставленный включённым, он ломает все соседние спеки, где что-то
