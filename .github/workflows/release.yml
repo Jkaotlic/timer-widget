@@ -169,6 +169,10 @@ jobs:
       - name: Build release notes from CHANGELOG
         run: node scripts/release-notes.js "${{ github.ref_name }}" --out RELEASE_NOTES.md
 
+      # Имена в файле — ПЛОСКИЕ, без папок артефактов: скачивают файлы по
+      # одному в свой каталог, и `sha256sum -c SHA256SUMS.txt` с путями вида
+      # `windows/…` не сходится. Проверка, которая не проверяется, — то же
+      # обещание без исполнения (у 2.6.0 файл пришлось перезаливать руками).
       # Контрольные суммы прикладываются к релизу, потому что сборки НЕ
       # ПОДПИСАНЫ: сертификата у проекта нет, система при первом запуске
       # предупреждает, и единственный способ отличить «просто неподписанный
@@ -181,7 +185,7 @@ jobs:
           find . -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \
             -o -name '*.deb' -o -name '*.AppImage' \) -print0 \
             | sort -z | xargs -0 sha256sum \
-            | sed 's| \./| |' > ../SHA256SUMS.txt
+            | sed 's| .*/| |' > ../SHA256SUMS.txt
           cat ../SHA256SUMS.txt
 
       - name: Create GitHub Release
