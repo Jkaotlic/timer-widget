@@ -174,3 +174,157 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
         await app.close();
     }
 });
+
+/**
+ * Отметка «этот вид сейчас на экране» — вычисляемая, а не память о клике.
+ *
+ * Просьба 20.08.2026: «сделай более явные кнопочки визуально для пресет
+ * записан и пресет применен, сейчас не понятно какой активный». Состояний в
+ * ячейке стало три, и здесь меряется главное свойство третьего: оно ГАСНЕТ,
+ * когда вид разошёлся с записанным. Отметка, пережившая правку настройки,
+ * хуже её отсутствия — она утверждает неправду о том, что на экране.
+ */
+test('ячейка помечается применённой и гаснет, когда вид разошёлся', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => localStorage.removeItem('uiPresets'));
+        await control.reload();
+        await control.waitForTimeout(1200);
+
+        const marks = () => control.evaluate(() => {
+            const out = {};
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`presetSlot${i}`);
+                const cs = getComputedStyle(el);
+                out[i] = {
+                    filled: el.classList.contains('filled'),
+                    active: el.classList.contains('active'),
+                    pressed: el.getAttribute('aria-pressed'),
+                    // ВЫЧИСЛЕННЫЕ заливка и цвет цифры, а не класс: класс можно
+                    // поставить и не нарисовать ничего.
+                    bg: cs.backgroundColor,
+                    fg: cs.color,
+                    dashed: cs.borderTopStyle
+                };
+            }
+            out.caption = document.getElementById('presetCaption').textContent.trim();
+            return out;
+        });
+
+        const empty = await marks();
+        console.log(`   пусто: ${JSON.stringify(empty[1])}`);
+        expect(empty[1].dashed, 'пустая ячейка не отличается контуром').toBe('dashed');
+        expect(empty[1].active).toBe(false);
+
+        await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
+        await control.waitForTimeout(700);
+        await control.click('#displayTimerStyle button[data-val="flip"]');
+        await control.waitForTimeout(700);
+
+        // Запись = этот вид И ЕСТЬ то, что на экране.
+        await control.click('#presetSlot1');
+        await control.waitForTimeout(800);
+        const saved = await marks();
+        console.log(`   записан и применён: ${JSON.stringify(saved[1])}`);
+        expect(saved[1].filled).toBe(true);
+        expect(saved[1].active, 'только что записанный вид не помечен применённым').toBe(true);
+        expect(saved[1].pressed).toBe('true');
+        expect(saved[1].dashed, 'записанная ячейка осталась пунктирной').toBe('solid');
+        // Применённая ЗАЛИТА, а не обведена: заливка обязана отличаться и от
+        // пустой ячейки, и от просто записанной — иначе «какой выбран» опять
+        // читается как оттенок рамки.
+        expect(saved[1].bg, 'применённая ячейка не залита').not.toBe(empty[1].bg);
+        expect(saved[1].bg, 'применённая залита так же, как пустая').not.toBe(saved[2].bg);
+        expect(saved[1].fg, 'цифра применённой ячейки не сменила цвет').not.toBe(saved[2].fg);
+        expect(saved.caption, 'подпись ряда не назвала ячейку').toContain('1');
+        expect(saved[2].active, 'применённой оказалась и пустая ячейка').toBe(false);
+
+        // Одна правка настройки — и на экране уже не пресет.
+        await control.click('#displayTimerStyle button[data-val="analog"]');
+        await control.waitForTimeout(900);
+        const drifted = await marks();
+        console.log(`   после правки: ${JSON.stringify(drifted[1])}`);
+        expect(drifted[1].active, 'отметка пережила смену стиля — она врёт про экран').toBe(false);
+        expect(drifted[1].filled, 'ячейка заодно перестала считаться записанной').toBe(true);
+        expect(drifted[1].bg, 'заливка осталась акцентной').not.toBe(saved[1].bg);
+        // И ряд ОТВЕЧАЕТ словом: вид настроен руками, ни одна ячейка не совпала.
+        expect(drifted.caption, 'ряд молчит о том, что вид больше не из ячейки').toContain('свой');
+
+        // Вернули кликом — отметка загорелась снова.
+        await control.click('#presetSlot1');
+        await control.waitForTimeout(1200);
+        const back = await marks();
+        console.log(`   после применения: ${JSON.stringify(back[1])}`);
+        expect(back[1].active, 'применённый вид не помечен').toBe(true);
+        expect(back[1].bg, 'заливка не вернулась').toBe(saved[1].bg);
+        expect(back.caption).toContain('1');
+    } finally {
+        await control.evaluate(() => {
+            localStorage.removeItem('uiPresets');
+            const el = document.getElementById('displayTimerStyle');
+            if (el) { el.value = 'circle'; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        }).catch(() => {});
+        await app.close();
+    }
+});
+
+/**
+ * Горит РОВНО ОДНА ячейка — даже когда снимки одинаковые.
+ *
+ * Жалоба 20.08.2026 повторилась трижды: «нет чёткого различия между пресет
+ * записан и пресет применён». Замер объяснил: пользователь тыкает пустые ячейки
+ * подряд, вид между кликами не меняется, снимки выходят одинаковыми — и все
+ * записанные ячейки совпадают с профилем, то есть горят ВСЕ. Различие
+ * существовало, но означало «этот вид на экране», а не «выбрана эта ячейка».
+ *
+ * Здесь меряется тот самый сценарий: три клика подряд и ЦВЕТ каждой ячейки.
+ */
+test('три ячейки подряд: применённой остаётся одна, остальные — записанные', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => {
+            localStorage.removeItem('uiPresets');
+            localStorage.removeItem('uiPresetActive');
+        });
+        await control.reload();
+        await control.waitForTimeout(1200);
+
+        for (const i of [1, 2, 3]) {
+            await control.click(`#presetSlot${i}`);
+            await control.waitForTimeout(600);
+        }
+
+        const row = await control.evaluate(() => {
+            const out = { cells: {} };
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`presetSlot${i}`);
+                out.cells[i] = { active: el.classList.contains('active'), bg: getComputedStyle(el).backgroundColor };
+            }
+            out.caption = document.getElementById('presetCaption').textContent.trim();
+            return out;
+        });
+        console.log(`   ${JSON.stringify(row)}`);
+
+        const lit = [1, 2, 3, 4].filter((i) => row.cells[i].active);
+        expect(lit, 'применённой должна быть ровно одна ячейка').toEqual([3]);
+        // И это видно ЦВЕТОМ, а не только классом.
+        expect(row.cells[1].bg, 'записанная залита как применённая').not.toBe(row.cells[3].bg);
+        expect(row.cells[2].bg).toBe(row.cells[1].bg);
+        expect(row.caption).toContain('3');
+
+        // Клик по записанной переносит отметку на неё.
+        await control.click('#presetSlot1');
+        await control.waitForTimeout(1200);
+        const after = await control.evaluate(() => [1, 2, 3, 4]
+            .filter((i) => document.getElementById(`presetSlot${i}`).classList.contains('active')));
+        expect(after, 'применение не перенесло отметку').toEqual([1]);
+    } finally {
+        await control.evaluate(() => {
+            localStorage.removeItem('uiPresets');
+            localStorage.removeItem('uiPresetActive');
+        }).catch(() => {});
+        await app.close();
+    }
+});

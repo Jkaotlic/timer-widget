@@ -1663,7 +1663,31 @@ class DisplayTimer {
         const timerColor = colors.timer && this._isSafeColor(colors.timer) ? colors.timer : null;
         const progressColor = colors.progress && this._isSafeColor(colors.progress) ? colors.progress : null;
 
-        // Circle style — стопы градиента кольца.
+        /**
+         * Переменная либо СТАВИТСЯ, либо УДАЛЯЕТСЯ.
+         *
+         * Односторонняя запись («поставить, если цвет пришёл») делает цвет
+         * несбрасываемым: «Сбросить всё» шлёт объект без полей, окно ничего не
+         * применяет — и продолжает краситься прошлым значением, потому что
+         * инлайновая переменная на documentElement пережила пустой payload.
+         * Замер 20.08.2026: после сброса дисплей оставался неоновым
+         * (`--timer-color: #39ff14`), тогда как виджет и часы возвращались к
+         * заводскому виду — у них этот приём уже был.
+         *
+         * Удаление возвращает значение по умолчанию его владельцу — CSS.
+         */
+        const root = document.documentElement.style;
+        const setVar = (name, value) => {
+            if (value) { root.setProperty(name, value); }
+            else { root.removeProperty(name); }
+        };
+
+        // Circle style — стопы градиента красит КАСКАД: правило
+        // `#mainGradient stop` в display.css сильнее презентационного атрибута.
+        // Раньше здесь стоял setAttribute, и снять поставленный им цвет было
+        // нечем: атрибут — не инлайновый стиль, removeProperty его не видит.
+        // Тот же приём и теми же именами переменных уже работает в виджете и в
+        // часах: одна механика окраски кольца на три окна.
         //
         // Свечения здесь больше нет. `--text-glow` и `--glow-color` писались
         // на каждый приход цвета и не читались НИ ОДНИМ правилом: редизайн
@@ -1671,12 +1695,10 @@ class DisplayTimer {
         // tests/flat-surfaces.test.js), а записи пережили своих читателей.
         // Мёртвая переменная опаснее отсутствующей: она выглядит как рабочий
         // механизм, и следующая правка цвета честно тащит её за собой.
-        const stop1 = document.querySelector('.grad-stop-1');
-        const stop2 = document.querySelector('.grad-stop-2');
-        if (stop1 && timerColor) { stop1.setAttribute('stop-color', timerColor); }
-        if (stop2 && progressColor) { stop2.setAttribute('stop-color', progressColor); }
+        setVar('--timer-color-stop', timerColor);
+        setVar('--progress-color-stop', progressColor);
 
-        // Цвет темы для цифр КРУГА, LED, «Цифр» и ФЛИПА — одна переменная.
+        // Цвет темы для цифр КРУГА, «Цифр» и ФЛИПА — одна переменная.
         //
         // Раньше каждый из этих стилей красился инлайном, и каждому нужен был
         // охранник «не трогать, если сейчас danger/warning»: инлайн бьёт
@@ -1684,9 +1706,8 @@ class DisplayTimer {
         // её стереть. С переменной охранники не нужны — правило .danger
         // сильнее по специфичности и выигрывает само, в каком бы порядке ни
         // пришли обновление цвета и обновление полосы.
-        if (timerColor) {
-            document.documentElement.style.setProperty('--timer-color', timerColor);
-        }
+        setVar('--timer-color', timerColor);
+
         // Info blocks (time blocks): ЗНАЧЕНИЕ берёт цвет темы, ПОДПИСЬ — нет.
         //
         // Раньше подпись красилась в `${timerColor}80`, то есть в цвет темы при
@@ -1700,18 +1721,12 @@ class DisplayTimer {
         //
         // Поэтому подпись отдана нейтральным fallback'ам, которые уже объявлены в
         // display.html под каждый стиль (--tw-fg-dim для круга и аналога,
-        // --tw-fg-muted для флипа, зелёный для LED). Замер по восьми темам: 4.55–6.63:1.
+        // --tw-fg-muted для флипа). Замер по восьми темам: 4.55–6.63:1.
         // Иерархию несут размер, насыщенность и капитель, а не понижение контраста
         // ниже порога читаемости. Побочная выгода: подпись остаётся читаемой при
         // ЛЮБОМ пользовательском цвете из палитры, а не только у восьми встроенных.
-        //
-        // removeProperty, а не «просто не ставить»: инлайновое значение с прошлой
-        // версии могло остаться на documentElement и переживало бы обновление.
-        if (timerColor) {
-            document.documentElement.style.setProperty('--info-color', timerColor);
-            document.documentElement.style.removeProperty('--info-color-dim');
-            document.documentElement.style.setProperty('--info-glow', `${timerColor}33`);
-        }
+        setVar('--info-color', timerColor);
+        setVar('--info-color-dim', null);
 
         // Analog style
         // L6: while in overtime the second hand / center / analog-digital text must
@@ -1723,22 +1738,18 @@ class DisplayTimer {
         // перерасход закончился. Раньше эти инлайновые стили ставила только ветка
         // перерасхода, а снять их было нечем — красные стрелки залипали до
         // следующей смены цвета в панели управления.
-        const root = document.documentElement.style;
-        if (progressColor) {
-            root.setProperty('--analog-hand-bg',
-                `linear-gradient(180deg, ${timerColor || progressColor} 0%, ${progressColor} 100%)`);
-            root.setProperty('--analog-hand-shadow', `0 0 15px ${progressColor}80`);
-        }
-        if (timerColor) {
-            root.setProperty('--analog-center-bg',
-                `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`);
-            root.setProperty('--analog-center-shadow', `0 0 15px ${timerColor}99`);
-            // Было b3 (0.7): выбор темы приглушал отсчёт ВТОРОЙ раз поверх
-            // токена, который и так вторичен. Инвариант сброса не задет —
-            // это база восстановления после перерасхода, она и должна быть
-            // непустой, а красные полосы ставятся и снимаются своими ветками.
-            root.setProperty('--analog-digital-color', `${timerColor}e6`);
-        }
+        //
+        // `--analog-hand-bg`, `--analog-hand-shadow`, `--analog-center-shadow` и
+        // `--info-glow` отсюда убраны: их не читало НИ ОДНО правило ни в
+        // display.css, ни в display.html — тени ушли вместе с ореолами в
+        // редизайне 12.08.2026, а записи остались. См. абзац про мёртвые
+        // переменные выше.
+        setVar('--analog-center-bg', timerColor
+            ? `linear-gradient(145deg, ${timerColor}, ${progressColor || timerColor})`
+            : null);
+        // Было b3 (0.7): выбор темы приглушал отсчёт ВТОРОЙ раз поверх
+        // токена, который и так вторичен.
+        setVar('--analog-digital-color', timerColor ? `${timerColor}e6` : null);
 
         // Охранника «применять цвет темы, только если НЕ идёт перерасход» здесь
         // больше нет, и он больше не нужен. Он существовал потому, что цвет

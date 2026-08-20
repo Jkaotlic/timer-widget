@@ -203,3 +203,58 @@ test('ключ замка объявлен в реестре хранилища'
         'ключ uiLocked не объявлен в CONFIG.STORAGE_KEYS — реестр обязан знать все ключи профиля'
     );
 });
+
+test('замок в ПОЛОСЕ и замок в титлбаре — одна привязка, а не две', () => {
+    // Просьба 20.08.2026: кнопка блокировки в свёрнутой полосе. Вторая
+    // привязка означала бы два состояния кнопки на одну величину: щёлкнул в
+    // титлбаре — в полосе остался прежний глиф. Поэтому bindLockToggle красит
+    // ВСЕ кнопки замка, сколько бы их ни было в документе.
+    const PanelTitlebar = require(path.join(ROOT, 'panel-titlebar.js'));
+    const make = () => {
+        const listeners = {};
+        const btn = {
+            listeners, attrs: {}, classes: new Set(), textContent: '', title: '',
+            setAttribute(k, v) { this.attrs[k] = v; },
+            getAttribute(k) { return this.attrs[k]; },
+            classList: { toggle: (cls, on) => { if (on) { btn.classes.add(cls); } else { btn.classes.delete(cls); } } },
+            addEventListener: (type, fn) => { listeners[type] = fn; }
+        };
+        return btn;
+    };
+    const titlebar = make();
+    const bar = make();
+    const doc = { getElementById: (id) => (id === 'lockToggle' ? titlebar : (id === 'miniBarLock' ? bar : null)) };
+    let stored = false;
+    const lock = {
+        readLock: () => stored,
+        writeLock: (v) => { stored = !!v; return stored; },
+        applyLock: (v) => !!v
+    };
+    const sent = [];
+    const api = PanelTitlebar.bindLockToggle({ doc, ipc: { send: (c, p) => sent.push([c, p]) }, lock });
+    assert.ok(api);
+    assert.equal(bar.textContent, '🔓', 'кнопка в полосе не получила начального состояния');
+
+    // Щёлкнули в ПОЛОСЕ — титлбар обязан показать то же самое.
+    bar.listeners.click();
+    assert.equal(stored, true, 'клик в полосе не запер');
+    assert.equal(titlebar.textContent, '🔒', 'кнопка титлбара осталась с прежним глифом');
+    assert.equal(bar.textContent, '🔒');
+    assert.equal(titlebar.getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(sent[sent.length - 1], ['ui-lock-update', { locked: true }]);
+
+    // И обратно: щёлкнули в титлбаре — полоса отпустила замок вместе с ним.
+    titlebar.listeners.click();
+    assert.equal(stored, false);
+    assert.equal(bar.textContent, '🔓', 'кнопка в полосе осталась запертой');
+});
+
+test('в полосе есть замок и четыре ячейки пресетов', () => {
+    const control = read('electron-control.html');
+    const bar = /<div class="mini-bar" id="miniBar">[\s\S]*?<\/div>/.exec(control);
+    assert.ok(bar, 'в панели нет полосы');
+    assert.match(bar[0], /id="miniBarLock"/, 'в полосе нет кнопки замка');
+    for (let i = 1; i <= 4; i++) {
+        assert.match(bar[0], new RegExp(`id="miniPresetSlot${i}"`), `в полосе нет ячейки ${i}`);
+    }
+});

@@ -37,6 +37,16 @@ const COLOR_TARGETS = {
     display: { field: 'displayColors', label: 'полноэкранного окна' }
 };
 
+/**
+ * Из каких полей состоит объект цветов окна.
+ *
+ * Список нужен ВТОРОЙ стороне — сбросу («Сбросить всё» обнуляет все поля), и
+ * держать его там своей копией нельзя: добавленное поле молча пережило бы
+ * сброс. Ровно так после сброса и оставалось `bg` — единственное поле, которого
+ * не было в копии списка внутри panel-reset.js.
+ */
+const COLOR_FIELDS = ['timer', 'progress', 'bg', 'surface', 'surfaceAlpha'];
+
 // Окна, у которых настраивается подложка. У полноэкранного окна фон свой
 // (сплошной/градиент/картинка) — вторая пара контролов там означала бы двух
 // владельцев одного значения.
@@ -240,10 +250,11 @@ const PanelColorsMixin = {
 };
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS };
+    module.exports = { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS, COLOR_FIELDS };
 }
 
 if (typeof window !== 'undefined') {
     window.PanelColorsMixin = PanelColorsMixin;
     window.mergeColors = mergeColors;
+    window.PanelColorFields = COLOR_FIELDS;
 }

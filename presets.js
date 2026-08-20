@@ -38,6 +38,22 @@ const PRESET_SLOTS = 4;
 const PRESETS_STORAGE_KEY = 'uiPresets';
 
 /**
+ * Какую ячейку применили последней.
+ *
+ * Зачем номер, если совпадение и так вычисляется. Потому что совпадение
+ * отвечает на вопрос «этот ли вид на экране», а не «какая ячейка выбрана», и
+ * при одинаковых снимках вырождается: три ячейки, записанные подряд без правок
+ * между ними, совпадают ВСЕ ТРИ и горят все три. Замер в живом окне 20.08.2026
+ * показал ровно это, и со стороны выглядело как «различия между записан и
+ * применён нет».
+ *
+ * Память и сравнение работают в паре: память отвечает «какая», сравнение —
+ * «ещё ли». Память в одиночку врёт (переживает любую правку настройки),
+ * сравнение в одиночку неоднозначно.
+ */
+const ACTIVE_SLOT_STORAGE_KEY = 'uiPresetActive';
+
+/**
  * Ключи профиля, из которых состоит ВИД.
  *
  * Порядок значения не имеет, но список держится одним местом: добавили
@@ -153,12 +169,92 @@ function writePreset(slot, preset, storage) {
     return all;
 }
 
+/**
+ * Каноничный вид значения для СРАВНЕНИЯ.
+ *
+ * Значения в профиле — строки, и почти все они JSON. Панель пересобирает их
+ * слиянием (`{ ...prev, ...settings }`), поэтому при тех же значениях порядок
+ * ключей в строке может отличаться. Сравнение строк «как есть» гасило бы
+ * отметку «применён» на ровном месте, поэтому объекты сравниваются с
+ * упорядоченными ключами, а не-JSON остаётся строкой.
+ */
+function canonicalValue(raw) {
+    if (typeof raw !== 'string') { return null; }
+    const trimmed = raw.trim();
+    if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) { return raw; }
+    try {
+        return JSON.stringify(sortDeep(JSON.parse(trimmed)));
+    } catch {
+        return raw;
+    }
+}
+
+function sortDeep(value) {
+    if (Array.isArray(value)) { return value.map(sortDeep); }
+    if (value && typeof value === 'object') {
+        const out = {};
+        for (const key of Object.keys(value).sort()) { out[key] = sortDeep(value[key]); }
+        return out;
+    }
+    return value;
+}
+
+/**
+ * Показывает ли экран ИМЕННО этот пресет.
+ *
+ * Отметку «применён» можно было бы хранить полем «последняя нажатая ячейка».
+ * Такое поле лжёт: после применения пресета пользователь меняет одну настройку,
+ * на экране уже не пресет — а поле продолжает утверждать обратное. Поэтому
+ * состояние ВЫЧИСЛЯЕТСЯ: совпали значения всех ключей снимка — значит на экране
+ * он, разошёлся хоть один — отметка гаснет сама.
+ *
+ * Сравниваются ТОЛЬКО ключи снимка: остальных применение не касается, и
+ * требовать от них совпадения значило бы не зажигать отметку никогда.
+ */
+function matchesPreset(preset, storage) {
+    const values = preset && preset.values ? preset.values : null;
+    if (!values || !storage) { return false; }
+    const keys = PRESET_KEYS.filter((key) => typeof values[key] === 'string');
+    if (!keys.length) { return false; }
+    for (const key of keys) {
+        let raw;
+        try { raw = storage.getItem(key); } catch { return false; }
+        if (canonicalValue(raw) !== canonicalValue(values[key])) { return false; }
+    }
+    return true;
+}
+
 /** Есть ли что применять в ячейке. */
 function hasPreset(slot, storage) {
     const key = normalizeSlot(slot);
     if (!key) { return false; }
     const all = readPresets(storage);
     return !!(all[key] && all[key].values && Object.keys(all[key].values).length > 0);
+}
+
+/** Запомнить, какую ячейку применили (или записали — это тоже выбор). */
+function writeActiveSlot(slot, storage) {
+    const key = normalizeSlot(slot);
+    if (!storage) { return null; }
+    try {
+        if (key) { storage.setItem(ACTIVE_SLOT_STORAGE_KEY, key); } else { storage.removeItem(ACTIVE_SLOT_STORAGE_KEY); }
+    } catch { /* переполненное хранилище не должно ломать ряд */ }
+    return key;
+}
+
+/**
+ * Какая ячейка ПРИМЕНЕНА сейчас: последняя нажатая, если её снимок всё ещё
+ * совпадает с профилем. Иначе — никакая, и ряд обязан это сказать словом.
+ */
+function activeSlot(storage) {
+    if (!storage) { return null; }
+    let raw;
+    try { raw = storage.getItem(ACTIVE_SLOT_STORAGE_KEY); } catch { return null; }
+    const key = normalizeSlot(raw);
+    if (!key) { return null; }
+    const preset = readPresets(storage)[key];
+    if (!preset || !matchesPreset(preset, storage)) { return null; }
+    return key;
 }
 
 const Presets = {
@@ -170,7 +266,11 @@ const Presets = {
     applyPreset,
     readPresets,
     writePreset,
-    hasPreset
+    hasPreset,
+    matchesPreset,
+    ACTIVE_SLOT_STORAGE_KEY,
+    writeActiveSlot,
+    activeSlot
 };
 
 if (typeof module !== 'undefined' && module.exports) {

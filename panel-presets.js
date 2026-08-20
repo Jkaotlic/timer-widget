@@ -20,44 +20,89 @@
 const SLOT_BUTTON_PREFIX = 'presetSlot';
 
 /**
+ * Где живут ячейки. Комплектов ДВА — в развёрнутой панели и в полосе, — но
+ * привязка одна: второй bindPresets означал бы второе место, которое решает,
+ * какая ячейка помечена, и они разошлись бы на первом же применении из полосы.
+ */
+const SLOT_BUTTON_PREFIXES = [SLOT_BUTTON_PREFIX, 'miniPresetSlot'];
+
+/**
  * @param {object} deps
  * @param {Document} deps.doc
  * @param {Storage} deps.storage
  * @param {object} deps.presets              модуль presets.js
  * @param {() => void} deps.onApplied        что делать после записи ключей
  * @param {(msg: string) => void} [deps.notify]  сообщение пользователю
+ * @param {string[]} [deps.prefixes]         префиксы id комплектов кнопок
  * @returns {{apply: (slot:number)=>boolean, save: (slot:number)=>boolean, refresh: ()=>void}|null}
  */
-function bindPresets({ doc, storage, presets, onApplied, notify }) {
+function bindPresets({ doc, storage, presets, onApplied, notify, prefixes = SLOT_BUTTON_PREFIXES }) {
     if (!doc || !storage || !presets) { return null; }
 
-    const buttons = [];
+    const cells = [];
     for (let slot = 1; slot <= presets.PRESET_SLOTS; slot++) {
-        const el = doc.getElementById(`${SLOT_BUTTON_PREFIX}${slot}`);
-        if (el) { buttons.push({ slot, el }); }
+        const els = [];
+        for (const prefix of prefixes) {
+            const el = doc.getElementById(`${prefix}${slot}`);
+            if (el) { els.push(el); }
+        }
+        if (els.length) { cells.push({ slot, els }); }
     }
-    if (!buttons.length) { return null; }
+    if (!cells.length) { return null; }
 
     const say = (msg) => { if (typeof notify === 'function') { notify(msg); } };
 
     /**
-     * Пустая ячейка выглядит пустой.
+     * Три состояния ячейки, и каждое видно.
      *
-     * Кнопка, которая молчит на клик, читается как сломанная, поэтому пустая
-     * ячейка не молчит: она ЗАПИСЫВАЕТ текущий вид (и говорит об этом). Это же
-     * решает задачу «как узнать, что тут можно сохранить» без второй кнопки на
-     * четыре ячейки.
+     * Пустая ячейка выглядит пустой. Кнопка, которая молчит на клик, читается
+     * как сломанная, поэтому пустая ячейка не молчит: она ЗАПИСЫВАЕТ текущий
+     * вид (и говорит об этом). Это же решает задачу «как узнать, что тут можно
+     * сохранить» без второй кнопки на четыре ячейки.
+     *
+     * ЗАПИСАННАЯ и ПРИМЕНЁННАЯ — разные состояния, и до 20.08.2026 они
+     * выглядели одинаково: «не понятно, какой активный». Применённая — та, чей
+     * снимок СОВПАДАЕТ с текущим профилем (см. presets.matchesPreset), поэтому
+     * отметка гаснет сама, как только пользователь что-нибудь поменял.
      */
+    // Подпись ряда — ОТЧЁТ, а не ярлык: она отвечает на вопрос «какой вид
+    // сейчас», включая ответ «никакой из ячеек». Молчащий ряд в этом состоянии
+    // читается как поломка, а не как «вид настроен руками».
+    const caption = doc.getElementById('presetCaption');
+
     const refresh = () => {
-        for (const { slot, el } of buttons) {
+        // Применена РОВНО ОДНА ячейка — последняя нажатая, и только пока её
+        // снимок совпадает с профилем. Одного совпадения мало: одинаковые
+        // снимки в разных ячейках совпадают все сразу, и горел бы весь ряд.
+        const applied = presets.activeSlot(storage);
+        for (const { slot, els } of cells) {
             const filled = presets.hasPreset(slot, storage);
-            el.classList.toggle('filled', filled);
-            el.setAttribute('aria-label', filled
-                ? `Пресет ${slot}: применить сохранённый вид. Shift+клик — заменить его текущим`
-                : `Пресет ${slot}: пусто. Клик запомнит текущий вид`);
-            el.title = filled
-                ? `Применить вид из ячейки ${slot} (или Ctrl+${slot})\nShift+клик — заменить его текущим видом`
-                : `Ячейка ${slot} пуста.\nКлик запомнит в неё текущий вид: стили окон, блоки и их места, цвета, масштабы`;
+            const active = filled && applied === String(slot);
+            const label = !filled
+                ? `Пресет ${slot}: пусто. Клик запомнит текущий вид`
+                : (active
+                    ? `Пресет ${slot}: этот вид сейчас на экране. Shift+клик — заменить его текущим`
+                    : `Пресет ${slot}: применить сохранённый вид. Shift+клик — заменить его текущим`);
+            const title = !filled
+                ? `Ячейка ${slot} пуста.\nКлик запомнит в неё текущий вид: стили окон, блоки и их места, цвета, масштабы`
+                : (active
+                    ? `Вид из ячейки ${slot} сейчас на экране.\nShift+клик — заменить его текущим видом`
+                    : `Применить вид из ячейки ${slot} (или Ctrl+${slot})\nShift+клик — заменить его текущим видом`);
+            for (const el of els) {
+                el.classList.toggle('filled', filled);
+                el.classList.toggle('active', active);
+                // Состояние объявляется и словом: индикатор, отличимый только
+                // цветом, в этом проекте уже был отдельным дефектом.
+                el.setAttribute('aria-pressed', String(active));
+                el.setAttribute('aria-label', label);
+                el.title = title;
+            }
+        }
+        if (caption) {
+            caption.textContent = applied ? `Вид · ${applied}` : 'Вид · свой';
+            caption.setAttribute('title', applied
+                ? `На экране вид из ячейки ${applied}`
+                : 'Вид настроен вручную и ни с одной ячейкой не совпадает');
         }
     };
 
@@ -65,6 +110,8 @@ function bindPresets({ doc, storage, presets, onApplied, notify }) {
         const key = presets.normalizeSlot(slot);
         if (!key) { return false; }
         presets.writePreset(key, presets.capturePreset(storage), storage);
+        // Запись — тоже выбор: записанный вид И ЕСТЬ то, что на экране.
+        presets.writeActiveSlot(key, storage);
         refresh();
         say(`Пресет ${key} записан`);
         return true;
@@ -82,19 +129,23 @@ function bindPresets({ doc, storage, presets, onApplied, notify }) {
         }
         const written = presets.applyPreset(preset, storage);
         if (!written.length) { return false; }
+        presets.writeActiveSlot(key, storage);
         if (typeof onApplied === 'function') { onApplied(); }
+        refresh();
         say(`Пресет ${key} применён`);
         return true;
     };
 
-    for (const { slot, el } of buttons) {
-        el.addEventListener('click', (e) => {
-            // Shift — «записать», без него — «применить». Одна кнопка на два
-            // действия, потому что четыре ячейки × две кнопки не помещаются в
-            // панель шириной 400px, а модальное «сейчас режим записи» — это
-            // состояние, которое пользователь обязан помнить.
-            if (e.shiftKey) { save(slot); } else { apply(slot); }
-        });
+    for (const { slot, els } of cells) {
+        for (const el of els) {
+            el.addEventListener('click', (e) => {
+                // Shift — «записать», без него — «применить». Одна кнопка на два
+                // действия, потому что четыре ячейки × две кнопки не помещаются в
+                // панель шириной 400px, а модальное «сейчас режим записи» — это
+                // состояние, которое пользователь обязан помнить.
+                if (e.shiftKey) { save(slot); } else { apply(slot); }
+            });
+        }
     }
 
     refresh();
@@ -171,6 +222,17 @@ function install({ doc, storage, presets, controller, ipc, notify }) {
         notify
     });
     if (!api) { return null; }
+    // Настройки меняются и в ДРУГИХ окнах: места карточек дисплея, масштабы
+    // блоков, стиль часов. Отметка «применён» обязана гаснуть и от них, иначе
+    // она врёт ровно в том случае, ради которого затевалась. Событие storage
+    // приходит от чужого документа того же происхождения — опроса не нужно.
+    const view = doc.defaultView;
+    if (view && typeof view.addEventListener === 'function') {
+        view.addEventListener('storage', () => api.refresh());
+        // Страховка на случай, если событие storage между окнами не доедет:
+        // вернулся в панель — отметки пересчитаны. Тоже по событию, без опроса.
+        view.addEventListener('focus', () => api.refresh());
+    }
     doc.addEventListener('keydown', presetHotkeyHandler({
         apply: (slot) => api.apply(slot),
         save: (slot) => api.save(slot),
@@ -184,7 +246,7 @@ function install({ doc, storage, presets, controller, ipc, notify }) {
     return api;
 }
 
-const PanelPresets = { bindPresets, presetHotkeyHandler, applyProfile, install, SLOT_BUTTON_PREFIX };
+const PanelPresets = { bindPresets, presetHotkeyHandler, applyProfile, install, SLOT_BUTTON_PREFIX, SLOT_BUTTON_PREFIXES };
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PanelPresets;

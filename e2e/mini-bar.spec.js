@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const CONFIG = require('../constants.js');
 
 /**
  * Режим полосы: окно действительно сжимается, полоса действительно управляет.
@@ -24,7 +25,11 @@ test('окно сжимается в полосу и разворачивает�
         });
 
         expect(collapsed.bounds.height, `высота окна ${collapsed.bounds.height}`).toBeLessThanOrEqual(60);
-        expect(collapsed.bounds.width, 'ширина при сворачивании не меняется').toBe(before.width);
+        // Ширину задаёт СОДЕРЖИМОЕ полосы: с 20.08.2026 в ней ещё четыре ячейки
+        // вида и замок, и на 400px набор не помещается. Правило — ПОЛ: окно
+        // шире пола сворачивается со своей шириной.
+        expect(collapsed.bounds.width, `ширина полосы ${collapsed.bounds.width}`)
+            .toBe(Math.max(before.width, CONFIG.CONTROL_BAR_MIN_WIDTH));
         expect(collapsed.bounds.y, 'держим ВЕРХНИЙ край').toBe(before.y);
         expect(collapsed.onTop, 'полоса обязана быть поверх окон').toBe(true);
 
@@ -240,6 +245,215 @@ test('тост в свёрнутом состоянии виден целико�
         await control.click('#miniBarExpand');
         await control.waitForTimeout(400);
     } finally {
+        await app.close();
+    }
+});
+
+/**
+ * Содержимое полосы ПОМЕЩАЕТСЯ в полосу — числом, а не на глаз.
+ *
+ * Просьба 20.08.2026 добавила в полосу шесть кнопок (четыре ячейки вида и
+ * замок), и «влезло ли» — это утверждение о прямоугольниках. Проверять его
+ * взглядом нельзя вдвойне: flex по умолчанию СЖИМАЕТ элементы, поэтому
+ * переполнение выглядит не как вылезший за край элемент, а как кнопка, тихо
+ * ставшая уже своей мишени. Поэтому меряются ОБЕ величины: и что ничего не
+ * вышло за padding-бокс полосы, и что каждая кнопка не мельче заявленного.
+ *
+ * Худший случай времени (H:MM:SS со знаком) подставляется в строку намеренно:
+ * ширина полосы обязана держать самое длинное, что она умеет показывать, а не
+ * то, что оказалось на экране в момент прогона.
+ */
+test('в полосе всё помещается: замер кнопок и правых краёв', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await control.click('#miniBarToggle');
+        await control.waitForTimeout(700);
+
+        const measure = () => control.evaluate(() => {
+            const bar = document.getElementById('miniBar');
+            const cs = getComputedStyle(bar);
+            const box = bar.getBoundingClientRect();
+            const padL = parseFloat(cs.paddingLeft);
+            const padR = parseFloat(cs.paddingRight);
+            const inner = { left: box.left + padL, right: box.right - padR };
+            // Спрятанное действие (в полосе на экране всегда одно из двух)
+            // прямоугольника не имеет — мерить его край бессмысленно.
+            const kids = [...bar.children].map((el) => {
+                const r = el.getBoundingClientRect();
+                return { id: el.id || el.className, left: r.left, right: r.right, w: r.width, h: r.height };
+            }).filter((k) => k.w > 0 || k.h > 0);
+            const time = document.getElementById('miniBarTime');
+            // ЗАПАС полосы — это ширина распорки: пока она больше нуля, всё
+            // остальное стоит в своих размерах. Сумма ширин детей на эту роль
+            // не годится вовсе — распорка растяжимая, и сумма равна ширине
+            // полосы за вычетом зазоров при ЛЮБОМ содержимом, то есть проверка
+            // «сумма ≤ ширины» зелена и тогда, когда кнопки уже сжаты.
+            const spacer = bar.querySelector('.mini-spacer').getBoundingClientRect().width;
+            const buttons = {};
+            for (const id of ['miniPresetSlot1', 'miniPresetSlot2', 'miniPresetSlot3', 'miniPresetSlot4',
+                'miniBarLock', 'miniBarReset', 'miniBarExpand']) {
+                const r = document.getElementById(id).getBoundingClientRect();
+                buttons[id] = { w: r.width, h: r.height };
+            }
+            return {
+                buttons,
+                inner,
+                innerWidth: inner.right - inner.left,
+                kids,
+                spacer,
+                sum: kids.reduce((a, k) => a + k.w, 0),
+                timeClipped: time.scrollWidth - time.clientWidth
+            };
+        });
+
+        const report = (m, label) => {
+            const widest = m.kids.reduce((a, k) => (k.right > a.right ? k : a), m.kids[0]);
+            console.log(`   [${label}] полоса ${m.innerWidth.toFixed(1)}px, содержимое ${(m.sum - m.spacer).toFixed(1)}px, `
+                + `запас (распорка) ${m.spacer.toFixed(1)}px, правый край дальше всех у ${widest.id}: `
+                + `${(widest.right - m.inner.right).toFixed(1)}px за краем`);
+        };
+
+        const check = (m, label) => {
+            report(m, label);
+            for (const k of m.kids) {
+                expect(k.left, `${label}: ${k.id} вылез за левый край`).toBeGreaterThanOrEqual(m.inner.left - 0.5);
+                expect(k.right, `${label}: ${k.id} вылез за правый край`).toBeLessThanOrEqual(m.inner.right + 0.5);
+            }
+            // Запас положительный: распорка схлопнулась в ноль — значит
+            // ширины уже не хватает, и следующим сожмётся что-нибудь нужное.
+            expect(m.spacer, `${label}: запаса нет, содержимое заняло всю полосу`).toBeGreaterThan(4);
+            expect(m.kids.find((k) => String(k.id).includes('mini-presets')),
+                `${label}: в полосе нет группы ячеек вида`).toBeTruthy();
+            // Мишени НЕ сжаты: именно так выглядит нехватка ширины во flex —
+            // не вылезшим за край элементом, а кнопкой, тихо ставшей уже.
+            console.log(`   [${label}] кнопки: ` + Object.entries(m.buttons)
+                .map(([id, sz]) => `${id} ${sz.w.toFixed(1)}×${sz.h.toFixed(1)}`).join(', '));
+            for (let i = 1; i <= 4; i++) {
+                expect(m.buttons[`miniPresetSlot${i}`].w, `${label}: ячейка ${i} сжата`).toBeGreaterThanOrEqual(23.5);
+                expect(m.buttons[`miniPresetSlot${i}`].h, `${label}: ячейка ${i} сплющена`).toBeGreaterThanOrEqual(23.5);
+            }
+            for (const id of ['miniBarLock', 'miniBarReset', 'miniBarExpand']) {
+                expect(m.buttons[id].w, `${label}: ${id} сжат`).toBeGreaterThanOrEqual(31.5);
+            }
+        };
+
+        const idle = await measure();
+        check(idle, 'покой');
+
+        // Худший случай: часы, минуты, секунды и минус — и самое длинное слово
+        // действия («Продолжить»). Действий на экране всегда ОДНО из двух,
+        // поэтому вторая кнопка остаётся спрятанной: показать обе — значит
+        // мерить полосу, которой не бывает.
+        await control.evaluate(() => {
+            document.getElementById('miniBarTime').textContent = '−9:59:59';
+            document.getElementById('miniBarStart').textContent = 'Продолжить';
+            document.getElementById('miniBarStart').style.display = 'block';
+            document.getElementById('miniBarPause').style.display = 'none';
+        });
+        await control.waitForTimeout(120);
+        const worst = await measure();
+        console.log('   [худший случай] по элементам: '
+            + worst.kids.map((k) => `${k.id} ${k.w.toFixed(1)}`).join(', '));
+        check(worst, 'худший случай');
+        expect(worst.timeClipped, 'время обрезано').toBeLessThanOrEqual(0);
+
+        await control.evaluate(() => {
+            document.getElementById('miniBarStart').style.display = '';
+            document.getElementById('miniBarPause').style.display = '';
+        });
+        await control.click('#miniBarExpand');
+        await control.waitForTimeout(500);
+    } finally {
+        await app.close();
+    }
+});
+
+/**
+ * Замок и ячейки вида работают ИЗ ПОЛОСЫ.
+ *
+ * Просьба 20.08.2026: «когда сворачиваешь окно в минибар, добавь туда кнопочку
+ * блокировки всего и кнопочки пресетов». Полоса — режим «всё настроено, идёт
+ * мероприятие», и оба действия нужны именно там.
+ *
+ * Меряется не наличие кнопок (это видит юнит-тест по разметке), а то, что за
+ * ними стоят ТЕ ЖЕ владельцы: щелчок в полосе меняет глиф и в титлбаре, а
+ * ячейка в полосе пишет в тот же профиль, что и ячейка в панели.
+ */
+test('в полосе замок и ячейки вида — те же самые, а не вторая копия', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => {
+            localStorage.removeItem('uiPresets');
+            localStorage.setItem('uiLocked', '0');
+        });
+        await control.reload();
+        await control.waitForTimeout(1200);
+
+        await control.click('#miniBarToggle');
+        await control.waitForTimeout(700);
+
+        // Кнопки в полосе ВИДНЫ: зелёный тест на скрытой кнопке ничего не значит.
+        const seen = await control.evaluate(() => {
+            const vis = (id) => {
+                const el = document.getElementById(id);
+                const r = el.getBoundingClientRect();
+                return !!el.offsetParent && r.width > 0 && r.height > 0;
+            };
+            return { lock: vis('miniBarLock'), slot1: vis('miniPresetSlot1'), slot4: vis('miniPresetSlot4') };
+        });
+        expect(seen.lock, 'замка в полосе не видно').toBe(true);
+        expect(seen.slot1, 'ячейки 1 в полосе не видно').toBe(true);
+        expect(seen.slot4, 'ячейки 4 в полосе не видно').toBe(true);
+
+        // --- замок ---
+        await control.click('#miniBarLock');
+        await control.waitForTimeout(500);
+        const locked = await control.evaluate(() => ({
+            html: document.documentElement.classList.contains('ui-locked'),
+            bar: document.getElementById('miniBarLock').textContent.trim(),
+            titlebar: document.getElementById('lockToggle').textContent.trim(),
+            stored: localStorage.getItem('uiLocked')
+        }));
+        console.log(`   после клика по замку в полосе: ${JSON.stringify(locked)}`);
+        expect(locked.html, 'замок из полосы не заперся').toBe(true);
+        expect(locked.stored).toBe('1');
+        expect(locked.bar, 'глиф в полосе не сменился').toBe('🔒');
+        expect(locked.titlebar, 'кнопка титлбара осталась с прежним глифом — значит владельцев два').toBe('🔒');
+
+        await control.click('#miniBarLock');
+        await control.waitForTimeout(500);
+        expect(await control.evaluate(() => document.documentElement.classList.contains('ui-locked')),
+            'второй клик не снял замок').toBe(false);
+
+        // --- ячейки вида: пустая ЗАПИСЫВАЕТ, и метку видно в обоих комплектах ---
+        await control.click('#miniPresetSlot2');
+        await control.waitForTimeout(800);
+        const marked = await control.evaluate(() => {
+            const mini = document.getElementById('miniPresetSlot2');
+            const panel = document.getElementById('presetSlot2');
+            return {
+                miniFilled: mini.classList.contains('filled'),
+                miniActive: mini.classList.contains('active'),
+                panelFilled: panel.classList.contains('filled'),
+                panelActive: panel.classList.contains('active'),
+                stored: Object.keys(JSON.parse(localStorage.getItem('uiPresets') || '{}'))
+            };
+        });
+        console.log(`   после клика по ячейке в полосе: ${JSON.stringify(marked)}`);
+        expect(marked.stored, 'клик в полосе не записал ячейку').toEqual(['2']);
+        expect(marked.miniActive, 'ячейка в полосе не помечена применённой').toBe(true);
+        expect(marked.panelFilled, 'панельная ячейка не узнала о записи из полосы').toBe(true);
+        expect(marked.panelActive, 'панельная ячейка не помечена применённой').toBe(true);
+    } finally {
+        await control.evaluate(() => {
+            localStorage.removeItem('uiPresets');
+            localStorage.setItem('uiLocked', '0');
+            document.documentElement.classList.remove('ui-locked');
+            if (window.ipcRenderer) { window.ipcRenderer.send('ui-lock-update', { locked: false }); }
+        }).catch(() => {});
+        await control.click('#miniBarExpand').catch(() => {});
+        await control.waitForTimeout(400);
         await app.close();
     }
 });

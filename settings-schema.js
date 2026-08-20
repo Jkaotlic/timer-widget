@@ -83,10 +83,13 @@ const SETTINGS_DESCRIPTORS = [
     { key: 'soundEndEnabled', el: 'soundEndEnabled', kind: 'checkbox', def: true },
     { key: 'soundMinuteEnabled', el: 'soundMinuteEnabled', kind: 'checkbox', def: false },
     { key: 'soundOverrunEnabled', el: 'soundOverrunEnabled', kind: 'checkbox', def: false },
-    { key: 'soundStartPreset', el: 'soundStartPreset', kind: 'value', def: 'none' },
-    { key: 'soundEndPreset', el: 'soundEndPreset', kind: 'value', def: 'none' },
-    { key: 'soundMinutePreset', el: 'soundMinutePreset', kind: 'value', def: 'none' },
-    { key: 'soundOverrunPreset', el: 'soundOverrunPreset', kind: 'value', def: 'triple' },
+    // Умолчание — звук, НАПИСАННЫЙ под это событие (см. sound-bank.js).
+    // Раньше три события из четырёх молчали по умолчанию, а перерасход подавал
+    // «тройной сигнал» — набор бипов, случайно выбранный из общего списка.
+    { key: 'soundStartPreset', el: 'soundStartPreset', kind: 'value', def: 'start-boost' },
+    { key: 'soundEndPreset', el: 'soundEndPreset', kind: 'value', def: 'finish-chime' },
+    { key: 'soundMinutePreset', el: 'soundMinutePreset', kind: 'value', def: 'minute-mark' },
+    { key: 'soundOverrunPreset', el: 'soundOverrunPreset', kind: 'value', def: 'overrun-alert' },
     {
         key: 'overrunIntervalMinutes', el: 'overrunIntervalMinutes', kind: 'value',
         // Своего значения по умолчанию нет: пустое хранилище оставляет выбранным
@@ -301,12 +304,16 @@ function collectSettings(doc) {
  * @param {Document} [doc]
  * @returns {Object} применённые значения (ключ → значение по умолчанию)
  */
-function resetOwnedSettings(owner, doc) {
+/**
+ * Общая механика сброса: «как вернуть контрол к умолчанию» знает ОДНО место.
+ * Кого именно сбрасывать, решает предикат — по владельцу или по списку ключей.
+ */
+function resetMatching(match, doc) {
     const target = doc || (typeof document !== 'undefined' ? document : null);
     const applied = {};
 
     for (const descriptor of SETTINGS_DESCRIPTORS) {
-        if (descriptor.owner !== owner) { continue; }
+        if (!match(descriptor)) { continue; }
         const el = elementById(target, descriptor.el);
         if (!el) { continue; }
 
@@ -322,6 +329,22 @@ function resetOwnedSettings(owner, doc) {
     return applied;
 }
 
+function resetOwnedSettings(owner, doc) {
+    return resetMatching((descriptor) => descriptor.owner === owner, doc);
+}
+
+/**
+ * Сбросить НАЗВАННЫЕ ключи — для кнопок уже́ настройки, а не всей вкладки.
+ *
+ * «Сбросить фон по умолчанию» перечисляла значения литералами прямо в
+ * обработчике: третья копия того, что описано таблицей. Умолчание правят в
+ * таблице — кнопка продолжала бы возвращать старое, и молча.
+ */
+function resetKeys(keys, doc) {
+    const wanted = new Set(keys || []);
+    return resetMatching((descriptor) => wanted.has(descriptor.key), doc);
+}
+
 const SettingsSchema = {
     SETTINGS_DESCRIPTORS,
     DISPLAY_BLOCK_KEYS,
@@ -330,7 +353,8 @@ const SettingsSchema = {
     settingValue,
     applyStoredSettings,
     collectSettings,
-    resetOwnedSettings
+    resetOwnedSettings,
+    resetKeys
 };
 
 // Node.js (тесты)

@@ -714,16 +714,27 @@ test('тема красит ЗНАЧЕНИЕ info-блока, но не подп
     // подписи опять уедут ниже порога во всех темах разом.
     const script = fs.readFileSync(path.join(__dirname, '..', 'display-script.js'), 'utf8');
     const code = script.replace(/^[ \t]*\/\/.*$/gm, '');
-    assert.match(code, /setProperty\('--info-color', timerColor\)/, 'значение обязано брать цвет темы');
+    // Переменные дисплея ставятся и снимаются одним помощником (setVar):
+    // односторонняя запись пережила бы «Сбросить всё». Проверяется тот же
+    // смысл, что и раньше, — просто в действующей форме записи.
+    assert.match(code, /setVar\('--info-color', timerColor\)/, 'значение обязано брать цвет темы');
     assert.match(
         code,
-        /removeProperty\('--info-color-dim'\)/,
+        /setVar\('--info-color-dim', null\)/,
         'подпись обязана отдаваться нейтральному fallback — иначе контраст падает до 2.15:1'
     );
     assert.doesNotMatch(
         code,
         /setProperty\('--info-color-dim'/,
         '--info-color-dim снова красится из темы: подписи уйдут ниже WCAG AA'
+    );
+    assert.doesNotMatch(
+        code,
+        // `\s+`, а не `\s*`: со звёздочкой lookahead проверяется В ПОЗИЦИИ ЗАПЯТОЙ
+        // (ноль пробелов), где дальше идёт « null» — то есть отрицание всегда
+        // истинно и тест зелен на любой строке. Проверено на самом себе ниже.
+        /setVar\('--info-color-dim',\s+(?!null)/,
+        '--info-color-dim снова красится из темы через setVar: подписи уйдут ниже WCAG AA'
     );
 });
 
@@ -812,3 +823,44 @@ test('расчёт контраста сверен с эталонными па�
     assert.ok(ratio > 4.45 && ratio < 4.6, `#767676 на белом должен давать ≈4.5:1, вышло ${ratio.toFixed(2)}`);
 });
 
+
+test('.preset-slot.active (применённая ячейка вида) читаема в ОБЕИХ темах, посчитано по реальному правилу control.css', () => {
+    // Применённая ячейка — единственная в панели, залитая ЧИСТЫМ акцентом, и
+    // она же тот случай, где «белым на синем» не работает: в тёмной теме
+    // акцент яркий (#0a84ff) и белая цифра даёт 3.65:1, то есть провал AA.
+    // Правило красит цифру цветом ФОНА ОКНА (--tw-bg-surface) — тема
+    // переопределяет его вместе с акцентом, поэтому ОДНА декларация даёт
+    // тёмную цифру на ярком синем и белую на затемнённом.
+    //
+    // Тест читает правило ИЗ control.css, а не повторяет литералы: правка в CSS
+    // без правки теста обязана проверяться на настоящем значении.
+    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+    const rule = /^\.preset-slot\.active\s*\{([^}]*)\}/m.exec(control);
+    assert.ok(rule, 'не найдено правило .preset-slot.active');
+    const bgTok = /background:\s*var\(--([a-z0-9-]+)\)/.exec(rule[1]);
+    // Граница слева обязательна: без неё `color:` матчится внутри
+    // `border-color:` — и тест считает контраст заливки с самой собой (1.00:1).
+    const fgTok = /(?:^|[;{\s])color:\s*var\(--([a-z0-9-]+)\)/.exec(rule[1]);
+    assert.ok(bgTok && fgTok, '.preset-slot.active: заливка и цвет цифры должны быть ТОКЕНАМИ, а не литералами');
+
+    const dark = contrast(
+        composite(darkToken(fgTok[1]), parseColor(darkToken(bgTok[1])).rgb),
+        parseColor(darkToken(bgTok[1])).rgb
+    );
+    const light = contrast(
+        composite(hcToken(fgTok[1]), parseColor(hcToken(bgTok[1])).rgb),
+        parseColor(hcToken(bgTok[1])).rgb
+    );
+    console.log(`   .preset-slot.active: тёмная ${dark.toFixed(2)}:1, светлая ${light.toFixed(2)}:1 `
+        + `(--${fgTok[1]} на --${bgTok[1]})`);
+    assert.ok(dark >= AA_NORMAL,
+        `тёмная тема: цифра --${fgTok[1]} на --${bgTok[1]} даёт ${dark.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+    assert.ok(light >= 7.0,
+        `светлая тема: цифра --${fgTok[1]} на --${bgTok[1]} даёт ${light.toFixed(2)}:1, нужно 7:1`);
+
+    // И проверка САМА СЕБЯ: белая цифра в тёмной теме обязана этот порог НЕ
+    // проходить — иначе тест зелен и на неверном выборе цвета тоже.
+    const white = contrast(composite('#ffffff', parseColor(darkToken(bgTok[1])).rgb), parseColor(darkToken(bgTok[1])).rgb);
+    assert.ok(white < AA_NORMAL,
+        `белая цифра на --${bgTok[1]} даёт ${white.toFixed(2)}:1 — порог перестал что-либо различать`);
+});

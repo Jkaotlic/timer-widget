@@ -617,6 +617,12 @@ body.style-analog .info-block .mini-tick.quarter {
    Правило CSS перебивает атрибут `stop-color`, поэтому в разметке он снят:
    два владельца одного значения — ровно то, из-за чего разъезжаются копии
    (тем же приёмом уже живёт #widgetGradient в виджете). */
+/* Основной градиент кольца — теми же переменными и с теми же значениями по
+   умолчанию, что у виджета и часов: одна механика окраски кольца на три окна.
+   Правило CSS сильнее презентационного атрибута, поэтому цвет СНИМАЕТСЯ вместе
+   с переменной — ради этого правило и заведено (см. applyColors). */
+#mainGradient stop:first-child { stop-color: var(--timer-color-stop, #0a84ff); }
+#mainGradient stop:last-child  { stop-color: var(--progress-color-stop, #30d158); }
 #dangerGradient stop:first-child  { stop-color: var(--tw-band-danger); }
 #dangerGradient stop:last-child   { stop-color: var(--tw-band-danger-deep); }
 #warningGradient stop:first-child { stop-color: var(--tw-band-warning); }

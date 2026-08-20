@@ -1167,7 +1167,12 @@ ipcMain.on('control-collapse', (_event, payload) => {
         controlBoundsBeforeCollapse = controlWindow.getBounds();
         const { x, y } = controlBoundsBeforeCollapse;
         controlWindow.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, 1);
-        controlWindow.setSize(curW, barHeight);
+        // Ширину задаёт СОДЕРЖИМОЕ полосы: в ней время, четыре ячейки вида,
+        // замок и управление отсчётом, и на 400px этот набор не помещается.
+        // Пол, а не размер: окно шире пола сворачивается со своей шириной, а
+        // разворот всё равно вернёт прежние границы целиком.
+        const barWidth = Math.max(curW, CONFIG.CONTROL_BAR_MIN_WIDTH);
+        controlWindow.setSize(barWidth, barHeight);
         controlWindow.setPosition(x, y);   // держим ВЕРХНИЙ край
         controlWindow.setAlwaysOnTop(true);
         return;
