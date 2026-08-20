@@ -316,3 +316,23 @@ test('синхронизация стилей учитывается: стиль
     assert.equal(synced.doc.rows.clockTicksRow.style.display, 'flex');
     delete global.document;
 });
+
+test('сброс окна обнуляет ВСЕ поля цвета, а не те, что вспомнили', () => {
+    // 20.08.2026: «Сбросить всё» оставляло поле `bg` — в panel-reset.js лежала
+    // СВОЯ копия списка полей, и в ней его не было. Список теперь один, у
+    // сборщика; тест проверяет, что сброс перечисляет именно его.
+    const { COLOR_FIELDS, mergeColors } = require(path.join(ROOT, 'panel-colors.js'));
+    const reset = fs.readFileSync(path.join(ROOT, 'panel-reset.js'), 'utf8');
+    assert.match(codeOnly(reset), /window\.PanelColorFields/,
+        'сброс перечисляет поля цвета сам — это вторая копия списка');
+
+    // И сама операция: патч из всех полей не оставляет от объекта ничего.
+    const patch = {};
+    for (const field of COLOR_FIELDS) { patch[field] = null; }
+    const full = { timer: '#fff', progress: '#000', bg: '#0f0c29', surface: '#123456', surfaceAlpha: 0.4 };
+    assert.deepEqual(mergeColors(full, patch), {}, 'после сброса в объекте цветов что-то осталось');
+    // Список не должен молча усохнуть: поля, которые окна реально читают.
+    for (const field of ['timer', 'progress', 'surface', 'surfaceAlpha', 'bg']) {
+        assert.ok(COLOR_FIELDS.includes(field), `поле ${field} выпало из списка полей цвета`);
+    }
+});

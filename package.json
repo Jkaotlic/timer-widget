@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -134,6 +134,7 @@
       "digits-style.js",
       "font-select.js",
       "sound-bank.js",
+      "sound-presets.js",
       "ui-feedback.js",
       "scale-input.js",
       "color-picker.js",

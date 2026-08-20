@@ -71,9 +71,14 @@ const PanelResetMixin = {
 
         // Цвета — тем же единственным сборщиком, что и всё остальное:
         // null означает «удали поле», то есть верни владельцу-CSS.
-        this.updateColors(target, {
-            timer: null, progress: null, surface: null, surfaceAlpha: null
-        });
+        //
+        // СПИСОК ПОЛЕЙ берётся у сборщика (panel-colors.js), а не перечисляется
+        // здесь. Своя копия списка уже подвела: поля `bg` в ней не было, и оно
+        // переживало «Сбросить всё» — то есть кнопка возвращала к заводскому
+        // виду не всё, а всё, кроме одного.
+        const patch = {};
+        for (const field of window.PanelColorFields) { patch[field] = null; }
+        this.updateColors(target, patch);
 
         this.saveExtSettings();
         this.pushResetTarget(target);

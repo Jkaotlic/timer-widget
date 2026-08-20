@@ -86,9 +86,19 @@ test('пустое хранилище даёт документированны�
     assert.equal(applied.showTimeLeft, false);
     assert.equal(applied.showEventTitle, false);
     assert.equal(applied.syncClockStyle, false, 'синхронизация стиля часов по умолчанию ВЫКЛЮЧЕНА');
-    // Значения.
-    assert.equal(applied.soundOverrunPreset, 'triple');
-    assert.equal(applied.soundStartPreset, 'none');
+    // Значения. Звуки событий 20.08.2026: у каждого события умолчанием стоит
+    // звук, НАПИСАННЫЙ под него. До этого три события из четырёх молчали, а
+    // перерасход подавал «тройной сигнал» — набор бипов из общего списка.
+    assert.equal(applied.soundOverrunPreset, 'overrun-alert');
+    assert.equal(applied.soundStartPreset, 'start-boost');
+    assert.equal(applied.soundEndPreset, 'finish-chime');
+    assert.equal(applied.soundMinutePreset, 'minute-mark');
+    // И это не выдуманные имена: каждое обязано быть в банке.
+    const { BUILT_IN_PRESETS } = require(path.join(__dirname, '..', 'sound-bank.js'));
+    for (const key of ['soundStartPreset', 'soundEndPreset', 'soundMinutePreset', 'soundOverrunPreset']) {
+        assert.ok(BUILT_IN_PRESETS.includes(applied[key]),
+            `умолчание ${key} = ${applied[key]} не реализовано в банке звуков`);
+    }
     assert.equal(applied.bgGrad2, '#302b63');
     assert.equal(applied.eventTime, '10:00');
     assert.equal(applied.endTime, '12:00');
@@ -399,4 +409,32 @@ test('у каждого ряда есть известный владелец, �
         const count = SETTINGS_DESCRIPTORS.filter((r) => r.owner === owner).length;
         assert.ok(count > 0, `у окна ${owner} нет ни одной своей настройки`);
     }
+});
+
+test('resetKeys возвращает к умолчанию ТОЛЬКО названные ключи', () => {
+    // 20.08.2026: «Сбросить фон по умолчанию» перечисляла значения фона
+    // литералами прямо в обработчике — третья копия того, что уже описано
+    // таблицей (`bgSolid`, `bgGrad1`, `bgGrad2`). Копия и разошлась бы первой:
+    // умолчание правят в таблице, а кнопка продолжает возвращать старое.
+    const doc = fakeDoc();
+    doc._get('bgSolidColor').value = '#8b0000';
+    doc._get('bgGrad1').value = '#111111';
+    doc._get('displayTimerScale').value = '250';
+
+    const applied = Schema.resetKeys(['bgSolid', 'bgGrad1', 'bgGrad2'], doc);
+
+    assert.deepEqual(Object.keys(applied).sort(), ['bgGrad1', 'bgGrad2', 'bgSolid']);
+    assert.equal(doc._get('bgSolidColor').value, '#0f0c29');
+    assert.equal(doc._get('bgGrad1').value, '#0f0c29');
+    assert.equal(doc._get('bgGrad2').value, '#302b63');
+    // Чужая настройка не тронута: сброс фона — это сброс фона.
+    assert.equal(doc._get('displayTimerScale').value, '250', 'resetKeys задел ключ, которого его не просили');
+});
+
+test('resetKeys и resetOwnedSettings — одна механика сброса контрола', () => {
+    // Две функции, но знание «как вернуть контрол к умолчанию» одно: чекбокс
+    // ставится в checked, остальные — в value, у ползунка обновляется подпись.
+    const source = fs.readFileSync(path.join(__dirname, '..', 'settings-schema.js'), 'utf8');
+    const resets = source.match(/el\.checked = !!descriptor\.def/g) || [];
+    assert.equal(resets.length, 1, 'механика сброса контрола скопирована ещё раз');
 });

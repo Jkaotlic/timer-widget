@@ -49,6 +49,20 @@
             <span class="mini-dot" id="miniBarDot" aria-hidden="true"></span>
             <span class="mini-time" id="miniBarTime">00:00</span>
             <span class="mini-spacer"></span>
+            <!-- Пресеты вида и замок — В ПОЛОСЕ, потому что полоса и есть режим
+                 «всё настроено, идёт мероприятие»: именно там нужно быстро
+                 переключить вид и запретить случайные сдвиги, не разворачивая
+                 окно. Кнопки те же самые (те же id-префиксы и та же привязка),
+                 второго владельца состояния нет — см. panel-presets.js и
+                 panel-titlebar.js. -->
+            <span class="mini-presets" role="group" aria-label="Пресеты вида">
+                <button class="preset-slot mini-preset" id="miniPresetSlot1" type="button">1</button>
+                <button class="preset-slot mini-preset" id="miniPresetSlot2" type="button">2</button>
+                <button class="preset-slot mini-preset" id="miniPresetSlot3" type="button">3</button>
+                <button class="preset-slot mini-preset" id="miniPresetSlot4" type="button">4</button>
+            </span>
+            <button class="mini-btn" id="miniBarLock" type="button" aria-pressed="false" title="Закрепить положение" aria-label="Закрепить положение">🔓</button>
+            <span class="mini-divider"></span>
             <!-- Действие названо СЛОВОМ, а не глифом. Кнопок по-прежнему две
                  (за ними висят разные обработчики), на экране всегда одна:
                  выбирает то же состояние, что и в развёрнутой панели. -->
@@ -191,7 +205,7 @@
         </div>
 
         <!-- ВИД ЦЕЛИКОМ в четырёх ячейках. Клик применяет, Shift+клик пишет; почему одна кнопка на два действия — в panel-presets.js. -->
-        <div class="preset-row" role="group" aria-label="Пресеты вида"><span class="preset-caption" title="В ячейке — весь вид: стили окон, блоки дисплея и их места, раскладка, цвета, шрифты и масштабы">Вид</span><button class="preset-slot" id="presetSlot1" type="button">1</button><button class="preset-slot" id="presetSlot2" type="button">2</button><button class="preset-slot" id="presetSlot3" type="button">3</button><button class="preset-slot" id="presetSlot4" type="button">4</button><span class="preset-hint">Клик по пустой ячейке — запомнить вид, по заполненной — применить. Shift+клик — заменить, Ctrl+1–4 — то же с клавиатуры</span></div>
+        <div class="preset-row" role="group" aria-label="Пресеты вида"><span class="preset-caption" id="presetCaption" title="В ячейке — весь вид: стили окон, блоки дисплея и их места, раскладка, цвета, шрифты и масштабы">Вид</span><button class="preset-slot" id="presetSlot1" type="button">1</button><button class="preset-slot" id="presetSlot2" type="button">2</button><button class="preset-slot" id="presetSlot3" type="button">3</button><button class="preset-slot" id="presetSlot4" type="button">4</button><span class="preset-hint">Залитая ячейка — этот вид сейчас на экране; «свой» значит, что вы настроили его руками. Клик по пустой — запомнить, по заполненной — применить, Shift+клик — заменить, Ctrl+1–4 — то же с клавиатуры</span></div>
 
         <!-- Подсказка клавиш моноширинным, по центру — последняя строка панели. -->
         <div class="panel-footer" id="panelFooter">Space — старт · R — сброс · 1–4 — пресеты</div>
@@ -209,7 +223,7 @@
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><rect x="7.5" y="7.5" width="6.5" height="6.5" rx="1.5"/></svg></span>
-                            Стиль виджета
+                            Стиль
                         </div>
                         <!-- .setting-block, а не .toggle-row: пять сегментов не
                              помещаются в правую половину flex-строки ни при какой
@@ -272,7 +286,7 @@
                     <div class="settings-group">
                         <div class="settings-group-title">
                             <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2s4 4.3 4 6.9a4 4 0 0 1-8 0c0-2.6 4-6.9 4-6.9z"/></svg></span>
-                            Цвета виджета
+                            Цвета
                         </div>
                         <div class="themes-grid" id="themesGrid"></div>
                     <div class="color-picker-panel" id="widgetColorPickerPanel">
@@ -311,26 +325,7 @@
                             <span class="sound-name">Старт</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundStartPreset" aria-label="Звук старта">
-                                <option value="none">— без звука —</option>
-                                <optgroup label="Стандартные">
-                                    <option value="beep-short">Короткий бип</option>
-                                    <option value="beep-long">Длинный бип</option>
-                                    <option value="triple">Тройной сигнал</option>
-                                    <option value="chirp">Чирп</option>
-                                    <option value="bell">Колокольчик</option>
-                                    <option value="ding">Динь</option>
-                                    <option value="whoosh">Свист</option>
-                                    <option value="click">Клик</option>
-                                    <option value="chime">Перезвон</option>
-                                    <option value="notification">Нотификация</option>
-                                    <option value="rising">Нарастающий</option>
-                                    <option value="pulse">Пульс</option>
-                                    <option value="drum-roll">Барабанная дробь</option>
-                                    <option value="epic-brass">Эпичная труба</option>
-                                    <option value="air-horn">Воздушный рожок</option>
-                                    <option value="metal-strike">Металлический удар</option>
-                                </optgroup>
-                                <optgroup label="Ваши звуки" id="customSoundsGroupStart"></optgroup>
+                                <!-- Список строит sound-presets.js: набор один на четыре события -->
                               </select>
                             </div>
                             <button class="sound-preview" id="soundStartPreview" title="Прослушать" aria-label="Прослушать">▶</button>
@@ -344,32 +339,7 @@
                             <span class="sound-name">Окончание</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundEndPreset" aria-label="Звук окончания">
-                                <option value="none">— без звука —</option>
-                                <optgroup label="Стандартные">
-                                    <option value="beep-short">Короткий бип</option>
-                                    <option value="beep-long">Длинный бип</option>
-                                    <option value="triple">Тройной сигнал</option>
-                                    <option value="chirp">Чирп</option>
-                                    <option value="bell">Колокольчик</option>
-                                    <option value="ding">Динь</option>
-                                    <option value="alarm">Будильник</option>
-                                    <option value="fanfare">Фанфары</option>
-                                    <option value="gong">Гонг</option>
-                                    <option value="chime">Перезвон</option>
-                                    <option value="complete">Завершение</option>
-                                    <option value="notification">Нотификация</option>
-                                    <option value="drop">Падающий тон</option>
-                                    <option value="cymbal">Тарелки</option>
-                                    <option value="deep-gong">Глубокий гонг</option>
-                                    <option value="air-horn">Воздушный рожок</option>
-                                    <option value="siren">Сирена</option>
-                                    <option value="church-bell">Церковный колокол</option>
-                                    <option value="drum-roll">Барабанная дробь</option>
-                                    <option value="ship-horn">Корабельный гудок</option>
-                                    <option value="metal-strike">Металлический удар</option>
-                                    <option value="epic-brass">Эпичная труба</option>
-                                </optgroup>
-                                <optgroup label="Ваши звуки" id="customSoundsGroupEnd"></optgroup>
+                                <!-- Список строит sound-presets.js: набор один на четыре события -->
                               </select>
                             </div>
                             <button class="sound-preview" id="soundEndPreview" title="Прослушать" aria-label="Прослушать">▶</button>
@@ -383,23 +353,7 @@
                             <span class="sound-name">Минута</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundMinutePreset" aria-label="Звук за минуту до конца">
-                                <option value="none">— без звука —</option>
-                                <optgroup label="Стандартные">
-                                    <option value="beep-short">Короткий бип</option>
-                                    <option value="beep-long">Длинный бип</option>
-                                    <option value="triple">Тройной сигнал</option>
-                                    <option value="chirp">Чирп</option>
-                                    <option value="bell">Колокольчик</option>
-                                    <option value="ding">Динь</option>
-                                    <option value="tick">Тик</option>
-                                    <option value="soft-alert">Мягкий сигнал</option>
-                                    <option value="countdown-tick">Обратный отсчёт</option>
-                                    <option value="pulse">Пульс</option>
-                                    <option value="notification">Нотификация</option>
-                                    <option value="metal-strike">Металлический удар</option>
-                                    <option value="church-bell">Церковный колокол</option>
-                                </optgroup>
-                                <optgroup label="Ваши звуки" id="customSoundsGroupMinute"></optgroup>
+                                <!-- Список строит sound-presets.js: набор один на четыре события -->
                               </select>
                             </div>
                             <button class="sound-preview" id="soundMinutePreview" title="Прослушать" aria-label="Прослушать">▶</button>
@@ -413,34 +367,14 @@
                             <span class="sound-name">Перерасход</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="soundOverrunPreset" aria-label="Звук овертайма">
-                                <option value="none">— без звука —</option>
-                                <optgroup label="Стандартные">
-                                    <option value="beep-short">Короткий бип</option>
-                                    <option value="beep-long">Длинный бип</option>
-                                    <option value="triple" selected>Тройной сигнал</option>
-                                    <option value="chirp">Чирп</option>
-                                    <option value="bell">Колокольчик</option>
-                                    <option value="ding">Динь</option>
-                                    <option value="alarm">Будильник</option>
-                                    <option value="soft-alert">Мягкий сигнал</option>
-                                    <option value="countdown-tick">Обратный отсчёт</option>
-                                    <option value="rising">Нарастающий</option>
-                                    <option value="pulse">Пульс</option>
-                                    <option value="cymbal">Тарелки</option>
-                                    <option value="siren">Сирена</option>
-                                    <option value="air-horn">Воздушный рожок</option>
-                                    <option value="deep-gong">Глубокий гонг</option>
-                                    <option value="ship-horn">Корабельный гудок</option>
-                                    <option value="metal-strike">Металлический удар</option>
-                                </optgroup>
-                                <optgroup label="Ваши звуки" id="customSoundsGroupOverrun"></optgroup>
+                                <!-- Список строит sound-presets.js: набор один на четыре события -->
                               </select>
                             </div>
                             <button class="sound-preview" id="soundOverrunPreview" title="Прослушать" aria-label="Прослушать">▶</button>
                           </div>
 
                           <div class="sound-item sound-sub-item">
-                            <span class="sound-sub-name">↳ каждые</span>
+                            <span class="sound-sub-name">повторять каждые</span>
                             <div class="select-wrap">
                               <select class="sound-select" id="overrunIntervalMinutes" aria-label="Интервал сигналов овертайма в минутах">
                                   <option value="1">1 мин</option>
@@ -461,7 +395,7 @@
                         <div class="settings-group-title">
                             <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12V4l7-1.4v8"/><circle cx="4.3" cy="12" r="1.8"/><circle cx="11.3" cy="10.6" r="1.8"/></svg></span>
                             Ваши звуки
-                            <span class="sound-formats">mp3 · wav · ogg · aac · flac · до 5 МБ</span>
+                            <span class="sound-formats">mp3, wav, ogg, aac, flac · до 5 МБ</span>
                         </div>
                         <div class="custom-sound-list" id="customSoundList"></div>
                         <div class="sound-err" id="soundUploadError">
@@ -496,7 +430,7 @@
                         <div class="settings-group">
                             <div class="settings-group-title">
                                 <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><rect x="7.5" y="7.5" width="6.5" height="6.5" rx="1.5"/></svg></span>
-                                Стиль часов
+                                Стиль
                             </div>
                             <!-- Чекбокс синхронизации ОБЯЗАН быть видимым. Логику
                                  «assignment .value не порождает change» починили в
@@ -562,7 +496,7 @@
                         <div class="settings-group">
                             <div class="settings-group-title">
                                 <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2s4 4.3 4 6.9a4 4 0 0 1-8 0c0-2.6 4-6.9 4-6.9z"/></svg></span>
-                                Цвета часов
+                                Цвета
                             </div>
                             <div class="themes-grid" id="clockThemesGrid"></div>
                             <div class="color-picker-panel" id="clockColorPickerPanel">
@@ -1099,7 +1033,7 @@
                      tests/faq-help.test.js падает при расхождении. Здесь стояло
                      v2.1.1 при фактических 2.3.2 — проверить это глазами было
                      нельзя, подвал справки не открывался вместе с ней. -->
-                <span id="appVersion">TimerWidget v2.5.0</span>
+                <span id="appVersion">TimerWidget v2.6.0</span>
                 <!-- Ссылка, а не запрос: см. onboarding.js -->
                 <button class="reset-btn" id="checkUpdatesBtn" type="button">Проверить обновления</button>
                 <button class="reset-btn" id="resetSettingsBtn">Сбросить настройки</button>
@@ -1133,6 +1067,7 @@
     <script src="clock-settings-schema.js"></script>
     <script src="display-layouts.js"></script>
     <script src="sound-bank.js"></script>
+    <script src="sound-presets.js"></script>
     <script src="ui-feedback.js"></script>
     <script src="scale-input.js"></script>
     <script src="color-picker.js"></script>
@@ -1203,6 +1138,10 @@
                     bg: '#0f0c29'
                 };
 
+                // Списки звуков строятся ДО чтения настроек: applyStoredSettings
+                // ставит select.value, а значение без <option> браузер молча
+                // отбрасывает — выбранный звук превратился бы в «— без звука —».
+                window.SoundPresets.buildSoundSelects(document);
                 this.initElements();
                 this.initTabs();
                 this.initThemes();
@@ -1860,22 +1799,24 @@
                 const resetStyleBtn = document.getElementById('resetStyleBtn');
                 if (resetStyleBtn) {
                     resetStyleBtn.addEventListener('click', () => {
-                        document.getElementById('bgSolidColor').value = '#0f0c29';
-                        document.getElementById('bgGrad1').value = '#0f0c29';
-                        document.getElementById('bgGrad2').value = '#302b63';
+                        // Кнопка сбрасывает ФОН и только его: она стоит в разделе
+                        // фона полноэкранного окна. Раньше последней строкой она
+                        // кликала ПЕРВЫЙ свотч темы в документе, а первый
+                        // принадлежит сетке ВИДЖЕТА, — и сброс фона дисплея
+                        // перекрашивал соседнее окно в тему «Синий», которая к
+                        // тому же не заводская: на чистом профиле ключа
+                        // widgetColors нет вовсе.
+                        //
+                        // Значения берутся из таблицы настроек, а не литералами:
+                        // умолчание правят в ней, и третья копия разошлась бы с
+                        // ней молча.
+                        window.SettingsSchema.resetKeys(['bgSolid', 'bgGrad1', 'bgGrad2'], document);
                         // «По умолчанию» — это то, что стоит на чистом профиле,
-                        // а там теперь «По теме». Кнопка, возвращающая не то же
-                        // самое, что новая установка, — это две разные правды.
+                        // а там «По теме». Кнопка, возвращающая не то же самое,
+                        // что новая установка, — это две разные правды. Клик по
+                        // режиму сохраняет настройки и шлёт их окну.
                         const themeModeBtn = document.querySelector('.bg-mode-btn[data-mode="theme"]');
                         if (themeModeBtn) { themeModeBtn.click(); }
-                        // FIX BUG-023: Optimize - clear active button reference
-                        if (this.activeThemeButton) {
-                            this.activeThemeButton.classList.remove('active');
-                            this.activeThemeButton = null;
-                        }
-                        // Применить первую тему по умолчанию
-                        const firstTheme = document.querySelector('.theme-btn');
-                        if (firstTheme) {firstTheme.click();}
                     });
                 }
 
@@ -1973,6 +1914,11 @@
                 // выражается: собственный формат двух ключей, побочные эффекты
                 // (видимость строк, отправка в окна) и поля контроллера.
                 const applied = window.SettingsSchema.applyStoredSettings(ext, document);
+                // Выбранного звука могло не стать: пресет убрали из набора или
+                // пользователь удалил свой файл. Тогда браузер молча показывает
+                // первый пункт, а в хранилище лежит другое — событие беззвучно,
+                // а настройка утверждает обратное. Чинит sound-presets.js.
+                window.SoundPresets.repairSelection(document, window.SettingsSchema);
 
                 // Слитый стиль. Профиль мог хранить `digital` (LED) — стиля с
                 // таким именем больше нет ни в одном окне, и сегментированный
@@ -2110,6 +2056,7 @@
                 }
                 // Backward compat (localStorage only, no global IPC broadcast)
                 localStorage.setItem('timerColors', JSON.stringify(this.currentColors));
+                this.refreshPresetMarks();
             }
 
             saveExtSettings() {
@@ -2131,6 +2078,16 @@
                 // Подписи строк — производная от этих же настроек (почему здесь,
                 // а не в пяти обработчиках, — в renderWindowRows).
                 this.renderWindowRows();
+                // И отметка «этот пресет сейчас на экране»: она вычисляется
+                // сравнением снимка с профилем, а профиль только что изменился.
+                this.refreshPresetMarks();
+            }
+
+            // Отметка «этот вид сейчас на экране» вычисляется сравнением с
+            // профилем, поэтому зовётся из КАЖДОГО места, где панель пишет его
+            // ключи. Метод — чтобы таких мест не стало три разных строки.
+            refreshPresetMarks() {
+                if (window.presetsApi) { window.presetsApi.refresh(); }
             }
 
             pushOverrunLimit() {
@@ -2238,6 +2195,7 @@
                 // стирала чужие поля.
                 const prevClock = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
                 localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prevClock, ...persisted }));
+                this.refreshPresetMarks();
 
                 ipcRenderer.send('clock-widget-settings', settings);
             }

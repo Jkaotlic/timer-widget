@@ -22,27 +22,43 @@
  */
 
 /**
+ * Где живут кнопки замка: титлбар развёрнутой панели и свёрнутая полоса.
+ * Величина одна, поэтому и привязка одна — на оба места.
+ */
+const LOCK_BUTTON_IDS = ['lockToggle', 'miniBarLock'];
+
+/**
  * @param {object} deps
  * @param {Document} deps.doc      документ панели
  * @param {object|null} deps.ipc   ipcRenderer (в браузере без Electron — null)
  * @param {object} deps.lock       модуль замка (window.UILock)
- * @param {string} [deps.buttonId] id кнопки
+ * @param {string|string[]} [deps.buttonId] id кнопки (или несколько)
  * @returns {{ set: (locked:boolean) => void, get: () => boolean }|null}
  */
-function bindLockToggle({ doc, ipc, lock, buttonId = 'lockToggle' }) {
-    const button = doc && doc.getElementById ? doc.getElementById(buttonId) : null;
-    if (!button || !lock) { return null; }
+function bindLockToggle({ doc, ipc, lock, buttonId = LOCK_BUTTON_IDS }) {
+    const ids = Array.isArray(buttonId) ? buttonId : [buttonId];
+    const buttons = [];
+    for (const id of ids) {
+        const el = doc && doc.getElementById ? doc.getElementById(id) : null;
+        if (el) { buttons.push(el); }
+    }
+    if (!buttons.length || !lock) { return null; }
 
     const label = (locked) => (locked ? 'Открепить положение' : 'Закрепить положение');
 
+    // Кнопок может быть несколько (титлбар и свёрнутая полоса), но состояние
+    // одно: красятся ВСЕ, иначе щелчок в полосе оставил бы титлбар с прежним
+    // глифом — два ответа на вопрос «заперто ли».
     const sync = (locked) => {
-        button.setAttribute('aria-pressed', String(locked));
-        button.classList.toggle('active', locked);
-        // Глиф — ВТОРОЙ признак состояния помимо цвета: индикатор, отличимый
-        // только цветом, в этом проекте уже был отдельным дефектом.
-        button.textContent = locked ? '🔒' : '🔓';
-        button.title = label(locked);
-        button.setAttribute('aria-label', label(locked));
+        for (const button of buttons) {
+            button.setAttribute('aria-pressed', String(locked));
+            button.classList.toggle('active', locked);
+            // Глиф — ВТОРОЙ признак состояния помимо цвета: индикатор, отличимый
+            // только цветом, в этом проекте уже был отдельным дефектом.
+            button.textContent = locked ? '🔒' : '🔓';
+            button.title = label(locked);
+            button.setAttribute('aria-label', label(locked));
+        }
     };
 
     const set = (locked) => {
@@ -56,7 +72,9 @@ function bindLockToggle({ doc, ipc, lock, buttonId = 'lockToggle' }) {
     };
 
     sync(lock.readLock());
-    button.addEventListener('click', () => set(!lock.readLock()));
+    for (const button of buttons) {
+        button.addEventListener('click', () => set(!lock.readLock()));
+    }
 
     // Состояние уезжает в окна и при старте панели: окно, открытое ПОСЛЕ
     // включения замка, иначе осталось бы единственным подвижным — тот же
@@ -104,7 +122,7 @@ function bindThemeToggle({ doc, ipc, theme, buttonId = 'contrastToggle' }) {
     return { set };
 }
 
-const PanelTitlebar = { bindLockToggle, bindThemeToggle };
+const PanelTitlebar = { bindLockToggle, bindThemeToggle, LOCK_BUTTON_IDS };
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PanelTitlebar;

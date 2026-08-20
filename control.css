@@ -587,20 +587,20 @@ body::after {
 /* Карточки в ящике — БЕЛЫЕ на сером фоне ящика; внутри них контролы серые.
    Ступень 1 (#f5f5f7) на сером ящике (#f2f2f7) отличалась бы на три единицы
    яркости, то есть карточкой не читалась бы вовсе. */
-[data-theme="light"] .settings-group,
-[data-theme="light"] .sound-item,
-[data-theme="light"] .sound-empty {
+[data-theme="light"] .settings-group {
     background: var(--tw-bg-glass);
     border: 1px solid var(--tw-border);
 }
-[data-theme="light"] .sound-sub-item {
-    background: transparent;
-    border: 0;
-}
+/* Строки звуков и пустой список карточками больше НЕ являются (20.08.2026):
+   переопределять в светлой теме нечего, а оставленное правило вернуло бы забор
+   ровно в одной теме — самый неприятный вид расхождения. */
+/* Подсказка тихая и в светлой теме: голубая заливка с синей кромкой делала её
+   самым ярким пятном вкладки, хотя это справка. Нейтральная ступень — та же
+   роль, что у тёмной темы, и одинаковый вес в обеих. */
 [data-theme="light"] .settings-hint {
-    background: rgba(0, 83, 174, 0.06);
-    border: 1px solid rgba(0, 83, 174, 0.22);
-    color: var(--tw-fg-secondary);
+    background: var(--tw-level-1);
+    border: 0;
+    color: var(--tw-fg-dim);
 }
 [data-theme="light"] .settings-hint kbd {
     color: var(--tw-fg);
@@ -612,9 +612,7 @@ body::after {
 /* --- Белый текст, зашитый литералами. На белом фоне он попросту исчезает --- */
 [data-theme="light"] .drawer-head::before,
 [data-theme="light"] .drawer-body .settings-group-title,
-[data-theme="light"] .sound-formats,
-[data-theme="light"] .sound-empty,
-[data-theme="light"] .sound-empty::before {
+[data-theme="light"] .sound-formats {
     color: var(--tw-fg-dim);
 }
 /* Крестик описан белыми литералами, а светлая тема перекрывала у него ТОЛЬКО
@@ -746,13 +744,11 @@ body::after {
    стала призрачной и описана токенами (--tw-border, --tw-fg-muted,
    --tw-level-2), которые сами меняются вместе с темой. Заливка акцентом в
    светлой теме вернула бы ровно то, от чего кнопку и уводили. */
-[data-theme="light"] .drawer-body #tab-sound .add-sound-btn {
-    background: rgba(0, 83, 174, 0.05);
-    border: 1.5px dashed rgba(0, 83, 174, 0.35);
-}
-[data-theme="light"] .drawer-body #tab-sound .add-sound-btn .drop-icon {
-    background: var(--tw-blue);
-    color: var(--tw-on-accent);
+/* Зона загрузки в покое нейтральна в ОБЕИХ темах (20.08.2026): акцент
+   включается на наведении и когда файл уже над зоной. Переопределений светлой
+   темы больше нет — они возвращали бы акцент ровно в одной теме. */
+[data-theme="light"] .drawer-body #tab-sound .add-sound-btn:hover {
+    background: color-mix(in srgb, var(--tw-blue) 8%, transparent);
 }
 [data-theme="light"] .custom-titlebar .titlebar-help.active {
     background: var(--tw-blue);
@@ -1322,18 +1318,30 @@ body::after {
 .sound-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 0;
 }
+/* СТРОКА, А НЕ КАРТОЧКА. До 20.08.2026 каждый звук был коробкой с заливкой и
+   рамкой: четыре подряд читались как забор, а вкладка — как список контейнеров,
+   а не как список звуков. Редизайн панели 12.08.2026 уже принял правило «ни
+   одной карточки и ни одной рамки: поверхности разделяют расстояние и одна
+   заливка», и эта вкладка была последней, где оно не действовало.
+
+   Разделитель — одна линия между строками, у последней её нет: линия нужна как
+   граница между соседями, а не как рамка вокруг каждого. */
 .sound-item {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 7px;
-    background: rgba(0, 0, 0, 0.28);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 10px;
+    /* 6px, а не 8: три зазора в строке — это 24px, которых не хватало списку.
+       Замер: при 8px самый длинный пункт обрезался на 4px. */
+    gap: 6px;
+    padding: 6px 2px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--tw-divider);
+    border-radius: 0;
     min-width: 0;
 }
+.sound-list > .sound-item:last-child { border-bottom: 0; }
 /* Ряд звука: переключатель — название — список — «прослушать».
    Здесь стоял .sound-check с нативным чекбоксом 14×14. Смысл у него ровно тот
    же, что у общего выключателя звука в шапке группы, а контрол был другой — и
@@ -1364,15 +1372,19 @@ body::after {
     transform: translateX(16px);
 }
 .sound-item .sound-name {
-    flex: 0 0 74px;
+    /* Колонка ФИКСИРОВАННАЯ: у событий имена разной длины («Старт» и
+       «Перерасход»), и при автоширине четыре списка начинались в четырёх разных
+       местах. Ровная вертикаль — половина ощущения «аккуратно». */
+    /* 76px — по ЗАМЕРУ: самое длинное имя события «Перерасход» занимает 72px,
+       и на 68px оно обрезалось в «Перерасх…». Шире не берём: остальное нужно
+       списку, где живут подписи звуков. */
+    flex: 0 0 76px;
     min-width: 0;
     font-size: 12px;
-    font-weight: 500;
     color: var(--tw-fg);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    user-select: none;
 }
 /* Выключенный ряд гасит и НАЗВАНИЕ: состояние читается по строке целиком, а не
    по одному контролу слева. */
@@ -1441,18 +1453,28 @@ body::after {
     box-shadow: 0 2px 6px rgba(245, 87, 108, 0.3);
 }
 .sound-item.disabled { opacity: 0.4; pointer-events: none; }
+/* Подстрока перерасхода. Раньше её привязку к строке выше обозначал глиф «↳»
+   и произвольный отступ — то есть отношение «это про перерасход» держалось на
+   символе, который ничего не значит для скринридера. Теперь подпись говорит
+   словом, а вертикаль совпадает с колонкой списков. */
 .sound-sub-item {
     background: transparent;
-    border: none;
-    padding: 2px 8px 2px 8px;
+    border: 0;
+    border-bottom: 0;
+    padding: 2px 2px 8px;
     gap: 6px;
 }
 .sound-sub-name {
-    flex: 0 0 88px;
-    font-size: 10px;
+    /* Одна колонка вместо «отступ + ширина»: 118px = тумблер 34 + зазор 8 +
+       имя события 76 при зазоре 6, поэтому список подстроки встаёт РОВНО под
+       списками строк выше. Прежняя пара «padding-left: 42 + flex 88» давала 33px расхождения —
+       замер, а не глаз: на кадре это читалось просто как «съехало». */
+    flex: 0 0 116px;
+    font-size: 11px;
     color: var(--tw-fg-dim);
     white-space: nowrap;
-    padding-left: 18px;
+    padding-left: 0;
+    text-align: right;
 }
 .sound-preview-placeholder {
     width: 28px;
@@ -1502,33 +1524,39 @@ body::after {
 
 /* Caption inside the "Ваши звуки" header (mp3 · wav · …) */
 .sound-formats {
+    /* Не моноширинный и в ОДНУ строку: моноширинный набор переносился посреди
+       «до 5 МБ» и читался как ошибка. Это подпись, а не данные. */
     margin-left: auto;
-    font-size: 9.5px;
-    font-weight: 500;
-    font-family: var(--tw-font-mono);
-    letter-spacing: 0.4px;
-    color: rgba(255, 255, 255, 0.44);
+    font-size: 10px;
+    font-family: inherit;
+    letter-spacing: 0;
     text-transform: none;
+    white-space: nowrap;
+    color: var(--tw-fg-dim);
 }
 
 /* Empty state for custom sounds list */
+/* Пустое состояние — ПОДПИСЬ, а не карточка: коробка вокруг фразы «нет
+   добавленных звуков» рисует контейнер для содержимого, которого нет. Цвета
+   токенами, а не белыми литералами: литералы жили только в тёмной теме и в
+   светлой перекрывались отдельным правилом — двумя местами на один цвет. */
 .sound-empty {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 14px 12px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.48);
+    padding: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--tw-fg-dim);
     font-size: 11.5px;
     font-weight: 500;
 }
 .sound-empty::before {
     content: "♪";
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--tw-fg-dim);
+    opacity: 0.7;
 }
 
 /* Spacing between custom list and dropzone */
@@ -1546,8 +1574,13 @@ body::after {
     column-gap: 10px;
     row-gap: 1px;
     padding: 10px 12px;
-    border: 1.5px dashed rgba(10, 132, 255, 0.36);
-    background: rgba(10, 132, 255, 0.045);
+    /* В ПОКОЕ — нейтральная. Синяя пунктирная карточка была самым громким
+       пятном вкладки, хотя загрузка файла здесь — второстепенное действие:
+       вкладка про звуки событий, а кричала «перетащите файл». Акцент включается
+       на наведении и на .drag-over, когда файл уже над зоной, — то есть ровно
+       тогда, когда обратная связь нужна. */
+    border: 1.5px dashed var(--tw-border-strong);
+    background: transparent;
     color: var(--tw-fg);
     border-radius: 11px;
     text-align: left;
@@ -1563,13 +1596,16 @@ body::after {
     width: 30px;
     height: 30px;
     border-radius: 9px;
-    background: rgba(10, 132, 255, 0.2);
-    color: var(--tw-blue);
+    background: var(--tw-level-2);
+    color: var(--tw-fg-muted);
     align-self: center;
 }
-.drawer-body #tab-sound .add-sound-btn:hover .drop-icon {
-    background: rgba(10, 132, 255, 0.28);
+.drawer-body #tab-sound .add-sound-btn:hover .drop-icon,
+.drawer-body #tab-sound .add-sound-btn.drag-over .drop-icon {
+    background: color-mix(in srgb, var(--tw-blue) 20%, transparent);
+    color: var(--tw-blue);
 }
+
 .drawer-body #tab-sound .add-sound-btn .drop-icon svg {
     width: 14px;
     height: 14px;
@@ -1707,10 +1743,14 @@ body::after {
 }
 
 /* Themes — color circle palette */
+/* Свотчей девять (восемь тем + пипетка), и при auto-fill они вставали 8 + один
+   висящий во второй строке — ряд читался как ошибка вёрстки. Пять колонок дают
+   5 + 4: обе строки заполнены, сетка ровная при любой ширине ящика. */
 .themes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
-    gap: 4px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    justify-items: center;
 }
 
 .theme-btn {
@@ -2326,6 +2366,10 @@ select optgroup,
     gap: 6px;
     width: 100%;
 }
+/* Раскладок ПЯТЬ, а колонки две: последняя кнопка висела в неполном ряду и
+   читалась как недоделанная сетка. Растягиваем её на обе колонки — ряд закрыт,
+   а какая именно кнопка растянута, роли не играет: раскладка это действие. */
+.layout-grid > .layout-btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 .layout-btn {
     padding: 7px 6px;
@@ -3707,7 +3751,12 @@ body.collapsed .app-shell::before {
 body.collapsed .mini-bar {
     display: flex;
     align-items: center;
-    gap: var(--tw-s-2);
+    /* Зазор меньше панельного: в полосе теперь девять элементов (точка, время,
+       четыре ячейки вида, замок, действие, сброс, разворот), и 8px между ними
+       съедали бы ширину, которой нет: восемь зазоров — это 24px разницы. Что
+       всё это ПОМЕЩАЕТСЯ — не мнение: ширину меряет e2e/mini-bar.spec.js на
+       живом окне и печатает запас. */
+    gap: 5px;
     height: 52px;
     padding: 0 var(--panel-inset);
     /* Полоса сама себе титлбар: её тянут за неё саму. Кнопки внутри —
@@ -3762,6 +3811,15 @@ body.collapsed .mini-bar button {
     font-size: 13px;
 }
 .mini-btn:hover { background: var(--tw-level-2); color: var(--tw-fg); }
+/* Запертый замок в полосе — тем же языком, что и применённая ячейка вида:
+   примесь акцента в подложке и акцентная кромка. Ниже :hover намеренно —
+   специфичность равная, и состояние обязано быть видно под курсором тоже.
+   Одного глифа 🔒 мало: он отличается от 🔓 на 24px деталью в пару пикселей. */
+.mini-btn.active {
+    background: color-mix(in srgb, var(--tw-blue) 18%, var(--tw-level-2));
+    border-color: var(--tw-blue);
+    color: var(--tw-fg);
+}
 .mini-btn:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 .mini-start { color: var(--tw-green); border-color: var(--tw-green); }
 
@@ -4338,10 +4396,27 @@ body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-r
     color: var(--tw-fg-dim);
     margin-right: 2px;
 }
+/* СОСТОЯНИЙ ТРИ, И ОНИ РАЗНЫЕ. До 20.08.2026 их было два — «пусто» и
+   «записан», — а третьего, «этот вид сейчас на экране», не было вовсе:
+   жалоба звучала как «не понятно, какой активный». Различаются они ЗАЛИВКОЙ,
+   а не оттенком рамки:
+
+     пусто     — ПУНКТИРНЫЙ контур, приглушённая цифра;
+     записан   — СПЛОШНОЙ контур, приподнятая заливка, полужирная цифра;
+     применён  — ЗАЛИТА акцентом, цифра обратная (цвета фона окна).
+
+   Первая версия правки (20.08.2026) отличала применённую кольцом и
+   подчёркиванием, оставляя цифру нейтральной, — и жалоба повторилась слово в
+   слово. Урок записан в разборе: «выбран один из нескольких» — это ЗАЛИВКА;
+   рамка отвечает на другой вопрос — «есть ли тут что применять».
+
+   Ловушку «акцент на акценте» это не воскрешает: цифра не синяя, а цвета фона
+   окна, и пара посчитана в обеих темах (см. правило .preset-slot.active). */
 .preset-slot {
+    position: relative;   /* под мишень-псевдоэлемент ячейки в полосе */
     flex: 1;
     height: 30px;
-    border: 1px solid var(--tw-border);
+    border: 1px dashed var(--tw-border);
     border-radius: var(--tw-r-md);
     background: transparent;
     color: var(--tw-fg-muted);
@@ -4353,15 +4428,66 @@ body.state-overtime .wrow:has(.wrow-toggle.active) .wrow-sub { color: var(--tw-r
                 border-color var(--tw-dur-base) var(--tw-ease);
 }
 .preset-slot:hover { border-color: var(--tw-blue); color: var(--tw-fg); }
-.preset-slot:focus-visible { box-shadow: var(--tw-focus-ring); }
-/* Записанная ячейка — залита и набрана жирным: два признака вместо одного. */
+/* Записанная ячейка: контур становится сплошным, поверхность — видимой. */
 .preset-slot.filled {
-    background: var(--tw-bg-surface);
-    border-color: var(--tw-blue);
+    border-style: solid;
+    border-color: var(--tw-border-strong);
+    background: var(--tw-level-1);
     color: var(--tw-fg);
     font-weight: 600;
 }
+/* Применённая — ЗАЛИТАЯ ячейка с обратной цифрой. Первая версия отличала её
+   кольцом и подчёркиванием: на кнопке 60px этого не хватило («не понятно,
+   какой профиль сейчас выбран»), и разница между «записан» и «применён»
+   читалась как оттенок рамки. Выбранный из нескольких — это заливка, а не
+   рамка.
+
+   Цвет цифры — `--tw-bg-surface`, то есть ФОН ОКНА: тема переопределяет его
+   вместе с акцентом, и одна декларация даёт верную пару в обеих. Посчитано:
+   тёмная #1e1e22 на #0a84ff — 4.55:1 (белым было бы 3.65:1, то есть провал
+   AA), светлая #ffffff на #0053ae — 7.37:1 (чёрным 2.85:1). Закреплено
+   tests/contrast.test.js, который читает ЭТО правило, а не копию литералов. */
+.preset-slot.active {
+    background: var(--tw-blue);
+    border-color: var(--tw-blue);
+    color: var(--tw-bg-surface);
+    font-weight: 700;
+}
+/* Фокус НИЖЕ состояний: он обязан быть виден и на залитой ячейке. */
+.preset-slot:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
 body.state-input .preset-row { display: none; }
+
+/* ---------- ТЕ ЖЕ ЯЧЕЙКИ В ПОЛОСЕ ----------
+   Кнопки полосы — те же .preset-slot (класс, привязка и состояния общие),
+   меняется только посадка: в 52px полосе им отведён квадрат 24×24.
+
+   Блок стоит ПОСЛЕ правил .preset-slot намеренно: специфичность равная
+   (0,1,0), и решает порядок — тот же капкан, что описан у блока «Режим
+   полоса» выше по файлу. */
+.mini-presets {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+.mini-preset {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 11px;
+    border-radius: 7px;
+    line-height: 1;
+}
+/* Мишень растёт ПСЕВДОЭЛЕМЕНТОМ, а не боксом: 24px по горизонтали держат
+   четыре ячейки в ряд, а по вертикали в полосе есть место — мишень становится
+   40px высотой. По горизонтали запас всего 1px с каждой стороны, чтобы мишени
+   соседних ячеек не наезжали друг на друга (зазор между ними 4px). */
+.mini-preset::before {
+    content: '';
+    position: absolute;
+    inset: -8px -1px;
+}
 
 .panel-footer {
     padding: 20px 20px 18px;
@@ -4460,13 +4586,24 @@ body.state-input .panel-footer { display: none; }
    Ряд из пяти значков соревновался за внимание с самими настройками. */
 .settings-group-title .icon { display: none; }
 
-/* Подсказка вверху таба — та же плоская строка, а не карточка в рамке. */
+/* Подсказка вверху таба — та же плоская строка, а не карточка в рамке.
+   И она ТИШЕ содержимого: до 20.08.2026 подсказка была самым громким пятном
+   вкладки (голубая заливка, 13px), а на «Дисплее» занимала 180px из 685 —
+   четверть высоты вкладки под инструкцию, которую читают один раз. Вес
+   перевёрнутый: инструкция кричала громче настроек. */
 .settings-hint {
     background: var(--tw-level-1);
     border: 0;
-    border-radius: 12px;
+    border-radius: 10px;
     box-shadow: none;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--tw-fg-dim);
+    padding: 8px 10px;
+    margin-bottom: 12px;
 }
+.settings-hint kbd { font-size: 10px; padding: 0 4px; }
+.settings-hint .hint-icon { opacity: 0.6; }
 
 /* Строка настройки: имя, пояснение, контрол справа. Числа из мока. */
 .toggle-row { padding: 0 0 16px; }
@@ -4650,13 +4787,19 @@ body.paused #miniBarStart { display: block; }
     flex: 1;
 }
 
+/* «Сбросить всё» — действие необратимое, поэтому набрано красным. Но красной
+   КРОМКИ у него больше нет: на вкладке это была самая большая цветная площадь,
+   и кнопка сброса перетягивала внимание с самих настроек. Сигнал несёт СЛОВО и
+   его цвет (светлая 5.38:1, тёмная 4.88:1 — обе выше порога AA), а не заливка
+   с рамкой. Кромка краснеет на наведении, когда действие уже выбирают. */
 .surface-reset.reset-all {
     color: var(--tw-red);
-    border-color: color-mix(in srgb, var(--tw-red) 35%, transparent);
+    border-color: var(--tw-border);
 }
 
 .surface-reset.reset-all:hover:not(:disabled) {
     color: var(--tw-red);
+    border-color: color-mix(in srgb, var(--tw-red) 45%, transparent);
     background: color-mix(in srgb, var(--tw-red) 12%, transparent);
 }
 
