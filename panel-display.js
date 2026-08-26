@@ -131,7 +131,12 @@ const PanelDisplayMixin = {
             displayTimerScale: parseInt(scaleEl.value, 10),
             timerStyle: styleEl.value,
             timerScale: parseInt(scaleEl.value, 10),
-            displayDigitsFont: this.displayDigitsFontEl ? this.displayDigitsFontEl.value : 'inter'
+            displayDigitsFont: this.displayDigitsFontEl ? this.displayDigitsFontEl.value : 'inter',
+            // Скрытый режим «47-й этаж». Ставка идёт СТРОКОЙ — к числу её
+            // приводит money-meter.js, один раз и одинаково для обоих счётчиков.
+            overrunPrice: this.overrunPriceEl ? this.overrunPriceEl.value : '1000',
+            overrunPeriod: this.overrunPeriodEl ? this.overrunPeriodEl.value : '3',
+            floor47Unlocked: this.isFloor47Unlocked()
         }, collectDisplayToggles(document), collectBlockLabels(document));
 
         window.ipcRenderer.send('display-settings-update', settings);
@@ -159,7 +164,10 @@ const PanelDisplayMixin = {
         if (this.eventTitleInputEl) {
             this.eventTitleInputEl.addEventListener('input', () => this.pushDisplaySettings());
         }
-        this.bindBlockLabelRows();
+        // Замок читается ДО рядов подписей: ряды спрашивают его про секретные
+        // элементы. bindFloor47 в конце сам зовёт renderFloor47, а тот —
+        // bindBlockLabelRows, поэтому второго вызова здесь нет.
+        this.bindFloor47();
     },
 
     /**
@@ -175,12 +183,224 @@ const PanelDisplayMixin = {
      * некуда. Порядок держит bindDisplayBlockControls, вызываемая при сборке
      * контроллера.
      */
+    isFloor47Unlocked() {
+        return !!(this.floor47UnlockedEl && this.floor47UnlockedEl.checked);
+    },
+
+    /**
+     * Скрытый режим «47-й этаж».
+     *
+     * Разблокировка — тройной клик по строке подсказок в подвале панели. Один
+     * жест мышью, без клавиатуры и без открытия справки; строка неинтерактивна,
+     * случайно трижды по ней не щёлкают. Это УДОБСТВО, а не защита: кто откроет
+     * профиль — увидит флаг. Настоящего замка здесь нет, и делать вид, что есть,
+     * не нужно: задача — чтобы контролы про деньги не мозолили глаза на обычных
+     * мероприятиях.
+     *
+     * `event.detail` считает браузер: у третьего клика подряд он равен 3. Свой
+     * счётчик с таймаутом был бы второй реализацией того же и разъехался бы с
+     * первой при первой же правке.
+     */
+    /**
+     * Разметка скрытого режима: секция настроек и модалка подтверждения.
+     *
+     * Строит МОДУЛЬ, а не HTML, — по тому же правилу, что ряды подписей выше и
+     * ряд «Фон» в panel-colors.js. Здесь у него есть и вторая причина:
+     * `electron-control.html` живёт под храповиком (tests/control-decomposition),
+     * и число его строк может только убывать. Пятьдесят строк статики внутри
+     * god-файла подняли бы потолок, а потолок не поднимают.
+     *
+     * Строится ДО applyStoredSettings: таблица настроек раскладывает значения
+     * по getElementById, и класть их было бы некуда. Порядок держит
+     * bindDisplayBlockControls, вызываемая при сборке контроллера.
+     */
+    buildFloor47Markup() {
+        const mount = document.getElementById('floor47Mount');
+        if (!mount || document.getElementById('floor47Section')) { return; }
+
+        const row = (labelText, forId, control) => {
+            const r = document.createElement('div');
+            r.className = 'toggle-row';
+            const label = document.createElement('label');
+            label.className = 'toggle-label';
+            label.setAttribute('for', forId);
+            label.textContent = labelText;
+            r.appendChild(label);
+            r.appendChild(control);
+            return r;
+        };
+
+        const numberInput = (id, min, step, aria) => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.id = id;
+            input.className = 'srow-input';
+            input.min = String(min);
+            input.step = String(step);
+            input.inputMode = 'numeric';
+            input.setAttribute('aria-label', aria);
+            return input;
+        };
+
+        // Тумблер повторяет разметку соседей: label.toggle-switch + чекбокс +
+        // span.toggle-slider. Без span правило CSS не находит ползунок, и
+        // чекбокс остаётся системным.
+        const toggle = (id) => {
+            const wrap = document.createElement('label');
+            wrap.className = 'toggle-switch';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.id = id;
+            const slider = document.createElement('span');
+            slider.className = 'toggle-slider';
+            wrap.appendChild(input);
+            wrap.appendChild(slider);
+            return wrap;
+        };
+
+        const section = document.createElement('div');
+        section.className = 'settings-group';
+        section.id = 'floor47Section';
+        section.hidden = true;
+
+        const title = document.createElement('div');
+        title.className = 'settings-subtitle';
+        title.textContent = 'Перелимит доклада';
+        section.appendChild(title);
+
+        section.appendChild(row('Сумма, ₽', 'overrunPrice',
+            numberInput('overrunPrice', 0, 100, 'Сумма штрафа за перелимит, рублей')));
+        section.appendChild(row('За каждые, сек', 'overrunPeriod',
+            numberInput('overrunPeriod', 1, 1, 'Период начисления штрафа, секунд')));
+        section.appendChild(row('Показывать перелимит', 'showOverrunCost', toggle('showOverrunCost')));
+        section.appendChild(row('Показывать итог', 'showTotalCost', toggle('showTotalCost')));
+
+        const actions = document.createElement('div');
+        actions.className = 'toggle-row floor47-actions';
+        for (const [id, text] of [['eventFinishBtn', 'Завершить мероприятие'], ['eventResetBtn', 'Новое мероприятие']]) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'reset-btn';
+            btn.id = id;
+            btn.textContent = text;
+            actions.appendChild(btn);
+        }
+        section.appendChild(actions);
+        section.appendChild(row('Показывать этот раздел', 'floor47Unlocked', toggle('floor47Unlocked')));
+        mount.appendChild(section);
+
+        // Модалка подтверждения — копия разметки #resetModal: подтверждения в
+        // этом проекте делаются модалкой с ловушкой фокуса (modal-manager.js),
+        // а window.confirm не используется нигде.
+        const modal = document.createElement('div');
+        modal.className = 'reset-modal';
+        modal.id = 'eventResetModal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'eventResetModalTitle');
+        const dialog = document.createElement('div');
+        dialog.className = 'reset-dialog';
+        const h3 = document.createElement('h3');
+        h3.id = 'eventResetModalTitle';
+        h3.textContent = 'Обнулить итог мероприятия?';
+        const p = document.createElement('p');
+        p.textContent = 'Накопленная сумма перелимита будет стёрта насовсем. Настройки и ставка останутся.';
+        const buttons = document.createElement('div');
+        buttons.className = 'reset-dialog-buttons';
+        for (const [id, cls, text] of [
+            ['eventResetCancel', 'reset-btn-cancel', 'Отмена'],
+            ['eventResetConfirm', 'reset-btn-confirm', 'Обнулить']
+        ]) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = cls;
+            btn.id = id;
+            btn.textContent = text;
+            buttons.appendChild(btn);
+        }
+        dialog.appendChild(h3);
+        dialog.appendChild(p);
+        dialog.appendChild(buttons);
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+    },
+
+    bindFloor47() {
+        this.buildFloor47Markup();
+        this.overrunPriceEl = document.getElementById('overrunPrice');
+        this.overrunPeriodEl = document.getElementById('overrunPeriod');
+        this.floor47UnlockedEl = document.getElementById('floor47Unlocked');
+        this.floor47SectionEl = document.getElementById('floor47Section');
+
+        const footer = document.getElementById('panelFooter');
+        if (footer) {
+            footer.addEventListener('click', (event) => {
+                if (event.detail < 3 || !this.floor47UnlockedEl) { return; }
+                this.floor47UnlockedEl.checked = true;
+                this.renderFloor47();
+                this.pushDisplaySettings();
+            });
+        }
+
+        for (const el of [this.overrunPriceEl, this.overrunPeriodEl]) {
+            if (el) { el.addEventListener('input', () => this.pushDisplaySettings()); }
+        }
+        if (this.floor47UnlockedEl) {
+            this.floor47UnlockedEl.addEventListener('change', () => {
+                this.renderFloor47();
+                this.pushDisplaySettings();
+            });
+        }
+
+        const finishBtn = document.getElementById('eventFinishBtn');
+        if (finishBtn) {
+            finishBtn.addEventListener('click', () => {
+                window.ipcRenderer.send('event-finish');
+            });
+        }
+
+        // Обнуление необратимо, поэтому спрашивается модалкой проекта:
+        // window.confirm здесь не используется нигде, зато есть три модалки с
+        // ловушкой фокуса и возвратом фокуса (modal-manager.js).
+        const resetBtn = document.getElementById('eventResetBtn');
+        const resetModal = document.getElementById('eventResetModal');
+        const resetCancel = document.getElementById('eventResetCancel');
+        const resetConfirm = document.getElementById('eventResetConfirm');
+        if (resetBtn && resetModal) {
+            resetBtn.addEventListener('click', () => window.openModal(resetModal, resetCancel));
+        }
+        if (resetCancel) {
+            resetCancel.addEventListener('click', () => window.closeModal(resetModal));
+        }
+        if (resetConfirm) {
+            resetConfirm.addEventListener('click', () => {
+                window.ipcRenderer.send('event-reset');
+                window.closeModal(resetModal);
+            });
+        }
+
+        this.renderFloor47();
+    },
+
+    /** Секция видна ровно тогда, когда режим разблокирован. */
+    renderFloor47() {
+        if (this.floor47SectionEl) {
+            this.floor47SectionEl.hidden = !this.isFloor47Unlocked();
+        }
+        // Ряды подписей строятся из реестра и знают про секретность, поэтому
+        // после смены замка их надо пересобрать.
+        this.bindBlockLabelRows();
+    },
+
     bindBlockLabelRows() {
         const mount = document.getElementById('blockLabelRows');
         const Layouts = window.DisplayLayouts;
         if (!mount || !Layouts) { return; }
         mount.textContent = '';
         for (const el of Layouts.LABELLED_ELEMENTS) {
+            // Ряд секретного элемента строится только при разблокировке: иначе
+            // поле «своё название плашки Итого» увидел бы каждый.
+            if (el.secret && !this.isFloor47Unlocked()) { continue; }
             const row = document.createElement('div');
             row.className = 'toggle-row';
 

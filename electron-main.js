@@ -26,6 +26,8 @@ const timerEngine = require('./timer-engine');
 const { createTimerController } = require('./timer-controller');
 const { fitScaledBounds, fitRestoredBounds } = require('./window-geometry');
 const recovery = require('./recovery');
+const MoneyMeter = require('./money-meter');
+const OverrunStore = require('./event-overrun-store');
 
 // Logger setup
 log.initialize();
@@ -107,12 +109,66 @@ let timerState = {
 };
 let timerInterval = null;
 
+/**
+ * Накопитель перелимита мероприятия — скрытый режим «47-й этаж».
+ *
+ * Здесь лежит единственная величина, которую нельзя пересчитать заново:
+ * секунды перелимита ЗАКРЫТЫХ докладов. Текущий перелимит в неё не входит —
+ * его дисплей считает сам из remainingSeconds, иначе одна и та же секунда
+ * оказалась бы посчитана дважды.
+ *
+ * `liveOverrunSeconds` — сколько секунд текущий доклад успел пробыть в
+ * минусе. Как только таймер выходит из минуса, эта величина ПЕРЕЕЗЖАЕТ в
+ * накопитель, и общая сумма при этом не дёргается: у дисплея из неё уходит
+ * ровно столько, сколько приходит.
+ */
+let eventOverrun = { overrunSeconds: 0, finished: false };
+let liveOverrunSeconds = 0;
+
+// Адресат один — дисплей: деньги показывает только он. Панель шлёт команды и
+// хранит ставку, но накопитель ей не нужен, и слать его туда значило бы
+// завести второе место, где живёт та же величина.
+function broadcastEventOverrun() {
+    safelySendToWindow(displayWindow, 'event-overrun-state', eventOverrun);
+}
+
+function persistEventOverrun() {
+    OverrunStore.saveStore(app.getPath('userData'), eventOverrun, log);
+}
+
+/**
+ * Учёт перелимита на каждом тике состояния таймера.
+ *
+ * Доклад «закрывается» при ЛЮБОМ выходе таймера из минуса: сброс, установка
+ * нового времени, применение пресета. Отдельного сигнала «доклад кончился» в
+ * приложении нет, и заводить его не нужно — выход из минуса и есть он.
+ *
+ * После завершения мероприятия накопитель заморожен: перелимиты в него больше
+ * не идут, пока не начато новое.
+ */
+function accrueOverrun(state) {
+    const live = MoneyMeter.overrunSeconds(state.remainingSeconds);
+    if (live > 0) {
+        liveOverrunSeconds = eventOverrun.finished ? 0 : live;
+        return;
+    }
+    if (liveOverrunSeconds <= 0) { return; }
+    eventOverrun = {
+        overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
+        finished: eventOverrun.finished
+    };
+    liveOverrunSeconds = 0;
+    persistEventOverrun();
+    broadcastEventOverrun();
+}
+
 const timerController = createTimerController({
     engine: timerEngine,
     now: Date.now,
     // FIX BUG-013: Безопасная отправка IPC сообщений
     onState: (state) => {
         timerState = state;
+        accrueOverrun(state);
         safelySendToWindow(widgetWindow, 'timer-state', state);
         safelySendToWindow(displayWindow, 'timer-state', state);
         safelySendToWindow(controlWindow, 'timer-state', state);
@@ -684,6 +740,11 @@ function createDisplayWindow(displayIndex) {
     displayWindow._displayIndex = displayIndex;
     announceWindowOpened(displayWindow, 'display-window-state', (win) => {
         safelySendToWindow(win, 'timer-state', timerState);
+        // Накопитель мероприятия — состояние, а не событие: окно,
+        // открытое посреди мероприятия, обязано узнать уже накопленное.
+        // Рассылки на изменение для этого мало — изменения может не быть
+        // до самого конца.
+        safelySendToWindow(win, 'event-overrun-state', eventOverrun);
         if (lastDisplaySettings) {
             safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
         }
@@ -935,6 +996,10 @@ app.whenReady().then(() => {
     // Recovery check before UI. Restore the FULL snapshot (remaining/total/preset)
     // so a crash mid-countdown comes back with the in-progress time intact. We never
     // auto-start (isRunning stays false); the timer simply shows where it was paused.
+    // Накопитель мероприятия читается ДО открытия окон: гидратация окна
+    // дисплея снимает ему уже прочитанное значение.
+    eventOverrun = OverrunStore.loadStore(app.getPath('userData'), log);
+
     const saved = loadSavedTimerState();
     const hasRecovery = recovery.isRecoveryValid(saved, Date.now());
     if (hasRecovery) {
@@ -1491,6 +1556,28 @@ ipcMain.on('preset-apply', (_event, payload) => {
 // переключить, окну неоткуда, и присланное им значение спорило бы с панелью.
 ipcMain.on('sound-toggle', () => {
     safelySendToWindow(controlWindow, 'sound-toggle');
+});
+
+// Завершить мероприятие принудительно: закрыть текущий перелимит и заморозить
+// итог. Полезной нагрузки нет — это ДЕЙСТВИЕ, а не настройка: величину знает
+// главный процесс, и присланная окном спорила бы с ней.
+ipcMain.on('event-finish', () => {
+    eventOverrun = {
+        overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
+        finished: true
+    };
+    liveOverrunSeconds = 0;
+    persistEventOverrun();
+    broadcastEventOverrun();
+});
+
+// Начать новое мероприятие: обнулить накопитель. Необратимо — подтверждение
+// спрашивает панель, здесь его повторять негде.
+ipcMain.on('event-reset', () => {
+    eventOverrun = { overrunSeconds: 0, finished: false };
+    liveOverrunSeconds = 0;
+    persistEventOverrun();
+    broadcastEventOverrun();
 });
 
 // Перечитать места и масштабы карточек. Payload нет: профиль общий для всех

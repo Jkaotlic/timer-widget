@@ -29,6 +29,18 @@ class DisplayTimer {
         this.isPaused = false;
         this.finished = false;
         this.overrunLimitSeconds = 0;
+
+        // Скрытый режим «47-й этаж»: накопитель приезжает каналом
+        // event-overrun-state и снимается окну на открытии — здесь только
+        // зеркало. Ставка приходит с настройками СТРОКОЙ (таблица настроек
+        // знает только 'checkbox' и 'value'), к числу её приводит money-meter.
+        this.eventOverrunSeconds = 0;
+        this.eventFinished = false;
+        this.floor47Unlocked = false;
+        this.showOverrunCost = false;
+        this.showTotalCost = false;
+        this.overrunPrice = '1000';
+        this.overrunPeriod = '3';
         this.lastTimestamp = 0;
         this.lastUpdateCounter = -1;  // FIX BUG-012: Монотонный счетчик вместо timestamp
         this.flashCount = 0;
@@ -1134,6 +1146,10 @@ class DisplayTimer {
 
         // Блоки, добавленные 17.08.2026: «До завершения» и название мероприятия.
         this.timeLeftBlock = document.getElementById('timeLeftBlock');
+        this.overrunCostBlock = document.getElementById('overrunCostBlock');
+        this.overrunCostValueEl = document.getElementById('overrunCostValue');
+        this.totalCostBlock = document.getElementById('totalCostBlock');
+        this.totalCostValueEl = document.getElementById('totalCostValue');
         this.timeLeftValueEl = document.getElementById('timeLeftValue');
         this.eventTitleBlock = document.getElementById('eventTitleBlock');
         this.eventTitleValueEl = document.getElementById('eventTitleValue');
@@ -1347,6 +1363,7 @@ class DisplayTimer {
             this.overrunLimitSeconds = Number(state.overrunLimitSeconds) || 0;
 
             this.updateDisplay();
+            this.updateMoneyBlocks();
         };
 
         this.ipcHandlers.colorsUpdate = (event, colors) => {
@@ -1375,6 +1392,17 @@ class DisplayTimer {
         this.ipcRenderer.on('display-settings-update', this.ipcHandlers.displaySettingsUpdate);
         this.ipcRenderer.on('display-layout', this.ipcHandlers.displayLayout);
 
+        // Накопитель перелимита мероприятия. Секунды, а не рубли: ставку знает
+        // это окно, и поправленная посреди мероприятия она обязана пересчитать
+        // уже накопленное.
+        this.ipcHandlers.eventOverrunState = (event, payload) => {
+            if (!payload || typeof payload !== 'object') { return; }
+            this.eventOverrunSeconds = Number(payload.overrunSeconds) || 0;
+            this.eventFinished = !!payload.finished;
+            this.updateMoneyBlocks();
+        };
+        this.ipcRenderer.on('event-overrun-state', this.ipcHandlers.eventOverrunState);
+
         // Пресет вернул в профиль другие места и масштабы карточек. Окно
         // перечитывает их ТЕМ ЖЕ путём, что и при открытии: два восстановления
         // — это две копии знания о том, что такое «место карточки».
@@ -1387,6 +1415,46 @@ class DisplayTimer {
         // Замок приходит тем же способом, что и тема: панель шлёт, главный
         // процесс рассылает всем окнам.
         if (window.UILock) { window.UILock.bindLockSync(this.ipcRenderer); }
+    }
+
+    /**
+     * Две денежные величины скрытого режима «47-й этаж».
+     *
+     * Обе — чистая функция от накопителя, состояния таймера и ставки; ничего
+     * своего окно не хранит и на диск не пишет. Накопитель держит главный
+     * процесс, потому что это единственная величина, которую нельзя
+     * пересчитать заново.
+     *
+     * «Перелимит» прячется, пока таймер в плюсе, ДАЖЕ при включённом тумблере:
+     * висящий весь доклад ноль мозолит глаз и обесценивает момент, когда сумма
+     * пойдёт. «Итого» показывается всегда, когда включён его тумблер, — он для
+     * того и нужен, чтобы видеть накопленное.
+     */
+    updateMoneyBlocks() {
+        const Money = window.MoneyMeter;
+        if (!Money) { return; }
+        const live = Money.overrunSeconds(this.remainingSeconds);
+        const price = this.overrunPrice;
+        const period = this.overrunPeriod;
+
+        if (this.overrunCostValueEl) {
+            this.overrunCostValueEl.textContent = Money.formatMoney(Money.overrunCost(live, price, period));
+        }
+        if (this.totalCostValueEl) {
+            this.totalCostValueEl.textContent = Money.formatMoney(
+                Money.totalCost(this.eventOverrunSeconds, this.remainingSeconds, price, period)
+            );
+        }
+
+        const unlocked = this.floor47Unlocked === true;
+        if (this.overrunCostBlock) {
+            this.overrunCostBlock.classList.toggle('visible',
+                unlocked && this.showOverrunCost === true && live > 0);
+        }
+        if (this.totalCostBlock) {
+            this.totalCostBlock.classList.toggle('visible',
+                unlocked && this.showTotalCost === true);
+        }
     }
 
     applyDisplaySettings(settings) {
@@ -1499,6 +1567,18 @@ class DisplayTimer {
             this.reflowSoon();
             this.updateTopBand();
         }
+
+        // Скрытый режим «47-й этаж»: ставка и разблокировка.
+        //
+        // Видимость денежных блоков считает ОДНО место (updateMoneyBlocks), и
+        // в списке BLOCKS выше их намеренно нет: у «Перелимита» условие показа
+        // не сводится к тумблеру — он прячется, пока таймер в плюсе.
+        this.floor47Unlocked = settings.floor47Unlocked === true;
+        this.showOverrunCost = settings.showOverrunCost === true;
+        this.showTotalCost = settings.showTotalCost === true;
+        if (settings.overrunPrice !== undefined) { this.overrunPrice = settings.overrunPrice; }
+        if (settings.overrunPeriod !== undefined) { this.overrunPeriod = settings.overrunPeriod; }
+        this.updateMoneyBlocks();
 
         // Название мероприятия — единственное значение блока, которое вводит
         // пользователь. Только textContent: разметка из настроек в окно не

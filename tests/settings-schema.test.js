@@ -292,9 +292,17 @@ test('модуль подключён в панели и попадает в с�
 // «Начало» рядом с реестром и разметкой дисплея; вместо этого проверяется
 // точка монтирования, а совпадение id с ключом настройки держит
 // tests/block-labels.test.js.
-const BUILT_BY_MODULE = new Map(
-    require('../display-layouts').LABELLED_ELEMENTS.map((el) => [el.labelKey, 'blockLabelRows'])
-);
+const DL = require('../display-layouts');
+const BUILT_BY_MODULE = new Map([
+    ...DL.LABELLED_ELEMENTS.map((el) => [el.labelKey, 'blockLabelRows']),
+    // Скрытый режим «47-й этаж»: секцию строит panel-display.js, в вёрстке
+    // только точка монтирования. Полсотни строк статики внутри god-файла
+    // подняли бы его потолок, а потолок только опускают.
+    ...DL.SECRET_ELEMENTS.map((el) => [el.toggle, 'floor47Mount']),
+    ['overrunPrice', 'floor47Mount'],
+    ['overrunPeriod', 'floor47Mount'],
+    ['floor47Unlocked', 'floor47Mount']
+]);
 
 test('каждый контрол из таблицы существует в разметке панели', () => {
     // Опечатка в id — молчаливая: контрол не найдётся, настройка не разложится,

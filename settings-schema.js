@@ -48,7 +48,9 @@
  * таблице ОПИСАН, проверяет tests/settings-schema.test.js.
  */
 const DISPLAY_BLOCK_KEYS = [
-    'showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle'
+    'showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle',
+    // Скрытый режим «47-й этаж»
+    'showOverrunCost', 'showTotalCost'
 ];
 const DISPLAY_LABEL_KEYS = ['showHeroLabel', 'showStatusPill'];
 
@@ -128,6 +130,22 @@ const SETTINGS_DESCRIPTORS = [
     { key: 'labelEventTime', el: 'labelEventTime', kind: 'value', def: '', owner: 'display' },
     { key: 'labelEndTime', el: 'labelEndTime', kind: 'value', def: '', owner: 'display' },
     { key: 'labelTimeLeft', el: 'labelTimeLeft', kind: 'value', def: '', owner: 'display' },
+    // Скрытый режим «47-й этаж»: деньги за перелимит доклада.
+    //
+    // Вид строк — 'value', а не 'number': таблица знает только 'checkbox' и
+    // 'value', и заводить третий вид ради двух полей не стоит. Значит ставка
+    // приезжает в money-meter.js СТРОКОЙ, и приведение к числу — обязанность
+    // модуля, а не вызывающего кода.
+    { key: 'overrunPrice', el: 'overrunPrice', kind: 'value', def: '1000', owner: 'display' },
+    { key: 'overrunPeriod', el: 'overrunPeriod', kind: 'value', def: '3', owner: 'display' },
+    { key: 'showOverrunCost', el: 'showOverrunCost', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'showTotalCost', el: 'showTotalCost', kind: 'checkbox', def: false, owner: 'display' },
+    { key: 'labelOverrunCost', el: 'labelOverrunCost', kind: 'value', def: '', owner: 'display' },
+    { key: 'labelTotalCost', el: 'labelTotalCost', kind: 'value', def: '', owner: 'display' },
+    // Владелец 'display' даёт следствие: сброс настроек дисплея ЗАПИРАЕТ режим
+    // обратно. Это осознанно — сброс обязан возвращать приложение к обычному
+    // виду, а повторный тройной клик стоит секунды.
+    { key: 'floor47Unlocked', el: 'floor47Unlocked', kind: 'checkbox', def: false, owner: 'display' },
     {
         key: 'timeBlocksScale', el: 'timeBlocksScale', kind: 'value', def: 100,
         label: 'timeBlocksScaleValue', numeric: true, owner: 'display'

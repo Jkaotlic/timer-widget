@@ -5064,3 +5064,16 @@ body.compact-panel-2 .main-btn,
 body.compact-panel-2 .transport-main {
     height: 46px;
 }
+
+/* Скрытый режим «47-й этаж»: ряд из двух кнопок мероприятия.
+   Обычный `.toggle-row` разносит подпись и контрол по краям — здесь контролов
+   два и подписи нет, поэтому кнопки делят ширину поровну. */
+.floor47-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.floor47-actions .reset-btn {
+    flex: 1 1 0;
+    min-width: 0;
+}

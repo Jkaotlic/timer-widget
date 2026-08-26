@@ -120,9 +120,12 @@ test('панель: подписи собираются одним проход�
     doc.getElementById('labelCurrentTime').value = ' Сейчас ';
     doc.getElementById('labelEndTime').value = '';
     const got = collectBlockLabels(doc);
-    assert.deepEqual(Object.keys(got).sort(), [
-        'labelCurrentTime', 'labelEndTime', 'labelEventTime', 'labelTimeLeft'
-    ]);
+    // Список берётся ИЗ РЕЕСТРА, а не пишется здесь: этот файл ровно про то,
+    // что вторая копия списка разъезжается молча. Записанный вручную, он
+    // разошёлся с реестром при первом же добавлении элемента (деньги за
+    // перелимит, 26.08.2026).
+    assert.deepEqual(Object.keys(got).sort(),
+        Layouts.LABELLED_ELEMENTS.map((el) => el.labelKey).sort());
     assert.equal(got.labelCurrentTime, ' Сейчас ', 'панель отдаёт ВВЕДЁННОЕ, обрезает дисплей');
     assert.equal(got.labelEndTime, '');
 });

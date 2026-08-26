@@ -46,7 +46,21 @@ const DISPLAY_ELEMENTS = [
     // пользователь и так вводит полем «Название».
     { id: 'eventTitle', toggle: 'showEventTitle', kind: 'block' },
     { id: 'heroLabel', toggle: 'showHeroLabel', kind: 'label' },
-    { id: 'statusPill', toggle: 'showStatusPill', kind: 'label' }
+    { id: 'statusPill', toggle: 'showStatusPill', kind: 'label' },
+    // Деньги за перелимит — скрытый режим «47-й этаж».
+    //
+    // `secret: true` означает две вещи, и обе несущие:
+    //   1. раскладка их НЕ трогает — ни тумблер, ни масштаб. Иначе оператор,
+    //      выбравший раскладку посреди мероприятия, погасил бы деньги: их
+    //      координат нет ни в одной раскладке, и общий проход выключил бы им
+    //      тумблеры;
+    //   2. панель не показывает их рядов, а дисплей не рисует блоков, пока
+    //      режим не разблокирован.
+    //
+    // При этом СВОЙ МАСШТАБ у них есть, как у любого подвижного элемента:
+    // normalizeScales идёт по всему реестру, а не по несекретной его части.
+    { id: 'overrunCost', toggle: 'showOverrunCost', kind: 'block', caption: 'Перелимит', labelKey: 'labelOverrunCost', secret: true },
+    { id: 'totalCost', toggle: 'showTotalCost', kind: 'block', caption: 'Итого', labelKey: 'labelTotalCost', secret: true }
 ];
 
 /**
@@ -54,6 +68,18 @@ const DISPLAY_ELEMENTS = [
  * Выводится из реестра, а не пишется списком, — иначе список разъедется с ним.
  */
 const LABELLED_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => el.labelKey);
+
+/** Элементы скрытого режима: раскладки их не трогают, панель прячет. */
+const SECRET_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => el.secret);
+
+/**
+ * Элементы, которыми РАСПОРЯЖАЕТСЯ раскладка.
+ *
+ * Секретных здесь нет: раскладка — обещание «всё вмещается», и она задаёт
+ * тумблер и масштаб КАЖДОМУ, кем распоряжается. Попади деньги в этот список,
+ * выбор раскладки посреди мероприятия гасил бы их на экране.
+ */
+const LAYOUT_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => !el.secret);
 
 /**
  * Потолок длины подписи.
@@ -244,7 +270,7 @@ function layoutById(id) {
  */
 function layoutToggles(layout) {
     const out = {};
-    for (const el of DISPLAY_ELEMENTS) {
+    for (const el of LAYOUT_ELEMENTS) {
         out[el.toggle] = !!(layout && layout.elements && layout.elements[el.id]);
     }
     return out;
@@ -259,7 +285,7 @@ function layoutToggles(layout) {
  */
 function layoutScales(layout) {
     const out = {};
-    for (const el of DISPLAY_ELEMENTS) {
+    for (const el of LAYOUT_ELEMENTS) {
         const entry = layout && layout.elements ? layout.elements[el.id] : null;
         const own = entry ? clampScale(entry.scale) : null;
         out[el.id] = own === null ? defaultScale(el.id) : own;
@@ -438,6 +464,8 @@ function fractionToPosition(fraction, viewport, size, margin = EDGE_MARGIN) {
 const DisplayLayouts = {
     DISPLAY_ELEMENTS,
     LABELLED_ELEMENTS,
+    SECRET_ELEMENTS,
+    LAYOUT_ELEMENTS,
     MAX_CAPTION,
     blockCaption,
     ELEMENT_IDS,
