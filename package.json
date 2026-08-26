@@ -121,6 +121,7 @@
       "constants.js",
       "color-utils.js",
       "renderer-shared.js",
+    "money-meter.js",
       "settings-schema.js",
       "clock-settings-schema.js",
       "ui-theme.js",
