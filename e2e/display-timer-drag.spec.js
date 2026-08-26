@@ -95,8 +95,34 @@ test('Alt+перетаскивание двигает таймер вместе 
         expect(idle.timer, 'таймер поехал БЕЗ Alt — двигает что-то другое, и замер ниже ничего не значит')
             .toEqual(before.timer);
 
-        const DX = -180;
-        const DY = -120;
+        // Дельта берётся ИЗ ОКНА, а не с монитора разработчика.
+        //
+        // Колонка героя поджимается к краям (display-script.js, MARGIN в
+        // place()), и ход вверх равен ровно `colTop - 20`. Замер 26.08.2026 на
+        // размерах раннеров: 1280×1024 — 118 px, 1024×737 — 66, 1024×720 — 63.
+        // Прежние жёсткие −120 не помещались НИ на macOS, ни на Windows (там
+        // спека и краснела), а на Linux помещались с запасом в два пикселя,
+        // то есть держались на допуске.
+        //
+        // Половина расстояния до края помещается всегда, когда самого места
+        // больше 40 px: поджатие стоит на 20. По горизонтали меряется коробка
+        // ТАЙМЕРА, а не колонки: в потоке колонка занимает всю ширину окна и
+        // про горизонтальный запас не говорит ничего.
+        const room = await display.evaluate(() => {
+            const c = document.querySelector('.display-container').getBoundingClientRect();
+            const t = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']
+                .map((id) => document.getElementById(id))
+                .find((el) => el && el.classList.contains('active'))
+                .getBoundingClientRect();
+            return { up: Math.round(c.top), left: Math.round(t.left), h: window.innerHeight, w: window.innerWidth };
+        });
+        expect(room.up, `окно ${room.w}×${room.h}: до верхнего края ${room.up} px — двигать некуда, спека была бы холостой`)
+            .toBeGreaterThanOrEqual(60);
+        expect(room.left, `окно ${room.w}×${room.h}: до левого края ${room.left} px — двигать некуда`)
+            .toBeGreaterThanOrEqual(120);
+        const DX = -Math.floor(room.left / 2);
+        const DY = -Math.floor(room.up / 2);
+        console.log(`   окно ${room.w}×${room.h}, до края вверх ${room.up} влево ${room.left} → дельта ${DX},${DY}`);
         await dragTimer(display, DX, DY);
         await display.waitForTimeout(500);
 
