@@ -166,7 +166,12 @@ class DisplayTimer {
             timeLeft: this.timeLeftBlock,
             eventTitle: this.eventTitleBlock,
             heroLabel: this.heroLabel,
-            statusPill: this.statusPill
+            statusPill: this.statusPill,
+            // Скрытый режим «47-й этаж». Без узла здесь элемент молча
+            // отфильтровывается ниже и теряет перетаскивание, масштаб и
+            // память о своём месте, оставаясь при этом на экране.
+            overrunCost: this.overrunCostBlock,
+            totalCost: this.totalCostBlock
         };
         // Подпись и плашка масштабируются кеглем через переменную на <body>
         // (см. display.css): они набраны в em и `transform` им не годится —

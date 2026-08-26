@@ -234,3 +234,43 @@ test('тумблеры денег подписывает тот, кто их с�
     assert.ok(/SECRET_ELEMENTS/.test(body) && /addEventListener\('change'/.test(body),
         'построенные модулем тумблеры остались без обработчика');
 });
+
+test('у каждого элемента реестра есть узел в initMovableElements', () => {
+    // Карта `nodes` там — единственная дорога от реестра к живому DOM, и
+    // элемент, которого в ней нет, молча отфильтровывается: он остаётся в
+    // реестре, попадает в таблицу настроек, показывается на экране — и при
+    // этом не перетаскивается, не масштабируется и не помнит своего места.
+    // Именно так уехали в main денежные блоки 26.08.2026: все тесты были
+    // зелёными, дефект увидел только КАДР.
+    const src = codeOnly(read('display-script.js'));
+    const at = src.indexOf('initMovableElements()');
+    assert.ok(at > 0, 'не найден initMovableElements');
+    const body = src.slice(at, src.indexOf('this.movableElements', at));
+    for (const el of Layouts.DISPLAY_ELEMENTS) {
+        assert.ok(new RegExp(`\\b${el.id}:`).test(body),
+            `${el.id}: нет узла — элемент выпадет из movableElements и потеряет жесты`);
+    }
+});
+
+test('каждая карточка дисплея стоит в СВОЁМ углу', () => {
+    // Правило записано в проекте с 17.08.2026 («пять блоков — пять разных
+    // углов») и нарушено при добавлении денег: три карточки получили
+    // bottom-right и легли друг на друга. На замере это не видно — только на
+    // кадре, поэтому инвариант проверяется здесь.
+    const html = read('display.html');
+    const CORNERS = ['top-left-third', 'top-right-third', 'bottom-left-third', 'bottom-right-third',
+        'top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'];
+    const seen = new Map();
+    const re = /<div class="display-movable info-block ([^"]+)" id="([^"]+)"/g;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+        const corner = CORNERS.find((c) => m[1].split(/\s+/).includes(c));
+        assert.ok(corner, `${m[2]}: у карточки нет класса угла вовсе`);
+        assert.ok(!seen.has(corner),
+            `${m[2]} и ${seen.get(corner)} делят угол ${corner} — они лягут друг на друга`);
+        seen.set(corner, m[2]);
+    }
+    // Само-проверка: зонд обязан НАХОДИТЬ карточки, иначе пустой перебор
+    // зелёный при любой вёрстке.
+    assert.ok(seen.size >= 7, `зонд нашёл только ${seen.size} карточек — регулярка не работает`);
+});
