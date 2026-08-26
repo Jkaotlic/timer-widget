@@ -113,6 +113,7 @@
       "timer-engine.js",
       "timer-controller.js",
       "recovery.js",
+    "event-overrun-store.js",
       "preload.js",
       "ipc-compat.js",
       "security.js",
