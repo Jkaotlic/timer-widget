@@ -38,6 +38,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `clock-widget-set-position` | `{ x, y }` — restore saved clock position (clamped to a live display) |
 | `display-move` | `{ deltaX, deltaY }` — move display window in windowed mode |
 | `display-layout` | `{ layout }` — применить раскладку (имя проверяется по реестру `display-layouts.js`). Отдельный канал: раскладка — действие, а не состояние; шлётся ПОСЛЕ тумблеров |
+| `sound-toggle` | Без payload: окно просит панель переключить мастер-звук (клавиша `Z`). Значение принадлежит панели — она же и играет; присланное окном значение спорило бы с ней. Тот же приём, что у `preset-apply` |
 | `ui-theme-update` | `{ theme: 'dark' \| 'light' }` — sent by the panel only; main validates against a whitelist and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide) |
 | `toggle-fullscreen` | Toggle fullscreen on the sender's window |
 | `reset-and-relaunch` | Clear all storage and quit |
@@ -57,6 +58,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `timer-overrun-minute` | Fired every N minutes in overrun mode |
 | `display-settings-update` | Display settings object |
 | `display-layout` | `{ layout }` — дисплею: разложить элементы по готовой раскладке |
+| `sound-toggle` | Без payload: панели — переключить мастер-звук (см. одноимённый канал в send) |
 | `displays-list` | Array of available displays |
 | `set-clock-style` / `clock-settings` | Clock widget settings |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |

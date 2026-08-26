@@ -286,10 +286,28 @@ test('модуль подключён в панели и попадает в с�
     assert.ok(pkg.build.files.includes('settings-schema.js'), 'settings-schema.js нет в build.files');
 });
 
+// Контролы, которых в разметке НЕТ намеренно: их ряды строит модуль по
+// реестру (panel-display.js по display-layouts.js), как ряд «Фон» в
+// panel-colors.js. Написать их в HTML — значит завести вторую копию слова
+// «Начало» рядом с реестром и разметкой дисплея; вместо этого проверяется
+// точка монтирования, а совпадение id с ключом настройки держит
+// tests/block-labels.test.js.
+const BUILT_BY_MODULE = new Map(
+    require('../display-layouts').LABELLED_ELEMENTS.map((el) => [el.labelKey, 'blockLabelRows'])
+);
+
 test('каждый контрол из таблицы существует в разметке панели', () => {
     // Опечатка в id — молчаливая: контрол не найдётся, настройка не разложится,
     // и пользователь увидит значение по умолчанию вместо своего.
     for (const d of SETTINGS_DESCRIPTORS) {
+        const mount = BUILT_BY_MODULE.get(d.el);
+        if (mount) {
+            assert.match(
+                controlHtml, new RegExp(`id="${mount}"`),
+                `${d.key}: в разметке панели нет точки монтирования #${mount}`
+            );
+            continue;
+        }
         assert.match(
             controlHtml, new RegExp(`id="${d.el}"`),
             `${d.key}: в разметке панели нет контрола #${d.el}`

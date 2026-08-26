@@ -85,7 +85,7 @@
 - Keyboard shortcuts work from **any** window (Space, R, 1–4, W, C, D)
 - **Ctrl + wheel** — scale widget / clock / display (30–600%)
 - **Shift + wheel** — separate scaling for info blocks on fullscreen
-- **Alt + drag** — freely move blocks on the fullscreen display
+- **Alt + drag** — freely move blocks and the timer itself on the fullscreen display
 - **Click the scale percentage** — exact input, double-click resets to 100%
 - All positions, scales and settings persist between sessions
 - Monitor picker for fullscreen mode
@@ -144,10 +144,11 @@ Work from **any** window.
 | `W` | Toggle widget |
 | `C` | Toggle clock |
 | `D` | Toggle fullscreen |
-| `Esc` | Close current window |
+| `Z` | Toggle sound |
+| `Esc` | Close settings, modal or help. Does NOT close windows |
 | `Ctrl` + wheel | Scale widget / clock / fullscreen |
 | `Shift` + wheel | Scale info blocks on fullscreen |
-| `Alt` + drag | Move info block on fullscreen |
+| `Alt` + drag | Move an info block — or the timer itself — on fullscreen |
 
 Scaling and dragging gestures are disabled by the position lock (the 🔒 button
 in the panel titlebar).

@@ -120,6 +120,14 @@ const SETTINGS_DESCRIPTORS = [
     { key: 'eventTime', el: 'eventTimeInput', kind: 'value', def: '10:00', owner: 'display' },
     { key: 'endTime', el: 'endTimeInput', kind: 'value', def: '12:00', owner: 'display' },
     { key: 'eventTitle', el: 'eventTitleInput', kind: 'value', def: '', owner: 'display' },
+    // Кастомные подписи блоков времени (24.08.2026). Умолчание — ПУСТАЯ строка,
+    // а не слово «Начало»: стандартную подпись знает реестр
+    // display-layouts.js (blockCaption), и второй её копии здесь заводить
+    // нельзя — поле панели стоит пустым ровно потому, что своего имени нет.
+    { key: 'labelCurrentTime', el: 'labelCurrentTime', kind: 'value', def: '', owner: 'display' },
+    { key: 'labelEventTime', el: 'labelEventTime', kind: 'value', def: '', owner: 'display' },
+    { key: 'labelEndTime', el: 'labelEndTime', kind: 'value', def: '', owner: 'display' },
+    { key: 'labelTimeLeft', el: 'labelTimeLeft', kind: 'value', def: '', owner: 'display' },
     {
         key: 'timeBlocksScale', el: 'timeBlocksScale', kind: 'value', def: 100,
         label: 'timeBlocksScaleValue', numeric: true, owner: 'display'

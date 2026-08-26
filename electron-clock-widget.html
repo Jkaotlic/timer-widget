@@ -1450,7 +1450,8 @@
                             e.preventDefault();
                             ipcRenderer.send('timer-control', 'reset');
                             break;
-                        case 'Escape':
+                        // Escape окно не гасит: см. разбор у дисплея — жест
+                        // «закрыть» принадлежит букве, а не клавише отмены.
                         case 'KeyC':
                             e.preventDefault();
                             ipcRenderer.send('close-clock-widget');
@@ -1462,6 +1463,13 @@
                         case 'KeyD':
                             e.preventDefault();
                             ipcRenderer.send(_displayIsOpen ? 'close-display' : 'open-display');
+                            break;
+                        // Z: мастер-звук. Значение принадлежит ПАНЕЛИ (она же
+                        // и играет), поэтому окно только просит — тем же
+                        // приёмом, что и пресеты вида.
+                        case 'KeyZ':
+                            e.preventDefault();
+                            ipcRenderer.send('sound-toggle');
                             break;
                     }
 

@@ -43,6 +43,10 @@ const ALLOWED_CHANNELS = {
         'display-layout',
         'display-restore-state',
         'preset-apply',
+        // Мастер-звук, переключённый клавишей Z НЕ в панели: окно просит,
+        // панель переключает. Как и у пресетов, имя одно в обе стороны —
+        // главный процесс просто передаёт просьбу дальше.
+        'sound-toggle',
         'display-move',
         // Дубль из channel-validator.js — sandbox запрещает здесь require().
         // Оба списка обязаны совпадать, это проверяет channel-validator.test.js.
@@ -75,6 +79,7 @@ const ALLOWED_CHANNELS = {
         'display-layout',
         'display-restore-state',
         'preset-apply',
+        'sound-toggle',
         'window-geometry',
         'ui-theme-update',
         'ui-lock-update',

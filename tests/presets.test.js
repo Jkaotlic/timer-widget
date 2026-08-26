@@ -55,9 +55,12 @@ test('снимок берёт ЗНАЧЕНИЯ ключей профиля, а �
     for (const [key, value] of Object.entries(SAMPLE)) {
         assert.equal(snap.values[key], value, `ключ ${key} не попал в снимок как есть`);
     }
-    // Ключи, которых в профиле нет, в снимок не попадают ВОВСЕ: применить их
-    // как «пусто» значило бы стереть чужую настройку.
-    assert.equal('clockColors' in snap.values, false);
+    // Ключ, которого в профиле НЕТ, записывается как `null` — отсутствие тоже
+    // часть вида. Раньше он не записывался вовсе, и пресет переставал быть
+    // видом: то, чего не было в момент записи, применение не трогало
+    // (см. capturePreset — там разбор жалобы 24.08.2026).
+    assert.equal('clockColors' in snap.values, true, 'отсутствие ключа не записано');
+    assert.equal(snap.values.clockColors, null);
 });
 
 test('картинка фона в пресет не попадает — четыре ячейки выбили бы квоту', () => {
@@ -280,13 +283,35 @@ test('пустая ячейка не бывает применённой', () =>
     assert.equal(Presets.matchesPreset(null, fakeStorage(SAMPLE)), false);
 });
 
-test('ключ, которого в снимке нет, на совпадение не влияет', () => {
-    // Применение такой ключ не трогает — значит и совпадению он не помеха,
-    // иначе отметка не загоралась бы сразу после применения.
+test('ключ, записанный ОТСУТСТВУЮЩИМ, гасит отметку, когда он появился', () => {
+    // Прежде этот тест утверждал обратное («такой ключ на совпадение не
+    // влияет»), и вместе с ним пресет не был видом: записанный на профиле, где
+    // ничего не двигали, он не знал `displayBlockPositions`, и сдвинутый потом
+    // таймер отметку не гасил — ряд ячеек показывал вид, которого на экране
+    // нет. Теперь отсутствие записано явно (`null`) и проверяется.
     const store = fakeStorage(SAMPLE);
     const snap = Presets.capturePreset(store);
+    assert.equal(Presets.matchesPreset(snap, store), true, 'свежий снимок не совпал сам с собой');
+
     store.setItem('clockColors', JSON.stringify({ timer: '#00ff00' }));
+    assert.equal(Presets.matchesPreset(snap, store), false, 'появившийся ключ не погасил отметку');
+
+    // Применение возвращает вид — то есть УБИРАЕТ ключ, которого в нём не было.
+    Presets.applyPreset(snap, store);
+    assert.equal(store.getItem('clockColors'), null, 'применение не убрало ключ, записанный отсутствующим');
     assert.equal(Presets.matchesPreset(snap, store), true);
+});
+
+test('снимок ПРОШЛОЙ версии (без записи об отсутствии) ведёт себя как прежде', () => {
+    // Обратная совместимость: в старых снимках ключа просто нет — ни значения,
+    // ни `null`. Такой ключ по-прежнему не участвует ни в применении, ни в
+    // сравнении, иначе обновление приложения обесценило бы записанные ячейки.
+    const store = fakeStorage(SAMPLE);
+    const legacy = { values: { displayTimerScale: SAMPLE.displayTimerScale } };
+    store.setItem('clockColors', JSON.stringify({ timer: '#00ff00' }));
+    assert.equal(Presets.matchesPreset(legacy, store), true);
+    assert.deepEqual(Presets.applyPreset(legacy, store), ['displayTimerScale']);
+    assert.equal(typeof store.getItem('clockColors'), 'string', 'старый снимок стёр ключ, о котором не знает');
 });
 
 test('после применения ячейка помечается применённой, соседняя — нет', () => {
@@ -495,4 +520,94 @@ test('в ряду горит РОВНО ОДНА ячейка, даже если
     api.apply(1);
     const litAfter = [1, 2, 3, 4].filter((i) => buttons[`presetSlot${i}`].classes.has('active'));
     assert.deepEqual(litAfter, [1]);
+});
+
+// ---------------------------------------------------------------------------
+// Жалоба 24.08.2026: «опять беда с визуальным применением пресета, не выделен
+// никак когда я применил».
+// ---------------------------------------------------------------------------
+/**
+ * Причина не в отметке, а в СРАВНЕНИИ. Снимок хранит значения ключей профиля
+ * целыми строками (`displayExtSettings` — весь объект настроек), а профиль
+ * после применения пересобирается панелью в ТЕКУЩЕЙ форме: `saveExtSettings()`
+ * пишет всю таблицу настроек, включая поля, которых на момент записи пресета
+ * ещё не существовало (в этот день их прибавилось четыре — свои подписи
+ * плашек). Строгое равенство объектов после этого не сходится НИКОГДА, и
+ * отметка «применён» гаснет сразу после клика — ровно на тех пресетах, что
+ * записаны прошлой версией.
+ *
+ * Это не разовая беда сегодняшнего дня: любая будущая настройка ломала бы все
+ * записанные пресеты тем же способом. Поэтому сравнение стало ПОДМНОЖЕСТВОМ —
+ * ровно тем правилом, которое модуль и так объявляет на верхнем уровне
+ * («сравниваются только ключи снимка»), опущенным на уровень полей внутри
+ * значения.
+ */
+test('снимок прошлой версии считается применённым, когда профиль оброс новыми полями', () => {
+    const storage = fakeStorage();
+    // Пресет записан ДО того, как в настройках появились подписи плашек.
+    const old = JSON.stringify({ displayTimerStyle: 'flip', showCurrentTime: true });
+    storage.setItem('displayExtSettings', old);
+    const preset = Presets.capturePreset(storage);
+
+    // Применение: панель пересобрала настройки в текущей форме — те же
+    // значения плюс новые поля со своими умолчаниями.
+    storage.setItem('displayExtSettings', JSON.stringify({
+        displayTimerStyle: 'flip',
+        showCurrentTime: true,
+        labelEventTime: '',
+        labelEndTime: ''
+    }));
+
+    assert.equal(
+        Presets.matchesPreset(preset, storage), true,
+        'новые поля профиля гасят отметку «применён» у пресета прошлой версии'
+    );
+});
+
+test('расхождение в ЗНАЧЕНИИ поля отметку по-прежнему гасит', () => {
+    // Проверка самой проверки: подмножество не должно превратиться в «всегда да».
+    const storage = fakeStorage();
+    storage.setItem('displayExtSettings', JSON.stringify({ displayTimerStyle: 'flip' }));
+    const preset = Presets.capturePreset(storage);
+
+    storage.setItem('displayExtSettings', JSON.stringify({ displayTimerStyle: 'circle', labelEndTime: '' }));
+    assert.equal(
+        Presets.matchesPreset(preset, storage), false,
+        'изменённый стиль обязан гасить отметку'
+    );
+});
+
+test('пропавшее поле профиля отметку гасит: подмножество считается в одну сторону', () => {
+    const storage = fakeStorage();
+    storage.setItem('displayExtSettings', JSON.stringify({ displayTimerStyle: 'flip', showCurrentTime: true }));
+    const preset = Presets.capturePreset(storage);
+
+    // В профиле поля снимка больше нет — вид не тот, что записывали.
+    storage.setItem('displayExtSettings', JSON.stringify({ displayTimerStyle: 'flip' }));
+    assert.equal(
+        Presets.matchesPreset(preset, storage), false,
+        'исчезнувшее из профиля поле снимка обязано гасить отметку'
+    );
+});
+
+test('вложенные объекты сравниваются тем же правилом', () => {
+    // `displayBlockPositions` — объект объектов: элемент, которого в снимке
+    // нет (например, таймер, сдвинутый уже после записи), не должен ломать
+    // сравнение ОСТАЛЬНЫХ, но и лгать про совпадение не должен.
+    const storage = fakeStorage();
+    storage.setItem('displayBlockPositions', JSON.stringify({
+        currentTime: { left: 10, top: 20, cx: 0.5, cy: 0.1 }
+    }));
+    const preset = Presets.capturePreset(storage);
+
+    storage.setItem('displayBlockPositions', JSON.stringify({
+        currentTime: { left: 10, top: 20, cx: 0.5, cy: 0.1 },
+        timerBox: { left: 100, top: 200, cx: 0.5, cy: 0.5 }
+    }));
+    assert.equal(Presets.matchesPreset(preset, storage), true, 'лишний элемент профиля гасит отметку');
+
+    storage.setItem('displayBlockPositions', JSON.stringify({
+        currentTime: { left: 999, top: 20, cx: 0.9, cy: 0.1 }
+    }));
+    assert.equal(Presets.matchesPreset(preset, storage), false, 'сдвинутая карточка обязана гасить отметку');
 });

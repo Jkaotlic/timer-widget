@@ -94,22 +94,14 @@ test('мастер-чекбокс звука ведёт за собой флаг
 // Клавиатура
 // ---------------------------------------------------------------------------
 
-test('Escape не закрывает окна поверх открытой модалки или панели настроек', () => {
-    // Баг: глобальный обработчик Esc закрывал дисплей/виджет/часы одновременно
-    // с закрытием модалки или drawer — все три слушателя висят на document.
-    assert.match(controlHtml, /function _isEscapeConsumedByOverlay\(\)/);
-    const escBranch = controlHtml.match(
-        /else if \(event\.code === 'Escape'\) \{[\s\S]*?\n {12}\}/
-    );
-    assert.ok(escBranch, 'ветка Escape должна существовать');
-    assert.match(escBranch[0], /if \(_isEscapeConsumedByOverlay\(\)\) \{ return; \}/);
-
-    // Проверяем, что охранник учитывает все три слоя.
-    const guard = controlHtml.match(/function _isEscapeConsumedByOverlay\(\)[\s\S]*?\n {8}\}/);
-    assert.match(guard[0], /keyboard-shortcuts-overlay/);
-    assert.match(guard[0], /classList\.contains\('show'\)/);
-    assert.match(guard[0], /settingsDrawer/);
-});
+// Здесь стоял тест «Escape не закрывает окна поверх открытой модалки или
+// панели настроек»: он сторожил охранника `_isEscapeConsumedByOverlay`, из-за
+// которого одно нажатие не закрывало разом модалку и три окна.
+//
+// 24.08.2026 просьба сняла сам жест: Escape окон не гасит вовсе, охранник ушёл
+// вместе с веткой, и сторожить стало нечего. Инвариант — теперь ОБРАТНЫЙ и
+// живёт в tests/escape-keeps-windows.test.js: ни одно из четырёх окон не
+// закрывается по Esc, а проверка проверяет сама себя буквами W / C / D.
 
 test('справка по F1 описывает реальные пресеты, а не выдуманные', () => {
     // Баг: в справке значилось «1-5 — пресеты (1, 5, 10, 15, 30 мин)», хотя

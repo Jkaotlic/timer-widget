@@ -37,14 +37,33 @@
  *            от которого они целиком построены в em).
  */
 const DISPLAY_ELEMENTS = [
-    { id: 'currentTime', toggle: 'showCurrentTime', kind: 'block' },
-    { id: 'eventTime', toggle: 'showEventTime', kind: 'block' },
-    { id: 'endTime', toggle: 'showEndTime', kind: 'block' },
-    { id: 'timeLeft', toggle: 'showTimeLeft', kind: 'block' },
+    { id: 'currentTime', toggle: 'showCurrentTime', kind: 'block', caption: 'Текущее время', labelKey: 'labelCurrentTime' },
+    { id: 'eventTime', toggle: 'showEventTime', kind: 'block', caption: 'Начало', labelKey: 'labelEventTime' },
+    { id: 'endTime', toggle: 'showEndTime', kind: 'block', caption: 'Окончание', labelKey: 'labelEndTime' },
+    { id: 'timeLeft', toggle: 'showTimeLeft', kind: 'block', caption: 'До завершения', labelKey: 'labelTimeLeft' },
+    // У названия мероприятия подписи НЕТ и переименовывать нечего: пустая
+    // строка в разметке — резерв высоты (см. display.html), а сам текст блока
+    // пользователь и так вводит полем «Название».
     { id: 'eventTitle', toggle: 'showEventTitle', kind: 'block' },
     { id: 'heroLabel', toggle: 'showHeroLabel', kind: 'label' },
     { id: 'statusPill', toggle: 'showStatusPill', kind: 'label' }
 ];
+
+/**
+ * Элементы, чью подпись можно переименовать: id → ключ настройки.
+ * Выводится из реестра, а не пишется списком, — иначе список разъедется с ним.
+ */
+const LABELLED_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => el.labelKey);
+
+/**
+ * Потолок длины подписи.
+ *
+ * Не про безопасность (в окно подпись попадает через textContent), а про
+ * ГАБАРИТ: по ширине блока считаются раскладки, поджатие к краям экрана и
+ * полоса, которую колонка героя уступает верхним карточкам. Подпись на сто
+ * символов растянула бы карточку на пол-экрана и утащила бы за собой всё это.
+ */
+const MAX_CAPTION = 40;
 
 const ELEMENT_IDS = DISPLAY_ELEMENTS.map((el) => el.id);
 
@@ -70,6 +89,29 @@ function clampScale(value) {
     const n = parseInt(value, 10);
     if (!Number.isFinite(n)) { return null; }
     return Math.max(MIN_ELEMENT_SCALE, Math.min(MAX_ELEMENT_SCALE, n));
+}
+
+/**
+ * Подпись блока: пользовательская, если она есть, иначе стандартная.
+ *
+ * @param {string} id  элемент реестра
+ * @param {*} custom   что ввёл пользователь (любой тип: приходит из настроек)
+ * @returns {string}
+ *
+ * Пустая строка и строка из одних пробелов означают «верни стандартную»: поле
+ * панели пустое ровно тогда, когда пользователь своего имени не задал, и
+ * записывать в него слово «Начало» нельзя — оно тут же стало бы ВТОРОЙ копией
+ * умолчания, которую надо было бы держать в согласии с этим реестром.
+ *
+ * Пробелы схлопываются, а длина обрезается по MAX_CAPTION: подпись задаёт
+ * ширину карточки, а по ширине карточки считается вся раскладка.
+ */
+function blockCaption(id, custom) {
+    const row = DISPLAY_ELEMENTS.find((el) => el.id === id);
+    const fallback = (row && row.caption) || '';
+    if (typeof custom !== 'string') { return fallback; }
+    const clean = custom.replace(/\s+/g, ' ').trim().slice(0, MAX_CAPTION);
+    return clean || fallback;
 }
 
 function defaultScale(id) {
@@ -395,6 +437,9 @@ function fractionToPosition(fraction, viewport, size, margin = EDGE_MARGIN) {
 
 const DisplayLayouts = {
     DISPLAY_ELEMENTS,
+    LABELLED_ELEMENTS,
+    MAX_CAPTION,
+    blockCaption,
     ELEMENT_IDS,
     LAYOUTS,
     LAYOUT_IDS,

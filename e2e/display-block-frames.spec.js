@@ -57,9 +57,9 @@ const probeSurfaces = (page) => page.evaluate(() => {
         if (getComputedStyle(el).display === 'none') { continue; }
         out.blocks.push(Object.assign({ id: el.id }, paint(el)));
     }
-    const value = document.querySelector('#eventTimeBlock .info-value');
+    const card = document.querySelector('.flip-card-inner');
     const dial = document.querySelector('#eventTimeBlock .mini-clock');
-    out.probes.value = value ? paint(value) : null;
+    out.probes.card = card ? paint(card) : null;
     out.probes.dial = dial ? paint(dial) : null;
     return out;
 });
@@ -121,9 +121,13 @@ test('ни один блок не носит заднюю рамку — чет�
 
                 // Проверка проверки: зонд обязан УМЕТЬ увидеть поверхность.
                 if (style === 'flip') {
+                    // Зонд смотрит на карточку САМОГО ТАЙМЕРА, а не на значение
+                    // блока: пластина под значением снята 24.08.2026 (плита
+                    // принадлежит таймеру — см. e2e/display-block-plate.spec.js),
+                    // и держать ею проверку проверки больше нельзя.
                     expect(
-                        painted(seen.probes.value),
-                        'флип: пластина под значением исчезла — либо стиль сломан, '
+                        painted(seen.probes.card),
+                        'флип: пластина карточки таймера исчезла — либо стиль сломан, '
                         + 'либо зонд не видит заливок, и всё выше зеленеет впустую'
                     ).toBe(true);
                 }

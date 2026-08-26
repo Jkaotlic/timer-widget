@@ -273,14 +273,50 @@ const PanelStateMixin = {
         document.getElementById('presetCustom')?.addEventListener('click', () => this.setInputMode(true));
         document.getElementById('manualCancel')?.addEventListener('click', () => this.setInputMode(false));
 
-        // Мастер-тумблер звука живёт строкой «Звуки» в списке окон.
+        // Мастер-тумблер звука живёт строкой «Звуки» в списке окон. Сам он
+        // ничего не решает и не хранит — зовёт общий путь (см. ниже).
         const soundMaster = document.getElementById('soundMasterToggle');
-        soundMaster?.addEventListener('click', () => {
-            this.setSoundEnabled(!this.soundEnabled);
-            soundMaster.setAttribute('aria-checked', String(!!this.soundEnabled));
-            soundMaster.classList.toggle('active', !!this.soundEnabled);
-            soundMaster.title = this.soundEnabled ? 'Звук включён' : 'Звук выключен';
-        });
+        soundMaster?.addEventListener('click', () => this.toggleSoundMaster());
+        this.renderSoundRow();
+
+        // Клавиша Z, нажатая НЕ в панели: окно шлёт просьбу, переключает панель.
+        // Тот же приём, что у пресетов вида (канал `preset-apply`): состояние
+        // звука принадлежит панели, и второй дороги до него нет.
+        if (ipcRenderer) {
+            ipcRenderer.on('sound-toggle', () => this.toggleSoundMaster());
+        }
+    },
+
+    /**
+     * Мастер-звук: ЕДИНСТВЕННЫЙ путь переключения.
+     *
+     * Входов три — клик по тумблеру строки, клавиша `Z` в панели и та же
+     * клавиша, нажатая в виджете, часах или на дисплее. Владелец значения при
+     * этом один: чекбокс `#soundMasterEnabled`, потому что его сохраняет
+     * таблица настроек (settings-schema.js), а тумблер строки — только вид.
+     *
+     * До 24.08.2026 владельцев было ДВА: тумблер строки писал свой
+     * `soundEnabled` в localStorage и красил сам себя, чекбокс жил отдельно, а
+     * `playSound` спрашивал ОБА. Отсюда состояние «строка зелёная, звука нет».
+     * Событие `change` шлётся настоящее: на нём висит вся остальная работа
+     * (гашение настроек звука, флаг `soundEnabled`, сохранение).
+     */
+    toggleSoundMaster() {
+        const box = this.soundMasterEl || document.getElementById('soundMasterEnabled');
+        if (!box) { return; }
+        box.checked = !box.checked;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+        this.renderSoundRow();
+    },
+
+    /** Вид тумблера строки — ВЫВОД из чекбокса, а не второй флаг. */
+    renderSoundRow() {
+        const box = this.soundMasterEl || document.getElementById('soundMasterEnabled');
+        const row = document.getElementById('soundMasterToggle');
+        if (!box || !row) { return; }
+        row.setAttribute('aria-checked', String(!!box.checked));
+        row.classList.toggle('active', !!box.checked);
+        row.title = box.checked ? 'Звук включён' : 'Звук выключен';
     },
 
     /**

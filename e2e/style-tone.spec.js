@@ -149,7 +149,15 @@ test('блок времени повторяет стиль: у флипа — �
         });
         expect(circle.image, 'в круге у значения блока пластины быть не должно').toBe('none');
 
-        // --- ФЛИП: пластина, сгиб и блик.
+        // --- ФЛИП: пластины у блока НЕТ (24.08.2026), а у карточки таймера есть.
+        //
+        // Здесь до 24.08.2026 сверялись пластина блока и пластина карточки:
+        // «блок повторяет стиль — значит теми же токенами». Пластину с блока
+        // сняли, и правило сузилось до того, что от фона не зависит: блок
+        // повторяет стиль ШРИФТОМ. Пластина светлого тона — белый
+        // прямоугольник, а тон выбирается по яркости ФОНА, и на цветном
+        // градиенте это четыре белые карточки поверх картинки
+        // (см. e2e/display-block-plate.spec.js).
         await control.click('#displayTimerStyle button[data-val="flip"]');
         await control.waitForTimeout(600);
         const flip = await display.evaluate(() => {
@@ -158,21 +166,24 @@ test('блок времени повторяет стиль: у флипа — �
             const hinge = getComputedStyle(el, '::before');
             const gloss = getComputedStyle(el, '::after');
             const card = document.querySelector('.flip-card-inner');
+            const digit = document.querySelector('.flip-digit');
             return {
                 image: cs.backgroundImage,
-                hingeH: hinge.height,
+                font: cs.fontFamily,
                 hingeBg: hinge.backgroundColor,
                 glossImage: gloss.backgroundImage,
-                cardImage: getComputedStyle(card).backgroundImage
+                cardImage: getComputedStyle(card).backgroundImage,
+                digitFont: getComputedStyle(digit).fontFamily
             };
         });
-        expect(flip.image, 'у флипа значение блока обязано получить пластину').toContain('gradient');
-        // ТА ЖЕ пластина, что у карточки таймера, — иначе блок не «повторяет
-        // стиль», а просто носит похожую заливку.
-        expect(flip.cardImage, 'пластина блока разошлась с карточкой таймера').toBe(flip.image);
-        expect(flip.hingeH, 'линии сгиба нет').not.toBe('0px');
-        expect(flip.hingeBg, 'линия сгиба прозрачна').not.toBe('rgba(0, 0, 0, 0)');
-        expect(flip.glossImage, 'блика верхней половины нет').toContain('gradient');
+        expect(flip.image, 'у флипа значение блока снова носит пластину').toBe('none');
+        expect(flip.hingeBg, 'у значения блока осталась линия сгиба').toBe('rgba(0, 0, 0, 0)');
+        expect(flip.glossImage, 'у значения блока остался блик пластины').toBe('none');
+        // Проверка себя: у САМОЙ карточки таймера пластина обязана остаться —
+        // иначе три утверждения выше зеленели бы на сломанном стиле.
+        expect(flip.cardImage, 'пластина исчезла и у карточки таймера').toContain('gradient');
+        // А стиль блок повторяет тем, что от фона не зависит.
+        expect(flip.font, 'значение блока набрано не шрифтом табло').toBe(flip.digitFont);
 
         // --- ЦИФРЫ: значение блока набрано ВЫБРАННЫМ шрифтом стиля.
         await control.click('#displayTimerStyle button[data-val="digits"]');

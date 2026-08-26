@@ -328,3 +328,74 @@ test('три ячейки подряд: применённой остаётся 
         await app.close();
     }
 });
+
+/**
+ * Жалоба 24.08.2026: «опять беда с визуальным применением пресета, не выделен
+ * никак когда я применил».
+ *
+ * Спека выше зеленела и в этот момент — потому что записывает пресет ТОЙ ЖЕ
+ * версией приложения, которой его применяет. У пользователя ячейки записаны
+ * ПРОШЛОЙ версией, а её снимок не знает полей, добавленных с тех пор в таблицу
+ * настроек: применение пересобирает профиль в текущей форме
+ * (`saveExtSettings` пишет всю таблицу), строгое сравнение не сходится, и
+ * отметка гаснет сразу после клика.
+ *
+ * Здесь это состояние воспроизводится честно: у записанного снимка ОТНИМАЕТСЯ
+ * поле — ровно так он и выглядел бы, будучи записанным до появления настройки.
+ */
+test('пресет, записанный прошлой версией, всё равно помечается применённым', async () => {
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => localStorage.removeItem('uiPresets'));
+        await control.reload();
+        await control.waitForTimeout(1200);
+
+        // Записываем ячейку 2 (Shift+клик) — это и есть «вид на экране».
+        await control.click('#presetSlot2', { modifiers: ['Shift'] });
+        await control.waitForTimeout(700);
+
+        // Делаем снимок «старым»: убираем из него поле, которого в прошлой
+        // версии не существовало. Значение в профиле при этом остаётся.
+        const stripped = await control.evaluate(() => {
+            const all = JSON.parse(localStorage.getItem('uiPresets'));
+            const settings = JSON.parse(all['2'].values.displayExtSettings);
+            const dropped = 'labelEventTime' in settings ? 'labelEventTime' : Object.keys(settings)[0];
+            delete settings[dropped];
+            all['2'].values.displayExtSettings = JSON.stringify(settings);
+            localStorage.setItem('uiPresets', JSON.stringify(all));
+            return dropped;
+        });
+        console.log(`   из снимка убрано поле: ${stripped}`);
+
+        // Перенастраиваем вид, чтобы отметка заведомо погасла...
+        await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
+        await control.waitForTimeout(700);
+        await control.click('#displayTimerStyle button[data-val="analog"]');
+        await control.waitForTimeout(700);
+        const off = await control.evaluate(() => ({
+            active: document.getElementById('presetSlot2').classList.contains('active'),
+            caption: document.getElementById('presetCaption').textContent
+        }));
+        expect(off.active, 'отметка не погасла после смены стиля — проверять нечего').toBe(false);
+
+        // ...и применяем ячейку кликом.
+        await control.click('#presetSlot2');
+        await control.waitForTimeout(1200);
+
+        const on = await control.evaluate(() => ({
+            active: document.getElementById('presetSlot2').classList.contains('active'),
+            aria: document.getElementById('presetSlot2').getAttribute('aria-pressed'),
+            caption: document.getElementById('presetCaption').textContent,
+            others: [1, 3, 4].map((i) => document.getElementById(`presetSlot${i}`).classList.contains('active'))
+        }));
+        console.log(`   после применения: ${JSON.stringify(on)}`);
+        expect(on.active, 'применённая ячейка не помечена').toBe(true);
+        expect(on.aria, 'ячейка не сообщает состояние словом').toBe('true');
+        expect(on.caption, 'подпись ряда не назвала ячейку').toContain('2');
+        expect(on.others, 'горит больше одной ячейки').toEqual([false, false, false]);
+    } finally {
+        await control.evaluate(() => localStorage.removeItem('uiPresets')).catch(() => {});
+        await app.close();
+    }
+});

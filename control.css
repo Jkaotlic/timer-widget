@@ -466,7 +466,8 @@ body::after {
     height: 13px;
 }
 .settings-hint .hint-text { flex: 1 1 auto; }
-.settings-hint kbd {
+.settings-hint kbd,
+.wrow-key kbd {
     display: inline-block;
     padding: 1px 5px;
     margin: 0 1px;
@@ -602,7 +603,8 @@ body::after {
     border: 0;
     color: var(--tw-fg-dim);
 }
-[data-theme="light"] .settings-hint kbd {
+[data-theme="light"] .settings-hint kbd,
+[data-theme="light"] .wrow-key kbd {
     color: var(--tw-fg);
     background: var(--tw-level-2);
     border: 1px solid var(--tw-border);
@@ -1130,6 +1132,23 @@ body::after {
 /* =======================================================
    Tabs — settings tab strip
    ======================================================= */
+/* Заголовок группы, у которого есть оговорка, — строка из двух частей:
+   название слева, оговорка справа. `:has()` вместо класса на самом заголовке:
+   правило нужно ровно там, где оговорка есть, и появляется вместе с ней. */
+.group-title:has(.group-note) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+.group-note {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    color: var(--tw-fg-dim);
+    white-space: nowrap;
+}
+
 .group-title {
     font-size: var(--tw-t-tiny);
     font-weight: 600;
@@ -4316,7 +4335,23 @@ body.state-input .input-extras { display: block; }
 }
 
 .wrow-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Имя строки и её клавиша — ОДНА строка, и это не украшение, а бюджет высоты:
+   содержимое панели ровно равно её окну (замер 24.08.2026: 740 при окне 740),
+   и третья строка в каждой из трёх строк окон (+45px) увела бы панель в
+   компактный режим на любом окне по умолчанию. Клавиша встаёт справа от
+   короткого имени, в место, которое и так пустовало (замер: имя ~50px,
+   подсказка 125px, колонка 238px). */
+.wrow-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .wrow-name { font-size: 14px; font-weight: 500; color: var(--tw-fg); }
+.wrow-key {
+    font-size: 11px;
+    color: var(--tw-fg-dim);
+    white-space: nowrap;
+    /* Ужимается первой: на узкой панели важнее имя окна, чем подсказка. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .wrow-sub  { font-size: 11.5px; color: var(--tw-fg-dim); }
 /* Включённая строка говорит СОСТОЯНИЕ, а не описание, и говорит его цветом
    полосы: зелёным в норме, красным в перерасходе. */

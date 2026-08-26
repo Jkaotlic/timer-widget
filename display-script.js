@@ -170,6 +170,39 @@ class DisplayTimer {
                 flowClass: row.id === 'heroLabel' ? 'hero-label-moved' : null
             }))
             .filter((row) => row.el);
+
+        // ВОСЬМОЙ подвижный элемент — сама колонка героя: подпись и таймер
+        // (просьба 24.08.2026). В реестре display-layouts.js его НЕТ, и это
+        // не забывчивость: тот реестр описывает элементы, у каждого из которых
+        // есть тумблер в панели и СВОЙ масштаб (`--info-scale`). У таймера нет
+        // ни того, ни другого — выключать его бессмысленно, а масштаб у него
+        // свой собственный и давно (`displayTimerScale`, Ctrl+колесо). Попади
+        // он в тот реестр — у масштаба таймера стало бы два владельца.
+        //
+        // `kind: 'timer'` читают ровно три места: колесо (масштабировать
+        // ТАЙМЕР, а не элемент), крестик (у колонки его нет) и раскладка
+        // (вернуть колонку в поток). Всё остальное — перетаскивание,
+        // сохранение места, пересчёт по доле окна — работает с ним как с любым
+        // другим подвижным элементом, потому что спрашивает про класс
+        // `custom-position`, а не про вид элемента.
+        const heroColumn = document.querySelector('.display-container');
+        if (heroColumn) {
+            this.movableElements.push({
+                id: 'timerBox',
+                toggle: null,
+                kind: 'timer',
+                el: heroColumn,
+                cssVar: null,
+                flowClass: 'timer-moved',
+                // Держать при перетаскивании надо ТО, за что взялись: у колонки
+                // при выходе из потока меняются отступы (уходят `--top-band` и
+                // `--hero-block`), и её собственная коробка съезжает
+                // относительно таймера внутри. Якорь — активный блок стиля.
+                anchor: () => [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
+                    .find((el) => el && el.classList.contains('active')) || heroColumn
+            });
+        }
+
         this.elementScales = {};
         // Доля окна для КАЖДОГО сдвинутого элемента — по ней он переставляется
         // при смене размера окна (см. reflowElements).
@@ -316,9 +349,26 @@ class DisplayTimer {
                 fraction, viewport, { width: rect.width, height: rect.height }
             );
             if (!pos) { continue; }
+            const wasLeft = parseFloat(row.el.style.left);
+            const wasTop = parseFloat(row.el.style.top);
             this.placeElementAt(row, pos.left, pos.top);
             this.settleAfterResize(row, fraction, viewport, rect);
-            moved = true;
+            // Записываем, только если место ДЕЙСТВИТЕЛЬНО изменилось.
+            //
+            // Пересчёт зовётся на каждой посылке настроек, а не только при
+            // изменении размера окна, и раньше он писал места ВСЕГДА — теми же
+            // числами, что и прочитал. Безобидно ровно до пресета: панель
+            // сначала кладёт в профиль места из снимка, потом рассылает
+            // настройки, и вот этот холостой пересчёт успевал ЗАТЕРЕТЬ их
+            // текущими, ещё не обновлёнными. Дальше приходило «перечитай» — и
+            // окно перечитывало собственную запись. Замер: таймер, сдвинутый
+            // после записи пресета, оставался сдвинутым после его применения.
+            const nowLeft = parseFloat(row.el.style.left);
+            const nowTop = parseFloat(row.el.style.top);
+            if (!Number.isFinite(wasLeft) || !Number.isFinite(wasTop)
+                || Math.abs(nowLeft - wasLeft) > 0.5 || Math.abs(nowTop - wasTop) > 0.5) {
+                moved = true;
+            }
         }
         // Доли НЕ пересобираются из нового положения: у прижатого к краю
         // элемента доля изменилась бы, и следующий ресайз считал бы уже от
@@ -509,7 +559,9 @@ class DisplayTimer {
                 // Выключенный элемент тоже возвращается в поток: включённый
                 // потом руками, он иначе появился бы там, где его оставила
                 // позапрошлая раскладка.
-                if (row.cssVar) { this.releaseToFlow(row); }
+                // Подпись, плашка и колонка героя — те, у кого поток и есть
+                // их место. У карточек места в потоке нет вовсе.
+                if (row.cssVar || row.kind === 'timer') { this.releaseToFlow(row); }
             }
         }
 
@@ -675,7 +727,10 @@ class DisplayTimer {
                         this.ipcRenderer.send('timer-control', 'pause');
                     }
                     break;
-                case 'Escape':
+                // Escape окно НЕ гасит (просьба 24.08.2026): на совещании его
+                // жмут рефлекторно — чтобы выйти из ввода, снять выделение,
+                // закрыть чужой попап, — и таймер пропадал с проектора. Жест
+                // «закрыть» остался за буквой, которая об этом написана.
                 case 'KeyD':
                     e.preventDefault();
                     if (this.ipcRenderer) {
@@ -692,6 +747,13 @@ class DisplayTimer {
                     e.preventDefault();
                     if (this.ipcRenderer) {
                         this.ipcRenderer.send(this._clockOpen ? 'close-clock-widget' : 'open-clock-widget');
+                    }
+                    break;
+                // Z: мастер-звук. Значение принадлежит ПАНЕЛИ — окно просит.
+                case 'KeyZ':
+                    e.preventDefault();
+                    if (this.ipcRenderer) {
+                        this.ipcRenderer.send('sound-toggle');
                     }
                     break;
             }
@@ -762,6 +824,18 @@ class DisplayTimer {
      * @returns {number} применённая высота полосы в пикселях
      */
     updateTopBand() {
+        // Колонку поставил пользователь — значит она стоит там, где он её
+        // поставил, и никаких полос никому не уступает. Обе величины
+        // обнуляются явно: иначе последняя посчитанная полоса осталась бы в
+        // отступе и сдвигала бы таймер относительно точки, за которую его
+        // тащили.
+        const hero = this.movableRow('timerBox');
+        if (hero && hero.el.classList.contains('custom-position')) {
+            this.setTimerShrink(0);
+            this.setTopBand(0);
+            return 0;
+        }
+
         const shared = window.RendererShared;
         const active = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
             .find((b) => b && b.classList.contains('active'));
@@ -1400,6 +1474,30 @@ class DisplayTimer {
             if (firstLoad && !hasCustomPositions(block.el)) {
                 this.applyPosition(block.el, block.home);
             }
+        }
+
+        // Кастомные подписи блоков времени (24.08.2026). Слова по умолчанию
+        // здесь НЕ пишутся: их знает реестр (DisplayLayouts.blockCaption), он
+        // же обрезает длину и схлопывает пробелы. Только textContent —
+        // разметка из настроек в окно не попадает.
+        //
+        // Перерисовка не безусловна: подпись задаёт ШИРИНУ карточки, а по
+        // ширине считаются места элементов и полоса сверху. Пересчитывать их на
+        // каждой посылке настроек (а она приходит на любое движение ползунка
+        // цвета) значило бы гонять раскладку впустую.
+        let captionChanged = false;
+        for (const row of window.DisplayLayouts.LABELLED_ELEMENTS) {
+            const movable = this.movableRow(row.id);
+            const node = movable && movable.el.querySelector('.info-label');
+            if (!node) { continue; }
+            const next = window.DisplayLayouts.blockCaption(row.id, settings[row.labelKey]);
+            if (node.textContent === next) { continue; }
+            node.textContent = next;
+            captionChanged = true;
+        }
+        if (captionChanged) {
+            this.reflowSoon();
+            this.updateTopBand();
         }
 
         // Название мероприятия — единственное значение блока, которое вводит
@@ -2709,7 +2807,10 @@ class DisplayTimer {
             const row = hovered
                 ? this.movableElements.find((r) => r.el === hovered)
                 : null;
-            if (row) {
+            // Колонка героя тоже подвижна, но масштаб у неё СВОЙ и давно:
+            // Ctrl+колесо над таймером обязано менять `displayTimerScale`, а не
+            // заводить таймеру второй масштаб через `--info-scale`.
+            if (row && row.kind !== 'timer') {
                 scaleOne(row.id, delta);
             } else {
                 scaleTimer(delta);
@@ -2737,6 +2838,10 @@ class DisplayTimer {
         // в тот же кадр, а не через круг «дисплей → панель → дисплей».
         this._handlers.blockCloses = [];
         for (const row of BLOCK_REGISTRY) {
+            // У колонки героя своего крестика нет — а `querySelector` нашёл бы
+            // ЧУЖОЙ: крестик подписи лежит внутри неё. Второй обработчик на той
+            // же кнопке гасил бы вместе с подписью весь таймер.
+            if (row.kind === 'timer') { continue; }
             const button = row.el.querySelector('.info-close');
             if (!button) { continue; }
             const onClose = (e) => {
@@ -2762,13 +2867,17 @@ class DisplayTimer {
         // Храним ссылки на mousedown handlers блоков для cleanup
         this._handlers.blockMousedowns = [];
 
-        BLOCK_REGISTRY.forEach(({ el: block, flowClass }) => {
+        BLOCK_REGISTRY.forEach(({ el: block, flowClass, anchor }) => {
             const blockMousedown = (e) => {
                 if (!e.altKey) { return; }
                 if (window.UILock && window.UILock.isLocked()) { return; }
                 e.preventDefault();
                 e.stopPropagation();
                 block.classList.add('dragging-block');
+
+                // Коробка якоря ДО выхода из потока: см. третий проход ниже.
+                const anchorEl = typeof anchor === 'function' ? anchor() : null;
+                const anchorBefore = anchorEl ? anchorEl.getBoundingClientRect() : null;
 
                 // If block uses preset positioning, switch to absolute left/top
                 if (!block.classList.contains('custom-position')) {
@@ -2805,6 +2914,21 @@ class DisplayTimer {
                     const shifted = block.getBoundingClientRect();
                     block.style.left = (rect.left + (rect.left - shifted.left)) + 'px';
                     block.style.top = (rect.top + (rect.top - shifted.top)) + 'px';
+
+                    // ТРЕТИЙ проход — только у элемента с якорем (колонка
+                    // героя). Два прохода выше держат на месте коробку САМОГО
+                    // элемента, и этого довольно, пока выход из потока её
+                    // размеров не меняет. У колонки меняет: вместе с
+                    // `custom-position` уходят отступы `--top-band` и
+                    // `--hero-block`, то есть таймер внутри коробки съезжает
+                    // вверх ровно на полосу — на глаз это «таймер прыгнул при
+                    // нажатии Alt». Держать надо то, за что взялись, поэтому
+                    // остаток меряется по якорю: активному блоку стиля.
+                    if (anchorEl && anchorBefore) {
+                        const now = anchorEl.getBoundingClientRect();
+                        block.style.left = ((parseFloat(block.style.left) || 0) + (anchorBefore.left - now.left)) + 'px';
+                        block.style.top = ((parseFloat(block.style.top) || 0) + (anchorBefore.top - now.top)) + 'px';
+                    }
                 }
 
                 const startScreenX = e.screenX;
@@ -2969,9 +3093,16 @@ class DisplayTimer {
         // Restore positions (with JSON structure validation)
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
-            if (!saved) { return; }
-            let positions;
-            try { positions = JSON.parse(saved); } catch { return; }
+            // Ключа НЕТ — это не «нечего делать», а полноценное состояние
+            // «ничего не сдвинуто». Так выглядит профиль после пресета,
+            // записанного на нетронутом виде: применение убирает ключ, и окно
+            // обязано вернуть сдвинутое на место. Раньше здесь стоял ранний
+            // выход, и таймер, подпись и плашка оставались там, куда их
+            // утащили, — то есть пресет не воспроизводил вид.
+            let positions = {};
+            if (typeof saved === 'string' && saved.trim()) {
+                try { positions = JSON.parse(saved); } catch { return; }
+            }
             if (typeof positions !== 'object' || positions === null) { return; }
 
             // Имена берутся из ТОГО ЖЕ реестра, что и при сохранении
@@ -2982,8 +3113,22 @@ class DisplayTimer {
                 const key = row.id;
                 const block = row.el;
                 const pos = positions[key];
-                if (!pos || typeof pos !== 'object') { continue; }
-                if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) { continue; }
+                if (!pos || typeof pos !== 'object'
+                    || !Number.isFinite(pos.left) || !Number.isFinite(pos.top)) {
+                    // Записи нет — а элемент СТОИТ сдвинутым. Так бывает после
+                    // пресета: снимок сделан до того, как элемент двигали, и
+                    // «применить вид» обязано вернуть его на место, иначе на
+                    // экране не тот вид, что записан (а ряд ячеек это сравнение
+                    // и показывает). Возвращается только тот, чьё место в
+                    // ПОТОКЕ: подпись, плашка и колонка героя. У карточки места
+                    // в потоке нет вовсе — её положение задаёт класс угла, и
+                    // снятие custom-position оставило бы её без координат.
+                    if ((row.cssVar || row.kind === 'timer')
+                        && block.classList.contains('custom-position')) {
+                        this.releaseToFlow(row);
+                    }
+                    continue;
+                }
 
                 // Доля окна главнее пикселя: окно могли открыть на другом
                 // мониторе или другого размера, и пиксель означал бы место в

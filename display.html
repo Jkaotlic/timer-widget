@@ -150,7 +150,12 @@
         <div class="info-value info-value-title" id="eventTitleValue"></div>
     </div>
 
-    <div class="display-container">
+    <!-- Колонка героя (подпись + таймер) — ВОСЬМОЙ подвижный элемент
+         (24.08.2026). Класс `display-movable` не украшение: на нём висят и
+         обводка режима Alt, и поиск `closest('.display-movable')` в колесе, и
+         сам жест перетаскивания. Позицию задаёт JS, из потока колонку выводит
+         правило `.display-container.custom-position`. -->
+    <div class="display-container display-movable">
         <!-- Текст подписи — в СВОЁМ span: updateChipState пишет его через
              textContent, и лежи текст прямо в блоке, эта запись стирала бы
              крестик. Ровно так уже ломался знак минуса в «Цифрах». -->

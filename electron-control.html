@@ -174,23 +174,23 @@
              вкладку настроек: тумблер открывает окно, шеврон — его настройки.
              Поэтому id кнопок и data-tab сохранены — за ними висят обработчики
              открытия окон и ящика настроек. -->
-        <div class="group-title">Показать на экране</div>
+        <div class="group-title">Показать на экране<span class="group-note">Esc окон не гасит</span></div>
         <div class="wrows">
             <div class="wrow">
                 <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="5.2"/><path d="M8 6.4V9l1.8 1.1"/><path d="M6.2 2h3.6"/></svg></span>
-                <span class="wrow-text"><span class="wrow-name">Виджет</span><span class="wrow-sub" id="subWidget">маленький таймер поверх окон</span></span>
+                <span class="wrow-text"><span class="wrow-head"><span class="wrow-name">Виджет</span><span class="wrow-key"><kbd>W</kbd> — открыть/закрыть</span></span><span class="wrow-sub" id="subWidget">маленький таймер поверх окон</span></span>
                 <button class="wrow-chevron tab-btn" data-tab="timer" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки виджета" aria-label="Настройки виджета">›</button>
                 <button class="wrow-toggle quick-window-btn widget" id="openWidgetBtn" role="switch" aria-checked="false" title="Компактный таймер поверх окон (W)" aria-label="Виджет"><span class="wrow-knob" aria-hidden="true"></span></button>
             </div>
             <div class="wrow">
                 <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.4V8l2.6 1.6"/></svg></span>
-                <span class="wrow-text"><span class="wrow-name">Часы</span><span class="wrow-sub" id="subClock">текущее время и дата</span></span>
+                <span class="wrow-text"><span class="wrow-head"><span class="wrow-name">Часы</span><span class="wrow-key"><kbd>C</kbd> — открыть/закрыть</span></span><span class="wrow-sub" id="subClock">текущее время и дата</span></span>
                 <button class="wrow-chevron tab-btn" data-tab="clock" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки часов" aria-label="Настройки часов">›</button>
                 <button class="wrow-toggle quick-window-btn clock" id="openClockBtn" role="switch" aria-checked="false" title="Часы в реальном времени (C)" aria-label="Часы"><span class="wrow-knob" aria-hidden="true"></span></button>
             </div>
             <div class="wrow">
                 <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.4"/><path d="M5.6 13.4h4.8"/><path d="M8 11v2.4"/></svg></span>
-                <span class="wrow-text"><span class="wrow-name">Дисплей</span><span class="wrow-sub" id="subDisplay">во весь экран, для проектора</span></span>
+                <span class="wrow-text"><span class="wrow-head"><span class="wrow-name">Дисплей</span><span class="wrow-key"><kbd>D</kbd> — открыть/закрыть</span></span><span class="wrow-sub" id="subDisplay">во весь экран, для проектора</span></span>
                 <button class="wrow-chevron tab-btn" data-tab="display" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки дисплея" aria-label="Настройки дисплея">›</button>
                 <button class="wrow-toggle quick-window-btn display" id="openDisplayBtn" role="switch" aria-checked="false" title="Полноэкранный режим для презентаций (D)" aria-label="Дисплей"><span class="wrow-knob" aria-hidden="true"></span></button>
             </div>
@@ -198,7 +198,7 @@
                  быть виден. Тумблер здесь означает звук вкл/выкл. -->
             <div class="wrow">
                 <span class="wrow-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.4 3.2 5.4 5.8H2.8v4.4h2.6l3 2.6z"/><path d="M11 6.2a2.6 2.6 0 0 1 0 3.6"/></svg></span>
-                <span class="wrow-text"><span class="wrow-name">Звуки</span><span class="wrow-sub" id="subSound">сигналы старта, минуты и финиша</span></span>
+                <span class="wrow-text"><span class="wrow-head"><span class="wrow-name">Звуки</span><span class="wrow-key"><kbd>Z</kbd> — вкл/выкл</span></span><span class="wrow-sub" id="subSound">сигналы старта, минуты и финиша</span></span>
                 <button class="wrow-chevron tab-btn" data-tab="sound" aria-controls="settingsDrawer" aria-expanded="false" title="Настройки звука" aria-label="Настройки звука">›</button>
                 <button class="wrow-toggle" id="soundMasterToggle" role="switch" aria-checked="true" title="Звук включён" aria-label="Звук"><span class="wrow-knob" aria-hidden="true"></span></button>
             </div>
@@ -218,7 +218,7 @@
                 <div class="tab-content active" id="tab-timer">
                     <div class="settings-hint" role="note">
                         <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                        <span class="hint-text">На виджете: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>4</kbd> работают и здесь</span>
+                        <span class="hint-text">На виджете: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>4</kbd> работают и здесь · <kbd>W</kbd> — открыть/закрыть виджет (<kbd>Esc</kbd> окон не гасит)</span>
                     </div>
                     <div class="settings-group">
                         <div class="settings-group-title">
@@ -425,7 +425,7 @@
                     <div class="settings-column">
                         <div class="settings-hint" role="note">
                             <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                            <span class="hint-text">На часах: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>4</kbd> работают и здесь</span>
+                            <span class="hint-text">На часах: <kbd>Ctrl</kbd>+колесо — масштаб (30–600%) · Перетаскивание мышью — перемещение окна · <kbd>Space</kbd>/<kbd>R</kbd>/<kbd>1</kbd>–<kbd>4</kbd> работают и здесь · <kbd>C</kbd> — открыть/закрыть часы (<kbd>Esc</kbd> окон не гасит)</span>
                         </div>
                         <div class="settings-group">
                             <div class="settings-group-title">
@@ -571,7 +571,7 @@
                                  полез крутить колесо, а не после. -->
                             <div class="settings-hint" role="note">
                                 <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 10.2a4.2 4.2 0 1 1 4.8 0v1.3H5.6z"/><path d="M6.4 13.4h3.2"/></svg></span>
-                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо над элементом — масштаб ЭТОГО элемента · <kbd>Ctrl</kbd>+колесо мимо всех — масштаб таймера · <kbd>Shift</kbd>+колесо — все блоки сразу · <kbd>Alt</kbd> — перетащить блок или закрыть его крестиком · <kbd>1</kbd>–<kbd>4</kbd> — пресеты времени, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>4</kbd> — пресеты вида, <kbd>Space</kbd> — старт/пауза, <kbd>R</kbd> — сброс</span>
+                                <span class="hint-text">На дисплее: <kbd>Ctrl</kbd>+колесо над элементом — масштаб ЭТОГО элемента · <kbd>Ctrl</kbd>+колесо мимо всех — масштаб таймера · <kbd>Shift</kbd>+колесо — все блоки сразу · <kbd>Alt</kbd> — перетащить блок ИЛИ САМ ТАЙМЕР, крестиком — убрать блок · <kbd>1</kbd>–<kbd>4</kbd> — пресеты времени, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>4</kbd> — пресеты вида, <kbd>Space</kbd> — старт/пауза, <kbd>R</kbd> — сброс · <kbd>D</kbd> — открыть/закрыть дисплей (<kbd>Esc</kbd> окон не гасит)</span>
                             </div>
                             <!-- .setting-block по той же причине, что и у виджета. -->
                             <div class="setting-block">
@@ -686,6 +686,10 @@
                                     <input type="text" id="eventTitleInput" class="srow-input" maxlength="60"
                                            placeholder="Оперативное совещание" aria-label="Название мероприятия">
                                 </div>
+                                <!-- Ряды строит panel-display.js по реестру display-layouts.js:
+                                     вторая копия списка блоков в вёрстке разъехалась бы с ним. -->
+                                <div class="settings-subtitle">Названия плашек</div>
+                                <div id="blockLabelRows"></div>
                             </div>
                         </div>
                     </div>
@@ -892,8 +896,9 @@
                                 <li><strong>Shift</strong> + колесо — масштаб всех блоков времени сразу</li>
                                 <li><strong>Alt</strong> + перетаскивание — переместить элемент куда угодно; позиции сохраняются. <strong>Alt</strong> + крестик — убрать его с экрана</li>
                                 <li><strong>Раскладка</strong> — пять готовых видов: «Классика», «Совещание», «Сцена», «Сводка», «Минимум». Кнопка расставляет элементы и подгоняет масштабы так, чтобы всё поместилось</li>
-                                <li>Элементы: текущее время, начало и окончание мероприятия, «до завершения», название, подпись над таймером и плашка состояния</li>
-                                <li>Горячие клавиши: <strong>D</strong> — открыть / закрыть, <strong>Esc</strong> — закрыть все окна</li>
+                                <li>Элементы: текущее время, начало и окончание мероприятия, «до завершения», название, подпись над таймером, плашка состояния и САМ ТАЙМЕР — его тоже можно перетащить куда угодно</li>
+                                <li>Названия плашек можно заменить своими: поля «Названия плашек» ниже. Пустое поле — стандартная подпись</li>
+                                <li>Горячие клавиши: <strong>D</strong> — открыть / закрыть. <strong>Esc</strong> окна не гасит: на совещании его жмут рефлекторно</li>
                             </ul>
                         </div>
                     </div>
@@ -993,7 +998,8 @@
                                 <div class="shortcut"><span class="key">C</span> <span class="shortcut-desc">Виджет часов (открыть / закрыть)</span></div>
                                 <div class="shortcut"><span class="key">D</span> <span class="shortcut-desc">Полноэкранный дисплей (открыть / закрыть)</span></div>
                                 <div class="shortcut"><span class="key">M</span> <span class="shortcut-desc">Свернуть окно в полосу (и обратно)</span></div>
-                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть все окна</span></div>
+                                <div class="shortcut"><span class="key">Z</span> <span class="shortcut-desc">Звук включить / выключить</span></div>
+                                <div class="shortcut"><span class="key">Esc</span> <span class="shortcut-desc">Закрыть настройки, модалку или справку</span></div>
                                 <div class="shortcut"><span class="key">F1</span> <span class="shortcut-desc">Шпаргалка по клавишам</span></div>
                             </div>
                         </div>
@@ -1830,6 +1836,7 @@
                     // старое значение soundEnabled=false из localStorage навсегда
                     // глушило playSound(), хотя чекбокс показывал «включено».
                     this.setSoundEnabled(this.soundMasterEl.checked);
+                    this.renderSoundRow();  // строка «Звуки» показывает ТОТ ЖЕ чекбокс
                     this.saveExtSettings();
                 });
 
@@ -1951,6 +1958,7 @@
                 // Чекбокс — авторитет: подтягиваем к нему внутренний флаг, иначе
                 // сохранённое soundEnabled=false молча глушит все звуки.
                 this.setSoundEnabled(applied.soundMasterEnabled);
+                this.renderSoundRow();
                 const soundSettings = document.getElementById('soundSettings');
                 soundSettings.style.opacity = applied.soundMasterEnabled ? '1' : '0.5';
                 soundSettings.style.pointerEvents = applied.soundMasterEnabled ? 'auto' : 'none';
@@ -2886,17 +2894,6 @@
             });
         });
 
-        // Есть ли открытый слой UI, который сам обрабатывает Escape?
-        // Порядок слоёв: справка по горячим клавишам → модалки → панель настроек.
-        function _isEscapeConsumedByOverlay() {
-            if (document.getElementById('keyboard-shortcuts-overlay')) { return true; }
-            const modals = [resetModal, exitModal, faqModal];
-            if (modals.some(m => m && m.classList.contains('show'))) { return true; }
-            const drawer = document.getElementById('settingsDrawer');
-            if (drawer && drawer.classList.contains('open')) { return true; }
-            return false;
-        }
-
         // FIX BUG-027: Keyboard shortcuts
         const _onGlobalShortcutsKeydown = (event) => {
             // Ignore if user is typing in an input field
@@ -3005,18 +3002,19 @@
                 }
             }
 
-            // Escape: закрыть все дочерние окна — но ТОЛЬКО если Esc не «занят»
-            // более близким слоем UI. Открытая модалка или выехавшая панель
-            // настроек обрабатывают Esc сами; без этой проверки одно нажатие
-            // одновременно закрывало модалку И убивало виджет/часы/дисплей.
-            else if (event.code === 'Escape') {
-                if (_isEscapeConsumedByOverlay()) { return; }
+            // Ветки Escape здесь БОЛЬШЕ НЕТ (просьба 24.08.2026: «сделать так,
+            // чтобы ескейп не выключал окна»). Она гасила разом дисплей, виджет
+            // и часы, и потому требовала охранника `_isEscapeConsumedByOverlay`:
+            // одно нажатие закрывало модалку И убивало три окна. Охранник ушёл
+            // вместе с веткой — сторожить больше нечего, а слои (справка,
+            // модалки, ящик, ручной ввод) как обрабатывали Esc сами, так и
+            // обрабатывают. Закрыть окно по-прежнему можно буквой: W / C / D.
+
+            // Z: мастер-звук (S занята паузой, M — полосой). Общий путь — тот
+            // же, что у клика по тумблеру строки (panel-state.js).
+            else if (event.code === 'KeyZ') {
                 event.preventDefault();
-                if (window.ipcRenderer) {
-                    window.ipcRenderer.send('close-display');
-                    window.ipcRenderer.send('close-widget');
-                    window.ipcRenderer.send('close-clock-widget');
-                }
+                window.timerController?.toggleSoundMaster();
             }
 
             // M: свернуть окно в полосу и обратно. Клавиша выбрана по коду из

@@ -101,12 +101,26 @@ function normalizeSlot(slot) {
 /**
  * Снять текущий вид.
  *
- * Отсутствующий ключ НЕ записывается вовсе (а не пишется как null): пресет
- * снят с профиля, в котором этой настройки не было, и применять её как
- * «пусто» значило бы стирать чужую настройку у того, кто пресет применяет.
+ * Отсутствие ключа — ТОЖЕ значение, и оно записывается как `null`.
+ *
+ * Раньше отсутствующий ключ в снимок не попадал вовсе, а рассуждение было
+ * такое: «применить его как пусто значило бы стереть чужую настройку». На деле
+ * получалось обратное — пресет переставал быть ВИДОМ. Записанный на профиле, где
+ * ничего не двигали, он не знал ключа `displayBlockPositions`; пользователь
+ * потом двигал таймер, применял пресет — и таймер оставался сдвинутым, потому
+ * что «этого ключа снимок не касается». Отметка «применён» при этом честно
+ * загоралась: сравнивать было нечего. То есть ряд ячеек показывал вид, которого
+ * на экране нет (жалоба 24.08.2026).
+ *
+ * Стереть настройку это не может по построению: стирается ровно то, чего в
+ * записанном ВИДЕ не было, и заменяется оно не пустотой, а умолчанием
+ * приложения — тем самым, что было на экране в момент записи.
+ *
+ * Снимки прошлых версий от этого не меняются: в них ключа просто нет, и
+ * сравнение с применением ведут себя как прежде.
  *
  * @param {Storage} storage
- * @returns {{savedAt:null, values:object}} снимок
+ * @returns {{values:object}} снимок
  */
 function capturePreset(storage) {
     const values = {};
@@ -114,7 +128,7 @@ function capturePreset(storage) {
     for (const key of PRESET_KEYS) {
         let raw;
         try { raw = storage.getItem(key); } catch { /* ключ недоступен — пропускаем */ }
-        if (typeof raw === 'string') { values[key] = raw; }
+        values[key] = typeof raw === 'string' ? raw : null;
     }
     return { values };
 }
@@ -130,10 +144,14 @@ function applyPreset(preset, storage) {
     if (!values || !storage) { return []; }
     const written = [];
     for (const key of PRESET_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(values, key)) { continue; }
         const raw = values[key];
-        if (typeof raw !== 'string') { continue; }
         try {
-            storage.setItem(key, raw);
+            // `null` означает «в записанном виде этого ключа не было» — значит
+            // и после применения его быть не должно (см. capturePreset).
+            if (raw === null) { storage.removeItem(key); }
+            else if (typeof raw === 'string') { storage.setItem(key, raw); }
+            else { continue; }
             written.push(key);
         } catch { /* квота: остальные ключи всё равно применяем */ }
     }
@@ -170,20 +188,19 @@ function writePreset(slot, preset, storage) {
 }
 
 /**
- * Каноничный вид значения для СРАВНЕНИЯ.
+ * Значение профиля, разобранное для СРАВНЕНИЯ.
  *
- * Значения в профиле — строки, и почти все они JSON. Панель пересобирает их
- * слиянием (`{ ...prev, ...settings }`), поэтому при тех же значениях порядок
- * ключей в строке может отличаться. Сравнение строк «как есть» гасило бы
- * отметку «применён» на ровном месте, поэтому объекты сравниваются с
- * упорядоченными ключами, а не-JSON остаётся строкой.
+ * Значения в профиле — строки, и почти все они JSON. Строка «как есть» для
+ * сравнения не годится: панель пересобирает настройки слиянием
+ * (`{ ...prev, ...settings }`), поэтому при тех же значениях порядок ключей
+ * может отличаться. Не-JSON остаётся строкой.
  */
-function canonicalValue(raw) {
-    if (typeof raw !== 'string') { return null; }
+function parsedValue(raw) {
+    if (typeof raw !== 'string') { return undefined; }
     const trimmed = raw.trim();
     if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) { return raw; }
     try {
-        return JSON.stringify(sortDeep(JSON.parse(trimmed)));
+        return JSON.parse(trimmed);
     } catch {
         return raw;
     }
@@ -197,6 +214,42 @@ function sortDeep(value) {
         return out;
     }
     return value;
+}
+
+/**
+ * Содержится ли СНИМОК в текущем значении.
+ *
+ * Сравнение намеренно НЕ строгое равенство, и это то же правило, которое
+ * модуль объявляет уровнем выше («сравниваются только ключи снимка»), опущенное
+ * на уровень полей внутри значения.
+ *
+ * Жалоба 24.08.2026: «опять беда с визуальным применением пресета, не выделен
+ * никак когда я применил». Причина — не отметка, а сравнение. Снимок хранит
+ * `displayExtSettings` целой строкой, а панель после применения пересобирает
+ * профиль в ТЕКУЩЕЙ форме: `saveExtSettings()` пишет ВСЮ таблицу настроек,
+ * включая поля, которых на момент записи пресета не существовало (в тот день их
+ * прибавилось четыре — свои подписи плашек). Строгое равенство после этого не
+ * сходится никогда, и отметка гасла сразу после клика на каждом пресете,
+ * записанном прошлой версией приложения. И это не разовая беда: ЛЮБАЯ будущая
+ * настройка ломала бы все записанные пресеты тем же способом.
+ *
+ * Односторонность важна: лишнее поле В ПРОФИЛЕ (о нём снимок ничего не знает и
+ * применение его не касается) отметку не гасит, а вот пропавшее или изменённое
+ * поле СНИМКА — гасит. Иначе «применён» превратился бы во «всегда да».
+ */
+function containsValue(snapshot, current) {
+    if (Array.isArray(snapshot) || Array.isArray(current)) {
+        return JSON.stringify(sortDeep(snapshot)) === JSON.stringify(sortDeep(current));
+    }
+    if (snapshot && typeof snapshot === 'object') {
+        if (!current || typeof current !== 'object') { return false; }
+        for (const [field, value] of Object.entries(snapshot)) {
+            if (!Object.prototype.hasOwnProperty.call(current, field)) { return false; }
+            if (!containsValue(value, current[field])) { return false; }
+        }
+        return true;
+    }
+    return snapshot === current;
 }
 
 /**
@@ -214,12 +267,20 @@ function sortDeep(value) {
 function matchesPreset(preset, storage) {
     const values = preset && preset.values ? preset.values : null;
     if (!values || !storage) { return false; }
-    const keys = PRESET_KEYS.filter((key) => typeof values[key] === 'string');
+    const keys = PRESET_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(values, key));
     if (!keys.length) { return false; }
     for (const key of keys) {
         let raw;
         try { raw = storage.getItem(key); } catch { return false; }
-        if (canonicalValue(raw) !== canonicalValue(values[key])) { return false; }
+        // Записанное отсутствие ключа — такое же условие, как записанное
+        // значение: ключ, появившийся в профиле после записи, означает, что вид
+        // изменился (например, таймер сдвинули, и завёлся displayBlockPositions).
+        if (values[key] === null) {
+            if (typeof raw === 'string' && raw.trim() !== '' && raw.trim() !== '{}') { return false; }
+            continue;
+        }
+        if (typeof values[key] !== 'string') { continue; }
+        if (!containsValue(parsedValue(values[key]), parsedValue(raw))) { return false; }
     }
     return true;
 }

@@ -43,6 +43,36 @@ const LABEL_KEYS = Schema.DISPLAY_LABEL_KEYS;
 const DISPLAY_TOGGLE_KEYS = BLOCK_KEYS.concat(LABEL_KEYS);
 
 /**
+ * Реестр подписей: id элемента → ключ настройки и стандартное слово.
+ *
+ * Берётся из display-layouts.js, а не пишется здесь списком: то же знание
+ * нужно дисплею (подставить стандартную подпись) и тесту (сверить разметку),
+ * и три копии слова «Начало» разъехались бы молча.
+ */
+const Layouts = (typeof window !== 'undefined' && window.DisplayLayouts)
+    ? window.DisplayLayouts
+    : require('./display-layouts');
+
+/**
+ * Значения полей с кастомными подписями блоков.
+ *
+ * @param {Document} doc
+ * @returns {object} ключ настройки → введённая строка (как есть)
+ *
+ * Обрезкой и подстановкой умолчания занимается ДИСПЛЕЙ (blockCaption): панель
+ * хранит ровно то, что человек напечатал, иначе его собственный текст
+ * менялся бы под курсором.
+ */
+function collectBlockLabels(doc) {
+    const out = {};
+    for (const el of Layouts.LABELLED_ELEMENTS) {
+        const node = doc.getElementById(el.labelKey);
+        if (node) { out[el.labelKey] = String(node.value || ''); }
+    }
+    return out;
+}
+
+/**
  * Значения всех тумблеров дисплея одним объектом.
  *
  * @param {Document} doc
@@ -102,7 +132,7 @@ const PanelDisplayMixin = {
             timerStyle: styleEl.value,
             timerScale: parseInt(scaleEl.value, 10),
             displayDigitsFont: this.displayDigitsFontEl ? this.displayDigitsFontEl.value : 'inter'
-        }, collectDisplayToggles(document));
+        }, collectDisplayToggles(document), collectBlockLabels(document));
 
         window.ipcRenderer.send('display-settings-update', settings);
     },
@@ -128,6 +158,49 @@ const PanelDisplayMixin = {
         }
         if (this.eventTitleInputEl) {
             this.eventTitleInputEl.addEventListener('input', () => this.pushDisplaySettings());
+        }
+        this.bindBlockLabelRows();
+    },
+
+    /**
+     * Поля «своё название плашки» — по одному на блок времени.
+     *
+     * Разметку строит модуль, а не HTML: список блоков живёт в реестре
+     * (display-layouts.js), и ряды обязаны выводиться ИЗ него. Стандартное
+     * слово стоит и подписью ряда, и placeholder'ом поля — так видно, что
+     * покажет дисплей, если поле оставить пустым.
+     *
+     * Значение поля таблица настроек раскладывает сама (ключ = id контрола),
+     * поэтому ряды строятся ДО applyStoredSettings — иначе класть было бы
+     * некуда. Порядок держит bindDisplayBlockControls, вызываемая при сборке
+     * контроллера.
+     */
+    bindBlockLabelRows() {
+        const mount = document.getElementById('blockLabelRows');
+        const Layouts = window.DisplayLayouts;
+        if (!mount || !Layouts) { return; }
+        mount.textContent = '';
+        for (const el of Layouts.LABELLED_ELEMENTS) {
+            const row = document.createElement('div');
+            row.className = 'toggle-row';
+
+            const label = document.createElement('label');
+            label.className = 'toggle-label';
+            label.setAttribute('for', el.labelKey);
+            label.textContent = el.caption;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = el.labelKey;
+            input.className = 'srow-input';
+            input.maxLength = Layouts.MAX_CAPTION;
+            input.placeholder = el.caption;
+            input.setAttribute('aria-label', `Своё название плашки «${el.caption}»`);
+            input.addEventListener('input', () => this.pushDisplaySettings());
+
+            row.appendChild(label);
+            row.appendChild(input);
+            mount.appendChild(row);
         }
     },
 
@@ -215,10 +288,16 @@ const PanelDisplayMixin = {
 };
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PanelDisplayMixin, collectDisplayToggles, BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS };
+    module.exports = {
+    PanelDisplayMixin, collectDisplayToggles, collectBlockLabels,
+    BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
+};
 }
 
 if (typeof window !== 'undefined') {
     window.PanelDisplayMixin = PanelDisplayMixin;
-    window.PanelDisplay = { collectDisplayToggles, BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS };
+    window.PanelDisplay = {
+        collectDisplayToggles, collectBlockLabels,
+        BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
+    };
 }
