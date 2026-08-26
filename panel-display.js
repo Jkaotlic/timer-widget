@@ -345,6 +345,17 @@ const PanelDisplayMixin = {
         for (const el of [this.overrunPriceEl, this.overrunPeriodEl]) {
             if (el) { el.addEventListener('input', () => this.pushDisplaySettings()); }
         }
+
+        // Тумблеры денег подписывает ТОТ, КТО ИХ СТРОИТ.
+        //
+        // Общий проход по ключам таблицы в bindDisplayBlockControls случается
+        // РАНЬШЕ, чем эта секция появляется в документе, — там их ещё нет, и
+        // обработчик им не достаётся. Симптом был бесшумный: тумблер щёлкал,
+        // галочка вставала, а в окно не уходило ничего.
+        for (const el of Layouts.SECRET_ELEMENTS) {
+            const node = document.getElementById(el.toggle);
+            if (node) { node.addEventListener('change', () => this.pushDisplaySettings()); }
+        }
         if (this.floor47UnlockedEl) {
             this.floor47UnlockedEl.addEventListener('change', () => {
                 this.renderFloor47();

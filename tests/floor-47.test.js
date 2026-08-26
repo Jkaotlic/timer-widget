@@ -220,3 +220,17 @@ test('обе команды мероприятия уходят из панел�
     assert.ok(src.includes("send('event-finish')"), 'панель не шлёт event-finish');
     assert.ok(src.includes("send('event-reset')"), 'панель не шлёт event-reset');
 });
+
+test('тумблеры денег подписывает тот, кто их строит', () => {
+    // Общий проход по ключам таблицы случается РАНЬШЕ, чем модуль строит
+    // секцию: там этих контролов ещё нет. Симптом бесшумный — тумблер щёлкает,
+    // галочка встаёт, а в окно не уходит ничего.
+    const src = codeOnly(read('panel-display.js'));
+    // Искать надо ОПРЕДЕЛЕНИЕ, а не первое упоминание имени: вызов метода
+    // стоит выше по файлу, и срез от него охватил бы чужой код.
+    const at = src.indexOf('\n    bindFloor47() {');
+    assert.ok(at > 0, 'в модуле нет метода bindFloor47');
+    const body = src.slice(at, src.indexOf('\n    renderFloor47() {', at));
+    assert.ok(/SECRET_ELEMENTS/.test(body) && /addEventListener\('change'/.test(body),
+        'построенные модулем тумблеры остались без обработчика');
+});
