@@ -398,9 +398,10 @@ const PanelDisplayMixin = {
         if (this.floor47SectionEl) {
             this.floor47SectionEl.hidden = !this.isFloor47Unlocked();
         }
-        // Ряды подписей строятся из реестра и знают про секретность, поэтому
-        // после смены замка их надо пересобрать.
+        // Ряды подписей и кнопки раскладок строятся из реестра и знают про
+        // секретность, поэтому после смены замка их надо пересобрать.
         this.bindBlockLabelRows();
+        this.bindDisplayLayouts();
     },
 
     bindBlockLabelRows() {
@@ -447,6 +448,11 @@ const PanelDisplayMixin = {
         if (!grid || !Layouts) { return; }
         grid.textContent = '';
         for (const layout of Layouts.LAYOUTS) {
+            // Секретная раскладка появляется вместе с разделом «47-го этажа».
+            // Кнопка с таким названием в общем списке рассказывала бы про режим
+            // каждому, кто открыл настройки, — а прятать сам раздел тогда
+            // незачем.
+            if (layout.secret && !this.isFloor47Unlocked()) { continue; }
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'layout-btn';

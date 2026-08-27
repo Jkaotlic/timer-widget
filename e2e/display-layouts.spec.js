@@ -90,6 +90,16 @@ const readScales = (page) => page.evaluate(() => {
 const NODES = MOVABLE.map((m) => m.node);
 
 /**
+ * Раскладки, которые панель предлагает на ЗАПЕРТОМ профиле.
+ *
+ * Секретная («47-й этаж») появляется в списке только после разблокировки
+ * режима — иначе кнопка с таким названием рассказывала бы про него каждому,
+ * кто открыл настройки. Здешние спеки работают на обычном профиле, поэтому
+ * перебирают открытые; секретную по клику проверяет e2e/floor-47.spec.js.
+ */
+const PUBLIC_LAYOUTS = DL.LAYOUTS.filter((l) => !l.secret);
+
+/**
  * Дождаться, пока размер элемента ОСЯДЕТ.
  *
  * Масштаб живёт в `transform: scale(var(--info-scale))`, и на `transform`
@@ -310,9 +320,9 @@ test('каждая раскладка применяется КЛИКОМ и н�
 
         // Кнопки должны быть на экране и кликабельны — по одной на раскладку.
         const buttons = control.locator('#displayLayoutGrid .layout-btn');
-        await expect(buttons).toHaveCount(DL.LAYOUTS.length);
+        await expect(buttons).toHaveCount(PUBLIC_LAYOUTS.length);
 
-        for (const layout of DL.LAYOUTS) {
+        for (const layout of PUBLIC_LAYOUTS) {
             await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout.id}"]`).click();
             await display.waitForTimeout(900);
 
@@ -708,7 +718,7 @@ test('раскладка на низком окне не кладёт карто
             expect(`${got.w}×${got.h}`, 'окно не приняло заданный размер — замер относится не к тому кадру')
                 .toBe(`${size.w}×${size.h}`);
 
-            for (const layout of DL.LAYOUTS) {
+            for (const layout of PUBLIC_LAYOUTS) {
                 await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout.id}"]`).click();
                 await display.waitForTimeout(1000);
 

@@ -1452,9 +1452,17 @@ class DisplayTimer {
         }
 
         const unlocked = this.floor47Unlocked === true;
+        // «Перелимит» слушается ТУМБЛЕРА, как все остальные блоки.
+        //
+        // До 26.08.2026 он прятался, пока таймер в плюсе («висящий весь доклад
+        // ноль мозолит глаз»). Правило проиграло кадру: раскладка кладёт
+        // элементы по ЖИВЫМ габаритам, а у спрятанного прямоугольник нулевой —
+        // разложить его нечем, и он оставался в домашнем углу поверх соседа.
+        // Блок, впрыгивающий на место только с началом перерасхода, хуже нуля
+        // на экране.
         if (this.overrunCostBlock) {
             this.overrunCostBlock.classList.toggle('visible',
-                unlocked && this.showOverrunCost === true && live > 0);
+                unlocked && this.showOverrunCost === true);
         }
         if (this.totalCostBlock) {
             this.totalCostBlock.classList.toggle('visible',

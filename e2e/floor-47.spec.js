@@ -122,13 +122,17 @@ test('ступени: 1000 ₽ за каждые 3 секунды перелим
             expect(got.over, `${seconds} с при ставке 1000/3`).toBe(expected);
         }
 
-        // «Перелимит» показан только в минусе, «Итого» — всегда.
+        // Оба блока слушаются ТУМБЛЕРА и в плюсе тоже: раскладка кладёт
+        // элементы по живым габаритам, а у спрятанного прямоугольник нулевой —
+        // прятавшийся «Перелимит» оставался в домашнем углу поверх соседа.
         await display.evaluate(() => {
             window.displayTimer.remainingSeconds = 60;
             window.displayTimer.updateMoneyBlocks();
         });
-        await expect(display.locator('#overrunCostBlock')).not.toHaveClass(/visible/);
+        await expect(display.locator('#overrunCostBlock')).toHaveClass(/visible/);
         await expect(display.locator('#totalCostBlock')).toHaveClass(/visible/);
+        expect(await display.locator('#overrunCostValue').textContent(),
+            'в плюсе перелимит обязан показывать ноль, а не прошлую сумму').toBe(`0${NB}₽`);
     } finally {
         await control.evaluate(() => window.ipcRenderer.send('close-display')).catch(() => {});
         await relock(control);
@@ -167,6 +171,62 @@ test('«Новое мероприятие» спрашивает и обнуля
         expect(total).toBe('0\u00A0₽');
     } finally {
         await control.evaluate(() => window.ipcRenderer.send('close-display')).catch(() => {});
+        await relock(control);
+        await app.close();
+    }
+});
+
+test('раскладка «47-й этаж» появляется только с режимом и раскладывает деньги ПО КЛИКУ', async () => {
+    test.setTimeout(200000);
+    const { app, control } = await launchApp();
+    try {
+        await openDisplayTab(control);
+        // Кнопки секретной раскладки на запертом профиле нет вовсе — иначе она
+        // рассказывала бы про режим каждому, кто открыл настройки.
+        const btn = control.locator('#displayLayoutGrid .layout-btn[data-layout="floor47"]');
+        await expect(btn).toHaveCount(0);
+        // Само-проверка зонда: обычные кнопки он видит и на запертом профиле.
+        await expect(control.locator('#displayLayoutGrid .layout-btn')).not.toHaveCount(0);
+
+        await unlock(control);
+        await expect(btn).toHaveCount(1);
+
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await control.waitForTimeout(2400);
+        const display = await findDisplay(app);
+        expect(display, 'окно дисплея не найдено').not.toBeNull();
+
+        await btn.click();
+        await display.waitForTimeout(1600);
+
+        const seen = await display.evaluate(() => {
+            const box = (id) => {
+                const el = document.getElementById(id);
+                const r = el.getBoundingClientRect();
+                return {
+                    visible: el.classList.contains('visible'),
+                    cx: Math.round(r.left + r.width / 2),
+                    cy: Math.round(r.top + r.height / 2)
+                };
+            };
+            return { over: box('overrunCostBlock'), total: box('totalCostBlock'), w: window.innerWidth };
+        });
+        console.log(`   перелимит ${seen.over.cx},${seen.over.cy} · итого ${seen.total.cx},${seen.total.cy} · окно ${seen.w}`);
+
+        expect(seen.over.visible, 'раскладка не включила «Перелимит»').toBe(true);
+        expect(seen.total.visible, 'раскладка не включила «Итого»').toBe(true);
+        // Зеркально по бокам от таймера: один левее середины, другой правее.
+        expect(seen.over.cx, '«Перелимит» не слева от центра').toBeLessThan(seen.w / 2);
+        expect(seen.total.cx, '«Итого» не справа от центра').toBeGreaterThan(seen.w / 2);
+        // И на одной высоте — раскладка задумана симметричной.
+        expect(Math.abs(seen.over.cy - seen.total.cy),
+            `деньги встали на разной высоте: ${seen.over.cy} против ${seen.total.cy}`).toBeLessThanOrEqual(8);
+    } finally {
+        await control.evaluate(() => {
+            window.ipcRenderer.send('close-display');
+            localStorage.removeItem('displayBlockPositions');
+            localStorage.removeItem('displayBlockScales');
+        }).catch(() => {});
         await relock(control);
         await app.close();
     }

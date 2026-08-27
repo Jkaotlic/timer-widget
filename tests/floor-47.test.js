@@ -89,11 +89,15 @@ test('реестр знает два денежных элемента и пом
     assert.deepEqual(Layouts.SECRET_ELEMENTS.map((el) => el.id), SECRET);
 });
 
-test('раскладки денежных элементов НЕ трогают', () => {
-    // Иначе оператор, выбравший раскладку посреди мероприятия, погасил бы
-    // деньги на экране: ни в одной раскладке их координат нет, и общий
-    // проход выключил бы им тумблеры.
+test('раскладка, которая про деньги НЕ знает, их и не трогает', () => {
+    // Иначе оператор, выбравший обычную раскладку посреди мероприятия, погасил
+    // бы деньги на экране: их координат там нет, и общий проход выключил бы им
+    // тумблеры. Правило уточнено 26.08.2026, когда появилась раскладка «47-й
+    // этаж»: не «секретное никогда», а «секретным распоряжается только тот, кто
+    // его перечислил».
     for (const layout of Layouts.LAYOUTS) {
+        const mentions = SECRET.some((id) => layout.elements[id]);
+        if (mentions) { continue; }
         const toggles = Layouts.layoutToggles(layout);
         const scales = Layouts.layoutScales(layout);
         for (const id of SECRET) {
@@ -104,6 +108,39 @@ test('раскладки денежных элементов НЕ трогают
                 `раскладка ${layout.id} трогает масштаб ${id}`);
         }
     }
+});
+
+test('раскладка «47-й этаж» деньгами РАСПОРЯЖАЕТСЯ и сама секретна', () => {
+    const floor = Layouts.layoutById('floor47');
+    assert.ok(floor, 'раскладки «47-й этаж» нет в реестре');
+    assert.equal(floor.secret, true,
+        'раскладка не помечена секретной — её кнопка расскажет про режим каждому');
+
+    const toggles = Layouts.layoutToggles(floor);
+    const scales = Layouts.layoutScales(floor);
+    for (const id of SECRET) {
+        const row = Layouts.DISPLAY_ELEMENTS.find((el) => el.id === id);
+        assert.equal(toggles[row.toggle], true, `${id}: раскладка не включает блок`);
+        assert.ok(scales[id] > 0, `${id}: раскладка не задаёт масштаб`);
+    }
+    // Деньги здесь главные — они крупнее соседних карточек времени.
+    assert.ok(scales.overrunCost > scales.currentTime,
+        'деньги не крупнее карточек времени — ради них раскладка и заведена');
+
+    // Само-проверка: у раскладки, про деньги не знающей, тех же ключей нет.
+    const classic = Layouts.layoutToggles(Layouts.layoutById('classic'));
+    assert.equal(classic.showOverrunCost, undefined, 'зонд не различает раскладки');
+});
+
+test('секретную раскладку панель не показывает, пока режим заперт', () => {
+    const src = codeOnly(read('panel-display.js'));
+    // Ищем ОПРЕДЕЛЕНИЕ, а не первое упоминание имени: вызов метода стоит выше
+    // по файлу (его зовёт renderFloor47), и срез от него охватил бы чужой код.
+    const at = src.indexOf('\n    bindDisplayLayouts() {');
+    assert.ok(at > 0, 'не найден построитель кнопок раскладок');
+    const body = src.slice(at, at + 1200);
+    assert.ok(/layout\.secret/.test(body),
+        'кнопки раскладок не спрашивают про секретность — «47-й этаж» увидит каждый');
 });
 
 test('семь несекретных элементов раскладка по-прежнему задаёт полностью', () => {

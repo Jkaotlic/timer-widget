@@ -82,6 +82,23 @@ const SECRET_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => el.secret);
 const LAYOUT_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => !el.secret);
 
 /**
+ * Распоряжается ли ЭТА раскладка этим элементом.
+ *
+ * Обычным элементом — всегда: раскладка задаёт тумблер и масштаб каждому, кем
+ * распоряжается, иначе включённый потом руками блок пришёл бы с масштабом от
+ * прошлой раскладки.
+ *
+ * Секретным (деньги «47-го этажа») — ТОЛЬКО если раскладка его перечисляет.
+ * Иначе общий проход выключал бы деньги ровно посреди мероприятия у оператора,
+ * выбравшего обычную раскладку. Раскладка, которая деньги перечислила, знает,
+ * что делает, — она для них и написана.
+ */
+function layoutOwns(layout, el) {
+    if (!el.secret) { return true; }
+    return !!(layout && layout.elements && layout.elements[el.id]);
+}
+
+/**
  * Потолок длины подписи.
  *
  * Не про безопасность (в окно подпись попадает через textContent), а про
@@ -249,6 +266,37 @@ const LAYOUTS = [
         }
     },
     {
+        // Скрытый режим «47-й этаж». `secret: true` держит её ВНЕ списка кнопок
+        // панели, пока режим не разблокирован: иначе кнопка с таким названием
+        // рассказывала бы про режим каждому, кто открыл настройки.
+        //
+        // Деньги стоят ПО БОКАМ от таймера, а не в нижнем ряду, и это не вкус:
+        // в нижнем ряду четыре карточки на 1280 px оставляют между собой
+        // семь пикселей (см. «Сводку»), то есть увеличить их было бы нельзя.
+        // Сбоку от таймера запаса больше — на 1280×720 колонка шириной 466 px
+        // при карточке 390 px, — и деньги помещаются на 130 %, крупнее
+        // остальных. Они здесь главные, ради них раскладка и заведена.
+        //
+        // Низ центра оставлен свободным намеренно: там стоит плашка состояния,
+        // и «Сводка» её выключает именно потому, что кладёт туда карточки.
+        id: 'floor47',
+        secret: true,
+        name: '47-й этаж',
+        hint: 'Деньги по бокам от таймера, время по углам',
+        timerScale: 88,
+        elements: {
+            eventTitle: { cx: 0.50, cy: 0.07, scale: 110 },
+            currentTime: { cx: 0.12, cy: 0.12, scale: 110 },
+            timeLeft: { cx: 0.88, cy: 0.12, scale: 110 },
+            overrunCost: { cx: 0.17, cy: 0.50, scale: 130 },
+            totalCost: { cx: 0.83, cy: 0.50, scale: 130 },
+            eventTime: { cx: 0.13, cy: 0.90, scale: 110 },
+            endTime: { cx: 0.87, cy: 0.90, scale: 110 },
+            heroLabel: { flow: true, scale: 100 },
+            statusPill: { flow: true, scale: 100 }
+        }
+    },
+    {
         id: 'minimal',
         name: 'Минимум',
         hint: 'Один таймер, без подписей и блоков',
@@ -270,7 +318,8 @@ function layoutById(id) {
  */
 function layoutToggles(layout) {
     const out = {};
-    for (const el of LAYOUT_ELEMENTS) {
+    for (const el of DISPLAY_ELEMENTS) {
+        if (!layoutOwns(layout, el)) { continue; }
         out[el.toggle] = !!(layout && layout.elements && layout.elements[el.id]);
     }
     return out;
@@ -285,7 +334,8 @@ function layoutToggles(layout) {
  */
 function layoutScales(layout) {
     const out = {};
-    for (const el of LAYOUT_ELEMENTS) {
+    for (const el of DISPLAY_ELEMENTS) {
+        if (!layoutOwns(layout, el)) { continue; }
         const entry = layout && layout.elements ? layout.elements[el.id] : null;
         const own = entry ? clampScale(entry.scale) : null;
         out[el.id] = own === null ? defaultScale(el.id) : own;
