@@ -89,6 +89,37 @@ const readScales = (page) => page.evaluate(() => {
 
 const NODES = MOVABLE.map((m) => m.node);
 
+/**
+ * Дождаться, пока размер элемента ОСЯДЕТ.
+ *
+ * Масштаб живёт в `transform: scale(var(--info-scale))`, и на `transform`
+ * висит переход 0.3 с: переменная меняется мгновенно, матрица едет. Замер
+ * 26.08.2026 по кадрам после Ctrl+колеса: сразу переменная уже 1.6, а матрица
+ * ещё 1.5; +100 мс — 1.546; +250 мс — 1.599; +500 мс — ровно 1.6.
+ *
+ * Отсюда мигание на CI: тест ждал фиксированные 250 мс, то есть попадал в
+ * самый конец анимации. На загруженном раннере переход стартует позже, и
+ * замер видит СТАРЫЙ размер при уже НОВОЙ переменной — ровно то, чем краснела
+ * macOS-джоба: «масштаб вырос, а элемент — нет (261.07 → 261.07)».
+ *
+ * Ждём не время, а условие: ширина не меняется три кадра подряд. Потолок в
+ * 120 кадров (~2 с) — чтобы зависший переход не превратился в вечное
+ * ожидание, а упал на самом утверждении теста.
+ */
+const waitSettled = (page, nodeId) => page.evaluate(async (id) => {
+    const el = document.getElementById(id);
+    if (!el) { return null; }
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    let last = -1;
+    let stable = 0;
+    for (let i = 0; i < 120 && stable < 3; i++) {
+        await frame();
+        const w = Math.round(el.getBoundingClientRect().width * 100) / 100;
+        if (w === last) { stable += 1; } else { stable = 0; last = w; }
+    }
+    return last;
+}, nodeId);
+
 function overlaps(a, b) {
     return a.left < b.left + b.width && b.left < a.left + a.width
         && a.top < b.top + b.height && b.top < a.top + a.height;
@@ -160,7 +191,9 @@ test('Ctrl+колесо над элементом меняет размер ТО
                     deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true
                 }));
             }, target.node);
-            await display.waitForTimeout(250);
+            // Не пауза, а условие: см. waitSettled — на transform висит переход
+            // 0.3 с, и фиксированные 250 мс мигали на медленной машине.
+            await waitSettled(display, target.node);
 
             const boxesAfter = await readBoxes(display, NODES);
             const scalesAfter = await readScales(display);
