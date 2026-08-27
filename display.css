@@ -315,7 +315,14 @@ body.style-digits .info-value {
        настроек. */
     font-family: var(--digits-font-family, var(--tw-font-sans));
     font-weight: var(--digits-font-weight, 700);
-    color: var(--info-color, var(--tw-led-green));
+    /* Цвет — ОБЫЧНЫЙ текст, как у «Флипа» и «Круга».
+       До 26.08.2026 здесь стоял `--tw-led-green` — остаток стиля LED, слитого
+       с «Цифрами» 13.08.2026. Он противоречил комментарию выше (стиль несёт
+       ШРИФТ, а не цвет) и красил блок под табло, которое само уже не зелёное:
+       замер на светлом тоне давал rgb(18,101,47) у блока при rgb(29,29,31) у
+       цифр таймера. Зелёной осталась ПОДПИСЬ — у неё свой тон-зависимый
+       `--style-led-label`, и это решение держит tests/contrast.test.js. */
+    color: var(--info-color, var(--tw-fg));
     /* Неон снят редизайном 2026-08-12. */
     text-shadow: var(--style-ink-shadow);
 }
