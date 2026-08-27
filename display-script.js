@@ -36,6 +36,7 @@ class DisplayTimer {
         // знает только 'checkbox' и 'value'), к числу её приводит money-meter.
         this.eventOverrunSeconds = 0;
         this.eventFinished = false;
+        this.excludedLiveSeconds = 0;
         this.floor47Unlocked = false;
         this.showOverrunCost = false;
         this.showTotalCost = false;
@@ -1404,6 +1405,9 @@ class DisplayTimer {
             if (!payload || typeof payload !== 'object') { return; }
             this.eventOverrunSeconds = Number(payload.overrunSeconds) || 0;
             this.eventFinished = !!payload.finished;
+            // Отсечка: секунды минуса, натикавшие до «Нового мероприятия». Они
+            // не относятся ни к «Перелимиту», ни к «Итого».
+            this.excludedLiveSeconds = Number(payload.excludedLiveSeconds) || 0;
             this.updateMoneyBlocks();
         };
         this.ipcRenderer.on('event-overrun-state', this.ipcHandlers.eventOverrunState);
@@ -1438,7 +1442,8 @@ class DisplayTimer {
     updateMoneyBlocks() {
         const Money = window.MoneyMeter;
         if (!Money) { return; }
-        const live = Money.overrunSeconds(this.remainingSeconds);
+        const excluded = this.excludedLiveSeconds || 0;
+        const live = Money.liveOverrun(this.remainingSeconds, excluded);
         const price = this.overrunPrice;
         const period = this.overrunPeriod;
 
@@ -1447,7 +1452,7 @@ class DisplayTimer {
         }
         if (this.totalCostValueEl) {
             this.totalCostValueEl.textContent = Money.formatMoney(
-                Money.totalCost(this.eventOverrunSeconds, this.remainingSeconds, price, period)
+                Money.totalCost(this.eventOverrunSeconds, this.remainingSeconds, price, period, excluded)
             );
         }
 

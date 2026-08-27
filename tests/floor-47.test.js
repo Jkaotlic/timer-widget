@@ -89,23 +89,20 @@ test('реестр знает два денежных элемента и пом
     assert.deepEqual(Layouts.SECRET_ELEMENTS.map((el) => el.id), SECRET);
 });
 
-test('раскладка, которая про деньги НЕ знает, их и не трогает', () => {
-    // Иначе оператор, выбравший обычную раскладку посреди мероприятия, погасил
-    // бы деньги на экране: их координат там нет, и общий проход выключил бы им
-    // тумблеры. Правило уточнено 26.08.2026, когда появилась раскладка «47-й
-    // этаж»: не «секретное никогда», а «секретным распоряжается только тот, кто
-    // его перечислил».
+test('раскладка описывает ВЕСЬ экран: не перечислила деньги — гасит их', () => {
+    // Здесь стояло обратное утверждение: раскладка, не знающая про деньги, их
+    // не трогает. Замысел был «не гасить деньги посреди мероприятия», и он
+    // проиграл жалобе 27.08.2026 «когда старые раскладки делаю, перелимит и
+    // итог остаются на экране». Раскладка, оставляющая на экране то, чего в ней
+    // нет, — сломанная раскладка: «Минимум» обещает «один таймер, без подписей
+    // и блоков».
     for (const layout of Layouts.LAYOUTS) {
-        const mentions = SECRET.some((id) => layout.elements[id]);
-        if (mentions) { continue; }
         const toggles = Layouts.layoutToggles(layout);
-        const scales = Layouts.layoutScales(layout);
         for (const id of SECRET) {
             const row = Layouts.DISPLAY_ELEMENTS.find((el) => el.id === id);
-            assert.equal(toggles[row.toggle], undefined,
-                `раскладка ${layout.id} трогает тумблер ${row.toggle}`);
-            assert.equal(scales[id], undefined,
-                `раскладка ${layout.id} трогает масштаб ${id}`);
+            const mentioned = !!layout.elements[id];
+            assert.equal(toggles[row.toggle], mentioned,
+                `${layout.id}: тумблер ${row.toggle} не совпал с тем, перечислен ли элемент`);
         }
     }
 });
@@ -127,9 +124,10 @@ test('раскладка «47-й этаж» деньгами РАСПОРЯЖА�
     assert.ok(scales.overrunCost > scales.currentTime,
         'деньги не крупнее карточек времени — ради них раскладка и заведена');
 
-    // Само-проверка: у раскладки, про деньги не знающей, тех же ключей нет.
+    // Само-проверка: обычная раскладка те же тумблеры ГАСИТ. Ключ есть у обеих,
+    // различаются они значением — раскладка описывает весь экран.
     const classic = Layouts.layoutToggles(Layouts.layoutById('classic'));
-    assert.equal(classic.showOverrunCost, undefined, 'зонд не различает раскладки');
+    assert.equal(classic.showOverrunCost, false, 'обычная раскладка не гасит деньги');
 });
 
 test('секретную раскладку панель не показывает, пока режим заперт', () => {
@@ -143,11 +141,11 @@ test('секретную раскладку панель не показывае
         'кнопки раскладок не спрашивают про секретность — «47-й этаж» увидит каждый');
 });
 
-test('семь несекретных элементов раскладка по-прежнему задаёт полностью', () => {
+test('раскладка задаёт тумблер КАЖДОМУ элементу реестра', () => {
     // Само-проверка предыдущего теста: если бы layoutToggles вдруг перестал
-    // возвращать что-либо, тот стал бы зелёным по ложной причине.
+    // возвращать часть ключей, тот стал бы зелёным по ложной причине.
     const toggles = Layouts.layoutToggles(Layouts.layoutById('classic'));
-    assert.equal(Object.keys(toggles).length, 7);
+    assert.equal(Object.keys(toggles).length, Layouts.DISPLAY_ELEMENTS.length);
 });
 
 test('семь новых строк есть в таблице настроек и умолчания там ОДНИ', () => {
@@ -235,25 +233,29 @@ test('ряды подписей денежных блоков строятся �
         'bindBlockLabelRows не спрашивает про секретность — поля увидят все');
 });
 
-test('обнуление мероприятия спрашивает подтверждение модалкой проекта', () => {
+test('ОБЕ команды мероприятия спрашивают подтверждение модалкой проекта', () => {
     const src = codeOnly(read('panel-display.js'));
-    // Смотреть надо на ПРИВЯЗКУ, а не на первое упоминание id: разметку кнопки
-    // строит тот же модуль, и срез от неё до обработчика не достаёт.
-    const at = src.indexOf('resetBtn.addEventListener');
-    assert.ok(at > 0, 'у кнопки обнуления нет обработчика');
-    const chunk = src.slice(at, at + 300);
-    assert.ok(chunk.includes('openModal'), 'итог мероприятия стирается без подтверждения');
+    // Обе кнопки проведены ОДНИМ путём, и у каждой СВОЯ модалка: «Завершить»
+    // тоже необратимо — итог замирает, и вернуть счёт можно только начав новое
+    // мероприятие, то есть стерев накопленное.
+    assert.ok(/confirmable\('eventFinishBtn', 'eventFinish',/.test(src),
+        '«Завершить мероприятие» не спрашивает подтверждения');
+    assert.ok(/confirmable\('eventResetBtn', 'eventReset',/.test(src),
+        '«Новое мероприятие» не спрашивает подтверждения');
+    assert.ok(src.includes('openModal'), 'подтверждение делается не модалкой проекта');
     // window.confirm в этом проекте не используется НИ РАЗУ: подтверждения
     // делаются модалкой с ловушкой фокуса (modal-manager.js). Вторая манера
     // спрашивать — это вторая манера выглядеть.
     assert.ok(!/window\.confirm|[^.\w]confirm\(/.test(src),
         'появился window.confirm — в проекте так не спрашивают');
-    assert.ok(src.includes("modal.id = 'eventResetModal'"),
-        'модуль не строит модалку подтверждения');
+    assert.ok(/modal\('eventReset',/.test(src) && /modal\('eventFinish',/.test(src),
+        'модуль строит не обе модалки подтверждения');
 });
 
 test('обе команды мероприятия уходят из панели', () => {
     const src = codeOnly(read('panel-display.js'));
+    // Помощник проводки один, но имя канала остаётся ЛИТЕРАЛОМ в месте вызова:
+    // без него ipc-liveness объявил бы канал мёртвым.
     assert.ok(src.includes("send('event-finish')"), 'панель не шлёт event-finish');
     assert.ok(src.includes("send('event-reset')"), 'панель не шлёт event-reset');
 });

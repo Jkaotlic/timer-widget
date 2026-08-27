@@ -54,17 +54,34 @@ function overrunCost(seconds, price, period) {
 }
 
 /**
+ * Секунды перелимита ТЕКУЩЕГО доклада с учётом отсечки.
+ *
+ * Отсечка — сколько секунд минуса уже натикало к моменту «Нового мероприятия».
+ * Без неё обнуление накопителя не очищало экран: жалоба 27.08.2026 «нельзя
+ * скинуть итог» — сумма оставалась прежней, потому что дисплей прибавлял к
+ * обнулённому накопителю текущий перелимит, а таймер всё ещё был в минусе.
+ *
+ * Отсечка больше самого минуса даёт 0, а не отрицательные секунды: так бывает
+ * после сброса таймера, когда минус начался заново.
+ */
+function liveOverrun(remainingSeconds, excludedSeconds) {
+    const live = overrunSeconds(remainingSeconds);
+    const cut = safeSeconds(excludedSeconds);
+    return live > cut ? live - cut : 0;
+}
+
+/**
  * Секунды перелимита всего мероприятия: накопленные закрытыми докладами плюс
  * текущий. Если таймер не в минусе, прибавляется 0 — поэтому повторный сброс
  * ничего не добавляет второй раз.
  */
-function totalSeconds(accumulatedSeconds, remainingSeconds) {
-    return safeSeconds(accumulatedSeconds) + overrunSeconds(remainingSeconds);
+function totalSeconds(accumulatedSeconds, remainingSeconds, excludedSeconds) {
+    return safeSeconds(accumulatedSeconds) + liveOverrun(remainingSeconds, excludedSeconds);
 }
 
 /** Цена перелимита всего мероприятия. */
-function totalCost(accumulatedSeconds, remainingSeconds, price, period) {
-    return overrunCost(totalSeconds(accumulatedSeconds, remainingSeconds), price, period);
+function totalCost(accumulatedSeconds, remainingSeconds, price, period, excludedSeconds) {
+    return overrunCost(totalSeconds(accumulatedSeconds, remainingSeconds, excludedSeconds), price, period);
 }
 
 /**
@@ -91,6 +108,7 @@ function formatMoney(rubles) {
 
 const MoneyMeter = {
     overrunSeconds,
+    liveOverrun,
     overrunCost,
     totalSeconds,
     totalCost,

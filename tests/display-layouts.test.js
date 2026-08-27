@@ -54,7 +54,7 @@ test('каждая раскладка описана целиком и ссыл�
 test('layoutToggles включает перечисленное и гасит остальное', () => {
     const minimal = DL.layoutById('minimal');
     const toggles = DL.layoutToggles(minimal);
-    assert.equal(Object.keys(toggles).length, DL.LAYOUT_ELEMENTS.length);
+    assert.equal(Object.keys(toggles).length, DL.DISPLAY_ELEMENTS.length);
     assert.ok(Object.values(toggles).every((v) => v === false), 'у «Минимума» не должно быть включённых элементов');
 
     const classic = DL.layoutToggles(DL.layoutById('classic'));
@@ -66,7 +66,7 @@ test('layoutToggles включает перечисленное и гасит о
 
 test('layoutScales задаёт масштаб и выключенным элементам', () => {
     const scales = DL.layoutScales(DL.layoutById('stage'));
-    assert.equal(Object.keys(scales).length, DL.LAYOUT_ELEMENTS.length);
+    assert.equal(Object.keys(scales).length, DL.DISPLAY_ELEMENTS.length);
     assert.equal(scales.heroLabel, 110);
     // Выключенный блок получает умолчание, а не значение прошлой раскладки.
     assert.equal(scales.currentTime, DL.DEFAULT_BLOCK_SCALE);

@@ -125,11 +125,26 @@ let timerInterval = null;
 let eventOverrun = { overrunSeconds: 0, finished: false };
 let liveOverrunSeconds = 0;
 
+/**
+ * Отсечка текущего минуса — сколько секунд перелимита уже натикало к моменту
+ * «Нового мероприятия».
+ *
+ * Без неё обнуление накопителя не очищало экран (жалоба 27.08.2026 «нельзя
+ * скинуть итог»): накопитель становился нулём, а дисплей прибавлял к нему
+ * текущий перелимит, потому что таймер всё ещё был в минусе. Отсечка гасит и
+ * «Перелимит», и «Итого» — новое мероприятие начинается с чистого листа.
+ *
+ * Снимается сама, как только таймер выходит из минуса: следующий доклад
+ * считается целиком.
+ */
+let excludedLiveSeconds = 0;
+
 // Адресат один — дисплей: деньги показывает только он. Панель шлёт команды и
 // хранит ставку, но накопитель ей не нужен, и слать его туда значило бы
 // завести второе место, где живёт та же величина.
 function broadcastEventOverrun() {
-    safelySendToWindow(displayWindow, 'event-overrun-state', eventOverrun);
+    safelySendToWindow(displayWindow, 'event-overrun-state',
+        Object.assign({ excludedLiveSeconds }, eventOverrun));
 }
 
 function persistEventOverrun() {
@@ -147,10 +162,18 @@ function persistEventOverrun() {
  * не идут, пока не начато новое.
  */
 function accrueOverrun(state) {
-    const live = MoneyMeter.overrunSeconds(state.remainingSeconds);
+    // Считается перелимит ЗА ВЫЧЕТОМ отсечки: секунды, натикавшие до «Нового
+    // мероприятия», к нему не относятся.
+    const live = MoneyMeter.liveOverrun(state.remainingSeconds, excludedLiveSeconds);
     if (live > 0) {
         liveOverrunSeconds = eventOverrun.finished ? 0 : live;
         return;
+    }
+    // Таймер вышел из минуса — отсечка своё отработала, следующий доклад
+    // считается целиком.
+    if (excludedLiveSeconds > 0 && MoneyMeter.overrunSeconds(state.remainingSeconds) <= 0) {
+        excludedLiveSeconds = 0;
+        broadcastEventOverrun();
     }
     if (liveOverrunSeconds <= 0) { return; }
     eventOverrun = {
@@ -1576,6 +1599,9 @@ ipcMain.on('event-finish', () => {
 ipcMain.on('event-reset', () => {
     eventOverrun = { overrunSeconds: 0, finished: false };
     liveOverrunSeconds = 0;
+    // Текущий минус к новому мероприятию не относится — отсекаем его целиком,
+    // иначе на экране осталась бы прежняя сумма.
+    excludedLiveSeconds = MoneyMeter.overrunSeconds(timerState.remainingSeconds);
     persistEventOverrun();
     broadcastEventOverrun();
 });

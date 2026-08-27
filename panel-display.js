@@ -289,40 +289,53 @@ const PanelDisplayMixin = {
         section.appendChild(row('Показывать этот раздел', 'floor47Unlocked', toggle('floor47Unlocked')));
         mount.appendChild(section);
 
-        // Модалка подтверждения — копия разметки #resetModal: подтверждения в
+        // Модалки подтверждения — копия разметки #resetModal: подтверждения в
         // этом проекте делаются модалкой с ловушкой фокуса (modal-manager.js),
         // а window.confirm не используется нигде.
-        const modal = document.createElement('div');
-        modal.className = 'reset-modal';
-        modal.id = 'eventResetModal';
-        modal.setAttribute('role', 'dialog');
-        modal.setAttribute('aria-modal', 'true');
-        modal.setAttribute('aria-labelledby', 'eventResetModalTitle');
-        const dialog = document.createElement('div');
-        dialog.className = 'reset-dialog';
-        const h3 = document.createElement('h3');
-        h3.id = 'eventResetModalTitle';
-        h3.textContent = 'Обнулить итог мероприятия?';
-        const p = document.createElement('p');
-        p.textContent = 'Накопленная сумма перелимита будет стёрта насовсем. Настройки и ставка останутся.';
-        const buttons = document.createElement('div');
-        buttons.className = 'reset-dialog-buttons';
-        for (const [id, cls, text] of [
-            ['eventResetCancel', 'reset-btn-cancel', 'Отмена'],
-            ['eventResetConfirm', 'reset-btn-confirm', 'Обнулить']
-        ]) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = cls;
-            btn.id = id;
-            btn.textContent = text;
-            buttons.appendChild(btn);
-        }
-        dialog.appendChild(h3);
-        dialog.appendChild(p);
-        dialog.appendChild(buttons);
-        modal.appendChild(dialog);
-        document.body.appendChild(modal);
+        //
+        // Спрашивают ОБЕ кнопки мероприятия. «Завершить» тоже необратимо: итог
+        // замирает, и вернуть счёт можно только начав новое мероприятие, то
+        // есть стерев накопленное. Просьба 27.08.2026 «сделай с
+        // подтверждениями» — во множественном числе.
+        const modal = (id, title, text, confirmText) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'reset-modal';
+            wrap.id = id;
+            wrap.setAttribute('role', 'dialog');
+            wrap.setAttribute('aria-modal', 'true');
+            wrap.setAttribute('aria-labelledby', `${id}Title`);
+            const dialog = document.createElement('div');
+            dialog.className = 'reset-dialog';
+            const h3 = document.createElement('h3');
+            h3.id = `${id}Title`;
+            h3.textContent = title;
+            const p = document.createElement('p');
+            p.textContent = text;
+            const buttons = document.createElement('div');
+            buttons.className = 'reset-dialog-buttons';
+            for (const [btnId, cls, label] of [
+                [`${id}Cancel`, 'reset-btn-cancel', 'Отмена'],
+                [`${id}Confirm`, 'reset-btn-confirm', confirmText]
+            ]) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = cls;
+                btn.id = btnId;
+                btn.textContent = label;
+                buttons.appendChild(btn);
+            }
+            dialog.appendChild(h3);
+            dialog.appendChild(p);
+            dialog.appendChild(buttons);
+            wrap.appendChild(dialog);
+            document.body.appendChild(wrap);
+        };
+        modal('eventReset', 'Обнулить итог мероприятия?',
+            'Накопленная сумма перелимита будет стёрта насовсем. Настройки и ставка останутся.',
+            'Обнулить');
+        modal('eventFinish', 'Завершить мероприятие?',
+            'Итог замрёт на текущей сумме: перелимиты дальше в него не пойдут. Возобновить счёт можно только начав новое мероприятие, а это стирает накопленное.',
+            'Завершить');
     },
 
     bindFloor47() {
@@ -363,32 +376,29 @@ const PanelDisplayMixin = {
             });
         }
 
-        const finishBtn = document.getElementById('eventFinishBtn');
-        if (finishBtn) {
-            finishBtn.addEventListener('click', () => {
-                window.ipcRenderer.send('event-finish');
-            });
-        }
-
-        // Обнуление необратимо, поэтому спрашивается модалкой проекта:
-        // window.confirm здесь не используется нигде, зато есть три модалки с
-        // ловушкой фокуса и возвратом фокуса (modal-manager.js).
-        const resetBtn = document.getElementById('eventResetBtn');
-        const resetModal = document.getElementById('eventResetModal');
-        const resetCancel = document.getElementById('eventResetCancel');
-        const resetConfirm = document.getElementById('eventResetConfirm');
-        if (resetBtn && resetModal) {
-            resetBtn.addEventListener('click', () => window.openModal(resetModal, resetCancel));
-        }
-        if (resetCancel) {
-            resetCancel.addEventListener('click', () => window.closeModal(resetModal));
-        }
-        if (resetConfirm) {
-            resetConfirm.addEventListener('click', () => {
-                window.ipcRenderer.send('event-reset');
-                window.closeModal(resetModal);
-            });
-        }
+        // Обе команды мероприятия спрашивают подтверждение — одним путём, а не
+        // двумя похожими: вторая манера спрашивать это вторая манера выглядеть.
+        // Помощник получает ДЕЙСТВИЕ, а не имя канала. Имя канала литералом
+        // остаётся на виду в месте вызова: tests/ipc-liveness.test.js ищет
+        // `.send('литерал')` и без него объявил бы канал мёртвым. Проводка при
+        // этом всё равно одна — вторая манера спрашивать подтверждение была бы
+        // второй манерой выглядеть.
+        const confirmable = (btnId, modalId, onConfirm) => {
+            const btn = document.getElementById(btnId);
+            const box = document.getElementById(modalId);
+            const cancel = document.getElementById(`${modalId}Cancel`);
+            const confirm = document.getElementById(`${modalId}Confirm`);
+            if (btn && box) { btn.addEventListener('click', () => window.openModal(box, cancel)); }
+            if (cancel) { cancel.addEventListener('click', () => window.closeModal(box)); }
+            if (confirm) {
+                confirm.addEventListener('click', () => {
+                    onConfirm();
+                    window.closeModal(box);
+                });
+            }
+        };
+        confirmable('eventFinishBtn', 'eventFinish', () => window.ipcRenderer.send('event-finish'));
+        confirmable('eventResetBtn', 'eventReset', () => window.ipcRenderer.send('event-reset'));
 
         this.renderFloor47();
     },

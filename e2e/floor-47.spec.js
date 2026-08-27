@@ -14,6 +14,9 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
 
+/** Неразрывный пробел — им разделены разряды суммы (money-meter.js). */
+const NB = '\u00A0';
+
 const IS_DISPLAY = () => !!document.getElementById('progressRing');
 
 async function findDisplay(app) {
@@ -114,7 +117,6 @@ test('ступени: 1000 ₽ за каждые 3 секунды перелим
             };
         };
 
-        const NB = '\u00A0';
         const table = [[2, `0${NB}₽`], [3, `1${NB}000${NB}₽`], [5, `1${NB}000${NB}₽`], [6, `2${NB}000${NB}₽`]];
         for (const [seconds, expected] of table) {
             const got = await money(seconds);
@@ -150,15 +152,19 @@ test('«Новое мероприятие» спрашивает и обнуля
         await control.fill('#overrunPeriod', '3');
         await setToggle(control, 'showTotalCost', true);
 
-        // Завершение мероприятия закрывает текущий перелимит и замораживает итог.
+        // Завершение мероприятия закрывает текущий перелимит и замораживает
+        // итог. С 27.08.2026 оно тоже спрашивает подтверждение: вернуть счёт
+        // можно только начав новое мероприятие, а это стирает накопленное.
         await control.locator('#eventFinishBtn').click();
-        await control.waitForTimeout(300);
+        await expect(control.locator('#eventFinish')).toBeVisible();
+        await control.locator('#eventFinishConfirm').click();
+        await expect(control.locator('#eventFinish')).toBeHidden();
 
         // Обнуление необратимо и спрашивает модалкой, а не window.confirm.
         await control.locator('#eventResetBtn').click();
-        await expect(control.locator('#eventResetModal')).toBeVisible();
+        await expect(control.locator('#eventReset')).toBeVisible();
         await control.locator('#eventResetConfirm').click();
-        await expect(control.locator('#eventResetModal')).toBeHidden();
+        await expect(control.locator('#eventReset')).toBeHidden();
 
         // Обнуление обязано доехать до накопителя, а не только до кнопки:
         // окно, открытое ПОСЛЕ него, снимает состояние на загрузке.
@@ -226,6 +232,67 @@ test('раскладка «47-й этаж» появляется только с
             window.ipcRenderer.send('close-display');
             localStorage.removeItem('displayBlockPositions');
             localStorage.removeItem('displayBlockScales');
+        }).catch(() => {});
+        await relock(control);
+        await app.close();
+    }
+});
+
+test('«Новое мероприятие» обнуляет экран, даже когда таймер в МИНУСЕ', async () => {
+    // Жалоба 27.08.2026 «нельзя скинуть итог». Накопитель обнулялся, а на
+    // экране оставалась прежняя сумма: дисплей прибавляет к накопителю ТЕКУЩИЙ
+    // перелимит, и таймер в этот момент всё ещё в минусе.
+    //
+    // Таймер здесь уводится в минус ПО-НАСТОЯЩЕМУ, а не присвоением поля: весь
+    // смысл проверки в том, что про минус знает и главный процесс, который
+    // ставит отсечку.
+    test.setTimeout(200000);
+    const { app, control } = await launchApp();
+    try {
+        await openDisplayTab(control);
+        await unlock(control);
+        await control.fill('#overrunPrice', '1000');
+        await control.fill('#overrunPeriod', '3');
+        await setToggle(control, 'showOverrunCost', true);
+        await setToggle(control, 'showTotalCost', true);
+        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await control.waitForTimeout(2400);
+        const display = await findDisplay(app);
+        expect(display, 'окно дисплея не найдено').not.toBeNull();
+
+        await control.evaluate(() => window.ipcRenderer.send('timer-command',
+            { type: 'set', seconds: 1, allowNegative: true }));
+        await control.waitForTimeout(300);
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
+        await control.waitForTimeout(8000);
+
+        const money = () => display.evaluate(() => ({
+            over: document.getElementById('overrunCostValue').textContent,
+            total: document.getElementById('totalCostValue').textContent
+        }));
+        const before = await money();
+        console.log(`   в минусе: перелимит «${before.over}», итого «${before.total}»`);
+        expect(before.total, 'таймер не ушёл в минус — обнулять нечего').not.toBe(`0${NB}₽`);
+
+        await control.locator('#eventResetBtn').click();
+        await expect(control.locator('#eventReset')).toBeVisible();
+        await control.locator('#eventResetConfirm').click();
+        await control.waitForTimeout(1200);
+
+        const after = await money();
+        console.log(`   после сброса: перелимит «${after.over}», итого «${after.total}»`);
+        expect(after.total, 'итог не обнулился, пока таймер в минусе').toBe(`0${NB}₽`);
+        expect(after.over, 'перелимит не обнулился, пока таймер в минусе').toBe(`0${NB}₽`);
+
+        // Отсечка снимается сама: минус, натикавший ПОСЛЕ сброса, снова считается.
+        await control.waitForTimeout(4500);
+        const later = await money();
+        console.log(`   ещё 4,5 с спустя: перелимит «${later.over}»`);
+        expect(later.over, 'после сброса счёт не возобновился').not.toBe(`0${NB}₽`);
+    } finally {
+        await control.evaluate(() => {
+            window.ipcRenderer.send('timer-command', { type: 'reset' });
+            window.ipcRenderer.send('close-display');
         }).catch(() => {});
         await relock(control);
         await app.close();

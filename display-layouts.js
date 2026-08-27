@@ -72,31 +72,19 @@ const LABELLED_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => el.labelKey);
 /** Элементы скрытого режима: раскладки их не трогают, панель прячет. */
 const SECRET_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => el.secret);
 
-/**
- * Элементы, которыми РАСПОРЯЖАЕТСЯ раскладка.
- *
- * Секретных здесь нет: раскладка — обещание «всё вмещается», и она задаёт
- * тумблер и масштаб КАЖДОМУ, кем распоряжается. Попади деньги в этот список,
- * выбор раскладки посреди мероприятия гасил бы их на экране.
- */
-const LAYOUT_ELEMENTS = DISPLAY_ELEMENTS.filter((el) => !el.secret);
 
 /**
- * Распоряжается ли ЭТА раскладка этим элементом.
+ * Раскладка описывает ВЕСЬ экран, включая деньги «47-го этажа».
  *
- * Обычным элементом — всегда: раскладка задаёт тумблер и масштаб каждому, кем
- * распоряжается, иначе включённый потом руками блок пришёл бы с масштабом от
- * прошлой раскладки.
+ * Здесь стояло исключение: секретный элемент трогала только та раскладка,
+ * которая его перечислила. Замысел был «не гасить деньги посреди мероприятия»,
+ * и он проиграл жалобе 27.08.2026: «когда старые раскладки делаю, перелимит и
+ * итог остаются на экране». Раскладка, оставляющая на экране то, чего в ней
+ * нет, — это не защита, а сломанная раскладка: «Минимум» обещает «один таймер,
+ * без подписей и блоков» и обязан это выполнить.
  *
- * Секретным (деньги «47-го этажа») — ТОЛЬКО если раскладка его перечисляет.
- * Иначе общий проход выключал бы деньги ровно посреди мероприятия у оператора,
- * выбравшего обычную раскладку. Раскладка, которая деньги перечислила, знает,
- * что делает, — она для них и написана.
+ * Деньги перечислены в раскладке «47-й этаж» — она их и показывает.
  */
-function layoutOwns(layout, el) {
-    if (!el.secret) { return true; }
-    return !!(layout && layout.elements && layout.elements[el.id]);
-}
 
 /**
  * Потолок длины подписи.
@@ -319,7 +307,6 @@ function layoutById(id) {
 function layoutToggles(layout) {
     const out = {};
     for (const el of DISPLAY_ELEMENTS) {
-        if (!layoutOwns(layout, el)) { continue; }
         out[el.toggle] = !!(layout && layout.elements && layout.elements[el.id]);
     }
     return out;
@@ -335,7 +322,6 @@ function layoutToggles(layout) {
 function layoutScales(layout) {
     const out = {};
     for (const el of DISPLAY_ELEMENTS) {
-        if (!layoutOwns(layout, el)) { continue; }
         const entry = layout && layout.elements ? layout.elements[el.id] : null;
         const own = entry ? clampScale(entry.scale) : null;
         out[el.id] = own === null ? defaultScale(el.id) : own;
@@ -515,7 +501,6 @@ const DisplayLayouts = {
     DISPLAY_ELEMENTS,
     LABELLED_ELEMENTS,
     SECRET_ELEMENTS,
-    LAYOUT_ELEMENTS,
     MAX_CAPTION,
     blockCaption,
     ELEMENT_IDS,
