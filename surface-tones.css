@@ -128,7 +128,6 @@
        фонов (tests/contrast.test.js считает все). Иерархия «подпись тише
        значения» держится кеглем и капителью, а не контрастом — на тёмном фоне
        «тише» означало бы «ближе к фону», то есть ровно нечитаемость. */
-    --style-led-label:   #5fe089;
     --style-tick-strong: rgba(255, 255, 255, 0.58);
     --style-hand: linear-gradient(180deg, #ffffff 0%, #cccccc 100%);
     --style-ink-shadow:  0 2px 8px rgba(0, 0, 0, 0.5);
@@ -200,7 +199,6 @@
     --style-face:        rgba(255, 255, 255, calc(0.82 * var(--surface-alpha, 1)));
     --style-tick:        rgba(0, 0, 0, 0.28);
     --style-ring-track:  rgba(0, 0, 0, 0.18);
-    --style-led-label:   #12652f;
     --style-tick-strong: rgba(0, 0, 0, 0.55);
     --style-hand: linear-gradient(180deg, #1d1d1f 0%, #48484f 100%);
     /* ТРИ слоя, и только третий декоративный.
@@ -243,7 +241,6 @@
      --style-face         подложка стилей без своей («Круг», «Цифры»)
      --style-tick         мелкое деление
      --style-ring-track   шкала под дугой кругового стиля
-     --style-led-label    подпись блока в стиле «Цифры»
      --style-tick-strong  крупное деление (5 минут, четверти)
      --style-hand         стрелка часов и минут
      --style-ink-shadow   тень под цифрами

@@ -297,9 +297,6 @@ body .info-block:not(.visible) {
    том, что и должно его нести: подпись цветом табло и значение выбранным
    шрифтом «Цифр». Контраст подписи (теперь ПРЯМО НА ХОЛСТЕ окна, а не на
    карточке) считает tests/contrast.test.js. */
-body.style-digits .info-label {
-    color: var(--info-color-dim, var(--style-led-label));
-}
 /* Значение блока набирается ТЕМ ЖЕ шрифтом, что и сам таймер: семейство и
    начертание кладёт display-script (applyDigitsFontToBlocks) из реестра
    digits-style.js. Прибить их здесь нельзя — шрифт выбирает пользователь, и
