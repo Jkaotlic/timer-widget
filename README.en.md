@@ -41,12 +41,13 @@
 
 <br>
 
-- 4 display styles — circle, digital LED, flip clock, analog
+- 4 display styles — **Circle**, **Flip** (split-flap leaves), **Analog** (hands), **Digits**
 - Overtime with red pulsation, configurable limit and notification interval
 - 4 time presets — 5, 15, 25, 45 minutes — + manual input (`sec`, `min:sec`, `hr:min:sec`)
 - `H:MM:SS` format automatically when timer exceeds one hour
 - Negative count with notifications every N minutes
-- 30 built-in sounds (Web Audio API) + custom `.mp3` / `.wav` / `.ogg` / `.flac` / `.webm` / `.aac` upload
+- 32 built-in sounds (Web Audio API, synthesised from oscillators — the package ships no audio files) + custom `.mp3` / `.wav` / `.ogg` / `.flac` / `.webm` / `.aac` upload, up to 5 MB
+- Each of the four events gets its own sound: start, zero, final minute, overrun
 
 </details>
 
@@ -57,10 +58,10 @@
 
 | Window | Description |
 |:-------|:------------|
-| **Control Panel** | Compact 380×720 with a slide-out settings drawer (macOS-style detail pane). 4 tabs: Widget, Clock, Fullscreen, Sounds |
+| **Control Panel** | Compact 400×740 (380 minimum) with a slide-out settings drawer. Four tabs: Widget, Clock, Display, Sounds. Collapses to a narrow bar with `M` — start, pause and reset only |
 | **Widget** | Transparent, always-on-top mini timer for desktop |
 | **Clock** | Independent clock with date and timezone, 4 style variants |
-| **Fullscreen** | For projectors or secondary monitors. Display picker, Alt-drag info blocks, windowed-mode toggle |
+| **Fullscreen** | For projectors or secondary monitors. Display picker, Alt-drag for blocks and for the timer itself, windowed-mode toggle |
 
 </details>
 
@@ -69,11 +70,15 @@
 
 <br>
 
-- Apple VisionOS glassmorphism — `blur(40px) saturate(180%)`, Inter Light for timer text, JetBrains Mono for LED
+- Flat, opaque surfaces — no blur, no outer glows: on a projector and in screen capture they smear the digits
+- **Two themes** — dark and light, shared across all four windows
+- A window's palette follows the BRIGHTNESS of its background, not the theme: on a light fill the text darkens by itself
+- 6 fonts to choose from for the **Digits** style — all local, the app never fetches them
 - **HSV color picker** per window — full color control, not just presets
 - Gradient progress ring (systemBlue `#0a84ff` → systemGreen `#30d158`)
 - Apple semantic palette: `#0a84ff` / `#30d158` / `#ff453a` / `#ff9f0a`
 - Fullscreen background — solid fill, gradient, or local file (`.png`, `.jpg`, `.webp` with magic-bytes validation)
+- The widget and the clock get their own background too, each with its own opacity
 
 </details>
 
@@ -89,6 +94,39 @@
 - **Click the scale percentage** — exact input, double-click resets to 100%
 - All positions, scales and settings persist between sessions
 - Monitor picker for fullscreen mode
+
+</details>
+
+<details>
+<summary><b>Fullscreen display: blocks and layouts</b></summary>
+
+<br>
+
+Seven movable elements live around the timer: current time, start, end, time
+left, event title, the caption under the timer and the status pill. Each has its
+own toggle, is dragged with `Alt` and scales with `Shift` + wheel **independently
+of the others**.
+
+**Five ready-made layouts** place everything at once — one button, no manual
+dragging:
+
+| Layout | For what |
+|:-------|:---------|
+| **Classic** | Timer in the centre, times in the corners |
+| **Meeting** | Title on top, four time blocks in the corners |
+| **Stage** | One large timer, nothing else |
+| **Summary** | All time blocks in a row along the bottom |
+| **Minimum** | The timer alone, no captions or blocks |
+
+A layout describes the **whole** screen: whatever it does not list, it turns off —
+so switching never leaves leftovers from the previous one.
+
+An element's position is stored as a **fraction of the window** rather than a
+pixel, and sizes are derived from the content band — the composition carries
+across monitors of different resolution and aspect ratio without hand-fixing.
+
+Any block's caption can be renamed in its own field; an empty field restores the
+default word.
 
 </details>
 
@@ -138,13 +176,17 @@ Work from **any** window.
 | Key | Action |
 |:----|:-------|
 | `Space` | Start / Pause |
-| `R` | Reset |
+| `S` | Pause |
+| `R` | Reset to the original value |
 | `1` `2` `3` `4` | TIME presets: 5, 15, 25, 45 min |
+| `5` | Custom time — manual input |
 | `Ctrl` + `1`…`4` | LOOK presets: apply a slot (`Ctrl` + `Shift` + `1`…`4` stores it) |
 | `W` | Toggle widget |
 | `C` | Toggle clock |
 | `D` | Toggle fullscreen |
 | `Z` | Toggle sound |
+| `M` | Collapse the panel to a bar and back |
+| `F1` | Keyboard cheat sheet |
 | `Esc` | Close settings, modal or help. Does NOT close windows |
 | `Ctrl` + wheel | Scale widget / clock / fullscreen |
 | `Shift` + wheel | Scale info blocks on fullscreen |

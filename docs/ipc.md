@@ -61,7 +61,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `display-settings-update` | Display settings object |
 | `display-layout` | `{ layout }` — дисплею: разложить элементы по готовой раскладке |
 | `sound-toggle` | Без payload: панели — переключить мастер-звук (см. одноимённый канал в send) |
-| `event-overrun-state` | Дисплею: `{ overrunSeconds, finished }` — накопитель перелимита мероприятия. СЕКУНДЫ, а не рубли: ставку знает окно, и поправленная посреди мероприятия она обязана пересчитать накопленное |
+| `event-overrun-state` | Дисплею И панели: `{ overrunSeconds, finished, excludedLiveSeconds }` — накопитель перелимита мероприятия. СЕКУНДЫ, а не рубли: ставку знает окно, и поправленная посреди мероприятия она обязана пересчитать накопленное. Дисплей рисует деньги залу, панель отчитывается оператору строкой «Идёт / Завершено»; итог оба собирают ОДНОЙ `MoneyMeter.eventSummary`. Payload собран в одном месте (`eventOverrunPayload()`) — рассылка и гидратация окна расходились полем `excludedLiveSeconds` |
 | `displays-list` | Array of available displays |
 | `set-clock-style` / `clock-settings` | Clock widget settings |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
