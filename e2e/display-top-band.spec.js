@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
 const { pickWindowSizes } = require('./window-sizes');
+const { resizeDisplay } = require('./display-window');
 
 /**
  * Карточка, прижатая к верху окна, не ложится на подпись «Осталось».
@@ -72,27 +73,6 @@ async function workArea(app) {
         const wa = screen.getPrimaryDisplay().workAreaSize;
         return { width: wa.width, height: wa.height };
     });
-}
-
-async function resizeDisplay(app, display, size) {
-    const apply = () => app.evaluate(async ({ BrowserWindow }, s) => {
-        const win = BrowserWindow.getAllWindows()
-            .find((w) => w.webContents.getURL().includes('display.html'));
-        if (win.isFullScreen()) {
-            win.setFullScreen(false);
-            await new Promise((r) => setTimeout(r, 800));
-        }
-        win.setBounds({ x: 40, y: 40, width: s.w, height: s.h });
-    }, size);
-
-    for (let attempt = 0; attempt < 6; attempt++) {
-        await apply();
-        await display.waitForTimeout(700);
-        const got = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
-        if (Math.abs(got.w - size.w) <= 2 && Math.abs(got.h - size.h) <= 2) { return; }
-    }
-    const got = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
-    throw new Error(`окно не приняло размер ${size.w}×${size.h}: сейчас ${got.w}×${got.h}`);
 }
 
 const measure = () => {
@@ -186,7 +166,7 @@ test('карточка сверху не ложится на подпись «О
             .toBeGreaterThan(0);
 
         for (const size of sizes) {
-            await resizeDisplay(app, display, size);
+            await resizeDisplay(app, display, size, { strict: true });
 
             for (const style of STYLES) {
                 await control.evaluate((st) => {

@@ -110,6 +110,14 @@ let timerState = {
 let timerInterval = null;
 
 /**
+ * Сколько ждать выхода из полноэкранного режима, прежде чем закрывать окно
+ * (или выходить из приложения) всё равно. Объявлена ЗДЕСЬ, а не рядом с
+ * первым использованием: пользователей два — закрытие дисплея и `before-quit`,
+ * и второй стоит в файле выше первого.
+ */
+const FULLSCREEN_EXIT_TIMEOUT_MS = 2000;
+
+/**
  * Накопитель перелимита мероприятия — скрытый режим «47-й этаж».
  *
  * Здесь лежит единственная величина, которую нельзя пересчитать заново:
@@ -139,12 +147,31 @@ let liveOverrunSeconds = 0;
  */
 let excludedLiveSeconds = 0;
 
-// Адресат один — дисплей: деньги показывает только он. Панель шлёт команды и
-// хранит ставку, но накопитель ей не нужен, и слать его туда значило бы
-// завести второе место, где живёт та же величина.
+/**
+ * ОДНА сборка payload накопителя на все отправки.
+ *
+ * Была не одна: рассылка добавляла отсечку, а гидратация окна дисплея слала
+ * голый `eventOverrun` — и окно, переоткрытое посреди мероприятия, показывало
+ * сумму, которую «Новое мероприятие» уже стёрло. Ровно тот случай, про который
+ * записано «перед добавлением поля в payload соберите payload в одном месте».
+ */
+function eventOverrunPayload() {
+    return Object.assign({ excludedLiveSeconds }, eventOverrun);
+}
+
+/**
+ * Адресатов два, и знают они РАЗНОЕ.
+ *
+ * Дисплей показывает деньги залу. Панель деньги не показывает — она
+ * отчитывается оператору строкой «Идёт · итог …» / «Завершено · итог
+ * заморожен: …», потому что нажимает кнопки мероприятия он, а сумму до
+ * 28.08.2026 читал с проекционного экрана. Второго места, где живёт накопитель,
+ * при этом не заводится: панель ничего не хранит и не пишет — она получает
+ * состояние и собирает из него ту же сводку, что дисплей.
+ */
 function broadcastEventOverrun() {
-    safelySendToWindow(displayWindow, 'event-overrun-state',
-        Object.assign({ excludedLiveSeconds }, eventOverrun));
+    safelySendToWindow(displayWindow, 'event-overrun-state', eventOverrunPayload());
+    safelySendToWindow(controlWindow, 'event-overrun-state', eventOverrunPayload());
 }
 
 function persistEventOverrun() {
@@ -543,6 +570,17 @@ function createControlWindow() {
     bindRenderCrashHandler(controlWindow, 'control');
     bindRenderConsole(controlWindow, 'control');
     bindWindowStateSnapshot(controlWindow);
+
+    // Накопитель мероприятия — состояние, а не событие: панель, открытая
+    // посреди мероприятия, обязана узнать, идёт оно или уже заморожено. Иначе
+    // строка отчёта врёт до первого изменения, а изменения может не быть до
+    // самого конца. Слушатель `on`, а не `once`, по той же причине, что у
+    // снимка состояния окон: перезагруженный краш-обработчиком рендерер обязан
+    // получить данные заново.
+    controlWindow.webContents.on('did-finish-load', () => {
+        safelySendToWindow(controlWindow, 'event-overrun-state', eventOverrunPayload());
+    });
+
     // Привязка живёт здесь, а не в whenReady: панель пересоздаётся из трея, из
     // second-instance и по 'activate'. Вызванная один раз при старте, привязка
     // доставалась только самому первому экземпляру окна, и пересозданная панель
@@ -767,7 +805,7 @@ function createDisplayWindow(displayIndex) {
         // открытое посреди мероприятия, обязано узнать уже накопленное.
         // Рассылки на изменение для этого мало — изменения может не быть
         // до самого конца.
-        safelySendToWindow(win, 'event-overrun-state', eventOverrun);
+        safelySendToWindow(win, 'event-overrun-state', eventOverrunPayload());
         if (lastDisplaySettings) {
             safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
         }
@@ -969,7 +1007,36 @@ function bindRenderConsole(win, label) {
     win.on('responsive', () => log.info(`[renderer:${label}] window responsive again`));
 }
 
-app.on('before-quit', () => {
+/**
+ * Выход из приложения при открытом полноэкранном дисплее.
+ *
+ * Та же авария, что и у `closeDisplayWindow`, только вход другой: на выходе
+ * окна разрушаются, macOS запускает анимацию выхода из полноэкранного режима и
+ * обходит все окна — по освобождённой памяти. В прогоне e2e приложение гасят
+ * больше двух сотен раз, и падение выглядело нестабильностью случайного теста.
+ *
+ * Выход ОТКЛАДЫВАЕТСЯ ровно один раз и не дольше страховки: приложение,
+ * которое не закрывается, хуже приложения, которое падает при закрытии.
+ * `before-quit` после этого сработает второй раз — оба его действия
+ * (`isQuitting`, удаление снимка восстановления) идемпотентны.
+ */
+let __leavingFullScreenToQuit = false;
+
+app.on('before-quit', (event) => {
+    const win = displayWindow;
+    if (!__leavingFullScreenToQuit && win && !win.isDestroyed() && win.isFullScreen()) {
+        __leavingFullScreenToQuit = true;
+        event.preventDefault();
+        const again = () => app.quit();
+        const timer = setTimeout(again, FULLSCREEN_EXIT_TIMEOUT_MS);
+        win.once('leave-full-screen', () => {
+            clearTimeout(timer);
+            setTimeout(again, 120);
+        });
+        win.setFullScreen(false);
+        return;
+    }
+
     isQuitting = true;
     // Stop the periodic save BEFORE unlinking, so an in-flight 10s tick can't
     // re-create the recovery file after we delete it.
@@ -1484,10 +1551,20 @@ ipcMain.on('open-display', (event, options) => {
         return;
     }
 
-    // Закрываем старое окно если оно открыто (переключение монитора)
+    // Закрываем старое окно если оно открыто (переключение монитора).
+    //
+    // Тем же помощником, что и команда «закрыть»: старое окно тоже
+    // полноэкранное, и закрытое напрямую оно роняло приложение так же. Новое
+    // создаётся ПОСЛЕ того, как старое ушло, — иначе два полноэкранных окна
+    // разъезжаются по пространствам macOS.
     if (displayWindow) {
-        displayWindow.close();
+        const closing = displayWindow;
+        closeDisplayWindow();
         displayWindow = null;
+        if (!closing.isDestroyed()) {
+            closing.once('closed', () => createDisplayWindow(displayIndex));
+            return;
+        }
     }
 
     // Индекс монитора, рассылка состояния и досылка настроек — внутри
@@ -1495,11 +1572,66 @@ ipcMain.on('open-display', (event, options) => {
     createDisplayWindow(displayIndex);
 });
 
-ipcMain.on('close-display', () => {
-    if (displayWindow) {
-        displayWindow.close();
-        // Уведомление отправится в обработчике 'closed' события окна
+/**
+ * Закрыть окно дисплея БЕЗОПАСНО: сперва выйти из полноэкранного режима.
+ *
+ * Найдено 28.08.2026 по системным отчётам macOS: одиннадцать падений из
+ * тринадцати за день — один и тот же `EXC_BAD_ACCESS` по адресу
+ * 0xefefefefefefeff7, то есть обращение к освобождённой памяти. Стек снизу
+ * вверх:
+ *
+ *   _doSucceededToExitFullScreen → _updateFullScreenPresentationOptions
+ *     → enumerateWindows → -[NSWindow _adjustWindowToScreen]
+ *       → NSNotificationCenter → Electron → уже освобождённое окно
+ *
+ * Окно дисплея создаётся `fullscreen: true`, а закрывали его голым `.close()`.
+ * macOS запускает анимацию выхода из полноэкранного режима на окне, которое
+ * Electron в этот момент разрушает, и обходит при этом ВСЕ окна приложения.
+ * Падало не окно — падало приложение целиком, вместе с идущим таймером.
+ *
+ * Поэтому: выйти из полноэкранного, ДОЖДАТЬСЯ события `leave-full-screen` и
+ * только потом закрывать. Ждать паузой нельзя — длительность анимации зависит
+ * от машины и нагрузки; ровно на этом сгорела первая попытка починить то же
+ * самое в тестах.
+ *
+ * Страховка по времени обязательна и закреплена тестом: не пришло событие —
+ * окно всё равно закрывается. Защита от падения, превращающая окно в
+ * незакрываемое, хуже падения.
+ */
+
+function closeDisplayWindow() {
+    const win = displayWindow;
+    if (!win || win.isDestroyed()) { return; }
+    // Второе нажатие «закрыть» посреди перехода — это тот же выстрел в то же
+    // окно: `isFullScreen()` к тому моменту уже false, а обход окон системой
+    // ещё идёт, и голый close() снова попал бы в середину. Метка на окне, а не
+    // переменная модуля: окон дисплея за жизнь приложения много.
+    if (win._closingFullScreen) { return; }
+    if (!win.isFullScreen()) {
+        win.close();
+        return;
     }
+    win._closingFullScreen = true;
+
+    let done = false;
+    const finish = () => {
+        if (done) { return; }
+        done = true;
+        if (!win.isDestroyed()) { win.close(); }
+    };
+    const timer = setTimeout(finish, FULLSCREEN_EXIT_TIMEOUT_MS);
+    win.once('leave-full-screen', () => {
+        clearTimeout(timer);
+        // Ещё один оборот цикла событий: `leave-full-screen` приходит в начале
+        // завершения перехода, а обход окон системой идёт следом за ним.
+        setTimeout(finish, 120);
+    });
+    win.setFullScreen(false);
+}
+
+ipcMain.on('close-display', () => {
+    // Уведомление отправится в обработчике 'closed' события окна.
+    closeDisplayWindow();
 });
 
 // Управление виджетом
