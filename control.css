@@ -5065,15 +5065,92 @@ body.compact-panel-2 .transport-main {
     height: 46px;
 }
 
-/* Скрытый режим «47-й этаж»: ряд из двух кнопок мероприятия.
-   Обычный `.toggle-row` разносит подпись и контрол по краям — здесь контролов
-   два и подписи нет, поэтому кнопки делят ширину поровну. */
+/* Скрытый режим «47-й этаж»: команды мероприятия.
+   Кнопки стоят СТОЛБИКОМ, а не рядом: у каждой своя подпись, а подпись под
+   кнопкой шириной в половину колонки переносится в три строки. Пока кнопки
+   были одинаковыми соседями, разница между «заморозить итог» и «стереть его»
+   открывалась только в модалке — то есть уже после нажатия. */
 .floor47-actions {
     display: flex;
-    gap: var(--space-2);
+    flex-direction: column;
+    gap: var(--tw-s-3);
 }
 
-.floor47-actions .reset-btn {
-    flex: 1 1 0;
+/* Глубина селектора здесь НЕСУЩАЯ, а не стилистическая.
+   Секция живёт внутри `#tab-display`, где для кнопки «Сбросить фон» объявлено
+   `#tab-display .reset-btn { width: auto; margin-left: auto; color: dim }`.
+   Одиночным классом это правило не перебить: команды мероприятия съезжали
+   вправо по ширине своего текста и красились в цвет второстепенной кнопки.
+   Замер поймал их разной ширины — 128 против 153 px. Повторяем ту же глубину. */
+#tab-display .floor47-action .reset-btn {
+    width: 100%;
+    margin: 0;
+    padding: var(--tw-s-3);
+    font-size: var(--tw-t-label);
+    color: var(--tw-fg-secondary);
+    background: var(--tw-overlay-light);
+}
+.floor47-action .toggle-hint { margin-top: 4px; }
+
+/* Кнопка «Завершить» на уже завершённом мероприятии: завершать нечего.
+   Гашение видно и без цвета — курсор говорит то же самое. */
+#tab-display .floor47-action .reset-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+#tab-display .floor47-action .reset-btn:disabled:hover {
+    border-color: var(--tw-border);
+    color: var(--tw-fg-secondary);
+    background: var(--tw-overlay-light);
+}
+
+/* Разрушающая команда выглядит разрушающей ещё до нажатия. Цвет здесь —
+   УСИЛЕНИЕ, а не носитель смысла: смысл несёт слово «обнулится, стёрто
+   насовсем» в подписи под кнопкой. Пара «--tw-red на поверхности панели» уже
+   в ходу (`.reset-btn:hover`) и в обеих темах: в светлой токен темнеет. */
+#tab-display .floor47-action .reset-btn-danger {
+    border-color: rgba(255, 69, 58, 0.32);
+    color: var(--tw-red);
+}
+#tab-display .floor47-action .reset-btn-danger:hover {
+    border-color: rgba(255, 69, 58, 0.55);
+    background: rgba(255, 69, 58, 0.12);
+}
+
+/* Строка настройки с пояснением: имя и подпись столбиком слева, контрол
+   справа. `.toggle-row` — flex со space-between, и без обёртки подпись стала
+   бы третьим элементом ряда и уехала бы под тумблер. */
+.toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     min-width: 0;
+    padding-right: var(--tw-s-3);
+}
+
+/* Отчёт о мероприятии: идёт оно или заморожено и на какой сумме.
+   Состояние помечено ФОРМОЙ точки, а не только цветом: у идущего она залита,
+   у завершённого — кольцо. Слово в самой строке говорит то же самое. */
+.event-status {
+    display: flex;
+    align-items: center;
+    gap: var(--tw-s-2);
+    font-size: 12px;
+    color: var(--tw-fg-secondary);
+    padding: 0 0 var(--tw-s-3);
+}
+
+.event-status::before {
+    content: '';
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--tw-green);
+}
+
+.event-status.is-finished { color: var(--tw-fg-dim); }
+.event-status.is-finished::before {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--tw-fg-dim);
 }

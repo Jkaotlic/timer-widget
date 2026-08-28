@@ -38,6 +38,29 @@ async function setToggle(control, id, on) {
     await expect(box).toBeChecked({ checked: on });
 }
 
+/**
+ * Открыть дисплей и ДОЖДАТЬСЯ его — по условию, а не паузой.
+ *
+ * Фиксированные 2400 мс соседних проверок держатся ровно до загруженной
+ * машины: в полном прогоне окно не успевало появиться, и тест падал «окно
+ * дисплея не найдено» — на диагнозе, не имеющем отношения к тому, что он
+ * проверяет. Ожидание по условию переносится между машинами, пауза — нет.
+ */
+async function openDisplay(app, control) {
+    await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+        const found = await findDisplay(app);
+        if (found) {
+            // Окно есть — но скрипт мог ещё не разложить блоки по узлам.
+            await found.waitForSelector('#totalCostValue', { timeout: 15000 });
+            return found;
+        }
+        await control.waitForTimeout(200);
+    }
+    return null;
+}
+
 /** Секция живёт в ящике настроек — без открытой вкладки её не видно. */
 async function openDisplayTab(control) {
     await control.click('.tab-btn[data-tab="display"]');
@@ -295,6 +318,186 @@ test('«Новое мероприятие» обнуляет экран, даж�
             window.ipcRenderer.send('close-display');
         }).catch(() => {});
         await relock(control);
+        await app.close();
+    }
+});
+
+test('«Завершить мероприятие» ЗАМОРАЖИВАЕТ итог: число не растёт, пока таймер в минусе', async () => {
+    // Дефект 28.08.2026, найденный при полировке кнопок. Кнопка обещала «итог
+    // замрёт на текущей сумме», главный процесс обещание держал — переставал
+    // начислять, — а дисплей считал итог сам по формуле «накопитель + текущий
+    // минус» и признак завершения не читал вовсе. Итог продолжал расти и
+    // вдобавок считал одни и те же секунды дважды.
+    //
+    // Проверка только числом и только на настоящем минусе: на глаз «замерло»
+    // от «растёт на 1000 ₽ раз в три секунды» не отличается, пока не подождёшь.
+    test.setTimeout(200000);
+    const { app, control } = await launchApp();
+    try {
+        await openDisplayTab(control);
+        await unlock(control);
+        await control.fill('#overrunPrice', '1000');
+        await control.fill('#overrunPeriod', '3');
+        await setToggle(control, 'showOverrunCost', true);
+        await setToggle(control, 'showTotalCost', true);
+        const display = await openDisplay(app, control);
+        expect(display, 'окно дисплея не найдено').not.toBeNull();
+
+        const money = () => display.evaluate(() => ({
+            over: document.getElementById('overrunCostValue').textContent,
+            total: document.getElementById('totalCostValue').textContent
+        }));
+
+        await control.evaluate(() => window.ipcRenderer.send('timer-command',
+            { type: 'set', seconds: 1, allowNegative: true }));
+        await control.waitForTimeout(300);
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
+        await control.waitForTimeout(8000);
+
+        const before = await money();
+        console.log(`   до заморозки: перелимит «${before.over}», итого «${before.total}»`);
+        expect(before.total, 'таймер не ушёл в минус — замораживать нечего').not.toBe(`0${NB}₽`);
+
+        await control.locator('#eventFinishBtn').click();
+        await expect(control.locator('#eventFinish')).toBeVisible();
+        await control.locator('#eventFinishConfirm').click();
+        await control.waitForTimeout(1200);
+
+        const atFreeze = await money();
+        console.log(`   в момент заморозки: перелимит «${atFreeze.over}», итого «${atFreeze.total}»`);
+        // Секунды текущего минуса главный процесс сложил в накопитель. Дисплей
+        // не смеет прибавить их второй раз: итог обязан остаться тем же.
+        expect(atFreeze.total, 'итог подскочил на заморозке — секунды посчитаны дважды')
+            .toBe(before.total);
+        // Начисляется теперь ничего: сумма, растущая рядом с замершим итогом,
+        // читается как ошибка счёта.
+        expect(atFreeze.over, 'на завершённом мероприятии всё ещё что-то начисляется')
+            .toBe(`0${NB}₽`);
+
+        // Главное: ждём заведомо больше периода (3 с) — итог не двигается.
+        await control.waitForTimeout(7000);
+        const later = await money();
+        console.log(`   ещё 7 с спустя: перелимит «${later.over}», итого «${later.total}»`);
+        expect(later.total, 'замороженный итог продолжает расти').toBe(before.total);
+        expect(later.over, 'на завершённом мероприятии возобновилось начисление').toBe(`0${NB}₽`);
+    } finally {
+        await control.evaluate(() => {
+            window.ipcRenderer.send('timer-command', { type: 'reset' });
+            window.ipcRenderer.send('close-display');
+        }).catch(() => {});
+        await relock(control);
+        await app.close();
+    }
+});
+
+test('панель отчитывается о мероприятии словом и суммой, а кнопки объясняют себя', async () => {
+    // Жалоба 28.08.2026 «логически непонятно, что какая кнопка делает».
+    // Проверяется ровно то, что видно глазом: разные слова у двух состояний,
+    // своя подпись у каждой кнопки, и то, что нажимать «Завершить» второй раз
+    // некуда.
+    test.setTimeout(200000);
+    const { app, control } = await launchApp();
+    try {
+        await openDisplayTab(control);
+        await unlock(control);
+        await control.fill('#overrunPrice', '1000');
+        await control.fill('#overrunPeriod', '3');
+
+        const status = control.locator('#eventStatus');
+        await expect(status).toBeVisible();
+
+        // У каждой кнопки СВОЯ подпись, и подписи разные: пока их не было,
+        // разница между «заморозить» и «стереть» открывалась только в модалке.
+        const finishHint = await control.locator('#eventFinishBtnHint').textContent();
+        const resetHint = await control.locator('#eventResetBtnHint').textContent();
+        console.log(`   подписи: «${finishHint.trim()}» / «${resetHint.trim()}»`);
+        await expect(control.locator('#eventFinishBtnHint')).toBeVisible();
+        await expect(control.locator('#eventResetBtnHint')).toBeVisible();
+        expect(finishHint.trim()).not.toBe(resetHint.trim());
+
+        // Кнопки стоят СТОЛБИКОМ: одна ширина, разная высота. Ряд из двух
+        // половинок ломал бы подписи на три строки каждая.
+        const geom = await control.evaluate(() => {
+            const r = (id) => document.getElementById(id).getBoundingClientRect();
+            const a = r('eventFinishBtn');
+            const b = r('eventResetBtn');
+            return { ax: Math.round(a.x), bx: Math.round(b.x), ay: Math.round(a.y), by: Math.round(b.y),
+                aw: Math.round(a.width), bw: Math.round(b.width) };
+        });
+        console.log(`   кнопки: x ${geom.ax}/${geom.bx}, y ${geom.ay}/${geom.by}, ширина ${geom.aw}/${geom.bw}`);
+        expect(geom.ax, 'кнопки не в одной колонке').toBe(geom.bx);
+        expect(geom.aw, 'кнопки разной ширины').toBe(geom.bw);
+        expect(geom.by, 'кнопки стоят в ряд, а не столбиком').toBeGreaterThan(geom.ay);
+
+        // Идущее мероприятие: слово одно, кнопка «Завершить» жива.
+        const running = (await status.textContent()).trim();
+        console.log(`   идёт: «${running}»`);
+        expect(running).toMatch(/Идёт/);
+        await expect(control.locator('#eventFinishBtn')).toBeEnabled();
+
+        await control.locator('#eventFinishBtn').click();
+        await expect(control.locator('#eventFinish')).toBeVisible();
+        await control.locator('#eventFinishConfirm').click();
+        await control.waitForTimeout(1200);
+
+        // Завершённое: слово ДРУГОЕ, и завершать больше нечего.
+        const frozen = (await status.textContent()).trim();
+        console.log(`   завершено: «${frozen}»`);
+        expect(frozen, 'два состояния мероприятия названы одним словом').not.toBe(running);
+        expect(frozen).toMatch(/Заморож/i);
+        await expect(control.locator('#eventFinishBtn')).toBeDisabled();
+
+        // «Новое мероприятие» возвращает панель в исходное состояние — и это
+        // же само-проверка: строка умеет меняться в ОБЕ стороны.
+        await control.locator('#eventResetBtn').click();
+        await expect(control.locator('#eventReset')).toBeVisible();
+        await control.locator('#eventResetConfirm').click();
+        await control.waitForTimeout(1200);
+        const again = (await status.textContent()).trim();
+        console.log(`   после нового: «${again}»`);
+        expect(again, 'строка не вернулась в «идёт»').toMatch(/Идёт/);
+        await expect(control.locator('#eventFinishBtn')).toBeEnabled();
+    } finally {
+        await relock(control);
+        await app.close();
+    }
+});
+
+test('справка про режим ДОСТУПНА до разблокировки и раскрывается по клику', async () => {
+    // Ответ «как включить» обязан быть виден тому, кто ещё не включил: секция
+    // справки единственная в этом режиме, которая НЕ прячется под замок.
+    // Раскрытие проверяется кликом, потому что вопросы строит модуль, а
+    // обработчик аккордеона в панели один и собирает их querySelectorAll — если
+    // секция построится после него, вопросы останутся мёртвыми.
+    test.setTimeout(120000);
+    const { app, control } = await launchApp();
+    try {
+        await control.click('#faqBtn');
+        await expect(control.locator('#faqModal')).toBeVisible();
+
+        const section = control.locator('#faq47Mount .faq-section');
+        await expect(section).toHaveCount(1);
+        await expect(section).toBeVisible();
+
+        const items = control.locator('#faq47Mount .faq-item');
+        const count = await items.count();
+        console.log(`   вопросов в разделе: ${count}`);
+        expect(count).toBeGreaterThanOrEqual(5);
+
+        // Ответ закрыт, пока не нажали, — и открывается ИМЕННО кликом.
+        const first = items.first();
+        await expect(first.locator('.faq-answer')).toBeHidden();
+        await first.locator('.faq-question').click();
+        await expect(first.locator('.faq-answer')).toBeVisible();
+        await expect(first.locator('.faq-question')).toHaveAttribute('aria-expanded', 'true');
+
+        // Способ включения назван в справке — иначе раздел не отвечает на
+        // главный вопрос, ради которого он и заведён.
+        const text = await section.textContent();
+        expect(text).toMatch(/тройной клик/i);
+        expect(text).toMatch(/подвал/i);
+    } finally {
+        await control.click('#faqClose').catch(() => {});
         await app.close();
     }
 });

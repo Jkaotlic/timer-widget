@@ -125,3 +125,83 @@ test('итог считает перелимит мероприятия с уч�
     assert.equal(Money.totalSeconds(7, -2), 9);
     assert.equal(Money.totalCost(0, -30, 1000, 3), 10000);
 });
+
+// ── Сводка мероприятия: одна сборка на панель и на дисплей ────────────────
+
+/**
+ * `eventSummary` появилась 28.08.2026 по следу дефекта, которого не видел ни
+ * один тест: дисплей ПРИНИМАЛ признак `finished` и нигде его не читал.
+ *
+ * «Завершить мероприятие» обещает «итог замрёт на текущей сумме». Главный
+ * процесс своё обещание держал — складывал текущий минус в накопитель и
+ * переставал начислять. А дисплей считал итог сам, по формуле «накопитель +
+ * текущий минус», и потому:
+ *
+ *   1. ПРИБАВЛЯЛ те же секунды второй раз (они уже лежали в накопителе);
+ *   2. продолжал РАСТИ, пока таймер оставался в минусе.
+ *
+ * Замер на ставке 1000 ₽ / 3 с, накопитель 15 с: в момент нажатия 8 000 ₽
+ * вместо 5 000, через три секунды 9 000, дальше 15 000. Кнопка не делала
+ * ничего видимого.
+ *
+ * Поэтому итог собирается ЗДЕСЬ и одинаково для обоих окон: панель берёт из
+ * сводки строку, дисплей — цену. Второе место, знающее формулу итога, — это и
+ * есть тот дефект.
+ */
+const summaryState = (patch) => Object.assign({
+    overrunSeconds: 0,
+    remainingSeconds: 0,
+    excludedLiveSeconds: 0,
+    finished: false,
+    price: '1000',
+    period: '3'
+}, patch);
+
+test('сводка идущего мероприятия растёт вместе с текущим минусом', () => {
+    const running = (rem) => Money.eventSummary(summaryState({ overrunSeconds: 6, remainingSeconds: rem }));
+    assert.equal(running(0).cost, 2000, '6 закрытых секунд — две ступени');
+    assert.equal(running(-3).cost, 3000, 'три секунды текущего минуса — ещё ступень');
+    assert.equal(running(-9).cost, 5000);
+    assert.equal(running(0).finished, false);
+});
+
+test('ЗАВЕРШЁННОЕ мероприятие не растёт и не считает секунды дважды', () => {
+    // Накопитель уже содержит секунды текущего минуса: их сложил главный
+    // процесс в момент «Завершить». Сколько бы таймер ни просидел в минусе
+    // дальше, итог обязан остаться прежним.
+    const frozen = (rem) => Money.eventSummary(summaryState({
+        overrunSeconds: 15, remainingSeconds: rem, finished: true
+    }));
+    assert.equal(frozen(-9).cost, 5000, 'в момент заморозки итог — цена накопителя, и только его');
+    assert.equal(frozen(-12).cost, 5000, 'итог пополз через три секунды');
+    assert.equal(frozen(-30).cost, 5000, 'итог пополз дальше');
+    assert.equal(frozen(-30).seconds, 15, 'секунды итога тоже обязаны замереть');
+    assert.equal(frozen(0).finished, true);
+});
+
+test('отсечка «Нового мероприятия» действует и в сводке', () => {
+    // Обнулили посреди минуса: секунды, натикавшие до нажатия, к новому
+    // мероприятию не относятся.
+    const s = Money.eventSummary(summaryState({
+        overrunSeconds: 0, remainingSeconds: -10, excludedLiveSeconds: 10
+    }));
+    assert.equal(s.cost, 0, 'новое мероприятие обязано начаться с нуля');
+});
+
+test('сводка отчитывается СЛОВОМ, и слово разное', () => {
+    const running = Money.eventSummary(summaryState({ overrunSeconds: 6 }));
+    const frozen = Money.eventSummary(summaryState({ overrunSeconds: 6, finished: true }));
+    assert.ok(running.text.includes(running.money), 'в строке идущего нет самой суммы');
+    assert.ok(frozen.text.includes(frozen.money), 'в строке завершённого нет самой суммы');
+    assert.notEqual(running.text, frozen.text,
+        'два состояния мероприятия названы одним словом — кнопка снова ничего не меняет');
+    assert.match(frozen.text, /заморож/i, 'завершённое мероприятие не названо замороженным');
+});
+
+test('сводка терпит мусор на входе, как и вся остальная арифметика', () => {
+    assert.equal(Money.eventSummary({}).cost, 0);
+    assert.equal(Money.eventSummary({}).seconds, 0);
+    assert.equal(Money.eventSummary(null).cost, 0, 'сводка без состояния роняла бы панель на старте');
+    assert.equal(Money.eventSummary(summaryState({ overrunSeconds: 9, period: '0' })).cost, 0,
+        'период 0 — это «считать нечем», а не деление на ноль');
+});

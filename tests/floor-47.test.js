@@ -313,3 +313,119 @@ test('каждая карточка дисплея стоит в СВОЁМ уг
     // зелёный при любой вёрстке.
     assert.ok(seen.size >= 7, `зонд нашёл только ${seen.size} карточек — регулярка не работает`);
 });
+
+// ── Заморозка итога: обещание кнопки «Завершить мероприятие» ──────────────
+
+test('дисплей ЧИТАЕТ признак завершения, а не только принимает его', () => {
+    // Дефект 28.08.2026: `this.eventFinished` присваивался в обработчике и не
+    // читался НИГДЕ. Кнопка обещала «итог замрёт», а «Итого» на экране росло
+    // дальше и вдобавок считало секунды текущего минуса дважды — их уже сложил
+    // в накопитель главный процесс.
+    const src = codeOnly(read('display-script.js'));
+    const at = src.indexOf('updateMoneyBlocks() {');
+    assert.ok(at > 0, 'не найден updateMoneyBlocks');
+    const body = src.slice(at, src.indexOf('\n    applyDisplaySettings(', at));
+    assert.ok(/eventFinished/.test(body),
+        'заморозка не учитывается при показе денег — «Завершить» снова ничего не меняет');
+
+    // Само-проверка зонда: срез обязан находить величину, которая там ТОЧНО
+    // есть. Иначе зелёный означал бы и «читает», и «смотрю не туда».
+    assert.ok(/eventOverrunSeconds/.test(body), 'зонд смотрит не туда — в срезе нет даже накопителя');
+});
+
+test('формулу итога знает ОДНО место — money-meter', () => {
+    const Money = require('../money-meter');
+    assert.equal(typeof Money.eventSummary, 'function', 'нет единой сборки итога');
+
+    // Ни одно окно не собирает итог само: «накопитель + текущий минус» — это и
+    // есть та вторая формула, которая разошлась с главным процессом.
+    for (const file of ['display-script.js', 'panel-display.js']) {
+        const src = codeOnly(read(file));
+        assert.ok(!/\btotalCost\s*\(/.test(src),
+            `${file}: собирает итог сам, мимо eventSummary`);
+    }
+    // Само-проверка: та же регулярка обязана НАХОДИТЬ вызов там, где он есть.
+    assert.ok(/\btotalCost\s*\(/.test(codeOnly(read('tests/money-meter.test.js'))),
+        'регулярка не работает — зелёный выше ничего не значит');
+});
+
+// ── Панель: что именно делает каждая кнопка ───────────────────────────────
+
+test('панель отчитывается о состоянии мероприятия строкой', () => {
+    const src = codeOnly(read('panel-display.js'));
+    assert.ok(src.includes("'eventStatus'"), 'модуль не строит строку состояния');
+    assert.ok(/eventSummary\(/.test(src),
+        'строка состояния собирается не общей сводкой, а на месте');
+    // Сумма растёт каждую секунду, пока таймер в минусе: строка обязана
+    // слушать и состояние накопителя, и тик таймера, и правку ставки.
+    assert.ok(src.includes("on('event-overrun-state'"),
+        'панель не подписана на накопитель — строка не узнает о заморозке');
+    assert.ok(src.includes("on('timer-state'"),
+        'панель не слушает тик — сумма в строке замрёт на минуте открытия');
+});
+
+test('у каждой кнопки мероприятия есть подпись, а у опасной — свой вид', () => {
+    const src = codeOnly(read('panel-display.js'));
+    for (const id of ['eventFinishBtn', 'eventResetBtn']) {
+        const at = src.indexOf(`'${id}'`);
+        assert.ok(at > 0, `в модуле нет кнопки ${id}`);
+    }
+    // Подпись объясняет ДЕЙСТВИЕ, а не повторяет название кнопки: разницу
+    // между «заморозить» и «стереть» сегодня видно только в тексте модалки, то
+    // есть уже после нажатия.
+    assert.ok(/toggle-hint/.test(src), 'кнопки остались без объясняющих подписей');
+    assert.ok(/замрёт/.test(src) && /обнул/i.test(src),
+        'подписи не называют разницу между заморозкой и обнулением');
+    // Разрушающая кнопка помечена не только цветом — у неё свой класс, а смысл
+    // несёт слово в подписи.
+    assert.ok(/reset-btn-danger/.test(src), 'обнуление выглядит как обычная кнопка');
+});
+
+test('«Завершить» гаснет на уже завершённом мероприятии', () => {
+    const src = codeOnly(read('panel-display.js'));
+    assert.ok(/eventFinishBtnEl\.disabled\s*=/.test(src),
+        'кнопка «Завершить» нажимается второй раз и молча ничего не делает');
+});
+
+test('оба подтверждения отчитываются тостом', () => {
+    const src = codeOnly(read('panel-display.js'));
+    const toasts = src.match(/Toast\.show\(/g) || [];
+    assert.ok(toasts.length >= 2, 'после подтверждения панель молчит — «сработало ли?»');
+});
+
+// ── Главный процесс: одна сборка payload, два адресата ────────────────────
+
+test('payload накопителя собирается в ОДНОМ месте', () => {
+    // Гидратация дисплея слала `eventOverrun` без отсечки, а рассылка — с
+    // отсечкой: переоткрытое посреди мероприятия окно показывало сумму,
+    // которую «Новое мероприятие» уже стёрло.
+    assert.ok(/function eventOverrunPayload\(\)/.test(MAIN),
+        'нет единой сборки payload накопителя');
+    const sends = MAIN.match(/'event-overrun-state',\s*([^)]+)\)/g) || [];
+    assert.ok(sends.length >= 2, 'зонд не нашёл отправок — регулярка не работает');
+    for (const send of sends) {
+        assert.ok(send.includes('eventOverrunPayload()'),
+            `отправка собирает payload по-своему: ${send.trim()}`);
+    }
+});
+
+test('накопитель едет и в панель: она показывает состояние мероприятия', () => {
+    const at = MAIN.indexOf('function broadcastEventOverrun');
+    assert.ok(at > 0, 'не найдена рассылка накопителя');
+    const body = MAIN.slice(at, MAIN.indexOf('\n}', at));
+    assert.ok(/displayWindow/.test(body) && /controlWindow/.test(body),
+        'у накопителя по-прежнему один адресат — панели нечем отчитаться');
+});
+
+test('панель получает накопитель на ЗАГРУЗКЕ, а не только на изменении', () => {
+    // Панель, открытая посреди мероприятия (или перезагруженная
+    // краш-обработчиком), обязана узнать, идёт оно или заморожено: изменения
+    // может не случиться до самого конца.
+    const at = MAIN.indexOf('function createControlWindow');
+    assert.ok(at > 0, 'не найдена функция создания панели');
+    const body = MAIN.slice(at, MAIN.indexOf('\nfunction createWidgetWindow', at));
+    assert.ok(body.includes("'event-overrun-state'"),
+        'панель при открытии не получает состояние мероприятия');
+    // Само-проверка зонда: срез обязан покрывать привязки окна.
+    assert.ok(body.includes('bindWindowStateSnapshot'), 'зонд смотрит не туда');
+});

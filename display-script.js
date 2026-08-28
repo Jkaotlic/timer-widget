@@ -1442,18 +1442,37 @@ class DisplayTimer {
     updateMoneyBlocks() {
         const Money = window.MoneyMeter;
         if (!Money) { return; }
-        const excluded = this.excludedLiveSeconds || 0;
-        const live = Money.liveOverrun(this.remainingSeconds, excluded);
         const price = this.overrunPrice;
         const period = this.overrunPeriod;
+
+        // Итог собирает ОБЩАЯ сводка — та же, которой отчитывается панель.
+        // Своя формула здесь и была дефектом 28.08.2026: окно прибавляло к
+        // накопителю текущий минус, не спросив про завершение, и «Итого» после
+        // «Завершить мероприятие» продолжало расти, считая одни и те же
+        // секунды дважды.
+        const summary = Money.eventSummary({
+            overrunSeconds: this.eventOverrunSeconds,
+            remainingSeconds: this.remainingSeconds,
+            excludedLiveSeconds: this.excludedLiveSeconds,
+            finished: this.eventFinished,
+            price,
+            period
+        });
+
+        // «Перелимит» — то, что НАЧИСЛЯЕТСЯ прямо сейчас. На завершённом
+        // мероприятии не начисляется ничего, поэтому здесь ноль, а не живой
+        // минус: сумма, растущая рядом с замершим итогом, читается как ошибка
+        // счёта. Блок при этом остаётся на экране — прятать его нельзя,
+        // раскладка кладёт элементы по живым габаритам (см. ниже).
+        const live = this.eventFinished
+            ? 0
+            : Money.liveOverrun(this.remainingSeconds, this.excludedLiveSeconds || 0);
 
         if (this.overrunCostValueEl) {
             this.overrunCostValueEl.textContent = Money.formatMoney(Money.overrunCost(live, price, period));
         }
         if (this.totalCostValueEl) {
-            this.totalCostValueEl.textContent = Money.formatMoney(
-                Money.totalCost(this.eventOverrunSeconds, this.remainingSeconds, price, period, excluded)
-            );
+            this.totalCostValueEl.textContent = summary.money;
         }
 
         const unlocked = this.floor47Unlocked === true;

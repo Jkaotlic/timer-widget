@@ -214,20 +214,133 @@ const PanelDisplayMixin = {
      * по getElementById, и класть их было бы некуда. Порядок держит
      * bindDisplayBlockControls, вызываемая при сборке контроллера.
      */
+    /**
+     * Справка по скрытому режиму «47-й этаж».
+     *
+     * Строит ТОТ ЖЕ модуль, что строит саму настройку: два описания одного
+     * режима — это две правды, и расходятся они молча. По той же причине текст
+     * называет контролы теми же словами, какими они подписаны выше в этом
+     * файле.
+     *
+     * Секция видна ВСЕГДА, а не только при разблокированном режиме, — иначе
+     * ответ «как включить» прячется ровно от того, кто его ищет.
+     *
+     * Собирается в конструкторе контроллера, то есть ДО
+     * `querySelectorAll('.faq-question')` в панели: единственный обработчик
+     * аккордеона забирает эти вопросы вместе с остальными. Второй обработчик
+     * тут завёлся бы легко и сломал бы раскрытие всей справки.
+     */
+    buildFloor47Help() {
+        const mount = document.getElementById('faq47Mount');
+        if (!mount || mount.childElementCount > 0) { return; }
+
+        const ITEMS = [
+            ['Что это такое', [
+                'Режим для мероприятий с регламентом: приложение считает деньги за превышение времени доклада.',
+                'На дисплее показываются две суммы — сколько набежало у текущего докладчика и сколько накопилось за всё мероприятие.'
+            ]],
+            ['Как включить и выключить', [
+                'Включить: <strong>тройной клик</strong> по подвалу панели — строке с подсказками в самом низу окна.',
+                'Внизу вкладки <strong>Дисплей</strong> появится раздел со ставкой, тумблерами и командами мероприятия.',
+                'Выключить: тумблер <strong>Показывать этот раздел</strong> в конце того же раздела. Накопленное при этом не стирается.'
+            ]],
+            ['Ставка: сумма и период', [
+                '<strong>Сумма, ₽</strong> — сколько стоит один период перелимита. <strong>За каждые, сек</strong> — длина периода.',
+                'Ступень целая: при 1000 ₽ за 3 секунды первая тысяча набегает на третьей секунде минуса, вторая на шестой. Одна и две секунды стоят 0 ₽.',
+                'Ставку можно поправить посреди мероприятия — накопленное пересчитается по новой.'
+            ]],
+            ['Что видно на дисплее', [
+                '<strong>Перелимит</strong> — сколько набежало у текущего доклада. <strong>Итого</strong> — сумма за всё мероприятие.',
+                'Каждый включается своим тумблером в группе <strong>Показывать на дисплее</strong>.',
+                'Обе плашки таскаются мышью и масштабируются <strong>Shift + колесо</strong>, как остальные блоки дисплея.',
+                'Готовая раскладка <strong>47-й этаж</strong> ставит деньги по бокам от таймера. Она появляется в списке раскладок вместе с режимом.'
+            ]],
+            ['Как считаются доклады', [
+                'Доклад закрывается сам, как только таймер выходит из минуса: сброс, новое время, выбор пресета. Отдельной кнопки «доклад окончен» нет.',
+                'Секунды перелимита складываются <strong>до</strong> перевода в деньги. Поэтому два доклада по 2 секунды при ставке 1000 ₽ / 3 с стоят 1000 ₽, хотя в каждый отдельный момент на экране горел ноль.'
+            ]],
+            ['Завершить и начать заново', [
+                'Строка над кнопками всегда говорит, идёт мероприятие или заморожено и на какой сумме.',
+                '<strong>Завершить мероприятие</strong> — итог замирает на текущей сумме. Дальше перелимиты в него не идут, «Перелимит» показывает 0 ₽.',
+                '<strong>Новое мероприятие</strong> — накопленное стирается насовсем, вместе с текущим минусом, если таймер в нём.',
+                'Обе команды спрашивают подтверждение: вернуть стёртое нечем.'
+            ]]
+        ];
+
+        const section = document.createElement('div');
+        section.className = 'faq-section';
+        const title = document.createElement('div');
+        title.className = 'faq-section-title';
+        title.textContent = 'Перелимит доклада';
+        section.appendChild(title);
+
+        for (const [question, paragraphs] of ITEMS) {
+            const item = document.createElement('div');
+            item.className = 'faq-item';
+            // Кнопка, а не <div>: вопрос обязан получать фокус и открываться с
+            // клавиатуры. Разметка повторяет соседние вопросы дословно —
+            // обработчик аккордеона ищет их по классу.
+            const btn = document.createElement('button');
+            btn.className = 'faq-question';
+            btn.type = 'button';
+            btn.setAttribute('aria-expanded', 'false');
+            btn.textContent = question;
+            const arrow = document.createElement('span');
+            arrow.className = 'arrow';
+            arrow.setAttribute('aria-hidden', 'true');
+            arrow.textContent = '⌄';
+            btn.appendChild(arrow);
+            const answer = document.createElement('div');
+            answer.className = 'faq-answer';
+            for (const html of paragraphs) {
+                const p = document.createElement('p');
+                // Разметка тут своя, из литералов выше, а не пользовательская:
+                // жирным выделены названия контролов, и они обязаны совпадать с
+                // подписями в панели слово в слово.
+                p.innerHTML = html;
+                answer.appendChild(p);
+            }
+            item.appendChild(btn);
+            item.appendChild(answer);
+            section.appendChild(item);
+        }
+        mount.appendChild(section);
+    },
+
     buildFloor47Markup() {
         const mount = document.getElementById('floor47Mount');
         if (!mount || document.getElementById('floor47Section')) { return; }
 
-        const row = (labelText, forId, control) => {
+        // Строка настройки: имя (и, если нужно, поясняющая подпись) слева,
+        // контрол справа. Подпись — не украшение: без неё «Перелимит» и
+        // «Итого» отличаются только словом, а означают разное — начисляемое
+        // прямо сейчас и накопленное за всё мероприятие.
+        const row = (labelText, forId, control, hintText) => {
             const r = document.createElement('div');
             r.className = 'toggle-row';
+            const text = document.createElement('div');
+            text.className = 'toggle-text';
             const label = document.createElement('label');
             label.className = 'toggle-label';
             label.setAttribute('for', forId);
             label.textContent = labelText;
-            r.appendChild(label);
+            text.appendChild(label);
+            if (hintText) {
+                const hint = document.createElement('div');
+                hint.className = 'toggle-hint';
+                hint.textContent = hintText;
+                text.appendChild(hint);
+            }
+            r.appendChild(text);
             r.appendChild(control);
             return r;
+        };
+
+        const subtitle = (textContent) => {
+            const el = document.createElement('div');
+            el.className = 'settings-subtitle';
+            el.textContent = textContent;
+            return el;
         };
 
         const numberInput = (id, min, step, aria) => {
@@ -263,27 +376,67 @@ const PanelDisplayMixin = {
         section.id = 'floor47Section';
         section.hidden = true;
 
-        const title = document.createElement('div');
-        title.className = 'settings-subtitle';
-        title.textContent = 'Перелимит доклада';
-        section.appendChild(title);
-
+        // Три подгруппы вместо плоского списка. В плоском ставка, показ и
+        // команды выглядели одинаково важными и одинаково устроенными, хотя
+        // говорят о разном: ставка — про доклад, тумблеры — про экран, кнопки —
+        // про мероприятие целиком. Жалоба 28.08.2026 «непонятно, что какая
+        // делает» — про это.
+        section.appendChild(subtitle('Ставка за перелимит'));
         section.appendChild(row('Сумма, ₽', 'overrunPrice',
             numberInput('overrunPrice', 0, 100, 'Сумма штрафа за перелимит, рублей')));
         section.appendChild(row('За каждые, сек', 'overrunPeriod',
             numberInput('overrunPeriod', 1, 1, 'Период начисления штрафа, секунд')));
-        section.appendChild(row('Показывать перелимит', 'showOverrunCost', toggle('showOverrunCost')));
-        section.appendChild(row('Показывать итог', 'showTotalCost', toggle('showTotalCost')));
 
+        section.appendChild(subtitle('Показывать на дисплее'));
+        section.appendChild(row('Перелимит', 'showOverrunCost', toggle('showOverrunCost'),
+            'Сколько набежало у текущего доклада'));
+        section.appendChild(row('Итого', 'showTotalCost', toggle('showTotalCost'),
+            'Сумма за всё мероприятие'));
+
+        section.appendChild(subtitle('Мероприятие'));
+
+        // Строка-отчёт: идёт мероприятие или заморожено и на какой сумме.
+        // Собирается из ДЕЙСТВУЮЩИХ значений (накопитель, ставка, текущий
+        // минус), а не запоминается. Без неё нажатие «Завершить» не меняло в
+        // панели ничего, и сумму оператор читал с проекционного экрана.
+        const status = document.createElement('div');
+        status.className = 'event-status';
+        status.id = 'eventStatus';
+        // Живая величина: перечитывать её вслух должен screen reader, а не
+        // только видеть глазами.
+        status.setAttribute('role', 'status');
+        section.appendChild(status);
+
+        // Кнопки — в столбик и каждая со своей подписью. Пока они стояли рядом
+        // одинаковыми, разница между «заморозить итог» и «стереть его» жила
+        // только в тексте модалки, то есть открывалась уже ПОСЛЕ нажатия.
         const actions = document.createElement('div');
-        actions.className = 'toggle-row floor47-actions';
-        for (const [id, text] of [['eventFinishBtn', 'Завершить мероприятие'], ['eventResetBtn', 'Новое мероприятие']]) {
+        actions.className = 'floor47-actions';
+        const ACTIONS = [
+            ['eventFinishBtn', 'Завершить мероприятие', 'reset-btn',
+                'Итог замрёт на текущей сумме, перелимиты дальше не считаются.'],
+            ['eventResetBtn', 'Новое мероприятие', 'reset-btn reset-btn-danger',
+                'Итог обнулится, накопленное будет стёрто насовсем.']
+        ];
+        for (const [id, text, cls, hintText] of ACTIONS) {
+            const cell = document.createElement('div');
+            cell.className = 'floor47-action';
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'reset-btn';
+            btn.className = cls;
             btn.id = id;
             btn.textContent = text;
-            actions.appendChild(btn);
+            const hint = document.createElement('div');
+            hint.className = 'toggle-hint';
+            hint.id = `${id}Hint`;
+            hint.textContent = hintText;
+            // Подпись объясняет саму кнопку — связываем их, иначе для
+            // screen reader кнопка остаётся такой же безымянной, какой она
+            // была для глаза.
+            btn.setAttribute('aria-describedby', hint.id);
+            cell.appendChild(btn);
+            cell.appendChild(hint);
+            actions.appendChild(cell);
         }
         section.appendChild(actions);
         section.appendChild(row('Показывать этот раздел', 'floor47Unlocked', toggle('floor47Unlocked')));
@@ -340,10 +493,18 @@ const PanelDisplayMixin = {
 
     bindFloor47() {
         this.buildFloor47Markup();
+        this.buildFloor47Help();
         this.overrunPriceEl = document.getElementById('overrunPrice');
         this.overrunPeriodEl = document.getElementById('overrunPeriod');
         this.floor47UnlockedEl = document.getElementById('floor47Unlocked');
         this.floor47SectionEl = document.getElementById('floor47Section');
+        this.eventStatusEl = document.getElementById('eventStatus');
+        this.eventFinishBtnEl = document.getElementById('eventFinishBtn');
+
+        // Накопитель панель не ХРАНИТ — она держит последнее присланное
+        // состояние, чтобы было из чего собрать отчёт. Значения по умолчанию
+        // нужны до первой посылки: панель рисует строку сразу.
+        this.eventOverrunState = { overrunSeconds: 0, finished: false, excludedLiveSeconds: 0 };
 
         const footer = document.getElementById('panelFooter');
         if (footer) {
@@ -356,7 +517,35 @@ const PanelDisplayMixin = {
         }
 
         for (const el of [this.overrunPriceEl, this.overrunPeriodEl]) {
-            if (el) { el.addEventListener('input', () => this.pushDisplaySettings()); }
+            if (el) {
+                el.addEventListener('input', () => {
+                    this.pushDisplaySettings();
+                    // Ставка входит в отчёт: поправленная посреди мероприятия,
+                    // она пересчитывает уже накопленное. Ждать тика нельзя —
+                    // строка отчитывается о действующем значении.
+                    this.renderEventStatus();
+                });
+            }
+        }
+
+        // Три входа у одной строки, и каждый обязателен.
+        //
+        // Накопитель — единственный источник признака заморозки. Тик таймера
+        // нужен потому, что в минусе сумма растёт каждую секунду. Подписку
+        // ставит ТОТ, КТО СТРОИТ секцию: общий проход панели случается раньше,
+        // чем эта секция появляется в документе.
+        const ipc = window.ipcRenderer;
+        if (ipc) {
+            ipc.on('event-overrun-state', (_event, payload) => {
+                if (!payload || typeof payload !== 'object') { return; }
+                this.eventOverrunState = payload;
+                this.renderEventStatus();
+            });
+            ipc.on('timer-state', (_event, state) => {
+                if (!state || typeof state !== 'object') { return; }
+                this.eventRemainingSeconds = state.remainingSeconds;
+                this.renderEventStatus();
+            });
         }
 
         // Тумблеры денег подписывает ТОТ, КТО ИХ СТРОИТ.
@@ -397,10 +586,47 @@ const PanelDisplayMixin = {
                 });
             }
         };
-        confirmable('eventFinishBtn', 'eventFinish', () => window.ipcRenderer.send('event-finish'));
-        confirmable('eventResetBtn', 'eventReset', () => window.ipcRenderer.send('event-reset'));
+        // Тост после подтверждения — единственный ответ панели на нажатие,
+        // приходящий сразу. Строка отчёта обновится следующей посылкой из
+        // главного процесса, а «сработало ли» спрашивают в ту же секунду.
+        confirmable('eventFinishBtn', 'eventFinish', () => {
+            window.ipcRenderer.send('event-finish');
+            window.Toast.show('Мероприятие завершено — итог заморожен', 'success');
+        });
+        confirmable('eventResetBtn', 'eventReset', () => {
+            window.ipcRenderer.send('event-reset');
+            window.Toast.show('Новое мероприятие — итог обнулён', 'success');
+        });
 
         this.renderFloor47();
+    },
+
+    /**
+     * Отчёт о мероприятии: строка состояния и вид кнопки «Завершить».
+     *
+     * Сводку собирает money-meter — та же, которой считает дисплей. Второй
+     * формулы итога в проекте нет: разошедшиеся формулы и были дефектом,
+     * из-за которого «Завершить» ничего не меняло на экране.
+     */
+    renderEventStatus() {
+        if (!this.eventStatusEl || !window.MoneyMeter) { return; }
+        const summary = window.MoneyMeter.eventSummary({
+            overrunSeconds: this.eventOverrunState.overrunSeconds,
+            remainingSeconds: this.eventRemainingSeconds,
+            excludedLiveSeconds: this.eventOverrunState.excludedLiveSeconds,
+            finished: this.eventOverrunState.finished,
+            price: this.overrunPriceEl ? this.overrunPriceEl.value : 0,
+            period: this.overrunPeriodEl ? this.overrunPeriodEl.value : 0
+        });
+        this.eventStatusEl.textContent = summary.text;
+        // Состояние — КЛАСС, а не инлайн-цвет; и помечено оно не одним цветом:
+        // слово в строке говорит то же самое.
+        this.eventStatusEl.classList.toggle('is-finished', summary.finished);
+        if (this.eventFinishBtnEl) {
+            // Завершать завершённое нечего: кнопка, молча ничего не делающая,
+            // читается как сломанная.
+            this.eventFinishBtnEl.disabled = summary.finished;
+        }
     },
 
     /** Секция видна ровно тогда, когда режим разблокирован. */
@@ -408,6 +634,7 @@ const PanelDisplayMixin = {
         if (this.floor47SectionEl) {
             this.floor47SectionEl.hidden = !this.isFloor47Unlocked();
         }
+        this.renderEventStatus();
         // Ряды подписей и кнопки раскладок строятся из реестра и знают про
         // секретность, поэтому после смены замка их надо пересобрать.
         this.bindBlockLabelRows();
