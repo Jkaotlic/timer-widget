@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -41,9 +41,9 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
-    "electron": "^43.4.1",
+    "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
-    "eslint": "^10.8.1",
+    "eslint": "^10.9.1",
     "eslint-plugin-html": "^8.1.4",
     "globals": "^17.11.0"
   },
@@ -113,7 +113,7 @@
       "timer-engine.js",
       "timer-controller.js",
       "recovery.js",
-    "event-overrun-store.js",
+      "event-overrun-store.js",
       "preload.js",
       "ipc-compat.js",
       "security.js",
@@ -122,7 +122,7 @@
       "constants.js",
       "color-utils.js",
       "renderer-shared.js",
-    "money-meter.js",
+      "money-meter.js",
       "settings-schema.js",
       "clock-settings-schema.js",
       "ui-theme.js",
@@ -147,7 +147,7 @@
       "panel-state.js",
       "custom-sounds.js",
       "local-background.js",
-    "theme-grid.js",
+      "theme-grid.js",
       "panel-colors.js",
       "panel-display.js",
       "panel-drawer.js",
