@@ -1073,6 +1073,36 @@ class DisplayTimer {
     }
 
     /**
+     * Габарит ЧЕРНИЛ активного стиля — того, что видно, а не рамы вокруг.
+     *
+     * Потолок масштаба считается по свободной полосе, и упираться в неё обязано
+     * СОДЕРЖИМОЕ. У «Круга», «Аналога» и «Флипа» блок и есть содержимое: их
+     * габарит задан самим циферблатом или створками. У «Цифр» блок — квадратная
+     * рама `--timer-box` (55vh), к строке времени отношения не имеющая: замер
+     * 31.08.2026 на 3380×1313 — чернил 883×487 в раме 1120×722. В потолок
+     * упирался воздух вокруг цифр, потолок выходил 169 % вместо 249 %, и окно
+     * при этом писало «Таймер уже во всю высоту», показывая цифры в треть
+     * экрана. Это и была вторая половина жалобы «не могу менять ширину».
+     *
+     * Ширина берётся с ДВУСТОРОННИМ запасом под знак минуса: он висит слева
+     * абсолютом, в offsetWidth не входит, а блок растёт от своего центра —
+     * значит запас обязан быть симметричным, иначе на пределе знак уедет за
+     * край окна в перерасходе.
+     *
+     * @param {HTMLElement} active — блок активного стиля
+     * @returns {{width: number, height: number}} пиксели РАСКЛАДКИ
+     */
+    timerInkBox(active) {
+        if (active === this.timerDigits && this.digitsTime) {
+            return {
+                width: this.digitsTime.offsetWidth + 2 * (this._digitsSignPx || 0),
+                height: this.digitsTime.offsetHeight
+            };
+        }
+        return { width: active.offsetWidth, height: active.offsetHeight };
+    }
+
+    /**
      * Сколько процентов из запрошенных реально помещается.
      *
      * Свободное место — это полоса между подписью над таймером и плашкой
@@ -1089,8 +1119,7 @@ class DisplayTimer {
         // Габарит БЕЗ трансформации: offsetWidth/offsetHeight её не видят,
         // а getBoundingClientRect() вернул бы уже увеличенный блок — то есть
         // подал бы собственный выход себе на вход.
-        const width = active.offsetWidth;
-        const height = active.offsetHeight;
+        const { width, height } = this.timerInkBox(active);
         const rect = active.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
@@ -2581,7 +2610,21 @@ class DisplayTimer {
         const probe = window.DigitsStyle.measureDigits(this.digitsProbe, this.digitsFont, probeText);
         if (!probe) { return; }
 
-        const box = this.timerDigits.getBoundingClientRect();
+        // Рама берётся из РАСКЛАДКИ, а не из прямоугольника. applyTimerScale()
+        // ставит на этот же блок `transform: scale()`, а
+        // getBoundingClientRect() трансформацию ВИДИТ — подгонка подавала бы
+        // собственный выход себе на вход. Замер 31.08.2026 на 3380×1313,
+        // посылки масштаба одна за другой: 100 → 150 → 100 % давало кегль
+        // 358 → 358 → 537px, то есть возврат к 100 % выглядел РОВНО как 150 %,
+        // а два одинаковых 150 % подряд увеличивали цифры ещё в полтора раза.
+        // Видимый размер зависел от порядка последних двух посылок — это и была
+        // жалоба «не могу нормально менять ширину».
+        //
+        // offsetWidth/offsetHeight — величины раскладки: трансформации на самом
+        // элементе и на его предках они не видят. Тот же грех тут уже чинили
+        // явной высотой вместо `height: auto` (см. .timer-digits в display.css),
+        // но закрыли только раскладочную половину.
+        const box = { width: this.timerDigits.offsetWidth, height: this.timerDigits.offsetHeight };
         const size = window.DigitsStyle.fitFontSize({
             availableWidth: box.width * 0.9,
             availableHeight: box.height * 0.9,
@@ -2590,6 +2633,15 @@ class DisplayTimer {
             signWidth: probe.signWidth
         });
         if (size > 0) { this.digitsTime.style.setProperty('--digits-font-size', size + 'px'); }
+        // Место под знак минуса в ПИКСЕЛЯХ текущего кегля. Знак висит слева
+        // абсолютом и в offsetWidth цифр не входит вовсе, а потолок масштаба
+        // обязан его учитывать: иначе на пределе минус уезжает за край окна
+        // ровно тогда, когда появляется, — в перерасходе. Величина запоминается
+        // здесь, потому что здесь она уже посчитана: probe.signWidth отдан в
+        // кегле пробы (см. measureDigits), перевод — линейный.
+        this._digitsSignPx = size > 0
+            ? probe.signWidth * size / window.DigitsStyle.PROBE_FONT_SIZE
+            : 0;
         // Вертикаль знака минуса — своя у каждого шрифта (см. measureSignShift):
         // центрируется бокс, а видно чернила.
         this.digitsTime.style.setProperty(

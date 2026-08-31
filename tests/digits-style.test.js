@@ -405,3 +405,53 @@ test('значение блока в «Цифрах» набирается ЦВ�
     // базовое .info-label. Инвариант «один тон подписи на все четыре стиля»
     // живёт в tests/contrast.test.js, чтобы не разъехаться на две копии.
 });
+
+// ---------------------------------------------------------------------------
+// Подгонка не меряет собственный выход
+// ---------------------------------------------------------------------------
+
+const { codeOnly, balancedBlockAt, maskNonCode } = require('./helpers/source-scan');
+
+/** Тело метода класса по имени: `имя() {` … закрывающая скобка. */
+function methodBody(src, name) {
+    const mask = maskNonCode(src);
+    const found = new RegExp(`\\n\\s+${name}\\([^)]*\\)\\s*\\{`).exec(mask);
+    assert.ok(found, `метод ${name} не найден`);
+    return balancedBlockAt(src, found.index, `метод ${name}`);
+}
+
+test('дисплей: кегль «Цифр» подгоняется по НЕтрансформированной раме', () => {
+    // Жалоба 31.08.2026: «не могу нормально менять ширину таймера». Подгонка
+    // брала доступное место из getBoundingClientRect() блока, а строкой выше на
+    // ЭТОТ ЖЕ блок ставится transform: scale() — прямоугольник трансформацию
+    // ВИДИТ. Замер: 100 → 150 → 100 % давало кегль 358 → 358 → 537px, то есть
+    // возврат к 100 % выглядел как 150 %. Габаритные offsetWidth/offsetHeight
+    // трансформации не видят — это единственная рама, в которую можно вписывать
+    // то, что саму раму потом растянет.
+    const src = fs.readFileSync(path.join(ROOT, 'display-script.js'), 'utf8');
+    const body = codeOnly(methodBody(src, 'updateDigitsScale'));
+
+    assert.match(body, /offsetWidth/, 'подгонка не берёт ширину раскладки');
+    assert.match(body, /offsetHeight/, 'подгонка не берёт высоту раскладки');
+    assert.ok(!/getBoundingClientRect/.test(body),
+        'подгонка кегля снова меряет трансформированный прямоугольник — свой собственный выход');
+
+    // Само-проверка: зонд обязан НАХОДИТЬ запрещённое там, где оно есть.
+    // Иначе зелёный значил бы и «убрано», и «регулярка не работает».
+    const broken = codeOnly('updateDigitsScale() {\n    const box = this.timerDigits.getBoundingClientRect();\n}');
+    assert.match(broken, /getBoundingClientRect/, 'зонд не видит запрещённого вызова — проверка холостая');
+});
+
+test('дисплей: потолок масштаба считается по чернилам активного стиля', () => {
+    // Вторая половина той же жалобы. Потолок мерил габарит БЛОКА, а у «Цифр»
+    // блок — квадратная рама --timer-box (55vh): чернил в ней 487px из 722px,
+    // и в потолок упирался воздух вокруг цифр. Отсюда «Таймер уже во всю
+    // высоту» при цифрах в треть экрана.
+    const src = fs.readFileSync(path.join(ROOT, 'display-script.js'), 'utf8');
+    const fit = codeOnly(methodBody(src, 'fitTimerScale'));
+
+    assert.match(fit, /this\.timerInkBox\(/,
+        'потолок берёт габарит блока напрямую — воздух вокруг чернил снова считается содержимым');
+    assert.ok(/timerInkBox\(active\)\s*\{/.test(codeOnly(src)) || /timerInkBox\(/.test(codeOnly(src)),
+        'метод timerInkBox не объявлен');
+});

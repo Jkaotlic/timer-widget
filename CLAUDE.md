@@ -251,6 +251,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `block-labels.spec.js` | Своё название плашки доезжает до окна ПО КЛИКУ, стирается в стандартное, переживает перезапуск |
 | `floor-47.spec.js` | Скрытый режим ПО КЛИКУ: разблокировка тройным кликом, деньги на дисплее, ЗАМОРОЗКА итога числом, отчёт панели, справка |
 | `display-proportions.spec.js` | Карточка занимает ОДНУ долю полосы на 16:9 и 4:3. Снимается, если разброс полос меньше ×1.6 |
+| `display-timer-width.spec.js` | Размер цифр — ФУНКЦИЯ процента, а не порядка посылок; потолок упирается в чернила; рама не крадёт клик у плашки |
 
 ## CI
 
@@ -321,11 +322,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **A green test does NOT prove a feature is reachable (CRITICAL)** — [разбор](docs/lessons.md#a-green-test-does-not-prove-a-feature-is-reachable-critical)
 - **Search for the identifier, not the CSS class** — [разбор](docs/lessons.md#search-for-the-identifier-not-the-css-class)
 - **Source-level tests must strip comments before asserting absence** — [разбор](docs/lessons.md#source-level-tests-must-strip-comments-before-asserting-abse)
-- **Never run `perl -pi` over these files** — [разбор](docs/lessons.md#never-run-perl--pi-over-these-files)
 - **Window state must be SNAPSHOT to each window on load, not only broadcast on change (CRITICAL)** — [разбор](docs/lessons.md#window-state-must-be-snapshot-to-each-window-on-load-not-onl)
-- **The finish flash must be latched** — [разбор](docs/lessons.md#the-finish-flash-must-be-latched)
-- **Flip timers belong to `flip-card.js`** — [разбор](docs/lessons.md#flip-timers-belong-to-flip-cardjs)
-- **`showTicks` drives TWO dials** — [разбор](docs/lessons.md#showticks-drives-two-dials)
 - **Resizing a window must hold its CENTRE, not its top-left corner (CRITICAL)** — [разбор](docs/lessons.md#resizing-a-window-must-hold-its-centre-not-its-top-left-corn)
 - **Верхний край экрана достижим: поджимает `constrainFrameRect`, а не уровень окна (CRITICAL)** — [разбор](docs/lessons.md#the-top-edge-is-reachable-what-clamps-is-constrainframerect)
 - **Восстановленная позиция сохраняет ПОЛОСУ ЗАХВАТА, а не всё окно; свисать за край разрешено (CRITICAL)** — [разбор](docs/lessons.md#a-restored-position-keeps-a-grabbable-strip-not-the-whole-window-critical)
@@ -345,42 +342,22 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **An unreachable theme is an untested theme** — [разбор](docs/lessons.md#an-unreachable-theme-is-an-untested-theme)
 - **`design-tokens.css` holds tokens, not recipes** — [разбор](docs/lessons.md#design-tokenscss-holds-tokens-not-recipes)
 - **Opening a window has ONE owner — the create-function (CRITICAL)** — [разбор](docs/lessons.md#opening-a-window-has-one-owner-the-create-function-critical)
-- **A payload default is not a guard** — [разбор](docs/lessons.md#a-payload-default-is-not-a-guard)
 - **A setting field needs an owner too, not just the key (CRITICAL)** — [разбор](docs/lessons.md#a-setting-field-needs-an-owner-too-not-just-the-key-critical)
 - **Tests and screenshots run in their OWN profiles** — [разбор](docs/lessons.md#tests-and-screenshots-run-in-their-own-profiles)
 - **`codeOnly()` is ONE implementation, in `tests/helpers/source-scan.js`** — [разбор](docs/lessons.md#codeonly-is-one-implementation-in-testshelperssource-scanjs)
-- **The bridge exposes no `invoke`** — [разбор](docs/lessons.md#the-bridge-exposes-no-invoke)
 - **Release gates count windows, they don't count matches** — [разбор](docs/lessons.md#release-gates-count-windows-they-dont-count-matches)
 - **`--no-sandbox` was cancelling the app's own `sandbox: true`** — [разбор](docs/lessons.md#no-sandbox-was-cancelling-the-apps-own-sandbox-true)
 - **The rot is not confined to `STORAGE_KEYS` — the WHOLE of `CONFIG` had it (CRITICAL)** — [разбор](docs/lessons.md#the-rot-is-not-confined-to-storage_keys-the-whole-of-config)
 - **`CONFIG.STORAGE_KEYS` is a registry, not an access point** — [разбор](docs/lessons.md#configstorage_keys-is-a-registry-not-an-access-point)
-- **The display has no browser-mode fallback** — [разбор](docs/lessons.md#the-display-has-no-browser-mode-fallback)
-- **IPC whitelist is duplicated** — [разбор](docs/lessons.md#ipc-whitelist-is-duplicated)
 - **A whitelisted channel is a permission, not a feature (CRITICAL)** — [разбор](docs/lessons.md#a-whitelisted-channel-is-a-permission-not-a-feature-critical)
-- **Adding new IPC channel** — [разбор](docs/lessons.md#adding-new-ipc-channel)
-- **Per-window colors** — [разбор](docs/lessons.md#per-window-colors)
-- **`ipc-compat.js`** — [разбор](docs/lessons.md#ipc-compatjs)
-- **Global keyboard shortcuts** — [разбор](docs/lessons.md#global-keyboard-shortcuts)
-- **Window state broadcast** — [разбор](docs/lessons.md#window-state-broadcast)
-- **Start sound from remote windows** — [разбор](docs/lessons.md#start-sound-from-remote-windows)
-- **Monitor selection persistence** — [разбор](docs/lessons.md#monitor-selection-persistence)
-- **Inline styles in HTML** — [разбор](docs/lessons.md#inline-styles-in-html)
-- **Widget devTools** — [разбор](docs/lessons.md#widget-devtools)
 - **A control with no visual coverage has no layout guarantee** — [разбор](docs/lessons.md#a-control-with-no-visual-coverage-has-no-layout-guarantee)
-- **Design previews** — [разбор](docs/lessons.md#design-previews)
-- **Sounds** — [разбор](docs/lessons.md#sounds)
-- **Control panel layout** — [разбор](docs/lessons.md#control-panel-layout)
-- **syncClockStyle** — [разбор](docs/lessons.md#syncclockstyle)
-- **Widget/clock geometry persistence** — [разбор](docs/lessons.md#widgetclock-geometry-persistence)
-- **Scale pushes must be change-detected** — [разбор](docs/lessons.md#scale-pushes-must-be-change-detected)
-- **Escape is layered** — [разбор](docs/lessons.md#escape-is-layered)
-- **A fitted size must never be measured against its own output (CRITICAL)** — [разбор](docs/lessons.md#a-fitted-size-must-never-be-measured-against-its-own-output)
+- **Подгонка размера не меряет собственный выход: рама берётся из РАСКЛАДКИ (`offset*`), потому что `getBoundingClientRect()` видит и `transform` (CRITICAL)** — [разбор](docs/lessons.md#a-fitted-size-must-never-be-measured-against-its-own-output)
+- **Потолок масштаба упирается в ЧЕРНИЛА, а не в раму блока: у «Цифр» рама — квадрат `--timer-box`, и в полосу упирался воздух вокруг цифр** — [разбор](docs/lessons.md#a-ceiling-is-measured-on-the-ink-not-on-the-frame)
 - **Accent text on an accent fill is a contrast trap, not bad luck with numbers** — [разбор](docs/lessons.md#accent-text-on-an-accent-fill-is-a-contrast-trap-not-bad-luc)
 - **A capture harness must wait for the theme too, not just for fonts** — [разбор](docs/lessons.md#a-capture-harness-must-wait-for-the-theme-too-not-just-for-f)
 - **Centre the DIGITS, not the whole inscription** — [разбор](docs/lessons.md#centre-the-digits-not-the-whole-inscription)
 - **The clock's superscript seconds are the opposite case** — [разбор](docs/lessons.md#the-clocks-superscript-seconds-are-the-opposite-case)
 - **Both rules were settled by measuring in `e2e` (digit centre, inscription centre,** — [разбор](docs/lessons.md#both-rules-were-settled-by-measuring-in-e2e-digit-centre-ins)
-- **Flip animation is shared** — [разбор](docs/lessons.md#flip-animation-is-shared)
 - **A segmented control's `.value` setter must NOT fire `change` (CRITICAL)** — [разбор](docs/lessons.md#a-segmented-controls-value-setter-must-not-fire-change-criti)
 - **Ряд выбора стиля часов не прячется: при синхронизации он зеркалит виджет, а клик по нему снимает синхронизацию** — [разбор](docs/lessons.md#clockstylerow-must-be-on-the-real-row)
 - **Segmented controls are `role="radiogroup"` + `role="radio"` + `aria-checked`, not tabs** — [разбор](docs/lessons.md#segmented-controls-are-roleradiogroup-roleradio-aria-checked)
@@ -399,32 +376,15 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **`visual:check` was NOT deterministic as of 10 Aug 2026 — verify the harness against itself before trusting a verdict** — [разбор](docs/lessons.md#visualcheck-was-not-deterministic-as-of-10-aug-2026-verify-t)
 - **`visual:check` has a tolerance, so it is not a substitute for measurement** — [разбор](docs/lessons.md#visualcheck-has-a-tolerance-so-it-is-not-a-substitute-for-me)
 - **The widget's flip separator is DOTS, not a glyph** — [разбор](docs/lessons.md#the-widgets-flip-separator-is-dots-not-a-glyph)
-- **Colour bands live in ONE place too** — [разбор](docs/lessons.md#colour-bands-live-in-one-place-too)
-- **One element, one colour system** — [разбор](docs/lessons.md#one-element-one-colour-system)
 - **Status palette is fixed across all three windows** — [разбор](docs/lessons.md#status-palette-is-fixed-across-all-three-windows)
-- **Scale is reported back** — [разбор](docs/lessons.md#scale-is-reported-back)
-- **Visual regression** — [разбор](docs/lessons.md#visual-regression)
-- **e2e needs `e2e/launch.js`** — [разбор](docs/lessons.md#e2e-needs-e2elaunchjs)
-- **Timer status priority lives in ONE place** — [разбор](docs/lessons.md#timer-status-priority-lives-in-one-place)
 - **`npm run screenshot` is the visual smoke test** — [разбор](docs/lessons.md#npm-run-screenshot-is-the-visual-smoke-test)
-- **Time format with hours** — [разбор](docs/lessons.md#time-format-with-hours)
-- **Display settings `showCurrentTime`** — [разбор](docs/lessons.md#display-settings-showcurrenttime)
 - **No external shadows on transparent windows** — [разбор](docs/lessons.md#no-external-shadows-on-transparent-windows)
-- **Design system v2** — [разбор](docs/lessons.md#design-system-v2)
 - **The second theme is LIGHT, and it is not the dark one inverted (CRITICAL)** — [разбор](docs/lessons.md#the-second-theme-is-light-and-it-is-not-the-dark-one-inverte)
 - **Windows whose background the USER paints keep the dark palette in both themes (CRITICAL)** — [разбор](docs/lessons.md#windows-whose-background-the-user-paints-keep-the-dark-palet)
-- **Two UI themes, `data-theme` on `<html>`** — [разбор](docs/lessons.md#two-ui-themes-data-theme-on-html)
-- **Display block positions** — [разбор](docs/lessons.md#display-block-positions)
-- **Display scaling** — [разбор](docs/lessons.md#display-scaling)
 - **У каждого элемента дисплея СВОЙ масштаб; ползунок панели — команда «поставить всем», а не зеркало; первая посылка его не применяет** — [разбор](docs/lessons.md#every-element-scales-on-its-own-and-the-slider-is-a-command)
 - **Раскладка дисплея — ДЕЙСТВИЕ, а не настройка: свой канал, ничего не сохраняет, шлётся ПОСЛЕ тумблеров (CRITICAL)** — [разбор](docs/lessons.md#a-layout-is-an-action-not-a-setting)
 - **«Чтобы всё вмещалось» — утверждение о прямоугольниках: координаты в долях, масштаб ужимается по свободной полосе** — [разбор](docs/lessons.md#fits-on-screen-is-a-statement-about-rectangles)
 - **Позиция элемента дисплея — ДОЛЯ окна, а не пиксель; доли не пересобираются из нового положения (CRITICAL)** — [разбор](docs/lessons.md#a-position-is-a-fraction-of-the-window-not-a-pixel)
-- **Manual time input** — [разбор](docs/lessons.md#manual-time-input)
-- **Color picker** — [разбор](docs/lessons.md#color-picker)
-- **Scale value edit** — [разбор](docs/lessons.md#scale-value-edit)
-- **Adaptive window height** — [разбор](docs/lessons.md#adaptive-window-height)
-- **Reset settings** — [разбор](docs/lessons.md#reset-settings)
 
 ## Работа с контекстом
 
@@ -437,6 +397,9 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 Перед переходом в новый чат: обнови файлы памяти проекта (что сделано, что
 запушено, что осталось), допиши `SESSION.md` и убедись, что незакоммиченного не
 осталось.
+
+Эти правила живут одним оглавлением: тема сама себе напоминание, а разбор
+раскрывает — [Never run `perl -pi` over these files](docs/lessons.md#never-run-perl--pi-over-these-files), [The finish flash must be latched](docs/lessons.md#the-finish-flash-must-be-latched), [Flip timers belong to `flip-card.js`](docs/lessons.md#flip-timers-belong-to-flip-cardjs), [`showTicks` drives TWO dials](docs/lessons.md#showticks-drives-two-dials), [A payload default is not a guard](docs/lessons.md#a-payload-default-is-not-a-guard), [The bridge exposes no `invoke`](docs/lessons.md#the-bridge-exposes-no-invoke), [The display has no browser-mode fallback](docs/lessons.md#the-display-has-no-browser-mode-fallback), [IPC whitelist is duplicated](docs/lessons.md#ipc-whitelist-is-duplicated), [Adding new IPC channel](docs/lessons.md#adding-new-ipc-channel), [Per-window colors](docs/lessons.md#per-window-colors), [`ipc-compat.js`](docs/lessons.md#ipc-compatjs), [Global keyboard shortcuts](docs/lessons.md#global-keyboard-shortcuts), [Window state broadcast](docs/lessons.md#window-state-broadcast), [Start sound from remote windows](docs/lessons.md#start-sound-from-remote-windows), [Monitor selection persistence](docs/lessons.md#monitor-selection-persistence), [Inline styles in HTML](docs/lessons.md#inline-styles-in-html), [Widget devTools](docs/lessons.md#widget-devtools), [Design previews](docs/lessons.md#design-previews), [Sounds](docs/lessons.md#sounds), [Control panel layout](docs/lessons.md#control-panel-layout), [syncClockStyle](docs/lessons.md#syncclockstyle), [Widget/clock geometry persistence](docs/lessons.md#widgetclock-geometry-persistence), [Scale pushes must be change-detected](docs/lessons.md#scale-pushes-must-be-change-detected), [Escape is layered](docs/lessons.md#escape-is-layered), [Flip animation is shared](docs/lessons.md#flip-animation-is-shared), [Colour bands live in ONE place too](docs/lessons.md#colour-bands-live-in-one-place-too), [One element, one colour system](docs/lessons.md#one-element-one-colour-system), [Scale is reported back](docs/lessons.md#scale-is-reported-back), [Visual regression](docs/lessons.md#visual-regression), [e2e needs `e2e/launch.js`](docs/lessons.md#e2e-needs-e2elaunchjs), [Timer status priority lives in ONE place](docs/lessons.md#timer-status-priority-lives-in-one-place), [Time format with hours](docs/lessons.md#time-format-with-hours), [Display settings `showCurrentTime`](docs/lessons.md#display-settings-showcurrenttime), [Design system v2](docs/lessons.md#design-system-v2), [Two UI themes, `data-theme` on `<html>`](docs/lessons.md#two-ui-themes-data-theme-on-html), [Display block positions](docs/lessons.md#display-block-positions), [Display scaling](docs/lessons.md#display-scaling), [Manual time input](docs/lessons.md#manual-time-input), [Color picker](docs/lessons.md#color-picker), [Scale value edit](docs/lessons.md#scale-value-edit), [Adaptive window height](docs/lessons.md#adaptive-window-height), [Reset settings](docs/lessons.md#reset-settings).
 
 ## Automation
 

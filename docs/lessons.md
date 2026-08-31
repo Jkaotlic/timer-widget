@@ -583,12 +583,58 @@
 
 ---
 
+<a id="a-ceiling-is-measured-on-the-ink-not-on-the-frame"></a>
+
+### Потолок масштаба меряется по ЧЕРНИЛАМ, а не по раме блока
+
+- **Потолок масштаба меряется по ЧЕРНИЛАМ, а не по раме блока**: `fitTimerScale()`
+  считал потолок по `offsetWidth/offsetHeight` блока стиля. У «Круга», «Аналога» и
+  «Флипа» блок и есть содержимое — их габарит задан циферблатом или створками. У
+  «Цифр» блок — КВАДРАТ `--timer-box` (55vh), к строке времени отношения не имеющий:
+  замер 31.08.2026 на 3380×1313 — чернил 883×487 в раме 1120×722. В свободную полосу
+  упирался воздух вокруг цифр, потолок выходил 169 % вместо 249 %, и окно при этом
+  писало «Таймер уже во всю высоту — мешает подпись над таймером», показывая цифры в
+  четверть ширины экрана. Надпись была честной по коду и ложной по факту: мешала
+  пустая рама. Габарит чернил берётся у `#digitsTime` и только `offset*` — по той же
+  причине, по которой это делает подгонка кегля (см. [разбор](#a-fitted-size-must-never-be-measured-against-its-own-output)).
+  Ширина берётся с ДВУСТОРОННИМ запасом под знак минуса: он висит слева абсолютом, в
+  `offsetWidth` не входит, а блок растёт от своего ЦЕНТРА — односторонний запас увёл
+  бы знак за край окна ровно тогда, когда он появляется, в перерасходе. Цена запаса
+  записана: сами цифры до края не доходят никогда, предел по ширине 911/1211 = 0.75.
+  Результат на том же экране: потолок 279 % вместо 141 %, цифры 78 % высоты окна
+  вместо 39 %. Плата — прозрачная рама на большом масштабе накрывает низ окна; по
+  плашке состояния попасть по-прежнему можно, потому что она `position: fixed` и в
+  порядке отрисовки идёт позже, и этот порядок теперь под проверкой.
+
+---
+
 <a id="a-fitted-size-must-never-be-measured-against-its-own-output"></a>
 
 ### A fitted size must never be measured against its own output (CRITICAL)
 
 - **A fitted size must never be measured against its own output (CRITICAL)**: the display's «Цифры» took its available height from `getBoundingClientRect()` of `#timerDigits`, declared `height: 100%` inside `.display-container` — whose height is `auto`. A percentage against `auto` resolves to `auto`, i.e. to the content height, i.e. to the height of the very digits being sized. The fit fed its own output back in and multiplied the size by **0.744 on every single recalculation**: 89.26 → 66.38 → 49.38 → 36.73 → 27.31 → 20.32 (measured). On a projector the timer shrank on any window resize and on the switch to `H:MM:SS`. The widget and the clock never had it — they take the frame from `this.container.offsetWidth/offsetHeight`, i.e. from the WINDOW. Two things this teaches: the sizing frame must be an element whose box does not depend on the thing being sized (`--timer-box` on `.display-container` is now that frame, shared with the ring so the literal exists once); and **"the size changes with the window" is not the invariant that catches this** — a collapse is also a change. The invariant is **idempotence**: `e2e/digits-style.spec.js` recalculates three times with nothing changed and demands one size, in all three windows, driven by a real `resize` event. Found by LOOKING at a screenshot — the display filled a fifth of the frame where the widget filled four fifths — which is exactly what the "look at the captures" step of a plan is for.
 
+
+- **Вторая половина того же греха — ТРАНСФОРМАЦИЯ, и она пряталась год** (31.08.2026).
+  Раскладочную половину закрыли явной высотой `--timer-box` вместо `height: auto`.
+  Но замер остался на `getBoundingClientRect()`, а `applyTimerScale()` строкой ВЫШЕ
+  ставит на тот же `#timerDigits` `transform: scale()` — прямоугольник трансформацию
+  ВИДИТ. Подгонка снова получала на вход свой выход, только умноженный не на 0.744,
+  а на текущий масштаб. Замер на 3380×1313, «Цифры»/Bebas, посылки масштаба подряд:
+  100 % → кегль 358px, чернила 883×487; 150 % → 358px, 1325×730; снова 100 % → **537px**,
+  чернила 1325×730 (то есть возврат к 100 % выглядит РОВНО как 150 %); снова 150 % →
+  358px, 1325×730 (150 % выглядит как 100 %); ещё раз 150 % → 537px, **1988×1095**.
+  Видимый размер зависел от ПОРЯДКА двух последних посылок, а не от числа — снаружи
+  это ровно жалоба «не могу нормально менять ширину таймера полноэкранного режима».
+  При запросе 300 % цифры вылезали за окно: 2881×1588 в окне высотой 1313.
+  Лечится тем же законом: рама берётся из РАСКЛАДКИ (`offsetWidth`/`offsetHeight`),
+  а она трансформаций ни на себе, ни на предках не видит.
+  Почему старая проверка идемпотентности этого не поймала: она пересчитывала трижды
+  **на одном масштабе**, а грех виден только когда масштаб МЕНЯЛСЯ между пересчётами.
+  Инвариант пришлось усилить: размер обязан быть ФУНКЦИЕЙ запрошенного процента —
+  одно и то же число даёт одну и ту же ширину, в какой бы последовательности его ни
+  прислали (`e2e/display-timer-width.spec.js`). Диагноз доказан подменой замера на
+  `offset*` в патче: та же последовательность дала кегль 358px во всех семи посылках.
 ---
 
 <a id="accent-text-on-an-accent-fill-is-a-contrast-trap-not-bad-luc"></a>

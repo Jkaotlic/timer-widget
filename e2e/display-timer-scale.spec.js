@@ -217,7 +217,20 @@ test('масштаб дисплея не выпускает таймер за о
             const active = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']
                 .map((id) => document.getElementById(id))
                 .find((el) => el && el.classList.contains('active'));
-            const box = active.getBoundingClientRect();
+            // Меряется ВИДИМОЕ, а не рама вокруг него. У «Круга», «Аналога» и
+            // «Флипа» блок и есть содержимое. У «Цифр» блок — квадрат
+            // `--timer-box` (55vh), к строке времени отношения не имеющий:
+            // замер 31.08.2026 на 3380×1313 — чернил 883×487 в раме 1120×722.
+            // Пока субъектом была рама, потолок упирался в воздух вокруг цифр
+            // (169 % вместо 249 %), окно писало «Таймер уже во всю высоту» и
+            // показывало цифры в треть экрана — жалоба «не могу менять ширину
+            // таймера». Обещание тут про то, что ВИДНО: пустая рама ни на
+            // подпись, ни на плашку не наезжает, потому что она прозрачна, а в
+            // hit-тесте плашка её обыгрывает (см. e2e/display-timer-width).
+            const visible = active.id === 'timerDigits'
+                ? document.getElementById('digitsTime')
+                : active;
+            const box = visible.getBoundingClientRect();
             const label = document.getElementById('heroLabel').getBoundingClientRect();
             const pill = document.querySelector('.status-pill').getBoundingClientRect();
             return {
