@@ -139,6 +139,7 @@
       "sound-presets.js",
       "ui-feedback.js",
       "scale-input.js",
+      "scale-report.js",
       "color-picker.js",
       "modal-manager.js",
       "shortcuts-help.js",

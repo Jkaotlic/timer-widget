@@ -669,7 +669,7 @@
                                 <div class="toggle-row">
                                     <span class="toggle-label">Размер блоков</span>
                                     <div class="scale-control">
-                                        <input type="range" id="timeBlocksScale" class="scale-slider" min="50" max="600" value="100" aria-label="Масштаб блоков времени">
+                                        <input type="range" id="timeBlocksScale" class="scale-slider" min="50" max="600" value="150" aria-label="Масштаб блоков времени">
                                         <span id="timeBlocksScaleValue" class="scale-value-text">100%</span>
                                     </div>
                                 </div>
@@ -1072,13 +1072,15 @@
     <script src="renderer-shared.js"></script>
     <script src="digits-style.js"></script>
     <script src="font-select.js"></script>
+    <!-- display-layouts.js РАНЬШЕ settings-schema.js: таблица берёт у реестра умолчание масштаба блоков -->
+    <script src="display-layouts.js"></script>
     <script src="settings-schema.js"></script>
     <script src="clock-settings-schema.js"></script>
-    <script src="display-layouts.js"></script>
     <script src="sound-bank.js"></script>
     <script src="sound-presets.js"></script>
     <script src="ui-feedback.js"></script>
     <script src="scale-input.js"></script>
+    <script src="scale-report.js"></script>
     <script src="color-picker.js"></script>
     <script src="modal-manager.js"></script>
     <script src="shortcuts-help.js"></script>
@@ -1111,12 +1113,11 @@
                 };
         }
 
-
-
-
-
-
-
+        // Обе величины — из реестра, а не литералами: масштаб «как при открытии»
+        // (ползунки говорят процентами, CONFIG.DEFAULT_SCALE хранит долю) и
+        // базовый размер окна часов, который панель дважды считала по числу 220.
+        const DEFAULT_SCALE_PCT = Math.round(window.CONFIG.DEFAULT_SCALE * 100);
+        const CLOCK_BASE_PX = window.CONFIG.CLOCK_WIDGET_DEFAULT_SIZE;
 
         class TimerController {
             constructor() {
@@ -1745,7 +1746,7 @@
                     clockScaleEl.addEventListener('input', () => {
                         const val = parseInt(clockScaleEl.value);
                         clockScaleValueEl.textContent = val + '%';
-                        const newSize = Math.round(220 * val / 100);
+                        const newSize = Math.round(CLOCK_BASE_PX * val / 100);
                         ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
                     });
                 }
@@ -1754,7 +1755,7 @@
                 setupScaleValueEdit(
                     document.getElementById('timerScaleValue'),
                     document.getElementById('timerScale'),
-                    30, 600, 100,
+                    DEFAULT_SCALE_PCT,
                     (val) => {
                         ipcRenderer.send('widget-style-update', this.widgetStylePayload({ timerScale: val }));
                         this.saveExtSettings();
@@ -1764,9 +1765,9 @@
                 setupScaleValueEdit(
                     document.getElementById('clockScaleValue'),
                     document.getElementById('clockScale'),
-                    30, 600, 100,
+                    DEFAULT_SCALE_PCT,
                     (val) => {
-                        const newSize = Math.round(220 * val / 100);
+                        const newSize = Math.round(CLOCK_BASE_PX * val / 100);
                         ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
                     }
                 );
@@ -1778,14 +1779,14 @@
                 setupScaleValueEdit(
                     document.getElementById('displayTimerScaleValue'),
                     document.getElementById('displayTimerScale'),
-                    30, 300, 100,
+                    DEFAULT_SCALE_PCT,
                     () => { this.pushDisplaySettings(); }
                 );
 
                 setupScaleValueEdit(
                     document.getElementById('timeBlocksScaleValue'),
                     document.getElementById('timeBlocksScale'),
-                    50, 600, 100,
+                    window.DisplayLayouts.DEFAULT_BLOCK_SCALE,
                     () => { this.pushDisplaySettings(); }
                 );
 
@@ -2280,31 +2281,15 @@
                 // отправки в окно не происходит и петля не замыкается. В localStorage
                 // пишем через saveExtSettings() — она не шлёт IPC.
                 this._onScaleReport = (event, data) => {
-                    if (!data || typeof data !== 'object') { return; }
-                    const pct = Number(data.scalePct);
-                    if (!Number.isFinite(pct)) { return; }
-                    const TARGETS = {
-                        'widget': ['timerScale', 'timerScaleValue'],
-                        'clock': ['clockScale', 'clockScaleValue'],
-                        'display': ['displayTimerScale', 'displayTimerScaleValue'],
-                        'display-blocks': ['timeBlocksScale', 'timeBlocksScaleValue']
-                    };
-                    const target = TARGETS[data.source];
-                    if (!target) { return; }
-                    const slider = document.getElementById(target[0]);
-                    const label = document.getElementById(target[1]);
-                    if (!slider) { return; }
-                    // Уважаем границы самого ползунка, чтобы не выставить значение вне диапазона.
-                    const min = Number(slider.min);
-                    const max = Number(slider.max);
-                    const clamped = window.RendererShared.clampScale(
-                        pct,
-                        Number.isFinite(min) ? min : 30,
-                        Number.isFinite(max) ? max : 600
-                    );
-                    slider.value = clamped;
-                    if (label) { label.textContent = clamped + '%'; }
-                    this.saveExtSettings();
+                    const applied = window.ScaleReport.applyScaleReport(data, {
+                        doc: document,
+                        storage: localStorage,
+                        clamp: window.RendererShared.clampScale,
+                        parseJSON: safeJSONParse
+                    });
+                    // Подписи строк — отчёт о ДЕЙСТВУЮЩИХ значениях, и масштаб
+                    // в них входит (см. renderWindowRows).
+                    if (applied !== null) { this.renderWindowRows(); }
                 };
                 ipcRenderer.on('scale-report', this._onScaleReport);
 

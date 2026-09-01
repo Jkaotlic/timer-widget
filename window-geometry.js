@@ -50,9 +50,13 @@ const SAVE_SETTLE_MS = 300;
  * @param {Storage} cfg.storage
  * @param {() => number} cfg.getOuterWidth
  * @param {() => {x: number, y: number}} cfg.getScreenPosition
+ * @param {(pct: number) => void} [cfg.onScaleSettled] — вызывается, когда
+ *        УСТОЯВШИЙСЯ размер оказался другим: окно узнало свой новый масштаб не
+ *        от колеса, а от системы (растянули за край рамки, ползунок панели).
+ *        Нужен, чтобы ползунок панели не остался на прежнем числе.
  */
 function createWindowGeometry(cfg) {
-    const { storageKey, baseSize, channels, send, parseJSON, storage, getOuterWidth, getScreenPosition } = cfg;
+    const { storageKey, baseSize, channels, send, parseJSON, storage, getOuterWidth, getScreenPosition, onScaleSettled } = cfg;
 
     // Текущий масштаб окна. Раньше жил в поле окна (_widgetScalePct /
     // _clockScalePct) и сравнивался СНАРУЖИ, в обработчике resize, ровно для
@@ -170,7 +174,23 @@ function createWindowGeometry(cfg) {
             settleTimer = setTimeout(() => {
                 settleTimer = null;
                 const pct = Math.round(currentBounds().width / baseSize * 100) || scalePct || 100;
-                if (pct !== scalePct) { save(pct); }
+                // С ЧЕМ сравнивать, когда своего масштаба ещё нет. Пустой
+                // scalePct означает не «неизвестно», а «окно открыто базового
+                // размера», то есть 100 %: другого размера у него на старте не
+                // бывает. Без этой подстановки открытие окна с чистой
+                // геометрией выглядело как изменение масштаба со 100 на 100 —
+                // и панель, получив отчёт, сохраняла ВЕСЬ свой набор настроек
+                // поверх профиля, затирая то, что туда положили мимо неё.
+                const known = Number.isFinite(scalePct) ? scalePct : 100;
+                if (pct === known) { return; }
+                save(pct);
+                // О новом масштабе узнаёт и панель. Без этого путь Ctrl+колеса
+                // был ЕДИНСТВЕННЫМ, который сообщал масштаб, — а окно можно
+                // растянуть за край рамки. Замер: окно 500 px (200 %), в
+                // хранилище 200, ползунок панели 100. Два источника правды
+                // расходились на сто процентных пунктов, и следующее движение
+                // ползунка возвращало окно назад.
+                if (typeof onScaleSettled === 'function') { onScaleSettled(pct); }
             }, delayMs);
         },
 

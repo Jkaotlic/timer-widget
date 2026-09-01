@@ -288,6 +288,32 @@ function reportGeometry(win) {
     safelySendToWindow(win, 'window-geometry', win.getBounds());
 }
 
+/**
+ * Окно сообщает СВОИ границы и тогда, когда двигало его не приложение.
+ *
+ * Раньше `window-geometry` уходил только из трёх обработчиков IPC
+ * (moveWindowBy / resizeWindowClamped / positionWindowClamped), то есть
+ * рендерер узнавал о размере лишь тогда, когда сам же его и попросил. Окна при
+ * этом `resizable: true` — их тянут за край рамки, их двигает и меняет система
+ * (WM_DPICHANGED, перенос на другой монитор). Всё это проходило мимо, и
+ * запомненные рендерером границы устаревали НАВСЕГДА.
+ *
+ * Замер 01.09.2026: первый запуск на чистом профиле — окно растянуто до 500 px,
+ * в widgetGeometry записалось 200 % ✔; второй запуск — растянуто до 750 px, а в
+ * хранилище так и осталось 200 %. Дефект прятался за тем, что на чистом
+ * профиле `reported` ещё пуст и работает запасной путь (outerWidth): со второго
+ * запуска восстановление позиции заполняло `reported`, и он больше не менялся.
+ *
+ * Петли здесь нет: рендерер по этому каналу только ЗАПОМИНАЕТ границы
+ * (setWindowBounds), обратно ничего не шлёт.
+ */
+function bindGeometryReports(win) {
+    if (!win) { return; }
+    const send = () => reportGeometry(win);
+    win.on('resize', send);
+    win.on('move', send);
+}
+
 // Перемещение окна за время ОДНОГО жеста не меняет его размер.
 //
 // Размер здесь не просто «не трогается» — он ЗАДАЁТСЯ на каждом шаге, тем
@@ -672,6 +698,8 @@ function createWidgetWindow() {
         log.info(`[perf] widget window ready in ${Date.now() - __widgetT0}ms`);
     });
 
+    bindGeometryReports(widgetWindow);
+
     widgetWindow.on('closed', () => {
         widgetWindow = null;
         // Уведомляем окно управления что виджет закрыт
@@ -733,6 +761,8 @@ function createClockWidgetWindow() {
     clockWidgetWindow.once('ready-to-show', () => {
         log.info(`[perf] clock window ready in ${Date.now() - __clockT0}ms`);
     });
+
+    bindGeometryReports(clockWidgetWindow);
 
     clockWidgetWindow.on('closed', () => {
         clockWidgetWindow = null;

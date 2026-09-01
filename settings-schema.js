@@ -47,6 +47,23 @@
  * Ключ совпадает с id контрола, как во всей таблице ниже; что каждый из них в
  * таблице ОПИСАН, проверяет tests/settings-schema.test.js.
  */
+/**
+ * Реестр подвижных элементов дисплея — источник умолчания масштаба блоков.
+ *
+ * Тем же приёмом, что в panel-display.js: в окне управления модуль уже лежит в
+ * `window` (порядок тегов в electron-control.html несущий — display-layouts.js
+ * подключается РАНЬШЕ этого файла), в Node берётся через require. Своей копии
+ * умолчания здесь нет намеренно: две копии одного числа в этом проекте уже
+ * расходились.
+ */
+// Имя УНИКАЛЬНО на весь документ: сборщика нет, все файлы — classic <script>,
+// и `const Layouts` здесь столкнулся бы с таким же именем в panel-display.js.
+// Столкновение роняет ВЕСЬ inline-скрипт панели («Identifier has already been
+// declared»), то есть окно управления перестаёт работать целиком.
+const SchemaLayouts = (typeof window !== 'undefined' && window.DisplayLayouts)
+    ? window.DisplayLayouts
+    : require('./display-layouts.js');
+
 const DISPLAY_BLOCK_KEYS = [
     'showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle',
     // Скрытый режим «47-й этаж»
@@ -147,7 +164,13 @@ const SETTINGS_DESCRIPTORS = [
     // виду, а повторный тройной клик стоит секунды.
     { key: 'floor47Unlocked', el: 'floor47Unlocked', kind: 'checkbox', def: false, owner: 'display' },
     {
-        key: 'timeBlocksScale', el: 'timeBlocksScale', kind: 'value', def: 100,
+        // Умолчание — НЕ своё: у масштаба блоков один владелец, реестр
+        // display-layouts.js. Пока здесь стояло 100, на чистом профиле панель
+        // показывала «100 %», а блоки дисплея стояли на 150 % (замер
+        // 01.09.2026), и первое же движение ползунка вниз роняло их все со 150
+        // до ~100 — видимый скачок из ниоткуда.
+        key: 'timeBlocksScale', el: 'timeBlocksScale', kind: 'value',
+        def: SchemaLayouts.DEFAULT_BLOCK_SCALE,
         label: 'timeBlocksScaleValue', numeric: true, owner: 'display'
     },
 

@@ -182,8 +182,20 @@ test('ползунки масштаба совпадают по диапазон
     // появился, когда инлайновые style= переехали в CSS) — важен сам диапазон.
     assert.match(controlHtml, /id="displayTimerScale"[^>]*min="30"[^>]*max="300"/);
     assert.match(controlHtml, /id="timeBlocksScale"[^>]*min="50"[^>]*max="600"/);
-    assert.match(controlHtml, /getElementById\('displayTimerScale'\),\s*\n\s*30, 300, 100,/);
-    assert.match(controlHtml, /getElementById\('timeBlocksScale'\),\s*\n\s*50, 600, 100,/);
+
+    // У границы ОДИН владелец — атрибуты ползунка. Раньше их дублировали
+    // четыре вызова setupScaleValueEdit, и тест сверял копии друг с другом;
+    // теперь ввод читает границы у самого ползунка, а копий нет вовсе.
+    // Проверка утверждает ОТСУТСТВИЕ, поэтому ниже стоит её самопроверка.
+    const scaleInput = fs.readFileSync(path.join(__dirname, '..', 'scale-input.js'), 'utf8');
+    assert.match(scaleInput, /const minVal = Number\(sliderEl\.min\);/);
+    assert.match(scaleInput, /const maxVal = Number\(sliderEl\.max\);/);
+    const NUMERIC_BOUNDS_ARG = /setupScaleValueEdit\([^)]*?\n\s*\d+,\s*\d+,/g;
+    assert.deepStrictEqual(controlHtml.match(NUMERIC_BOUNDS_ARG) || [], [],
+        'границы снова передаются числом — у ползунка появился второй владелец');
+    assert.strictEqual(
+        ('setupScaleValueEdit(\n  a,\n  b,\n  30, 600,\n)').match(NUMERIC_BOUNDS_ARG).length, 1,
+        'самопроверка: регулярка числовых границ не ловит подделку');
 
     // Источник истины на стороне дисплея. Границы таймера переехали в CONFIG:
     // они объявлялись там как 50/200 при настоящих 30/300 в этом файле, и
@@ -193,8 +205,13 @@ test('ползунки масштаба совпадают по диапазон
     assert.equal(CONFIG.MAX_TIMER_SCALE, 300);
     assert.match(displayScript, /const TIMER_MIN_SCALE = window\.CONFIG\.MIN_TIMER_SCALE;/);
     assert.match(displayScript, /const TIMER_MAX_SCALE = window\.CONFIG\.MAX_TIMER_SCALE;/);
-    assert.match(displayScript, /const BLOCK_MIN_SCALE = 50;/);
-    assert.match(displayScript, /const BLOCK_MAX_SCALE = 600;/);
+    // Пределы блоков тоже переехали к владельцу — в реестр display-layouts.js,
+    // где ими же поджимается КАЖДОЕ применяемое значение.
+    const Layouts = require('../display-layouts');
+    assert.equal(Layouts.MIN_ELEMENT_SCALE, 50);
+    assert.equal(Layouts.MAX_ELEMENT_SCALE, 600);
+    assert.match(displayScript, /const BLOCK_MIN_SCALE = window\.DisplayLayouts\.MIN_ELEMENT_SCALE;/);
+    assert.match(displayScript, /const BLOCK_MAX_SCALE = window\.DisplayLayouts\.MAX_ELEMENT_SCALE;/);
 });
 
 test('масштаб дисплея применяется только при реальном движении ползунка', () => {
@@ -634,8 +651,15 @@ test('панель подтягивает ползунок и не отвеча�
     assert.ok(handler, 'обработчик scale-report должен существовать');
     // Присваивание .value не порождает 'input', поэтому обратной отправки быть не должно.
     assert.doesNotMatch(handler[0], /ipcRenderer\.send/);
-    assert.match(handler[0], /slider\.value = clamped/);
-    assert.match(handler[0], /this\.saveExtSettings\(\)/);
+    // Сама логика — в модуле scale-report.js: она проверяется в Node на
+    // поддельных документе и хранилище (tests/scale-range.test.js).
+    assert.match(handler[0], /window\.ScaleReport\.applyScaleReport/);
+    // Сохраняется ТОЛЬКО сообщённая величина. Здесь стоял saveExtSettings(),
+    // то есть отчёт о размере окна записывал профиль целиком, из контролов
+    // панели: открытие окна виджета затирало настройки, положенные в профиль
+    // мимо неё (поймано 01.09.2026 — падал e2e/digits-style.spec.js).
+    assert.doesNotMatch(handler[0], /this\.saveExtSettings\(\)/);
+    assert.match(controlHtml, /<script src="scale-report\.js"><\/script>/);
     // И слушатель обязан сниматься при закрытии окна.
     assert.match(controlHtml, /removeListener\('scale-report', this\._onScaleReport\)/);
 });

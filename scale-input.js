@@ -12,9 +12,21 @@
  * переиспользуется всеми четырьмя ползунками масштаба.
  */
 
-// Scale value click-to-edit and double-click-to-reset
-function setupScaleValueEdit(spanEl, sliderEl, minVal, maxVal, defaultVal, onApply) {
+/**
+ * @param {HTMLElement} spanEl      подпись «120%»
+ * @param {HTMLInputElement} sliderEl  ползунок; ЕГО `min`/`max` и есть границы
+ * @param {number} defaultVal       значение двойного клика (сброс)
+ * @param {(val:number)=>void} onApply
+ *
+ * Границы НЕ передаются отдельно: раньше их дублировали четыре вызова
+ * (30/600, 30/600, 30/300, 50/600) при тех же числах в атрибутах разметки, то
+ * есть у каждой границы было по два владельца, и разъехаться они могли молча —
+ * ползунок пустил бы значение, которое ввод отверг бы, и наоборот.
+ */
+function setupScaleValueEdit(spanEl, sliderEl, defaultVal, onApply) {
     if (!spanEl || !sliderEl) { return; }
+    const minVal = Number(sliderEl.min);
+    const maxVal = Number(sliderEl.max);
     spanEl.className = 'scale-value-text';
     spanEl.title = 'Клик — ввести значение · Двойной клик — сброс к ' + defaultVal + '%';
     // Remove inline styles that conflict

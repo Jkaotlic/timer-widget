@@ -1113,7 +1113,14 @@
                     parseJSON: safeJSONParse,
                     storage: localStorage,
                     getOuterWidth: () => window.outerWidth,
-                    getScreenPosition: () => ({ x: window.screenX, y: window.screenY })
+                    getScreenPosition: () => ({ x: window.screenX, y: window.screenY }),
+                    // Размер меняют не только Ctrl+колесом: окно тянут за край
+                    // рамки. Тот путь ползунку панели ничего не сообщал, и
+                    // панель оставалась на прежнем числе (замер: окно 200 %,
+                    // ползунок 100 %). Сообщаем ТЕМ ЖЕ каналом, что и колесо.
+                    onScaleSettled: (pct) => ipcRenderer.send(
+                        'report-scale', { source: 'clock', scalePct: pct }
+                    )
                 });
 
                 this.initElements();
@@ -1492,7 +1499,23 @@
                 // Ctrl+Wheel scaling — resize clock by 10% per scroll tick
                 const CLOCK_MIN_SCALE = window.WindowGeometry.MIN_SCALE_PCT;
                 const CLOCK_MAX_SCALE = window.WindowGeometry.MAX_SCALE_PCT;
-                let clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
+                // Масштаб НЕ хранится второй копией здесь. Копия жила в этом
+                // обработчике, а обработчик `resize` перезаписывал её из
+                // `window.outerWidth`, прочитанного ПРЯМО в событии, — то есть
+                // ещё СТАРЫМ размером окна (об этом же говорит saveSettled).
+                // Счётчик откатывался на ступень назад, и каждый второй щелчок
+                // колеса пропадал: замер 8 щелчков вверх от 30 % дал
+                // 40 → 40 → 50 → 50 → 60 → 60 → 70 → 70 %.
+                //
+                // Владелец один — модуль геометрии: он же обновляет величину,
+                // когда размер УСТОЯЛСЯ, и знает про все пути (колесо, ползунок
+                // панели, край рамки).
+                const currentScalePct = () => {
+                    const own = this._geometry.scalePct;
+                    return Number.isFinite(own)
+                        ? own
+                        : Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
+                };
                 this._handlers.onWheel = (e) => {
                     if (!e.ctrlKey) { return; }
                     // Замок «Закрепить положение» запрещает жест, но не
@@ -1506,9 +1529,9 @@
                     const raw = e.deltaY !== 0 ? e.deltaY : e.deltaX;
                     if (!raw) { return; }
                     const delta = raw < 0 ? step : -step;
-                    const newPct = window.RendererShared.clampScale(clockScalePct + delta, CLOCK_MIN_SCALE, CLOCK_MAX_SCALE);
-                    if (newPct === clockScalePct) { return; }
-                    clockScalePct = newPct;
+                    const cur = currentScalePct();
+                    const newPct = window.RendererShared.clampScale(cur + delta, CLOCK_MIN_SCALE, CLOCK_MAX_SCALE);
+                    if (newPct === cur) { return; }
                     const newSize = Math.round(CLOCK_BASE_SIZE * newPct / 100);
                     ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
                     // Без этого масштаб от Ctrl+колеса терялся при переоткрытии.
@@ -1518,7 +1541,6 @@
                 };
                 document.addEventListener('wheel', this._handlers.onWheel, { passive: false });
                 this._handlers.onResizeScalePct = () => {
-                    clockScalePct = Math.round(window.outerWidth / CLOCK_BASE_SIZE * 100);
                     // Окно могли отмасштабировать НЕ колесом: ползунком «Масштаб
                     // часов» в панели управления (она шлёт clock-widget-resize и
                     // сама ничего не сохраняет) либо потянув за край окна. Без

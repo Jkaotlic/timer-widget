@@ -2835,8 +2835,12 @@ class DisplayTimer {
     }
 
     setupBlockControls() {
-        const BLOCK_MIN_SCALE = 50;
-        const BLOCK_MAX_SCALE = 600;
+        // Пределы масштаба блоков принадлежат реестру: там же ими пользуется
+        // clampScale(), которым применяется КАЖДОЕ значение. Своя пара
+        // литералов означала бы, что колесо считает предел одним числом, а
+        // применение поджимает другим, — и жест молча крутился бы вхолостую.
+        const BLOCK_MIN_SCALE = window.DisplayLayouts.MIN_ELEMENT_SCALE;
+        const BLOCK_MAX_SCALE = window.DisplayLayouts.MAX_ELEMENT_SCALE;
         const TIMER_MIN_SCALE = window.CONFIG.MIN_TIMER_SCALE;
         const TIMER_MAX_SCALE = window.CONFIG.MAX_TIMER_SCALE;
         const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
@@ -2900,8 +2904,11 @@ class DisplayTimer {
         // Ползунок остаётся командой «поставить всем сразу», а не зеркалом —
         // зеркалом семи величин одно число быть не может.
         const scaleOne = (id, delta) => {
-            const cur = this.elementScales[id];
-            const next = clampScale((cur || 100) + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
+            // Запасное умолчание берётся у реестра (у карточки и у подписи оно
+            // РАЗНОЕ), а не пишется числом: копия 100 пережила смену умолчания
+            // карточек со 120 на 150 и стала третьим значением.
+            const cur = this.elementScales[id] ?? window.DisplayLayouts.defaultScale(id);
+            const next = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
             if (next === cur) {
                 // Тот же принцип, что у таймера: упор объясняется, а не молчит.
                 this.showScaleNote(delta > 0
@@ -2919,7 +2926,8 @@ class DisplayTimer {
         const scaleAllBlocks = (delta) => {
             const blocks = this.movableElements.filter((row) => row.kind === 'block');
             if (!blocks.length) { return; }
-            const cur = this.elementScales[blocks[0].id] || 120;
+            const cur = this.elementScales[blocks[0].id]
+                ?? window.DisplayLayouts.DEFAULT_BLOCK_SCALE;
             const next = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
             if (next === cur) { return; }
             for (const row of blocks) { this.applyElementScale(row.id, next); }
