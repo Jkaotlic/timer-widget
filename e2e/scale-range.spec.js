@@ -26,14 +26,43 @@ const MIN = WindowGeometry.MIN_SCALE_PCT;
 
 const WINDOWS = [
     { name: 'виджет', open: 'open-widget', url: 'electron-widget.html',
-      base: CONFIG.WIDGET_DEFAULT_WIDTH, wait: waitForWidget,
+      base: CONFIG.WIDGET_DEFAULT_WIDTH, wait: waitForWidget, owner: 'timerWidget',
+      storageKey: 'widgetGeometry',
       apply: (page, pct) => page.evaluate((p) => window.timerWidget.resizeToScale(p), pct) },
     { name: 'часы', open: 'open-clock-widget', url: 'electron-clock-widget.html',
-      base: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE, wait: waitForClock,
+      base: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE, wait: waitForClock, owner: 'clockWidget',
+      storageKey: 'clockGeometry',
       apply: (page, pct, base) => page.evaluate(({ p, b }) => window.ipcRenderer.send(
           'clock-widget-resize', { width: Math.round(b * p / 100), height: Math.round(b * p / 100) }
       ), { p: pct, b: base }) }
 ];
+
+/**
+ * Ждать, пока окно САМО признает новый масштаб.
+ *
+ * Пауза здесь не годится, и это уже записанное правило проекта: запись
+ * геометрии откладывается до тишины (`SAVE_SETTLE_MS`), а на медленной машине
+ * тишина наступает позже. Замер на macOS-раннере: спека ставила 100 %, ждала
+ * 300 мс, и не дожидалась — окно всё ещё считало себя на 200 % от предыдущего
+ * теста, поэтому первый же щелчок колеса дал 210 % вместо 110 %.
+ */
+async function waitForOwnScale(page, owner, expected, timeout = 8000) {
+    const deadline = Date.now() + timeout;
+    for (;;) {
+        const raw = await page.evaluate(
+            (name) => (window[name] && window[name]._geometry)
+                ? window[name]._geometry.scalePct : null, owner);
+        // Пустой scalePct — это не «неизвестно», а «окно базового размера»,
+        // то есть 100 %: тот же контракт, по которому модуль решает, было ли
+        // что менять (см. saveSettled в window-geometry.js).
+        const own = raw === undefined || raw === null ? 100 : raw;
+        if (own === expected) { return own; }
+        if (Date.now() >= deadline) {
+            throw new Error(`окно не признало масштаб ${expected} % за ${timeout} мс: у него ${own}`);
+        }
+        await new Promise((r) => setTimeout(r, 50));
+    }
+}
 
 const boundsOf = (app, part) => app.evaluate(({ BrowserWindow }, p) => {
     const w = BrowserWindow.getAllWindows().find(x => x.webContents.getURL().includes(p));
@@ -122,9 +151,26 @@ test('растянутое за край окно доезжает до полз
         expect(panel.widget, `виджет: окно 200 %, ползунок ${panel.widget} %`).toBe(200);
         expect(panel.clock, `часы: окно 200 %, ползунок ${panel.clock} %`).toBe(200);
     } finally {
+        // Профиль e2e ОБЩИЙ, и эта спека меняет глобальное состояние: без
+        // возврата следующие тесты открывают окна растянутыми на 200 %, а
+        // ползунки панели приезжают туда же. Именно так этот тест уронил
+        // соседний на macOS-раннере.
+        await restoreDefaultScale(app);
         await app.close();
     }
 });
+
+/** Стирает записанную геометрию окон — профиль остаётся таким, каким был. */
+async function restoreDefaultScale(app) {
+    for (const page of app.windows()) {
+        const href = await page.evaluate(() => location.href).catch(() => '');
+        const target = WINDOWS.find((t) => href.includes(t.url));
+        if (!target) { continue; }
+        await page.evaluate((key) => {
+            try { localStorage.removeItem(key); } catch { /* профиль недоступен — уборку не роняем */ }
+        }, target.storageKey).catch(() => {});
+    }
+}
 
 /**
  * Каждый щелчок Ctrl+колеса меняет размер РОВНО на одну ступень.
@@ -153,7 +199,8 @@ for (const target of WINDOWS) {
             const page = await target.wait(app);
             await page.waitForTimeout(300);
             await target.apply(page, 100, target.base);
-            await page.waitForTimeout(300);
+            // Условие, а не пауза: см. waitForOwnScale.
+            await waitForOwnScale(page, target.owner, 100);
 
             const seen = [];
             for (let i = 0; i < 6; i++) {
