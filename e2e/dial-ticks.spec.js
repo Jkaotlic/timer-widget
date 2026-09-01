@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Деления круглого циферблата — настройка ЧАСОВ.
@@ -63,6 +64,8 @@ test('деления включаются и выключаются у часо�
         window.ipcRenderer.send('open-widget');
         window.ipcRenderer.send('open-clock-widget');
     });
+    await waitForWidget(app);
+    await waitForClock(app);
     await control.waitForTimeout(2000);
 
     const widget = await findWindow(app, 'widget');
@@ -105,6 +108,7 @@ test('у кольца дисплея делений нет — как и у ко
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findWindow(app, 'display');
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -136,6 +140,7 @@ test('включённые деления переживают переоткр�
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+    await waitForClock(app);
     await control.waitForTimeout(1500);
     await setTicks(control, true);
     await control.waitForTimeout(700);
@@ -145,6 +150,7 @@ test('включённые деления переживают переоткр�
     await control.evaluate(() => window.ipcRenderer.send('close-clock-widget'));
     await control.waitForTimeout(800);
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+    await waitForClock(app);
     await control.waitForTimeout(1500);
 
     const clock = await findWindow(app, 'clock');

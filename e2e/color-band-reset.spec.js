@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForWidget } = require('./window-ready');
 
 /**
  * Возврат из цветовой полосы обязан снимать ВСЁ, что полоса нарисовала.
@@ -79,6 +80,7 @@ function readGlow() {
 test.beforeAll(async () => {
     ({ app, control } = await launchApp());
     await control.evaluate(() => { window.ipcRenderer.send('open-widget'); });
+    await waitForWidget(app);
     await control.waitForTimeout(1500);
     for (const page of app.windows()) {
         if ((await page.url()).includes('electron-widget')) { widget = page; }

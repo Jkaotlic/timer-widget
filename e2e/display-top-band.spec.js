@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 const { pickWindowSizes } = require('./window-sizes');
 const { resizeDisplay } = require('./display-window');
 
@@ -120,6 +121,10 @@ const measure = () => {
 };
 
 test('карточка сверху не ложится на подпись «Осталось» ни в одном стиле', async () => {
+    // Спека длинная по существу (замер 01.09.2026: 22.1 с на быстрой машине
+    // при потолке Playwright 30 с). На руннере, который медленнее, она
+    // упиралась бы в потолок и падала по времени, ничего не проверив.
+    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         // Позиции от соседних спек стираем ДО открытия окна, а не после.
@@ -135,6 +140,7 @@ test('карточка сверху не ложится на подпись «О
             localStorage.removeItem('displayBlockScales');
         });
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2000);
         const display = await findDisplay(app);
         expect(display, 'полноэкранное окно должно открыться').not.toBeNull();

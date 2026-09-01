@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForWidget } = require('./window-ready');
 
 /**
  * Синхронизация состояния окон с окном, которое загрузилось ПОЗЖЕ остальных.
@@ -39,11 +40,13 @@ test('окно, открытое вторым, знает про уже откр
 
     // 1. Сначала часы.
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+    await waitForClock(app);
     await control.waitForTimeout(1500);
     expect(await findWindow(app, 'clock'), 'часы должны открыться').not.toBeNull();
 
     // 2. Потом виджет — он загружается ПОСЛЕ часов.
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+    await waitForWidget(app);
     await control.waitForTimeout(1500);
     const widget = await findWindow(app, 'widget');
     expect(widget, 'виджет должен открыться').not.toBeNull();
@@ -69,6 +72,7 @@ test('панель управления после перезагрузки ре
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+    await waitForWidget(app);
     await control.waitForTimeout(1500);
 
     // Перезагрузка рендерера — именно это делает краш-обработчик

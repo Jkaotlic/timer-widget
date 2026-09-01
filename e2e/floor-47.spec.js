@@ -13,6 +13,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /** Неразрывный пробел — им разделены разряды суммы (money-meter.js). */
 const NB = '\u00A0';
@@ -48,17 +49,9 @@ async function setToggle(control, id, on) {
  */
 async function openDisplay(app, control) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-    const deadline = Date.now() + 30000;
-    while (Date.now() < deadline) {
-        const found = await findDisplay(app);
-        if (found) {
-            // Окно есть — но скрипт мог ещё не разложить блоки по узлам.
-            await found.waitForSelector('#totalCostValue', { timeout: 15000 });
-            return found;
-        }
-        await control.waitForTimeout(200);
-    }
-    return null;
+    // Окно может появиться раньше, чем скрипт разложит блоки по узлам, поэтому
+    // ждём не только окно, но и узел денег.
+    return waitForDisplay(app, { selector: '#totalCostValue' });
 }
 
 /** Секция живёт в ящике настроек — без открытой вкладки её не видно. */
@@ -122,6 +115,7 @@ test('ступени: 1000 ₽ за каждые 3 секунды перелим
         await control.waitForTimeout(400);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -192,6 +186,7 @@ test('«Новое мероприятие» спрашивает и обнуля
         // Обнуление обязано доехать до накопителя, а не только до кнопки:
         // окно, открытое ПОСЛЕ него, снимает состояние на загрузке.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -221,6 +216,7 @@ test('раскладка «47-й этаж» появляется только с
         await expect(btn).toHaveCount(1);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -279,6 +275,7 @@ test('«Новое мероприятие» обнуляет экран, даж�
         await setToggle(control, 'showOverrunCost', true);
         await setToggle(control, 'showTotalCost', true);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();

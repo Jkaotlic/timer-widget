@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Минус перерасхода в виджете: он ЧАСТЬ табло, а не отдельная деталь.
@@ -48,6 +49,7 @@ test('перекидыш: минус мигает в одной фазе с ци
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(2200);
         await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' }));
         await control.waitForTimeout(800);
@@ -112,6 +114,7 @@ test('«Цифры»: чернила минуса по центру чернил
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(2200);
         await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits' }));
         await control.waitForTimeout(800);
@@ -205,6 +208,8 @@ test('«Цифры»: минус прижат к числу и не обреза
             window.ipcRenderer.send('open-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
+        await waitForDisplay(app);
+        await waitForWidget(app);
         await control.waitForTimeout(2500);
         await control.evaluate(() => {
             window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits' });

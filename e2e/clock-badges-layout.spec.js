@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock } = require('./window-ready');
 
 /**
  * Шильдики даты и часового пояса в КРУГОВОМ стиле часов не должны налезать
@@ -52,6 +53,7 @@ test('дата и часовой пояс в круговых часах не п
     const { app, control } = await launchApp();
 
     await control.evaluate(() => { window.ipcRenderer.send('open-clock-widget'); });
+    await waitForClock(app);
     await control.waitForTimeout(2000);
 
     const clock = await findClock(app);

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Перекидывание цифры — ЗАМЕРОМ ДВИЖЕНИЯ, а не наличием класса.
@@ -49,6 +50,9 @@ test('перекидывание ВИДНО в виджете, часах и п�
             window.ipcRenderer.send('open-clock-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
+        await waitForDisplay(app);
+        await waitForWidget(app);
+        await waitForClock(app);
         await control.waitForTimeout(2500);
 
         await control.evaluate(() => {
@@ -219,6 +223,7 @@ test('«меньше движения» отменяет створки, а не
     });
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(2000);
         await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' }));
         await control.waitForTimeout(1200);

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Палитра перерасхода: КРАСНЫЙ во всех трёх окнах.
@@ -76,6 +77,9 @@ test('перерасход красный и в дисплее, и в видже
         window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         window.ipcRenderer.send('open-widget');
     });
+    await waitForDisplay(app);
+    await waitForWidget(app);
+    await waitForWidget(app);
     await control.waitForTimeout(2200);
 
     const display = await findWindow(app, () => !!document.getElementById('progressRing'));
@@ -146,6 +150,9 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
             window.ipcRenderer.send('open-widget');
         });
+        await waitForDisplay(app);
+        await waitForWidget(app);
+        await waitForWidget(app);
         await control.waitForTimeout(2200);
 
         const display = await findWindow(app, () => !!document.getElementById('progressRing'));

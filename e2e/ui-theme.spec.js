@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Тема интерфейса: переключение доходит до всех окон и переживает перезагрузку.
@@ -56,6 +57,9 @@ test('светлая тема включается во всех четырёх 
         window.ipcRenderer.send('open-clock-widget');
         window.ipcRenderer.send('open-display');
     });
+    await waitForDisplay(app);
+    await waitForWidget(app);
+    await waitForClock(app);
     await control.waitForTimeout(2500);
 
     const widget = await findWindow(app, 'widget');

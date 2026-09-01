@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForDisplay } = require('./window-ready');
 
 /**
  * Стиль «Цифры» и выбор шрифта.
@@ -200,6 +201,7 @@ test('стиль «Цифры» доходит до полноэкранного
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
 
         // Открыть вкладку «Дисплей» — только кликом.
@@ -270,6 +272,7 @@ test('масштаб дисплея действует и на стиль «Ци
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
 
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
@@ -338,6 +341,7 @@ test('в перерасходе ЦИФРЫ остаются на оси окна
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
 
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
@@ -841,6 +845,7 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
 
         // --- Дисплей ---
@@ -1020,6 +1025,7 @@ test('выбор шрифта доходит до СВОЕГО окна клик
 
         // Дисплей открывается по IPC, как и в остальных тестах этого файла.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
         const display = await findWindow(app, IS_DISPLAY);
         expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
@@ -1121,6 +1127,7 @@ test('часы «Цифры»: дата и пояс встают ПОД врем
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        await waitForClock(app);
         await control.waitForTimeout(2000);
         const clock = await findWindow(app, IS_CLOCK);
         expect(clock, 'окно часов не найдено').not.toBeNull();

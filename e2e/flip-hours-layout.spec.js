@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForWidget } = require('./window-ready');
 
 /**
  * Раскладка flip-стиля виджета таймера в режиме с часами (H:MM:SS).
@@ -58,6 +59,7 @@ test('flip-часы: разделитель — тоже точки, а не г�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        await waitForClock(app);
         await control.waitForTimeout(1500);
         await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'flip'));
         await control.waitForTimeout(800);
@@ -102,6 +104,7 @@ test('flip-виджет: разделитель остаётся точками 
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+    await waitForWidget(app);
     await control.waitForTimeout(1500);
     await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' }));
     await control.waitForTimeout(500);

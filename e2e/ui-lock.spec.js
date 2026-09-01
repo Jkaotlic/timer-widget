@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Замок «Закрепить положение» ПО КЛИКУ по настоящей кнопке.
@@ -76,6 +77,7 @@ test('замок держит карточки дисплея и снимает�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findWindow(app, IS_DISPLAY);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -143,6 +145,7 @@ test('замок держит ОКНО виджета, а панель прод�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(2000);
         const widget = await findWindow(app, IS_WIDGET);
         expect(widget, 'окно виджета не найдено').not.toBeNull();

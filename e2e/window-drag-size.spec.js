@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Перемещение окна не меняет его размер.
@@ -154,6 +155,7 @@ test('дисплей: размер, заданный между жестами, 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
         const page = await findWindow(app, URL_PART);
         await page.waitForLoadState('domcontentloaded');
+        await waitForDisplay(app);
         await page.waitForTimeout(1200);
 
         // Из полноэкранного режима выходим: перетаскивание в нём запрещено.

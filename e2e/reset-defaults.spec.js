@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * «Сбросить всё» возвращает окно к ЗАВОДСКОМУ ВИДУ — сверка с чистым профилем.
@@ -64,6 +65,9 @@ test('«Сбросить всё» возвращает окно к виду чи
             window.ipcRenderer.send('open-clock-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
+        await waitForDisplay(app);
+        await waitForWidget(app);
+        await waitForClock(app);
         await control.waitForTimeout(3000);
 
         const wins = {
@@ -141,6 +145,8 @@ test('«Сбросить фон по умолчанию» возвращает �
             window.ipcRenderer.send('open-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
+        await waitForDisplay(app);
+        await waitForWidget(app);
         await control.waitForTimeout(3000);
         const display = await findWindow(app, IS_DISPLAY);
         const widget = await findWindow(app, IS_WIDGET);

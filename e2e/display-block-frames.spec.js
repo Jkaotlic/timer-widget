@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Просьба 19.08.2026, три части — и все три про то, ЧТО НАРИСОВАНО:
@@ -81,6 +82,7 @@ test('ни один блок не носит заднюю рамку — чет�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -165,6 +167,7 @@ test('аналог: «До завершения» показывает ОСТА�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -269,6 +272,7 @@ test('верхний ряд блоков выровнен: подписи на �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -283,6 +287,7 @@ test('верхний ряд блоков выровнен: подписи на �
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(900);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2500);
         const disp = await findDisplay(app);
 

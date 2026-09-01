@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 const { pickWindowSizes } = require('./window-sizes');
 const DL = require('../display-layouts');
 
@@ -172,6 +173,7 @@ async function resetDisplayState(control, display) {
 
 async function openDisplayWithEverything(control, app) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+    await waitForDisplay(app);
     await control.waitForTimeout(2200);
     const display = await findDisplay(app);
     expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -313,6 +315,7 @@ test('каждая раскладка применяется КЛИКОМ и н�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -401,6 +404,7 @@ test('упор масштаба называет помеху, и без неё 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display).not.toBeNull();
@@ -536,6 +540,7 @@ test('раскладка переживает переоткрытие окна 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         let display = await findDisplay(app);
         expect(display).not.toBeNull();
@@ -548,6 +553,7 @@ test('раскладка переживает переоткрытие окна 
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(800);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         display = await findDisplay(app);
         expect(display).not.toBeNull();

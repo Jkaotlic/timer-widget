@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Блоки дисплея: у каждого свой тумблер, каждый тащится и закрывается крестиком.
@@ -52,6 +53,7 @@ test('каждый тумблер гасит СВОЙ блок и ничего �
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -90,6 +92,7 @@ test('крестик на блоке снимает ИМЕННО его тумб
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
 
@@ -133,6 +136,7 @@ test('подпись над таймером и плашка состояния:
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         let display = await findDisplay(app);
 
@@ -235,6 +239,7 @@ test('подпись над таймером и плашка состояния:
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(900);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2500);
         display = await findDisplay(app);
         const reopened = await display.evaluate(geometry);
@@ -292,6 +297,7 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
 
@@ -378,6 +384,7 @@ test('«До завершения» считает до времени окон�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
 
@@ -459,6 +466,7 @@ test('аналог: круг — у циферблата, подписи не в
         const display = await findDisplay(app);
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1800);
         const disp = display || await findDisplay(app);
         expect(disp, 'окно дисплея не найдено').not.toBeNull();
@@ -585,6 +593,7 @@ test('длинное название мероприятия переносит�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1800);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();

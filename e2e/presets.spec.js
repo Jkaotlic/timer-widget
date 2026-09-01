@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Пресеты вида ПО КЛИКУ: записали один вид, перенастроили, вернули.
@@ -53,6 +54,7 @@ test('ячейка записывает вид и возвращает его К
         await control.waitForTimeout(1200);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -138,6 +140,7 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
         await control.reload();
         await control.waitForTimeout(1200);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
 

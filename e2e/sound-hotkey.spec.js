@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForWidget } = require('./window-ready');
 
 /**
  * Клавиша `Z` переключает звук — ПО НАЖАТИЮ, из панели и из чужого окна.
@@ -65,6 +66,7 @@ test('Z из окна виджета доезжает до панели', async 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(2000);
         const widget = await findWidget(app);
         expect(widget, 'окно виджета не найдено').not.toBeNull();

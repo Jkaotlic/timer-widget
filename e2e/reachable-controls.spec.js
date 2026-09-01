@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock } = require('./window-ready');
 
 /**
  * Достижимость мышью — тема этого прохода.
@@ -122,6 +123,7 @@ test('вернувшиеся переключатели часов меняют 
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+    await waitForClock(app);
     await control.waitForTimeout(2000);
     const clock = await findClock(app);
     expect(clock, 'окно часов не найдено').not.toBeNull();

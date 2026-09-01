@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Часовая стрелка аналогового стиля полноэкранного режима обязана двигаться.
@@ -28,6 +29,7 @@ test('часовая стрелка отражает остаток, а не с�
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+    await waitForDisplay(app);
     await control.waitForTimeout(2000);
 
     let display = null;

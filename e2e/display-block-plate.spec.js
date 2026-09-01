@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Просьба 24.08.2026: «при градиенте у функциональных блоков белая подложка».
@@ -76,6 +77,7 @@ test('на цветном градиенте у блоков и плашки н�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Центровка времени в перерасходе: по центру стоят ЦИФРЫ.
@@ -136,6 +137,8 @@ test('замер центровки времени в перерасходе', a
         window.ipcRenderer.send('open-widget');
         window.ipcRenderer.send('open-display');
     });
+    await waitForDisplay(app);
+    await waitForWidget(app);
     await control.waitForTimeout(2500);
 
     const widget = await findWindow(app, 'widget');

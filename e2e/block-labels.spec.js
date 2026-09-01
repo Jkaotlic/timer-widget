@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Свои названия плашек (просьба 24.08.2026) — ПО КЛИКУ.
@@ -41,6 +42,7 @@ test('своё название плашки доезжает до диспле�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2200);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -103,6 +105,7 @@ test('своё название переживает перезапуск при
 
         await setToggle(control, 'showCurrentTime', true);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(await caption(display, 'currentTimeBlock')).toBe('Сейчас');

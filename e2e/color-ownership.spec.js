@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * ХАРАКТЕРИЗАЦИЯ цвета: 5 стилей × 4 полосы × 2 окна.
@@ -198,6 +199,8 @@ test.beforeAll(async () => {
         window.ipcRenderer.send('open-widget');
         window.ipcRenderer.send('open-display');
     });
+    await waitForDisplay(app);
+    await waitForWidget(app);
     await control.waitForTimeout(2500);
     for (const page of app.windows()) {
         const url = await page.url();

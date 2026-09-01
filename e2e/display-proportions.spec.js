@@ -29,6 +29,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
 const IS_DISPLAY = () => !!document.getElementById('progressRing');
@@ -96,6 +97,7 @@ test('карточка занимает одну долю полосы соде�
             });
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
+        await waitForDisplay(app);
         await control.waitForTimeout(2600);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();

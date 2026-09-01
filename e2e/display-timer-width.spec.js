@@ -29,6 +29,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
 const IS_DISPLAY = () => !!document.getElementById('timerDigits') && !!document.getElementById('progressRing');
@@ -70,6 +71,7 @@ async function setScale(control, pct) {
 
 async function openDisplayWithDigits(app, control) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+    await waitForDisplay(app);
     await control.waitForTimeout(1500);
     await control.click('.tab-btn[data-tab="display"]');
     await control.click('#displayTimerStyle button[data-val="digits"]');

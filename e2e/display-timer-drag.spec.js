@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Таймер полноэкранного окна ПЕРЕТАСКИВАЕТСЯ (просьба 24.08.2026: «в
@@ -82,6 +83,7 @@ test('Alt+перетаскивание двигает таймер вместе 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
@@ -143,6 +145,7 @@ test('Alt+перетаскивание двигает таймер вместе 
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(900);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2600);
         const reopened = await findDisplay(app);
         const restored = await reopened.evaluate(geometry);
@@ -177,6 +180,7 @@ test('замок «Закрепить положение» держит и та�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
 
@@ -221,6 +225,7 @@ test('пресет возвращает сдвинутый таймер в по�
         await control.waitForTimeout(1200);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(2400);
         const display = await findDisplay(app);
         expect(display, 'окно дисплея не найдено').not.toBeNull();

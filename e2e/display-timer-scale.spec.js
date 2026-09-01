@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay } = require('./window-ready');
 
 /**
  * Характеризация: масштаб полноэкранного таймера применяется ко всем блокам
@@ -87,6 +88,7 @@ test('масштаб дисплея применяется ко всем бло�
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
 
         display = await findDisplay(app);
@@ -209,6 +211,7 @@ test('масштаб дисплея не выпускает таймер за о
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
         display = await findDisplay(app);
         expect(display, 'полноэкранное окно должно открыться').not.toBeNull();

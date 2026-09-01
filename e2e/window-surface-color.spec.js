@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, waitForWidget } = require('./window-ready');
 
 /**
  * Цвет ФОНА виджета и часов — по клику в панели, с замером на живом окне.
@@ -127,6 +128,7 @@ test.describe('фон виджета и часов', () => {
     test.beforeAll(async () => {
         ({ app, control } = await launchApp());
         await control.evaluate(() => window.electronAPI.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(1500);
         widget = await findWindow(app, 'electron-widget');
         expect(widget, 'окно виджета должно открыться').toBeTruthy();
@@ -319,6 +321,7 @@ test.describe('фон виджета и часов', () => {
     test('фон часов не течёт в виджет', async () => {
         await control.click('#drawerClose');
         await control.evaluate(() => window.electronAPI.send('open-clock-widget'));
+        await waitForClock(app);
         await control.waitForTimeout(1500);
         const clock = await findWindow(app, 'electron-clock-widget');
         expect(clock, 'окно часов должно открыться').toBeTruthy();
@@ -351,6 +354,7 @@ test.describe('сброс настроек окна', () => {
     test.beforeAll(async () => {
         ({ app, control } = await launchApp());
         await control.evaluate(() => window.electronAPI.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(1500);
         for (const page of app.windows()) {
             if ((await page.url()).includes('electron-widget')) { widget = page; }

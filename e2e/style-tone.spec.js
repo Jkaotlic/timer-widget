@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Две просьбы 18.08.2026, обе проверяются ПО КЛИКУ и ЗАМЕРОМ.
@@ -54,6 +55,8 @@ test('по умолчанию (светлая тема) виджет и дисп
             window.ipcRenderer.send('open-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
+        await waitForDisplay(app);
+        await waitForWidget(app);
         await control.waitForTimeout(2000);
 
         const display = await findWindow(app, IS_DISPLAY);
@@ -100,6 +103,7 @@ test('тёмная заливка при светлой теме оставля�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
         const display = await findWindow(app, IS_DISPLAY);
         expect(display).not.toBeNull();
@@ -127,6 +131,7 @@ test('блок времени повторяет стиль: у флипа — �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
         const display = await findWindow(app, IS_DISPLAY);
         expect(display).not.toBeNull();
@@ -227,6 +232,7 @@ test('аналог: стрелки мини-часов в блоке — те ж
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
+        await waitForDisplay(app);
         await control.waitForTimeout(1500);
         const display = await findWindow(app, IS_DISPLAY);
         expect(display).not.toBeNull();
@@ -276,6 +282,7 @@ test('на светлом тоне у «Круга» и «Цифр» видже�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        await waitForWidget(app);
         await control.waitForTimeout(1500);
         const widget = await findWindow(app, IS_WIDGET);
         expect(widget, 'окно виджета не найдено').not.toBeNull();
