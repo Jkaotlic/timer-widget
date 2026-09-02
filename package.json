@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -41,11 +41,11 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
-    "electron": "^44.0.0",
+    "electron": "^44.1.1",
     "electron-builder": "^26.15.3",
     "eslint": "^10.9.1",
-    "eslint-plugin-html": "^8.1.4",
-    "globals": "^17.11.0"
+    "eslint-plugin-html": "^8.2.0",
+    "globals": "^17.12.0"
   },
   "build": {
     "appId": "com.timer.widget",

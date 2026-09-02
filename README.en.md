@@ -6,7 +6,7 @@
 
 **Transparent timer widget for presentations and desktop**
 
-[![Version](https://img.shields.io/badge/v2.7.0-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.7.1-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)

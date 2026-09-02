@@ -695,7 +695,7 @@ License: MIT
 Repository: https://github.com/electron/windows-installer
 
 === electron ===
-Version: 43.4.1
+Version: 44.1.1
 License: MIT
 Repository: https://github.com/electron/electron
 Publisher: Electron Community
@@ -791,7 +791,7 @@ Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
 === eslint-plugin-html ===
-Version: 8.1.4
+Version: 8.2.0
 License: ISC
 Repository: https://github.com/BenoitZugmeyer/eslint-plugin-html
 
@@ -815,7 +815,7 @@ Publisher: Toru Nagashima
 Homepage: https://github.com/mysticatea
 
 === eslint ===
-Version: 10.8.1
+Version: 10.9.1
 License: MIT
 Repository: https://github.com/eslint/eslint
 Publisher: Nicholas C. Zakas
@@ -1028,7 +1028,7 @@ Publisher: Gajus Kuizinas
 Homepage: http://gajus.com
 
 === globals ===
-Version: 17.11.0
+Version: 17.12.0
 License: MIT
 Repository: https://github.com/sindresorhus/globals
 Publisher: Sindre Sorhus
