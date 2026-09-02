@@ -26,6 +26,17 @@ const DL = require('../display-layouts');
  * Раскладка применяется КЛИКОМ по кнопке в панели: зелёный тест на канале
  * ничего не сказал бы о том, доступна ли кнопка (см. разбор «зелёный тест не
  * доказывает достижимости»).
+ *
+ * 02.09.2026, про поиск окна. Здесь жила ВТОРАЯ реализация `findDisplay` —
+ * своя проба по `#timerRing` вместо общей по `#progressRing`, — и пять мест
+ * звали её ПОСЛЕ уже дождавшегося `waitForDisplay`, выбрасывая его результат.
+ * Разница решающая: общий помощник опрашивает окна с дедлайном и null не
+ * возвращает вовсе, а одноразовый поиск возвращает — потому что `evaluate`
+ * во время перехода в полноэкранный режим отклоняется, а `.catch(() => false)`
+ * это проглатывает. На macOS-руннере 01.09.2026 так и упало: «раскладка
+ * переживает переоткрытие окна дисплея», `expect(display).not.toBeNull()`,
+ * при 229 зелёных. Страница теперь берётся из результата ожидания. Пауза после
+ * него оставлена намеренно: она ждёт не ОКНО, а осадку раскладки.
  */
 
 const MOVABLE = [
@@ -37,14 +48,6 @@ const MOVABLE = [
     { id: 'heroLabel', node: 'heroLabel', toggle: 'showHeroLabel' },
     { id: 'statusPill', node: 'statusPill', toggle: 'showStatusPill' }
 ];
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(() => !!document.getElementById('timerRing')).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
 
 const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     const el = document.getElementById(key);
@@ -173,10 +176,8 @@ async function resetDisplayState(control, display) {
 
 async function openDisplayWithEverything(control, app) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-    await waitForDisplay(app);
+    const display = await waitForDisplay(app);
     await control.waitForTimeout(2200);
-    const display = await findDisplay(app);
-    expect(display, 'окно дисплея не найдено').not.toBeNull();
     for (const m of MOVABLE) { await setToggle(control, m.toggle, true); }
     await display.waitForTimeout(800);
     return display;
@@ -315,10 +316,8 @@ test('каждая раскладка применяется КЛИКОМ и н�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
         await openDisplayDrawer(control);
 
         // Кнопки должны быть на экране и кликабельны — по одной на раскладку.
@@ -404,10 +403,8 @@ test('упор масштаба называет помеху, и без неё 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display).not.toBeNull();
         await setToggle(control, 'showStatusPill', true);
         await setToggle(control, 'showHeroLabel', true);
         await display.waitForTimeout(600);
@@ -540,10 +537,8 @@ test('раскладка переживает переоткрытие окна 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        let display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        let display = await findDisplay(app);
-        expect(display).not.toBeNull();
         await openDisplayDrawer(control);
 
         await control.locator('#displayLayoutGrid .layout-btn[data-layout="dashboard"]').click();
@@ -553,10 +548,8 @@ test('раскладка переживает переоткрытие окна 
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(800);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        display = await findDisplay(app);
-        expect(display).not.toBeNull();
         await display.waitForTimeout(600);
 
         const after = await readBoxes(display, ['currentTimeBlock', 'endTimeBlock']);
