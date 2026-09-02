@@ -23,15 +23,6 @@ const { waitForDisplay } = require('./window-ready');
  * циферблат аналога.
  */
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     const el = document.getElementById(key);
     if (!el) { return; }
@@ -82,10 +73,8 @@ test('ни один блок не носит заднюю рамку — чет�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
@@ -167,10 +156,8 @@ test('аналог: «До завершения» показывает ОСТА�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
@@ -272,10 +259,8 @@ test('верхний ряд блоков выровнен: подписи на �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         // Сохранённые в общем профиле позиции и масштабы сдвинули бы ряд —
         // меряем блоки на их домашних местах и в одном масштабе.
@@ -287,9 +272,8 @@ test('верхний ряд блоков выровнен: подписи на �
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(900);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const disp = await waitForDisplay(app);
         await control.waitForTimeout(2500);
-        const disp = await findDisplay(app);
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }

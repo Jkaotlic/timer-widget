@@ -54,14 +54,6 @@ function readScales(ids) {
     return out;
 }
 
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(() => !!document.getElementById('timerRing')).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
-
 // Общий сброс для обеих сессий: localStorage в этом приложении ОБЩИЙ для
 // всех окон (все они file:// — один источник хранилища), а профиль e2e
 // ОДИН на весь прогон (см. e2e/launch.js). Возвращаем оба представления
@@ -88,11 +80,8 @@ test('масштаб дисплея применяется ко всем бло�
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        display = await waitForDisplay(app);
         await control.waitForTimeout(1500);
-
-        display = await findDisplay(app);
-        expect(display, 'полноэкранное окно должно открыться').not.toBeNull();
 
         // Точка входа 1: приход настроек от панели.
         await display.evaluate(() => window.ipcRenderer.send('get-timer-state'));
@@ -211,10 +200,8 @@ test('масштаб дисплея не выпускает таймер за о
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        display = await waitForDisplay(app);
         await control.waitForTimeout(1500);
-        display = await findDisplay(app);
-        expect(display, 'полноэкранное окно должно открыться').not.toBeNull();
 
         const measure = () => {
             const active = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']

@@ -18,15 +18,6 @@ const { waitForDisplay } = require('./window-ready');
 /** Неразрывный пробел — им разделены разряды суммы (money-meter.js). */
 const NB = '\u00A0';
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 /**
  * Тумблер переключается КЛИКОМ по ползунку, а не присвоением `.checked`:
  * сам чекбокс спрятан вёрсткой (`opacity: 0; width: 0`), и Playwright по нему
@@ -115,10 +106,8 @@ test('ступени: 1000 ₽ за каждые 3 секунды перелим
         await control.waitForTimeout(400);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         // Перелимит задаётся ПРЯМО, а не выжидается: настоящие секунды сделали
         // бы спеку медленной и зависящей от скорости машины, а проверяется
@@ -186,10 +175,8 @@ test('«Новое мероприятие» спрашивает и обнуля
         // Обнуление обязано доехать до накопителя, а не только до кнопки:
         // окно, открытое ПОСЛЕ него, снимает состояние на загрузке.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
         const total = await display.locator('#totalCostValue').textContent();
         console.log(`   итого после обнуления: «${total}»`);
         expect(total).toBe('0\u00A0₽');
@@ -216,10 +203,8 @@ test('раскладка «47-й этаж» появляется только с
         await expect(btn).toHaveCount(1);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         await btn.click();
         await display.waitForTimeout(1600);
@@ -275,10 +260,8 @@ test('«Новое мероприятие» обнуляет экран, даж�
         await setToggle(control, 'showOverrunCost', true);
         await setToggle(control, 'showTotalCost', true);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         await control.evaluate(() => window.ipcRenderer.send('timer-command',
             { type: 'set', seconds: 1, allowNegative: true }));

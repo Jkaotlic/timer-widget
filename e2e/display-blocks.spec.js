@@ -28,13 +28,6 @@ const BLOCKS = [
     { toggle: 'showEventTitle', block: 'eventTitleBlock', name: 'название' }
 ];
 
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(() => !!document.getElementById('progressRing')).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     const el = document.getElementById(key);
     el.checked = on;
@@ -53,10 +46,8 @@ test('каждый тумблер гасит СВОЙ блок и ничего �
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         // Включаем все пять.
         for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
@@ -92,9 +83,8 @@ test('крестик на блоке снимает ИМЕННО его тумб
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
 
         for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
         await display.waitForTimeout(700);
@@ -136,9 +126,8 @@ test('подпись над таймером и плашка состояния:
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        let display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        let display = await findDisplay(app);
 
         const geometry = () => {
             const box = (sel) => {
@@ -239,9 +228,8 @@ test('подпись над таймером и плашка состояния:
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(900);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        display = await waitForDisplay(app);
         await control.waitForTimeout(2500);
-        display = await findDisplay(app);
         const reopened = await display.evaluate(geometry);
         console.log(`после переоткрытия: окно ${g.vw}×${g.vh} → ${reopened.vw}×${reopened.vh}; `
             + `центр ${g.label.cx},${g.label.cy} → ${reopened.label.cx},${reopened.label.cy}; `
@@ -297,9 +285,8 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
 
         await control.evaluate(() => localStorage.removeItem('displayBlockPositions'));
         for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
@@ -384,9 +371,8 @@ test('«До завершения» считает до времени окон�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
 
         // Ставим «Конец» на 40 минут вперёд от системного времени.
         const target = await control.evaluate(() => {
@@ -463,13 +449,10 @@ test('аналог: круг — у циферблата, подписи не в
     // «Ежегодная конференция» — 216.2px в круге 120px.
     const { app, control } = await launchApp();
     try {
-        const display = await findDisplay(app);
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const disp = await waitForDisplay(app);
         await control.waitForTimeout(1800);
-        const disp = display || await findDisplay(app);
-        expect(disp, 'окно дисплея не найдено').not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
@@ -593,10 +576,8 @@ test('длинное название мероприятия переносит�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(1800);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
         await setToggle(control, 'showEventTitle', true);

@@ -32,15 +32,6 @@ const { launchApp } = require('./launch');
 const { waitForDisplay } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
-const IS_DISPLAY = () => !!document.getElementById('timerDigits') && !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 /**
  * Чернила стиля «Цифры» — то, что видно, а не рама вокруг.
  *
@@ -71,14 +62,12 @@ async function setScale(control, pct) {
 
 async function openDisplayWithDigits(app, control) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-    await waitForDisplay(app);
+    const display = await waitForDisplay(app);
     await control.waitForTimeout(1500);
     await control.click('.tab-btn[data-tab="display"]');
     await control.click('#displayTimerStyle button[data-val="digits"]');
     await control.waitForTimeout(900);
 
-    const display = await findDisplay(app);
-    expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
     await display.waitForSelector('#timerDigits.active');
 
     // Размер окна берётся из рабочей области, а условия считаются по

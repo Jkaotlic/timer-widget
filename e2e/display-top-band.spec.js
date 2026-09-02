@@ -36,13 +36,6 @@ const SIZES = [
 
 const STYLES = ['circle', 'flip', 'analog', 'digits'];
 
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(() => !!document.getElementById('progressRing')).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     const el = document.getElementById(key);
     if (!el) { return; }
@@ -140,10 +133,8 @@ test('карточка сверху не ложится на подпись «О
             localStorage.removeItem('displayBlockScales');
         });
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2000);
-        const display = await findDisplay(app);
-        expect(display, 'полноэкранное окно должно открыться').not.toBeNull();
         // И масштаб таймера — тоже к умолчанию. Профиль общий на весь прогон, а
         // соседняя спека (display-timer-scale) оставляет его увеличенным: при
         // 150 % колонка героя выше, и «карточка легла на подпись» означает не

@@ -192,7 +192,6 @@ test.describe('лимит перерасхода', () => {
         el.dispatchEvent(new Event('change'));
     }, on);
 
-
     test('строка лимита появляется только вместе с режимом «ниже нуля»', async () => {
         await enterInputMode();
         const row = control.locator('#overrunRow');

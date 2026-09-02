@@ -31,15 +31,6 @@ const { waitForDisplay } = require('./window-ready');
  * светлом тоне). Позеленей зонд впустую — эти два замера станут красными.
  */
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     const el = document.getElementById(key);
     if (!el) { return; }
@@ -77,10 +68,8 @@ test('на цветном градиенте у блоков и плашки н�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of ['showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showStatusPill']) {

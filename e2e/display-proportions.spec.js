@@ -32,15 +32,6 @@ const { launchApp } = require('./launch');
 const { waitForDisplay } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 async function workArea(app) {
     return app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);
 }
@@ -97,10 +88,8 @@ test('карточка занимает одну долю полосы соде�
             });
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2600);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
         await display.waitForSelector('#currentTimeBlock');
         await display.waitForTimeout(800);
 

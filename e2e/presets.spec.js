@@ -16,15 +16,6 @@ const { waitForDisplay } = require('./window-ready');
  * есть что цепочка «ячейка → профиль → панель → IPC → дисплей» жива целиком.
  */
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 const displayStyle = (page) => page.evaluate(() => {
     const body = document.body.className;
     const m = /style-(\w+)/.exec(body);
@@ -54,10 +45,8 @@ test('ячейка записывает вид и возвращает его К
         await control.waitForTimeout(1200);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         // Ячейки ВИДНЫ и пусты — иначе всё дальнейшее проверяло бы невидимое.
         const before = await slotState(control);
@@ -140,9 +129,8 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
         await control.reload();
         await control.waitForTimeout(1200);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
-        const display = await findDisplay(app);
 
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
         await control.waitForTimeout(600);

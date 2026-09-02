@@ -21,15 +21,6 @@ const { waitForDisplay } = require('./window-ready');
  * границу, а не движение (этот класс ошибки в проекте уже был).
  */
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findDisplay(app) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(IS_DISPLAY).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 /** Центр видимой коробки таймера и подписи над ним. */
 const geometry = () => {
     const box = (el) => {
@@ -83,10 +74,8 @@ test('Alt+перетаскивание двигает таймер вместе 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         const before = await display.evaluate(geometry);
         expect(before.moved, 'таймер стоит сдвинутым ещё до жеста — профиль не чист').toBe(false);
@@ -145,9 +134,8 @@ test('Alt+перетаскивание двигает таймер вместе 
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await control.waitForTimeout(900);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const reopened = await waitForDisplay(app);
         await control.waitForTimeout(2600);
-        const reopened = await findDisplay(app);
         const restored = await reopened.evaluate(geometry);
         console.log(`   после переоткрытия ${restored.timer.x},${restored.timer.y}`);
         expect(Math.abs(restored.timer.x - after.timer.x), 'место таймера не пережило переоткрытие').toBeLessThanOrEqual(8);
@@ -180,9 +168,8 @@ test('замок «Закрепить положение» держит и та�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
 
         await control.click('#lockToggle');
         await display.waitForTimeout(700);
@@ -225,10 +212,8 @@ test('пресет возвращает сдвинутый таймер в по�
         await control.waitForTimeout(1200);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
+        const display = await waitForDisplay(app);
         await control.waitForTimeout(2400);
-        const display = await findDisplay(app);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
 
         // Записываем вид, в котором таймер стоит по центру.
         const home = await display.evaluate(geometry);
