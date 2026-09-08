@@ -78,6 +78,37 @@ async function resetDisplayStyle(control) {
     await control.click('#displayTimerStyle button[data-val="circle"]').catch(() => {});
 }
 
+// Все ТРИ поля, а не только то, которое трогает вызывающий тест: если завтра
+// другой тест начнёт писать в #labelHeroCurrent или #labelHeroToStart, этот
+// сброс останется честным без правки. Каждое поле — своя настройка
+// (settings-schema.js, def: ''), пишется через panel-display.js в общий
+// профиль, который global-setup.js стирает ОДИН РАЗ на весь прогон, а не
+// перед каждым тестом — значит уцелевшая «Финиш» дожила бы до любого
+// следующего теста/файла, который войдёт в режим «До конца» без своей
+// подписи, и ждущего там assert'а на СТАНДАРТНОЕ слово.
+//
+// Через evaluate(), а НЕ через .locator().fill(): видно всегда только ОДНО
+// из трёх полей (владелец режима — this.heroMode в панели, см.
+// heroModeSection), два другие скрыты атрибутом `hidden`. Этот сброс обычно
+// зовётся ПОСЛЕ resetHeroMode(), когда режим уже «Таймер» и скрыты ВСЕ ТРИ —
+// .fill() у Playwright ждёт actionability (видимость) и висит до таймаута
+// ДЕЙСТВИЯ на каждом скрытом поле по очереди, что и превращает try/finally
+// в новый способ повесить тест на все отпущенные 30с. DOM-присваивание
+// значения + событие 'input' (тот слушатель, что вешает panel-display.js)
+// работает независимо от видимости.
+async function resetHeroCaptions(control) {
+    if (!control || control.isClosed()) { return; }
+    await control.evaluate(() => {
+        for (const id of ['labelHeroCurrent', 'labelHeroToStart', 'labelHeroToEnd']) {
+            const el = document.getElementById(id);
+            if (el && el.value !== '') {
+                el.value = '';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }
+    }).catch(() => {});
+}
+
 test.describe('режимы центрального времени', () => {
     test('четыре режима дают на экране четыре разных числа', async () => {
         const { app, control } = await launchApp();
@@ -115,6 +146,14 @@ test.describe('режимы центрального времени', () => {
             await expect.poll(() => heroText(display)).not.toMatch(/^[−-]/);
             expect(await heroText(display)).not.toBe('05:00');
         } finally {
+            // Пресет «5 минут» НЕ возвращается намеренно: нет канонического
+            // «дефолта», к которому его возвращать (каждый следующий тест
+            // запускает СВОЙ Electron-процесс и либо сам ставит нужную ему
+            // длительность через timer-command, либо вообще не смотрит на
+            // остаток таймера), и ни один тест этого файла или соседних не
+            // читает стартовую длительность, не задав её явно первым делом.
+            // Если это когда-нибудь перестанет быть верным — здесь нужен
+            // resetTimerPreset(control), симметричный остальным reset*().
             await resetHeroMode(control);
             await resetEventTimes(control);
             await app.close();
@@ -192,6 +231,7 @@ test.describe('режимы центрального времени', () => {
             await expect.poll(caption).toBe('Осталось');
         } finally {
             await resetHeroMode(control);
+            await resetHeroCaptions(control);
             await app.close();
         }
     });
