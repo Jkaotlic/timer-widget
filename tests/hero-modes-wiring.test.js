@@ -16,6 +16,7 @@ const path = require('path');
 const { codeOnly, balancedBlockAt, maskNonCode, afterBalanced } = require('./helpers/source-scan');
 
 const SRC = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'display-script.js'), 'utf8'));
+const CSS = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
 const HeroModes = require('../hero-modes.js');
 const { PanelResetMixin } = require('../panel-reset.js');
 
@@ -161,14 +162,76 @@ test('деньги 47-го этажа продолжают читать СЫРО
         'деньги перешли на геройское число — счёт перелимита сломан');
 });
 
+// --- Финальный раунд ветки (08.09.2026): краска в режимах без тотала.
+//
+// Замерено Playwright'ом: `updateProgress()` звалась ровно один раз на вход в
+// режим и дальше замерзала — `calculateProgressValue()` при нулевом тотале
+// возвращает КОНСТАНТУ 0, а ключом перерисовки было только её значение.
+// Поэтому оба теста ниже проверяют КЛЮЧ, а не поведение: поведение меряет
+// e2e/hero-modes.spec.js, у которого есть настоящее окно.
+
+test('ворота перерисовки прогресса ключуются ПОЛОСОЙ, а не одним значением', () => {
+    const body = methodBody(SRC, 'updateDisplay');
+
+    assert.ok(body.includes('this.cache.lastProgress !== progress || this.cache.lastBand !== band'),
+        'ворота перерисовки прогресса смотрят только на значение — при нулевом тотале оно КОНСТАНТА 0, и смена полосы туда не доходит');
+    assert.ok(body.includes('this.cache.lastBand = band;'),
+        'ворота не запоминают полосу — сравнивать на следующем тике будет не с чем');
+
+    // Полоса на тик считается ОДИН раз: её читают и стиль «Цифры», и ворота.
+    // Два вызова означали бы два ответа на один вопрос в одном тике.
+    assert.equal((body.match(/this\._colorBand\(/g) || []).length, 1,
+        'полоса срочности в updateDisplay() считается больше одного раза');
+});
+
+test('поле lastBand заведено в кэше и сбрасывается на смене режима', () => {
+    assert.ok(/lastBand: null/.test(SRC),
+        'lastBand не объявлен в кэше конструктора — первое сравнение пойдёт с undefined');
+    // Смена режима сбрасывает ключи перерисовки рядом: полоса — такой же ключ,
+    // как значение прогресса, и забытый сброс вернул бы ту же заморозку в
+    // момент, когда её труднее всего заметить.
+    const reset = SRC.slice(SRC.indexOf('this.cache.lastProgress = null;'));
+    assert.ok(reset.slice(0, 200).includes('this.cache.lastBand = null;'),
+        'смена режима не сбрасывает lastBand рядом с lastProgress');
+});
+
+test('нижнюю полосу без тотала гасит класс, и класс этот есть в CSS', () => {
+    // Проводка в ОБЕ стороны: имя класса живёт в двух файлах, и опечатка в
+    // любом из них не роняет ни линт, ни один другой тест.
+    assert.ok(SRC.includes("document.body.classList.toggle('no-hero-total', heroTotal <= 0);"),
+        'класс no-hero-total не ставится по САМОМУ тоталу — правило по имени режима пропустит «до конца» с концом не позже начала');
+    assert.ok(CSS.includes('body.no-hero-total .display-progress-fill'),
+        'в display.css нет правила на no-hero-total — класс ставится и ничего не делает');
+
+    // Прячется ЗАЛИВКА, а не жёлоб: серая шкала во всю ширину видна и на
+    // дисплее без пресета в режиме «таймер», и этот режим обязан выглядеть
+    // ровно как до 08.09.2026.
+    const hidesTrack = (css) => /no-hero-total\s+\.display-progress\s*\{/.test(css);
+    assert.equal(hidesTrack(CSS), false,
+        'правило гасит весь жёлоб полосы — режим «таймер» без пресета потерял бы серую шкалу');
+    // Проба проверяет себя: на заведомо плохом правиле она обязана сработать.
+    assert.equal(hidesTrack('body.no-hero-total .display-progress { display: none; }'), true,
+        'проба слепа: не видит даже правила, гасящего жёлоб целиком');
+});
+
 test('внешние ворота updateProgress() читают геройский тотал, а не сырой', () => {
     // Тело метода уже честно считает calculateProgressValue()/_colorBand() от
     // _heroTotal(), но внешние ворота гасили кольцо и полосу целиком, когда
     // this.totalSeconds === 0 — а в режиме «до конца» тотал есть (длина
     // мероприятия) даже без пресета у таймера доклада.
+    //
+    // С 08.09.2026 тотал СНАЧАЛА кладётся в локальную `heroTotal`: его
+    // спрашивают двое — ворота геометрии и класс `no-hero-total`, гасящий
+    // нижнюю полосу там, где доли не существует. Требование при этом не
+    // ослаблено, а усилено: величина читается РОВНО ОДИН РАЗ, то есть второму
+    // ответу на вопрос «есть ли тотал» взяться неоткуда.
     const body = methodBody(SRC, 'updateProgress');
-    assert.ok(body.includes('this._heroTotal() > 0'),
-        'updateProgress() не спрашивает _heroTotal() воротами — тот же класс дефекта, что и в точках вызова _colorBand()/flipCells()');
+    assert.ok(body.includes('const heroTotal = this._heroTotal();'),
+        'updateProgress() не берёт геройский тотал в одну величину');
+    assert.equal((body.match(/_heroTotal\(\)/g) || []).length, 1,
+        'геройский тотал читается в updateProgress() больше одного раза — два ответа на один вопрос');
+    assert.ok(body.includes('if (heroTotal > 0)'),
+        'updateProgress() не спрашивает геройский тотал воротами — тот же класс дефекта, что и в точках вызова _colorBand()/flipCells()');
     assert.ok(!/if \(this\.totalSeconds > 0\)/.test(body),
         'в updateProgress() остались сырые ворота this.totalSeconds > 0');
 });
@@ -179,6 +242,8 @@ test('зонд updateProgress проверяет себя: подделанны�
     const body = methodBody(fakeSrc, 'updateProgress');
     assert.ok(/if \(this\.totalSeconds > 0\)/.test(body),
         'methodBody не ловит даже заведомо плохой исходник');
+    assert.ok(!body.includes('if (heroTotal > 0)'),
+        'зонд считает геройскими ворота, которых в заведомо плохом исходнике нет');
 });
 
 // --- Раунд 1 фикса Task 5 + финальное ревью ветки: ворота на `_heroTotal()`
@@ -200,7 +265,7 @@ test('зонд updateProgress проверяет себя: подделанны�
  * литерале.
  */
 function splitByTotalGate(body) {
-    const gateAt = body.indexOf('if (this._heroTotal() > 0)');
+    const gateAt = body.indexOf('if (heroTotal > 0)');
     assert.notEqual(gateAt, -1,
         'в updateProgress() нет ворот на геройском тотале — тест ищет не то');
 
@@ -257,7 +322,8 @@ test('зонд полосы проверяет себя: раскраска, з�
     // Ровно тот дефект, что был до финального ревью: band и все классы стоят
     // ВНУТРИ if (this._heroTotal() > 0), а ветка else их только снимает.
     const fakeSrc = '\nclass X {\n    updateProgress() {\n'
-        + '        if (this._heroTotal() > 0) {\n'
+        + '        const heroTotal = this._heroTotal();\n'
+        + '        if (heroTotal > 0) {\n'
         + '            const band = this._colorBand(this._heroSeconds());\n'
         + "            document.body.classList.toggle('overtime', band === 'overtime');\n"
         + "            document.body.classList.toggle('warning', band === 'warning');\n"
@@ -289,7 +355,8 @@ test('ветка else в updateProgress() стирает след таймера
 
 test('зонд ветки else проверяет себя: подделанный исходник без очистки ловится', () => {
     const fakeSrc = '\nclass X {\n    updateProgress() {\n'
-        + '        if (this._heroTotal() > 0) {\n'
+        + '        const heroTotal = this._heroTotal();\n'
+        + '        if (heroTotal > 0) {\n'
         + '            this.displayProgressFill.style.width = ratio + \'%\';\n'
         + '        } else {\n'
         + "            this.progressRing.classList.remove('warning', 'danger', 'overtime');\n"

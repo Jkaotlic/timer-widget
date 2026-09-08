@@ -55,6 +55,86 @@ async function heroText(display) {
     });
 }
 
+/**
+ * ОДИН замер того, что НАРИСОВАНО: вычисленные цвета и вычисленная геометрия,
+ * а не имена классов. Класс мог остаться от прошлого состояния, а мог и быть
+ * снят правилом каскада, которого автор теста не знает; краска на экране — то
+ * единственное, что видит зал.
+ *
+ * Имя класса на <body> в снимке всё же есть, но исключительно как ПОДПИСЬ к
+ * упавшему замеру (в сообщении об ошибке видно, в каком режиме мерили) и как
+ * доказательство того, что режим за время теста НЕ менялся. Ни одно
+ * утверждение на нём не строится.
+ */
+async function readPaint(display) {
+    return display.evaluate(() => {
+        const hero = document.getElementById('timeDisplay');
+        const fill = document.getElementById('displayProgressFill');
+        const track = document.getElementById('displayProgress');
+        return {
+            bodyClass: document.body.className,
+            heroText: (hero.textContent || '').replace(/\s+/g, ''),
+            heroColor: getComputedStyle(hero).color,
+            fillDisplay: getComputedStyle(fill).display,
+            fillWidth: fill.getBoundingClientRect().width,
+            trackBg: getComputedStyle(track).backgroundColor
+        };
+    });
+}
+
+/**
+ * Красное ли это по ЧИСЛАМ, а не по имени токена.
+ *
+ * Цвет полосы следует тону окна (на светлом фоне красный затемняется — см.
+ * разбор «полоса следует тону»), поэтому литерал вроде #ff453a проверял бы
+ * тему, а не полосу. Порог в 40 единиц отделяет любой из красных палитры от
+ * нейтрального текста и от плёнки `--tw-overlay-medium`, у которой все три
+ * канала равны.
+ */
+function isRed(rgb) {
+    const nums = String(rgb).match(/\d+/g);
+    if (!nums || nums.length < 3) { return false; }
+    const [r, g, b] = nums.map(Number);
+    return r > g + 40 && r > b + 40;
+}
+
+/** Только время НАЧАЛА: тесты полос двигают одну отметку, не обе. */
+async function setStart(control, start) {
+    await control.locator('#eventTimeInput').fill(start);
+    await control.locator('#eventTimeInput').blur();
+}
+
+/** Секунды с начала суток — по часам САМОГО окна дисплея. */
+async function nowSecondsIn(display) {
+    return display.evaluate(() => {
+        const d = new Date();
+        return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+    });
+}
+
+/** Секунды с начала суток → 'HH:MM' (вниз до минуты — точнее отметка не бывает). */
+function clockOf(seconds) {
+    const m = Math.floor(seconds / 60) % 1440;
+    return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+async function sendCommand(control, cmd) {
+    await control.evaluate((c) => { window.ipcRenderer.send('timer-command', c); }, cmd);
+}
+
+/**
+ * Полоса `danger` у таймера ДОКЛАДА — 5 % остатка от пресета.
+ *
+ * `set` переписывает и total, и remaining разом, поэтому процент набирается
+ * парой set+adjust (тот же приём, что enterDanger() в
+ * e2e/color-band-reset.spec.js). Никаких системных часов: состояние
+ * детерминировано в любой час прогона.
+ */
+async function enterTalkTimerDanger(control) {
+    await sendCommand(control, { type: 'set', seconds: 100 });
+    await sendCommand(control, { type: 'adjust', deltaSeconds: -95 });
+}
+
 // ---------------------------------------------------------------------------
 // Сброс общего профиля — вызывается ТОЛЬКО из `finally`, поэтому каждый шаг
 // специально «глотает» свою ошибку: если контрол уже закрыт или один из
@@ -407,6 +487,221 @@ test.describe('режимы центрального времени', () => {
             await resetHeroMode(control);
             await resetEventTimes(control);
             await resetDisplayStyle(control);
+            await app.close();
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // ПОЛОСА СРОЧНОСТИ В РЕЖИМАХ БЕЗ ТОТАЛА
+    //
+    // Четыре теста ниже заведены 08.09.2026 после того, как полный проход
+    // ревью пропустил замерзающую краску. Пропустил закономерно: все прежние
+    // проверки этой ветки утверждают о ФОРМЕ ИСХОДНИКА («такой-то метод читает
+    // такое-то поле»), а замерзший кэш — свойство ВЫПОЛНЕНИЯ. Источник при нём
+    // выглядит безупречно: и `_heroSeconds()`, и `_colorBand()` на своих
+    // местах, просто вызывающий их метод перестаёт зваться.
+    //
+    // Отсюда правило для всего блока: тест меняет ТОЛЬКО СЕКУНДЫ (режим стоит
+    // на месте, класс режима на <body> сверяется до и после) и утверждает о
+    // ВЫЧИСЛЕННОЙ краске. Проверка на отсутствие обязана показать, что её
+    // проба вообще способна что-то увидеть.
+    // -----------------------------------------------------------------------
+
+    test('отметка проходит САМА — и круг краснеет от одних секунд', async () => {
+        // Единственный тест набора, который ждёт РЕАЛЬНОГО времени: отметка
+        // часов задаётся с точностью до минуты, значит пересечение границы
+        // «до отметки» → «после отметки» стоит до 60 с. Дешевле его не
+        // сделать, а подменять здесь Date значило бы проверить не тот
+        // драйвер: число в этом режиме двигает самокорректирующийся тик
+        // startCurrentTimeClock(), а не приход timer-state.
+        test.setTimeout(180000);
+
+        const { app, control } = await launchApp();
+        try {
+            const display = await openDisplay(app, control);
+            await openDisplayTab(control);
+
+            const t0 = await nowSecondsIn(display);
+            // Приложение не умеет мероприятие через полночь (спека, раздел
+            // «Чего в задаче НЕТ»), поэтому в последние минуты суток отметки
+            // В БУДУЩЕМ не существует вовсе. Пропуск громкий и с причиной —
+            // это честнее, чем тихо померить не тот переход.
+            test.skip(t0 > 86400 - 180,
+                'до полуночи меньше трёх минут: отметки в будущем в сутках не осталось');
+
+            // Ближайшая граница минуты; если до неё меньше 8 с, берём
+            // следующую — иначе не успеть замерить состояние ДО перехода.
+            const boundary = (Math.floor(t0 / 60) + 1) * 60;
+            const mark = (boundary - t0 < 8) ? boundary + 60 : boundary;
+
+            await setStart(control, clockOf(mark));
+            await pickMode(control, 'to-start');
+
+            // ДО отметки: число без минуса, краски нет.
+            await expect.poll(async () => (await readPaint(display)).heroText,
+                { message: 'герой не перешёл на отсчёт до отметки' }).not.toMatch(/^[−-]/);
+            const before = await readPaint(display);
+            expect(before.bodyClass).toContain('hero-mode-to-start');
+            expect(isRed(before.heroColor),
+                `до отметки герой уже красный: ${before.heroColor} при «${before.heroText}»`
+            ).toBe(false);
+
+            // Ждём, пока отметка пройдёт САМА. Режим не трогаем, настройки не
+            // шлём — меняются только секунды.
+            await expect.poll(async () => (await readPaint(display)).heroText, {
+                message: 'отметка не прошла: герой так и не показал минус',
+                timeout: (mark - t0) * 1000 + 20000,
+                intervals: [500]
+            }).toMatch(/^[−-]/);
+
+            // ПОСЛЕ отметки: краска обязана появиться на том же тике, но
+            // опрашиваем — repaint и замер идут в разных процессах.
+            await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
+                message: 'отметка прошла, а круг остался цветом темы'
+            }).toBe(true);
+
+            const after = await readPaint(display);
+            // Доказательство того, что менялись ИМЕННО секунды: режим тот же.
+            expect(after.bodyClass).toContain('hero-mode-to-start');
+        } finally {
+            await resetHeroMode(control);
+            await resetEventTimes(control);
+            await app.close();
+        }
+    });
+
+    test('уход отметки в будущее СНИМАЕТ красное — оба стиля говорят одно', async () => {
+        const { app, control } = await launchApp();
+        try {
+            const display = await openDisplay(app, control);
+            await openDisplayTab(control);
+
+            const t0 = await nowSecondsIn(display);
+            test.skip(t0 > 86400 - 180,
+                'до полуночи меньше трёх минут: отметки в будущем в сутках не осталось');
+
+            // Прошедшая отметка — минута назад по часам ОКНА, не по расписанию
+            // проверяющего. Клампа в ноль тут нет (signedSecondsUntilClock —
+            // прямое вычитание), поэтому «минута назад» в 00:00:30 даёт 00:00
+            // и честный минус.
+            await setStart(control, clockOf(Math.max(0, t0 - 60)));
+            await pickMode(control, 'to-start');
+
+            await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
+                message: 'прошедшая отметка не покрасила героя — мерить обратный переход нечем'
+            }).toBe(true);
+            const red = await readPaint(display);
+            // Тот же замер видит и полосу состояния на <body>: жёлоб полосы
+            // прогресса в перерасходе тонируется красным (display.css).
+            expect(isRed(red.trackBg),
+                `жёлоб полосы не покраснел в перерасходе: ${red.trackBg}`).toBe(true);
+
+            // Двигаем ТОЛЬКО отметку: режим прежний, кэш перерисовки НЕ
+            // сбрасывается (сброс живёт лишь в ветке смены режима).
+            await setStart(control, clockOf(Math.min(86340, t0 + 3600)));
+
+            await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
+                message: 'отметка ушла в будущее, а герой остался красным (замёрзшая полоса)'
+            }).toBe(false);
+
+            const clean = await readPaint(display);
+            expect(clean.heroText, 'число не стало положительным').not.toMatch(/^[−-]/);
+            expect(isRed(clean.trackBg),
+                `жёлоб остался красным при положительном числе: ${clean.trackBg}`).toBe(false);
+            expect(clean.bodyClass).toContain('hero-mode-to-start');
+        } finally {
+            await resetHeroMode(control);
+            await resetEventTimes(control);
+            await app.close();
+        }
+    });
+
+    test('без тотала нижней полосы нет вовсе', async () => {
+        const { app, control } = await launchApp();
+        try {
+            const display = await openDisplay(app, control);
+            await openDisplayTab(control);
+
+            const t0 = await nowSecondsIn(display);
+
+            // ПРОБА ПРОВЕРЯЕТ СЕБЯ. Утверждение ниже — об ОТСУТСТВИИ, а
+            // зелёный такой проверки одинаково означает и «полосы нет», и
+            // «проба слепа». Поэтому сначала состояние, где полоса ОБЯЗАНА
+            // быть: таймер доклада с пресетом, 5 % остатка — полоса занимает
+            // 95 % ширины экрана. Тем же самым замером.
+            await pickMode(control, 'timer');
+            await enterTalkTimerDanger(control);
+            await expect.poll(async () => (await readPaint(display)).fillWidth, {
+                message: 'проба не увидела полосу там, где она есть — мерить отсутствие нечем'
+            }).toBeGreaterThan(100);
+            const withTotal = await readPaint(display);
+            expect(withTotal.fillDisplay).not.toBe('none');
+
+            // Теперь величина БЕЗ тотала: отметка «до начала» уже прошла.
+            // Полоса перерасхода тянула сюда `width: 100% !important` и
+            // рисовала залу «мероприятие пройдено на 100 %» для величины, у
+            // которой доли не существует.
+            await setStart(control, clockOf(Math.max(0, t0 - 60)));
+            await pickMode(control, 'to-start');
+
+            await expect.poll(async () => (await readPaint(display)).fillDisplay, {
+                message: 'полоса прогресса осталась на экране в режиме без тотала'
+            }).toBe('none');
+            const noTotal = await readPaint(display);
+            expect(noTotal.fillWidth,
+                `полоса без тотала занимает ${noTotal.fillWidth}px при классах «${noTotal.bodyClass}»`
+            ).toBe(0);
+        } finally {
+            await resetHeroMode(control);
+            await resetEventTimes(control);
+            await app.close();
+        }
+    });
+
+    test('красный таймер доклада не остаётся на экране после ухода в «Текущее время»', async () => {
+        // Гарантия, добытая раньше и обязанная пережить правку полосы:
+        // оператор переключает экран на часы посреди перерасхода доклада, и
+        // след таймера обязан быть СТЁРТ, а не просто перестать обновляться.
+        const { app, control } = await launchApp();
+        try {
+            const display = await openDisplay(app, control);
+            await openDisplayTab(control);
+
+            await pickMode(control, 'timer');
+            await enterTalkTimerDanger(control);
+
+            await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
+                message: 'таймер доклада не покраснел — стирать нечего, тест бессмыслен'
+            }).toBe(true);
+            // Ширина ОПРАШИВАЕТСЯ, а не читается разом: у заливки есть
+            // переход `transition: width` (display.css), и первый кадр после
+            // прихода состояния честно показывает 0px — замер одним чтением
+            // ловил бы начало анимации и объявлял отсутствующей полосу,
+            // которая просто ещё едет.
+            await expect.poll(async () => (await readPaint(display)).fillWidth, {
+                message: 'полоса доклада не появилась — стирать нечего, тест бессмыслен'
+            }).toBeGreaterThan(100);
+
+            await pickMode(control, 'current');
+
+            await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
+                message: 'часы показывают красным след ушедшего доклада'
+            }).toBe(false);
+
+            const clock = await readPaint(display);
+            for (const band of ['overtime', 'warning', 'danger']) {
+                expect(clock.bodyClass,
+                    `на <body> остался класс полосы «${band}»: «${clock.bodyClass}»`
+                ).not.toContain(band);
+            }
+            expect(clock.fillWidth,
+                `полоса ушедшего доклада шириной ${clock.fillWidth}px осталась на экране`
+            ).toBe(0);
+            expect(clock.fillDisplay).toBe('none');
+            expect(isRed(clock.trackBg),
+                `жёлоб полосы остался красным: ${clock.trackBg}`).toBe(false);
+        } finally {
+            await resetHeroMode(control);
             await app.close();
         }
     });
