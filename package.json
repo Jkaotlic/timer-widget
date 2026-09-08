@@ -153,6 +153,7 @@
       "panel-display.js",
       "panel-drawer.js",
       "display-layouts.js",
+      "hero-modes.js",
       "panel-reset.js",
       "electron-widget.html",
       "electron-control.html",

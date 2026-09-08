@@ -1,0 +1,168 @@
+'use strict';
+
+/**
+ * hero-modes.js — что показывает КРУПНОЕ число полноэкранного дисплея.
+ *
+ * До 08.09.2026 это всегда был остаток таймера доклада. На мероприятии этого
+ * мало: пока зал собирается, нужно «до начала», ведущему по ходу — «до конца»
+ * (величина, не связанная с текущим докладом), в перерыве — просто часы.
+ *
+ * Модуль чистый: ни Electron, ни DOM. Сюда приходят режим, показания часов и
+ * состояние таймера — отсюда уходят два числа и подпись.
+ *
+ * Правило, ради которого модуль отдельный: РЕЖИМ ВЛИЯЕТ НА ЦВЕТ ТОЛЬКО ЧЕРЕЗ
+ * ТОТАЛ. `RendererShared.timerColorBand(secs, total)` уже отдаёт `overtime`
+ * при отрицательных секундах и `normal` при `total <= 0`, поэтому «полосы от
+ * тотала», «только минус» и «полос нет» — это не три правила, а три значения
+ * одного тотала. Второго знания о цвете здесь не заводится.
+ */
+
+// Имена УНИКАЛЬНЫ на весь документ: сборщика нет, все файлы — classic
+// <script>, и столкновение имени верхнего уровня роняет inline-скрипт окна
+// целиком.
+const HeroShared = (typeof window !== 'undefined' && window.RendererShared)
+    ? window.RendererShared
+    : require('./renderer-shared.js');
+
+const HeroLayouts = (typeof window !== 'undefined' && window.DisplayLayouts)
+    ? window.DisplayLayouts
+    : require('./display-layouts.js');
+
+/**
+ * Реестр режимов.
+ *
+ * `caption: null` у таймера — не «подписи нет», а «подпись принадлежит другому
+ * владельцу»: её пишет updateChipState() по состоянию таймера («Осталось» /
+ * «Пауза» / «Завершено»). Вызывающий обязан отличать null от пустой строки.
+ */
+const HERO_MODES = [
+    { id: 'timer', caption: null, labelKey: null },
+    { id: 'current', caption: 'Текущее время', labelKey: 'labelHeroCurrent' },
+    { id: 'to-start', caption: 'До начала мероприятия', labelKey: 'labelHeroToStart' },
+    { id: 'to-end', caption: 'До конца мероприятия', labelKey: 'labelHeroToEnd' }
+];
+
+const HERO_MODE_IDS = HERO_MODES.map((mode) => mode.id);
+const HERO_LABEL_KEYS = HERO_MODES.filter((mode) => mode.labelKey).map((mode) => mode.labelKey);
+const DEFAULT_MODE = 'timer';
+
+const SECONDS_PER_DAY = 86400;
+
+/** Режим по id; мусор и отсутствие дают режим по умолчанию. */
+function modeById(id) {
+    return HERO_MODES.find((mode) => mode.id === id) || HERO_MODES[0];
+}
+
+function toNumber(value, fallback) {
+    const n = typeof value === 'string' ? Number(value.trim()) : Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Секунды с начала суток для отметки 'HH:MM'.
+ *
+ * Считается ЧУЖОЙ арифметикой намеренно: расстояние от полуночи до отметки —
+ * это и есть `signedSecondsUntilClock(0, clock)`. Свой разбор строки здесь был
+ * бы второй копией регулярки и диапазонов.
+ */
+function clockSeconds(clock) {
+    return HeroShared.signedSecondsUntilClock(0, clock);
+}
+
+/**
+ * Подпись над героем: своя, иначе стандартная из реестра, иначе `null`.
+ *
+ * Потолок длины — общий `DisplayLayouts.MAX_CAPTION`, а не своё число: подпись
+ * стоит в той же колонке, ширину которой считают раскладки дисплея.
+ */
+function heroCaption(id, custom) {
+    const mode = modeById(id);
+    if (!mode.caption) { return null; }
+    if (typeof custom !== 'string') { return mode.caption; }
+    const clean = custom.replace(/\s+/g, ' ').trim().slice(0, HeroLayouts.MAX_CAPTION);
+    return clean || mode.caption;
+}
+
+/**
+ * Число, которое показывает герой.
+ *
+ * Режим `current` отдаёт СЕКУНДЫ С НАЧАЛА СУТОК: общий formatTime() превращает
+ * 49207 в «13:40:07», и той же цифрой кормятся флип и «Цифры». Отдельного
+ * форматирования часам не нужно.
+ */
+function heroSeconds(state) {
+    const s = state || {};
+    const mode = modeById(s.mode).id;
+    const now = toNumber(s.nowSeconds, 0);
+
+    if (mode === 'current') {
+        return Math.min(SECONDS_PER_DAY - 1, Math.max(0, Math.floor(now)));
+    }
+    if (mode === 'to-start') {
+        return HeroShared.signedSecondsUntilClock(now, s.startClock);
+    }
+    if (mode === 'to-end') {
+        return HeroShared.signedSecondsUntilClock(now, s.endClock);
+    }
+    return Math.floor(toNumber(s.remainingSeconds, 0));
+}
+
+/**
+ * Проверка, что часы в формате HH:MM и значения в диапазонах.
+ *
+ * Мероприятие с невалидными часами не имеет длины: конец не позже начала.
+ */
+function isValidClock(clock) {
+    if (typeof clock !== 'string') { return false; }
+    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
+    if (!match) { return false; }
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    return hours <= 23 && minutes <= 59;
+}
+
+/**
+ * Тотал, от которого считаются полосы срочности. Ноль означает «полос нет»
+ * (кроме минуса, который красит сам timerColorBand).
+ *
+ * У «до конца» тотал есть и он осмыслен — длина мероприятия. У «до начала»
+ * тотала нет: расстояние до старта не доля чего-либо. Мероприятие с концом не
+ * позже начала (в том числе через полночь) тотала не имеет — отрицательная
+ * доля выдала бы полосы задом наперёд.
+ */
+function heroTotal(state) {
+    const s = state || {};
+    const mode = modeById(s.mode).id;
+
+    if (mode === 'timer') {
+        const total = toNumber(s.totalSeconds, 0);
+        return total > 0 ? total : 0;
+    }
+    if (mode === 'to-end') {
+        if (!isValidClock(s.startClock) || !isValidClock(s.endClock)) { return 0; }
+        const span = clockSeconds(s.endClock) - clockSeconds(s.startClock);
+        return span > 0 ? span : 0;
+    }
+    return 0;
+}
+
+const HeroModes = {
+    HERO_MODES,
+    HERO_MODE_IDS,
+    HERO_LABEL_KEYS,
+    DEFAULT_MODE,
+    modeById,
+    heroCaption,
+    heroSeconds,
+    heroTotal
+};
+
+// Node.js (тесты)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = HeroModes;
+}
+
+// Браузер (дисплей, панель)
+if (typeof window !== 'undefined') {
+    window.HeroModes = HeroModes;
+}
