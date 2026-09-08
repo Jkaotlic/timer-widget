@@ -712,15 +712,40 @@ function migrateTimerStyle(style) {
 }
 
 // ---------------------------------------------------------------------------
+// clockToSeconds(clock) → секунды с начала суток, или null
+// ---------------------------------------------------------------------------
+/**
+ * Парсит 'HH:MM' и возвращает количество секунд с начала суток (от 0 до 86399),
+ * или null, если вход невалиден.
+ *
+ * `null` используется вместо `0`, потому что ноль — это полуночь, легитимное время.
+ * Возвращение 0 для невалидного входа замаскировало бы разницу между «часы
+ * установлены на полночь» и «в качестве часов передан мусор».
+ *
+ * @param {string} clock — 'HH:MM'
+ * @returns {number|null} секунды (0–86399) или null для невалидного входа
+ */
+function clockToSeconds(clock) {
+    if (typeof clock !== 'string') { return null; }
+
+    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
+    if (!match) { return null; }
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) { return null; }
+
+    return hours * 3600 + minutes * 60;
+}
+
 // secondsUntilClock(nowSeconds, 'HH:MM') → секунды до этого времени сегодня
 // ---------------------------------------------------------------------------
 /**
  * ЗНАКОВОЕ расстояние от системных часов до отметки: минус означает, что
  * отметка прошла.
  *
- * Разбор входа живёт здесь, в одном месте: `secondsUntilClock` ниже — это она
- * же с клампом. Две копии регулярки и диапазонов разошлись бы на первом же
- * исправлении.
+ * Разбор входа живёт в `clockToSeconds()`, в одном месте: `secondsUntilClock`
+ * ниже — это она же с клампом. Две копии регулярки и диапазонов разошлись бы
+ * на первом же исправлении.
  *
  * Невалидный вход даёт 0, и для знаковой версии это значит «отметка сейчас»,
  * а не «отметка прошла»: выдумывать минус из мусора нельзя.
@@ -732,15 +757,11 @@ function migrateTimerStyle(style) {
 function signedSecondsUntilClock(nowSeconds, clock) {
     const now = Number(nowSeconds);
     if (!Number.isFinite(now)) { return 0; }
-    if (typeof clock !== 'string') { return 0; }
 
-    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
-    if (!match) { return 0; }
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    if (hours > 23 || minutes > 59) { return 0; }
+    const mark = clockToSeconds(clock);
+    if (mark === null) { return 0; }
 
-    return hours * 3600 + minutes * 60 - now;
+    return mark - now;
 }
 
 /**
@@ -816,6 +837,7 @@ const RendererShared = {
     fitBlockScale,
     topBandReserve,
     heroFrameShrink,
+    clockToSeconds,
     secondsUntilClock,
     signedSecondsUntilClock,
     migrateDisplayBlocks,

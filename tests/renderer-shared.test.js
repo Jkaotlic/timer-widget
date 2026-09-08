@@ -323,7 +323,46 @@ test('endsAt: мусор даёт null, а не NaN в подписи', () => {
 // ---------------------------------------------------------------------------
 // secondsUntilClock — блок «До завершения» (17.08.2026)
 // ---------------------------------------------------------------------------
-const { secondsUntilClock, signedSecondsUntilClock } = require('../renderer-shared');
+const { clockToSeconds, secondsUntilClock, signedSecondsUntilClock } = require('../renderer-shared');
+
+test('clockToSeconds: парсит HH:MM и возвращает секунды с начала суток', () => {
+    // 10:30 — 10 часов * 3600 + 30 минут * 60 = 37800 секунд
+    assert.equal(clockToSeconds('10:30'), 37800);
+});
+
+test('clockToSeconds: полуночь возвращает ноль, а не null', () => {
+    // Это опционально, но важно: ноль — легитимное время, и путать его
+    // с «невалидный вход» нельзя.
+    assert.equal(clockToSeconds('00:00'), 0);
+});
+
+test('clockToSeconds: граничные значения', () => {
+    // Начало суток
+    assert.equal(clockToSeconds('00:00'), 0);
+    // Конец суток (23:59)
+    assert.equal(clockToSeconds('23:59'), 23 * 3600 + 59 * 60);
+});
+
+test('clockToSeconds: невалидные входы возвращают null', () => {
+    // Непарсируемые
+    assert.equal(clockToSeconds('мусор'), null);
+    assert.equal(clockToSeconds(''), null);
+    assert.equal(clockToSeconds('12'), null);
+    assert.equal(clockToSeconds('12:'), null);
+    assert.equal(clockToSeconds('12:34:56'), null);
+    // Часы вне диапазона
+    assert.equal(clockToSeconds('24:00'), null);
+    assert.equal(clockToSeconds('25:30'), null);
+    assert.equal(clockToSeconds('-1:00'), null);
+    // Минуты вне диапазона
+    assert.equal(clockToSeconds('12:60'), null);
+    assert.equal(clockToSeconds('12:99'), null);
+    // Не строка
+    assert.equal(clockToSeconds(null), null);
+    assert.equal(clockToSeconds(undefined), null);
+    assert.equal(clockToSeconds(1234), null);
+    assert.equal(clockToSeconds({}), null);
+});
 
 test('secondsUntilClock: считает от текущего момента до времени «Конец»', () => {
     // 12:55:39 → 15:00 = 2 ч 4 мин 21 с (числа с фотографии пользователя).

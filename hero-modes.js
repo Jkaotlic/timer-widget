@@ -53,20 +53,9 @@ function modeById(id) {
     return HERO_MODES.find((mode) => mode.id === id) || HERO_MODES[0];
 }
 
-function toNumber(value, fallback) {
+function heroNumber(value, fallback) {
     const n = typeof value === 'string' ? Number(value.trim()) : Number(value);
     return Number.isFinite(n) ? n : fallback;
-}
-
-/**
- * Секунды с начала суток для отметки 'HH:MM'.
- *
- * Считается ЧУЖОЙ арифметикой намеренно: расстояние от полуночи до отметки —
- * это и есть `signedSecondsUntilClock(0, clock)`. Свой разбор строки здесь был
- * бы второй копией регулярки и диапазонов.
- */
-function clockSeconds(clock) {
-    return HeroShared.signedSecondsUntilClock(0, clock);
 }
 
 /**
@@ -93,7 +82,7 @@ function heroCaption(id, custom) {
 function heroSeconds(state) {
     const s = state || {};
     const mode = modeById(s.mode).id;
-    const now = toNumber(s.nowSeconds, 0);
+    const now = heroNumber(s.nowSeconds, 0);
 
     if (mode === 'current') {
         return Math.min(SECONDS_PER_DAY - 1, Math.max(0, Math.floor(now)));
@@ -104,21 +93,7 @@ function heroSeconds(state) {
     if (mode === 'to-end') {
         return HeroShared.signedSecondsUntilClock(now, s.endClock);
     }
-    return Math.floor(toNumber(s.remainingSeconds, 0));
-}
-
-/**
- * Проверка, что часы в формате HH:MM и значения в диапазонах.
- *
- * Мероприятие с невалидными часами не имеет длины: конец не позже начала.
- */
-function isValidClock(clock) {
-    if (typeof clock !== 'string') { return false; }
-    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
-    if (!match) { return false; }
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    return hours <= 23 && minutes <= 59;
+    return Math.floor(heroNumber(s.remainingSeconds, 0));
 }
 
 /**
@@ -135,12 +110,14 @@ function heroTotal(state) {
     const mode = modeById(s.mode).id;
 
     if (mode === 'timer') {
-        const total = toNumber(s.totalSeconds, 0);
+        const total = heroNumber(s.totalSeconds, 0);
         return total > 0 ? total : 0;
     }
     if (mode === 'to-end') {
-        if (!isValidClock(s.startClock) || !isValidClock(s.endClock)) { return 0; }
-        const span = clockSeconds(s.endClock) - clockSeconds(s.startClock);
+        const startMark = HeroShared.clockToSeconds(s.startClock);
+        const endMark = HeroShared.clockToSeconds(s.endClock);
+        if (startMark === null || endMark === null) { return 0; }
+        const span = endMark - startMark;
         return span > 0 ? span : 0;
     }
     return 0;
