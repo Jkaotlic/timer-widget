@@ -98,6 +98,26 @@ test('деньги 47-го этажа продолжают читать СЫРО
         'деньги перешли на геройское число — счёт перелимита сломан');
 });
 
+test('внешние ворота updateProgress() читают геройский тотал, а не сырой', () => {
+    // Тело метода уже честно считает calculateProgressValue()/_colorBand() от
+    // _heroTotal(), но внешние ворота гасили кольцо и полосу целиком, когда
+    // this.totalSeconds === 0 — а в режиме «до конца» тотал есть (длина
+    // мероприятия) даже без пресета у таймера доклада.
+    const body = methodBody(SRC, 'updateProgress');
+    assert.ok(body.includes('this._heroTotal() > 0'),
+        'updateProgress() не спрашивает _heroTotal() воротами — тот же класс дефекта, что и в точках вызова _colorBand()/flipCells()');
+    assert.ok(!/if \(this\.totalSeconds > 0\)/.test(body),
+        'в updateProgress() остались сырые ворота this.totalSeconds > 0');
+});
+
+test('зонд updateProgress проверяет себя: подделанный исходник ловится', () => {
+    const fakeSrc = '\nclass X {\n    updateProgress() {\n'
+        + '        if (this.totalSeconds > 0) {\n        }\n    }\n}\n';
+    const body = methodBody(fakeSrc, 'updateProgress');
+    assert.ok(/if \(this\.totalSeconds > 0\)/.test(body),
+        'methodBody не ловит даже заведомо плохой исходник');
+});
+
 // --- Раунд 1 code review: три точки ВЫЗОВА читали сырые поля таймера мимо
 // _heroSeconds()/_heroTotal(), хотя тела вызываемых функций были правильными.
 // Тесты выше проверяли ТЕЛО (_colorBand, updateDisplay) — этого недостаточно:
@@ -158,4 +178,37 @@ test('зонд updateDigitsScale проверяет себя: подделанн
     const body = methodBody(fakeSrc, 'updateDigitsScale');
     assert.ok(body.includes('this.remainingSeconds'),
         'methodBody не ловит даже заведомо плохой исходник');
+});
+
+test('подпись героя имеет ОДНОГО владельца, выбираемого режимом', () => {
+    const chip = methodBody(SRC, 'updateChipState');
+    // В не-таймерных режимах отчёт о состоянии подпись не трогает ВОВСЕ —
+    // ранним выходом, а не перезаписью после. Перезапись означала бы двух
+    // владельцев, дерущихся за один узел на каждом тике.
+    assert.ok(/this\.heroMode !== window\.HeroModes\.DEFAULT_MODE/.test(chip),
+        'updateChipState() пишет подпись во всех режимах — это второй владелец');
+
+    const label = methodBody(SRC, 'updateHeroLabel');
+    assert.ok(label.includes('window.HeroModes.heroCaption'),
+        'updateHeroLabel() не спрашивает реестр, значит завёл свою копию слова');
+});
+
+test('вспышка завершения не запускается вне режима таймера', () => {
+    assert.ok(/heroMode === window\.HeroModes\.DEFAULT_MODE[\s\S]{0,200}triggerFinishEffect/.test(SRC),
+        'вспышка «время вышло» бьёт по экрану, где крупно показано другое');
+});
+
+test('плашка состояния гасится классом режима, а не инлайном', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    for (const mode of ['current', 'to-start', 'to-end']) {
+        assert.ok(new RegExp(`body\\.hero-mode-${mode}\\s+#statusPill`).test(css),
+            `в display.css нет правила, гасящего плашку в режиме ${mode}`);
+    }
+    // Отрицательного селектора быть не должно: до первой посылки настроек на
+    // <body> нет ни одного класса режима, и он погасил бы плашку в режиме
+    // таймера на чистом профиле.
+    assert.ok(!/body:not\(\.hero-mode-timer\)/.test(css),
+        'плашка гасится отрицательным селектором — на чистом профиле она пропадёт и в режиме таймера');
+    assert.ok(SRC.includes("'hero-mode-' + this.heroMode"),
+        'класс режима не ставится на body');
 });

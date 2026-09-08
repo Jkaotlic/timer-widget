@@ -2397,9 +2397,16 @@ class DisplayTimer {
         // повторное нажатие Space/Start на 00:00 (контроллер отвечает finish()),
         // любая посылка настроек перерасхода из панели (configChanged → emit),
         // ответ на get-timer-state у только что открытого окна.
+        // Вспышка «время вышло» — утверждение о таймере доклада. На экране,
+        // где крупно показано текущее время или отсчёт до конца мероприятия,
+        // она читается как сбой окна. Защёлка при этом ставится в любом
+        // режиме: вернувшись в режим таймера, пропущенную вспышку выдавать
+        // задним числом тоже нельзя.
         if (this.finished && !this._finishEffectShown && !this.flashInterval) {
             this._finishEffectShown = true;
-            this.triggerFinishEffect();
+            if (this.heroMode === window.HeroModes.DEFAULT_MODE) {
+                this.triggerFinishEffect();
+            }
         }
     }
 
@@ -2467,8 +2474,35 @@ class DisplayTimer {
         return window.RendererShared.timerColorBand(secs, this._heroTotal());
     }
 
-    // Наполняется в задаче 5.
+    /**
+     * Подпись над героем. Владельца выбирает РЕЖИМ, и он всегда один.
+     *
+     * В режиме `timer` владелец — updateChipState(): подпись там не заголовок,
+     * а отчёт («Осталось» / «Пауза» / «Сверх времени» / «Завершено»), и он
+     * единственный на экране говорит, идёт таймер или стоит. В трёх остальных
+     * режимах отчёт не про то, что нарисовано крупно, и владельцем становится
+     * настройка.
+     *
+     * Класс режима на <body> — потому что от режима зависит не только текст:
+     * плашка состояния гасится каскадом, а не присвоением стиля.
+     */
     updateHeroLabel() {
+        for (const id of window.HeroModes.HERO_MODE_IDS) {
+            document.body.classList.remove('hero-mode-' + id);
+        }
+        document.body.classList.add('hero-mode-' + this.heroMode);
+
+        const mode = window.HeroModes.modeById(this.heroMode);
+        if (!mode.labelKey) { return; }  // режим таймера: владелец другой
+
+        const caption = window.HeroModes.heroCaption(mode.id, this.heroLabels[mode.labelKey]);
+        if (this.heroLabelText && this.heroLabelText.textContent !== caption) {
+            this.heroLabelText.textContent = caption;
+            // Подпись задаёт ширину колонки героя, по которой считаются места
+            // элементов и полоса сверху.
+            this.reflowSoon();
+            this.updateTopBand();
+        }
     }
 
     // Вспомогательная функция для определения статуса (для кэширования)
@@ -2743,7 +2777,15 @@ class DisplayTimer {
     }
 
     updateProgress() {
-        if (this.totalSeconds > 0) {
+        // Ворота на геройском тотале, а не на сыром this.totalSeconds: у
+        // режима «до конца» тотал — длина мероприятия, и он может быть
+        // положительным даже когда у таймера доклада нет пресета
+        // (totalSeconds === 0). Сырые ворота в этом случае гасили бы кольцо
+        // и полосу прогресса, хотя calculateProgressValue() и _colorBand()
+        // ниже уже честно считают от того же геройского тотала — тот же
+        // класс дефекта, что был исправлен в точках вызова _colorBand()/
+        // flipCells() 08.09.2026.
+        if (this._heroTotal() > 0) {
             // FIX BUG-016: Use calculateProgressValue() for correct overtime handling
             const progress = this.calculateProgressValue();
 
@@ -2844,6 +2886,14 @@ class DisplayTimer {
         const pill = this.statusPill;
         const label = this.heroLabelText;
         if (!pill) { return; }
+
+        // Вне режима таймера подпись принадлежит настройке режима, и отчёт о
+        // состоянии её НЕ ТРОГАЕТ. Не «пишет и потом перезаписываем» — тогда
+        // владельцев было бы два, и они дрались бы на каждом тике.
+        if (this.heroMode !== window.HeroModes.DEFAULT_MODE) {
+            pill.classList.remove('is-success', 'is-attention');
+            return;
+        }
 
         // ЦВЕТ плашки задают только семантические классы (running / paused /
         // finished / overtime) из updateStatus(). Раньше сюда добавлялась ВТОРАЯ
