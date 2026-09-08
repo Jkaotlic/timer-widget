@@ -323,7 +323,7 @@ test('endsAt: мусор даёт null, а не NaN в подписи', () => {
 // ---------------------------------------------------------------------------
 // secondsUntilClock — блок «До завершения» (17.08.2026)
 // ---------------------------------------------------------------------------
-const { secondsUntilClock } = require('../renderer-shared');
+const { secondsUntilClock, signedSecondsUntilClock } = require('../renderer-shared');
 
 test('secondsUntilClock: считает от текущего момента до времени «Конец»', () => {
     // 12:55:39 → 15:00 = 2 ч 4 мин 21 с (числа с фотографии пользователя).
@@ -345,6 +345,36 @@ test('secondsUntilClock: мусор даёт 0, а не NaN', () => {
         assert.equal(secondsUntilClock(3600, bad), 0, `вход ${JSON.stringify(bad)}`);
     }
     assert.equal(secondsUntilClock(NaN, '15:00'), 0);
+});
+
+test('signedSecondsUntilClock уходит в минус на прошедшей отметке', () => {
+    // 15:01, отметка 15:00 — мероприятие вылезло за расписание на 60 секунд.
+    const now = 15 * 3600 + 1 * 60;
+    assert.equal(signedSecondsUntilClock(now, '15:00'), -60);
+});
+
+test('signedSecondsUntilClock даёт положительное до отметки', () => {
+    const now = 14 * 3600;
+    assert.equal(signedSecondsUntilClock(now, '15:30'), 5400);
+});
+
+test('signedSecondsUntilClock на мусоре даёт ноль, а не минус', () => {
+    const now = 15 * 3600;
+    // Ноль здесь значит «отметка сейчас», а не «отметка прошла»: герой покажет
+    // 00:00:00 вместо выдуманного минуса.
+    assert.equal(signedSecondsUntilClock(now, 'нет'), 0);
+    assert.equal(signedSecondsUntilClock(now, '25:00'), 0);
+    assert.equal(signedSecondsUntilClock(now, '12:99'), 0);
+    assert.equal(signedSecondsUntilClock(NaN, '12:00'), 0);
+    assert.equal(signedSecondsUntilClock(now, null), 0);
+});
+
+test('secondsUntilClock по-прежнему клампит в ноль', () => {
+    // Старое поведение не изменилось: плашка «До завершения» не имеет права
+    // показать минус или перенос на следующие сутки.
+    const now = 15 * 3600 + 1 * 60;
+    assert.equal(secondsUntilClock(now, '15:00'), 0);
+    assert.equal(secondsUntilClock(now, '15:30'), 1740);
 });
 
 // ---------------------------------------------------------------------------

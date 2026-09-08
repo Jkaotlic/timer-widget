@@ -715,6 +715,35 @@ function migrateTimerStyle(style) {
 // secondsUntilClock(nowSeconds, 'HH:MM') → секунды до этого времени сегодня
 // ---------------------------------------------------------------------------
 /**
+ * ЗНАКОВОЕ расстояние от системных часов до отметки: минус означает, что
+ * отметка прошла.
+ *
+ * Разбор входа живёт здесь, в одном месте: `secondsUntilClock` ниже — это она
+ * же с клампом. Две копии регулярки и диапазонов разошлись бы на первом же
+ * исправлении.
+ *
+ * Невалидный вход даёт 0, и для знаковой версии это значит «отметка сейчас»,
+ * а не «отметка прошла»: выдумывать минус из мусора нельзя.
+ *
+ * @param {number} nowSeconds — секунды с начала суток
+ * @param {string} clock — 'HH:MM'
+ * @returns {number} секунды; отрицательные, если отметка позади
+ */
+function signedSecondsUntilClock(nowSeconds, clock) {
+    const now = Number(nowSeconds);
+    if (!Number.isFinite(now)) { return 0; }
+    if (typeof clock !== 'string') { return 0; }
+
+    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
+    if (!match) { return 0; }
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) { return 0; }
+
+    return hours * 3600 + minutes * 60 - now;
+}
+
+/**
  * Сколько осталось до времени окончания мероприятия — для блока «До
  * завершения» на дисплее.
  *
@@ -734,18 +763,7 @@ function migrateTimerStyle(style) {
  * @returns {number} секунды, не меньше нуля
  */
 function secondsUntilClock(nowSeconds, clock) {
-    const now = Number(nowSeconds);
-    if (!Number.isFinite(now)) { return 0; }
-    if (typeof clock !== 'string') { return 0; }
-
-    const match = /^(\d{1,2}):(\d{2})$/.exec(clock.trim());
-    if (!match) { return 0; }
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    if (hours > 23 || minutes > 59) { return 0; }
-
-    const target = hours * 3600 + minutes * 60;
-    return Math.max(0, target - now);
+    return Math.max(0, signedSecondsUntilClock(nowSeconds, clock));
 }
 
 // ---------------------------------------------------------------------------
@@ -799,6 +817,7 @@ const RendererShared = {
     topBandReserve,
     heroFrameShrink,
     secondsUntilClock,
+    signedSecondsUntilClock,
     migrateDisplayBlocks,
     timerLifecycleStatus,
     timerColorBand,
