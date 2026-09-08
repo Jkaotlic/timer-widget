@@ -100,6 +100,10 @@ class DisplayTimer {
 
         // Настройки отображения
         this.eventTime = '10:00';
+        // Режим центрального времени. Умолчание — таймер: профиль без
+        // настройки обязан вести себя ровно как до 08.09.2026.
+        this.heroMode = window.HeroModes.DEFAULT_MODE;
+        this.heroLabels = {};
         this.endTime = '12:00';
         this.timerScale = 100;
         this.timerStyle = 'circle';
@@ -1275,6 +1279,14 @@ class DisplayTimer {
                     left % 60
                 );
             }
+
+            // Герой в не-таймерных режимах меняется от СИСТЕМНЫХ ЧАСОВ, а не
+            // от прихода timer-state. Второго таймера не заводим: этот тик уже
+            // самокорректирующийся, и лишний ежесекундный интервал на
+            // презентационном экране — просто вторая точка расхождения.
+            if (this.heroMode !== window.HeroModes.DEFAULT_MODE) {
+                this.updateDisplay();
+            }
         };
         updateClock();
 
@@ -1633,6 +1645,24 @@ class DisplayTimer {
             this.reflowSoon();
             this.updateTopBand();
         }
+
+        // Режим центрального времени. Кэш секунд сбрасывается ЯВНО: в новом
+        // режиме число почти наверняка другое, но `lastSeconds` мог совпасть —
+        // и тогда ранний выход по кэшу оставил бы на экране прежнюю величину.
+        if (settings.heroMode !== undefined) {
+            const nextMode = window.HeroModes.modeById(settings.heroMode).id;
+            if (nextMode !== this.heroMode) {
+                this.heroMode = nextMode;
+                this.cache.lastSeconds = null;
+                this.cache.lastFormatted = null;
+                this.cache.lastProgress = null;
+                this.reflowSoon();
+            }
+        }
+        for (const key of window.HeroModes.HERO_LABEL_KEYS) {
+            if (settings[key] !== undefined) { this.heroLabels[key] = String(settings[key]); }
+        }
+        this.updateHeroLabel();
 
         // Скрытый режим «47-й этаж»: ставка и разблокировка.
         //
@@ -2246,7 +2276,7 @@ class DisplayTimer {
     }
 
     updateDisplay() {
-        const secs = Math.floor(this.remainingSeconds);
+        const secs = this._heroSeconds();
 
         // Снимаем защёлку вспышки, как только состояние перестало быть
         // «завершено» (сброс, новый пресет, старт) — следующее завершение снова
@@ -2375,18 +2405,17 @@ class DisplayTimer {
 
     // Вспомогательная функция для вычисления прогресса (для кэширования)
     calculateProgressValue() {
-        if (this.totalSeconds === 0) {return 0;}
+        const total = this._heroTotal();
+        if (total === 0) { return 0; }
 
-        // FIX BUG-016: Handle overtime progress correctly
-        if (this.remainingSeconds < 0) {
-            // В overtime режиме показываем прогресс от 0 до -1
-            // Это позволит визуализировать "обратный" прогресс
+        const secs = this._heroSeconds();
+        // FIX BUG-016: в перерасходе прогресс идёт от 0 к -1 — «обратный» ход.
+        if (secs < 0) {
             const overrunLimit = this.overrunLimitSeconds || 300;
-            const overtimeRatio = Math.abs(this.remainingSeconds) / overrunLimit;
-            return -Math.min(1, overtimeRatio); // Отрицательное значение
+            return -Math.min(1, Math.abs(secs) / overrunLimit);
         }
 
-        return Math.round((this.remainingSeconds / this.totalSeconds) * 1000) / 1000;
+        return Math.round((secs / total) * 1000) / 1000;
     }
 
     // Полоса срочности — общая для всех окон (RendererShared.timerColorBand).
@@ -2400,8 +2429,46 @@ class DisplayTimer {
     // _baseSecondHandBg / _baseSecondHandShadow / _baseCenterBg /
     // _baseCenterShadow / _baseAnalogDigitalColor и вся функция
     // _enforceOvertimeColors(), которая перекрашивала DOM на каждом тике.
+
+    /**
+     * ЕДИНСТВЕННОЕ место, где решается, что за число показывает герой.
+     *
+     * Заведено 08.09.2026 вместе с режимами центрального времени. До этого
+     * `updateDisplay()` читала `this.remainingSeconds` первой строкой, и любой
+     * второй читатель немедленно стал бы вторым источником правды.
+     *
+     * `this.remainingSeconds` при этом НЕ исчезает: это сырое состояние
+     * таймера доклада, и его продолжают читать деньги «47-го этажа» и отчёт о
+     * состоянии. Подменить его геройским числом значило бы считать перелимит
+     * доклада от расписания мероприятия.
+     */
+    _heroSeconds() {
+        const now = new Date();
+        return window.HeroModes.heroSeconds({
+            mode: this.heroMode,
+            nowSeconds: now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(),
+            startClock: this.eventTime,
+            endClock: this.endTime,
+            remainingSeconds: this.remainingSeconds
+        });
+    }
+
+    /** Тотал для полос срочности — тоже из одного места. Ноль = полос нет. */
+    _heroTotal() {
+        return window.HeroModes.heroTotal({
+            mode: this.heroMode,
+            totalSeconds: this.totalSeconds,
+            startClock: this.eventTime,
+            endClock: this.endTime
+        });
+    }
+
     _colorBand(secs) {
-        return window.RendererShared.timerColorBand(secs, this.totalSeconds);
+        return window.RendererShared.timerColorBand(secs, this._heroTotal());
+    }
+
+    // Наполняется в задаче 5.
+    updateHeroLabel() {
     }
 
     // Вспомогательная функция для определения статуса (для кэширования)
