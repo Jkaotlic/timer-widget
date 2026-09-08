@@ -120,6 +120,14 @@ const PanelDisplayMixin = {
             eventTime: this.eventTimeInputEl.value,
             endTime: this.endTimeInputEl.value,
             eventTitle: this.eventTitleInputEl ? this.eventTitleInputEl.value : '',
+            // Режим центрального времени и своя подпись КАЖДОГО режима.
+            // Подписи уходят все три, а не только текущего режима: дисплей
+            // хранит их для всех и переключение режима не должно требовать
+            // повторного ввода.
+            heroMode: this.heroMode || window.HeroModes.DEFAULT_MODE,
+            labelHeroCurrent: this.heroLabelInputs.current ? this.heroLabelInputs.current.value : '',
+            labelHeroToStart: this.heroLabelInputs['to-start'] ? this.heroLabelInputs['to-start'].value : '',
+            labelHeroToEnd: this.heroLabelInputs['to-end'] ? this.heroLabelInputs['to-end'].value : '',
             timeBlocksScale: parseInt(this.timeBlocksScaleEl.value, 10),
             // Стиль и масштаб идут ПОД СВОИМИ именами. Общие
             // `timerStyle`/`timerScale` остаются рядом: на них опирается откат
@@ -164,10 +172,65 @@ const PanelDisplayMixin = {
         if (this.eventTitleInputEl) {
             this.eventTitleInputEl.addEventListener('input', () => this.pushDisplaySettings());
         }
+
+        // Режим центрального времени. Ряд кнопок ведёт себя как bgMode:
+        // владелец значения — this.heroMode, кнопки лишь его ВИД.
+        this.heroMode = window.HeroModes.DEFAULT_MODE;
+        this.heroLabelInputs = {};
+        for (const mode of window.HeroModes.HERO_MODES) {
+            if (!mode.labelKey) { continue; }
+            this.heroLabelInputs[mode.id] = document.getElementById(mode.labelKey);
+        }
+        document.querySelectorAll('.hero-mode-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.setHeroMode(btn.dataset.mode);
+                this.pushDisplaySettings();
+            });
+        });
+        for (const input of Object.values(this.heroLabelInputs)) {
+            if (input) { input.addEventListener('input', () => this.pushDisplaySettings()); }
+        }
+
         // Замок читается ДО рядов подписей: ряды спрашивают его про секретные
         // элементы. bindFloor47 в конце сам зовёт renderFloor47, а тот —
         // bindBlockLabelRows, поэтому второго вызова здесь нет.
         this.bindFloor47();
+    },
+
+    /**
+     * Смена режима героя.
+     *
+     * Поле заголовка ОДНО на четыре режима: показывается вход того режима,
+     * который выбран. Четыре видимых поля рядом означали бы, что три из них
+     * ни на что не влияют прямо сейчас, — а надпись обязана обещать правду.
+     */
+    setHeroMode(id) {
+        const mode = window.HeroModes.modeById(id);
+        this.heroMode = mode.id;
+
+        document.querySelectorAll('.hero-mode-btn').forEach((btn) => {
+            const on = btn.dataset.mode === mode.id;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+
+        for (const [modeId, input] of Object.entries(this.heroLabelInputs)) {
+            if (input) { input.hidden = modeId !== mode.id; }
+        }
+
+        const row = document.getElementById('heroLabelRow');
+        const note = document.getElementById('heroTimerLabelNote');
+        const hint = document.getElementById('heroLabelHint');
+        const isTimer = mode.id === 'timer';
+        if (row) { row.hidden = isTimer; }
+        if (note) { note.hidden = !isTimer; }
+        // Подпись поля ведёт к тому входу, который сейчас виден: иначе `for`
+        // указывает на скрытый элемент и клик по подписи не делает ничего.
+        if (!isTimer) {
+            const label = row && row.querySelector('.toggle-label');
+            if (label) { label.setAttribute('for', mode.labelKey); }
+            if (hint) { hint.textContent = `Пустое поле вернёт «${window.HeroModes.heroCaption(mode.id)}».`; }
+        }
     },
 
     /**

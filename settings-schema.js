@@ -147,6 +147,13 @@ const SETTINGS_DESCRIPTORS = [
     { key: 'labelEventTime', el: 'labelEventTime', kind: 'value', def: '', owner: 'display' },
     { key: 'labelEndTime', el: 'labelEndTime', kind: 'value', def: '', owner: 'display' },
     { key: 'labelTimeLeft', el: 'labelTimeLeft', kind: 'value', def: '', owner: 'display' },
+    // Свои подписи героя (08.09.2026). Умолчание — ПУСТАЯ строка: стандартное
+    // слово каждого режима знает реестр hero-modes.js (heroCaption), и второй
+    // копии здесь нет. У режима `timer` ключа НЕТ вовсе: там подпись — отчёт о
+    // состоянии таймера, и владелец у неё другой.
+    { key: 'labelHeroCurrent', el: 'labelHeroCurrent', kind: 'value', def: '', owner: 'display' },
+    { key: 'labelHeroToStart', el: 'labelHeroToStart', kind: 'value', def: '', owner: 'display' },
+    { key: 'labelHeroToEnd', el: 'labelHeroToEnd', kind: 'value', def: '', owner: 'display' },
     // Скрытый режим «47-й этаж»: деньги за перелимит доклада.
     //
     // Вид строк — 'value', а не 'number': таблица знает только 'checkbox' и
@@ -223,7 +230,7 @@ const SETTINGS_DESCRIPTORS = [
 
 // Ключи, которые панель пишет в `displayExtSettings` МИМО таблицы. Держим списком,
 // чтобы тест мог убедиться, что ни один ключ не потерялся при переносе.
-const MANUAL_KEYS = ['overrunLimitSeconds', 'bgMode'];
+const MANUAL_KEYS = ['overrunLimitSeconds', 'bgMode', 'heroMode'];
 
 // ---------------------------------------------------------------------------
 // Чтение значения из хранилища

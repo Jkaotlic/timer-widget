@@ -378,13 +378,33 @@ test('шрифт цифр: круговой рейс через поддельн
 });
 
 test('ключи, оставленные панели, названы явно', () => {
-    // Два ключа таблицей не выражаются (свой формат и кнопки вместо поля).
+    // Три ключа таблицей не выражаются (свой формат и кнопки вместо поля).
     // Список нужен, чтобы «не описан» нельзя было спутать с «забыт».
-    assert.deepEqual(MANUAL_KEYS, ['overrunLimitSeconds', 'bgMode']);
+    assert.deepEqual(MANUAL_KEYS, ['overrunLimitSeconds', 'bgMode', 'heroMode']);
     for (const key of MANUAL_KEYS) {
         assert.equal(byKey(key), undefined, `${key} описан и в таблице, и в списке ручных`);
         assert.match(controlHtml, new RegExp(key), `${key} нигде не сохраняется`);
     }
+});
+
+test('ключи подписей героя описаны в таблице с пустым умолчанием', () => {
+    const HeroModes = require('../hero-modes');
+    for (const key of HeroModes.HERO_LABEL_KEYS) {
+        const row = Schema.SETTINGS_DESCRIPTORS.find((d) => d.key === key);
+        assert.ok(row, `в таблице нет строки ${key}`);
+        assert.equal(row.owner, 'display');
+        assert.equal(row.kind, 'value');
+        // Стандартное слово знает реестр hero-modes.js. Второй его копии здесь
+        // быть не должно — ровно как у подписей плашек.
+        assert.equal(row.def, '');
+    }
+});
+
+test('heroMode идёт мимо таблицы, как bgMode', () => {
+    // Ряд кнопок с классом .active — не 'checkbox' и не 'value'. Третий вид
+    // контрола ради одного поля не заводим, значит ключ ручной.
+    assert.ok(Schema.MANUAL_KEYS.includes('heroMode'));
+    assert.ok(!Schema.SETTINGS_DESCRIPTORS.some((d) => d.key === 'heroMode'));
 });
 
 /* ─────────────────────── сброс настроек одного окна ──────────────────────── */
