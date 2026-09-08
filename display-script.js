@@ -1646,42 +1646,6 @@ class DisplayTimer {
             this.updateTopBand();
         }
 
-        // Режим центрального времени. Кэш секунд сбрасывается ЯВНО: в новом
-        // режиме число почти наверняка другое, но `lastSeconds` мог совпасть —
-        // и тогда ранний выход по кэшу оставил бы на экране прежнюю величину.
-        //
-        // `lastStatus` сбрасывается тут же намеренно (найдено 08.09.2026 этим
-        // же тестом): при возврате в `timer` подпись отдаётся updateChipState(),
-        // а её вызывает updateStatus() только когда СТАТУС меняется — не когда
-        // меняется режим. Пока пользователь не тронул сам таймер, статус тот
-        // же, что был до похода в другой режим, и «Осталось» не возвращалось
-        // ни на один тик: подпись стояла заголовком того режима, откуда ушли.
-        //
-        // updateDisplay() вызывается ЗДЕСЬ ЖЕ, а не оставляется ближайшему
-        // тику: тик у стоящего таймера не приходит вовсе (секундный интервал в
-        // главном процессе живёт только пока таймер РАБОТАЕТ — handleTimerStart
-        // в electron-main.js), а самокорректирующийся тик по системным часам
-        // сам гасится, как только режим становится `timer` (см. updateClock
-        // выше). На простаивающем таймере смена режима назад в «Таймер» без
-        // этого вызова навсегда замораживала бы экран на числе прежнего
-        // режима — не только подпись, а и само крупное число.
-        if (settings.heroMode !== undefined) {
-            const nextMode = window.HeroModes.modeById(settings.heroMode).id;
-            if (nextMode !== this.heroMode) {
-                this.heroMode = nextMode;
-                this.cache.lastSeconds = null;
-                this.cache.lastFormatted = null;
-                this.cache.lastProgress = null;
-                this.cache.lastStatus = null;
-                this.reflowSoon();
-                this.updateDisplay();
-            }
-        }
-        for (const key of window.HeroModes.HERO_LABEL_KEYS) {
-            if (settings[key] !== undefined) { this.heroLabels[key] = String(settings[key]); }
-        }
-        this.updateHeroLabel();
-
         // Скрытый режим «47-й этаж»: ставка и разблокировка.
         //
         // Видимость денежных блоков считает ОДНО место (updateMoneyBlocks), и
@@ -1728,6 +1692,49 @@ class DisplayTimer {
             this.endTimeEl.textContent = settings.endTime;
             this.updateStaticMiniClock(this.endTimeBlock, settings.endTime);
         }
+
+        // Режим центрального времени. Блок стоит ПОСЛЕ присвоения eventTime и
+        // endTime намеренно: он тут же зовёт updateDisplay(), а `_heroSeconds()`
+        // в режимах «до начала»/«до конца» считает именно от этих двух полей.
+        // Стоя выше, он рисовал первый кадр открытого в сохранённом режиме
+        // дисплея по умолчаниям конструктора — то есть по чужому расписанию.
+        // Само собой это лечилось следующим тиком (~1 с), но кадр видел зал.
+        //
+        // Кэш секунд сбрасывается ЯВНО: в новом режиме число почти наверняка
+        // другое, но `lastSeconds` мог совпасть — и тогда ранний выход по кэшу
+        // оставил бы на экране прежнюю величину.
+        //
+        // `lastStatus` сбрасывается тут же намеренно (найдено 08.09.2026 этим
+        // же тестом): при возврате в `timer` подпись отдаётся updateChipState(),
+        // а её вызывает updateStatus() только когда СТАТУС меняется — не когда
+        // меняется режим. Пока пользователь не тронул сам таймер, статус тот
+        // же, что был до похода в другой режим, и «Осталось» не возвращалось
+        // ни на один тик: подпись стояла заголовком того режима, откуда ушли.
+        //
+        // updateDisplay() вызывается ЗДЕСЬ ЖЕ, а не оставляется ближайшему
+        // тику: тик у стоящего таймера не приходит вовсе (секундный интервал в
+        // главном процессе живёт только пока таймер РАБОТАЕТ — handleTimerStart
+        // в electron-main.js), а самокорректирующийся тик по системным часам
+        // сам гасится, как только режим становится `timer` (см. updateClock
+        // выше). На простаивающем таймере смена режима назад в «Таймер» без
+        // этого вызова навсегда замораживала бы экран на числе прежнего
+        // режима — не только подпись, а и само крупное число.
+        if (settings.heroMode !== undefined) {
+            const nextMode = window.HeroModes.modeById(settings.heroMode).id;
+            if (nextMode !== this.heroMode) {
+                this.heroMode = nextMode;
+                this.cache.lastSeconds = null;
+                this.cache.lastFormatted = null;
+                this.cache.lastProgress = null;
+                this.cache.lastStatus = null;
+                this.reflowSoon();
+                this.updateDisplay();
+            }
+        }
+        for (const key of window.HeroModes.HERO_LABEL_KEYS) {
+            if (settings[key] !== undefined) { this.heroLabels[key] = String(settings[key]); }
+        }
+        this.updateHeroLabel();
 
         // Масштаб таймера. Панель управления шлёт ВЕСЬ объект настроек при любом
         // изменении (цвет, фон, блоки), поэтому применять timerScale безусловно
@@ -2488,6 +2495,21 @@ class DisplayTimer {
         });
     }
 
+    /**
+     * Печатается ли группа часов у геройского числа.
+     *
+     * У ДЛИТЕЛЬНОСТИ — только когда часы реально есть: «05:00» короче и
+     * читается с дальнего ряда лучше, чем «00:05:00». У ПОКАЗАНИЙ ЧАСОВ —
+     * всегда: formatTime() даёт ЧЧ:ММ:СС и в 00:30:15, и проба «Цифр»,
+     * посчитанная по правилу длительности, зарезервировала бы место под
+     * «88:88» под текст в восемь знаков — цифры вылезли бы за рамку ровно в
+     * тот час, когда никто не смотрит на тесты.
+     */
+    _heroHasHours(secs) {
+        if (window.HeroModes.isClockMode(this.heroMode)) { return true; }
+        return Math.abs(secs) >= 3600;
+    }
+
     _colorBand(secs) {
         return window.RendererShared.timerColorBand(secs, this._heroTotal());
     }
@@ -2560,6 +2582,16 @@ class DisplayTimer {
                 s2: String(seconds % 10),
                 hasHours: hours > 0 || this._heroTotal() >= 3600
             };
+        }
+
+        // Показания часов — ВСЕГДА шесть створок, даже когда час нулевой.
+        // Правило «hours > 0 || total >= 3600» верно для ДЛИТЕЛЬНОСТИ: у часов
+        // тотала нет вовсе (heroTotal → 0), и в 00:30:15 флип показывал бы
+        // четыре карточки «30:15» — тот же дефект, что короткий форматтер у
+        // остальных стилей, только выраженный числом створок. Признак «это
+        // часы» спрашивается у реестра, второй копии здесь нет.
+        if (window.HeroModes.isClockMode(this.heroMode)) {
+            cells.hasHours = true;
         }
 
         // Показываем/скрываем знак минуса
@@ -2663,18 +2695,18 @@ class DisplayTimer {
 
         // Обновляем цифровое время под циферблатом
         if (this.analogDigitalTime) {
-            // absSecs >= 0, поэтому formatTimeShort не добавит знак — знак минуса
-            // рисуется отдельно через _setAnalogTimeContent. Вывод идентичен ручному
-            // `H:MM:SS` / `MM:SS`.
-            const timeStr = (window.TimeUtils && window.TimeUtils.formatTimeShort)
-                ? window.TimeUtils.formatTimeShort(absSecs)
-                : (() => {
-                    const hours = Math.floor(absSecs / 3600);
-                    const mins = Math.floor((absSecs % 3600) / 60);
-                    return hours > 0
-                        ? `${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-                        : `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                })();
+            // Через this.formatTime(), а не своим вызовом formatTimeShort:
+            // выбор написания принадлежит ОДНОМУ месту (см. formatTime ниже),
+            // а цифра под циферблатом в режиме часов — те же показания часов,
+            // что и у остальных стилей, и «9:05:07» здесь было бы тем же
+            // дефектом. Прежняя ручная развилка `H:MM:SS` / `MM:SS` на случай
+            // отсутствия TimeUtils убрана как мёртвая: сам formatTime() и
+            // добрая половина updateDisplay() уже зовут TimeUtils без охраны,
+            // а вторая копия правила написания — ровно то, что здесь чинится.
+            //
+            // absSecs >= 0, поэтому знак форматтер не добавит — минус рисуется
+            // отдельно через _setAnalogTimeContent.
+            const timeStr = this.formatTime(absSecs);
             this._setAnalogTimeContent(timeStr, secs < 0);
         }
 
@@ -2726,7 +2758,7 @@ class DisplayTimer {
         // Проба меряется от ГЕРОЙСКОГО числа: в режиме «Текущее время» герой —
         // это часы вида «13:40:07», а не остаток доклада, и проба обязана
         // резервировать место под ту же ширину, что реально печатается.
-        const hasHours = Math.abs(Math.floor(this._heroSeconds())) >= 3600;
+        const hasHours = this._heroHasHours(Math.floor(this._heroSeconds()));
         // measureDigits() принимает ЯВНУЮ эталонную строку, не булев hasHours —
         // выбор строки остаётся здесь, у потребителя.
         const probeText = hasHours ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
@@ -2782,7 +2814,7 @@ class DisplayTimer {
     updateDigitsDisplay(secs) {
         if (!this.digitsValue) { return; }
         const wasHours = this._digitsHadHours;
-        const hasHours = Math.abs(secs) >= 3600;
+        const hasHours = this._heroHasHours(secs);
 
         this.digitsSign.textContent = secs < 0 ? '−' : '';
         this.digitsValue.textContent = this.formatTime(Math.abs(secs));
@@ -2795,12 +2827,30 @@ class DisplayTimer {
     }
 
     updateProgress() {
+        // ПОЛОСА СРОЧНОСТИ СЧИТАЕТСЯ ВСЕГДА, а геометрия кольца и полосы — по
+        // тоталу. Это два разных вопроса, и раньше они стояли под одними
+        // воротами.
+        //
+        // `timerColorBand()` отдаёт `overtime` при отрицательных секундах ДО
+        // всякого обращения к тоталу (renderer-shared.js), поэтому цифрам,
+        // флипу и аналогу минус краснеет и при тотале 0. Круглому стилю — нет:
+        // его классы ставились ТОЛЬКО внутри ветки `_heroTotal() > 0`. Режим
+        // «до начала» после прошедшей отметки (тотал 0, секунды отрицательные)
+        // — это каждый рабочий день мероприятия: три стиля показывали число
+        // красным, четвёртый, он же стиль по умолчанию, — обычным цветом темы.
+        // Одно состояние, один режим, два ответа.
+        //
+        // Аргумент — геройское число: полоса красит progressRing и timeDisplay,
+        // то есть сам видимый герой и кольцо вокруг него, и обязана совпадать с
+        // тем, что показывают цифры, а не с сырым остатком доклада.
+        const band = this._colorBand(this._heroSeconds());
+
         // Ворота на геройском тотале, а не на сыром this.totalSeconds: у
         // режима «до конца» тотал — длина мероприятия, и он может быть
         // положительным даже когда у таймера доклада нет пресета
         // (totalSeconds === 0). Сырые ворота в этом случае гасили бы кольцо
         // и полосу прогресса, хотя calculateProgressValue() и _colorBand()
-        // ниже уже честно считают от того же геройского тотала — тот же
+        // уже честно считают от того же геройского тотала — тот же
         // класс дефекта, что был исправлен в точках вызова _colorBand()/
         // flipCells() 08.09.2026.
         if (this._heroTotal() > 0) {
@@ -2819,63 +2869,56 @@ class DisplayTimer {
             if (this.displayProgressFill) {
                 this.displayProgressFill.style.width = ((1 - ratio) * 100) + '%';
             }
-
-            // Цветовые предупреждения. Аргумент — геройское число: эта полоса
-            // красит progressRing и timeDisplay (стиль «Круг»), то есть сам
-            // видимый герой и кольцо вокруг него, и обязана совпадать с тем,
-            // что показывают цифры, а не с сырым остатком доклада.
-            const band = this._colorBand(this._heroSeconds());
-
-            // Полосу красит КЛАСС на <body>, а не инлайн: цвет в этом проекте
-            // принадлежит каскаду. Полоса лежит вне всех пяти контейнеров
-            // стилей, поэтому и класс общий, на body.
-            document.body.classList.toggle('overtime', band === 'overtime');
-            document.body.classList.toggle('warning', band === 'warning');
-            document.body.classList.toggle('danger', band === 'danger');
-
-            this.progressRing.classList.remove('warning', 'danger', 'overtime');
-            this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
-
-            // Комментарий «CSS class alone may be insufficient» описывал
-            // следствие, а не причину: класса не хватало ровно потому, что
-            // applyColors писала цвет темы ИНЛАЙНОМ и била его. Теперь тема
-            // приходит переменной, и класса достаточно.
-            if (band === 'overtime') {
-                this.progressRing.classList.add('danger', 'overtime');
-                this.timeDisplay.classList.add('danger', 'overtime');
-            } else if (band === 'danger') {
-                this.progressRing.classList.add('danger');
-                this.timeDisplay.classList.add('danger');
-            } else if (band === 'warning') {
-                this.progressRing.classList.add('warning');
-                this.timeDisplay.classList.add('warning');
-            }
         } else {
             this.progressRing.style.strokeDashoffset = this.circumference;
-            // Без пресета (totalSeconds === 0) полос danger/warning быть не может,
-            // но раньше эта ветка не снимала ни классы, ни инлайновый цвет — после
-            // перерасхода круглый стиль оставался красным.
-            this.progressRing.classList.remove('warning', 'danger', 'overtime');
-            this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
 
-            // Раунд 1 фикса: полоса по нижнему краю (.display-progress-fill) и
-            // классы overtime/warning/danger на <body> — ОБЩИЕ для всех пяти
-            // стилей (display.css:1754-1770), а не собственность круглого
-            // стиля, как progressRing/timeDisplay выше. До гейта на
-            // _heroTotal() эта ветка вообще не могла сработать, пока у
-            // таймера доклада был пресет, — и стирать оказалось нечего.
-            // Теперь может: оператор переключает heroMode на «Текущее время»
-            // или «До начала» посреди перерасхода доклада (heroTotal() там
-            // всегда 0), кэш прогресса сбрасывается на смене режима, и без
-            // явной очистки красная полоса на 90% и body.danger оставались
-            // бы на экране на весь перерыв, хотя герой уже показывает часы.
             // Ветка обязана СТЕРЕТЬ след таймера доклада, а не просто не
             // рисовать новый — «не покрасить» и «стереть прежнюю краску» это
-            // не одно и то же действие.
+            // не одно и то же действие. Полоса по нижнему краю
+            // (.display-progress-fill) ОБЩАЯ для всех пяти стилей
+            // (display.css:1754-1770), а не собственность круглого стиля, как
+            // progressRing выше. До гейта на _heroTotal() эта ветка вообще не
+            // могла сработать, пока у таймера доклада был пресет, — и стирать
+            // оказывалось нечего. Теперь может: оператор переключает heroMode
+            // на «Текущее время» или «До начала» посреди перерасхода доклада
+            // (heroTotal() там всегда 0), кэш прогресса сбрасывается на смене
+            // режима, и без явной очистки красная полоса на 90% оставалась бы
+            // на экране на весь перерыв, хотя герой уже показывает часы.
+            //
+            // Классы полосы здесь НЕ снимаются: их ставит и снимает общий
+            // блок ниже, одинаково в обеих ветках. Снимать их тут значило бы
+            // снова завести второго владельца цвета — того самого, из-за
+            // которого круг не краснел в «до начала».
             if (this.displayProgressFill) {
                 this.displayProgressFill.style.width = '0%';
             }
-            document.body.classList.remove('overtime', 'warning', 'danger');
+        }
+
+        // Полосу красит КЛАСС на <body>, а не инлайн: цвет в этом проекте
+        // принадлежит каскаду. Полоса лежит вне всех пяти контейнеров
+        // стилей, поэтому и класс общий, на body. toggle() с явным вторым
+        // аргументом одновременно и красит, и СТИРАЕТ — отдельной ветки
+        // очистки этим трём классам не нужно.
+        document.body.classList.toggle('overtime', band === 'overtime');
+        document.body.classList.toggle('warning', band === 'warning');
+        document.body.classList.toggle('danger', band === 'danger');
+
+        this.progressRing.classList.remove('warning', 'danger', 'overtime');
+        this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
+
+        // Комментарий «CSS class alone may be insufficient» описывал
+        // следствие, а не причину: класса не хватало ровно потому, что
+        // applyColors писала цвет темы ИНЛАЙНОМ и била его. Теперь тема
+        // приходит переменной, и класса достаточно.
+        if (band === 'overtime') {
+            this.progressRing.classList.add('danger', 'overtime');
+            this.timeDisplay.classList.add('danger', 'overtime');
+        } else if (band === 'danger') {
+            this.progressRing.classList.add('danger');
+            this.timeDisplay.classList.add('danger');
+        } else if (band === 'warning') {
+            this.progressRing.classList.add('warning');
+            this.timeDisplay.classList.add('warning');
         }
     }
 
@@ -2981,8 +3024,25 @@ class DisplayTimer {
         this._intervals.push(this.flashInterval);
     }
 
+    /**
+     * ЕДИНСТВЕННОЕ место, где дисплей выбирает форматтер.
+     *
+     * Часы и длительность НЕ МОГУТ делить одно написание. Длительность идёт
+     * коротким `formatTimeShort` («05:00» — пять минут, и «00:05:00» на весь
+     * экран не нужно), показания часов — всегда полным `formatTime`, ЧЧ:ММ:СС.
+     * Иначе в 00:30:15 герой под подписью «Текущее время» показывает залу
+     * «30:15» (короткий форматтер выбрасывает нулевую группу часов), а в
+     * 09:05:07 — «9:05:07» рядом с «09:05:07» на плашке в углу: одна величина,
+     * два написания, один экран.
+     *
+     * Спрашиваем РЕЕСТР (`HeroModes.isClockMode`), а не сравниваем режим со
+     * строкой: признак «это часы» принадлежит режиму, и второй его копии
+     * здесь не заводится.
+     */
     formatTime(seconds) {
-        return window.TimeUtils.formatTimeShort(seconds);
+        return window.HeroModes.isClockMode(this.heroMode)
+            ? window.TimeUtils.formatTime(seconds)
+            : window.TimeUtils.formatTimeShort(seconds);
     }
 
     // ===== Block Controls: Ctrl+Scale, Alt+Drag =====

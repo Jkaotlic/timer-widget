@@ -103,8 +103,30 @@ test('heroTotal: конец не позже начала даёт ноль, а �
 });
 
 test('у каждого режима, кроме таймера, есть свой ключ подписи', () => {
-    const withKeys = HeroModes.HERO_MODES.filter((m) => m.labelKey).map((m) => m.labelKey);
-    assert.deepEqual(withKeys, HeroModes.HERO_LABEL_KEYS);
-    assert.equal(HeroModes.HERO_LABEL_KEYS.length, 3);
-    assert.equal(new Set(HeroModes.HERO_LABEL_KEYS).size, 3);
+    // Против ОЖИДАЕМЫХ ИМЁН, а не против того же `filter().map()`, которым
+    // HERO_LABEL_KEYS и определяется в модуле: такое сравнение не может
+    // провалиться ни при каком содержимом реестра — оно сравнивает выражение с
+    // самим собой. Имена несущие: под ними ключи лежат в settings-schema.js, в
+    // payload панели и в id полей разметки, и переименование одного из них
+    // обязано уронить тест здесь, а не молча разорвать проводку.
+    assert.deepEqual(HeroModes.HERO_LABEL_KEYS,
+        ['labelHeroCurrent', 'labelHeroToStart', 'labelHeroToEnd']);
+    assert.equal(HeroModes.HERO_MODES.filter((m) => m.labelKey).length, 3,
+        'ключей подписи не три — реестр и HERO_LABEL_KEYS разошлись');
+    assert.equal(HeroModes.modeById('timer').labelKey, null,
+        'у режима таймера завёлся ключ подписи — владелец подписи там другой');
+});
+
+test('часы — единственный режим, у которого число это ПОКАЗАНИЯ, а не длительность', () => {
+    // Признак живёт в реестре, потому что от него зависит написание: часам
+    // положен formatTime (всегда ЧЧ:ММ:СС), длительности — formatTimeShort.
+    // Спутать их значит показать залу «30:15» в 00:30:15.
+    assert.equal(HeroModes.isClockMode('current'), true);
+    for (const id of ['timer', 'to-start', 'to-end']) {
+        assert.equal(HeroModes.isClockMode(id), false, `режим ${id} объявлен часами`);
+    }
+    // Мусор ведёт себя как режим по умолчанию, а не как часы.
+    for (const junk of [undefined, null, '', 'to-mars', 42, {}]) {
+        assert.equal(HeroModes.isClockMode(junk), false);
+    }
 });

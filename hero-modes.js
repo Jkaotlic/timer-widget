@@ -34,12 +34,17 @@ const HeroLayouts = (typeof window !== 'undefined' && window.DisplayLayouts)
  * `caption: null` у таймера — не «подписи нет», а «подпись принадлежит другому
  * владельцу»: её пишет updateChipState() по состоянию таймера («Осталось» /
  * «Пауза» / «Завершено»). Вызывающий обязан отличать null от пустой строки.
+ *
+ * `clock: true` — «это ПОКАЗАНИЯ ЧАСОВ, а не длительность». Числа у них
+ * одинаковые (секунды), а вот печатаются они по-разному, и знание об этом
+ * обязано жить ЗДЕСЬ, а не размножаться по местам показа: см. разбор у
+ * `isClockMode()`.
  */
 const HERO_MODES = [
-    { id: 'timer', caption: null, labelKey: null },
-    { id: 'current', caption: 'Текущее время', labelKey: 'labelHeroCurrent' },
-    { id: 'to-start', caption: 'До начала мероприятия', labelKey: 'labelHeroToStart' },
-    { id: 'to-end', caption: 'До конца мероприятия', labelKey: 'labelHeroToEnd' }
+    { id: 'timer', caption: null, labelKey: null, clock: false },
+    { id: 'current', caption: 'Текущее время', labelKey: 'labelHeroCurrent', clock: true },
+    { id: 'to-start', caption: 'До начала мероприятия', labelKey: 'labelHeroToStart', clock: false },
+    { id: 'to-end', caption: 'До конца мероприятия', labelKey: 'labelHeroToEnd', clock: false }
 ];
 
 const HERO_MODE_IDS = HERO_MODES.map((mode) => mode.id);
@@ -51,6 +56,30 @@ const SECONDS_PER_DAY = 86400;
 /** Режим по id; мусор и отсутствие дают режим по умолчанию. */
 function modeById(id) {
     return HERO_MODES.find((mode) => mode.id === id) || HERO_MODES[0];
+}
+
+/**
+ * Часы это или длительность.
+ *
+ * ЧАСЫ И ДЛИТЕЛЬНОСТЬ НЕ МОГУТ ДЕЛИТЬ ФОРМАТТЕР. Длительность печатается
+ * коротко и без ведущих нулей (`formatTimeShort`): «05:00» — это пять минут, и
+ * писать «00:05:00» на весь экран незачем. Часы так печатать НЕЛЬЗЯ: в 00:30:15
+ * короткий форматтер выбрасывает группу часов и выдаёт «30:15», а зал под
+ * подписью «Текущее время» читает это как получасовой отсчёт; в 09:05:07 он же
+ * теряет ведущий ноль и выдаёт «9:05:07» рядом с «09:05:07» на плашке в углу —
+ * одна величина, два написания, один экран. Часам положен `formatTime`, всегда
+ * ЧЧ:ММ:СС.
+ *
+ * Замечено 08.09.2026 финальным ревью ветки: вся она писалась в 15:xx–16:xx,
+ * когда `formatTimeShort` и `formatTime` на показаниях часов совпадают, и
+ * дефекта не видел никто — включая e2e, зелёную ровно по той же причине.
+ *
+ * Признак живёт в реестре, а не предикатом `mode === 'current'` у потребителя:
+ * потребителей у него три (текст героя, «Цифры», число створок флипа), и
+ * пятый режим не должен требовать поиска по коду.
+ */
+function isClockMode(id) {
+    return modeById(id).clock === true;
 }
 
 function heroNumber(value, fallback) {
@@ -129,6 +158,7 @@ const HeroModes = {
     HERO_LABEL_KEYS,
     DEFAULT_MODE,
     modeById,
+    isClockMode,
     heroCaption,
     heroSeconds,
     heroTotal
