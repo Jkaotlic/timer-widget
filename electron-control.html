@@ -700,7 +700,12 @@
                         <!-- Режим центрального времени (08.09.2026). Ряд кнопок ведёт
                              себя как выбор фона ниже: владелец значения — heroMode в
                              панели, кнопки лишь его вид. Поле заголовка одно на четыре
-                             режима — показывается вход того режима, который выбран. -->
+                             режима — показывается вход того режима, который выбран.
+
+                             Сырая разметка совпадает с УМОЛЧАНИЕМ (режим «Таймер»):
+                             ряд заголовка скрыт, пояснение про отчёт о состоянии
+                             видно. Обратный порядок давал вспышку не того состояния
+                             в кадре до того, как setHeroMode('timer') отработает. -->
                         <div class="settings-group" id="heroModeSection">
                             <div class="settings-subtitle">Центральное время</div>
                             <div class="hero-mode-tabs" role="radiogroup" aria-label="Что показывает крупное число">
@@ -709,7 +714,7 @@
                                 <button class="hero-mode-btn" type="button" role="radio" aria-checked="false" data-mode="to-start">До начала</button>
                                 <button class="hero-mode-btn" type="button" role="radio" aria-checked="false" data-mode="to-end">До конца</button>
                             </div>
-                            <div class="toggle-row" id="heroLabelRow">
+                            <div class="toggle-row" id="heroLabelRow" hidden>
                                 <div class="toggle-text">
                                     <label class="toggle-label" for="labelHeroCurrent">Заголовок</label>
                                     <div class="toggle-hint" id="heroLabelHint">Пустое поле вернёт стандартный.</div>
@@ -718,7 +723,7 @@
                                 <input type="text" class="srow-input" id="labelHeroToStart" maxlength="40" hidden>
                                 <input type="text" class="srow-input" id="labelHeroToEnd" maxlength="40" hidden>
                             </div>
-                            <div class="toggle-hint" id="heroTimerLabelNote" hidden>В режиме «Таймер» подпись показывает состояние таймера — «Осталось», «Пауза», «Завершено».</div>
+                            <div class="toggle-hint" id="heroTimerLabelNote">В режиме «Таймер» подпись показывает состояние таймера — «Осталось», «Пауза», «Завершено».</div>
                         </div>
                         <div class="settings-group">
                             <div class="settings-group-title">
