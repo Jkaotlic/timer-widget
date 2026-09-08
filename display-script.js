@@ -2839,6 +2839,25 @@ class DisplayTimer {
             // перерасхода круглый стиль оставался красным.
             this.progressRing.classList.remove('warning', 'danger', 'overtime');
             this.timeDisplay.classList.remove('warning', 'danger', 'overtime');
+
+            // Раунд 1 фикса: полоса по нижнему краю (.display-progress-fill) и
+            // классы overtime/warning/danger на <body> — ОБЩИЕ для всех пяти
+            // стилей (display.css:1754-1770), а не собственность круглого
+            // стиля, как progressRing/timeDisplay выше. До гейта на
+            // _heroTotal() эта ветка вообще не могла сработать, пока у
+            // таймера доклада был пресет, — и стирать оказалось нечего.
+            // Теперь может: оператор переключает heroMode на «Текущее время»
+            // или «До начала» посреди перерасхода доклада (heroTotal() там
+            // всегда 0), кэш прогресса сбрасывается на смене режима, и без
+            // явной очистки красная полоса на 90% и body.danger оставались
+            // бы на экране на весь перерыв, хотя герой уже показывает часы.
+            // Ветка обязана СТЕРЕТЬ след таймера доклада, а не просто не
+            // рисовать новый — «не покрасить» и «стереть прежнюю краску» это
+            // не одно и то же действие.
+            if (this.displayProgressFill) {
+                this.displayProgressFill.style.width = '0%';
+            }
+            document.body.classList.remove('overtime', 'warning', 'danger');
         }
     }
 

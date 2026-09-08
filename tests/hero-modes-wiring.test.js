@@ -118,6 +118,48 @@ test('зонд updateProgress проверяет себя: подделанны�
         'methodBody не ловит даже заведомо плохой исходник');
 });
 
+// --- Раунд 1 фикса Task 5: гейт на _heroTotal() открыл ветку else в режимах
+// current/to-start (heroTotal() там всегда 0 — hero-modes.js), а она снимала
+// классы только с progressRing/timeDisplay. Полоса .display-progress-fill и
+// классы overtime/warning/danger на <body> общие для ВСЕХ пяти стилей
+// (display.css:1754-1770), и без явной очистки застревали: оператор
+// переключает heroMode посреди перерасхода доклада — красная полоса на 90%
+// и body.danger остаются на экране всю смену режима.
+
+test('ветка else в updateProgress() стирает след таймера доклада, а не молчит', () => {
+    const body = methodBody(SRC, 'updateProgress');
+    const elseAt = body.indexOf('} else {');
+    assert.notEqual(elseAt, -1, 'у updateProgress() нет ветки else — тест ищет не то');
+    const elseBody = body.slice(elseAt);
+
+    assert.ok(elseBody.includes("document.body.classList.remove('overtime', 'warning', 'danger')"),
+        'ветка else не снимает overtime/warning/danger с <body> — полоса и подсветка застревают при переключении режима');
+    assert.ok(elseBody.includes("this.displayProgressFill.style.width = '0%'"),
+        'ветка else не сбрасывает ширину .display-progress-fill — полоса застревает с прошлым процентом');
+});
+
+test('зонд ветки else проверяет себя: подделанный исходник без очистки ловится', () => {
+    // Тот же дефект, что был до фикса: ветка else снимает классы только с
+    // progressRing/timeDisplay, про <body> и .display-progress-fill молчит.
+    const fakeSrc = '\nclass X {\n    updateProgress() {\n'
+        + '        if (this._heroTotal() > 0) {\n'
+        + '            this.displayProgressFill.style.width = ratio + \'%\';\n'
+        + '            document.body.classList.toggle(\'danger\', band === \'danger\');\n'
+        + '        } else {\n'
+        + '            this.progressRing.classList.remove(\'warning\', \'danger\', \'overtime\');\n'
+        + '            this.timeDisplay.classList.remove(\'warning\', \'danger\', \'overtime\');\n'
+        + '        }\n'
+        + '    }\n}\n';
+    const body = methodBody(fakeSrc, 'updateProgress');
+    const elseAt = body.indexOf('} else {');
+    assert.notEqual(elseAt, -1, 'зонд сломан: в заведомо плохом исходнике нет ветки else');
+    const elseBody = body.slice(elseAt);
+    assert.ok(!elseBody.includes("document.body.classList.remove('overtime', 'warning', 'danger')"),
+        'зонд не ловит заведомо плохой исходник — регулярка на <body> не работает');
+    assert.ok(!elseBody.includes("this.displayProgressFill.style.width = '0%'"),
+        'зонд не ловит заведомо плохой исходник — регулярка на .display-progress-fill не работает');
+});
+
 // --- Раунд 1 code review: три точки ВЫЗОВА читали сырые поля таймера мимо
 // _heroSeconds()/_heroTotal(), хотя тела вызываемых функций были правильными.
 // Тесты выше проверяли ТЕЛО (_colorBand, updateDisplay) — этого недостаточно:
