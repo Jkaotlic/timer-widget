@@ -240,4 +240,6 @@ function styleToken(name, tone = 'dark') {
     return m[1].trim().replace(/\s+/g, ' ');
 }
 
-module.exports = { maskNonCode, balancedBlockAt, functionBody, constructorBlocks, ipcHandlerBody, codeOnly, styleToken };
+module.exports = {
+    maskNonCode, balancedBlockAt, afterBalanced, functionBody, constructorBlocks, ipcHandlerBody, codeOnly, styleToken
+};

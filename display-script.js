@@ -2488,11 +2488,12 @@ class DisplayTimer {
         const isNegative = secs < 0;
 
         // F-024/refactor: общая логика разбиения на цифры (renderer-shared.flipCells).
-        // Передаём preset (this.totalSeconds), чтобы правило показа часов осталось
-        // `hours > 0 || totalSeconds >= 3600`.
+        // Передаём геройский тотал (this._heroTotal()), чтобы правило показа
+        // часов осталось «hours > 0 || total >= 3600» — но от того тотала,
+        // которому принадлежит показанное число, а не от пресета доклада.
         let cells;
         if (window.RendererShared) {
-            cells = window.RendererShared.flipCells(secs, this.totalSeconds);
+            cells = window.RendererShared.flipCells(secs, this._heroTotal());
         } else {
             const absSecs = Math.abs(secs);
             const hours = Math.floor(absSecs / 3600);
@@ -2505,7 +2506,7 @@ class DisplayTimer {
                 m2: String(mins % 10),
                 s1: String(Math.floor(seconds / 10)),
                 s2: String(seconds % 10),
-                hasHours: hours > 0 || this.totalSeconds >= 3600
+                hasHours: hours > 0 || this._heroTotal() >= 3600
             };
         }
 
@@ -2670,7 +2671,10 @@ class DisplayTimer {
     updateDigitsScale() {
         if (!this.timerDigits || !this.digitsTime || !this._digitsFontsReady) { return; }
 
-        const hasHours = Math.abs(Math.floor(this.remainingSeconds)) >= 3600;
+        // Проба меряется от ГЕРОЙСКОГО числа: в режиме «Текущее время» герой —
+        // это часы вида «13:40:07», а не остаток доклада, и проба обязана
+        // резервировать место под ту же ширину, что реально печатается.
+        const hasHours = Math.abs(Math.floor(this._heroSeconds())) >= 3600;
         // measureDigits() принимает ЯВНУЮ эталонную строку, не булев hasHours —
         // выбор строки остаётся здесь, у потребителя.
         const probeText = hasHours ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
@@ -2756,8 +2760,11 @@ class DisplayTimer {
                 this.displayProgressFill.style.width = ((1 - ratio) * 100) + '%';
             }
 
-            // Цветовые предупреждения
-            const band = this._colorBand(Math.floor(this.remainingSeconds));
+            // Цветовые предупреждения. Аргумент — геройское число: эта полоса
+            // красит progressRing и timeDisplay (стиль «Круг»), то есть сам
+            // видимый герой и кольцо вокруг него, и обязана совпадать с тем,
+            // что показывают цифры, а не с сырым остатком доклада.
+            const band = this._colorBand(this._heroSeconds());
 
             // Полосу красит КЛАСС на <body>, а не инлайн: цвет в этом проекте
             // принадлежит каскаду. Полоса лежит вне всех пяти контейнеров
