@@ -13,6 +13,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const Module = require('node:module');
 
 const repoRoot = path.join(__dirname, '..');
@@ -444,6 +446,22 @@ for (const c of REOPEN_CASES) {
 // --- Журнал докладов -------------------------------------------------------
 
 /**
+ * Поддельный отправитель IPC — то, чем для главного процесса является окно.
+ *
+ * Обработчики, которые ОТВЕЧАЮТ спросившему, без него проверить нельзя:
+ * `loadMain` окон не создаёт, и ответ уходил бы в никуда. Записанное сюда
+ * попадает в тот же журнал `sent`, что и обычная рассылка.
+ */
+function fakeEvent(stubs) {
+    return {
+        sender: {
+            isDestroyed: () => false,
+            send: (channel, payload) => { stubs.sent.push({ channel, payload }); }
+        }
+    };
+}
+
+/**
  * Остановить таймер после теста.
  *
  * С разрешённым минусом таймер не останавливается сам НИКОГДА — в этом весь
@@ -534,4 +552,79 @@ test('«Новое мероприятие» очищает журнал вмес
     assert.equal(payload.overrunSeconds, 0);
     assert.equal(payload.talksCount, 0);
     stopTimer(stubs);
+});
+
+// --- Выгрузка отчёта -------------------------------------------------------
+
+test('event-export пишет НАСТОЯЩИЙ файл и отвечает результатом', async () => {
+    // Файл пишется на диск по-настоящему, во временный каталог: подменять `fs`
+    // целиком нельзя — его же используют хранилище и восстановление, и
+    // подставка вместо него сделала бы проверку разговором с самой собой.
+    // Подменяется только диалог, то есть ровно то, что требует человека с мышью.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'export-'));
+    const target = path.join(dir, 'отчёт.csv');
+    const stubs = createStubs();
+    stubs.electron.dialog = {
+        showSaveDialog: async () => ({ canceled: false, filePath: target })
+    };
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    try {
+        await runOvertimeTalk(stubs);
+        stubs.ipcHandlers.get('event-finish')(null);
+        stopTimer(stubs);
+
+        stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+        await new Promise((r) => setTimeout(r, 120));
+
+        assert.ok(fs.existsSync(target), 'файл обязан появиться на диске');
+        const csv = fs.readFileSync(target, 'utf8');
+        assert.match(csv, /Итого/);
+        assert.equal(csv.charCodeAt(0), 0xFEFF, 'без BOM Excel прочтёт кириллицу как мусор');
+
+        const answer = stubs.lastSent('event-export-done');
+        assert.ok(answer, 'панель обязана узнать результат — молчание она показать не может');
+        assert.equal(answer.ok, true);
+        assert.equal(answer.path, target);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('отмена диалога — не ошибка', async () => {
+    // Человек передумал. Тост про ошибку в этом месте — враньё.
+    const stubs = createStubs();
+    stubs.electron.dialog = {
+        showSaveDialog: async () => ({ canceled: true, filePath: undefined })
+    };
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+    await new Promise((r) => setTimeout(r, 120));
+
+    const answer = stubs.lastSent('event-export-done');
+    assert.equal(answer.ok, false);
+    assert.equal(answer.canceled, true);
+    assert.ok(!answer.error, 'отмена не должна выглядеть поломкой');
+});
+
+test('ошибка записи доходит до панели, а не тонет в логе', async () => {
+    // Молчаливый выход здесь уже стоил проекту отдельной сессии: человек жмёт
+    // кнопку, ничего не происходит, и почему — не сказано нигде.
+    const stubs = createStubs();
+    stubs.electron.dialog = {
+        // Каталога не существует — запись обязана провалиться.
+        showSaveDialog: async () => ({ canceled: false, filePath: '/нет/такого/пути/отчёт.csv' })
+    };
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+    await new Promise((r) => setTimeout(r, 120));
+
+    const answer = stubs.lastSent('event-export-done');
+    assert.equal(answer.ok, false);
+    assert.ok(answer.error, 'причина отказа обязана дойти до человека');
 });

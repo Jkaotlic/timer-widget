@@ -502,6 +502,27 @@ const PanelDisplayMixin = {
             actions.appendChild(cell);
         }
         section.appendChild(actions);
+
+        // Выгрузка стоит ОТДЕЛЬНО от двух действий выше и намеренно не похожа
+        // на них: те необратимы и спрашивают подтверждение, а эта ничего не
+        // меняет — она только читает то, что уже накоплено. Одинаковый вид
+        // заставлял бы бояться её так же, как соседних.
+        const exportCell = document.createElement('div');
+        exportCell.className = 'floor47-action';
+        const exportBtn = document.createElement('button');
+        exportBtn.type = 'button';
+        exportBtn.className = 'reset-btn';
+        exportBtn.id = 'eventExportBtn';
+        exportBtn.textContent = 'Выгрузить отчёт';
+        const exportHint = document.createElement('div');
+        exportHint.className = 'toggle-hint';
+        exportHint.id = 'eventExportBtnHint';
+        exportHint.textContent = 'Файл CSV: дата, перелимит каждого доклада и общий итог.';
+        exportBtn.setAttribute('aria-describedby', exportHint.id);
+        exportCell.appendChild(exportBtn);
+        exportCell.appendChild(exportHint);
+        section.appendChild(exportCell);
+
         section.appendChild(row('Показывать этот раздел', 'floor47Unlocked', toggle('floor47Unlocked')));
         mount.appendChild(section);
 
@@ -563,6 +584,7 @@ const PanelDisplayMixin = {
         this.floor47SectionEl = document.getElementById('floor47Section');
         this.eventStatusEl = document.getElementById('eventStatus');
         this.eventFinishBtnEl = document.getElementById('eventFinishBtn');
+        this.eventExportBtnEl = document.getElementById('eventExportBtn');
 
         // Накопитель панель не ХРАНИТ — она держит последнее присланное
         // состояние, чтобы было из чего собрать отчёт. Значения по умолчанию
@@ -661,6 +683,33 @@ const PanelDisplayMixin = {
             window.Toast.show('Новое мероприятие — итог обнулён', 'success');
         });
 
+        // Выгрузка НЕ проходит через confirmable: подтверждения в этом проекте
+        // спрашивают необратимые действия, а лишний вопрос учит человека жать
+        // «Да» не читая — и тогда подтверждение перестаёт защищать там, где
+        // оно нужно.
+        if (this.eventExportBtnEl) {
+            this.eventExportBtnEl.addEventListener('click', () => {
+                window.ipcRenderer.send('event-export');
+            });
+        }
+
+        // Ответ обязателен в любом исходе: кнопка, после которой ничего не
+        // происходит и ничего не сказано, читается как сломанное окно. Отмена
+        // диалога — не событие: человек передумал, и тост об этом был бы шумом.
+        window.ipcRenderer.on('event-export-done', (_event, result) => {
+            const answer = result || {};
+            if (answer.canceled) { return; }
+            if (answer.ok) {
+                const rows = Number(answer.rows) || 0;
+                window.Toast.show(
+                    rows > 0 ? `Отчёт сохранён · докладов: ${rows}` : 'Отчёт сохранён',
+                    'success'
+                );
+                return;
+            }
+            window.Toast.show(`Отчёт не сохранён: ${answer.error || 'неизвестная причина'}`, 'error');
+        });
+
         this.renderFloor47();
     },
 
@@ -689,6 +738,12 @@ const PanelDisplayMixin = {
             // Завершать завершённое нечего: кнопка, молча ничего не делающая,
             // читается как сломанная.
             this.eventFinishBtnEl.disabled = summary.finished;
+        }
+        if (this.eventExportBtnEl) {
+            // Выгружать нечего, пока мероприятие не набрало ни секунды
+            // перелимита: пустой отчёт — это тот же молчаливый отказ, только
+            // в виде файла.
+            this.eventExportBtnEl.disabled = summary.seconds <= 0;
         }
     },
 

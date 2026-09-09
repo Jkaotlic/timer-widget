@@ -429,3 +429,61 @@ test('панель получает накопитель на ЗАГРУЗКЕ, 
     // Само-проверка зонда: срез обязан покрывать привязки окна.
     assert.ok(body.includes('bindWindowStateSnapshot'), 'зонд смотрит не туда');
 });
+
+// --- Выгрузка отчёта -------------------------------------------------------
+
+test('каналы выгрузки объявлены в обоих списках и в обе стороны', () => {
+    // Правило проекта: канал объявляется в channel-validator.js И в preload.js,
+    // и у него обязаны быть ОБА конца. Белый список — это разрешение, а не
+    // доказательство жизни.
+    assert.ok(VALIDATOR.includes("'event-export'"), 'event-export не разрешён валидатором');
+    assert.ok(PRELOAD.includes("'event-export'"), 'event-export не разрешён preload');
+    assert.ok(VALIDATOR.includes("'event-export-done'"), 'ответ не разрешён валидатором');
+    assert.ok(PRELOAD.includes("'event-export-done'"), 'ответ не разрешён preload');
+    assert.match(MAIN, /ipcMain\.on\('event-export'/, 'у канала нет конца в главном процессе');
+});
+
+test('кнопка выгрузки есть и НЕ выглядит необратимой', () => {
+    // Две одинаковые кнопки рядом обещают равнозначность. «Завершить» и
+    // «Новое мероприятие» необратимы и красятся соответственно; выгрузка
+    // ничего не меняет — и обязана отличаться видом, иначе человек будет
+    // бояться её так же, как соседних.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.match(panel, /eventExportBtn/, 'кнопки выгрузки нет');
+    const idx = panel.indexOf('eventExportBtn');
+    const around = panel.slice(Math.max(0, idx - 400), idx + 400);
+    assert.doesNotMatch(
+        around,
+        /reset-btn-danger/,
+        'безопасное действие не красится как разрушительное'
+    );
+});
+
+test('выгрузка не спрашивает подтверждения', () => {
+    // Подтверждения в этом проекте спрашивают НЕОБРАТИМЫЕ действия. Лишний
+    // вопрос учит человека жать «Да» не читая — и тогда подтверждение
+    // перестаёт защищать там, где оно нужно.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.doesNotMatch(
+        panel,
+        /confirmable\('eventExportBtn'/,
+        'выгрузка ничего не разрушает и подтверждения не требует'
+    );
+    assert.match(panel, /ipcRenderer\.send\('event-export'\)/, 'кнопка обязана слать канал');
+});
+
+test('панель слушает ответ и показывает его человеку', () => {
+    // Кнопка, после которой ничего не происходит и ничего не сказано,
+    // читается как сломанное окно.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.match(panel, /'event-export-done'/, 'ответ никто не слушает');
+    const idx = panel.indexOf("'event-export-done'");
+    const around = panel.slice(idx, idx + 700);
+    assert.match(around, /Toast/, 'результат обязан быть показан');
+});
+
+test('пустое мероприятие гасит кнопку выгрузки', () => {
+    // Выгружать нечего — кнопка неактивна, как и «Завершить» у завершённого.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.match(panel, /eventExportBtnEl\.disabled/, 'состояние кнопки никто не считает');
+});

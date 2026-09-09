@@ -17,8 +17,9 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const log = require('electron-log/main');
 const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
@@ -28,6 +29,7 @@ const { fitScaledBounds, fitRestoredBounds } = require('./window-geometry');
 const recovery = require('./recovery');
 const MoneyMeter = require('./money-meter');
 const OverrunStore = require('./event-overrun-store');
+const EventReport = require('./event-report');
 
 // Logger setup
 log.initialize();
@@ -1921,6 +1923,64 @@ ipcMain.on('event-finish', () => {
     liveOverrunSeconds = 0;
     persistEventOverrun();
     broadcastEventOverrun();
+});
+
+// Выгрузить отчёт о перелимите файлом.
+//
+// Payload нет: и журнал, и итог живут ЗДЕСЬ, а ставка с названием мероприятия
+// приходят в `lastDisplaySettings` тем же каналом, что и остальные настройки
+// дисплея. Присланные окном значения спорили бы с этими — и отчёт разошёлся бы
+// с тем, что показано на экране.
+//
+// Ответ обязателен в любом исходе. Кнопка, после которой ничего не происходит
+// и ничего не сказано, читается как сломанное окно; молчаливый выход в этом
+// проекте уже стоил отдельной сессии разбора.
+ipcMain.on('event-export', async (event) => {
+    const answer = (payload) => {
+        safelySendToWindow(controlWindow, 'event-export-done', payload);
+        // Отвечаем и тому, кто спросил: канал может позвать не только панель.
+        if (event && event.sender && !event.sender.isDestroyed()) {
+            try { event.sender.send('event-export-done', payload); } catch { /* окно закрылось */ }
+        }
+    };
+
+    try {
+        const settings = lastDisplaySettings || {};
+        const report = EventReport.buildReportCSV({
+            talks: eventOverrun.talks,
+            // Итог берётся тот же, что показан на экране: накопленное плюс
+            // текущий минус, если мероприятие ещё идёт.
+            overrunSeconds: MoneyMeter.totalSeconds(
+                eventOverrun.overrunSeconds,
+                eventOverrun.finished ? 0 : timerState.remainingSeconds,
+                excludedLiveSeconds
+            ),
+            finished: eventOverrun.finished,
+            title: settings.eventTitle,
+            price: settings.overrunPrice,
+            period: settings.overrunPeriod,
+            now: new Date()
+        });
+
+        const stamp = new Date().toISOString().slice(0, 10);
+        const result = await dialog.showSaveDialog({
+            title: 'Сохранить отчёт о перелимите',
+            defaultPath: `перелимит-${stamp}.csv`,
+            filters: [{ name: 'CSV', extensions: ['csv'] }]
+        });
+
+        if (!result || result.canceled || !result.filePath) {
+            answer({ ok: false, canceled: true });
+            return;
+        }
+
+        fs.writeFileSync(result.filePath, report.csv, 'utf8');
+        log.info(`[export] отчёт записан: ${result.filePath} (${report.rows} строк)`);
+        answer({ ok: true, canceled: false, path: result.filePath, rows: report.rows });
+    } catch (err) {
+        log.error('[export] отчёт не записан:', err);
+        answer({ ok: false, canceled: false, error: (err && err.message) || String(err) });
+    }
 });
 
 // Начать новое мероприятие: обнулить накопитель. Необратимо — подтверждение

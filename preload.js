@@ -54,6 +54,7 @@ const ALLOWED_CHANNELS = {
         // спорила бы с ней. «Заверши» закрывает текущий перелимит и
         // замораживает итог, «начни новое» обнуляет накопитель.
         'event-finish',
+        'event-export',
         'event-reset',
         // Дубль из channel-validator.js — sandbox запрещает здесь require().
         // Оба списка обязаны совпадать, это проверяет channel-validator.test.js.
@@ -91,6 +92,7 @@ const ALLOWED_CHANNELS = {
         // окно, и поправленная посреди мероприятия она обязана пересчитать
         // накопленное). Адресат один — дисплей.
         'event-overrun-state',
+        'event-export-done',
         'window-geometry',
         'ui-theme-update',
         'ui-lock-update',
