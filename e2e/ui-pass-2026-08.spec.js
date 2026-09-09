@@ -1,5 +1,9 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+// Окна ждут ОПРОСОМ с дедлайном, а не событием 'window': событие приходит
+// ровно раз и теряется, если окно успело открыться между возвратом из
+// click() и подпиской — тест после этого висит до таймаута.
+const { waitForWidget, waitForClock, waitForDisplay } = require('./window-ready');
 
 /**
  * Замеры UI-прохода от 07.08.2026 — то, что картинкой не поймать.
@@ -24,7 +28,7 @@ function handAngle(id) {
 test('часовая стрелка виджета движется', async () => {
     const { app, control } = await launchApp();
     await control.click('#openWidgetBtn');
-    const widget = await app.waitForEvent('window');
+    const widget = await waitForWidget(app);
     await widget.waitForLoadState('domcontentloaded');
 
     // Стиль переключаем ЧЕРЕЗ интерфейс: контейнеры стилей скрыты и
@@ -61,7 +65,7 @@ test('деления циферблата виджета стоят на одн�
     // висели выше горизонтальной оси — замер давал 23.5px на кадре 800px.
     const { app, control } = await launchApp();
     await control.click('#openWidgetBtn');
-    const widget = await app.waitForEvent('window');
+    const widget = await waitForWidget(app);
     await widget.waitForLoadState('domcontentloaded');
 
     await control.click('.wrow-chevron[data-tab="timer"]');
@@ -106,7 +110,7 @@ test('в светлой теме часы читаемы: стрелки, циф
     // поэтому картинкой это не проверить в принципе — только замером.
     const { app, control } = await launchApp();
     await control.click('#openClockBtn');
-    const clock = await app.waitForEvent('window');
+    const clock = await waitForClock(app);
     await clock.waitForLoadState('domcontentloaded');
 
     // Дефолт после редизайна 2026-08-12 — СВЕТЛАЯ тема, поэтому переключать
@@ -128,7 +132,14 @@ test('в светлой теме часы читаемы: стрелки, циф
             flipCard: cs('.widget-flip-inner')?.backgroundImage || '',
             // Первый стоп градиента — верхняя половина створки.
             flipCardTop: (cs('.widget-flip-inner')?.backgroundImage || '').slice(0, 80),
-            seconds: cs('.time-display .clock-seconds')?.opacity || ''
+            // Отсутствие элемента и его прозрачность — РАЗНЫЕ ответы, и
+            // склеивать их в `|| ''` нельзя: `Number('')` даёт 0, то есть
+            // «секунд в разметке нет» читалось как «секунды невидимы».
+            // Именно так выглядело падение, когда соседняя спека оставила в
+            // общем профиле выключённый показ секунд.
+            seconds: document.querySelector('.time-display .clock-seconds')
+                ? cs('.time-display .clock-seconds').opacity
+                : null
         };
     });
 
@@ -157,6 +168,11 @@ test('в светлой теме часы читаемы: стрелки, циф
         .not.toMatch(/255,\s*255,\s*255/);
     expect(seen.flipCard, 'табло флипа в светлой теме обязано быть светлым').toMatch(/gradient/);
     expect(seen.flipCardTop, 'верхняя половина табло обязана быть светлой').toMatch(/2[0-5][0-9],\s*2[0-5][0-9],\s*2[0-5][0-9]/);
+    expect(
+        seen.seconds,
+        'секунд нет в разметке часов: показ секунд выключен в общем профиле e2e — '
+        + 'какая-то спека вернула не умолчание. Это не про светлую тему'
+    ).not.toBeNull();
     expect(Number(seen.seconds)).toBeCloseTo(0.62, 2);
 
     // Тема живёт в localStorage, а профиль e2e ОДИН на весь прогон (иначе
@@ -172,7 +188,7 @@ test('в светлой теме часы читаемы: стрелки, циф
 test('кольцо дисплея стоит в центре окна, чип не наезжает на подсказку', async () => {
     const { app, control } = await launchApp();
     await control.click('#openDisplayBtn');
-    const display = await app.waitForEvent('window');
+    const display = await waitForDisplay(app);
     await display.waitForLoadState('domcontentloaded');
     await display.waitForSelector('.timer-ring');
     await display.waitForTimeout(500);

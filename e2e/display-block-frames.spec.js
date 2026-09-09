@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, reopenDisplay } = require('./window-ready');
 
 /**
  * Просьба 19.08.2026, три части — и все три про то, ЧТО НАРИСОВАНО:
@@ -269,10 +269,7 @@ test('верхний ряд блоков выровнен: подписи на �
             localStorage.removeItem('displayBlockScales');
             localStorage.removeItem('displayBlockScale');
         });
-        await control.evaluate(() => window.ipcRenderer.send('close-display'));
-        await control.waitForTimeout(900);
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const disp = await waitForDisplay(app);
+        const disp = await reopenDisplay(app, control, { displayIndex: 0 });
         await control.waitForTimeout(2500);
 
         await control.click('.tab-btn[data-tab="display"]');

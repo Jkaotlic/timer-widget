@@ -94,6 +94,51 @@ async function waitForWindow(app, probe, opts = {}) {
     }
 }
 
+/**
+ * Дождаться, пока окно ИСЧЕЗНЕТ.
+ *
+ * Обратная сторона `waitForWindow`, и нужна она ровно так же часто: закрытие
+ * окна дисплея не мгновенно. Оно полноэкранное, и `closeDisplayWindow()` в
+ * главном процессе сначала выходит из полноэкранного режима, ждёт события
+ * `leave-full-screen` и только потом закрывает — иначе macOS роняет всё
+ * приложение (разбор — в electron-main.js). Пока идёт этот переход, окно
+ * отвечает на пробу как живое.
+ *
+ * Спеки ждали здесь паузой (`waitForTimeout(800)`), и это та же ставка на
+ * скорость машины, что и при открытии: на загруженном раннере следующая
+ * команда «открыть» приходила в середину закрытия. Ошибка называет, сколько
+ * окон осталось, — «не закрылось за N мс» без числа диагностировать нечем.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {Function} probe — выполняется В ОКНЕ, отвечает true/false
+ * @param {{timeout?: number, name?: string}} [opts]
+ * @returns {Promise<void>}
+ */
+async function waitForWindowGone(app, probe, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const name = opts.name || 'окно';
+    const deadline = Date.now() + timeout;
+
+    for (;;) {
+        const page = await findWindowBy(app, probe);
+        if (!page) { return; }
+        if (Date.now() >= deadline) {
+            throw new Error(`${name} не закрылось за ${timeout} мс: окон открыто ${app.windows().length}`);
+        }
+        await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+}
+
+/** Дождаться закрытия окна дисплея. */
+function waitForDisplayGone(app, opts = {}) {
+    return waitForWindowGone(app, DISPLAY_PROBE, Object.assign({ name: 'окно дисплея' }, opts));
+}
+
+/** Дождаться закрытия окна виджета. */
+function waitForWidgetGone(app, opts = {}) {
+    return waitForWindowGone(app, WIDGET_PROBE, Object.assign({ name: 'окно виджета' }, opts));
+}
+
 /** @returns {Promise<import('@playwright/test').Page>} окно дисплея */
 function waitForDisplay(app, opts = {}) {
     return waitForWindow(app, DISPLAY_PROBE, Object.assign({ name: 'окно дисплея' }, opts));
@@ -126,8 +171,41 @@ async function openDisplay(app, control, opts = {}) {
     return waitForDisplay(app, opts);
 }
 
+/**
+ * Закрыть дисплей и ДОЖДАТЬСЯ, что он закрылся.
+ *
+ * Пара к `openDisplay`, и без неё переоткрытие ненадёжно с обеих сторон:
+ * `waitForDisplay`, позванный сразу после команды «закрыть», находит СТАРОЕ
+ * окно — проба в нём ещё сходится, — и спека продолжает работать со ссылкой на
+ * окно, которое вот-вот исчезнет («Target page, context or browser has been
+ * closed» в середине следующего замера).
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control — окно панели
+ * @param {{timeout?: number}} [opts]
+ */
+async function closeDisplay(app, control, opts = {}) {
+    await control.evaluate(() => window.ipcRenderer.send('close-display'));
+    await waitForDisplayGone(app, opts);
+}
+
+/**
+ * Переоткрыть дисплей: закрыть, дождаться закрытия, открыть, дождаться готовности.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control — окно панели
+ * @param {{displayIndex?: number|string, timeout?: number, selector?: string}} [opts]
+ * @returns {Promise<import('@playwright/test').Page>} новое окно дисплея
+ */
+async function reopenDisplay(app, control, opts = {}) {
+    await closeDisplay(app, control, opts);
+    return openDisplay(app, control, opts);
+}
+
 module.exports = {
-    openDisplay, waitForDisplay, waitForWidget, waitForClock, waitForWindow,
+    openDisplay, closeDisplay, reopenDisplay,
+    waitForDisplay, waitForWidget, waitForClock, waitForWindow,
+    waitForWindowGone, waitForDisplayGone, waitForWidgetGone,
     findDisplay, findWindowBy,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

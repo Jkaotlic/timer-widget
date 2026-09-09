@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, reopenDisplay } = require('./window-ready');
 
 /**
  * Блоки дисплея: у каждого свой тумблер, каждый тащится и закрывается крестиком.
@@ -225,10 +225,7 @@ test('подпись над таймером и плашка состояния:
         expect(g.labelText, 'текст подписи потерялся').toBe(before.labelText);
 
         // 5. Позиция переживает переоткрытие окна.
-        await control.evaluate(() => window.ipcRenderer.send('close-display'));
-        await control.waitForTimeout(900);
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        display = await waitForDisplay(app);
+        display = await reopenDisplay(app, control);
         await control.waitForTimeout(2500);
         const reopened = await display.evaluate(geometry);
         console.log(`после переоткрытия: окно ${g.vw}×${g.vh} → ${reopened.vw}×${reopened.vh}; `

@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, reopenDisplay } = require('./window-ready');
 
 /**
  * Таймер полноэкранного окна ПЕРЕТАСКИВАЕТСЯ (просьба 24.08.2026: «в
@@ -131,10 +131,7 @@ test('Alt+перетаскивание двигает таймер вместе 
             'подпись отстала от таймера').toBeLessThanOrEqual(8);
 
         // Переоткрытие окна: место сохранено.
-        await control.evaluate(() => window.ipcRenderer.send('close-display'));
-        await control.waitForTimeout(900);
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const reopened = await waitForDisplay(app);
+        const reopened = await reopenDisplay(app, control, { displayIndex: 0 });
         await control.waitForTimeout(2600);
         const restored = await reopened.evaluate(geometry);
         console.log(`   после переоткрытия ${restored.timer.x},${restored.timer.y}`);
@@ -164,7 +161,6 @@ test('Alt+перетаскивание двигает таймер вместе 
 });
 
 test('замок «Закрепить положение» держит и таймер', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
