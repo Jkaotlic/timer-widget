@@ -162,3 +162,48 @@ function fakeDocument() {
     for (const d of Schema.SETTINGS_DESCRIPTORS) { ensure(d.el); if (d.label) { ensure(d.label); } }
     return { getElementById: (id) => (nodes.has(id) ? nodes.get(id) : null) };
 }
+
+test('санитайзер подписи ОДИН, и обе подписи зовут его', () => {
+    // Правило про подпись («стандартное слово — в реестре, пустое поле = верни
+    // стандартное») было записано дважды: одинаковая строка
+    // `custom.replace(/\s+/g, ' ').trim().slice(0, MAX_CAPTION)` жила и в
+    // blockCaption (подписи плашек), и в heroCaption (подпись над героем).
+    // Вторая копия появилась 08.09.2026 вместе с режимами героя и была
+    // отмечена как долг сразу: две копии одного правила расходятся молча —
+    // разойтись им достаточно на одну правку потолка или на один  .
+    //
+    // Владелец — display-layouts.js: там же живёт MAX_CAPTION, от которого
+    // подпись зависит, и hero-modes.js этот модуль уже импортирует.
+    assert.equal(typeof Layouts.sanitizeCaption, 'function', 'общий санитайзер не экспортирован');
+
+    // Поведение, которое обе подписи обязаны разделять.
+    assert.equal(Layouts.sanitizeCaption('  Конец   доклада  ', 'Запас'), 'Конец доклада');
+    assert.equal(Layouts.sanitizeCaption('', 'Запас'), 'Запас', 'пустая строка = верни стандартное');
+    assert.equal(Layouts.sanitizeCaption('   ', 'Запас'), 'Запас', 'одни пробелы = верни стандартное');
+    assert.equal(Layouts.sanitizeCaption(42, 'Запас'), 'Запас', 'не строка = верни стандартное');
+    assert.equal(Layouts.sanitizeCaption(null, 'Запас'), 'Запас');
+    assert.equal(
+        Layouts.sanitizeCaption('я'.repeat(Layouts.MAX_CAPTION + 20), 'Запас').length,
+        Layouts.MAX_CAPTION,
+        'потолок длины обязан действовать'
+    );
+
+    // Точки ВЫЗОВА, а не тело владельца: тело бывает чистым, пока копия живёт
+    // у звонящего (правило проекта, оно уже ловило дефект).
+    const layoutsSrc = codeOnly(read('display-layouts.js'));
+    const heroSrc = codeOnly(read('hero-modes.js'));
+
+    assert.match(heroSrc, /sanitizeCaption\(/, 'heroCaption обязан звать общий санитайзер');
+    const copies = (layoutsSrc + heroSrc).match(/replace\(\/\\s\+\/g,\s*' '\)/g) || [];
+    assert.equal(
+        copies.length, 1,
+        `схлопывание пробелов записано ${copies.length} раз — санитайзер снова размножился`
+    );
+
+    // Проверка себя: зонд обязан УВИДЕТЬ копию, если она есть.
+    const withCopy = layoutsSrc + heroSrc + "const x = s.replace(/\\s+/g, ' ');";
+    assert.equal(
+        (withCopy.match(/replace\(\/\\s\+\/g,\s*' '\)/g) || []).length, 2,
+        'зонд не отличает одну копию от двух — тогда его зелёный ничего не значит'
+    );
+});

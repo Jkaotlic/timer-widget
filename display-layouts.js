@@ -139,7 +139,24 @@ function clampScale(value) {
  */
 function blockCaption(id, custom) {
     const row = DISPLAY_ELEMENTS.find((el) => el.id === id);
-    const fallback = (row && row.caption) || '';
+    return sanitizeCaption(custom, (row && row.caption) || '');
+}
+
+/**
+ * Ввод пользователя → подпись: пробелы схлопнуты, длина обрезана, пустое
+ * значит «верни стандартное».
+ *
+ * Живёт здесь, потому что здесь же живёт MAX_CAPTION, от которого правило
+ * зависит. Зовут отсюда ОБЕ подписи дисплея — плашек (blockCaption) и над
+ * героем (hero-modes.js heroCaption): одинаковая строка санитайза успела
+ * прожить в двух копиях, а две копии одного правила расходятся молча —
+ * достаточно одной правки потолка.
+ *
+ * @param {*} custom      что ввёл пользователь (любой тип: приходит из настроек)
+ * @param {string} fallback стандартное слово из реестра
+ * @returns {string}
+ */
+function sanitizeCaption(custom, fallback) {
     if (typeof custom !== 'string') { return fallback; }
     const clean = custom.replace(/\s+/g, ' ').trim().slice(0, MAX_CAPTION);
     return clean || fallback;
@@ -503,6 +520,7 @@ const DisplayLayouts = {
     SECRET_ELEMENTS,
     MAX_CAPTION,
     blockCaption,
+    sanitizeCaption,
     ELEMENT_IDS,
     LAYOUTS,
     LAYOUT_IDS,

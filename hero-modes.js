@@ -96,9 +96,9 @@ function heroNumber(value, fallback) {
 function heroCaption(id, custom) {
     const mode = modeById(id);
     if (!mode.caption) { return null; }
-    if (typeof custom !== 'string') { return mode.caption; }
-    const clean = custom.replace(/\s+/g, ' ').trim().slice(0, HeroLayouts.MAX_CAPTION);
-    return clean || mode.caption;
+    // Санитайзер ОБЩИЙ с подписями плашек: он и потолок длины принадлежат
+    // display-layouts.js, потому что по подписи считается ширина колонки.
+    return HeroLayouts.sanitizeCaption(custom, mode.caption);
 }
 
 /**
