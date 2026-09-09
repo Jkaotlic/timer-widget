@@ -91,6 +91,7 @@ Rules when working here:
 - `presets.js` — четыре ячейки вида: снимок ЗНАЧЕНИЙ ключей профиля (`PRESET_KEYS`). Без картинки фона и геометрии окон — почему, в модуле
 - `ui-theme.js` — the only owner of `data-theme` and of the tone class `on-light-bg` (`applyTone` / `initTone` / `bindThemeSync`). The pure part is unit-tested; the DOM/storage part loads in all four windows from `<head>`
 - `hero-modes.js` — что показывает КРУПНОЕ число дисплея: реестр четырёх режимов, подписи, секунды и тотал. Режим влияет на цвет ТОЛЬКО через тотал
+- `event-report.js` — отчёт о перелимите в CSV: ЧИСТЫЙ модуль (ни Electron, ни `fs`). Итог берётся из накопителя, а не складывается из строк — расхождение законно (миграция, обрезка журнала) и НАЗЫВАЕТСЯ в самом отчёте; стоимость считает `money-meter.js`
 
 ### Key Patterns
 
