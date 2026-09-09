@@ -190,7 +190,14 @@ async function resetHeroCaptions(control) {
 }
 
 test.describe('режимы центрального времени', () => {
+    // Бюджет времени задан ЯВНО каждому тесту набора, как в block-labels и
+    // crash-recovery. Умолчание 30 с рассчитано на тест внутри одного окна, а
+    // здесь каждый поднимает НАСТОЯЩИЙ Electron и опрашивает окно по условию:
+    // на macOS-раннере, где вся сюита идёт 25 минут, этого не хватает. Замер
+    // 09.09.2026: тест ниже уложился локально, но выпал по таймауту на CI —
+    // зелёный локально не значит зелёный на раннере.
     test('четыре режима дают на экране четыре разных числа', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
@@ -241,6 +248,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('вне режима таймера плашка состояния скрыта при включённом тумблере', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
@@ -265,6 +273,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('«до конца» на прошедшем конце показывает минус и красный', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
@@ -290,6 +299,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('своя подпись героя доезжает и стирается в стандартную', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
@@ -317,6 +327,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('режим переживает переоткрытие окна дисплея', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             await openDisplay(app, control);
@@ -335,6 +346,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('аналоговая стрелка в режиме часов показывает ЧАС, а не долю от 12 часов', async () => {
+        test.setTimeout(120000);
         // Заложенный сюрприз: updateAnalogDisplay() раскладывает ДЛИТЕЛЬНОСТЬ
         // (час за 12 часов). Для настенных часов в 13:40 часовая стрелка
         // обязана встать по %12 — примерно на 50°, а не на 410°. Если замер
@@ -407,6 +419,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('«Цифры» с заведомо двузначным часом не вылезают за рамку', async () => {
+        test.setTimeout(120000);
         // updateDigitsScale() выбирает эталон подгонки по ЧИСЛУ ГЕРОЯ (задача
         // 4: `hasHours = Math.abs(Math.floor(this._heroSeconds())) >= 3600`),
         // но у самого эталона PROBE_HOURS = '8:88:88' — семь знаков,
@@ -571,6 +584,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('уход отметки в будущее СНИМАЕТ красное — оба стиля говорят одно', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
@@ -617,6 +631,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('без тотала нижней полосы нет вовсе', async () => {
+        test.setTimeout(120000);
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
@@ -659,6 +674,7 @@ test.describe('режимы центрального времени', () => {
     });
 
     test('красный таймер доклада не остаётся на экране после ухода в «Текущее время»', async () => {
+        test.setTimeout(120000);
         // Гарантия, добытая раньше и обязанная пережить правку полосы:
         // оператор переключает экран на часы посреди перерасхода доклада, и
         // след таймера обязан быть СТЁРТ, а не просто перестать обновляться.
