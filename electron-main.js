@@ -235,6 +235,16 @@ timerState = timerController.getState();
 let lastDisplaySettings = null;
 let lastDisplayIndex = 'auto';
 
+/**
+ * Монитор, на котором дисплей откроется, КАК ТОЛЬКО закроется текущее окно.
+ *
+ * `null` — отложенного открытия нет. Владелец у него ровно один: два запроса
+ * «открыть», пришедшие пока окно закрывается, обязаны дать ОДНО окно, а не
+ * два — второе оказалось бы неуправляемым, потому что `displayWindow`
+ * указывал бы только на одно из них.
+ */
+let pendingDisplayOpen = null;
+
 // Per-window colors (independent themes)
 let lastWidgetColors = null;
 let lastClockColors = null;
@@ -1575,8 +1585,24 @@ ipcMain.on('open-display', (event, options) => {
     const displayIndex = opts.displayIndex !== undefined ? opts.displayIndex : lastDisplayIndex;
     lastDisplayIndex = displayIndex;
 
-    // Если дисплей уже открыт и запрос на тот же монитор - просто фокус
-    if (displayWindow && displayIndex === displayWindow._displayIndex) {
+    // Открытие уже запланировано на закрытие текущего окна — владелец у него
+    // один. Второй обработчик `closed` создал бы ВТОРОЕ окно дисплея, и одно
+    // из них перестало бы слушаться и кнопки, и клавиши D: ссылка `displayWindow`
+    // указывает только на последнее созданное.
+    if (pendingDisplayOpen !== null) {
+        pendingDisplayOpen = displayIndex;
+        return;
+    }
+
+    // Если дисплей уже открыт и запрос на тот же монитор - просто фокус.
+    //
+    // ЗАКРЫВАЮЩЕЕСЯ окно открытым не считается. Оно живо по ссылке всё время,
+    // пока идёт выход из полноэкранного режима (см. closeDisplayWindow ниже), и
+    // без этой проверки «закрыть, тут же открыть» фокусировало обречённое окно
+    // и выходило — а через мгновение дисплея не оставалось совсем. Замерено
+    // 09.09.2026: без паузы между командами приложение оставалось с одним
+    // окном, панелью. Спека — e2e/display-reopen-race.spec.js.
+    if (displayWindow && !displayWindow._closing && displayIndex === displayWindow._displayIndex) {
         displayWindow.focus();
         return;
     }
@@ -1592,7 +1618,17 @@ ipcMain.on('open-display', (event, options) => {
         closeDisplayWindow();
         displayWindow = null;
         if (!closing.isDestroyed()) {
-            closing.once('closed', () => createDisplayWindow(displayIndex));
+            // Индекс держим в переменной, а не в замыкании: пока окно
+            // закрывается, запрос может смениться на другой монитор, и
+            // открыться обязан последний запрошенный.
+            pendingDisplayOpen = displayIndex;
+            closing.once('closed', () => {
+                const idx = pendingDisplayOpen;
+                pendingDisplayOpen = null;
+                // `null` значит «пока мы ждали, пришла команда ЗАКРЫТЬ»:
+                // человек передумал, и открывать уже нечего.
+                if (idx !== null) { createDisplayWindow(idx); }
+            });
             return;
         }
     }
@@ -1637,6 +1673,12 @@ function closeDisplayWindow() {
     // ещё идёт, и голый close() снова попал бы в середину. Метка на окне, а не
     // переменная модуля: окон дисплея за жизнь приложения много.
     if (win._closingFullScreen) { return; }
+    // Метка «этому окну жить осталось недолго» ставится ВО ВСЕХ ветках, включая
+    // мгновенную: `close()` возвращает управление сразу, а событие `closed`
+    // приходит следующим оборотом цикла. Между ними ссылка `displayWindow` ещё
+    // указывает на окно, и без метки команда «открыть» приняла бы его за
+    // работающее (см. обработчик `open-display`).
+    win._closing = true;
     if (!win.isFullScreen()) {
         win.close();
         return;
@@ -1660,6 +1702,10 @@ function closeDisplayWindow() {
 }
 
 ipcMain.on('close-display', () => {
+    // «Закрыть» отменяет отложенное открытие: если оно было запланировано на
+    // конец текущего закрытия, человек только что передумал, и окно, которое
+    // он закрывает, не должно возродиться само.
+    pendingDisplayOpen = null;
     // Уведомление отправится в обработчике 'closed' события окна.
     closeDisplayWindow();
 });

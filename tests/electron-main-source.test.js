@@ -74,7 +74,7 @@ test('control window uses a transparent native surface for rounded corners', () 
 // Режим «полоса»: свёртывание окна управления
 // ---------------------------------------------------------------------------
 
-const { codeOnly } = require('./helpers/source-scan.js');
+const { codeOnly, ipcHandlerBody, functionBody } = require('./helpers/source-scan.js');
 
 test('свёртывание в полосу снимает пол минимального размера и возвращает его', () => {
     // Окно управления создаётся с minHeight: 660. Полоса — 52px, то есть НИЖЕ
@@ -106,4 +106,57 @@ test('свёртывание в полосу снимает пол минима�
 test('канал control-collapse объявлен в whitelist', () => {
     const validator = require('../channel-validator.js');
     assert.ok(validator.ALLOWED_CHANNELS.send.includes('control-collapse'));
+});
+
+test('закрывающееся окно дисплея не считается открытым, а отложенное открытие имеет одного владельца', () => {
+    // Разбор — в шапке e2e/display-reopen-race.spec.js. Коротко: `displayWindow`
+    // остаётся живой ссылкой всё время, пока идёт выход из полноэкранного
+    // режима, и «открыть» принимало обречённое окно за работающее.
+    //
+    // Проверяется ТЕЛО обработчика, а не файл целиком: метка `_closing` есть и
+    // в closeDisplayWindow, и поиск по всему исходнику был бы зелёным при
+    // полностью пустом обработчике.
+    const body = ipcHandlerBody(source, 'open-display');
+    const code = codeOnly(body);
+
+    assert.match(
+        code,
+        /displayWindow\s*&&\s*!displayWindow\._closing/,
+        'ветка «просто сфокусировать» обязана спрашивать, не закрывается ли окно'
+    );
+    assert.match(
+        code,
+        /pendingDisplayOpen\s*!==\s*null/,
+        'второй запрос «открыть» во время закрытия обязан присоединяться к уже '
+        + 'запланированному, а не вешать свой обработчик closed'
+    );
+
+    // Метка ставится ВО ВСЕХ ветках закрытия, включая мгновенную: иначе
+    // не-полноэкранное окно (режим съёмки) осталось бы без защиты.
+    const closeBody = functionBody(source, 'closeDisplayWindow');
+    const closeCode = codeOnly(closeBody);
+    const markIdx = closeCode.indexOf('win._closing = true');
+    const fullscreenIdx = closeCode.indexOf('isFullScreen()');
+    assert.ok(markIdx > -1, 'closeDisplayWindow обязан помечать окно закрывающимся');
+    assert.ok(
+        markIdx < fullscreenIdx,
+        'метка обязана стоять ДО развилки по полноэкранности, иначе мгновенное '
+        + 'закрытие уходит без неё'
+    );
+
+    // Команда «закрыть» отменяет отложенное открытие — иначе окно возродилось бы.
+    const closeHandler = codeOnly(ipcHandlerBody(source, 'close-display'));
+    assert.match(
+        closeHandler,
+        /pendingDisplayOpen\s*=\s*null/,
+        '«закрыть» обязано отменять запланированное открытие'
+    );
+
+    // Проверка себя: на исходнике с вырезанной меткой тест обязан краснеть.
+    const mutated = code.replace('!displayWindow._closing', 'displayWindow');
+    assert.doesNotMatch(
+        mutated,
+        /displayWindow\s*&&\s*!displayWindow\._closing/,
+        'зонд сломан: он не отличает исходник с проверкой от исходника без неё'
+    );
 });
