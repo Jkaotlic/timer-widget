@@ -164,3 +164,43 @@ test('в build.files не попадают файлы, которые ранта
         `эти файлы попадают в сборку, но их никто не читает в рантайме: ${leaked.join(', ')}`
     );
 });
+
+test('каждый модуль, который требует главный процесс, лежит в build.files', () => {
+    // Дыра, найденная 09.09.2026. Проверка выше перечисляет только то, что
+    // подключено из HTML тегом <script src>. Модули главного процесса
+    // подключаются через require, в HTML не встречаются вовсе — и любой из них
+    // мог не попасть в сборку, оставшись зелёным во всех тестах: в рабочем
+    // дереве файл на месте, а `require` в собранном приложении падает уже у
+    // пользователя, на старте.
+    //
+    // Ловится только упаковкой: `npm start` и все тесты читают файлы прямо из
+    // каталога проекта.
+    const mainSrc = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+    const missing = [];
+    const seen = new Set();
+
+    // Инструменты разработки в сборку не идут НАМЕРЕННО: стенд съёмки нужен
+    // только при `npm run screenshot`, а в собранном приложении этого режима
+    // нет. Исключение названо адресом каталога, а не именем файла: любой
+    // будущий инструмент оттуда попадёт под то же правило.
+    const DEV_ONLY_PREFIX = 'scripts/';
+
+    const requireRe = /require\(\s*'\.\/([^']+)'\s*\)/g;
+    let match;
+    while ((match = requireRe.exec(mainSrc)) !== null) {
+        const name = match[1].endsWith('.js') ? match[1] : `${match[1]}.js`;
+        if (seen.has(name)) { continue; }
+        seen.add(name);
+        if (name.startsWith(DEV_ONLY_PREFIX)) { continue; }
+        if (!fs.existsSync(path.join(repoRoot, name))) {
+            missing.push(`electron-main.js требует ${name}, которого нет на диске`);
+            continue;
+        }
+        if (!isPacked(name)) {
+            missing.push(`${name} требуется главным процессом, но не перечислен в build.files`);
+        }
+    }
+
+    assert.ok(seen.size > 0, 'зонд не нашёл НИ ОДНОГО require — регулярка сломана, и зелёный тут ничего не значит');
+    assert.deepStrictEqual(missing, [], missing.join('\n'));
+});
