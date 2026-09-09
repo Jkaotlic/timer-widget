@@ -22,6 +22,7 @@ const repoRoot = path.join(__dirname, '..');
 // --- Заглушки -------------------------------------------------------------
 
 function createStubs() {
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-main-load-'));
     const ipcHandlers = new Map();
     const noop = () => {};
 
@@ -127,7 +128,14 @@ function createStubs() {
     const electron = {
         app: {
             getVersion: () => '0.0.0-test',
-            getPath: () => repoRoot,
+            // userData — ВРЕМЕННЫЙ каталог, а не корень репозитория.
+            //
+            // Пока здесь стоял repoRoot, тесты писали в рабочее дерево: как
+            // только главный процесс научился сохранять журнал докладов, в
+            // корне проекта после каждого прогона оседал event-overrun.json.
+            // Такой файл ничем не отличается от кода на `git add .` — а
+            // состояние прошлого прогона ещё и подмешивалось бы в следующий.
+            getPath: () => userDataDir,
             isPackaged: false,
             on: noop,
             quit: noop,
@@ -158,7 +166,7 @@ function createStubs() {
         session: { defaultSession: {} }
     };
 
-    return { electron, ipcHandlers, created, sent, lastSent };
+    return { electron, ipcHandlers, created, sent, lastSent, userDataDir };
 }
 
 // Загружает electron-main.js с подменённым 'electron' и 'electron-log/main'.
