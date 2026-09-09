@@ -1935,32 +1935,46 @@ class DisplayTimer {
     }
 
     loadBackgroundSettings() {
+        // Молчаливый выход здесь стоил дорого: из-за него «фон не применялся
+        // никогда» жил незамеченным, а в режиме съёмки — где окна успевают
+        // прочитать хранилище раньше, чем панель туда пишет, — кадр расходился
+        // с эталоном на половину площади при полностью исправном приложении.
+        // Консоль рендерера уезжает в общий лог (bindRenderConsole), поэтому
+        // сообщение отсюда видно в терминале и в файле лога.
         const bgSettings = localStorage.getItem('displayExtSettings');
-        if (bgSettings) {
-            const settings = window.SecurityUtils
-                ? window.SecurityUtils.safeJSONParse(bgSettings, {})
+        if (!bgSettings) {
+            console.info('[display] фон не применён: ключа displayExtSettings нет (первый запуск или чистый профиль)');
+            return;
+        }
+        const settings = window.SecurityUtils
+            ? window.SecurityUtils.safeJSONParse(bgSettings, {})
+            : {};
+
+        if (!settings || Object.keys(settings).length === 0) {
+            console.warn(
+                '[display] фон не применён: displayExtSettings есть, но разобрался в пустой объект '
+                + `(${bgSettings.length} байт). Настройки испорчены?`
+            );
+            return;
+        }
+
+        // Для локального фона нужно дополнительно загрузить изображение
+        if (settings.bgMode === 'local') {
+            const localBgImage = localStorage.getItem('localBgImage');
+            const localBgSettingsStr = localStorage.getItem('localBgSettings') || '{}';
+            const localBgSettings = window.SecurityUtils
+                ? window.SecurityUtils.safeJSONParse(localBgSettingsStr, {})
                 : {};
 
-            if (settings && Object.keys(settings).length > 0) {
-                // Для локального фона нужно дополнительно загрузить изображение
-                if (settings.bgMode === 'local') {
-                    const localBgImage = localStorage.getItem('localBgImage');
-                    const localBgSettingsStr = localStorage.getItem('localBgSettings') || '{}';
-                    const localBgSettings = window.SecurityUtils
-                        ? window.SecurityUtils.safeJSONParse(localBgSettingsStr, {})
-                        : {};
-
-                    if (localBgImage) {
-                        settings.bgLocalImage = localBgImage;
-                        settings.bgLocalFit = localBgSettings.fit || 'cover';
-                        settings.bgLocalOverlay = localBgSettings.overlay || 30;
-                    }
-                }
-
-                this.applyBackground(settings);
-                this.applyDisplaySettings(settings);
+            if (localBgImage) {
+                settings.bgLocalImage = localBgImage;
+                settings.bgLocalFit = localBgSettings.fit || 'cover';
+                settings.bgLocalOverlay = localBgSettings.overlay || 30;
             }
         }
+
+        this.applyBackground(settings);
+        this.applyDisplaySettings(settings);
     }
 
     applyColors(colors) {

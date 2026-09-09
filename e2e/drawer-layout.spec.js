@@ -329,7 +329,6 @@ test('панель не прыгает горизонтально при отк�
 const NARROW_THRESHOLD = 720;
 
 test('узкое окно: ящик накрывает панель целиком и остаётся непрозрачным', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await openDrawer(control, 'display');

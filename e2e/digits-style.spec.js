@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay } = require('./window-ready');
+const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
 
 /**
  * Стиль «Цифры» и выбор шрифта.
@@ -384,10 +384,13 @@ test('стиль «Цифры» доходит до виджета кликом,
 
         // Достижимость — только кликом: сначала открыть окно кнопкой на панели,
         // затем переключить стиль сегментом на вкладке «Виджет». Открытие ждём
-        // событием, а не findWindow() сразу после клика — окно ещё не
-        // существует в момент возврата из click().
+        // Опросом с дедлайном (waitForWidget/waitForClock), а не событием
+        // 'window': событие приходит РОВНО раз, и если окно успело открыться
+        // между возвратом из click() и подпиской, ждать его больше нечего —
+        // тест висит до таймаута. Голый findWindow() тоже не годится: сразу
+        // после click() окна ещё нет. Опрос верен в обоих случаях.
         await control.click('#openWidgetBtn');
-        widget = await app.waitForEvent('window');
+        widget = await waitForWidget(app);
         await widget.waitForLoadState('domcontentloaded');
         expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
 
@@ -449,7 +452,7 @@ test('масштаб виджета действует и на стиль «Ци
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.click('#openWidgetBtn');
-        widget = await app.waitForEvent('window');
+        widget = await waitForWidget(app);
         await widget.waitForLoadState('domcontentloaded');
         expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
 
@@ -615,10 +618,13 @@ test('стиль «Цифры» доходит до часов кликом, и 
 
         // Достижимость — только кликом: открыть часы кнопкой на панели, затем
         // переключить стиль сегментом на вкладке «Часы». Открытие ждём
-        // событием, а не findWindow() сразу после клика — окно ещё не
-        // существует в момент возврата из click().
+        // Опросом с дедлайном (waitForWidget/waitForClock), а не событием
+        // 'window': событие приходит РОВНО раз, и если окно успело открыться
+        // между возвратом из click() и подпиской, ждать его больше нечего —
+        // тест висит до таймаута. Голый findWindow() тоже не годится: сразу
+        // после click() окна ещё нет. Опрос верен в обоих случаях.
         await control.click('#openClockBtn');
-        clock = await app.waitForEvent('window');
+        clock = await waitForClock(app);
         await clock.waitForLoadState('domcontentloaded');
         expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
 
@@ -687,7 +693,7 @@ test('часы «Цифры» не обрезаются в 12-часовом ф�
         await control.waitForLoadState('domcontentloaded');
 
         await control.click('#openClockBtn');
-        clock = await app.waitForEvent('window');
+        clock = await waitForClock(app);
         await clock.waitForLoadState('domcontentloaded');
         expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
 
@@ -862,10 +868,11 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
         ).toBeLessThan(0.5);
 
         // --- Виджет ---
-        // Окно открываем кнопкой и ждём СОБЫТИЕМ: сразу после click() окна ещё
-        // нет, и findWindow() вернёт null (ровно так этот тест и упал первый раз).
+        // Окно открываем кнопкой и ждём ОПРОСОМ с дедлайном: сразу после
+        // click() окна ещё нет (так этот тест и упал первый раз), а событие
+        // 'window' приходит один раз и теряется, если окно опередило подписку.
         await control.click('#openWidgetBtn');
-        const widget = await app.waitForEvent('window');
+        const widget = await waitForWidget(app);
         await widget.waitForLoadState('domcontentloaded');
         expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
 
@@ -881,7 +888,7 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
 
         // --- Часы ---
         await control.click('#openClockBtn');
-        const clock = await app.waitForEvent('window');
+        const clock = await waitForClock(app);
         await clock.waitForLoadState('domcontentloaded');
         expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
 
@@ -1012,13 +1019,13 @@ test('выбор шрифта доходит до СВОЕГО окна клик
 
         // Открыть виджет и часы кнопками панели (достижимость — только кликом).
         await control.click('#openWidgetBtn');
-        widget = await app.waitForEvent('window');
+        widget = await waitForWidget(app);
         await widget.waitForLoadState('domcontentloaded');
         expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
         widgetGeometryBefore = await snapshotWidgetGeometry(widget);
 
         await control.click('#openClockBtn');
-        clock = await app.waitForEvent('window');
+        clock = await waitForClock(app);
         await clock.waitForLoadState('domcontentloaded');
         expect(await clock.evaluate(IS_CLOCK), 'открывшееся окно должно быть часами').toBe(true);
         clockGeometryBefore = await snapshotClockGeometry(clock);
@@ -1183,8 +1190,15 @@ test('часы «Цифры»: дата и пояс встают ПОД врем
         }
 
         // Профиль e2e общий на прогон: возвращаем тумблеры и стиль.
+        //
+        // Возвращать надо к УМОЛЧАНИЮ, а не к тому, что было удобно этому
+        // тесту. Здесь стояло `showSeconds: false`, хотя умолчание проекта —
+        // true (clock-settings-schema.js), и часы оставались без секунд всем
+        // следующим спекам прогона. Ловилось это далеко: ui-pass-2026-08
+        // мерил прозрачность `.clock-seconds`, которого при выключенных
+        // секундах нет вовсе, и падал «0 вместо 0.62» через полсотни тестов.
         await control.evaluate(() => window.ipcRenderer.send('clock-widget-settings', {
-            showDate: false, showTimezone: false, showSeconds: false
+            showDate: false, showTimezone: false, showSeconds: true
         }));
         await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'circle'));
         await clock.waitForTimeout(500);

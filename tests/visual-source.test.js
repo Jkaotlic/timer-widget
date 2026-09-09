@@ -485,3 +485,53 @@ test('название мероприятия печатается как наб
         'подписи приложения перестали быть прописными — либо это правка, либо регулярка ослепла'
     );
 });
+
+test('стенд съёмки отчитывается отказом, если кадр не снят', () => {
+    // Пустой список неснятых кадров — единственное доказательство, что прогон
+    // вообще что-то снял. До 09.09.2026 промах кадра только логировался:
+    // `capture()` писал строку в лог и возвращался, а процесс завершался нулём.
+    // Шаг на CI при этом стоял с `continue-on-error: true`, и обе половины
+    // складывались в проверку, которая не могла провалиться. Именно так до
+    // 2.4.0 прожило незамеченным падение Electron под xvfb — exit 133 ещё до
+    // первого кадра.
+    const runner = readCode('scripts/screenshot-runner.js');
+
+    assert.match(
+        runner,
+        /CAPTURE_FAILURES\s*=\s*\[\]/,
+        'стенд обязан вести список неснятых кадров'
+    );
+    // Обе причины промаха обязаны попадать в список: окна нет и попытки
+    // capturePage исчерпаны.
+    const pushes = (runner.match(/CAPTURE_FAILURES\.push\(/g) || []).length;
+    assert.ok(
+        pushes >= 2,
+        `в список пишут ${pushes} раз — а причин промаха две: окна нет и попытки исчерпаны`
+    );
+    assert.match(
+        runner,
+        /CAPTURE_FAILURES\.length\s*>\s*0[\s\S]{0,600}?app\.exit\(\s*4\s*\)/,
+        'неполная съёмка обязана завершать процесс НЕнулевым кодом, а не тонуть в логе'
+    );
+
+    // И шаг CI больше не прячет этот код.
+    const workflow = fs.readFileSync(
+        path.join(repoRoot, '.github', 'workflows', 'nodejs.yml'), 'utf8'
+    );
+    const stepStart = workflow.indexOf('- name: Visual regression');
+    assert.ok(stepStart > -1, 'шаг визуальной сверки в workflow не найден');
+    const nextStep = workflow.indexOf('- name:', stepStart + 10);
+    const step = workflow.slice(stepStart, nextStep === -1 ? undefined : nextStep);
+    assert.doesNotMatch(
+        step,
+        /continue-on-error:\s*true/,
+        'шаг визуальной сверки снова неблокирующий — падение съёмки опять невидимо'
+    );
+
+    // Проверка себя: на образце с маскировкой утверждение обязано падать.
+    assert.match(
+        '- name: Visual regression\n  run: x\n  continue-on-error: true\n',
+        /continue-on-error:\s*true/,
+        'зонд не видит маскировку там, где она есть'
+    );
+});

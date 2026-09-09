@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, waitForDisplayGone } = require('./window-ready');
 const { pickWindowSizes } = require('./window-sizes');
 const DL = require('../display-layouts');
 
@@ -312,7 +312,6 @@ test('Shift+колесо двигает ВСЕ карточки сразу', asy
 });
 
 test('каждая раскладка применяется КЛИКОМ и ничто не наезжает друг на друга', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
@@ -399,7 +398,6 @@ test('каждая раскладка применяется КЛИКОМ и н�
  * объяснение без рычага — это извинение.
  */
 test('упор масштаба называет помеху, и без неё потолок выше', async () => {
-    test.setTimeout(90000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
@@ -462,7 +460,6 @@ test('упор масштаба называет помеху, и без неё 
  * случае, который и есть дефект.
  */
 test('элементы держат композицию при изменении размера окна', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         const display = await openDisplayWithEverything(control, app);
@@ -533,7 +530,6 @@ test('элементы держат композицию при изменени
 });
 
 test('раскладка переживает переоткрытие окна дисплея', async () => {
-    test.setTimeout(60000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
@@ -545,8 +541,13 @@ test('раскладка переживает переоткрытие окна 
         await display.waitForTimeout(900);
         const before = await readBoxes(display, ['currentTimeBlock', 'endTimeBlock']);
 
+        // Закрытие ждут УСЛОВИЕМ, а не паузой. Окно дисплея полноэкранное, и
+        // закрывается оно через выход из полноэкранного режима — на
+        // загруженном раннере это дольше любой зашитой паузы, и следующая
+        // команда «открыть» попадала в середину закрытия. Разбор и защита в
+        // самом приложении — e2e/window-reopen-race.spec.js.
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
-        await control.waitForTimeout(800);
+        await waitForDisplayGone(app);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
         display = await waitForDisplay(app);
         await control.waitForTimeout(2400);

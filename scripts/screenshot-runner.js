@@ -254,9 +254,22 @@ async function waitForRemaining(win, seconds, log, timeoutMs = 3000) {
     return false;
 }
 
+/**
+ * Кадры, которые снять НЕ удалось.
+ *
+ * Пустой список — единственное доказательство, что прогон вообще что-то снял.
+ * Без него шаг сверки на CI годами мог отчитываться успехом, не сделав ни
+ * одного кадра: до 2.4.0 Electron падал под ubuntu с кодом 133 ещё до первого
+ * снимка, и `continue-on-error: true` это прятало. Промах отдельного окна
+ * заслуживает того же: «пропустил кадр» — это ответ «не знаю», а не «всё
+ * хорошо».
+ */
+const CAPTURE_FAILURES = [];
+
 async function capture(win, filePath, log) {
     if (!win || win.isDestroyed()) {
         log.warn(`[screenshot] skip ${path.basename(filePath)} — window missing`);
+        CAPTURE_FAILURES.push({ file: path.basename(filePath), reason: 'окна нет' });
         return;
     }
     // Transparent windows that were never shown don't allocate a compositor
@@ -291,6 +304,7 @@ async function capture(win, filePath, log) {
         } catch (err) {
             if (attempt === maxAttempts) {
                 log.error(`[screenshot] ${path.basename(filePath)} failed after ${maxAttempts} attempts: ${err.message}`);
+                CAPTURE_FAILURES.push({ file: path.basename(filePath), reason: err.message });
                 return;
             }
             await sleep(250 * attempt);
@@ -440,35 +454,21 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         }
         await sleep(500);
 
-        // Перечитать фон, когда панель уже отработала.
+        // Здесь до 09.09.2026 стоял костыль REREAD_BACKGROUND: съёмка звала
+        // `widgetTimer.loadBackgroundSettings()` и `displayTimer.…` заново,
+        // потому что в режиме съёмки все четыре окна поднимаются одновременно
+        // и успевали прочитать localStorage раньше, чем панель туда пишет.
+        // Круг виджета оставался с CSS-дефолтом, и кадр расходился с эталоном
+        // на половину площади при исправном приложении.
         //
-        // Фон виджета и дисплея живёт в `displayExtSettings`, который пишет
-        // панель. В режиме съёмки все четыре окна поднимаются ОДНОВРЕМЕННО,
-        // поэтому окно успевает прочитать localStorage раньше, чем панель туда
-        // пишет: `loadBackgroundSettings()` не находит ключа и уходит молча, а
-        // `applyBackground()` так и не вызывается. Круг виджета остаётся с
-        // CSS-дефолтом `rgba(15, 15, 25, 0.7)`, и поверх НЕПРОЗРАЧНОГО фона окна
-        // режима съёмки (#1c1c1e) это даёт серый вместо `#0f0c29` — кадр
-        // расходился с эталоном на половину площади при полностью исправном
-        // приложении (в живом окне fill = rgb(15, 12, 41) сразу и стабильно).
-        //
-        // У пользователя гонки нет: окна открываются позже панели и читают уже
-        // записанные настройки. Поэтому чиним съёмку, а не приложение —
-        // повторяем ровно то, что делает штатное открытие окна.
-        const REREAD_BACKGROUND = {
-            widget: 'widgetTimer.loadBackgroundSettings()',
-            display: 'displayTimer.loadBackgroundSettings()'
-        };
-        for (const [name, expr] of Object.entries(REREAD_BACKGROUND)) {
-            const w = ctx()[name];
-            if (!w || w.isDestroyed()) { continue; }
-            try {
-                await w.webContents.executeJavaScript(`(() => { ${expr}; return true; })()`);
-            } catch (e) {
-                log.warn(`[screenshot] перечитать фон (${name}): ${e.message}`);
-            }
-        }
-        await sleep(400);
+        // Гонку закрыли в приложении: настройки досылает сама create-функция
+        // окна (announceWindowOpened в electron-main.js), поэтому окну больше
+        // не нужно угадывать, успела ли панель записать хранилище. План
+        // требовал ПРОВЕРИТЬ, что решение настоящее, а не замаскированное:
+        // «убрать костыль, три сверки подряд обязаны остаться по нулям».
+        // Проверено 09.09.2026 — три прогона, 49 кадров сверено, 16 пропущено
+        // по времени, расхождений 0, 0, 0. Костыль удалён.
+
 
         for (const state of STATES) {
             try {
@@ -905,6 +905,22 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
 
         // Сверка с эталонами — только по запросу (--visual-check), чтобы обычный
         // прогон скриншотов оставался быстрым и не падал.
+        // Неполная съёмка — отказ, а не мелочь.
+        //
+        // Сверять картинки на CI пока не с чем: эталоны (8.6 МБ PNG) в
+        // репозиторий не кладутся, а рендеринг ubuntu отличается от macOS.
+        // Но проверить, что приложение поднялось и сняло ВСЕ окна, можно и без
+        // эталонов — и это ровно то, чего шагу не хватало, когда падение
+        // Electron под xvfb прожило незамеченным.
+        if (CAPTURE_FAILURES.length > 0) {
+            const list = CAPTURE_FAILURES.map((f) => `${f.file} (${f.reason})`).join(', ');
+            log.error(`[screenshot] кадров не снято: ${CAPTURE_FAILURES.length} — ${list}`);
+            console.error(`[screenshot] кадров не снято: ${CAPTURE_FAILURES.length} — ${list}`);
+            clearTimeout(hardTimeout);
+            app.exit(4);
+            return;
+        }
+
         if (process.argv.includes('--visual-check') && nativeImage) {
             const regressions = compareWithBaseline({
                 nativeImage,

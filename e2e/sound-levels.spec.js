@@ -88,7 +88,6 @@ test('каждый встроенный звук звучит в рабочем 
  * (это событие зала), тревога — самой громкой по энергии.
  */
 test('звуки событий различаются по длине и энергии так, как обещано', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         const m = await control.evaluate(async () => {

@@ -1252,7 +1252,13 @@
                     this.applyColors();
                     this.loadBackgroundSettings();
                 } catch (e) {
-                    console.warn('Widget init warning:', e.message);
+                    // Это не «warning»: сюда попадает окно, у которого не
+                    // отработали настройки, цвета ИЛИ фон — то есть виджет
+                    // остался на умолчаниях, и человек видит не то, что
+                    // настроил. Стек обязателен: без него сообщение говорит,
+                    // ЧТО сломалось, но не ГДЕ, а три вызова выше выглядят
+                    // одинаково.
+                    console.error('[widget] инициализация не отработала:', e && (e.stack || e.message));
                 }
 
                 this.setupIPC();
@@ -1773,40 +1779,53 @@
             }
 
             loadBackgroundSettings() {
+                // Не молчать при выходе. Из-за молчания здесь «фон не
+                // применялся никогда» жил незамеченным, а в режиме съёмки —
+                // где окна читают хранилище раньше, чем панель туда пишет, —
+                // круг виджета оставался с CSS-дефолтом, и кадр расходился с
+                // эталоном при полностью исправном приложении. Консоль
+                // рендерера уезжает в общий лог (bindRenderConsole).
                 const bgSettings = localStorage.getItem('displayExtSettings');
-                if (bgSettings) {
-                    const settings = safeJSONParse(bgSettings, {});
+                if (!bgSettings) {
+                    console.info('[widget] настройки не применены: ключа displayExtSettings нет (первый запуск или чистый профиль)');
+                    return;
+                }
+                const settings = safeJSONParse(bgSettings, {});
 
-                    if (settings && Object.keys(settings).length > 0) {
-                        // Виджет всегда прозрачный — картинки только на полноэкранном дисплее
-                        if (settings.bgMode === 'local') {
-                            settings.bgMode = 'default';
-                        }
+                if (!settings || Object.keys(settings).length === 0) {
+                    console.warn(
+                        '[widget] настройки не применены: displayExtSettings есть, но разобрался '
+                        + `в пустой объект (${bgSettings.length} байт). Настройки испорчены?`
+                    );
+                    return;
+                }
+                // Виджет всегда прозрачный — картинки только на полноэкранном дисплее
+                if (settings.bgMode === 'local') {
+                    settings.bgMode = 'default';
+                }
 
-                        this.applyBackground(settings);
+                this.applyBackground(settings);
 
-                        // Стиль виджета — под СВОИМ именем. Общее `timerStyle`
-                        // в этом наборе тоже принадлежит виджету (его пишет
-                        // alsoWrite ради отката версии), но то же самое имя в
-                        // IPC-пакете display-settings-update означает уже стиль
-                        // ПОЛНОЭКРАННОГО режима. Спрашиваем своё имя первым,
-                        // общее держим запасным — см. RendererShared.pickOwnSetting.
-                        const ownStyle = window.RendererShared.pickOwnSetting(settings, 'widgetTimerStyle', 'timerStyle');
-                        if (ownStyle) {
-                            this.setTimerStyle(ownStyle);
-                        }
+                // Стиль виджета — под СВОИМ именем. Общее `timerStyle`
+                // в этом наборе тоже принадлежит виджету (его пишет
+                // alsoWrite ради отката версии), но то же самое имя в
+                // IPC-пакете display-settings-update означает уже стиль
+                // ПОЛНОЭКРАННОГО режима. Спрашиваем своё имя первым,
+                // общее держим запасным — см. RendererShared.pickOwnSetting.
+                const ownStyle = window.RendererShared.pickOwnSetting(settings, 'widgetTimerStyle', 'timerStyle');
+                if (ownStyle) {
+                    this.setTimerStyle(ownStyle);
+                }
 
-                        // Шрифт стиля «Цифры» — своё имя внутри displayExtSettings,
-                        // тем же путём, каким приходит widgetTimerStyle. У шрифта нет
-                        // локального источника изменений (только панель), поэтому
-                        // отдельного ключа в localStorage у него нет.
-                        if (settings.widgetDigitsFont !== undefined) {
-                            const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.widgetDigitsFont);
-                            if (font.id !== this.digitsFont) {
-                                this.digitsFont = font.id;
-                                this.applyDigitsFont(font.id);
-                            }
-                        }
+                // Шрифт стиля «Цифры» — своё имя внутри displayExtSettings,
+                // тем же путём, каким приходит widgetTimerStyle. У шрифта нет
+                // локального источника изменений (только панель), поэтому
+                // отдельного ключа в localStorage у него нет.
+                if (settings.widgetDigitsFont !== undefined) {
+                    const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.widgetDigitsFont);
+                    if (font.id !== this.digitsFont) {
+                        this.digitsFont = font.id;
+                        this.applyDigitsFont(font.id);
                     }
                 }
             }

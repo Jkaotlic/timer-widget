@@ -73,7 +73,6 @@ const lockState = (page) => page.evaluate(() => ({
 }));
 
 test('замок держит карточки дисплея и снимается той же кнопкой', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -141,7 +140,6 @@ test('замок держит карточки дисплея и снимает�
 });
 
 test('замок держит ОКНО виджета, а панель продолжает им управлять', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));

@@ -29,7 +29,6 @@ const caption = (display, blockId) => display.evaluate(
 );
 
 test('своё название плашки доезжает до дисплея и стирается обратно в стандартное', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -75,7 +74,6 @@ test('своё название плашки доезжает до диспле�
 });
 
 test('своё название переживает перезапуск приложения', async () => {
-    test.setTimeout(120000);
     let app1;
     try {
         const first = await launchApp();

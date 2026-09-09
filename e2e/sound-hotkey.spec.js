@@ -31,7 +31,6 @@ const soundState = (control) => control.evaluate(() => {
 });
 
 test('Z переключает звук из панели, и оба вида согласны друг с другом', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         const before = await soundState(control);
@@ -62,7 +61,6 @@ test('Z переключает звук из панели, и оба вида с
 });
 
 test('Z из окна виджета доезжает до панели', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
@@ -93,7 +91,6 @@ test('Z из окна виджета доезжает до панели', async 
 });
 
 test('клик по тумблеру строки ведёт себя так же, как клавиша', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         const before = await soundState(control);

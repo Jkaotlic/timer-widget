@@ -31,19 +31,57 @@ function createStubs() {
             this._position = [opts.x || 0, opts.y || 0];
             this._minWidth = opts.minWidth || 0;
             this._minHeight = opts.minHeight || 0;
+            this._fullscreen = !!opts.fullscreen;
+            this._destroyed = false;
             this.webContents = {
-                on: noop, once: noop, send: noop, isDestroyed: () => false,
+                on: noop, once: noop, send: noop, isDestroyed: () => this._destroyed,
                 setWindowOpenHandler: noop, setZoomFactor: noop,
                 setZoomLevel: noop, setVisualZoomLevelLimits: noop, openDevTools: noop
             };
             created.push(this);
         }
         static getAllWindows() { return created; }
-        loadFile() { return Promise.resolve(); }
-        on() {} once() {} focus() {} show() {} hide() {} minimize() {} close() {}
+        loadFile(file) { this._file = file; return Promise.resolve(); }
+        // События окна ХРАНЯТСЯ, а не выбрасываются.
+        //
+        // Пока `on`/`once` были пустыми, подставка не умела главного, что
+        // делает настоящее окно: закрыться. Любая логика главного процесса,
+        // построенная на `once('closed', …)` — а на ней держится переоткрытие
+        // дисплея, — исполнялась «в пустоту», и тест этого не видел.
+        on(event, fn) {
+            if (!this._events) { this._events = new Map(); }
+            if (!this._events.has(event)) { this._events.set(event, []); }
+            this._events.get(event).push(fn);
+        }
+        once(event, fn) { this.on(event, fn); }
+        emit(event, ...args) {
+            const list = (this._events && this._events.get(event)) || [];
+            // Копия списка: обработчик может подписаться на то же событие.
+            for (const fn of list.slice()) { fn(...args); }
+        }
+        show() {} hide() {} minimize() {}
+        // Закрытие как в Electron: окно разрушается СРАЗУ, а событие `closed`
+        // приходит следующим оборотом цикла. Между этими двумя моментами
+        // ссылка в главном процессе ещё указывает на окно — именно в этот
+        // зазор и попадала команда «открыть».
+        close() {
+            if (this._destroyed) { return; }
+            this._destroyed = true;
+            setTimeout(() => this.emit('closed'), 0);
+        }
+        // Настоящее окно на этом бросает «Object has been destroyed».
+        focus() {
+            if (this._destroyed) { throw new Error('Object has been destroyed'); }
+        }
+        isFullScreen() { return !!this._fullscreen; }
+        setFullScreen(value) {
+            const was = this._fullscreen;
+            this._fullscreen = !!value;
+            if (was && !this._fullscreen) { this.emit('leave-full-screen'); }
+        }
         isVisible() { return true; }
         isMinimized() { return false; }
-        isDestroyed() { return false; }
+        isDestroyed() { return this._destroyed; }
         getSize() { return this._size.slice(); }
         getPosition() { return this._position.slice(); }
         setPosition(x, y) { this._position = [x, y]; }
@@ -256,3 +294,132 @@ test('timer-command переживает отсутствующий и мусо�
         );
     }
 });
+
+// Окна дисплея среди созданных — по файлу, который окно грузило.
+function displayWindows(stubs) {
+    return stubs.created.filter((w) => w._file === 'display.html');
+}
+
+test('«закрыть» и сразу «открыть»: окно дисплея остаётся, и оно ОДНО', async () => {
+    // Поведенческая половина разбора «закрывающееся окно — не открытое».
+    // Source-тест (electron-main-source.test.js) проверяет, что вопрос задан;
+    // здесь проверяется ОТВЕТ — на подставке, которая умеет закрываться так
+    // же, как настоящее окно: выйти из полноэкранного режима, дождаться
+    // события, закрыться следующим оборотом цикла.
+    const stubs = createStubs();
+    loadMain(stubs);
+
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+    const first = displayWindows(stubs)[0];
+    assert.ok(first, 'open-display должен создать окно дисплея');
+    assert.equal(first.isFullScreen(), true, 'окно дисплея создаётся полноэкранным');
+
+    // Закрытие началось, но ещё не закончилось: главный процесс ждёт своего
+    // таймера в 120 мс после leave-full-screen.
+    stubs.ipcHandlers.get('close-display')(null);
+    assert.equal(first.isDestroyed(), false, 'закрытие полноэкранного окна не мгновенно');
+
+    // И ровно в этот момент приходит «открыть» — то, что человек делает
+    // кнопкой, а раннер CI получает сам собой из-за медленной машины.
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+
+    await new Promise((r) => setTimeout(r, 400));
+
+    assert.equal(first.isDestroyed(), true, 'старое окно обязано закрыться');
+    const alive = displayWindows(stubs).filter((w) => !w.isDestroyed());
+    assert.equal(
+        alive.length, 1,
+        `после close→open должно остаться РОВНО одно живое окно дисплея, а их ${alive.length}. `
+        + '0 — команду «открыть» проглотило закрытие; 2 — у отложенного открытия нет владельца'
+    );
+    assert.notEqual(alive[0], first, 'живым обязано быть НОВОЕ окно, а не то, что закрывали');
+});
+
+test('два «открыть» во время закрытия дают одно окно, а «закрыть» отменяет отложенное', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+    stubs.ipcHandlers.get('close-display')(null);
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+    await new Promise((r) => setTimeout(r, 400));
+
+    assert.equal(
+        displayWindows(stubs).filter((w) => !w.isDestroyed()).length, 1,
+        'два запроса «открыть» подряд обязаны дать ОДНО окно: второе стало бы неуправляемым'
+    );
+
+    // А человек, передумавший посреди закрытия, не должен получить окно назад.
+    const stubs2 = createStubs();
+    loadMain(stubs2);
+    stubs2.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+    stubs2.ipcHandlers.get('close-display')(null);
+    stubs2.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+    stubs2.ipcHandlers.get('close-display')(null);
+    await new Promise((r) => setTimeout(r, 400));
+
+    assert.equal(
+        displayWindows(stubs2).filter((w) => !w.isDestroyed()).length, 0,
+        '«закрыть» обязано отменять отложенное открытие — иначе окно возрождается само'
+    );
+});
+
+// Окна по файлу, который они грузили: у подставки нет другого признака вида.
+function windowsOf(stubs, file) {
+    return stubs.created.filter((w) => w._file === file);
+}
+
+const REOPEN_CASES = [
+    { who: 'виджет', file: 'electron-widget.html', open: 'open-widget', close: 'close-widget' },
+    { who: 'часы', file: 'electron-clock-widget.html', open: 'open-clock-widget', close: 'close-clock-widget' }
+];
+
+for (const c of REOPEN_CASES) {
+    test(`${c.who}: «закрыть» и сразу «открыть» оставляет окно`, async () => {
+        // Тот же дефект, что был у дисплея, и полноэкранный режим тут ни при
+        // чём: `close()` разрушает окно сразу, а событие `closed` — то, что
+        // обнуляет ссылку в главном процессе, — приходит следующим оборотом
+        // цикла. Команда «открыть», попавшая в этот зазор, видела живую ссылку
+        // и уходила в `focus()`.
+        //
+        // Замер на настоящем Electron 09.09.2026: `close-widget` и
+        // `open-widget` без паузы между ними — через 4 секунды у приложения
+        // одно окно, панель. У часов так же. Сценарий человеческий: нажать
+        // клавишу закрытия и тут же клавишу открытия.
+        const stubs = createStubs();
+        loadMain(stubs);
+
+        stubs.ipcHandlers.get(c.open)(null);
+        const first = windowsOf(stubs, c.file)[0];
+        assert.ok(first, `${c.open} должен создать окно`);
+
+        stubs.ipcHandlers.get(c.close)(null);
+        stubs.ipcHandlers.get(c.open)(null);
+        await new Promise((r) => setTimeout(r, 100));
+
+        const alive = windowsOf(stubs, c.file).filter((w) => !w.isDestroyed());
+        assert.equal(
+            alive.length, 1,
+            `после close→open должно остаться РОВНО одно живое окно (${c.who}), а их ${alive.length}. `
+            + '0 — команду «открыть» проглотило закрытие; 2 — у отложенного открытия нет владельца'
+        );
+        assert.notEqual(alive[0], first, 'живым обязано быть НОВОЕ окно');
+    });
+
+    test(`${c.who}: «закрыть» отменяет запланированное открытие`, async () => {
+        const stubs = createStubs();
+        loadMain(stubs);
+
+        stubs.ipcHandlers.get(c.open)(null);
+        stubs.ipcHandlers.get(c.close)(null);
+        stubs.ipcHandlers.get(c.open)(null);
+        stubs.ipcHandlers.get(c.close)(null);
+        await new Promise((r) => setTimeout(r, 100));
+
+        assert.equal(
+            windowsOf(stubs, c.file).filter((w) => !w.isDestroyed()).length, 0,
+            'человек, передумавший посреди закрытия, не должен получить окно назад'
+        );
+    });
+}
