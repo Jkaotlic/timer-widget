@@ -206,7 +206,7 @@ function cancelQueuedOpen(key) { pendingOpens.delete(key); }
  * накопитель, и общая сумма при этом не дёргается: у дисплея из неё уходит
  * ровно столько, сколько приходит.
  */
-let eventOverrun = { overrunSeconds: 0, finished: false };
+let eventOverrun = { overrunSeconds: 0, finished: false, talks: [] };
 let liveOverrunSeconds = 0;
 
 /**
@@ -232,7 +232,15 @@ let excludedLiveSeconds = 0;
  * записано «перед добавлением поля в payload соберите payload в одном месте».
  */
 function eventOverrunPayload() {
-    return Object.assign({ excludedLiveSeconds }, eventOverrun);
+    // Панели уходит СЧЁТЧИК записей, а не сам журнал: он бывает на пятьсот
+    // строк, а рассылается это состояние каждую секунду. Всё, что панели нужно
+    // от журнала, — знать, есть ли что выгружать; сам отчёт собирает главный
+    // процесс, у которого журнал и лежит.
+    return Object.assign(
+        { excludedLiveSeconds, talksCount: eventOverrun.talks.length },
+        eventOverrun,
+        { talks: undefined }
+    );
 }
 
 /**
@@ -264,6 +272,30 @@ function persistEventOverrun() {
  * После завершения мероприятия накопитель заморожен: перелимиты в него больше
  * не идут, пока не начато новое.
  */
+/**
+ * Дописать закрытый доклад в журнал.
+ *
+ * Зовётся из ДВУХ мест — тика (доклад вышел из минуса) и «Завершить
+ * мероприятие», — и потому существует отдельно: два экземпляра этой арифметики
+ * разошлись бы номерами.
+ *
+ * Потолок тот же, что в хранилище: журнал пишется на диск синхронно. Итог при
+ * обрезке не страдает — он живёт отдельным числом.
+ */
+function appendTalk(seconds) {
+    if (!(seconds > 0)) { return eventOverrun.talks; }
+    const talks = eventOverrun.talks.concat([{
+        n: eventOverrun.talks.length + 1,
+        endedAt: new Date().toISOString(),
+        overrunSeconds: Math.floor(seconds)
+    }]);
+    return talks.slice(-OverrunStore.MAX_TALKS).map((talk, i) => ({
+        n: i + 1,
+        endedAt: talk.endedAt,
+        overrunSeconds: talk.overrunSeconds
+    }));
+}
+
 function accrueOverrun(state) {
     // Считается перелимит ЗА ВЫЧЕТОМ отсечки: секунды, натикавшие до «Нового
     // мероприятия», к нему не относятся.
@@ -281,7 +313,8 @@ function accrueOverrun(state) {
     if (liveOverrunSeconds <= 0) { return; }
     eventOverrun = {
         overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
-        finished: eventOverrun.finished
+        finished: eventOverrun.finished,
+        talks: appendTalk(liveOverrunSeconds)
     };
     liveOverrunSeconds = 0;
     persistEventOverrun();
@@ -1880,7 +1913,10 @@ ipcMain.on('sound-toggle', () => {
 ipcMain.on('event-finish', () => {
     eventOverrun = {
         overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
-        finished: true
+        finished: true,
+        // Последний доклад тоже запись: иначе он окажется в итоге, но не в
+        // разбивке, и суммы в отчёте разойдутся без всякой причины.
+        talks: appendTalk(liveOverrunSeconds)
     };
     liveOverrunSeconds = 0;
     persistEventOverrun();
@@ -1890,7 +1926,7 @@ ipcMain.on('event-finish', () => {
 // Начать новое мероприятие: обнулить накопитель. Необратимо — подтверждение
 // спрашивает панель, здесь его повторять негде.
 ipcMain.on('event-reset', () => {
-    eventOverrun = { overrunSeconds: 0, finished: false };
+    eventOverrun = { overrunSeconds: 0, finished: false, talks: [] };
     liveOverrunSeconds = 0;
     // Текущий минус к новому мероприятию не относится — отсекаем его целиком,
     // иначе на экране осталась бы прежняя сумма.

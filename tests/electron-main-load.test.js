@@ -23,6 +23,21 @@ function createStubs() {
     const ipcHandlers = new Map();
     const noop = () => {};
 
+    // Что главный процесс РАССЫЛАЕТ окнам.
+    //
+    // Пока `send` был заглушкой-пустышкой, подставка молча съедала весь
+    // исходящий поток: тест не мог отличить «главный процесс разослал верное
+    // состояние» от «не разослал ничего». Для проверок, где важен именно
+    // ответ окнам (журнал докладов, результат выгрузки), это разница между
+    // проверкой и её видимостью.
+    const sent = [];
+    const lastSent = (channel) => {
+        for (let i = sent.length - 1; i >= 0; i--) {
+            if (sent[i].channel === channel) { return sent[i].payload; }
+        }
+        return null;
+    };
+
     const created = [];
     class StubBrowserWindow {
         constructor(opts = {}) {
@@ -34,7 +49,9 @@ function createStubs() {
             this._fullscreen = !!opts.fullscreen;
             this._destroyed = false;
             this.webContents = {
-                on: noop, once: noop, send: noop, isDestroyed: () => this._destroyed,
+                on: noop, once: noop,
+                send: (channel, payload) => { sent.push({ channel, payload }); },
+                isDestroyed: () => this._destroyed,
                 setWindowOpenHandler: noop, setZoomFactor: noop,
                 setZoomLevel: noop, setVisualZoomLevelLimits: noop, openDevTools: noop
             };
@@ -139,7 +156,7 @@ function createStubs() {
         session: { defaultSession: {} }
     };
 
-    return { electron, ipcHandlers, created };
+    return { electron, ipcHandlers, created, sent, lastSent };
 }
 
 // Загружает electron-main.js с подменённым 'electron' и 'electron-log/main'.
@@ -423,3 +440,98 @@ for (const c of REOPEN_CASES) {
         );
     });
 }
+
+// --- Журнал докладов -------------------------------------------------------
+
+/**
+ * Остановить таймер после теста.
+ *
+ * С разрешённым минусом таймер не останавливается сам НИКОГДА — в этом весь
+ * смысл перелимита. Оставленный работать, он держит цикл событий, и `node
+ * --test` не завершается вовсе: прогон выглядит зависшим, хотя все проверки
+ * прошли.
+ */
+function stopTimer(stubs) {
+    stubs.ipcHandlers.get('timer-command')(null, { type: 'pause' });
+    stubs.ipcHandlers.get('timer-command')(null, { type: 'reset', allowNegative: false });
+}
+
+/**
+ * Открыть окно дисплея.
+ *
+ * Без него рассылка состояния мероприятия уходит в никуда: broadcast шлёт
+ * ТОЛЬКО в открытые окна, а `loadMain` окон не создаёт (whenReady в подставке
+ * не резолвится намеренно). Проверять рассылку, не открыв ни одного окна, —
+ * это проверять тишину.
+ */
+function openDisplay(stubs) {
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
+}
+
+/**
+ * Провести доклад с перелимитом: короткий пресет, старт, уход в минус.
+ *
+ * Ждать нужно ДОЛЬШЕ секунды сверх пресета: перелимит считается целыми
+ * секундами (`Math.floor` в money-meter.js), и доклад, просроченный на 300 мс,
+ * стоит ноль — накопитель его не заметит, а тест решит, что журнал сломан.
+ */
+async function runOvertimeTalk(stubs, ms = 2600) {
+    // `allowNegative: true` обязателен: без него таймер ОСТАНАВЛИВАЕТСЯ на
+    // нуле, перелимита не возникает вовсе, и тест про журнал проверял бы
+    // тишину. Перелимит — это про минус, а минус в приложении разрешается
+    // настройкой.
+    stubs.ipcHandlers.get('timer-command')(null, { type: 'set', seconds: 1, allowNegative: true });
+    stubs.ipcHandlers.get('timer-command')(null, { type: 'start', allowNegative: true });
+    await new Promise((r) => setTimeout(r, ms));
+}
+
+test('закрытый доклад попадает в журнал, а не только в итог', async () => {
+    // Доклад «закрывается» при выходе таймера из минуса — это определение уже
+    // живёт в accrueOverrun(), и записывать журнал обязано ровно то же место:
+    // два места, знающие «доклад закончился», разойдутся на первой правке.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    await runOvertimeTalk(stubs);
+    stubs.ipcHandlers.get('timer-command')(null, { type: 'reset' });
+    await new Promise((r) => setTimeout(r, 50));
+
+    const payload = stubs.lastSent('event-overrun-state');
+    assert.ok(payload, 'состояние мероприятия обязано рассылаться');
+    assert.ok(payload.talksCount >= 1, 'журнал обязан пополниться вместе с итогом');
+    assert.ok(payload.overrunSeconds > 0, 'итог тоже обязан вырасти');
+    stopTimer(stubs);
+});
+
+test('«Завершить мероприятие» дописывает последний доклад в журнал', async () => {
+    // Иначе последний доклад окажется в итоге, но не в разбивке, и суммы в
+    // отчёте разойдутся без всякой причины.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    await runOvertimeTalk(stubs);
+    stubs.ipcHandlers.get('event-finish')(null);
+
+    const payload = stubs.lastSent('event-overrun-state');
+    assert.equal(payload.finished, true);
+    assert.ok(payload.talksCount >= 1, 'замороженный итог обязан иметь запись о последнем докладе');
+    stopTimer(stubs);
+});
+
+test('«Новое мероприятие» очищает журнал вместе с итогом', async () => {
+    // Стереть итог, оставив разбивку, — это отчёт о несуществующем.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    await runOvertimeTalk(stubs);
+    stubs.ipcHandlers.get('event-finish')(null);
+    stubs.ipcHandlers.get('event-reset')(null);
+
+    const payload = stubs.lastSent('event-overrun-state');
+    assert.equal(payload.overrunSeconds, 0);
+    assert.equal(payload.talksCount, 0);
+    stopTimer(stubs);
+});
