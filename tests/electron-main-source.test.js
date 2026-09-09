@@ -108,35 +108,66 @@ test('канал control-collapse объявлен в whitelist', () => {
     assert.ok(validator.ALLOWED_CHANNELS.send.includes('control-collapse'));
 });
 
-test('закрывающееся окно дисплея не считается открытым, а отложенное открытие имеет одного владельца', () => {
-    // Разбор — в шапке e2e/display-reopen-race.spec.js. Коротко: `displayWindow`
-    // остаётся живой ссылкой всё время, пока идёт выход из полноэкранного
-    // режима, и «открыть» принимало обречённое окно за работающее.
+test('закрывающееся окно не считается открытым — во ВСЕХ трёх окнах', () => {
+    // Разбор — в docs/lessons.md и в шапке e2e/window-reopen-race.spec.js.
+    // Коротко: `close()` разрушает окно сразу, а событие `closed` — то, что
+    // обнуляет ссылку в главном процессе — приходит следующим оборотом цикла.
+    // Команда «открыть», попавшая в зазор, видела живую ссылку и уходила в
+    // `focus()`; окно после этого закрывалось до конца, и его не оставалось.
     //
-    // Проверяется ТЕЛО обработчика, а не файл целиком: метка `_closing` есть и
-    // в closeDisplayWindow, и поиск по всему исходнику был бы зелёным при
+    // Проверяются ТЕЛА обработчиков, а не файл целиком: `isUsableWindow` есть
+    // в файле по определению, и поиск по всему исходнику был бы зелёным при
     // полностью пустом обработчике.
-    const body = ipcHandlerBody(source, 'open-display');
-    const code = codeOnly(body);
+    const OPENERS = ['open-widget', 'open-clock-widget', 'open-display'];
+    for (const channel of OPENERS) {
+        const code = codeOnly(ipcHandlerBody(source, channel));
+        assert.match(
+            code,
+            /isUsableWindow\(/,
+            `${channel}: ветка «просто сфокусировать» обязана спрашивать, не закрывается ли окно`
+        );
+        assert.match(
+            code,
+            /queueOpenAfterClose\(/,
+            `${channel}: запрос, пришедший во время закрытия, обязан быть ОТЛОЖЕН, а не потерян`
+        );
+    }
 
-    assert.match(
-        code,
-        /displayWindow\s*&&\s*!displayWindow\._closing/,
-        'ветка «просто сфокусировать» обязана спрашивать, не закрывается ли окно'
-    );
-    assert.match(
-        code,
-        /pendingDisplayOpen\s*!==\s*null/,
-        'второй запрос «открыть» во время закрытия обязан присоединяться к уже '
-        + 'запланированному, а не вешать свой обработчик closed'
+    // «Закрыть» отменяет отложенное открытие — иначе окно возрождается само.
+    for (const channel of ['close-widget', 'close-clock-widget', 'close-display']) {
+        assert.match(
+            codeOnly(ipcHandlerBody(source, channel)),
+            /cancelQueuedOpen\(/,
+            `${channel}: «закрыть» обязано отменять запланированное открытие`
+        );
+    }
+
+    // Метка «закрываюсь» ставится ВЕЗДЕ, где зовётся close(): у виджета и
+    // часов — и в обработчике канала, и в пункте трея (трей ходит МИМО IPC),
+    // у дисплея — в closeDisplayWindow.
+    //
+    // Считать вхождения `markClosing(` по всему файлу нельзя: в счёт попадает
+    // её собственное объявление, и проверка «вызовов не меньше четырёх»
+    // остаётся зелёной, когда один вызов убрали. Это не выдумка — ровно так
+    // первая версия этой проверки и прошла мутацию.
+    for (const channel of ['close-widget', 'close-clock-widget']) {
+        assert.match(
+            codeOnly(ipcHandlerBody(source, channel)),
+            /markClosing\(/,
+            `${channel}: закрытие обязано помечать окно, иначе «открыть» в тот же миг видит его живым`
+        );
+    }
+    const tray = codeOnly(functionBody(source, 'rebuildTrayMenu'));
+    const trayMarks = (tray.match(/markClosing\(/g) || []).length;
+    assert.equal(
+        trayMarks, 2,
+        `в rebuildTrayMenu ${trayMarks} пометок вместо двух (виджет и часы): трей закрывает окна МИМО IPC, `
+        + 'и без метки там дефект возвращается только для этого пути'
     );
 
-    // Метка ставится ВО ВСЕХ ветках закрытия, включая мгновенную: иначе
-    // не-полноэкранное окно (режим съёмки) осталось бы без защиты.
-    const closeBody = functionBody(source, 'closeDisplayWindow');
-    const closeCode = codeOnly(closeBody);
-    const markIdx = closeCode.indexOf('win._closing = true');
-    const fullscreenIdx = closeCode.indexOf('isFullScreen()');
+    const closeBody = codeOnly(functionBody(source, 'closeDisplayWindow'));
+    const markIdx = closeBody.indexOf('_closing = true');
+    const fullscreenIdx = closeBody.indexOf('isFullScreen()');
     assert.ok(markIdx > -1, 'closeDisplayWindow обязан помечать окно закрывающимся');
     assert.ok(
         markIdx < fullscreenIdx,
@@ -144,19 +175,23 @@ test('закрывающееся окно дисплея не считается
         + 'закрытие уходит без неё'
     );
 
-    // Команда «закрыть» отменяет отложенное открытие — иначе окно возродилось бы.
-    const closeHandler = codeOnly(ipcHandlerBody(source, 'close-display'));
+    // У отложенного открытия ОДИН владелец на все окна: два запроса, пришедшие
+    // пока окно закрывается, обязаны дать одно окно.
+    const queue = codeOnly(functionBody(source, 'queueOpenAfterClose'));
+    assert.match(queue, /pendingOpens\.has\(/, 'очередь обязана узнавать уже запланированное открытие');
+    assert.match(queue, /once\('closed'/, 'открытие обязано ждать события закрытия');
     assert.match(
-        closeHandler,
-        /pendingDisplayOpen\s*=\s*null/,
-        '«закрыть» обязано отменять запланированное открытие'
+        queue,
+        /setTimeout\(\s*run/,
+        'нужна страховка по времени: окно, не приславшее closed, не имеет права '
+        + 'сделать приложение НЕоткрываемым'
     );
 
-    // Проверка себя: на исходнике с вырезанной меткой тест обязан краснеть.
-    const mutated = code.replace('!displayWindow._closing', 'displayWindow');
+    // Проверка себя: на исходнике с вырезанной проверкой тест обязан краснеть.
+    const mutated = codeOnly(ipcHandlerBody(source, 'open-widget')).replace('isUsableWindow(', 'Boolean(');
     assert.doesNotMatch(
         mutated,
-        /displayWindow\s*&&\s*!displayWindow\._closing/,
+        /isUsableWindow\(/,
         'зонд сломан: он не отличает исходник с проверкой от исходника без неё'
     );
 });

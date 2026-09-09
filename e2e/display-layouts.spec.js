@@ -545,7 +545,7 @@ test('раскладка переживает переоткрытие окна 
         // закрывается оно через выход из полноэкранного режима — на
         // загруженном раннере это дольше любой зашитой паузы, и следующая
         // команда «открыть» попадала в середину закрытия. Разбор и защита в
-        // самом приложении — e2e/display-reopen-race.spec.js.
+        // самом приложении — e2e/window-reopen-race.spec.js.
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await waitForDisplayGone(app);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));

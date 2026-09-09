@@ -304,7 +304,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Часы и длительность не делят форматтер: у `current` всегда ЧЧ:ММ:СС и шесть створок, выбор — по реестру. Час суток — скрытый параметр теста (CRITICAL)** — [разбор](docs/lessons.md#a-clock-and-a-duration-cannot-share-a-formatter)
 - **Гейт перерисовки ключуется ВСЕМ, что красит — константа при нулевом тотале не просигналит смену в принципе, а дефект ВО ВРЕМЕНИ форма-тест не ловит: нужны реальное окно и ОДНА переменная (CRITICAL)** — [разбор](docs/lessons.md#a-repaint-gate-must-key-on-everything-it-paints)
 - **Полоса прогресса без тотала не рисуется вовсе: признак — сам тотал, а не имя режима; гасит её класс на `<body>`, не второй `!important`** — [разбор](docs/lessons.md#a-progress-strip-with-no-total-must-not-appear)
-- **Закрывающееся окно — НЕ открытое: «открыть» спрашивает не «есть ли объект», а «будет ли он жив»; у отложенного открытия один владелец (CRITICAL)** — [разбор](docs/lessons.md#a-closing-window-is-not-an-open-window)
+- **Закрывающееся окно — НЕ открытое (у ЛЮБОГО из четырёх, не только полноэкранного): «открыть» спрашивает не «есть ли объект», а «будет ли он жив»; отложенное открытие — ОДИН реестр на все окна, метку закрытия ставят и пути мимо IPC, включая трей (CRITICAL)** — [разбор](docs/lessons.md#a-closing-window-is-not-an-open-window)
 - **Окно в e2e ждут ОПРОСОМ, а не событием `window`: событие приходит раз и теряется, если окно опередило подписку** — [разбор](docs/lessons.md#an-event-fires-once-a-poll-is-always-right)
 - **Бюджет e2e-теста — ОДНА величина в `playwright.config.js`; свой `test.setTimeout` только ПОДНИМАЕТ его** — [разбор](docs/lessons.md#a-test-budget-is-a-setting-with-one-owner)
 

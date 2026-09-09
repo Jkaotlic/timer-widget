@@ -118,6 +118,82 @@ let timerInterval = null;
 const FULLSCREEN_EXIT_TIMEOUT_MS = 2000;
 
 /**
+ * Страховка отложенного открытия: сколько ждать события `closed`, прежде чем
+ * открыть окно всё равно.
+ *
+ * Та же логика, что у страховки выхода из полноэкранного режима: защита,
+ * превращающая окно в НЕоткрываемое, хуже той беды, от которой защищались.
+ */
+const WINDOW_REOPEN_TIMEOUT_MS = 3000;
+
+/**
+ * Отложенные открытия окон: ключ окна → чем его создать, когда старое уйдёт.
+ *
+ * Зачем это вообще нужно. Окно закрывается не мгновенно: `close()` разрушает
+ * его сразу, а событие `closed` — то, что обнуляет ссылку здесь, в главном
+ * процессе, — приходит следующим оборотом цикла (у полноэкранного дисплея
+ * зазор ещё длиннее: сначала выход из полноэкранного режима). Команда
+ * «открыть», попавшая в этот зазор, видела живую ссылку, считала окно
+ * работающим и уходила в `focus()`. Потом закрытие доводилось до конца, и окна
+ * не оставалось совсем.
+ *
+ * Замерено 09.09.2026 на всех трёх окнах: `close` и `open` без паузы между
+ * ними оставляли приложение с одним окном — панелью. Сценарий человеческий:
+ * нажать клавишу закрытия и тут же клавишу открытия.
+ *
+ * Владелец у отложенного открытия ОДИН, поэтому здесь Map, а не флаг на
+ * каждое окно: два запроса «открыть», пришедшие пока окно закрывается, обязаны
+ * дать ОДНО окно. Второе стало бы неуправляемым — ссылка (`widgetWindow` и
+ * прочие) указывает только на последнее созданное.
+ */
+const pendingOpens = new Map();
+
+/** Пометить окно закрывающимся. Ставится ВЕЗДЕ, где зовётся close(). */
+function markClosing(win) {
+    if (win && !win.isDestroyed()) { win._closing = true; }
+    return win;
+}
+
+/** Окно, которое можно показать: оно есть, не закрывается и не разрушено. */
+function isUsableWindow(win) {
+    return !!win && !win._closing && !win.isDestroyed();
+}
+
+/**
+ * Запланировать открытие окна на момент, когда закрывающееся уйдёт.
+ *
+ * @param {string} key — какое окно ('widget' | 'clock' | 'display')
+ * @param {object|null} closing — закрывающееся окно; null, если запрос просто
+ *        присоединяется к уже запланированному
+ * @param {Function} create — чем создать новое окно
+ * @returns {boolean} true — запланировано, звонящий обязан выйти
+ */
+function queueOpenAfterClose(key, closing, create) {
+    // Уже запланировано: последний запрос побеждает — пока окно закрывалось,
+    // человек мог выбрать другой монитор.
+    if (pendingOpens.has(key)) {
+        pendingOpens.set(key, create);
+        return true;
+    }
+    if (!closing) { return false; }
+
+    pendingOpens.set(key, create);
+    const run = () => {
+        // Пусто — значит пришла команда «закрыть»: человек передумал.
+        if (!pendingOpens.has(key)) { return; }
+        const make = pendingOpens.get(key);
+        pendingOpens.delete(key);
+        make();
+    };
+    closing.once('closed', run);
+    setTimeout(run, WINDOW_REOPEN_TIMEOUT_MS);
+    return true;
+}
+
+/** Отменить отложенное открытие: «закрыть» отменяет «открыть». */
+function cancelQueuedOpen(key) { pendingOpens.delete(key); }
+
+/**
  * Накопитель перелимита мероприятия — скрытый режим «47-й этаж».
  *
  * Здесь лежит единственная величина, которую нельзя пересчитать заново:
@@ -235,15 +311,6 @@ timerState = timerController.getState();
 let lastDisplaySettings = null;
 let lastDisplayIndex = 'auto';
 
-/**
- * Монитор, на котором дисплей откроется, КАК ТОЛЬКО закроется текущее окно.
- *
- * `null` — отложенного открытия нет. Владелец у него ровно один: два запроса
- * «открыть», пришедшие пока окно закрывается, обязаны дать ОДНО окно, а не
- * два — второе оказалось бы неуправляемым, потому что `displayWindow`
- * указывал бы только на одно из них.
- */
-let pendingDisplayOpen = null;
 
 // Per-window colors (independent themes)
 let lastWidgetColors = null;
@@ -980,12 +1047,12 @@ function rebuildTrayMenu() {
             controlWindow.focus();
         }},
         { label: 'Виджет', type: 'checkbox', checked: widgetOpen, click: () => {
-            if (widgetWindow) { widgetWindow.close(); }
+            if (widgetWindow) { cancelQueuedOpen('widget'); markClosing(widgetWindow).close(); }
             else { createWidgetWindow(); }
             setTimeout(updateTrayMenu, 200);
         }},
         { label: 'Часы', type: 'checkbox', checked: clockOpen, click: () => {
-            if (clockWidgetWindow) { clockWidgetWindow.close(); }
+            if (clockWidgetWindow) { cancelQueuedOpen('clock'); markClosing(clockWidgetWindow).close(); }
             else { createClockWidgetWindow(); }
             setTimeout(updateTrayMenu, 200);
         }},
@@ -1474,16 +1541,22 @@ ipcMain.on('display-settings-update', (event, settings) => {
 // Обработчик намеренно тонкий: рассылка состояния и досылка настроек живут в
 // createWidgetWindow, потому что окно открывают ещё и из трея — мимо этого канала.
 ipcMain.on('open-widget', () => {
-    if (!widgetWindow) {
-        createWidgetWindow();
-    } else {
+    // ЗАКРЫВАЮЩЕЕСЯ окно открытым не считается — см. pendingOpens выше.
+    if (isUsableWindow(widgetWindow)) {
         widgetWindow.focus();
+        return;
     }
+    if (widgetWindow && queueOpenAfterClose('widget', widgetWindow, createWidgetWindow)) {
+        return;
+    }
+    createWidgetWindow();
 });
 
 ipcMain.on('close-widget', () => {
+    // «Закрыть» отменяет отложенное открытие: человек передумал.
+    cancelQueuedOpen('widget');
     if (widgetWindow) {
-        widgetWindow.close();
+        markClosing(widgetWindow).close();
         // Уведомление отправится в обработчике 'closed' события окна
     }
 });
@@ -1547,16 +1620,20 @@ ipcMain.on('reset-and-relaunch', async () => {
 // Виджет часов
 // Тонкий обработчик — см. комментарий у open-widget.
 ipcMain.on('open-clock-widget', () => {
-    if (!clockWidgetWindow) {
-        createClockWidgetWindow();
-    } else {
+    if (isUsableWindow(clockWidgetWindow)) {
         clockWidgetWindow.focus();
+        return;
     }
+    if (clockWidgetWindow && queueOpenAfterClose('clock', clockWidgetWindow, createClockWidgetWindow)) {
+        return;
+    }
+    createClockWidgetWindow();
 });
 
 ipcMain.on('close-clock-widget', () => {
+    cancelQueuedOpen('clock');
     if (clockWidgetWindow) {
-        clockWidgetWindow.close();
+        markClosing(clockWidgetWindow).close();
         // Уведомление отправится в обработчике 'closed' события окна
     }
 });
@@ -1607,11 +1684,9 @@ ipcMain.on('open-display', (event, options) => {
     lastDisplayIndex = displayIndex;
 
     // Открытие уже запланировано на закрытие текущего окна — владелец у него
-    // один. Второй обработчик `closed` создал бы ВТОРОЕ окно дисплея, и одно
-    // из них перестало бы слушаться и кнопки, и клавиши D: ссылка `displayWindow`
-    // указывает только на последнее созданное.
-    if (pendingDisplayOpen !== null) {
-        pendingDisplayOpen = displayIndex;
+    // один (pendingOpens), и последний запрошенный монитор побеждает: пока
+    // окно закрывалось, человек мог выбрать другой экран.
+    if (queueOpenAfterClose('display', null, () => createDisplayWindow(displayIndex))) {
         return;
     }
 
@@ -1622,8 +1697,8 @@ ipcMain.on('open-display', (event, options) => {
     // без этой проверки «закрыть, тут же открыть» фокусировало обречённое окно
     // и выходило — а через мгновение дисплея не оставалось совсем. Замерено
     // 09.09.2026: без паузы между командами приложение оставалось с одним
-    // окном, панелью. Спека — e2e/display-reopen-race.spec.js.
-    if (displayWindow && !displayWindow._closing && displayIndex === displayWindow._displayIndex) {
+    // окном, панелью. Спека — e2e/window-reopen-race.spec.js.
+    if (isUsableWindow(displayWindow) && displayIndex === displayWindow._displayIndex) {
         displayWindow.focus();
         return;
     }
@@ -1638,18 +1713,7 @@ ipcMain.on('open-display', (event, options) => {
         const closing = displayWindow;
         closeDisplayWindow();
         displayWindow = null;
-        if (!closing.isDestroyed()) {
-            // Индекс держим в переменной, а не в замыкании: пока окно
-            // закрывается, запрос может смениться на другой монитор, и
-            // открыться обязан последний запрошенный.
-            pendingDisplayOpen = displayIndex;
-            closing.once('closed', () => {
-                const idx = pendingDisplayOpen;
-                pendingDisplayOpen = null;
-                // `null` значит «пока мы ждали, пришла команда ЗАКРЫТЬ»:
-                // человек передумал, и открывать уже нечего.
-                if (idx !== null) { createDisplayWindow(idx); }
-            });
+        if (queueOpenAfterClose('display', closing, () => createDisplayWindow(displayIndex))) {
             return;
         }
     }
@@ -1726,7 +1790,7 @@ ipcMain.on('close-display', () => {
     // «Закрыть» отменяет отложенное открытие: если оно было запланировано на
     // конец текущего закрытия, человек только что передумал, и окно, которое
     // он закрывает, не должно возродиться само.
-    pendingDisplayOpen = null;
+    cancelQueuedOpen('display');
     // Уведомление отправится в обработчике 'closed' события окна.
     closeDisplayWindow();
 });

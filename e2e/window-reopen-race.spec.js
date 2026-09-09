@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Переоткрытие дисплея сразу после закрытия.
+ * Переоткрытие окна сразу после закрытия — все три окна.
  *
  * Жалоба нашлась не от человека, а из CI: `display-layouts:535` («раскладка
  * переживает переоткрытие окна дисплея») падал на macOS-раннере в трёх
@@ -26,11 +26,21 @@
  *
  * Правило: закрывающееся окно — НЕ открытое окно. Команда «открыть» обязана
  * спросить не «есть ли объект», а «будет ли он жив».
+ *
+ * ТО ЖЕ САМОЕ у виджета и часов, и полноэкранный режим тут ни при чём: `close()`
+ * разрушает окно сразу, а событие `closed` — то, что обнуляет ссылку в главном
+ * процессе, — приходит следующим оборотом цикла. Замер 09.09.2026: `close-widget`
+ * и `open-widget` без паузы между ними оставляли приложение с одним окном,
+ * панелью; у часов так же. Сценарий человеческий: нажать клавишу закрытия и тут
+ * же клавишу открытия.
  */
 
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForDisplay, findDisplay } = require('./window-ready');
+const {
+    waitForDisplay, findDisplay, waitForWidget, waitForClock, findWindowBy,
+    WIDGET_PROBE, CLOCK_PROBE
+} = require('./window-ready');
 
 /** Сколько ждать, прежде чем спросить реальность: заведомо больше закрытия. */
 const SETTLE_MS = 6000;
@@ -117,3 +127,37 @@ test('два «открыть» подряд во время закрытия д
         await app.close();
     }
 });
+
+// Виджет и часы: та же гонка, тот же общий механизм в главном процессе.
+const SMALL_WINDOWS = [
+    { who: 'виджет', open: 'open-widget', close: 'close-widget', wait: waitForWidget, probe: WIDGET_PROBE },
+    { who: 'часы', open: 'open-clock-widget', close: 'close-clock-widget', wait: waitForClock, probe: CLOCK_PROBE }
+];
+
+for (const w of SMALL_WINDOWS) {
+    test(`${w.who}: закрыть и сразу открыть — окно остаётся`, async () => {
+        const { app, control } = await launchApp();
+        try {
+            await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open);
+            await w.wait(app);
+
+            await control.evaluate(([close, open]) => {
+                window.ipcRenderer.send(close);
+                window.ipcRenderer.send(open);
+            }, [w.close, w.open]);
+
+            await control.waitForTimeout(4000);
+            const found = await findWindowBy(app, w.probe);
+            expect(
+                found,
+                `${w.who}: после close→open окно обязано существовать — команду «открыть» `
+                + 'проглотило закрытие, которое ещё шло'
+            ).not.toBeNull();
+
+            // Закрываем за собой: профиль e2e общий на прогон.
+            await control.evaluate((ch) => window.ipcRenderer.send(ch), w.close);
+        } finally {
+            await app.close();
+        }
+    });
+}
