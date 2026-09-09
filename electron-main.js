@@ -250,6 +250,16 @@ let lastWidgetColors = null;
 let lastClockColors = null;
 let lastDisplayColors = null;
 let lastWidgetStyle = null;
+/**
+ * Настройки окна часов (дата, пояс, секунды, 24 ч, цифры циферблата).
+ *
+ * Главный процесс их ПОМНИТ, а не только ретранслирует: окно, открытое после
+ * того как панель прислала настройки, иначе узнавало бы о них только потому,
+ * что читает тот же localStorage. Там, где эта подпорка не работает — гонка
+ * старта в режиме съёмки, когда окна успевают прочитать хранилище раньше, чем
+ * панель туда пишет, — снимок и нужен.
+ */
+let lastClockSettings = null;
 
 // Block Ctrl+=/- keyboard zoom and Ctrl+Wheel page zoom on all windows
 function blockZoom(win) {
@@ -758,6 +768,10 @@ function createClockWidgetWindow() {
         // Настройки дисплея несут стиль часов (clockStyle) и цифры циферблата
         if (lastDisplaySettings) {
             safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
+        }
+        // Свои настройки окна часов — тумблеры даты, пояса, секунд и формата.
+        if (lastClockSettings) {
+            safelySendToWindow(win, 'clock-settings', lastClockSettings);
         }
         if (lastClockColors) {
             safelySendToWindow(win, 'clock-colors-update', lastClockColors);
@@ -1565,6 +1579,13 @@ ipcMain.on('clock-widget-set-style', (event, style) => {
 
 // Настройки виджета часов (дата, часовой пояс и т.д.)
 ipcMain.on('clock-widget-settings', (event, settings) => {
+    // Снимок НАКАПЛИВАЕТСЯ: панель шлёт и частичные наборы (например только
+    // три тумблера из девяти), а окну, открытому позже, нужна вся картина.
+    // Простое присваивание отдало бы ему последнее сообщение и стёрло всё
+    // остальное.
+    if (isPayloadObject(settings)) {
+        lastClockSettings = Object.assign({}, lastClockSettings, settings);
+    }
     safelySendToWindow(clockWidgetWindow, 'clock-settings', settings);
 });
 

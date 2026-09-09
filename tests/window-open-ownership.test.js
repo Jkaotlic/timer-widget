@@ -45,7 +45,14 @@ const WINDOWS = [
         create: 'createClockWidgetWindow',
         channel: 'clock-window-state',
         opener: 'open-clock-widget',
-        hydration: ['display-settings-update', 'clock-colors-update']
+        // `clock-settings` (дата, пояс, секунды, 24 ч, цифры циферблата)
+        // досылается с 09.09.2026. До этого главный процесс канал только
+        // РЕТРАНСЛИРОВАЛ и ничего о нём не помнил: окно, открытое после того
+        // как панель прислала настройки, знало о них лишь потому, что читает
+        // тот же localStorage. Ровно там, где эта подпорка не работает —
+        // гонка старта в режиме съёмки, когда окна успевают прочитать
+        // хранилище раньше, чем панель туда пишет, — снапшот и нужен.
+        hydration: ['display-settings-update', 'clock-colors-update', 'clock-settings']
     },
     {
         create: 'createDisplayWindow',
@@ -135,5 +142,25 @@ test('payload из рендерера нормализуется, а не дес
         openDisplay,
         /if\s*\(!isPayloadObject\([A-Za-z_$][\w$]*\)\)\s*\{\s*return/,
         'open-display без payload обязан работать — это клавиша D в виджете и часах'
+    );
+});
+
+test('главный процесс ПОМНИТ настройки часов, а не только ретранслирует их', () => {
+    // Досылать нечего, если обработчик канала ничего не сохраняет. Это вторая
+    // половина того же снапшота, и без неё первая зелёная и бесполезная.
+    const body = ipcHandlerBody(source, 'clock-widget-settings');
+    assert.match(
+        body,
+        /lastClockSettings\s*=/,
+        'clock-widget-settings обязан запоминать настройки — иначе новому окну нечего досылать'
+    );
+    // Панель шлёт и ЧАСТИЧНЫЕ наборы (тест e2e digits-style шлёт три поля из
+    // девяти). Снимок обязан накапливаться, иначе досылка стирает всё, чего
+    // не было в последнем сообщении.
+    assert.match(
+        body,
+        /(\.\.\.\s*\(?\s*lastClockSettings|Object\.assign\(\s*\{\s*\}\s*,\s*lastClockSettings)/,
+        'снимок настроек часов обязан НАКАПЛИВАТЬСЯ: панель шлёт и частичные наборы. '
+        + 'Годится и спред, и Object.assign — проверяется накопление, а не синтаксис'
     );
 });
