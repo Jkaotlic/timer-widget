@@ -35,7 +35,6 @@ const slotState = (control) => control.evaluate(() => {
 });
 
 test('ячейка записывает вид и возвращает его КЛИКОМ', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         // Профиль e2e общий: начинаем с пустых ячеек, иначе тест мерил бы
@@ -122,7 +121,6 @@ test('ячейка записывает вид и возвращает его К
 });
 
 test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.removeItem('uiPresets'));
@@ -176,7 +174,6 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
  * хуже её отсутствия — она утверждает неправду о том, что на экране.
  */
 test('ячейка помечается применённой и гаснет, когда вид разошёлся', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.removeItem('uiPresets'));
@@ -272,7 +269,6 @@ test('ячейка помечается применённой и гаснет, 
  * Здесь меряется тот самый сценарий: три клика подряд и ЦВЕТ каждой ячейки.
  */
 test('три ячейки подряд: применённой остаётся одна, остальные — записанные', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => {
@@ -335,7 +331,6 @@ test('три ячейки подряд: применённой остаётся 
  * поле — ровно так он и выглядел бы, будучи записанным до появления настройки.
  */
 test('пресет, записанный прошлой версией, всё равно помечается применённым', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.removeItem('uiPresets'));

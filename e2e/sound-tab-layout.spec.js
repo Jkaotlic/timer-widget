@@ -15,7 +15,6 @@ const { launchApp } = require('./launch');
  * Ширину ящика задаёт приложение, поэтому цифры берутся из ОКНА.
  */
 test('в списках звуков ничего не обрезано, а колонки выровнены', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.clear());
@@ -91,7 +90,6 @@ test('в списках звуков ничего не обрезано, а ко
  * нет», и «замер смотрит не туда».
  */
 test('строки звуков не обведены рамкой — вкладка не забор из карточек', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.click('.wrow:has(#soundMasterToggle) .wrow-chevron');

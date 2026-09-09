@@ -135,7 +135,6 @@ test('«Сбросить всё» возвращает окно к виду чи
  * Отсюда две проверки: фон вернулся к чистому И чужое окно не тронуто.
  */
 test('«Сбросить фон по умолчанию» возвращает фон и НЕ красит виджет', async () => {
-    test.setTimeout(120000);
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.clear());
