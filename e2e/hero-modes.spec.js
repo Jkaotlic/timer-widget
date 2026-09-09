@@ -201,11 +201,20 @@ test.describe('режимы центрального времени', () => {
         const { app, control } = await launchApp();
         try {
             const display = await openDisplay(app, control);
+
+            // Пресет жмётся ДО открытия ящика настроек. Ящик — НАКЛАДКА
+            // (panel-drawer.js), и на узком окне он ложится поверх ряда
+            // пресетов: на macOS-раннере клик 30 секунд перехватывал
+            // `.toggle-row` из `#settingsDrawer.open`, локально при более
+            // широком окне — нет. Это не дефект приложения: ширину, при
+            // которой ящик не накрывает панель, сторожит drawer-layout.spec.js.
+            // Дефект был в ПОРЯДКЕ теста, и лечится он порядком, а не ожиданием.
+            await control.locator('.preset[data-minutes="5"]').click();
+
             await openDisplayTab(control);
 
             // Режим «Таймер» — как было до 08.09.2026.
             await pickMode(control, 'timer');
-            await control.locator('.preset[data-minutes="5"]').click();
             await expect.poll(() => heroText(display)).toMatch(/^05:00$/);
 
             // Мероприятие с 00:01 до 23:59: начало заведомо прошло, конец заведомо
