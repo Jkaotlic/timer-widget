@@ -301,7 +301,8 @@ const BUILT_BY_MODULE = new Map([
     ...DL.SECRET_ELEMENTS.map((el) => [el.toggle, 'floor47Mount']),
     ['overrunPrice', 'floor47Mount'],
     ['overrunPeriod', 'floor47Mount'],
-    ['floor47Unlocked', 'floor47Mount']
+    ['floor47Unlocked', 'floor47Mount'],
+    ['reportOnlyOverruns', 'floor47Mount']
 ]);
 
 test('каждый контрол из таблицы существует в разметке панели', () => {

@@ -123,6 +123,7 @@
       "color-utils.js",
       "renderer-shared.js",
       "money-meter.js",
+      "event-report.js",
       "settings-schema.js",
       "clock-settings-schema.js",
       "ui-theme.js",

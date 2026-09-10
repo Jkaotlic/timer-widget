@@ -166,6 +166,10 @@ const SETTINGS_DESCRIPTORS = [
     { key: 'showTotalCost', el: 'showTotalCost', kind: 'checkbox', def: false, owner: 'display' },
     { key: 'labelOverrunCost', el: 'labelOverrunCost', kind: 'value', def: '', owner: 'display' },
     { key: 'labelTotalCost', el: 'labelTotalCost', kind: 'value', def: '', owner: 'display' },
+    // Фильтр отчёта о перелимите: скрыть доклады, уложившиеся в срок. По
+    // умолчанию ВЫКЛЮЧЕН — в отчёте все доклады; иначе отчёт по мероприятию без
+    // перелимитов оказался бы пустым, и человек решил бы, что выгрузка сломана.
+    { key: 'reportOnlyOverruns', el: 'reportOnlyOverruns', kind: 'checkbox', def: false, owner: 'display' },
     // Владелец 'display' даёт следствие: сброс настроек дисплея ЗАПИРАЕТ режим
     // обратно. Это осознанно — сброс обязан возвращать приложение к обычному
     // виду, а повторный тройной клик стоит секунды.

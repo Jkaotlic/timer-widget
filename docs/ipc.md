@@ -41,6 +41,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `sound-toggle` | Без payload: окно просит панель переключить мастер-звук (клавиша `Z`). Значение принадлежит панели — она же и играет; присланное окном значение спорило бы с ней. Тот же приём, что у `preset-apply` |
 | `event-finish` | Скрытый режим «47-й этаж»: завершить мероприятие — закрыть текущий перелимит и заморозить итог. Полезной нагрузки нет: величину знает главный процесс |
 | `event-reset` | Скрытый режим «47-й этаж»: новое мероприятие — обнулить накопитель. Полезной нагрузки нет |
+| `event-export` | Скрытый режим «47-й этаж»: выгрузить отчёт о перелимите в CSV. Полезной нагрузки нет: журнал и итог живут в главном процессе, ставка и название мероприятия приходят туда же с `display-settings-update` |
 | `ui-theme-update` | `{ theme: 'dark' \| 'light' }` — sent by the panel only; main validates against a whitelist and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide) |
 | `toggle-fullscreen` | Toggle fullscreen on the sender's window |
 | `reset-and-relaunch` | Clear all storage and quit |
@@ -62,6 +63,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `display-layout` | `{ layout }` — дисплею: разложить элементы по готовой раскладке |
 | `sound-toggle` | Без payload: панели — переключить мастер-звук (см. одноимённый канал в send) |
 | `event-overrun-state` | Дисплею И панели: `{ overrunSeconds, finished, excludedLiveSeconds }` — накопитель перелимита мероприятия. СЕКУНДЫ, а не рубли: ставку знает окно, и поправленная посреди мероприятия она обязана пересчитать накопленное. Дисплей рисует деньги залу, панель отчитывается оператору строкой «Идёт / Завершено»; итог оба собирают ОДНОЙ `MoneyMeter.eventSummary`. Payload собран в одном месте (`eventOverrunPayload()`) — рассылка и гидратация окна расходились полем `excludedLiveSeconds` |
+| `event-export-done` | Результат выгрузки: `{ ok, canceled, path, rows, error }`. Ответ обязателен в любом исходе, кроме отмены — кнопка без ответа читается как сломанная |
 | `displays-list` | Array of available displays |
 | `set-clock-style` / `clock-settings` | Clock widget settings |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |

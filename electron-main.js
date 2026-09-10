@@ -17,8 +17,9 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const log = require('electron-log/main');
 const { safelySendToWindow, formatTimeShort } = require('./utils');
 const CONFIG = require('./constants');
@@ -28,6 +29,7 @@ const { fitScaledBounds, fitRestoredBounds } = require('./window-geometry');
 const recovery = require('./recovery');
 const MoneyMeter = require('./money-meter');
 const OverrunStore = require('./event-overrun-store');
+const EventReport = require('./event-report');
 
 // Logger setup
 log.initialize();
@@ -206,7 +208,7 @@ function cancelQueuedOpen(key) { pendingOpens.delete(key); }
  * накопитель, и общая сумма при этом не дёргается: у дисплея из неё уходит
  * ровно столько, сколько приходит.
  */
-let eventOverrun = { overrunSeconds: 0, finished: false };
+let eventOverrun = { overrunSeconds: 0, finished: false, talks: [] };
 let liveOverrunSeconds = 0;
 
 /**
@@ -232,7 +234,15 @@ let excludedLiveSeconds = 0;
  * записано «перед добавлением поля в payload соберите payload в одном месте».
  */
 function eventOverrunPayload() {
-    return Object.assign({ excludedLiveSeconds }, eventOverrun);
+    // Панели уходит СЧЁТЧИК записей, а не сам журнал: он бывает на пятьсот
+    // строк, а рассылается это состояние каждую секунду. Всё, что панели нужно
+    // от журнала, — знать, есть ли что выгружать; сам отчёт собирает главный
+    // процесс, у которого журнал и лежит.
+    return Object.assign(
+        { excludedLiveSeconds, talksCount: eventOverrun.talks.length },
+        eventOverrun,
+        { talks: undefined }
+    );
 }
 
 /**
@@ -264,7 +274,68 @@ function persistEventOverrun() {
  * После завершения мероприятия накопитель заморожен: перелимиты в него больше
  * не идут, пока не начато новое.
  */
+/**
+ * Текущий доклад: шёл ли таймер, прошла ли хоть секунда, сколько перелимита
+ * доклад уже набрал.
+ *
+ * Отдельного сигнала «доклад начался / кончился» в приложении нет, и заводить
+ * его не нужно: конец доклада — это возврат ЗАПУЩЕННОГО таймера в покой. Сброс
+ * и новый пресет дают одно и то же состояние (см. isAtRest). Пресет, который
+ * поставили и не запускали, докладом не считается — иначе журнал наполнялся бы
+ * строками от перебора пресетов; старт и тут же сброс — тоже, секунда не прошла.
+ *
+ * Перелимит копится ЗДЕСЬ, а не пишется в журнал сразу при выходе из минуса:
+ * время можно добавить прямо в перелимите, таймер выйдет из минуса, а доклад
+ * продолжится. Одна запись на доклад, её перелимит — сумма.
+ *
+ * `skip` — доклад, шедший в момент «Нового мероприятия»: к новому он не
+ * относится, по тому же принципу, что и отсечка минуса (excludedLiveSeconds).
+ */
+function freshTalk() {
+    return { active: false, elapsed: false, overrun: 0, skip: false };
+}
+let currentTalk = freshTalk();
+
+/** Покой: остаток равен тоталу, таймер не идёт и не на паузе. Так выглядят и сброс, и новый пресет. */
+function isAtRest(state) {
+    return !!state && !state.isRunning && !state.isPaused && !state.finished
+        && Number(state.remainingSeconds) === Number(state.totalSeconds);
+}
+
+function trackTalk(state) {
+    if (state.isRunning) { currentTalk.active = true; }
+    if (currentTalk.active && Number(state.remainingSeconds) < Number(state.totalSeconds)) {
+        currentTalk.elapsed = true;
+    }
+}
+
+/**
+ * Дописать закрытый доклад в журнал.
+ *
+ * Зовётся из ДВУХ мест — тика (доклад вышел из минуса) и «Завершить
+ * мероприятие», — и потому существует отдельно: два экземпляра этой арифметики
+ * разошлись бы номерами.
+ *
+ * Потолок тот же, что в хранилище: журнал пишется на диск синхронно. Итог при
+ * обрезке не страдает — он живёт отдельным числом.
+ */
+function appendTalk(seconds) {
+    // Ноль — законная запись: доклад уложился в срок.
+    const overrun = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+    const talks = eventOverrun.talks.concat([{
+        n: eventOverrun.talks.length + 1,
+        endedAt: new Date().toISOString(),
+        overrunSeconds: overrun
+    }]);
+    return talks.slice(-OverrunStore.MAX_TALKS).map((talk, i) => ({
+        n: i + 1,
+        endedAt: talk.endedAt,
+        overrunSeconds: talk.overrunSeconds
+    }));
+}
+
 function accrueOverrun(state) {
+    trackTalk(state);
     // Считается перелимит ЗА ВЫЧЕТОМ отсечки: секунды, натикавшие до «Нового
     // мероприятия», к нему не относятся.
     const live = MoneyMeter.liveOverrun(state.remainingSeconds, excludedLiveSeconds);
@@ -278,12 +349,30 @@ function accrueOverrun(state) {
         excludedLiveSeconds = 0;
         broadcastEventOverrun();
     }
-    if (liveOverrunSeconds <= 0) { return; }
-    eventOverrun = {
-        overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
-        finished: eventOverrun.finished
-    };
-    liveOverrunSeconds = 0;
+
+    let changed = false;
+    if (liveOverrunSeconds > 0) {
+        // Итог растёт СРАЗУ — он виден на экране. Доклад же свой перелимит
+        // только копит: запись о нём появится, когда он кончится.
+        eventOverrun = Object.assign({}, eventOverrun, {
+            overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds
+        });
+        currentTalk.overrun += liveOverrunSeconds;
+        // Перелимит без запущенного доклада невозможен; помечаем явно, чтобы
+        // секунды итога никогда не остались без строки в журнале.
+        currentTalk.active = true;
+        currentTalk.elapsed = true;
+        liveOverrunSeconds = 0;
+        changed = true;
+    }
+    if (currentTalk.active && isAtRest(state)) {
+        if (currentTalk.elapsed && !currentTalk.skip && !eventOverrun.finished) {
+            eventOverrun = Object.assign({}, eventOverrun, { talks: appendTalk(currentTalk.overrun) });
+            changed = true;
+        }
+        currentTalk = freshTalk();
+    }
+    if (!changed) { return; }
     persistEventOverrun();
     broadcastEventOverrun();
 }
@@ -1878,23 +1967,97 @@ ipcMain.on('sound-toggle', () => {
 // итог. Полезной нагрузки нет — это ДЕЙСТВИЕ, а не настройка: величину знает
 // главный процесс, и присланная окном спорила бы с ней.
 ipcMain.on('event-finish', () => {
+    // Последний доклад тоже запись: иначе он окажется в итоге, но не в
+    // разбивке, и суммы в отчёте разойдутся без всякой причины. Записывается
+    // он, только если шёл, — завершение из покоя доклада не выдумывает.
+    const record = !eventOverrun.finished && !currentTalk.skip
+        && (currentTalk.elapsed || liveOverrunSeconds > 0);
     eventOverrun = {
         overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
-        finished: true
+        finished: true,
+        talks: record ? appendTalk(currentTalk.overrun + liveOverrunSeconds) : eventOverrun.talks
     };
     liveOverrunSeconds = 0;
+    currentTalk = freshTalk();
     persistEventOverrun();
     broadcastEventOverrun();
+});
+
+// Выгрузить отчёт о перелимите файлом.
+//
+// Payload нет: и журнал, и итог живут ЗДЕСЬ, а ставка с названием мероприятия
+// приходят в `lastDisplaySettings` тем же каналом, что и остальные настройки
+// дисплея. Присланные окном значения спорили бы с этими — и отчёт разошёлся бы
+// с тем, что показано на экране.
+//
+// Ответ обязателен в любом исходе. Кнопка, после которой ничего не происходит
+// и ничего не сказано, читается как сломанное окно; молчаливый выход в этом
+// проекте уже стоил отдельной сессии разбора.
+ipcMain.on('event-export', async (event) => {
+    const answer = (payload) => {
+        safelySendToWindow(controlWindow, 'event-export-done', payload);
+        // Отвечаем и тому, кто спросил: канал может позвать не только панель.
+        if (event && event.sender && !event.sender.isDestroyed()) {
+            try { event.sender.send('event-export-done', payload); } catch { /* окно закрылось */ }
+        }
+    };
+
+    try {
+        const settings = lastDisplaySettings || {};
+        const report = EventReport.buildReportCSV({
+            talks: eventOverrun.talks,
+            // Итог берётся тот же, что показан на экране: накопленное плюс
+            // текущий минус, если мероприятие ещё идёт.
+            overrunSeconds: MoneyMeter.totalSeconds(
+                eventOverrun.overrunSeconds,
+                eventOverrun.finished ? 0 : timerState.remainingSeconds,
+                excludedLiveSeconds
+            ),
+            finished: eventOverrun.finished,
+            title: settings.eventTitle,
+            price: settings.overrunPrice,
+            period: settings.overrunPeriod,
+            // Фильтр — такая же настройка дисплея, как ставка: у просьбы о
+            // выгрузке payload нет, и отдельного источника у него быть не должно.
+            onlyOverruns: settings.reportOnlyOverruns === true,
+            now: new Date()
+        });
+
+        const stamp = new Date().toISOString().slice(0, 10);
+        const result = await dialog.showSaveDialog({
+            title: 'Сохранить отчёт о перелимите',
+            defaultPath: `перелимит-${stamp}.csv`,
+            filters: [{ name: 'CSV', extensions: ['csv'] }]
+        });
+
+        if (!result || result.canceled || !result.filePath) {
+            answer({ ok: false, canceled: true });
+            return;
+        }
+
+        fs.writeFileSync(result.filePath, report.csv, 'utf8');
+        log.info(`[export] отчёт записан: ${result.filePath} (${report.rows} строк)`);
+        answer({ ok: true, canceled: false, path: result.filePath, rows: report.rows });
+    } catch (err) {
+        log.error('[export] отчёт не записан:', err);
+        answer({ ok: false, canceled: false, error: (err && err.message) || String(err) });
+    }
 });
 
 // Начать новое мероприятие: обнулить накопитель. Необратимо — подтверждение
 // спрашивает панель, здесь его повторять негде.
 ipcMain.on('event-reset', () => {
-    eventOverrun = { overrunSeconds: 0, finished: false };
+    eventOverrun = { overrunSeconds: 0, finished: false, talks: [] };
     liveOverrunSeconds = 0;
     // Текущий минус к новому мероприятию не относится — отсекаем его целиком,
     // иначе на экране осталась бы прежняя сумма.
     excludedLiveSeconds = MoneyMeter.overrunSeconds(timerState.remainingSeconds);
+    // И текущий ДОКЛАД к нему не относится по тому же принципу. Из покоя
+    // «Новое мероприятие» ничего не отсекает: следующий доклад — уже его.
+    currentTalk = Object.assign(freshTalk(), {
+        active: !isAtRest(timerState),
+        skip: !isAtRest(timerState)
+    });
     persistEventOverrun();
     broadcastEventOverrun();
 });

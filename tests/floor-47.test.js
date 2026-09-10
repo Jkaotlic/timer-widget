@@ -18,7 +18,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { codeOnly } = require('./helpers/source-scan');
+const { codeOnly, ipcHandlerBody } = require('./helpers/source-scan');
 
 const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
 
@@ -428,4 +428,100 @@ test('панель получает накопитель на ЗАГРУЗКЕ, 
         'панель при открытии не получает состояние мероприятия');
     // Само-проверка зонда: срез обязан покрывать привязки окна.
     assert.ok(body.includes('bindWindowStateSnapshot'), 'зонд смотрит не туда');
+});
+
+// --- Выгрузка отчёта -------------------------------------------------------
+
+test('каналы выгрузки объявлены в обоих списках и в обе стороны', () => {
+    // Правило проекта: канал объявляется в channel-validator.js И в preload.js,
+    // и у него обязаны быть ОБА конца. Белый список — это разрешение, а не
+    // доказательство жизни.
+    assert.ok(VALIDATOR.includes("'event-export'"), 'event-export не разрешён валидатором');
+    assert.ok(PRELOAD.includes("'event-export'"), 'event-export не разрешён preload');
+    assert.ok(VALIDATOR.includes("'event-export-done'"), 'ответ не разрешён валидатором');
+    assert.ok(PRELOAD.includes("'event-export-done'"), 'ответ не разрешён preload');
+    assert.match(MAIN, /ipcMain\.on\('event-export'/, 'у канала нет конца в главном процессе');
+});
+
+test('кнопка выгрузки есть и НЕ выглядит необратимой', () => {
+    // Две одинаковые кнопки рядом обещают равнозначность. «Завершить» и
+    // «Новое мероприятие» необратимы и красятся соответственно; выгрузка
+    // ничего не меняет — и обязана отличаться видом, иначе человек будет
+    // бояться её так же, как соседних.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.match(panel, /eventExportBtn/, 'кнопки выгрузки нет');
+    const idx = panel.indexOf('eventExportBtn');
+    const around = panel.slice(Math.max(0, idx - 400), idx + 400);
+    assert.doesNotMatch(
+        around,
+        /reset-btn-danger/,
+        'безопасное действие не красится как разрушительное'
+    );
+});
+
+test('выгрузка не спрашивает подтверждения', () => {
+    // Подтверждения в этом проекте спрашивают НЕОБРАТИМЫЕ действия. Лишний
+    // вопрос учит человека жать «Да» не читая — и тогда подтверждение
+    // перестаёт защищать там, где оно нужно.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.doesNotMatch(
+        panel,
+        /confirmable\('eventExportBtn'/,
+        'выгрузка ничего не разрушает и подтверждения не требует'
+    );
+    assert.match(panel, /ipcRenderer\.send\('event-export'\)/, 'кнопка обязана слать канал');
+});
+
+test('панель слушает ответ и показывает его человеку', () => {
+    // Кнопка, после которой ничего не происходит и ничего не сказано,
+    // читается как сломанное окно.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.match(panel, /'event-export-done'/, 'ответ никто не слушает');
+    const idx = panel.indexOf("'event-export-done'");
+    const around = panel.slice(idx, idx + 700);
+    assert.match(around, /Toast/, 'результат обязан быть показан');
+});
+
+test('пустое мероприятие гасит кнопку выгрузки', () => {
+    // Выгружать нечего — кнопка неактивна, как и «Завершить» у завершённого.
+    const panel = codeOnly(read('panel-display.js'));
+    assert.match(panel, /eventExportBtnEl\.disabled/, 'состояние кнопки никто не считает');
+});
+
+
+// --- Фильтр отчёта: доклады, уложившиеся в срок ------------------------------
+
+test('фильтр отчёта — строка таблицы настроек, по умолчанию выключен', () => {
+    // По умолчанию в отчёте ВСЕ доклады: скрыть уложившиеся — выбор человека,
+    // а не умолчание, иначе отчёт по мероприятию без перелимитов был бы пуст.
+    const row = Schema.SETTINGS_DESCRIPTORS.find((d) => d.key === 'reportOnlyOverruns');
+    assert.ok(row, 'в таблице настроек нет строки фильтра');
+    assert.equal(row.def, false);
+    assert.equal(row.kind, 'checkbox');
+    assert.equal(row.el, 'reportOnlyOverruns', 'id контрола обязан совпадать с ключом');
+    assert.equal(row.owner, 'display');
+});
+
+test('панель строит тумблер фильтра и шлёт его той же единственной сборкой payload', () => {
+    const src = codeOnly(read('panel-display.js'));
+    assert.ok(src.includes("'reportOnlyOverruns'"), 'модуль не строит тумблер фильтра');
+    const sends = src.match(/send\('display-settings-update'/g) || [];
+    assert.equal(sends.length, 1, 'сборок payload стало больше одной');
+    assert.match(src, /reportOnlyOverruns:\s*this\./, 'фильтр в payload не попадает');
+});
+
+test('главный процесс берёт фильтр из настроек дисплея, а не из просьбы о выгрузке', () => {
+    // У просьбы payload нет намеренно: всё, что нужно отчёту, главный процесс
+    // уже знает. Фильтр — такая же настройка, как ставка.
+    const body = codeOnly(ipcHandlerBody(read('electron-main.js'), 'event-export'));
+    assert.match(body, /onlyOverruns:\s*settings\.reportOnlyOverruns\s*===\s*true/,
+        'отчёт собирается без фильтра');
+});
+
+test('кнопка выгрузки гаснет, только когда нет ни перелимита, ни докладов', () => {
+    // Мероприятие из одних уложившихся докладов — законный отчёт: итог в нём
+    // ноль, но строки есть.
+    const src = codeOnly(read('panel-display.js'));
+    assert.match(src, /eventExportBtnEl\.disabled\s*=[^;]*talksCount/,
+        'кнопка не знает про уложившиеся доклады и гаснет при нулевом итоге');
 });
