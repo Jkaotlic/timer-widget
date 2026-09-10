@@ -636,3 +636,161 @@ test('ошибка записи доходит до панели, а не тон
     assert.equal(answer.ok, false);
     assert.ok(answer.error, 'причина отказа обязана дойти до человека');
 });
+
+// --- Доклады, уложившиеся в срок -------------------------------------------
+//
+// Конец доклада — возврат ЗАПУЩЕННОГО таймера в покой: сброс или новый пресет
+// дают одно состояние (остаток = тотал, не идёт, не на паузе). Пресет, который
+// поставили и не запускали, докладом не считается: иначе журнал наполнялся бы
+// строками от перебора пресетов.
+
+const cmd = (stubs, payload) => stubs.ipcHandlers.get('timer-command')(null, payload);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('уложившийся доклад попадает в журнал с нулём перелимита', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    cmd(stubs, { type: 'set', seconds: 5 });
+    cmd(stubs, { type: 'start' });
+    await wait(1300);
+    cmd(stubs, { type: 'reset' });
+    await wait(50);
+
+    const payload = stubs.lastSent('event-overrun-state');
+    assert.ok(payload, 'закрытие доклада обязано разослать состояние');
+    assert.equal(payload.talksCount, 1, 'уложившийся доклад — тоже доклад');
+    assert.equal(payload.overrunSeconds, 0, 'нули на итог не влияют');
+    stopTimer(stubs);
+});
+
+test('пресет, который не запускали, докладом не считается', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    cmd(stubs, { type: 'set', seconds: 5 });
+    cmd(stubs, { type: 'set', seconds: 10 });
+    cmd(stubs, { type: 'set', seconds: 15 });
+    // «Завершить» рассылает состояние — им и проверяем, что записей нет. Он же
+    // заодно проверяет, что завершение не выдумывает доклад из покоя.
+    stubs.ipcHandlers.get('event-finish')(null);
+
+    assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0);
+});
+
+test('старт и тут же сброс — не доклад', async () => {
+    // Случайное нажатие. Ни одной секунды не прошло — записывать нечего.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    cmd(stubs, { type: 'set', seconds: 5 });
+    cmd(stubs, { type: 'start' });
+    cmd(stubs, { type: 'reset' });
+    await wait(50);
+    stubs.ipcHandlers.get('event-finish')(null);
+
+    assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0);
+});
+
+test('выход из минуса посреди доклада не дробит его на две записи', async () => {
+    // Время можно добавить прямо в перелимите — таймер выходит из минуса, но
+    // доклад продолжается. Одна запись на доклад, а его перелимит — сумма.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    await runOvertimeTalk(stubs);
+    cmd(stubs, { type: 'adjust', deltaSeconds: 60 });
+    await wait(1200);
+    cmd(stubs, { type: 'reset' });
+    await wait(50);
+
+    const payload = stubs.lastSent('event-overrun-state');
+    assert.equal(payload.talksCount, 1, 'один доклад — одна запись');
+    assert.ok(payload.overrunSeconds >= 1, 'перелимит этого доклада обязан быть в итоге');
+    stopTimer(stubs);
+});
+
+test('после «Завершить» новые доклады в журнал не идут', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    stubs.ipcHandlers.get('event-finish')(null);
+    cmd(stubs, { type: 'set', seconds: 5 });
+    cmd(stubs, { type: 'start' });
+    await wait(1300);
+    cmd(stubs, { type: 'reset' });
+    await wait(50);
+
+    assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0, 'итог заморожен — журнал тоже');
+    stopTimer(stubs);
+});
+
+test('доклад, шедший во время «Нового мероприятия», в новое не попадает', async () => {
+    // Тот же принцип, что у отсечки минуса: текущий доклад к новому
+    // мероприятию не относится.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    cmd(stubs, { type: 'set', seconds: 5 });
+    cmd(stubs, { type: 'start' });
+    await wait(1300);
+    stubs.ipcHandlers.get('event-reset')(null);
+    // Доклад ПРОДОЛЖАЕТСЯ после отсечки хотя бы тик. Без этой паузы тест
+    // проходил по признаку «секунда не прошла», а не по самой отсечке: первая
+    // версия сбрасывала таймер сразу, и снятая отсечка оставалась зелёной —
+    // поймано мутацией.
+    await wait(1300);
+    cmd(stubs, { type: 'reset' });
+    await wait(50);
+
+    assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0);
+
+    // А следующий доклад — уже законная запись нового мероприятия.
+    cmd(stubs, { type: 'start' });
+    await wait(1300);
+    cmd(stubs, { type: 'reset' });
+    await wait(50);
+    assert.equal(stubs.lastSent('event-overrun-state').talksCount, 1);
+    stopTimer(stubs);
+});
+
+test('«Завершить» посреди уложившегося доклада записывает его', async () => {
+    // Мероприятие кончилось на этом докладе — он в нём был.
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    cmd(stubs, { type: 'set', seconds: 30 });
+    cmd(stubs, { type: 'start' });
+    await wait(1300);
+    stubs.ipcHandlers.get('event-finish')(null);
+
+    const payload = stubs.lastSent('event-overrun-state');
+    assert.equal(payload.talksCount, 1);
+    assert.equal(payload.overrunSeconds, 0);
+    stopTimer(stubs);
+});
+
+test('«Завершить» после «Нового мероприятия» не пишет отсечённый доклад', async () => {
+    // Вторая дорога той же отсечки: доклад, шедший при «Новом мероприятии»,
+    // не становится записью и тогда, когда его закрывает «Завершить».
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    cmd(stubs, { type: 'set', seconds: 30 });
+    cmd(stubs, { type: 'start' });
+    await wait(1300);
+    stubs.ipcHandlers.get('event-reset')(null);
+    await wait(1300);
+    stubs.ipcHandlers.get('event-finish')(null);
+
+    assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0);
+    stopTimer(stubs);
+});
