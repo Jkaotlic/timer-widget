@@ -1,5 +1,13 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+// Окно ждут по УСЛОВИЮ общими помощниками, а не своей копией с паузами. Здесь
+// жил собственный поиск окна по адресу страницы и голая пауза 700 мс между
+// «закрыть» и «открыть» — ставка на скорость машины. 10.09.2026 она проиграла
+// один раз из трёх полных прогонов: «окно electron-clock-widget.html не
+// появилось», при том что в логе главного процесса за это время нет ни одной
+// ошибки. Общий помощник ещё и называет, сколько окон было, — по «не появилось»
+// диагностировать нечего.
+const { waitForWindow, waitForWindowGone, WIDGET_PROBE, CLOCK_PROBE } = require('./window-ready');
 
 /**
  * Масштабирование окна не должно выбрасывать его за край экрана.
@@ -25,6 +33,7 @@ const WINDOWS = [
         open: 'open-widget',
         close: 'close-widget',
         url: 'electron-widget.html',
+        probe: WIDGET_PROBE,
         resize: 'widget-resize',
         storageKey: 'widgetGeometry',
         base: 250
@@ -34,22 +43,12 @@ const WINDOWS = [
         open: 'open-clock-widget',
         close: 'close-clock-widget',
         url: 'electron-clock-widget.html',
+        probe: CLOCK_PROBE,
         resize: 'clock-widget-resize',
         storageKey: 'clockGeometry',
         base: 220
     }
 ];
-
-async function findWindow(app, urlPart) {
-    for (let attempt = 0; attempt < 40; attempt++) {
-        for (const w of app.windows()) {
-            const href = await w.evaluate(() => location.href).catch(() => '');
-            if (href.includes(urlPart)) { return w; }
-        }
-        await new Promise(r => setTimeout(r, 250));
-    }
-    throw new Error(`окно ${urlPart} не появилось`);
-}
 
 function boundsOf(app, urlPart) {
     return app.evaluate(({ BrowserWindow }, part) => {
@@ -86,7 +85,7 @@ for (const target of WINDOWS) {
         const { app, control } = await launchApp();
         try {
             await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await findWindow(app, target.url);
+            const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
             await win.waitForLoadState('domcontentloaded');
             await win.waitForTimeout(800);
 
@@ -156,7 +155,7 @@ function rightmostDisplay(displays) {
 
 async function restoreFromPoint(app, control, target, point, scalePct) {
     await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-    const win = await findWindow(app, target.url);
+    const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
     await win.waitForLoadState('domcontentloaded');
     await win.waitForTimeout(800);
 
@@ -166,9 +165,9 @@ async function restoreFromPoint(app, control, target, point, scalePct) {
         { key: target.storageKey, g: geo });
 
     await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
-    await control.waitForTimeout(700);
+    await waitForWindowGone(app, target.probe, { name: `окно ${target.name}` });
     await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-    const reopened = await findWindow(app, target.url);
+    const reopened = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
     await reopened.waitForLoadState('domcontentloaded');
     await reopened.waitForTimeout(1600);
 
@@ -237,7 +236,7 @@ for (const target of WINDOWS) {
         const { app, control } = await launchApp();
         try {
             await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await findWindow(app, target.url);
+            const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
             await win.waitForLoadState('domcontentloaded');
             await win.waitForTimeout(800);
 
@@ -250,9 +249,9 @@ for (const target of WINDOWS) {
             const before = await boundsOf(app, target.url);
 
             await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
-            await control.waitForTimeout(700);
+            await waitForWindowGone(app, target.probe, { name: `окно ${target.name}` });
             await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const reopened = await findWindow(app, target.url);
+            const reopened = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
             await reopened.waitForLoadState('domcontentloaded');
             await reopened.waitForTimeout(1400);
 
