@@ -99,12 +99,29 @@ test('normalizeStore: мусор в talks отбрасывается по одн
             null,
             { n: 2, endedAt: 'не дата', overrunSeconds: 5 },
             { n: 3, endedAt: '2026-09-09T15:00:00.000Z', overrunSeconds: -7 },
-            { n: 4, endedAt: '2026-09-09T15:00:00.000Z', overrunSeconds: 0 },
+            { n: 4, endedAt: '2026-09-09T15:00:00.000Z', overrunSeconds: 'нет' },
             'строка'
         ]
     });
     assert.strictEqual(out.talks.length, 1, 'выжить обязана только целая запись');
     assert.strictEqual(out.talks[0].overrunSeconds, 135);
+});
+
+test('normalizeStore: доклад, уложившийся в срок, — законная запись с нулём', () => {
+    // До 10.09.2026 ноль здесь считался мусором: журнал перечислял только
+    // доклады с перелимитом, потому что про остальные приложение не знало.
+    // Теперь знает (конец доклада — возврат запущенного таймера в покой), и
+    // выбросить ноль при чтении значило бы молча стереть уложившиеся доклады
+    // при каждом перезапуске.
+    const out = Store.normalizeStore({
+        overrunSeconds: 135,
+        talks: [
+            { n: 1, endedAt: '2026-09-09T14:00:00.000Z', overrunSeconds: 0 },
+            { n: 2, endedAt: '2026-09-09T14:32:10.000Z', overrunSeconds: 135 }
+        ]
+    });
+    assert.deepStrictEqual(out.talks.map((t) => t.overrunSeconds), [0, 135]);
+    assert.strictEqual(out.overrunSeconds, 135, 'нули на итог не влияют');
 });
 
 test('normalizeStore: talks не массив — пустой журнал, итог цел', () => {

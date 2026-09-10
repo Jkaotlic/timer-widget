@@ -41,16 +41,17 @@ function getStorePath(userDataPath) {
 /**
  * Одна запись журнала или null, если запись не имеет смысла.
  *
- * Вход недоверенный так же, как и весь файл. Запись без положительного
- * перелимита выбрасывается: журнал перечисляет доклады, которые ВЫШЛИ за
- * время, и строка «0 секунд» в нём означала бы, что приложение знает про
- * доклады, уложившиеся в срок, — а оно про них не знает (отдельного сигнала
- * «доклад начался» в приложении нет).
+ * Вход недоверенный так же, как и весь файл. Ноль — ЗАКОННАЯ запись: доклад,
+ * уложившийся в срок. До 10.09.2026 ноль здесь выбрасывался, потому что про
+ * такие доклады приложение не знало; теперь конец доклада фиксируется при
+ * возврате запущенного таймера в покой, и выбросить ноль при чтении значило
+ * бы молча стирать уложившиеся доклады на каждом перезапуске. Отрицательное и
+ * нечисловое по-прежнему мусор.
  */
 function normalizeTalk(raw) {
     if (raw === null || typeof raw !== 'object') { return null; }
     const seconds = Number(raw.overrunSeconds);
-    if (!Number.isFinite(seconds) || seconds <= 0) { return null; }
+    if (!Number.isFinite(seconds) || seconds < 0) { return null; }
     const endedAt = typeof raw.endedAt === 'string' ? raw.endedAt : '';
     if (!endedAt || Number.isNaN(Date.parse(endedAt))) { return null; }
     return { endedAt, overrunSeconds: Math.floor(seconds) };

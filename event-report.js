@@ -73,10 +73,15 @@ function formatClock(date) {
     return `${hh}:${mm}:${ss}`;
 }
 
+/** Записи журнала, пригодные к печати. Ноль — законный: доклад уложился в срок. */
 function safeTalks(raw) {
     if (!Array.isArray(raw)) { return []; }
-    return raw.filter((talk) => talk && Number(talk.overrunSeconds) > 0
-        && typeof talk.endedAt === 'string' && !Number.isNaN(Date.parse(talk.endedAt)));
+    return raw.filter((talk) => {
+        if (!talk) { return false; }
+        const seconds = Number(talk.overrunSeconds);
+        return Number.isFinite(seconds) && seconds >= 0
+            && typeof talk.endedAt === 'string' && !Number.isNaN(Date.parse(talk.endedAt));
+    });
 }
 
 /**
@@ -90,6 +95,7 @@ function safeTalks(raw) {
  * @param {number} input.price — ставка, ₽
  * @param {number} input.period — за сколько секунд ставка
  * @param {Date}   input.now — «сейчас», для даты при пустом журнале
+ * @param {boolean} [input.onlyOverruns] — печатать только доклады с перелимитом
  * @returns {{csv: string, rows: number, totalSeconds: number, totalCost: number, partial: boolean}}
  */
 function buildReportCSV(input) {
@@ -111,8 +117,15 @@ function buildReportCSV(input) {
     const withMoney = MoneyLib.overrunCost(totalSeconds, price, period) > 0
         || (Number.isFinite(price) && price > 0);
 
+    // Расхождение с итогом считается по ВСЕМУ журналу, а не по напечатанным
+    // строкам: скрытые фильтром нули на сумму секунд не влияют, и тревога о
+    // «неполной разбивке» из-за фильтра была бы ложной.
     const sumOfRows = talks.reduce((acc, talk) => acc + Math.floor(Number(talk.overrunSeconds)), 0);
     const partial = sumOfRows !== totalSeconds;
+    const onlyOverruns = data.onlyOverruns === true;
+    const printed = onlyOverruns
+        ? talks.filter((talk) => Math.floor(Number(talk.overrunSeconds)) > 0)
+        : talks;
 
     // Дата мероприятия — из ПЕРВОЙ записи: отдельного «начала мероприятия» в
     // приложении нет, а первый закрытый доклад точно случился. Пустой журнал
@@ -126,6 +139,9 @@ function buildReportCSV(input) {
     if (title) { lines.push(csvRow(['Мероприятие', title])); }
     lines.push(csvRow(['Дата', formatDate(eventDate)]));
     if (data.finished) { lines.push(csvRow(['Состояние', 'Завершено'])); }
+    // Отфильтрованный отчёт обязан это СКАЗАТЬ: иначе три строки из пяти
+    // читаются как полный список докладов.
+    if (onlyOverruns) { lines.push(csvRow(['Показаны', 'только доклады с перелимитом'])); }
     lines.push('');
 
     const header = withMoney
@@ -133,7 +149,9 @@ function buildReportCSV(input) {
         : ['№', 'Окончание', 'Перелимит'];
     lines.push(csvRow(header));
 
-    for (const talk of talks) {
+    // Номер строки — место доклада в мероприятии, фильтр его не меняет:
+    // «2, 5, 7» честно говорит, что между ними были уложившиеся доклады.
+    for (const talk of printed) {
         const seconds = Math.floor(Number(talk.overrunSeconds));
         const cells = [
             talk.n,
@@ -165,7 +183,7 @@ function buildReportCSV(input) {
 
     return {
         csv: BOM + lines.join(EOL) + EOL,
-        rows: talks.length,
+        rows: printed.length,
         totalSeconds,
         totalCost,
         partial

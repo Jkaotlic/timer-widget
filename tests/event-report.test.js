@@ -142,3 +142,42 @@ test('мусор во входе не роняет сборку', () => {
     assert.equal(out.totalSeconds, 0);
     assert.equal(typeof out.csv, 'string');
 });
+
+// --- Доклады, уложившиеся в срок --------------------------------------------
+
+const MIXED = [
+    { n: 1, endedAt: '2026-09-09T10:15:00.000Z', overrunSeconds: 0 },
+    { n: 2, endedAt: '2026-09-09T11:32:10.000Z', overrunSeconds: 135 },
+    { n: 3, endedAt: '2026-09-09T12:05:00.000Z', overrunSeconds: 0 }
+];
+
+test('уложившийся доклад — строка с нулём, а не пропуск', () => {
+    const out = build({ talks: MIXED, overrunSeconds: 135 });
+    assert.equal(out.rows, 3, 'по умолчанию в отчёте ВСЕ доклады');
+    const first = out.csv.split('\r\n').find((l) => l.startsWith('1;'));
+    assert.match(first, /;00:00:00;/, 'уложившийся печатается нулём перелимита');
+    assert.match(first, /;0\s?₽$/, 'и нулём денег, если ставка задана');
+});
+
+test('фильтр оставляет только доклады с перелимитом', () => {
+    const out = build({ talks: MIXED, overrunSeconds: 135, onlyOverruns: true });
+    assert.equal(out.rows, 1);
+    const numbered = out.csv.split('\r\n').filter((l) => /^\d+;/.test(l));
+    assert.equal(numbered.length, 1);
+    assert.match(numbered[0], /^2;/, 'номер доклада — его место в мероприятии, фильтр его не меняет');
+});
+
+test('отфильтрованный отчёт говорит, что он отфильтрован', () => {
+    // Иначе читатель примет «три строки из пяти» за полный список докладов.
+    const filtered = build({ talks: MIXED, overrunSeconds: 135, onlyOverruns: true });
+    assert.match(filtered.csv, /Показаны;только доклады с перелимитом/);
+    const full = build({ talks: MIXED, overrunSeconds: 135 });
+    assert.doesNotMatch(full.csv, /Показаны;/, 'полный отчёт оговорки не несёт');
+});
+
+test('фильтр не делает разбивку «неполной»', () => {
+    // Скрытые нули на сумму секунд не влияют — предупреждение о расхождении
+    // здесь было бы ложной тревогой.
+    const out = build({ talks: MIXED, overrunSeconds: 135, onlyOverruns: true });
+    assert.equal(out.partial, false);
+});
