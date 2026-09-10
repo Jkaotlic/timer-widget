@@ -18,7 +18,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { codeOnly } = require('./helpers/source-scan');
+const { codeOnly, ipcHandlerBody } = require('./helpers/source-scan');
 
 const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
 
@@ -486,4 +486,42 @@ test('пустое мероприятие гасит кнопку выгрузк
     // Выгружать нечего — кнопка неактивна, как и «Завершить» у завершённого.
     const panel = codeOnly(read('panel-display.js'));
     assert.match(panel, /eventExportBtnEl\.disabled/, 'состояние кнопки никто не считает');
+});
+
+
+// --- Фильтр отчёта: доклады, уложившиеся в срок ------------------------------
+
+test('фильтр отчёта — строка таблицы настроек, по умолчанию выключен', () => {
+    // По умолчанию в отчёте ВСЕ доклады: скрыть уложившиеся — выбор человека,
+    // а не умолчание, иначе отчёт по мероприятию без перелимитов был бы пуст.
+    const row = Schema.SETTINGS_DESCRIPTORS.find((d) => d.key === 'reportOnlyOverruns');
+    assert.ok(row, 'в таблице настроек нет строки фильтра');
+    assert.equal(row.def, false);
+    assert.equal(row.kind, 'checkbox');
+    assert.equal(row.el, 'reportOnlyOverruns', 'id контрола обязан совпадать с ключом');
+    assert.equal(row.owner, 'display');
+});
+
+test('панель строит тумблер фильтра и шлёт его той же единственной сборкой payload', () => {
+    const src = codeOnly(read('panel-display.js'));
+    assert.ok(src.includes("'reportOnlyOverruns'"), 'модуль не строит тумблер фильтра');
+    const sends = src.match(/send\('display-settings-update'/g) || [];
+    assert.equal(sends.length, 1, 'сборок payload стало больше одной');
+    assert.match(src, /reportOnlyOverruns:\s*this\./, 'фильтр в payload не попадает');
+});
+
+test('главный процесс берёт фильтр из настроек дисплея, а не из просьбы о выгрузке', () => {
+    // У просьбы payload нет намеренно: всё, что нужно отчёту, главный процесс
+    // уже знает. Фильтр — такая же настройка, как ставка.
+    const body = codeOnly(ipcHandlerBody(read('electron-main.js'), 'event-export'));
+    assert.match(body, /onlyOverruns:\s*settings\.reportOnlyOverruns\s*===\s*true/,
+        'отчёт собирается без фильтра');
+});
+
+test('кнопка выгрузки гаснет, только когда нет ни перелимита, ни докладов', () => {
+    // Мероприятие из одних уложившихся докладов — законный отчёт: итог в нём
+    // ноль, но строки есть.
+    const src = codeOnly(read('panel-display.js'));
+    assert.match(src, /eventExportBtnEl\.disabled\s*=[^;]*talksCount/,
+        'кнопка не знает про уложившиеся доклады и гаснет при нулевом итоге');
 });

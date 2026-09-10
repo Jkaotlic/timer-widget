@@ -2017,6 +2017,9 @@ ipcMain.on('event-export', async (event) => {
             title: settings.eventTitle,
             price: settings.overrunPrice,
             period: settings.overrunPeriod,
+            // Фильтр — такая же настройка дисплея, как ставка: у просьбы о
+            // выгрузке payload нет, и отдельного источника у него быть не должно.
+            onlyOverruns: settings.reportOnlyOverruns === true,
             now: new Date()
         });
 

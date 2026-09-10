@@ -144,7 +144,8 @@ const PanelDisplayMixin = {
             // приводит money-meter.js, один раз и одинаково для обоих счётчиков.
             overrunPrice: this.overrunPriceEl ? this.overrunPriceEl.value : '1000',
             overrunPeriod: this.overrunPeriodEl ? this.overrunPeriodEl.value : '3',
-            floor47Unlocked: this.isFloor47Unlocked()
+            floor47Unlocked: this.isFloor47Unlocked(),
+            reportOnlyOverruns: this.reportOnlyOverrunsEl ? this.reportOnlyOverrunsEl.checked : false
         }, collectDisplayToggles(document), collectBlockLabels(document));
 
         window.ipcRenderer.send('display-settings-update', settings);
@@ -522,6 +523,8 @@ const PanelDisplayMixin = {
         exportCell.appendChild(exportBtn);
         exportCell.appendChild(exportHint);
         section.appendChild(exportCell);
+        section.appendChild(row('Только с перелимитом', 'reportOnlyOverruns', toggle('reportOnlyOverruns'),
+            'Скрыть в отчёте доклады, уложившиеся в срок'));
 
         section.appendChild(row('Показывать этот раздел', 'floor47Unlocked', toggle('floor47Unlocked')));
         mount.appendChild(section);
@@ -585,11 +588,12 @@ const PanelDisplayMixin = {
         this.eventStatusEl = document.getElementById('eventStatus');
         this.eventFinishBtnEl = document.getElementById('eventFinishBtn');
         this.eventExportBtnEl = document.getElementById('eventExportBtn');
+        this.reportOnlyOverrunsEl = document.getElementById('reportOnlyOverruns');
 
         // Накопитель панель не ХРАНИТ — она держит последнее присланное
         // состояние, чтобы было из чего собрать отчёт. Значения по умолчанию
         // нужны до первой посылки: панель рисует строку сразу.
-        this.eventOverrunState = { overrunSeconds: 0, finished: false, excludedLiveSeconds: 0 };
+        this.eventOverrunState = { overrunSeconds: 0, finished: false, excludedLiveSeconds: 0, talksCount: 0 };
 
         const footer = document.getElementById('panelFooter');
         if (footer) {
@@ -599,6 +603,12 @@ const PanelDisplayMixin = {
                 this.renderFloor47();
                 this.pushDisplaySettings();
             });
+        }
+
+        // Фильтр отчёта — настройка, как ставка: главный процесс читает его из
+        // display-settings-update в момент выгрузки. Своего канала у него нет.
+        if (this.reportOnlyOverrunsEl) {
+            this.reportOnlyOverrunsEl.addEventListener('change', () => this.pushDisplaySettings());
         }
 
         for (const el of [this.overrunPriceEl, this.overrunPeriodEl]) {
@@ -740,10 +750,12 @@ const PanelDisplayMixin = {
             this.eventFinishBtnEl.disabled = summary.finished;
         }
         if (this.eventExportBtnEl) {
-            // Выгружать нечего, пока мероприятие не набрало ни секунды
-            // перелимита: пустой отчёт — это тот же молчаливый отказ, только
-            // в виде файла.
-            this.eventExportBtnEl.disabled = summary.seconds <= 0;
+            // Выгружать нечего, пока нет ни перелимита, ни закрытых докладов:
+            // пустой отчёт — тот же молчаливый отказ, только в виде файла.
+            // Мероприятие из одних уложившихся докладов — законный отчёт с
+            // нулевым итогом, и кнопка обязана его отдавать.
+            this.eventExportBtnEl.disabled = summary.seconds <= 0
+                && !(Number(this.eventOverrunState.talksCount) > 0);
         }
     },
 

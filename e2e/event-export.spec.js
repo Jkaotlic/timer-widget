@@ -143,3 +143,77 @@ test('зонд проверяет себя: без подмены диалога
         await app.close();
     }
 });
+
+/** Тумблер — кликом по ползунку: сам чекбокс спрятан вёрсткой. */
+async function setToggle(control, id, on) {
+    const box = control.locator(`#${id}`);
+    if (await box.isChecked() === on) { return; }
+    await control.locator(`#${id} + .toggle-slider`).click();
+    await expect(box).toBeChecked({ checked: on });
+}
+
+/** Строки докладов отчёта — те, что начинаются с номера. */
+const numbered = (csv) => csv.split('\r\n').filter((line) => /^\d+;/.test(line));
+
+test('уложившиеся доклады — в отчёте, а фильтр их скрывает', async () => {
+    const { app, control } = await launchApp();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-export-'));
+    const full = path.join(dir, 'все.csv');
+    const filtered = path.join(dir, 'с-перелимитом.csv');
+    try {
+        await openDisplayTab(control);
+        await unlock(control);
+        await control.fill('#overrunPrice', '1000');
+        await control.fill('#overrunPeriod', '3');
+        await setToggle(control, 'reportOnlyOverruns', false);
+
+        // Доклад 1 — уложился: запущен, прошла секунда с лишним, сброшен.
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 30 }));
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
+        await control.waitForTimeout(1600);
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
+        await control.waitForTimeout(400);
+
+        // Доклад 2 — с перелимитом, закрыт «Завершить».
+        await makeOverrun(control);
+        await control.locator('#eventFinishBtn').click();
+        await control.locator('#eventFinishConfirm').click();
+        await control.waitForTimeout(800);
+
+        // Без фильтра — оба доклада.
+        await stubSaveDialog(app, full);
+        await control.locator('#eventExportBtn').click();
+        await expect.poll(() => fs.existsSync(full)).toBe(true);
+        const all = fs.readFileSync(full, 'utf8');
+        console.log(`   без фильтра:\n${all.replace(/^/gm, '   | ')}`);
+        const allRows = numbered(all);
+        expect(allRows.length, 'без фильтра в отчёте ВСЕ доклады').toBe(2);
+        expect(allRows[0], 'уложившийся доклад печатается нулём').toMatch(/^1;\d{2}:\d{2}:\d{2};00:00:00;/);
+        expect(all, 'полный отчёт не несёт оговорки о фильтре').not.toContain('Показаны;');
+
+        // С фильтром — только доклад с перелимитом, и отчёт об этом говорит.
+        await setToggle(control, 'reportOnlyOverruns', true);
+        await control.waitForTimeout(300);
+        await stubSaveDialog(app, filtered);
+        await control.locator('#eventExportBtn').click();
+        await expect.poll(() => fs.existsSync(filtered)).toBe(true);
+        const only = fs.readFileSync(filtered, 'utf8');
+        console.log(`   с фильтром:\n${only.replace(/^/gm, '   | ')}`);
+        const onlyRows = numbered(only);
+        expect(onlyRows.length, 'фильтр оставляет только доклады с перелимитом').toBe(1);
+        expect(onlyRows[0], 'номер доклада фильтр не меняет').toMatch(/^2;/);
+        expect(only).toContain('Показаны;только доклады с перелимитом');
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+        // Профиль e2e общий на прогон: фильтр возвращается к УМОЛЧАНИЮ.
+        await control.evaluate(() => {
+            const stored = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+            stored.reportOnlyOverruns = false;
+            localStorage.setItem('displayExtSettings', JSON.stringify(stored));
+            window.ipcRenderer.send('timer-command', { type: 'reset' });
+            window.ipcRenderer.send('event-reset');
+        }).catch(() => {});
+        await relock(control);
+        await app.close();
+    }
+});
