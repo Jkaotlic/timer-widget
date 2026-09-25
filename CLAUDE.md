@@ -175,6 +175,7 @@ Release: те же ворота до сборки, Electron — последни
 разбор: правило говорит ЧТО делать, разбор — почему все предыдущие попытки
 сделали иначе.
 
+- **Окна — на `app://timer-widget/`, file:// чужой; фьюз file:// держит лишь перенос настроек (CRITICAL)** — [разбор](docs/lessons.md#windows-live-on-the-app-scheme)
 - **Диапазон масштаба обязан быть ДОСТИЖИМ: пол окна = его размер при `MIN_SCALE_PCT`, ОДИНАКОВЫЙ по осям (иначе окно не квадрат) (CRITICAL)** — [разбор](docs/lessons.md#a-promised-range-must-be-reachable-at-both-ends)
 - **Счётчик масштаба не обновляют из `outerWidth`, прочитанного В событии `resize`: там окно ещё прежнего размера — владелец величины один, модуль геометрии** — [разбор](docs/lessons.md#a-scale-counter-must-not-be-refreshed-from-a-stale-outerwidth)
 - **`window-geometry` шлётся и по СВОИМ событиям окна (`resize`/`move`): размер меняют не только через IPC** — [разбор](docs/lessons.md#the-main-process-must-report-geometry-on-its-own-events-too)
