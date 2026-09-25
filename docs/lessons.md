@@ -345,6 +345,8 @@
 
 - **`--no-sandbox` was cancelling the app's own `sandbox: true`**: the flag sat in `build.linux.executableArgs`, so it shipped to EVERY Linux target, while `build/linux-after-install.sh` deliberately stripped the SUID bit "to fall back on user namespaces" — the sandbox therefore worked through neither path. `executableArgs` also exists on `CommonLinuxOptions`, so it can be scoped: deb now gets a proper SUID helper (`chmod 4755` + `chown root:root`) and no flag; AppImage keeps the flag because it has no install step and unprivileged user namespaces are not universally available (hardened kernels; AppArmor restricts them since Ubuntu 24.04). Checked on the built packages by the `linux-sandbox` CI job — none of this is verifiable from macOS.
 
+  **Epilogue (25.09.2026):** the AppImage exception did not survive acceptance testing — the Linux build failed on exactly that flag, and AppImage was removed from the targets altogether. deb is now the only Linux package: an AppArmor `userns` profile first, SUID-root on `chrome-sandbox` only where the kernel has no user namespaces, `--no-sandbox` nowhere. See [a documented hole is still a hole](#a-documented-hole-is-still-a-hole).
+
 ---
 
 <a id="the-rot-is-not-confined-to-storage_keys-the-whole-of-config"></a>
@@ -3690,3 +3692,77 @@ await click; await p;` тоже корректна — подписка стои
 **Правило.** Бюджет времени — это настройка, а у настройки есть владелец.
 Копия умолчания в теле теста врёт, что у него особый бюджет; значение ниже
 умолчания — молчаливое ослабление.
+
+<a id="a-documented-hole-is-still-a-hole"></a>
+
+### Задокументированная дыра — всё равно дыра
+
+С 2.4.0 `--no-sandbox` остался «только у AppImage», и это было оформлено
+честно: абзац в SECURITY.md, строка в README, тест, проверяющий, что флаг есть
+ровно у одной цели. Всё это было правдой — и именно на этом Linux-сборка не
+прошла ПСИ по критическим уязвимостям (25.09.2026). Сканер не читает
+обоснований: он видит бинарь, который отключает песочницу у всех четырёх окон,
+и `sandbox: true` в коде тогда ничего не значит.
+
+Документ и тест здесь закрепили дыру, а не закрыли её: тест «флаг только у
+AppImage» стерёг исключение от исчезновения. Выход был в другом месте —
+отказаться от цели, которая без исключения не работает. AppImage снят, deb
+получил профиль AppArmor с `userns`, SUID остался запасным путём, а тест теперь
+утверждает обратное: `--no-sandbox` нет ни в одной цели.
+
+**Правило.** Исключение из защиты («осознанное», «задокументированное», «только
+в одной сборке») — это дыра с описанием. Его убирают вместе с тем, что без него
+не работает; если убрать нельзя — это пункт «Известных ограничений» с планом,
+а не тест, который его охраняет.
+
+<a id="an-inline-script-edit-is-a-csp-edit"></a>
+
+### Правка инлайнового скрипта — это правка CSP
+
+С 25.09.2026 (SEC-08) `script-src` окон не содержит `'unsafe-inline'`: каждый
+инлайновый `<script>` разрешён своим `sha256` в `<meta>` CSP. Хеш — отпечаток
+ТЕКСТА блока, включая комментарии и пробелы. Изменил хоть символ — браузер
+откажется блок исполнять, и окно останется разметкой без логики: ни ошибки
+сборки, ни падения при загрузке, только молчащие кнопки.
+
+Поэтому политику четырёх окон пишет одно место — `scripts/csp-hash.js` (один
+шаблон, хеши считаются так же, как их видит браузер: LF, UTF-8, HTML-комментарии
+вне скрипта пропускаются). После правки: `npm run csp:hash -- --write`.
+`tests/csp-hash.test.js` падает на расхождении и называет команду; e2e
+`windows-load-clean` проверяет, что инлайновый скрипт каждого окна
+действительно исполнился.
+
+Побочный вывод: чем меньше кода в инлайне, тем реже эта церемония. Блок, который
+всё равно трогаешь, выносится в модуль (так в BUG-18 уехал `updateDisplaysList`).
+
+**Правило.** Правка инлайнового `<script>` = пересчёт хеша в том же коммите.
+Внедрённый скрипт без хеша не исполнится — ради этого всё и затевалось.
+
+<a id="a-duration-needs-a-monotonic-clock"></a>
+
+### Длительность меряют монотонными часами, а сон — явно
+
+Таймер считал ход по `Date.now()` — ради того, чтобы сон машины засчитывался:
+во сне `setInterval` не тикает, а стенные часы идут, и после пробуждения
+таймер догонял правду. Но стенные часы ПЕРЕВОДЯТ — NTP, смена пояса, ручная
+правка. Перевод на час назад замораживал идущий таймер на час, вперёд —
+проваливал его в минус и начислял деньги за перелимит, которого не было
+(BUG-03).
+
+Теперь в `timer-controller.js` два вида часов с разными ролями: ход — по
+монотонным (`performance.now()`), они не прыгают; сон засчитывается ЯВНО —
+главный процесс зовёт `suspend()`/`resume()` по `powerMonitor`, и сон — это
+стенной ход между ними МИНУС монотонный. Разность, а не стенной ход целиком:
+на части Windows-машин монотонные часы во сне идут, и сон посчитался бы
+дважды. Отрицательная разность (часы перевели во сне назад) не засчитывается.
+`timestamp` в `timer-state` остался только штампом — порядок держит
+`updateCounter`.
+
+Там же найдено соседнее: пауза и поправка сначала сверяют натикавшее и
+переносят долю секунды в новый якорь, иначе каждая пауза удлиняла таймер
+на эту долю (BUG-05).
+
+**Правило.** «Сколько прошло» — монотонные часы; «который час» — стенные. Сон
+не угадывается по скачку стенных часов, а приходит событием и учитывается
+отдельной слагаемой. Тест — поддельные часы обоих видов, переводимые
+независимо (`tests/timer-controller.test.js`).

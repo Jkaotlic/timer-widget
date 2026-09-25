@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-J1aw5gAe+TWlTRTEwW902CjRYgPUzLjuo+pMICUL1Eg=' 'sha256-88a/gBVbfmKpvgBiktM809l9TmMPZsTlHivc13nzSKg=' 'sha256-7rPjL83ogfQCxwAH5vsM56ewahnD+sjGx83rmpAHGmw='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-J1aw5gAe+TWlTRTEwW902CjRYgPUzLjuo+pMICUL1Eg=' 'sha256-MWO6fukhyfiaqfTiKZp96DablETOyP63btgzK7Ba/2U=' 'sha256-7rPjL83ogfQCxwAH5vsM56ewahnD+sjGx83rmpAHGmw='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление Таймером</title>
     <link rel="stylesheet" href="fonts.css">
@@ -1212,7 +1212,9 @@
                 this.resetBtn = document.getElementById('resetBtn');
                 // customMinutes / customSeconds убраны вместе со старым вводом
                 // «минуты + секунды»: поля жили в блоке display:none и были
-                // недостижимы. Точное время задаётся через #manualTimeInput.
+                // недостижимы. Точное время вводится прямо в крупных цифрах:
+                // клик по #controlTime → поля #manualHours / #manualMinutes /
+                // #manualSeconds (panel-state.js).
 
                 // Настройки
                 this.allowNegativeEl = document.getElementById('allowNegative');
@@ -1607,8 +1609,10 @@
                 // с валидацией и всплывающими сообщениями об ошибке. Сами поля и кнопка
                 // лежали в блоке `display:none` («removed from UI but needed by JS»),
                 // то есть дотянуться до них было невозможно: ни ввести, ни нажать.
-                // Живая замена — поле точного времени (#manualTimeInput) с умным
-                // разбором TimeUtils.parseManualTime и подсветкой .input-error.
+                // Живая замена — ввод прямо в крупных цифрах (#controlTime →
+                // #manualHours / #manualMinutes / #manualSeconds, panel-state.js).
+                // Строгий TimeUtils.parseManualTime с подсветкой .input-error
+                // разбирает поле лимита перерасхода (#overrunLimit).
 
                 // Здесь же висел обработчик на .adjust-btn с data-seconds — вторая
                 // половина того же трупа: класс не встречается в разметке ни разу

@@ -81,7 +81,13 @@ Rules when working here:
 
 - `constants.js` — all magic numbers, IPC channel names, storage keys, theme definitions, dimension limits
 - `utils.js` — `formatTime()`, `formatTimeShort()`, `parseManualTime()`, `debounce()`, `getTimerStatus()`, `calculateProgress()`, `safelySendToWindow()`
-- `security.js` — input validation (`isValidDataURL`, `isValidURL`, `validateImageSource`), `escapeHTML()`, `safeJSONParse()`
+- `security.js` — input validation (`isValidDataURL`, `validateImageSource`, `isSafeColor`), `escapeHTML()`, `safeJSONParse()`
+- `ipc-senders.js` — channel → windows allowed to send it; wraps `ipcMain` in main
+- `relay-payload.js` — what relay channels may remember: flat primitives, size cap
+- `navigation-guard.js` — navigation only to the four app pages; `window.open`/`<webview>` denied
+- `drop-guard.js` — a file dropped on widget/clock/display does not replace the page (panel: `custom-sounds.js`)
+- `atomic-write.js` — tmp + fsync + rename for `event-overrun.json` and `last-state.json`
+- `scripts/csp-hash.js` — owner of the windows' CSP: one template, sha256 per inline script
 - `renderer-shared.js` — чистая логика, которую иначе копировало бы каждое окно: `breakdown`, `flipCells`, `clampScale`, `fitBlockScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt`, тона, `surfacePaint`, `topBandReserve`
 - `surface-tones.css` — ОДНА палитра на виджет, часы и дисплей: два блока тона, поверхности `--style-*`, полосы состояния. Класс тона ставит `UITheme.applyTone()` по яркости фона
 - `window-geometry.js` — перетаскивание, размер и позиция виджета и часов плюс `fitRestoredBounds`. Проверяется в Node на поддельных хранилище и DOM
@@ -91,13 +97,13 @@ Rules when working here:
 - `presets.js` — четыре ячейки вида: снимок ЗНАЧЕНИЙ ключей профиля (`PRESET_KEYS`). Без картинки фона и геометрии окон — почему, в модуле
 - `ui-theme.js` — the only owner of `data-theme` and of the tone class `on-light-bg` (`applyTone` / `initTone` / `bindThemeSync`). The pure part is unit-tested; the DOM/storage part loads in all four windows from `<head>`
 - `hero-modes.js` — что показывает КРУПНОЕ число дисплея: реестр четырёх режимов, подписи, секунды и тотал. Режим влияет на цвет ТОЛЬКО через тотал
-- `event-report.js` — отчёт о перелимите в CSV: ЧИСТЫЙ модуль (ни Electron, ни `fs`). Итог берётся из накопителя, а не складывается из строк — расхождение законно (миграция, обрезка журнала) и НАЗЫВАЕТСЯ в самом отчёте; стоимость считает `money-meter.js`. Конец доклада — возврат ЗАПУЩЕННОГО таймера в покой; уложившийся — строка с нулём
+- `event-report.js` — CSV перелимита, ЧИСТЫЙ модуль. Итог — из накопителя, а не сумма строк: расхождение законно и НАЗЫВАЕТСЯ в отчёте. Доклад кончается возвратом ЗАПУЩЕННОГО таймера в покой или выходом; идущий — строка «идёт»; текст-формула — с апострофом
 
 ### Key Patterns
 
 - Window references are global (`controlWindow`, `widgetWindow`, `displayWindow`, `clockWidgetWindow`). Always use `safelySendToWindow()` to avoid "Object has been destroyed" crashes.
 - Renderer windows persist settings in `localStorage`. Storage keys are defined in `constants.js` (`STORAGE_KEYS`).
-- Each HTML file is self-contained with inline `<script>` and `<style>` blocks. CSP: `style-src 'unsafe-inline'`, но инлайновые `<script>` разрешены ТОЛЬКО по sha256 — после правки любого из них `npm run csp:hash -- --write` (владелец политики — `scripts/csp-hash.js`, сверку держит `tests/csp-hash.test.js`).
+- Each HTML file is self-contained with inline `<script>` and `<style>` blocks (CSP hashes the scripts — see Security).
 - JS-based window drag: Widget and clock windows use JavaScript mousedown/mousemove + IPC (`widget-move`, `clock-widget-move`) instead of `-webkit-app-region: drag`. This is because on Windows, transparent frameless windows with `drag` on parent elements intercept ALL mouse events before `no-drag` children.
 - Scaling: Widget and clock — Ctrl+wheel (30–600 %, пол окна = размер при 30 %). Display — Ctrl+wheel context-sensitive (hover on info-block → block scale, else → timer) + Shift+wheel for blocks.
 
@@ -110,37 +116,23 @@ Rules when working here:
 ## Security
 
 - All BrowserWindows: `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`
-- `hardenWindow()` applied to all windows: blocks `will-navigate` to non-file:// URLs, denies `window.open`
+- Guards: modules above; packaged build exits on debug switches; `build.electronFuses` (`GrantFileProtocolExtraPrivileges` ON — `localStorage` on `file://`). See `SECURITY.md`
+- CSP: scripts by sha256 only (`tests/csp-hash.test.js`) — edited an inline `<script>`? `npm run csp:hash -- --write`
 - IPC channel whitelist in `preload.js` with direction validation (send vs receive)
 - All IPC resize/move/opacity handlers validate numeric inputs (bounds, NaN, Infinity)
 - Image validation: size + MIME + magic bytes (WebP checks RIFF+WEBP signature)
 - SVG excluded from data URL whitelist (XSS vector)
 - Audio upload rejects empty `file.type`
-- CSS injection prevented: color values validated with regex, URLs validated with `URL()` constructor
-- Timer state: `presetSeconds` tracks original preset for correct reset after on-the-fly adjustments
+- CSS injection prevented: colours go through `isSafeColor`
 
 ## IPC
 
 Каналы, их направление и payload — в [docs/ipc.md](docs/ipc.md). Правило: новый
 канал объявляется в `channel-validator.js` И `preload.js`, у него обязаны быть
 ОБА конца (`tests/ipc-liveness.test.js` проверяет), а сама таблица живёт в
-`docs/ipc.md`, чтобы не занимать контекст каждого разговора.
-
-## Timer State Structure
-
-Broadcast via `timer-state` channel every second:
-
-```js
-{
-    totalSeconds: 300,        // Original preset duration
-    remainingSeconds: 245,    // Current remaining (negative = overrun)
-    presetSeconds: 300,       // Preset for reset (survives on-the-fly adjustments)
-    isRunning: true,          // Timer is actively counting
-    isPaused: false,          // Timer is paused
-    finished: false,          // Timer reached zero (latched until reset)
-    updateCounter: 42         // Monotonic counter for reliable sync
-}
-```
+`docs/ipc.md`, чтобы не занимать контекст каждого разговора. Там же — поля
+`timer-state`. Каждому каналу нужна строка в `ipc-senders.js` (кто вправе слать):
+без неё `electron-main.js` не загрузится.
 
 ## Testing
 
@@ -153,36 +145,29 @@ suites to get it.
 при работе с конкретной подсистемой, а места в контексте занимал в каждом
 разговоре (та же причина, по которой вынесена таблица каналов).
 
-Two flavours of test live here:
-
-- **Behavioural** — pure modules (`utils`, `security`, `timer-engine`, `timer-controller`,
-  `recovery`, `renderer-shared`, `renderer-storage`, `color-utils`) are imported and exercised.
-- **Source-level** — logic that lives inside inline `<script>` blocks in the HTML windows
-  cannot be imported, so those tests read the file and assert on its source. Keep asserting
-  BOTH the presence of the correct behaviour and the absence of the old broken one, otherwise
-  a regression slips back silently.
+Two flavours (behavioural / source-level) — see `docs/tests.md`. A source-level
+test asserts BOTH the correct behaviour and the absence of the old broken one.
 
 Бюджет времени e2e-теста — ОДНА величина в `playwright.config.js`; свой
 `test.setTimeout` законен только чтобы его ПОДНЯТЬ (`tests/e2e-budget.test.js`).
 
 ## CI
 
-GitHub Actions (`.github/workflows/nodejs.yml`), Node 22, three jobs:
+GitHub Actions (`.github/workflows/nodejs.yml`), Node 22:
 
 | Job | Where | What |
 |-----|-------|------|
 | `build` | ubuntu-latest | `npm run ci`, затем неблокирующие `visual:check` под xvfb и `coverage`. Визуальному шагу нужен `chmod 4755` + root на `chrome-sandbox`, иначе Chromium падает с кодом 133 |
 | `e2e` | ubuntu + windows + macos | `npx playwright test` — the ONLY thing exercising the real Electron runtime. Linux under `xvfb-run`; `fail-fast: false`; report uploaded per-OS on failure |
 | `pack` | ubuntu + windows | `electron-builder --dir`, then `node scripts/verify-packed.js` (assets + release gates on the real `app.asar` + Electron fuses read back from the packed binary) |
-| `linux-sandbox` | ubuntu-latest | builds deb + AppImage, then `node scripts/verify-linux-sandbox.js`: deb's postinst sets SUID + root owner and its `.desktop` has NO `--no-sandbox`; the AppImage's `.desktop` DOES. This cannot be checked from macOS at all |
+| `linux-sandbox` | ubuntu-latest | builds the deb (the only Linux target), then `node scripts/verify-linux-sandbox.js`: AppArmor `userns` profile, SUID only without user namespaces, no `--no-sandbox`. Release runs it too. Not checkable from macOS |
 
 Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 
 - **`pack` catches what `tests/packaging.test.js` cannot**: the unit test checks
   the *list* in `package.json`, `verify-packed.js` opens the real `app.asar`
-  (that is how `design-tokens.css` went missing in 2.3.2). It parses the asar
-  header by hand, and `tests/verify-packed.test.js` validates that parser
-  against the **real** `default_app.asar`, not only a synthetic fixture.
+  (so `design-tokens.css` went missing in 2.3.2); its parser is tested on the
+  **real** `default_app.asar`.
 
 ## Gotchas
 Каждый пункт — правило, которое можно нарушить и не заметить. Полный разбор
@@ -308,8 +293,11 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Закрывающееся окно — НЕ открытое (у ЛЮБОГО из четырёх, не только полноэкранного): «открыть» спрашивает не «есть ли объект», а «будет ли он жив»; отложенное открытие — ОДИН реестр на все окна, метку закрытия ставят и пути мимо IPC, включая трей (CRITICAL)** — [разбор](docs/lessons.md#a-closing-window-is-not-an-open-window)
 - **Окно в e2e ждут ОПРОСОМ, а не событием `window`: событие приходит раз и теряется, если окно опередило подписку** — [разбор](docs/lessons.md#an-event-fires-once-a-poll-is-always-right)
 - **Бюджет e2e-теста — ОДНА величина в `playwright.config.js`; свой `test.setTimeout` только ПОДНИМАЕТ его** — [разбор](docs/lessons.md#a-test-budget-is-a-setting-with-one-owner)
+- **Описанное исключение из защиты — та же дыра: `--no-sandbox` у AppImage провалил ПСИ** — [разбор](docs/lessons.md#a-documented-hole-is-still-a-hole)
+- **Правка инлайнового `<script>` — правка CSP: `npm run csp:hash -- --write`** — [разбор](docs/lessons.md#an-inline-script-edit-is-a-csp-edit)
+- **Длительность — по МОНОТОННЫМ часам, сон засчитывают явно (suspend/resume)** — [разбор](docs/lessons.md#a-duration-needs-a-monotonic-clock)
 
-Правила-оглавления: тема сама себе напоминание, разбор раскрывает — [Never run `perl -pi` over these files](docs/lessons.md#never-run-perl--pi-over-these-files), [The finish flash must be latched](docs/lessons.md#the-finish-flash-must-be-latched), [Flip timers belong to `flip-card.js`](docs/lessons.md#flip-timers-belong-to-flip-cardjs), [`showTicks` drives TWO dials](docs/lessons.md#showticks-drives-two-dials), [A payload default is not a guard](docs/lessons.md#a-payload-default-is-not-a-guard), [The bridge exposes no `invoke`](docs/lessons.md#the-bridge-exposes-no-invoke), [The display has no browser-mode fallback](docs/lessons.md#the-display-has-no-browser-mode-fallback), [IPC whitelist is duplicated](docs/lessons.md#ipc-whitelist-is-duplicated), [Adding new IPC channel](docs/lessons.md#adding-new-ipc-channel), [Per-window colors](docs/lessons.md#per-window-colors), [`ipc-compat.js`](docs/lessons.md#ipc-compatjs), [Global keyboard shortcuts](docs/lessons.md#global-keyboard-shortcuts), [Window state broadcast](docs/lessons.md#window-state-broadcast), [Start sound from remote windows](docs/lessons.md#start-sound-from-remote-windows), [Monitor selection persistence](docs/lessons.md#monitor-selection-persistence), [Inline styles in HTML](docs/lessons.md#inline-styles-in-html), [Widget devTools](docs/lessons.md#widget-devtools), [Design previews](docs/lessons.md#design-previews), [Sounds](docs/lessons.md#sounds), [Control panel layout](docs/lessons.md#control-panel-layout), [syncClockStyle](docs/lessons.md#syncclockstyle), [Widget/clock geometry persistence](docs/lessons.md#widgetclock-geometry-persistence), [Scale pushes must be change-detected](docs/lessons.md#scale-pushes-must-be-change-detected), [Escape is layered](docs/lessons.md#escape-is-layered), [Flip animation is shared](docs/lessons.md#flip-animation-is-shared), [Colour bands live in ONE place too](docs/lessons.md#colour-bands-live-in-one-place-too), [One element, one colour system](docs/lessons.md#one-element-one-colour-system), [Scale is reported back](docs/lessons.md#scale-is-reported-back), [Visual regression](docs/lessons.md#visual-regression), [e2e needs `e2e/launch.js`](docs/lessons.md#e2e-needs-e2elaunchjs), [Timer status priority lives in ONE place](docs/lessons.md#timer-status-priority-lives-in-one-place), [Time format with hours](docs/lessons.md#time-format-with-hours), [Display settings `showCurrentTime`](docs/lessons.md#display-settings-showcurrenttime), [Design system v2](docs/lessons.md#design-system-v2), [Two UI themes, `data-theme` on `<html>`](docs/lessons.md#two-ui-themes-data-theme-on-html), [Display block positions](docs/lessons.md#display-block-positions), [Display scaling](docs/lessons.md#display-scaling), [Manual time input](docs/lessons.md#manual-time-input), [Color picker](docs/lessons.md#color-picker), [Scale value edit](docs/lessons.md#scale-value-edit), [Adaptive window height](docs/lessons.md#adaptive-window-height), [Reset settings](docs/lessons.md#reset-settings), [A plan's prediction authorises a measurement, not a fix](docs/lessons.md#a-plans-prediction-authorises-a-measurement-not-a-fix).
+Правила-оглавления: тема сама себе напоминание, разбор раскрывает — [No `perl -pi` here](docs/lessons.md#never-run-perl--pi-over-these-files), [The finish flash must be latched](docs/lessons.md#the-finish-flash-must-be-latched), [Flip timers belong to `flip-card.js`](docs/lessons.md#flip-timers-belong-to-flip-cardjs), [`showTicks` drives TWO dials](docs/lessons.md#showticks-drives-two-dials), [A payload default is not a guard](docs/lessons.md#a-payload-default-is-not-a-guard), [The bridge exposes no `invoke`](docs/lessons.md#the-bridge-exposes-no-invoke), [The display has no browser-mode fallback](docs/lessons.md#the-display-has-no-browser-mode-fallback), [IPC whitelist is duplicated](docs/lessons.md#ipc-whitelist-is-duplicated), [Adding new IPC channel](docs/lessons.md#adding-new-ipc-channel), [Per-window colors](docs/lessons.md#per-window-colors), [`ipc-compat.js`](docs/lessons.md#ipc-compatjs), [Global keyboard shortcuts](docs/lessons.md#global-keyboard-shortcuts), [Window state broadcast](docs/lessons.md#window-state-broadcast), [Start sound from remote windows](docs/lessons.md#start-sound-from-remote-windows), [Monitor selection persistence](docs/lessons.md#monitor-selection-persistence), [Inline styles in HTML](docs/lessons.md#inline-styles-in-html), [Widget devTools](docs/lessons.md#widget-devtools), [Design previews](docs/lessons.md#design-previews), [Sounds](docs/lessons.md#sounds), [Control panel layout](docs/lessons.md#control-panel-layout), [syncClockStyle](docs/lessons.md#syncclockstyle), [Geometry persistence](docs/lessons.md#widgetclock-geometry-persistence), [Scale pushes must be change-detected](docs/lessons.md#scale-pushes-must-be-change-detected), [Escape is layered](docs/lessons.md#escape-is-layered), [Flip animation is shared](docs/lessons.md#flip-animation-is-shared), [Colour bands: one place](docs/lessons.md#colour-bands-live-in-one-place-too), [One element, one colour system](docs/lessons.md#one-element-one-colour-system), [Scale is reported back](docs/lessons.md#scale-is-reported-back), [Visual regression](docs/lessons.md#visual-regression), [e2e needs `e2e/launch.js`](docs/lessons.md#e2e-needs-e2elaunchjs), [Status priority: one place](docs/lessons.md#timer-status-priority-lives-in-one-place), [Time format with hours](docs/lessons.md#time-format-with-hours), [Display settings `showCurrentTime`](docs/lessons.md#display-settings-showcurrenttime), [Design system v2](docs/lessons.md#design-system-v2), [Two UI themes](docs/lessons.md#two-ui-themes-data-theme-on-html), [Display block positions](docs/lessons.md#display-block-positions), [Display scaling](docs/lessons.md#display-scaling), [Manual time input](docs/lessons.md#manual-time-input), [Color picker](docs/lessons.md#color-picker), [Scale value edit](docs/lessons.md#scale-value-edit), [Adaptive window height](docs/lessons.md#adaptive-window-height), [Reset settings](docs/lessons.md#reset-settings), [A prediction authorises a measurement](docs/lessons.md#a-plans-prediction-authorises-a-measurement-not-a-fix).
 
 ## Работа с контекстом
 

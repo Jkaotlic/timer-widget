@@ -24,7 +24,7 @@
 | File | Covers |
 |------|--------|
 | `time-utils.test.js` | `formatTime`, `formatTimeShort`, `parseManualTime` (строгий формат) |
-| `security.test.js` | `isValidDataURL`, `isValidURL`, `validateImageSource`, `safeJSONParse`, `escapeHTML` |
+| `security.test.js` | `isValidDataURL`, `validateImageSource`, `safeJSONParse`, `isSafeColor`, `escapeHTML` |
 | `security-extended.test.js` | `safeSetBackgroundImage` |
 | `status-progress.test.js` | `getTimerStatus`, `calculateProgress` |
 | `validation-utils.test.js` | `isValidNumber`, `clamp` |
@@ -39,6 +39,22 @@
 | `timer-engine.test.js` | `tick`/`adjust`/`reset`/`setPreset` arithmetic + boundary events |
 | `timer-controller.test.js` | State machine with a fake clock (start/pause/reset/reconcile) |
 | `recovery.test.js` | Crash-recovery persist/load/validate |
+| `event-overrun-store.test.js` | Накопитель перелимита на диске: битый/чужой файл — чистое состояние, журнал ≤ 500 с перенумерацией, `pending` сворачивается ровно один раз (BUG-04) |
+| `electron-main-load.test.js` | НАСТОЯЩИЙ `electron-main.js` на заглушке `electron`: загрузка, IPC-обработчики поведением — геометрия, переоткрытие окон, журнал докладов и выгрузка, SEC-04/05/07/10/11, BUG-01/04/07/10/15/17 |
+| `control-decomposition.test.js` | Вынесенные из панели модули подключены, в `build.files` и не тянут внутренности панели |
+| `flip-card.test.js` | Перекидыш запускается при смене значения и НЕ запускается на том же |
+| `sound-bank.test.js` | Каждый встроенный звук строит узлы на подставном `AudioContext` и планирует остановку осцилляторов |
+| `mini-bar.test.js` | Режим полосы на поддельном документе: класс `collapsed`, `render()` отдаёт значения |
+| `panel-compact.test.js` | Компактный режим панели по ЗАМЕРУ с гистерезисом — без мигания |
+| `panel-drawer.test.js` | Ширина колонки при открытии ящика — предсказание по той же обрезке, что у main |
+| `preset-keys.test.js` | Клавиши пресетов во всех четырёх окнах ограничены длиной реестра — «6» не сбрасывает время |
+| `wheel-axis.test.js` | Колесо с нулевым `deltaY` (Shift на macOS) — не «уменьшить» |
+| `silent-exits.test.js` | Ранние выходы инициализации окон оставляют след в журнале |
+| `fullscreen-close.test.js` | Полноэкранное окно закрывают ПОСЛЕ выхода из полноэкранного режима (краш macOS 28.08.2026) |
+| `visual-diff.test.js` | Арифметика визуальной сверки на синтетических RGBA-буферах |
+| `ui-pass-2026-08.test.js` | Регрессии UI-прохода 07.08.2026 по исходникам (`codeOnly`) |
+| `e2e-budget.test.js` | `test.setTimeout` в e2e только ПОДНИМАЕТ бюджет из `playwright.config.js` |
+| `sound-hotkey.test.js` | Клавиша `Z` и мастер-звук: у звука ОДИН владелец (`#soundMasterEnabled`), тумблер строки и посылки окон идут через `toggleSoundMaster` |
 | `atomic-write.test.js` | Атомарная запись (tmp + fsync + rename): сорвавшаяся запись оставляет старый файл — накопитель и снимок восстановления (BUG-09) |
 | `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint`, `fitBlockScale`, `topBandReserve`, `heroFrameShrink` |
 | `renderer-storage.test.js` | Quota-safe localStorage helpers |
@@ -67,7 +83,7 @@
 | `window-open-ownership.test.js` | Every create-function announces and hydrates its own window; tray binding in `createControlWindow` |
 | `settings-key-ownership.test.js` | `pickOwnSetting` + wiring: display/widget read their OWN key, ticks have one owner |
 | `color-validation-single-owner.test.js` | One colour validator (`SecurityUtils.isSafeColor`); weaker copies stay gone |
-| `release-gates.test.js` | DevTools guarded on EVERY window, isolation, no external URLs, local fonts, no auto-update, CSP per window, Linux sandbox scoped to AppImage |
+| `release-gates.test.js` | DevTools guarded on EVERY window, isolation, no external URLs, local fonts, no auto-update, CSP per window, Linux: deb only, AppArmor `userns` + SUID as fallback, `--no-sandbox` in no target; navigation guard wired; `build.electronFuses` config |
 | `verify-packed.test.js` (фьюзы) | SEC-03: читалка фьюзов из `scripts/verify-packed.js` — индексы из `@electron/fuses`, удалённый/отсутствующий фьюз — провал, живой неперевёрнутый бинарь Electron отвергается; поиск исполняемого файла по раскладке mac/win/linux |
 | `csp-hash.test.js` | SEC-08: CSP окон без `'unsafe-inline'` в script-src — хеши совпадают с инлайновыми блоками (эталон из спецификации CSP, CRLF, комментарии), закрыты base/form/frame/worker/connect; самопроверка «правка без пересчёта видна» |
 | `navigation-guard.test.js` | SEC-06: навигация окна — только на четыре свои страницы (хеш/query не мешают, `%2e%2e` не обходит); `window.open` и `<webview>` — отказ на каждом событии |
@@ -102,6 +118,23 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `flip-animation.spec.js` | Перекидывание ВИДНО в трёх окнах: створки меряются покадрово, не по классу |
 | `flip-hours-layout.spec.js` | Flip separator stays dots (never a glyph) in H:MM:SS, measured |
 | `window-state-sync.spec.js` | A window loaded second knows which windows are already open |
+| `window-reopen-race.spec.js` | Закрыть и сразу открыть — у всех трёх окон окно остаётся, и оно одно |
+| `mini-bar.spec.js` | Режим полосы сжимает НАСТОЯЩЕЕ окно и возвращает прежние размер и позицию |
+| `panel-shell.spec.js` | У панели ОДНА оболочка при любой ширине окна |
+| `min-size-layout.spec.js` | На минимуме окна ряд вкладок настроек виден целиком |
+| `drawer-focus.spec.js` | Фокус переходит в открытый ящик настроек и возвращается |
+| `segmented-label.spec.js` | Подпись контрола выбора стиля не ломается в две строки |
+| `toast-placement.spec.js` | Тост не закрывает герой-время |
+| `sound-controls.spec.js` | Вкладка «Звуки»: один вид контрола на смысл, мишень не меньше нормы |
+| `reset-defaults.spec.js` | «Сбросить всё» возвращает заводской вид — сверка с чистым профилем |
+| `clock-badges-layout.spec.js` | Шильдики даты и пояса в круговых часах не налезают при любом размере |
+| `clock-style-hardening.spec.js` | Испорченное значение стиля не оставляет часы пустым окном |
+| `clock-style-sync.spec.js` | Ряд стиля часов зеркалит виджет при синхронизации, клик снимает её |
+| `display-ring-proportion.spec.js` | Дуга прогресса занимает долю высоты окна, а не пиксели |
+| `flip-separator.spec.js` | Разделитель флипа — точки во всех трёх окнах |
+| `overtime-centering.spec.js` | В перерасходе по центру стоят ЦИФРЫ, а не вся надпись |
+| `overtime-minus.spec.js` | Минус перерасхода в виджете — часть табло: мигает в одной фазе с цифрами, зазор у «Цифр» не шире нормы |
+| `ui-pass-2026-08.spec.js` | Замеры UI-прохода 07.08.2026, которые картинкой не поймать |
 | `dial-ticks.spec.js` | Dial tick marks toggle reaches widget + clock and survives reopen |
 | `overtime-palette.spec.js` | Overtime is red in display + widget — digits, glow and status chip |
 | `analog-hour-hand.spec.js` | Display's analog hour hand angle at 5 min / 1 h / 1:30 / 6 h |
@@ -139,6 +172,6 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `floor-47.spec.js` | Скрытый режим ПО КЛИКУ: разблокировка тройным кликом, деньги, ЗАМОРОЗКА итога числом, отчёт, справка |
 | `display-proportions.spec.js` | Карточка занимает ОДНУ долю полосы на 16:9 и 4:3; снимается при разбросе полос меньше ×1.6 |
 | `scale-range.spec.js` | Пол масштаба ДОСТИЖИМ, окно квадратно на всей лестнице, каждая ступень меняет размер; растянутое за край доезжает до ползунка |
-| `windows-load-clean.spec.js` | Четыре окна грузятся без ошибок консоли (ловит столкновение имён верхнего уровня); зонд проверяет себя |
+| `windows-load-clean.spec.js` | Четыре окна грузятся без ошибок консоли (ловит столкновение имён верхнего уровня); инлайновый скрипт каждого окна исполнился под CSP на хешах; зонды проверяют себя |
 | `display-timer-width.spec.js` | Размер цифр — ФУНКЦИЯ процента, а не порядка посылок; потолок в чернила; рама не крадёт клик |
 | `hero-modes.spec.js` | Четыре режима ПО КЛИКУ: число из ЧАСОВ ОКНА, плашка гаснет, «до конца» красный, стрелка по %12 |

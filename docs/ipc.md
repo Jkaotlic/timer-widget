@@ -80,3 +80,26 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `window-geometry` | `{x, y, width, height}` — НАСТОЯЩИЕ границы окна от главного процесса. Виджет и часы пишут в `localStorage` их, а не свои `outerWidth`/`screenX`: на мониторе с масштабом ≠ 100 % это разные единицы |
 | `timer-recovery-available` | The crash snapshot (`{ presetSeconds, totalSeconds, remainingSeconds, savedAt }`), sent to the control window once on `did-finish-load`. Main restores the time itself; this only tells the panel to say so (a toast) |
 
+
+## Timer state
+
+`timer-state` payload (перенесено из `CLAUDE.md`; собирает `patch()` в
+`timer-controller.js`):
+
+```js
+{
+    totalSeconds: 300,        // Original preset duration
+    remainingSeconds: 245,    // Current remaining (negative = overrun)
+    presetSeconds: 300,       // Preset for reset (survives on-the-fly adjustments)
+    isRunning: true,          // Timer is actively counting
+    isPaused: false,          // Timer is paused
+    finished: false,          // Timer reached zero (latched until reset)
+    overrunLimitSeconds: 0,   // Config stamped on every patch
+    allowNegative: false,     // Config stamped on every patch
+    timestamp: 1790000000000, // Wall clock of the patch — NOT used for ordering
+    updateCounter: 42         // Monotonic counter for reliable sync
+}
+```
+
+Отсчёт внутри — по монотонным часам (`performance.now`), сон машины
+засчитывается через `powerMonitor` suspend/resume; `timestamp` только штамп.
