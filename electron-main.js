@@ -53,6 +53,7 @@ const recovery = require('./recovery');
 const MoneyMeter = require('./money-meter');
 const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
+const NavigationGuard = require('./navigation-guard');
 
 // Logger setup
 //
@@ -461,21 +462,32 @@ function blockZoom(win) {
     win.webContents.setVisualZoomLevelLimits(1, 1);
 }
 
-// Защита от навигации и открытия новых окон.
-// will-navigate ловит обычную навигацию, will-redirect — серверные/meta редиректы,
-// will-frame-navigate — навигацию субфреймов; блокируем всё, что не file://.
-function hardenWindow(win) {
-    const blockNonFile = (event, url) => {
-        if (!url.startsWith('file://')) {
-            event.preventDefault();
-        }
-    };
-    win.webContents.on('will-navigate', blockNonFile);
-    win.webContents.on('will-redirect', blockNonFile);
-    // will-frame-navigate передаёт WebFrameMain-событие, целевой URL в event.url
-    win.webContents.on('will-frame-navigate', (event) => blockNonFile(event, event.url));
-    win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+// Защита от навигации и открытия новых окон (SEC-06).
+//
+// Переход разрешён ТОЛЬКО на четыре страницы приложения — сравнение адресов в
+// navigation-guard.js. Прежнее правило «всё, что file://» пускало в окно любой
+// HTML с диска вместе с preload-мостом: хватало перетащить файл на виджет.
+// Эталон считается от __dirname: внутри сборки это каталог app.asar, и loadFile
+// грузит страницы оттуда же.
+const APP_PAGE_URLS = NavigationGuard.appPageUrls(__dirname);
+
+function logBlockedNavigation(kind, url) {
+    log.warn(`[nav] отклонено ${kind}: ${NavigationGuard.describeUrl(url)}`);
 }
+
+function hardenWindow(win) {
+    NavigationGuard.guardWebContents(win.webContents, APP_PAGE_URLS, logBlockedNavigation);
+}
+
+// Те же запреты — на КАЖДЫЙ webContents, который когда-либо появится, а не
+// только на четыре окна, которые мы знаем по имени: <webview>, окно, созданное
+// в обход create-функции, DevTools-фронтенд. hardenWindow в create-функциях
+// остаётся — он ставит запреты в том же месте, где окно родилось, и тест
+// release-gates считает его вызовы; двойная установка безвредна (отказ
+// дважды — всё ещё отказ).
+app.on('web-contents-created', (_event, contents) => {
+    NavigationGuard.guardWebContents(contents, APP_PAGE_URLS, logBlockedNavigation);
+});
 
 function isPayloadObject(payload) {
     return payload !== null && typeof payload === 'object';

@@ -64,6 +64,8 @@
 | `settings-key-ownership.test.js` | `pickOwnSetting` + wiring: display/widget read their OWN key, ticks have one owner |
 | `color-validation-single-owner.test.js` | One colour validator (`SecurityUtils.isSafeColor`); weaker copies stay gone |
 | `release-gates.test.js` | DevTools guarded on EVERY window, isolation, no external URLs, local fonts, no auto-update, CSP per window, Linux sandbox scoped to AppImage |
+| `navigation-guard.test.js` | SEC-06: навигация окна — только на четыре свои страницы (хеш/query не мешают, `%2e%2e` не обходит); `window.open` и `<webview>` — отказ на каждом событии |
+| `drop-guard.test.js` | SEC-06: сброшенный файл не открывается вместо виджета, часов и дисплея; у панели свой гаситель |
 | `docs-integrity.test.js` | Связность `CLAUDE.md` ↔ `docs/lessons.md`: ссылка ведёт в разбор, разбор достижим; плюс потолок размера |
 | `onboarding.test.js` | Подсказка первого запуска: один раз, флаг ДО показа, сломанное хранилище не роняет; канал релизов БЕЗ payload |
 | `flat-surfaces.test.js` | Инвариант «плоско»: ни блюра, ни прозрачных тёмных поверхностей, ни свечений; пятая проверка — САМ разбор |

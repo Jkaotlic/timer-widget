@@ -389,8 +389,23 @@ test('песочница Linux: ни одна цель не отключает �
 });
 
 test('навигация и новые окна заблокированы', () => {
-    assert.match(MAIN, /will-navigate/, 'нет запрета навигации');
-    assert.match(MAIN, /setWindowOpenHandler/, 'нет запрета window.open');
+    // Сами запреты живут в navigation-guard.js (там их проверяют поведенчески,
+    // tests/navigation-guard.test.js); здесь — что main их ПРИМЕНЯЕТ: к каждому
+    // окну и к любому webContents, появившемуся в обход create-функций.
+    const GUARD = codeOnly(read('navigation-guard.js'));
+    for (const event of ['will-navigate', 'will-redirect', 'will-frame-navigate', 'will-attach-webview']) {
+        assert.ok(GUARD.includes(`'${event}'`), `нет запрета ${event}`);
+    }
+    assert.match(GUARD, /setWindowOpenHandler\(\(\) => \(\{ action: 'deny' \}\)\)/, 'нет запрета window.open');
+    assert.match(MAIN_CODE, /function hardenWindow\(win\) \{\s*NavigationGuard\.guardWebContents\(/,
+        'hardenWindow не ставит запреты navigation-guard');
+    assert.match(
+        MAIN_CODE,
+        /app\.on\('web-contents-created',[^]*?NavigationGuard\.guardWebContents\(contents/,
+        'нет глобального запрета на web-contents-created'
+    );
+    // Прежнее правило «любой file://» не вернулось.
+    assert.doesNotMatch(MAIN_CODE, /startsWith\('file:\/\/'\)/, 'навигация снова пускает любой file://');
     assert.match(MAIN, /hardenWindow\(/, 'hardenWindow не применяется');
     // hardenWindow вызывается для каждого окна.
     const calls = (MAIN.match(/hardenWindow\((?!window)/g) || []).length;
