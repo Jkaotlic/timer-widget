@@ -1133,3 +1133,57 @@ test('SEC-10: цвета и стиль виджета — только плос�
     stubs.ipcHandlers.get('widget-style-update')(null, [1]);
     assert.equal(stubs.lastSent('widget-style-update'), null);
 });
+
+// --- BUG-17: одна выгрузка — один ответ, один диалог -------------------------
+
+test('BUG-17: ответ о выгрузке приходит панели ОДИН раз', async () => {
+    // Панель — и controlWindow, и event.sender: отвечая обоим, главный процесс
+    // показывал два одинаковых тоста.
+    const stubs = createStubs();
+    stubs.electron.dialog = { showSaveDialog: async () => ({ canceled: true }) };
+    loadMain(stubs);
+    stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(stubs.sent.filter((m) => m.channel === 'event-export-done').length, 1);
+});
+
+test('BUG-17: диалог сохранения — дочерний окну панели', async () => {
+    const stubs = createStubs();
+    const calls = [];
+    stubs.electron.dialog = { showSaveDialog: async (...args) => { calls.push(args); return { canceled: true }; } };
+    loadMain(stubs);
+    const control = openControl(stubs);
+    stubs.ipcHandlers.get('event-export')(eventFrom(control));
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], control, 'без родителя диалог уходит за окна и не блокирует панель');
+    assert.equal(typeof calls[0][1], 'object', 'параметры диалога — вторым аргументом');
+});
+
+test('BUG-17: повторный клик, пока диалог открыт, второго диалога не открывает', async () => {
+    const stubs = createStubs();
+    let opened = 0;
+    let close;
+    stubs.electron.dialog = {
+        showSaveDialog: () => { opened++; return new Promise((r) => { close = r; }); }
+    };
+    loadMain(stubs);
+    const control = openControl(stubs);
+    const handler = stubs.ipcHandlers.get('event-export');
+    handler(eventFrom(control));
+    handler(eventFrom(control));
+    handler(eventFrom(control));
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(opened, 1, 'три клика — три диалога');
+
+    close({ canceled: true });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(stubs.sent.filter((m) => m.channel === 'event-export-done').length, 1,
+        'проглоченный повтор не должен отвечать отдельно');
+    // Диалог закрыт — следующий клик снова работает.
+    handler(eventFrom(control));
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(opened, 2, 'после закрытия диалога выгрузка заперлась навсегда');
+    close({ canceled: true });
+    await new Promise((r) => setTimeout(r, 20));
+});

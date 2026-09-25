@@ -2080,13 +2080,19 @@ ipcMain.on('event-finish', () => {
 // Ответ обязателен в любом исходе. Кнопка, после которой ничего не происходит
 // и ничего не сказано, читается как сломанное окно; молчаливый выход в этом
 // проекте уже стоил отдельной сессии разбора.
-ipcMain.on('event-export', async (event) => {
+//
+// Ответ — ОДИН и только панели (BUG-17). Канал шлёт лишь панель (SEC-07), так
+// что «ответить ещё и спросившему» значило ответить ей дважды — два тоста.
+//
+// Диалог — дочерний окну панели и один: без родителя он уходил за окна и не
+// блокировал панель, и каждый клик открывал ещё один. Повтор, пока диалог
+// открыт, проглатывается без ответа — ответит тот, первый.
+let eventExportBusy = false;
+ipcMain.on('event-export', async () => {
+    if (eventExportBusy) { return; }
+    eventExportBusy = true;
     const answer = (payload) => {
         safelySendToWindow(controlWindow, 'event-export-done', payload);
-        // Отвечаем и тому, кто спросил: канал может позвать не только панель.
-        if (event && event.sender && !event.sender.isDestroyed()) {
-            try { event.sender.send('event-export-done', payload); } catch { /* окно закрылось */ }
-        }
     };
 
     try {
@@ -2111,7 +2117,7 @@ ipcMain.on('event-export', async (event) => {
         });
 
         const stamp = new Date().toISOString().slice(0, 10);
-        const result = await dialog.showSaveDialog({
+        const result = await dialog.showSaveDialog(controlWindow, {
             title: 'Сохранить отчёт о перелимите',
             defaultPath: `перелимит-${stamp}.csv`,
             filters: [{ name: 'CSV', extensions: ['csv'] }]
@@ -2133,6 +2139,8 @@ ipcMain.on('event-export', async (event) => {
         // он нужен человеку, который выбирал этот путь сам.
         log.error(`[export] отчёт не записан: ${(err && (err.code || err.name)) || 'ошибка'}`);
         answer({ ok: false, canceled: false, error: (err && err.message) || String(err) });
+    } finally {
+        eventExportBusy = false;
     }
 });
 
