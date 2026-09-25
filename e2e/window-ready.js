@@ -202,10 +202,44 @@ async function reopenDisplay(app, control, opts = {}) {
     return openDisplay(app, control, opts);
 }
 
+/**
+ * Дождаться, что величина в окне ОСЕЛА: `read` вернул одно и то же
+ * `samples` раз подряд с шагом `interval`.
+ *
+ * Для того, что приходит не событием, а серией: полноэкранный переход,
+ * раскладка после открытия, сохранённое место после переоткрытия. Пауза
+ * «2400 мс хватит» — ставка на скорость машины; здесь ждут, пока перестанет
+ * меняться, и не дольше.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {Function} read — выполняется В ОКНЕ, возвращает сериализуемое значение
+ * @param {{samples?: number, interval?: number, timeout?: number, name?: string}} [opts]
+ * @returns {Promise<any>} осевшее значение
+ */
+async function waitForSteady(page, read, opts = {}) {
+    const samples = opts.samples ?? 3;
+    const interval = opts.interval ?? 150;
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const deadline = Date.now() + timeout;
+    let last;
+    let same = 0;
+    for (;;) {
+        const value = await page.evaluate(read);
+        const key = JSON.stringify(value);
+        same = key === last ? same + 1 : 1;
+        last = key;
+        if (same >= samples) { return value; }
+        if (Date.now() > deadline) {
+            throw new Error(`${opts.name || 'величина'} не осела за ${timeout} мс; последнее: ${key}`);
+        }
+        await new Promise((r) => setTimeout(r, interval));
+    }
+}
+
 module.exports = {
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone,
-    findDisplay, findWindowBy,
+    findDisplay, findWindowBy, waitForSteady,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

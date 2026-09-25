@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
-const { waitForDisplay, reopenDisplay } = require('./window-ready');
+const { waitForDisplay, reopenDisplay, waitForSteady } = require('./window-ready');
 
 /**
  * Таймер полноэкранного окна ПЕРЕТАСКИВАЕТСЯ (просьба 24.08.2026: «в
@@ -37,6 +37,18 @@ const geometry = () => {
         moved: document.querySelector('.display-container').classList.contains('custom-position')
     };
 };
+
+/**
+ * Ожидания здесь — УСЛОВИЯ, а не паузы (правило e2e/window-ready.js). Спека
+ * ждала числами 2400/2600/1200/800 мс, и в пакетном прогоне однажды краснела,
+ * а поодиночке — нет. Окно открылось — ждём, пока коробка таймера осядет;
+ * переоткрылось — пока вернётся сдвиг; раскладка применена — пока он уйдёт.
+ */
+const steady = (page, name) => waitForSteady(page, geometry, { samples: 4, name });
+const moved = (page, want) => page.waitForFunction(
+    (w) => document.querySelector('.display-container').classList.contains('custom-position') === w,
+    want, { timeout: 15000 }
+).catch(() => {});
 
 /** Alt+перетаскивание за точку внутри коробки таймера. */
 const dragTimer = (display, dx, dy, opts = {}) => display.evaluate(async ([dX, dY, alt]) => {
@@ -75,14 +87,13 @@ test('Alt+перетаскивание двигает таймер вместе 
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
 
-        const before = await display.evaluate(geometry);
+        const before = await steady(display, 'таймер после открытия');
         expect(before.moved, 'таймер стоит сдвинутым ещё до жеста — профиль не чист').toBe(false);
 
         // Без Alt жест не должен делать ничего: проверка проверки.
         await dragTimer(display, 150, -100, { alt: false });
-        const idle = await display.evaluate(geometry);
+        const idle = await steady(display, 'таймер после жеста без Alt');
         expect(idle.timer, 'таймер поехал БЕЗ Alt — двигает что-то другое, и замер ниже ничего не значит')
             .toEqual(before.timer);
 
@@ -115,9 +126,9 @@ test('Alt+перетаскивание двигает таймер вместе 
         const DY = -Math.floor(room.up / 2);
         console.log(`   окно ${room.w}×${room.h}, до края вверх ${room.up} влево ${room.left} → дельта ${DX},${DY}`);
         await dragTimer(display, DX, DY);
-        await display.waitForTimeout(500);
+        await moved(display, true);
 
-        const after = await display.evaluate(geometry);
+        const after = await steady(display, 'таймер после перетаскивания');
         console.log(`   таймер ${before.timer.x},${before.timer.y} → ${after.timer.x},${after.timer.y}`);
         expect(after.moved, 'таймер не перешёл в свободное положение').toBe(true);
         expect(Math.abs(after.timer.x - (before.timer.x + DX)),
@@ -132,8 +143,8 @@ test('Alt+перетаскивание двигает таймер вместе 
 
         // Переоткрытие окна: место сохранено.
         const reopened = await reopenDisplay(app, control, { displayIndex: 0 });
-        await control.waitForTimeout(2600);
-        const restored = await reopened.evaluate(geometry);
+        await moved(reopened, true);
+        const restored = await steady(reopened, 'таймер после переоткрытия');
         console.log(`   после переоткрытия ${restored.timer.x},${restored.timer.y}`);
         expect(Math.abs(restored.timer.x - after.timer.x), 'место таймера не пережило переоткрытие').toBeLessThanOrEqual(8);
         expect(Math.abs(restored.timer.y - after.timer.y), 'место таймера не пережило переоткрытие').toBeLessThanOrEqual(8);
@@ -141,8 +152,8 @@ test('Alt+перетаскивание двигает таймер вместе 
         // Раскладка возвращает таймер в поток: она владеет композицией целиком.
         await control.click('.tab-btn[data-tab="display"]');
         await control.click('#displayLayoutGrid button[data-layout="classic"]');
-        await reopened.waitForTimeout(1200);
-        const afterLayout = await reopened.evaluate(geometry);
+        await moved(reopened, false);
+        const afterLayout = await steady(reopened, 'таймер после раскладки');
         expect(afterLayout.moved, 'раскладка не вернула таймер в поток').toBe(false);
     } finally {
         // Профиль общий: раскладка включила тумблеры и записала места карточек,
@@ -165,17 +176,17 @@ test('замок «Закрепить положение» держит и та�
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
+        await steady(display, 'таймер после открытия');
 
         await control.click('#lockToggle');
-        await display.waitForTimeout(700);
+        await display.waitForFunction(() => document.documentElement.classList.contains('ui-locked'),
+            null, { timeout: 10000 }).catch(() => {});
         const locked = await display.evaluate(() => document.documentElement.classList.contains('ui-locked'));
         expect(locked, 'замок не доехал до дисплея — проверять нечего').toBe(true);
 
-        const before = await display.evaluate(geometry);
+        const before = await steady(display, 'таймер под замком');
         await dragTimer(display, -160, -100);
-        await display.waitForTimeout(400);
-        const after = await display.evaluate(geometry);
+        const after = await steady(display, 'таймер после жеста под замком');
         expect(after.timer, 'замок не остановил перетаскивание таймера').toEqual(before.timer);
     } finally {
         await control.click('#lockToggle').catch(() => {});
@@ -205,23 +216,26 @@ test('пресет возвращает сдвинутый таймер в по�
             localStorage.removeItem('displayBlockPositions');
         });
         await control.reload();
-        await control.waitForTimeout(1200);
+        await control.waitForLoadState('domcontentloaded');
+        await control.waitForFunction(() => !!window.timerController, null, { timeout: 15000 });
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
 
         // Записываем вид, в котором таймер стоит по центру.
-        const home = await display.evaluate(geometry);
+        const home = await steady(display, 'таймер после открытия');
         expect(home.moved, 'таймер уже сдвинут — записывать нечего').toBe(false);
         await control.click('#presetSlot3', { modifiers: ['Shift'] });
-        await control.waitForTimeout(800);
+        await control.waitForFunction(() => document.getElementById('presetSlot3').classList.contains('active'),
+            null, { timeout: 10000 }).catch(() => {});
 
         // Двигаем таймер — отметка обязана погаснуть.
         await dragTimer(display, -200, -140);
-        await display.waitForTimeout(800);
-        const moved = await display.evaluate(geometry);
-        expect(moved.moved, 'таймер не сдвинулся — проверять нечего').toBe(true);
+        await moved(display, true);
+        const shifted = await steady(display, 'таймер после перетаскивания');
+        await control.waitForFunction(() => !document.getElementById('presetSlot3').classList.contains('active'),
+            null, { timeout: 10000 }).catch(() => {});
+        expect(shifted.moved, 'таймер не сдвинулся — проверять нечего').toBe(true);
         const off = await control.evaluate(
             () => document.getElementById('presetSlot3').classList.contains('active')
         );
@@ -229,10 +243,12 @@ test('пресет возвращает сдвинутый таймер в по�
 
         // Применяем ячейку: таймер обязан вернуться, ячейка — загореться.
         await control.click('#presetSlot3');
-        await control.waitForTimeout(1600);
+        await moved(display, false);
+        await control.waitForFunction(() => document.getElementById('presetSlot3').classList.contains('active'),
+            null, { timeout: 10000 }).catch(() => {});
 
-        const back = await display.evaluate(geometry);
-        console.log(`   таймер ${moved.timer.x},${moved.timer.y} → ${back.timer.x},${back.timer.y} (был ${home.timer.x},${home.timer.y})`);
+        const back = await steady(display, 'таймер после применения пресета');
+        console.log(`   таймер ${shifted.timer.x},${shifted.timer.y} → ${back.timer.x},${back.timer.y} (был ${home.timer.x},${home.timer.y})`);
         expect(back.moved, 'пресет не вернул таймер в поток').toBe(false);
         expect(Math.abs(back.timer.x - home.timer.x), 'таймер вернулся не туда').toBeLessThanOrEqual(8);
 
