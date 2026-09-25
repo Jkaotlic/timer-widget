@@ -137,13 +137,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Проверяется ТОТ пакет, что уходит в релиз, а не соседняя сборка из CI:
+      # песочница и профиль AppArmor видны только в готовом postinst.
+      - name: Verify sandbox setup in the shipped package
+        run: node scripts/verify-linux-sandbox.js
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
           name: linux
           path: |
             dist/*.deb
-            dist/*.AppImage
           retention-days: 5
 
   release:
@@ -183,7 +187,7 @@ jobs:
         run: |
           cd artifacts
           find . -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \
-            -o -name '*.deb' -o -name '*.AppImage' \) -print0 \
+            -o -name '*.deb' \) -print0 \
             | sort -z | xargs -0 sha256sum \
             | sed 's| .*/| |' > ../SHA256SUMS.txt
           cat ../SHA256SUMS.txt
@@ -206,7 +210,6 @@ jobs:
             artifacts/**/*.zip
             artifacts/**/*.exe
             artifacts/**/*.deb
-            artifacts/**/*.AppImage
             SHA256SUMS.txt
             sbom.json
         env:

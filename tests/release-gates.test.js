@@ -348,46 +348,44 @@ test('в каждом окне есть CSP и она не разрешает в
     }
 });
 
-test('песочница Linux: ключ --no-sandbox только у AppImage', () => {
-    // Ключ отключает главную границу изоляции рендерера и противоречит
-    // `sandbox: true` во всех окнах. Он стоял на уровне `linux`, то есть уезжал
-    // и в deb — при том что у deb есть шаг установки, на котором песочницу можно
-    // настроить по-человечески. Разнесено по целям:
-    //   deb      — SUID-помощник ставится в postinst, ключ не нужен;
-    //   AppImage — устанавливать нечего, а user namespaces есть не везде
-    //              (жёсткие ядра, AppArmor в Ubuntu 24.04), поэтому ключ остаётся
-    //              осознанным исключением.
-    assert.equal(
-        PKG.build.linux.executableArgs,
-        undefined,
-        'executableArgs на уровне linux уезжает во ВСЕ цели, включая deb'
-    );
-    assert.deepEqual(
-        PKG.build.appImage.executableArgs,
-        ['--no-sandbox'],
-        'у AppImage ключ должен быть указан явно, иначе он потеряется вместе с общим'
-    );
-    assert.equal(
-        PKG.build.deb.executableArgs,
-        undefined,
-        'deb обязан идти с включённой песочницей'
-    );
+test('песочница Linux: ни одна цель не отключает её, deb ставит AppArmor и SUID только запасом', () => {
+    // Ключ --no-sandbox отключает главную границу изоляции рендерера и
+    // противоречит `sandbox: true` во всех окнах. Раньше он оставался у AppImage
+    // «осознанным исключением» — и на ПСИ именно Linux-сборка не прошла по
+    // критическим уязвимостям. AppImage убран: без шага установки песочницу на
+    // Ubuntu 24.04+ не поднять ничем, кроме этого ключа.
+    const build = JSON.stringify(PKG.build);
+    assert.ok(!build.includes('--no-sandbox'), 'в конфигурации сборки снова есть --no-sandbox');
+    assert.deepEqual(PKG.build.linux.target, ['deb'], 'Linux поставляется только deb-пакетом');
+    assert.equal(PKG.build.appImage, undefined, 'секция appImage осталась без цели');
 
-    // Скрипт установки обязан ставить SUID и владельца root — без этого
-    // песочница в deb не поднимется на системах без user namespaces.
-    // Комментарии вырезаются: скрипт намеренно объясняет, почему прежний
-    // `chmod 0755` был неверным, и упоминает эту команду в тексте.
-    const afterInstall = read('build/linux-after-install.sh')
+    const code = (file) => read(file)
         .split('\n')
         .filter((l) => !l.trim().startsWith('#'))
         .join('\n');
-    assert.match(afterInstall, /chmod 4755/, 'postinst не ставит SUID-бит на chrome-sandbox');
-    assert.match(afterInstall, /chown root:root/, 'postinst не задаёт владельца root');
-    assert.ok(
-        !/chmod 0755/.test(afterInstall),
-        'вернулся chmod 0755: SUID снят, а ключа --no-sandbox в deb больше нет — приложение не стартует'
-    );
+
+    // postinst: профиль AppArmor с userns (Ubuntu 24.04+ режет user namespaces
+    // без него), а SUID-root на chrome-sandbox — ТОЛЬКО если user namespaces в
+    // ядре нет вовсе. Бинарник с SUID-root там, где он не нужен, — лишняя
+    // поверхность атаки, которую сканер помечает сам по себе.
     assert.equal(PKG.build.deb.afterInstall, 'build/linux-after-install.sh', 'postinst не подключён');
+    const afterInstall = code('build/linux-after-install.sh');
+    assert.match(afterInstall, /unshare --user true/, 'postinst не проверяет user namespaces перед SUID');
+    assert.match(afterInstall, /chmod 4755/, 'нет запасного SUID для ядер без user namespaces');
+    assert.match(afterInstall, /chown root:root/, 'SUID без владельца root бесполезен');
+    assert.match(afterInstall, /chmod 0755/, 'при рабочих user namespaces SUID обязан сниматься');
+    assert.match(afterInstall, /\/etc\/apparmor\.d\//, 'postinst не ставит профиль AppArmor');
+    assert.match(afterInstall, /apparmor_parser --skip-kernel-load/, 'профиль ставится без пробной загрузки');
+
+    // postrm: профиль выгружается и удаляется, purge не идёт по симлинкам.
+    assert.equal(PKG.build.deb.afterRemove, 'build/linux-post-remove.sh', 'postrm подключён мимо electron-builder');
+    assert.ok(
+        !(PKG.build.deb.fpm || []).some((a) => a.startsWith('--after-remove')),
+        'сырой --after-remove в fpm подменяет штатный postrm'
+    );
+    const afterRemove = code('build/linux-post-remove.sh');
+    assert.match(afterRemove, /apparmor_parser --remove/, 'postrm не выгружает профиль AppArmor');
+    assert.match(afterRemove, /-L /, 'purge удаляет каталоги, не проверив симлинк');
 });
 
 test('навигация и новые окна заблокированы', () => {

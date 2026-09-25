@@ -34,17 +34,20 @@
     "email": "jkaotlic@users.noreply.github.com"
   },
   "license": "MIT",
-  "comment:overrides": "brace-expansion <=5.0.8 has a high-severity DoS advisory (GHSA-rgw5-rvv9-x895) that bypasses the earlier CVE-2026-14257 mitigation; it supersedes the two ReDoS/OOM advisories this override was originally written for (GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg). 5.0.9 is the patched release. The override is still load-bearing and must NOT be dropped as 'probably fixed upstream': the consumers in this tree ask for ^1.1.7 / ^2.0.1 / ^2.0.2 / ^5.0.5 (minimatch under glob, asar, universal, dir-compare, filelist), so without the pin npm resolves vulnerable 1.x and 2.x copies alongside the patched one. It reaches us purely through the electron-builder dev toolchain, never through app runtime code — 'npm audit --omit=dev' is clean either way. 5.0.9 ships dual CJS+ESM exports, so the CJS consumers keep working.",
+  "comment:overrides": "brace-expansion <=5.0.8 has a high-severity DoS advisory (GHSA-rgw5-rvv9-x895) that bypasses the earlier CVE-2026-14257 mitigation; it supersedes the two ReDoS/OOM advisories this override was originally written for (GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg). 5.0.9 is the patched release. The override is still load-bearing and must NOT be dropped as 'probably fixed upstream': the consumers in this tree ask for ^1.1.7 / ^2.0.1 / ^2.0.2 / ^5.0.5 (minimatch under glob, asar, universal, dir-compare, filelist), so without the pin npm resolves vulnerable 1.x and 2.x copies alongside the patched one. It reaches us purely through the electron-builder dev toolchain, never through app runtime code — 'npm audit --omit=dev' is clean either way. 5.0.9 ships dual CJS+ESM exports, so the CJS consumers keep working. @xmldom/xmldom ^0.8.15 (8 advisories incl. GHSA-6gmq-8vp8-gcm6, under plist), fast-uri ^3.1.8 (SSRF/host confusion GHSA-f65p-4m7j-42xc and 3 more, under ajv) and js-yaml ^4.3.2 (GHSA-2883-xcg3-v3hh) are pinned the same way: all three reach us only through the electron-builder toolchain, but an acceptance scanner reads package-lock/SBOM and flags them regardless. Each pin stays inside the major the consumer asks for — plist 3.x breaks on xmldom 0.9 (mimeType became mandatory).",
   "overrides": {
-    "brace-expansion": "^5.0.9"
+    "brace-expansion": "^5.0.9",
+    "@xmldom/xmldom": "^0.8.15",
+    "fast-uri": "^3.1.8",
+    "js-yaml": "^4.3.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.62.1",
-    "electron": "^44.1.1",
+    "@playwright/test": "^1.63.0",
+    "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
-    "eslint": "^10.9.1",
-    "eslint-plugin-html": "^8.2.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-html": "^8.2.1",
     "globals": "^17.12.0"
   },
   "build": {
@@ -90,8 +93,7 @@
     },
     "linux": {
       "target": [
-        "deb",
-        "AppImage"
+        "deb"
       ],
       "category": "Utility",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -99,10 +101,10 @@
     },
     "deb": {
       "fpm": [
-        "--deb-no-default-config-files",
-        "--after-remove=build/linux-post-remove.sh"
+        "--deb-no-default-config-files"
       ],
-      "afterInstall": "build/linux-after-install.sh"
+      "afterInstall": "build/linux-after-install.sh",
+      "afterRemove": "build/linux-post-remove.sh"
     },
     "publish": null,
     "extraResources": [
@@ -170,13 +172,7 @@
       "sounds/**/*",
       "fonts/**/*",
       "NOTICE"
-    ],
-    "appImage": {
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "executableArgs": [
-        "--no-sandbox"
-      ]
-    }
+    ]
   },
   "dependencies": {
     "electron-log": "^5.4.4"

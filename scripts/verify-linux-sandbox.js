@@ -2,24 +2,24 @@
 'use strict';
 
 /**
- * Проверяет настройку песочницы Chromium в СОБРАННЫХ Linux-пакетах.
+ * Проверяет настройку песочницы Chromium в СОБРАННОМ deb-пакете.
  *
  * Зачем отдельный скрипт, а не unit-тест. Unit-тест читает package.json и
- * build/linux-after-install.sh — то есть мои намерения. Здесь проверяется
- * результат: что electron-builder действительно положил postinst в deb, что в
- * .desktop-файле нет `--no-sandbox`, и что у AppImage ключ, наоборот, на месте.
- * Между намерением и артефактом стоит сборщик со своими шаблонами и заменами.
+ * build/linux-*.sh — то есть мои намерения. Здесь проверяется результат: что
+ * electron-builder действительно положил наш postinst/postrm (с подставленными
+ * путями), профиль AppArmor с `userns,` и .desktop без `--no-sandbox`. Между
+ * намерением и артефактом стоит сборщик со своими шаблонами и заменами.
  *
- * Почему цели разные:
- *   deb      — есть шаг установки, значит можно выставить SUID-бит и владельца
- *              root на chrome-sandbox; песочница работает без user namespaces;
- *   AppImage — устанавливать нечего, SUID выставить некому, а непривилегированные
- *              user namespaces доступны не везде (жёсткие ядра, а в Ubuntu 24.04
- *              их ограничивает профиль AppArmor). Поэтому там `--no-sandbox`
- *              остаётся осознанным исключением, и это единственная цель, где он
- *              допустим.
+ * Схема песочницы:
+ *   AppArmor — Ubuntu 24.04+ ограничивает user namespaces для приложений без
+ *              профиля; postinst ставит профиль с `userns,`;
+ *   SUID     — chrome-sandbox получает 4755 + root ТОЛЬКО там, где user
+ *              namespaces в ядре нет вовсе; в остальных случаях 0755.
+ * `--no-sandbox` не допускается ни в одной цели. AppImage снят с поставки: без
+ * шага установки песочницу там не поднять ничем, кроме этого ключа, и именно
+ * Linux-сборка не прошла ПСИ по критическим уязвимостям.
  *
- * Запускается в CI на ubuntu после `electron-builder --linux deb AppImage`.
+ * Запускается в CI и в релизе на ubuntu после `electron-builder --linux deb`.
  * Ненулевой код возврата валит сборку.
  */
 
@@ -31,10 +31,8 @@ const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 
 const problems = [];
-const notes = [];
 
 function fail(msg) { problems.push(msg); }
-function note(msg) { notes.push(msg); }
 
 function findByExt(dir, ext) {
     if (!fs.existsSync(dir)) { return []; }
@@ -54,11 +52,25 @@ function checkDeb(debPath) {
         .filter((l) => !l.trim().startsWith('#'))
         .join('\n');
 
+    if (!/unshare --user true/.test(code)) {
+        fail('postinst не проверяет user namespaces — SUID-root ставится там, где не нужен');
+    }
     if (!/chmod\s+4755/.test(code)) {
-        fail('в postinst deb-пакета нет `chmod 4755` — песочница не поднимется без user namespaces');
+        fail('в postinst нет запасного `chmod 4755` — на ядрах без user namespaces приложение не стартует');
     }
     if (!/chown\s+root:root/.test(code)) {
-        fail('в postinst deb-пакета нет `chown root:root` — один SUID-бит без владельца root бесполезен');
+        fail('в postinst нет `chown root:root` — SUID-бит без владельца root бесполезен');
+    }
+    if (!/\/etc\/apparmor\.d\/[\w-]+/.test(code)) {
+        fail('postinst не ставит профиль AppArmor — на Ubuntu 24.04+ песочница не поднимется');
+    }
+    if (/\$\{[a-zA-Z]+\}/.test(code)) {
+        fail('в postinst остались неподставленные макросы ${...}');
+    }
+
+    const postrm = execFileSync('dpkg-deb', ['-I', debPath, 'postrm'], { encoding: 'utf8' });
+    if (!/apparmor_parser --remove/.test(postrm)) {
+        fail('postrm не выгружает профиль AppArmor — он останется в системе после удаления');
     }
 
     // Строка запуска в .desktop не должна отключать песочницу.
@@ -75,55 +87,39 @@ function checkDeb(debPath) {
     const exec = (desktop.split('\n').find((l) => l.startsWith('Exec=')) || '');
     console.log(`[linux-sandbox]   Exec: ${exec}`);
     if (exec.includes('--no-sandbox')) {
-        fail('deb запускается с --no-sandbox: песочница отключена в пакете, у которого есть postinst');
+        fail('deb запускается с --no-sandbox: песочница отключена');
     }
-}
 
-// --- AppImage ----------------------------------------------------------------
-function checkAppImage(appImagePath) {
-    console.log(`[linux-sandbox] AppImage: ${path.basename(appImagePath)}`);
-    // AppImage — это squashfs с префиксом. Ключ запуска лежит в .desktop внутри
-    // образа; распаковываем самим образом (--appimage-extract), это не требует
-    // FUSE.
-    fs.chmodSync(appImagePath, 0o755);
-    const workdir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'appimage-'));
-    execFileSync(appImagePath, ['--appimage-extract'], { cwd: workdir, stdio: 'pipe' });
-    const squash = path.join(workdir, 'squashfs-root');
-    const desktopFile = findByExt(squash, '.desktop')[0];
-    if (!desktopFile) {
-        fail('в AppImage не найден .desktop-файл');
+    const profileEntry = list.split('\n').find((l) => /resources\/apparmor-profile$/.test(l.trim()));
+    if (!profileEntry) {
+        fail('в пакете нет resources/apparmor-profile');
         return;
     }
-    const exec = (fs.readFileSync(desktopFile, 'utf8').split('\n').find((l) => l.startsWith('Exec=')) || '');
-    console.log(`[linux-sandbox]   Exec: ${exec}`);
-    if (!exec.includes('--no-sandbox')) {
-        fail(
-            'у AppImage пропал --no-sandbox: без установочного шага SUID выставить нечем, '
-            + 'и на системах без user namespaces приложение не запустится'
-        );
+    const profilePath = profileEntry.trim().split(/\s+/).pop().replace(/^\.\//, '');
+    const profile = fs.readFileSync(path.join(extractDir, profilePath), 'utf8');
+    if (!/^\s*userns,/m.test(profile)) {
+        fail('профиль AppArmor не разрешает userns — он ничего не даёт песочнице');
     }
 }
 
 function main() {
     const debs = findByExt(DIST, '.deb');
-    const appImages = findByExt(DIST, '.appimage');
-
-    if (!debs.length && !appImages.length) {
-        console.error('[linux-sandbox] в dist/ нет ни deb, ни AppImage — сначала соберите пакеты');
+    if (!debs.length) {
+        console.error('[linux-sandbox] в dist/ нет deb — сначала соберите пакет');
         process.exit(1);
     }
+    checkDeb(debs[0]);
 
-    if (debs.length) { checkDeb(debs[0]); } else { note('deb не собран — проверка postinst пропущена'); }
-    if (appImages.length) { checkAppImage(appImages[0]); } else { note('AppImage не собран — проверка пропущена'); }
-
-    for (const n of notes) { console.log(`[linux-sandbox] заметка: ${n}`); }
+    if (findByExt(DIST, '.appimage').length) {
+        fail('в dist/ снова AppImage: без шага установки он запускается только с --no-sandbox');
+    }
 
     if (problems.length) {
         console.error('\n[linux-sandbox] ПЕСОЧНИЦА НАСТРОЕНА НЕВЕРНО');
         for (const p of problems) { console.error(`  ${p}`); }
         process.exit(1);
     }
-    console.log('[linux-sandbox] OK: deb с рабочей песочницей, исключение только у AppImage');
+    console.log('[linux-sandbox] OK: deb с рабочей песочницей (AppArmor + SUID только запасом), --no-sandbox нет нигде');
 }
 
 if (require.main === module) {
