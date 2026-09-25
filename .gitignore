@@ -63,3 +63,6 @@ analysis/
 osv-results.json
 sbom.cdx.json
 scan-root/
+
+# Аудиты — рабочий стол (глобальное правило); уже отслеживаемые остаются
+audit/
