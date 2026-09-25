@@ -327,7 +327,7 @@ timer-widget/
 - Per-window IPC whitelist with direction validation (send / receive): `ipc-senders.js` tables → `preload.js`, plus a sender check in the main process
 - The main process checks the sender of every IPC channel (`ipc-senders.js`) and the shape of relayed payloads (`relay-payload.js`)
 - Navigation only to the app's own four pages (`navigation-guard.js`); `window.open` and `<webview>` are denied
-- CSP: inline scripts allowed by sha256, no `'unsafe-inline'`; `connect-src 'none'`
+- CSP: `script-src 'self'; style-src 'self'` — no inline scripts or styles at all; `connect-src 'none'`
 - **No HTTP/HTTPS loading.** Background images are accepted only as local `data:` URLs
 - Numeric IPC inputs: checks for `NaN`, `Infinity`, min/max bounds
 - Images: MIME + magic-bytes validation (WebP checks RIFF+WEBP signature, ≤10 MB)

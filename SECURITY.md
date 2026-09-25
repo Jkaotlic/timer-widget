@@ -172,21 +172,43 @@ IPC (начало `electron-main.js`). В разработке ключи раз
 
 ### Content Security Policy
 
-Политика четырёх окон собирается из одного шаблона в `scripts/csp-hash.js` и
+Политика четырёх окон — одна строка `POLICY` в `scripts/csp-guard.js`; она же
 лежит в `<meta http-equiv="Content-Security-Policy">` каждого HTML:
 
-- `script-src 'self'` плюс `sha256` **каждого** инлайнового `<script>` —
-  `'unsafe-inline'` для скриптов нет, внедрённый в страницу скрипт не
-  исполнится;
+```
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+media-src 'self' data:; font-src 'self' data:; connect-src 'none';
+object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none';
+worker-src 'none'
+```
+
+- `script-src 'self'` — исполняются только файлы приложения: ни
+  `'unsafe-inline'`, ни хешей, ни `'unsafe-eval'`. Внедрённый в страницу
+  скрипт (или обработчик `on*=`) не исполнится;
+- `style-src 'self'` — применяются только таблицы-файлы: внедрённый `<style>`
+  или атрибут `style="…"` не применится. Изменение стиля скриптом через CSSOM
+  (`el.style.x = …`) политика не ограничивает — так окна и показывают/прячут
+  элементы;
 - `connect-src`, `object-src`, `base-uri`, `form-action`, `frame-src`,
   `worker-src` — `'none'`;
 - `img-src`, `media-src`, `font-src` — `'self' data:` (фон и звуки
-  пользователя живут `data:`-URL);
-- `style-src 'self' 'unsafe-inline'` — см. «Известные ограничения».
+  пользователя живут `data:`-URL).
 
-Хеш — отпечаток текста блока, поэтому правка инлайнового скрипта требует
-`npm run csp:hash -- --write`; `tests/csp-hash.test.js` падает, если хеш
-разошёлся с текстом, и называет команду.
+До 25.09.2026 инлайновые скрипты окон разрешались поимённо (sha256 каждого
+блока), а стили — целиком (`style-src 'unsafe-inline'`). Теперь инлайна в окнах
+нет: код страниц — `*-app.js`, `*-theme-sync.js`, `theme-init*.js`, стили —
+`control.css`, `widget.css`, `clock-widget.css`, `display.css`.
+
+Проверки:
+- `npm run csp:check` / `tests/csp-guard.test.js` — в разметке окон нет
+  `<script>` без `src`, `<style>`, `style=`, `on*=`, `javascript:`; в их
+  скриптах — шаблонов со `style=`/`on*=`, `setAttribute('style')`,
+  `createElement('style')`, `eval`; meta совпадает с `POLICY`. Сканер
+  проверен на себе;
+- `e2e/csp-strict.spec.js` — ноль событий `securitypolicyviolation` во всех
+  четырёх живых окнах при проходе по стилям, ящику и вкладкам;
+- `e2e/windows-load-clean.spec.js` — внедрённые `<script>` и `<style>` не
+  срабатывают.
 
 ### IPC
 
@@ -287,7 +309,7 @@ base64. Сверх потолка payload отвергается целиком,
 npm audit                      # уязвимости зависимостей (весь граф)
 npm audit --omit=dev           # то, что попадает в приложение
 npm run ci                     # lint + unit-тесты, включая release-gates
-npm run csp:hash               # CSP окон совпадает с инлайновыми скриптами
+npm run csp:check              # CSP окон: политика в meta, ни одного инлайна
 
 npx electron-builder --dir     # собрать без установщика
 node scripts/verify-packed.js  # содержимое app.asar, релизные гейты, фьюзы
@@ -318,15 +340,12 @@ node scripts/verify-linux-sandbox.js
    `protocol.handle`) — это меняет источник хранилища и требует миграции
    настроек. Риск частично закрыт: навигация ограничена четырьмя своими
    страницами, `connect-src 'none'` запрещает странице `fetch`/XHR.
-3. **`style-src 'unsafe-inline'`.** Стили инлайновые повсюду (`style=""`,
-   `<style>`); CSS кода не исполняет, скрипты под хешами. Внедрённый стиль
-   может исказить вид окна, но не выполнить код.
-4. **Девятый фьюз провода неизвестен `@electron/fuses` 1.8.0.** Провод Electron
+3. **Девятый фьюз провода неизвестен `@electron/fuses` 1.8.0.** Провод Electron
    44 содержит бит с индексом 8, которому в библиотеке нет имени:
    `npx @electron/fuses read` печатает его как `undefined is Enabled`. Сборка
    его не трогает — он остаётся в значении Electron по умолчанию, и
    `verify-packed.js` его не проверяет.
-5. **Ручная проверка установщика Windows** (вопрос об удалении настроек при
+4. **Ручная проверка установщика Windows** (вопрос об удалении настроек при
    деинсталляции) не автоматизирована.
 
 ## Как сообщить об уязвимости

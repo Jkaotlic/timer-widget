@@ -327,7 +327,7 @@ timer-widget/
 - IPC whitelist по окнам с валидацией направления (send / receive): таблицы `ipc-senders.js` → `preload.js`, плюс проверка отправителя в главном процессе
 - Главный процесс проверяет отправителя каждого IPC-канала (`ipc-senders.js`) и форму payload ретрансляторов (`relay-payload.js`)
 - Навигация — только на четыре собственные страницы (`navigation-guard.js`), `window.open` и `<webview>` запрещены
-- CSP: инлайновые скрипты разрешены по sha256, без `'unsafe-inline'`; `connect-src 'none'`
+- CSP: `script-src 'self'; style-src 'self'` — ни инлайновых скриптов, ни инлайновых стилей; `connect-src 'none'`
 - **Никакой загрузки по HTTP/HTTPS.** Фоновые изображения принимаются только как локальные `data:` URL
 - Числовые IPC-инпуты: проверка на `NaN`, `Infinity`, min/max bounds
 - Изображения: валидация MIME + magic bytes (WebP проверяет RIFF+WEBP сигнатуру, ≤10 MB)

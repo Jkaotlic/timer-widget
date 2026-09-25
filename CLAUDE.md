@@ -25,7 +25,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 **Main process** (`electron-main.js` + `main-*.js`, map and rules — [docs/main-process.md](docs/main-process.md); electron only in the entry) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
-1. **Control Window** (`electron-control.html`) — main management panel. Settings live in a slide-out drawer. Default 400px wide (`CONFIG.CONTROL_WINDOW_WIDTH`), min 380; the drawer adds ~336px. Inline there remains only `TimerController` plus bootstrap — see **Control panel modules**.
+1. **Control Window** (`electron-control.html`) — main management panel. Settings live in a slide-out drawer. Default 400px wide (`CONFIG.CONTROL_WINDOW_WIDTH`), min 380; the drawer adds ~336px. What is left of it (`TimerController` + bootstrap) is `control-app.js` — see **Control panel modules**.
 2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, flip, analog, digits (LED слит с «Цифрами» 13.08.2026). Glassmorphism design.
 3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, flip, analog, digits. Has a `DisplayTimer` class.
 4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, flip, analog, digits. Glassmorphism design.
@@ -74,7 +74,7 @@ Rules when working here:
 - **No bundler.** Every file is a classic `<script>`, so cross-module references go through `window.X`. A bare name resolves only by accident via the global scope and breaks lint.
 - **Several are prototype mixins** (`Object.assign(TimerController.prototype, window.XMixin)`), not free functions: their methods call each other and the controller's `this.beep()`, and DOM handlers close over `this`. If the `Object.assign` line is lost, nothing fails at load; it fails at the first click.
 - **Every new module must go into `package.json` `build.files`** or it silently vanishes from the packaged app; two tests guard this.
-- **When you touch a self-contained block still living inline, move it out** instead of editing it in place.
+- **When you touch a self-contained block still living in `control-app.js`, move it out** instead of editing it in place.
 - **A setting's key, control and default belong in `settings-schema.js` — in ONE row.** `loadSettings()` keeps only what the table cannot express: the two keys with their own format (`MANUAL_KEYS`) and the side effects. `tests/settings-schema.test.js` fails if a second copy of a default reappears
 
 ### Shared Modules
@@ -87,7 +87,7 @@ Rules when working here:
 - `navigation-guard.js` — navigation only to the four app pages; `window.open`/`<webview>` denied
 - `drop-guard.js` — a file dropped on widget/clock/display does not replace the page (panel: `custom-sounds.js`)
 - `atomic-write.js` — tmp + fsync + rename for `event-overrun.json` and `last-state.json`
-- `scripts/csp-hash.js` — owner of the windows' CSP: one template, sha256 per inline script
+- `scripts/csp-guard.js` — the windows' CSP (one `POLICY`) + guard: no inline script/style/handler in windows or their scripts
 - `renderer-shared.js` — чистая логика, которую иначе копировало бы каждое окно: `breakdown`, `flipCells`, `clampScale`, `fitBlockScale`, `timerLifecycleStatus`, `timerColorBand`, `pickOwnSetting`, `endsAt`, тона, `surfacePaint`, `topBandReserve`
 - `surface-tones.css` — ОДНА палитра на виджет, часы и дисплей: два блока тона, поверхности `--style-*`, полосы состояния. Класс тона ставит `UITheme.applyTone()` по яркости фона
 - `window-geometry.js` — перетаскивание, размер и позиция виджета и часов плюс `fitRestoredBounds`. Проверяется в Node на поддельных хранилище и DOM
@@ -103,7 +103,7 @@ Rules when working here:
 
 - Window references live in ONE registry (`main-state.js`: `windows.controlWindow`, …). Always use `safelySendToWindow()` to avoid "Object has been destroyed" crashes.
 - Renderer windows persist settings in `localStorage`. Storage keys are defined in `constants.js` (`STORAGE_KEYS`).
-- Each HTML file is self-contained with inline `<script>` and `<style>` blocks (CSP hashes the scripts — see Security).
+- No inline code in HTML: page code is `*-app.js`/`*-theme-sync.js`/`theme-init*.js`, styles the window's `.css`. Tests read a window via `tests/helpers/window-source.js`.
 - JS-based window drag: Widget and clock windows use JavaScript mousedown/mousemove + IPC (`widget-move`, `clock-widget-move`) instead of `-webkit-app-region: drag`. This is because on Windows, transparent frameless windows with `drag` on parent elements intercept ALL mouse events before `no-drag` children.
 - Scaling: Widget and clock — Ctrl+wheel (30–600 %, пол окна = размер при 30 %). Display — Ctrl+wheel context-sensitive (hover on info-block → block scale, else → timer) + Shift+wheel for blocks.
 
@@ -117,7 +117,7 @@ Rules when working here:
 
 - All BrowserWindows: `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`
 - Guards: modules above; packaged build exits on debug switches; `build.electronFuses` (`GrantFileProtocolExtraPrivileges` ON — `localStorage` on `file://`). See `SECURITY.md`
-- CSP: scripts by sha256 only (`tests/csp-hash.test.js`) — edited an inline `<script>`? `npm run csp:hash -- --write`
+- CSP `script-src 'self'; style-src 'self'` (`npm run csp:check`); runtime proof — `e2e/csp-strict.spec.js`
 - Per-window IPC bridge (`preload.js`) + sender check in main (`ipc-senders.js`)
 - All IPC resize/move/opacity handlers validate numeric inputs (bounds, NaN, Infinity)
 - Image validation: size + MIME + magic bytes (WebP checks RIFF+WEBP signature)
@@ -293,7 +293,7 @@ Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
 - **Окно в e2e ждут ОПРОСОМ, а не событием `window`: событие приходит раз и теряется, если окно опередило подписку** — [разбор](docs/lessons.md#an-event-fires-once-a-poll-is-always-right)
 - **Бюджет e2e-теста — ОДНА величина в `playwright.config.js`; свой `test.setTimeout` только ПОДНИМАЕТ его** — [разбор](docs/lessons.md#a-test-budget-is-a-setting-with-one-owner)
 - **Описанное исключение из защиты — та же дыра: `--no-sandbox` у AppImage провалил ПСИ** — [разбор](docs/lessons.md#a-documented-hole-is-still-a-hole)
-- **Правка инлайнового `<script>` — правка CSP: `npm run csp:hash -- --write`** — [разбор](docs/lessons.md#an-inline-script-edit-is-a-csp-edit)
+- **Инлайн в окне молча не исполнится и не применится: `style=`/`<style>`/`on*=` запрещены, начальное «скрыто» — правило CSS, CSSOM (`el.style.x`) можно** — [разбор](docs/lessons.md#no-inline-code-in-a-window)
 - **Длительность — по МОНОТОННЫМ часам, сон засчитывают явно (suspend/resume)** — [разбор](docs/lessons.md#a-duration-needs-a-monotonic-clock)
 
 Правила-оглавления: тема сама себе напоминание, разбор раскрывает — [No `perl -pi` here](docs/lessons.md#never-run-perl--pi-over-these-files), [The finish flash must be latched](docs/lessons.md#the-finish-flash-must-be-latched), [Flip timers belong to `flip-card.js`](docs/lessons.md#flip-timers-belong-to-flip-cardjs), [`showTicks` drives TWO dials](docs/lessons.md#showticks-drives-two-dials), [A payload default is not a guard](docs/lessons.md#a-payload-default-is-not-a-guard), [The bridge exposes no `invoke`](docs/lessons.md#the-bridge-exposes-no-invoke), [The display has no browser-mode fallback](docs/lessons.md#the-display-has-no-browser-mode-fallback), [Bridge table is generated](docs/lessons.md#ipc-whitelist-is-duplicated), [Adding new IPC channel](docs/lessons.md#adding-new-ipc-channel), [Per-window colors](docs/lessons.md#per-window-colors), [`ipc-compat.js`](docs/lessons.md#ipc-compatjs), [Global keyboard shortcuts](docs/lessons.md#global-keyboard-shortcuts), [Window state broadcast](docs/lessons.md#window-state-broadcast), [Start sound from remote windows](docs/lessons.md#start-sound-from-remote-windows), [Monitor selection persistence](docs/lessons.md#monitor-selection-persistence), [Inline styles in HTML](docs/lessons.md#inline-styles-in-html), [Widget devTools](docs/lessons.md#widget-devtools), [Design previews](docs/lessons.md#design-previews), [Sounds](docs/lessons.md#sounds), [Control panel layout](docs/lessons.md#control-panel-layout), [syncClockStyle](docs/lessons.md#syncclockstyle), [Geometry persistence](docs/lessons.md#widgetclock-geometry-persistence), [Scale pushes must be change-detected](docs/lessons.md#scale-pushes-must-be-change-detected), [Escape is layered](docs/lessons.md#escape-is-layered), [Flip animation is shared](docs/lessons.md#flip-animation-is-shared), [Colour bands: one place](docs/lessons.md#colour-bands-live-in-one-place-too), [One element, one colour system](docs/lessons.md#one-element-one-colour-system), [Scale is reported back](docs/lessons.md#scale-is-reported-back), [Visual regression](docs/lessons.md#visual-regression), [e2e needs `e2e/launch.js`](docs/lessons.md#e2e-needs-e2elaunchjs), [Status priority: one place](docs/lessons.md#timer-status-priority-lives-in-one-place), [Time format with hours](docs/lessons.md#time-format-with-hours), [Display settings `showCurrentTime`](docs/lessons.md#display-settings-showcurrenttime), [Design system v2](docs/lessons.md#design-system-v2), [Two UI themes](docs/lessons.md#two-ui-themes-data-theme-on-html), [Display block positions](docs/lessons.md#display-block-positions), [Display scaling](docs/lessons.md#display-scaling), [Manual time input](docs/lessons.md#manual-time-input), [Color picker](docs/lessons.md#color-picker), [Scale value edit](docs/lessons.md#scale-value-edit), [Adaptive window height](docs/lessons.md#adaptive-window-height), [Reset settings](docs/lessons.md#reset-settings), [A prediction authorises a measurement](docs/lessons.md#a-plans-prediction-authorises-a-measurement-not-a-fix).
