@@ -40,7 +40,7 @@
 | `timer-controller.test.js` | State machine with a fake clock (start/pause/reset/reconcile) |
 | `recovery.test.js` | Crash-recovery persist/load/validate |
 | `event-overrun-store.test.js` | Накопитель перелимита на диске: битый/чужой файл — чистое состояние, журнал ≤ 500 с перенумерацией, `pending` сворачивается ровно один раз (BUG-04) |
-| `electron-main-load.test.js` | НАСТОЯЩИЙ `electron-main.js` на заглушке `electron`: загрузка, IPC-обработчики поведением — геометрия, переоткрытие окон, журнал докладов и выгрузка, SEC-04/05/07/10/11, BUG-01/04/07/10/15/17 |
+| `electron-main-load.test.js` | НАСТОЯЩИЙ главный процесс (`electron-main.js` + `main-*.js`) на заглушке `electron`: загрузка, IPC-обработчики поведением — геометрия, переоткрытие окон, журнал докладов и выгрузка, SEC-04/05/07/10/11, BUG-01/04/07/10/15/17 |
 | `control-decomposition.test.js` | Вынесенные из панели модули подключены, в `build.files` и не тянут внутренности панели |
 | `flip-card.test.js` | Перекидыш запускается при смене значения и НЕ запускается на том же |
 | `sound-bank.test.js` | Каждый встроенный звук строит узлы на подставном `AudioContext` и планирует остановку осцилляторов |
@@ -66,6 +66,7 @@
 | `perf.test.js` | Hot-path performance budgets |
 | `packaging.test.js` | Каждый ресурс перечислен в `build.files` |
 | `electron-main-source.test.js` | IPC payload hardening, DevTools gating, icon path |
+| `main-modules.test.js` | Модули `main-*.js`: нет сирот, electron только в точке входа (регулярка + загрузка с ловушкой), `rawIpcMain` не покидает точку входа, гард SEC-04 раньше первого `require` — [docs/main-process.md](main-process.md) |
 | `visual-source.test.js` | Layout/centering invariants, release-doc freshness |
 | `audit-2026-07-fixes.test.js` | Regressions from the July 2026 audit (sound, Esc, scales, geometry) |
 | `audit-2026-07-30-fixes.test.js` | Regressions from the 30 Jul 2026 pass (flip, finish flash, geometry, modifiers, F1) |

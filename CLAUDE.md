@@ -23,7 +23,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 ### Process Model
 
-**Main process** (`electron-main.js`) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
+**Main process** (`electron-main.js` + `main-*.js`, map and rules — [docs/main-process.md](docs/main-process.md); electron only in the entry) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
 1. **Control Window** (`electron-control.html`) — main management panel. Settings live in a slide-out drawer. Default 400px wide (`CONFIG.CONTROL_WINDOW_WIDTH`), min 380; the drawer adds ~336px. Inline there remains only `TimerController` plus bootstrap — see **Control panel modules**.
 2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, flip, analog, digits (LED слит с «Цифрами» 13.08.2026). Glassmorphism design.
@@ -101,7 +101,7 @@ Rules when working here:
 
 ### Key Patterns
 
-- Window references are global (`controlWindow`, `widgetWindow`, `displayWindow`, `clockWidgetWindow`). Always use `safelySendToWindow()` to avoid "Object has been destroyed" crashes.
+- Window references live in ONE registry (`main-state.js`: `windows.controlWindow`, …). Always use `safelySendToWindow()` to avoid "Object has been destroyed" crashes.
 - Renderer windows persist settings in `localStorage`. Storage keys are defined in `constants.js` (`STORAGE_KEYS`).
 - Each HTML file is self-contained with inline `<script>` and `<style>` blocks (CSP hashes the scripts — see Security).
 - JS-based window drag: Widget and clock windows use JavaScript mousedown/mousemove + IPC (`widget-move`, `clock-widget-move`) instead of `-webkit-app-region: drag`. This is because on Windows, transparent frameless windows with `drag` on parent elements intercept ALL mouse events before `no-drag` children.
@@ -132,7 +132,7 @@ Rules when working here:
 ОБА конца (`tests/ipc-liveness.test.js` проверяет), а сама таблица живёт в
 `docs/ipc.md`, чтобы не занимать контекст каждого разговора. Там же — поля
 `timer-state`. Каждому каналу нужна строка в `ipc-senders.js` (кто вправе слать):
-без неё `electron-main.js` не загрузится.
+без неё главный процесс не загрузится.
 
 ## Testing
 

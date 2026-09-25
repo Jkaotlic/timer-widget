@@ -255,7 +255,8 @@ npm start
 
 ```
 timer-widget/
-├── electron-main.js            # Main process — состояние таймера, IPC, окна
+├── electron-main.js            # Main process — точка входа: гарды, журнал, сборка модулей
+├── main-*.js                   # Модули главного процесса (docs/main-process.md)
 ├── electron-control.html       # Панель управления (4 вкладки + drawer)
 ├── electron-widget.html        # Виджет (transparent, frameless, always-on-top)
 ├── electron-clock-widget.html  # Часы (transparent, frameless, always-on-top)

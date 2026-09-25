@@ -28,7 +28,7 @@ node --test tests/perf.test.js
 
 ## Startup instrumentation
 
-В `electron-main.js` логируется время готовности каждого окна:
+В `main-windows.js` (create-функции окон) логируется время готовности каждого окна:
 
 ```
 [perf] control window ready in 350ms

@@ -457,7 +457,7 @@
 
 ### Widget devTools
 
-- **Widget devTools**: Set to `false` in production. Change to `true` in `electron-main.js` for debugging.
+- **Widget devTools**: Set to `false` in production. Change to `true` in `main-windows.js` for debugging.
 
 ---
 
