@@ -13,7 +13,7 @@
 | `main-window-closing.js` | Закрывающееся окно ≠ открытое: `markClosing`, `isUsableWindow`, ОДИН реестр отложенных открытий, `closeDisplayWindow` (выход из полноэкранного по событию + страховка) |
 | `main-geometry.js` | `moveWindowBy` / `resizeWindowClamped` / `positionWindowClamped`, отчёт `window-geometry` и по своим событиям окна |
 | `main-window-hooks.js` | Что получает каждое окно: `hardenWindow`, запрет масштаба страницы, журнал рендерера, перезагрузка после падения, снимок состояния окон, `announceWindowOpened` |
-| `main-windows.js` | Четыре create-функции — единственный владелец «окно открылось» — и уровень окна выше полоски меню |
+| `main-windows.js` | Четыре create-функции — единственный владелец «окно открылось» — и уровень окна выше полоски меню. Каждому окну — роль моста `additionalArguments: [windowArgument(роль)]` ([docs/ipc.md](ipc.md#мост-по-окнам)) |
 | `main-timer.js` | Контроллер таймера, настоящий интервал, рассылка `timer-state`, сон машины, каналы `timer-command` / `get-timer-state` / `timer-control` |
 | `main-recovery.js` | Снимок восстановления после сбоя: когда писать, когда стирать, запись раз в 10 с |
 | `main-event-overrun.js` | Накопитель «47-й этаж»: доклады, журнал, выход и сбой посреди доклада, выгрузка CSV, каналы `event-*` |

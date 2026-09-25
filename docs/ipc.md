@@ -5,12 +5,40 @@
 МОМЕНТ работы с IPC, а не в каждом разговоре с первого слова, — та же причина,
 по которой туда же уехали разборы ловушек (`docs/lessons.md`).
 
-Правила, которые остаются в `CLAUDE.md`: канал объявляется в ОБА списка
-(`channel-validator.js` + `preload.js`), у него обязаны быть оба конца
+Правила, которые остаются в `CLAUDE.md`: канал — строка в `ipc-senders.js`
+(`SENDERS` — кто шлёт, `RECEIVERS` — кто слушает), у него обязаны быть оба конца
 (`tests/ipc-liveness.test.js`), а разрешение — это не функция.
 
+## Мост по окнам
 
-Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
+С 25.09.2026 мост (`preload.js`) каждого окна открывает ТОЛЬКО каналы этого
+окна: виджет не может послать `reset-and-relaunch`, панель не подписывается на
+`window-geometry`. Это второй слой; первый — проверка отправителя в главном
+процессе (SEC-07, ниже), и он остаётся.
+
+- **Источник один** — `SENDERS` и `RECEIVERS` в `ipc-senders.js`;
+  `channelsFor(role)` даёт строку окна. `channel-validator.js` — лишь их
+  объединение по направлениям, своего списка у него нет.
+- **Таблица в preload.js сгенерирована** (`npm run preload:channels -- --write`,
+  `scripts/preload-channels.js`): песочница (`sandbox: true`) разрешает мосту
+  `require` только модуля `electron`, прочитать `ipc-senders.js` он не может.
+- **Роль окна** — аргумент рендерера `--tw-window=<роль>`
+  (`webPreferences.additionalArguments` в `main-windows.js`), мост читает его из
+  `process.argv`. Задаётся главным процессом до запуска страницы. Нет роли,
+  неизвестная или их две — мост закрыт целиком (и пишет почему в консоль).
+- Один preload с таблицей всех окон, а не четыре файла: то же разделение без
+  трёх лишних файлов в сборке и четырёх копий кода моста.
+- Отказ моста — `console.error` «Blocked attempt … (окно <роль>)», его видно в
+  журнале главного процесса как `[renderer:<окно>]`.
+
+Проверки: `tests/preload-channels.test.js` — таблица свежая; мост на подставке
+пропускает своё и режет чужое для каждого окна; строки ТОЧНО равны тому, что
+окно шлёт и слушает по исходникам (`tests/helpers/ipc-scan.js`, обе стороны).
+`tests/electron-main-load.test.js` — каждое окно получает свою роль; главный
+процесс шлёт окну только открытое в его мосте (храповик на шесть старых
+широковещаний без слушателя). `tests/release-gates.test.js`,
+`scripts/verify-packed.js` — то же на исходнике и на `app.asar`;
+`e2e/windows-load-clean.spec.js` — в настоящем Electron у каждого окна своя роль.
 
 ### Send (renderer → main)
 
@@ -57,6 +85,9 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `minimize-window` / `quit-app` | minimize-window: панель, дисплей; quit-app: панель | Window management |
 
 ### Receive (main → renderer)
+
+Кто слушает каждый канал — `RECEIVERS` в `ipc-senders.js` (из неё собраны мосты
+окон); здесь только смысл и payload.
 
 | Channel | Payload |
 |---------|---------|

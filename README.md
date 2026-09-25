@@ -264,9 +264,9 @@ timer-widget/
 ├── display-script.js           # Полноэкранный режим (логика DisplayTimer)
 ├── timer-engine.js             # Чистая логика таймера (testable)
 ├── recovery.js                 # Восстановление состояния после crash'а
-├── preload.js                  # IPC bridge с whitelist каналов
+├── preload.js                  # IPC bridge: у каждого окна только свои каналы
 ├── ipc-compat.js               # Совместимость ipcRenderer → electronAPI
-├── channel-validator.js        # Whitelist IPC каналов
+├── channel-validator.js        # Все каналы IPC (вид на ipc-senders.js)
 ├── constants.js                # Константы, IPC каналы, ключи storage
 ├── utils.js                    # formatTime, parseManualTime, debounce, safelySendToWindow
 ├── security.js                 # Валидация: data URL, изображения, escapeHTML
@@ -324,7 +324,7 @@ timer-widget/
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` на всех окнах
 - DevTools окон — только при `--dev` в несобранном приложении; собранное с `--remote-debugging-*` / `--inspect*` выходит до первого окна
 - Фьюзы Electron: без `RunAsNode`, `NODE_OPTIONS` и `--inspect`, `app.asar` сверяется с хешем
-- IPC whitelist с валидацией направления (send / receive) в `preload.js` и `channel-validator.js`
+- IPC whitelist по окнам с валидацией направления (send / receive): таблицы `ipc-senders.js` → `preload.js`, плюс проверка отправителя в главном процессе
 - Главный процесс проверяет отправителя каждого IPC-канала (`ipc-senders.js`) и форму payload ретрансляторов (`relay-payload.js`)
 - Навигация — только на четыре собственные страницы (`navigation-guard.js`), `window.open` и `<webview>` запрещены
 - CSP: инлайновые скрипты разрешены по sha256, без `'unsafe-inline'`; `connect-src 'none'`

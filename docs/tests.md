@@ -32,7 +32,7 @@
 | `display-select.test.js` | BUG-18: список мониторов строится без CSS-селектора из данных хранилища (`fillDisplaySelect`) |
 | `custom-sounds.test.js` | BUG-21: испорченное хранилище звуков, только `data:audio/` в `Audio`, нечитаемый файл, замена по базовому имени — с тостом |
 | `debounce-send.test.js` | `debounce`, `safelySendToWindow` |
-| `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS`, preload/validator sync |
+| `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS` — вид на `ipc-senders.js`, без своего списка |
 | `ipc-liveness.test.js` | Every whitelisted channel has BOTH ends. The whitelist is a permission, not proof of life |
 | `edge-cases.test.js` | Edge cases for all utils |
 | `constants.test.js` | CONFIG immutability and structure, plus the orphan check — every key needs a reader outside `constants.js` and this test |
@@ -74,7 +74,7 @@
 | `contrast.test.js` | WCAG contrast WITH alpha compositing, BOTH themes (dark ≥ AA, light ≥ AAA), light surface ladder, accents on accent fills |
 | `ui-lock.test.js` | Замок: логика на поддельном хранилище, модуль в 4 окнах, канал в оба конца, вопрос к замку в КАЖДОМ жесте |
 | `presets.test.js` | Пресеты вида: состав снимка (включая записанное ОТСУТСТВИЕ), сравнение по подмножеству, рейс, квота |
-| `ui-theme.test.js` | Theme logic + wiring: module → four windows' `<head>` → channel in both whitelists → main's relay → panel button |
+| `ui-theme.test.js` | Theme logic + wiring: module → four windows' `<head>` → channel in the panel's send and every window's receive bridge → main's relay → panel button |
 | `faq-and-hidden-controls.test.js` | Clock settings reachable (no `display:none`), ONE accordion handler, help matches UI, footer version == package.json, dead CSS deleted |
 | `release-notes.test.js` | Заметки к релизу — из CHANGELOG, таблица загрузок совпадает с `build.target`, обещания в шапке не протухли |
 | `e2e-window-sizes.test.js` | Выбор размеров окна для e2e: помещающиеся, вывод из рабочей области, пол; ошибка делает спеку ХОЛОСТОЙ |
@@ -89,6 +89,7 @@
 | `csp-hash.test.js` | SEC-08: CSP окон без `'unsafe-inline'` в script-src — хеши совпадают с инлайновыми блоками (эталон из спецификации CSP, CRLF, комментарии), закрыты base/form/frame/worker/connect; самопроверка «правка без пересчёта видна» |
 | `navigation-guard.test.js` | SEC-06: навигация окна — только на четыре свои страницы (хеш/query не мешают, `%2e%2e` не обходит); `window.open` и `<webview>` — отказ на каждом событии |
 | `ipc-senders.test.js` | SEC-07: таблица «канал → окна-отправители» покрывает каждый канал main/preload/validator, необратимое — только панель, каждое окно допущено ко всему, что шлёт сегодня (сканер проверен на себе); отказ субфрейму, чужой странице, чужому webContents |
+| `preload-channels.test.js` | Мост по окнам: таблица в `preload.js` свежая (генератор), строки окна РОВНО равны тому, что окно шлёт и слушает (сканер `helpers/ipc-scan.js` проверен на себе), мост на подставке пропускает своё и режет чужое, без роли / с двумя ролями закрыт |
 | `relay-payload.test.js` | SEC-10: payload ретрансляторов (цвета, стиль, настройки дисплея и часов) — плоский объект примитивов, `__proto__` не прототип, потолок размера пропускает фон 10 МБ и отвергает больше, название ≤ 60 |
 | `drop-guard.test.js` | SEC-06: сброшенный файл не открывается вместо виджета, часов и дисплея; у панели свой гаситель |
 | `docs-integrity.test.js` | Связность `CLAUDE.md` ↔ `docs/lessons.md`: ссылка ведёт в разбор, разбор достижим; плюс потолок размера |

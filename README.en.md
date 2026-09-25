@@ -264,9 +264,9 @@ timer-widget/
 ├── display-script.js           # Fullscreen mode (DisplayTimer logic)
 ├── timer-engine.js             # Pure timer logic (testable)
 ├── recovery.js                 # State recovery after crash
-├── preload.js                  # IPC bridge with channel whitelist
+├── preload.js                  # IPC bridge: each window gets only its own channels
 ├── ipc-compat.js               # ipcRenderer → electronAPI shim
-├── channel-validator.js        # IPC channel whitelist
+├── channel-validator.js        # All IPC channels (view over ipc-senders.js)
 ├── constants.js                # Constants, IPC channels, storage keys
 ├── utils.js                    # formatTime, parseManualTime, debounce, safelySendToWindow
 ├── security.js                 # Validation: data URL, images, escapeHTML
@@ -324,7 +324,7 @@ timer-widget/
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` on all windows
 - Window DevTools only with `--dev` in an unpackaged app; a packaged app started with `--remote-debugging-*` / `--inspect*` exits before the first window
 - Electron fuses: no `RunAsNode`, `NODE_OPTIONS` or `--inspect`; `app.asar` is checked against its build-time hash
-- IPC whitelist with direction validation (send / receive) in `preload.js` and `channel-validator.js`
+- Per-window IPC whitelist with direction validation (send / receive): `ipc-senders.js` tables → `preload.js`, plus a sender check in the main process
 - The main process checks the sender of every IPC channel (`ipc-senders.js`) and the shape of relayed payloads (`relay-payload.js`)
 - Navigation only to the app's own four pages (`navigation-guard.js`); `window.open` and `<webview>` are denied
 - CSP: inline scripts allowed by sha256, no `'unsafe-inline'`; `connect-src 'none'`

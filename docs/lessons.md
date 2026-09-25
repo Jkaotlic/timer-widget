@@ -377,7 +377,7 @@
 
 ### IPC whitelist is duplicated
 
-- **IPC whitelist is duplicated**: `preload.js` inlines the whitelist from `channel-validator.js` (sandbox blocks `require()`). Both files MUST stay in sync — the test `channel-validator.test.js` verifies this.
+- **Bridge table is generated** (was: «IPC whitelist is duplicated»): until 25.09.2026 `preload.js` carried a hand copy of the whitelist in `channel-validator.js`, one list for all four windows. Now the only source is `SENDERS`/`RECEIVERS` in `ipc-senders.js`; `scripts/preload-channels.js` writes the per-window table into `preload.js` (sandbox: the preload can `require` only `electron`), and `tests/preload-channels.test.js` fails when it is stale. Never edit the block between the `<preload-channels>` markers by hand. The window picks its row by `--tw-window=<role>` from `process.argv`, passed by `main-windows.js`.
 
 ---
 
@@ -393,7 +393,7 @@
 
 ### Adding new IPC channel
 
-- **Adding new IPC channel**: Add to BOTH `send` and `receive` arrays in BOTH `preload.js` and `channel-validator.js`. Missing receive = widget silently ignores messages.
+- **Adding new IPC channel**: add a row to `SENDERS` (windows that send it) and/or `RECEIVERS` (windows that listen) in `ipc-senders.js`, then `npm run preload:channels -- --write`. List exactly the windows whose code uses it: `tests/preload-channels.test.js` compares the rows with what each page and its scripts send and subscribe to, both ways. A missing window = its bridge drops the message silently; an extra one = a permission without a feature.
 
 ---
 
