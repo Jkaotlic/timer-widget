@@ -22,6 +22,7 @@
 const path = require('path');
 const os = require('os');
 const { _electron: electron } = require('playwright');
+const profileGuard = require('./profile-guard');
 
 const MAIN = path.join(__dirname, '..', 'electron-main.js');
 
@@ -46,7 +47,7 @@ function cleanEnv(extra = {}) {
  * Поднимает приложение и возвращает { app, control } с уже загруженным
  * окном управления.
  *
- * @param {{args?: string[], env?: Record<string,string>, settleMs?: number}} [opts]
+ * @param {{args?: string[], env?: Record<string,string>, settleMs?: number, keepProfile?: boolean}} [opts]
  */
 async function launchApp(opts = {}) {
     const app = await electron.launch({
@@ -61,6 +62,10 @@ async function launchApp(opts = {}) {
     // Панель досылает стартовые настройки с задержкой до 600 мс; ждём тишины,
     // иначе тест успевает прочитать промежуточное состояние.
     await control.waitForTimeout(opts.settleMs ?? 900);
+    // Сторож общего профиля (e2e/profile-guard.js): «было» — здесь, на
+    // app.close() — сверка и возврат. `keepProfile` — для первого запуска
+    // теста с перезапуском, которому настройка нужна во втором.
+    await profileGuard.watch(app, { keepProfile: !!opts.keepProfile });
     return { app, control };
 }
 

@@ -15,9 +15,12 @@
 
 const fs = require('fs');
 const { USER_DATA_DIR } = require('./launch');
+const { resetLedger } = require('./profile-guard');
 
 module.exports = function globalSetup() {
     fs.rmSync(USER_DATA_DIR, { recursive: true, force: true });
     fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+    // Журнал сторожа профиля — тоже на прогон: утечки прошлого прогона не наши.
+    resetLedger();
     console.log(`[e2e] профиль тестов: ${USER_DATA_DIR}`);
 };

@@ -76,7 +76,9 @@ test('своё название плашки доезжает до диспле�
 test('своё название переживает перезапуск приложения', async () => {
     let app1;
     try {
-        const first = await launchApp();
+        // Название обязано пережить перезапуск — сторож профиля вернёт его
+        // только на последнем закрытии теста.
+        const first = await launchApp({ keepProfile: true });
         app1 = first.app;
         await first.control.click('.tab-btn[data-tab="display"]');
         await first.control.locator('#labelCurrentTime').fill('Сейчас');
