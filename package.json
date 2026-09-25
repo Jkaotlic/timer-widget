@@ -141,6 +141,7 @@
       "money-meter.js",
       "event-report.js",
       "navigation-guard.js",
+      "ipc-senders.js",
       "drop-guard.js",
       "settings-schema.js",
       "clock-settings-schema.js",

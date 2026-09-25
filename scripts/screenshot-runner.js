@@ -18,9 +18,15 @@ const { diffBitmaps, isRegression, isTimeDependent } = require('../visual-diff')
  * показывает состояние, которого у пользователя не бывает (замерено: 250×140
  * вместо 250×90). `ipcMain.emit` зовёт НАСТОЯЩИЙ обработчик тем же путём, каким
  * приходит сообщение из панели.
+ *
+ * Событие — ОТ ПАНЕЛИ, как у настоящего сообщения: с SEC-07 главный процесс
+ * проверяет отправителя, и пустое `{}` отвергалось бы до обработчика — кадр
+ * молча снимал бы прежний стиль.
  */
-function sendWidgetStyle(style) {
-    require('electron').ipcMain.emit('widget-style-update', {}, { timerStyle: style });
+function sendWidgetStyle(style, control) {
+    const contents = control.webContents;
+    require('electron').ipcMain.emit('widget-style-update',
+        { sender: contents, senderFrame: contents.mainFrame }, { timerStyle: style });
 }
 
 const STATES = [
@@ -540,7 +546,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                     w.display.webContents.send('display-settings-update', { timerStyle: style });
                 }
                 if (w.widget && !w.widget.isDestroyed()) {
-                    sendWidgetStyle(style);
+                    sendWidgetStyle(style, ctx().control);
                 }
             } catch (e) {
                 log.warn(`[screenshot] style ${style} switch failed: ${e.message}`);
@@ -657,7 +663,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                     w.display.webContents.send('display-settings-update', { timerStyle: style });
                 }
                 if (w.widget && !w.widget.isDestroyed()) {
-                    sendWidgetStyle(style);
+                    sendWidgetStyle(style, ctx().control);
                     // Размер задаётся ПОСЛЕ смены стиля, а не до неё: с 12.08.2026
                     // форму окна выбирает сам стиль (LED — полоса по размеру цифр,
                     // остальные — квадрат), и выставленная заранее геометрия
@@ -744,7 +750,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                 w.display.webContents.send('display-settings-update', { timerStyle: 'circle' });
             }
             if (w.widget && !w.widget.isDestroyed()) {
-                sendWidgetStyle('circle');
+                sendWidgetStyle('circle', ctx().control);
             }
             applyTimerState({
                 totalSeconds: 300, presetSeconds: 300, remainingSeconds: 183,

@@ -17,7 +17,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog } = require('electron');
 
 // Ключи отладки в СОБРАННОМ приложении — выход до первого окна (SEC-04).
 //
@@ -54,6 +54,7 @@ const MoneyMeter = require('./money-meter');
 const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
 const NavigationGuard = require('./navigation-guard');
+const IpcSenders = require('./ipc-senders');
 
 // Logger setup
 //
@@ -474,6 +475,23 @@ const APP_PAGE_URLS = NavigationGuard.appPageUrls(__dirname);
 function logBlockedNavigation(kind, url) {
     log.warn(`[nav] отклонено ${kind}: ${NavigationGuard.describeUrl(url)}`);
 }
+
+// Кто вправе прислать канал (SEC-07). `ipcMain` ниже — обвязка над настоящим:
+// каждый `ipcMain.on('канал', …)` этого файла регистрируется через неё и не
+// может миновать проверку отправителя (окно из строки таблицы ipc-senders.js,
+// главный кадр, своя страница). Настоящий ipcMain под другим именем, чтобы
+// обработчик нельзя было повесить мимо обвязки по привычке.
+const ipcMain = IpcSenders.guardIpcMain(rawIpcMain, IpcSenders.createSenderGate({
+    windowOf: (contents) => BrowserWindow.fromWebContents(contents),
+    windowsByRole: () => ({
+        control: controlWindow,
+        widget: widgetWindow,
+        clock: clockWidgetWindow,
+        display: displayWindow
+    }),
+    isAppPage: (url) => NavigationGuard.isAppPageUrl(url, APP_PAGE_URLS),
+    onReject: IpcSenders.onceLogger((line) => log.warn(line))
+}));
 
 function hardenWindow(win) {
     NavigationGuard.guardWebContents(win.webContents, APP_PAGE_URLS, logBlockedNavigation);

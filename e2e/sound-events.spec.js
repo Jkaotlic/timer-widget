@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForWidget } = require('./window-ready');
 
 /**
  * Звуки во времени: КАЖДОЕ событие звучит и звучит РОВНО ОДИН раз.
@@ -138,11 +139,17 @@ test('звук старта не дублируется при локально�
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
     await control.waitForTimeout(600);
     await clearSounds(control);
-    await control.evaluate(() => window.ipcRenderer.send('timer-control', 'start'));
+    // Шлёт НАСТОЯЩЕЕ другое окно: `timer-control` — канал клавиш виджета,
+    // часов и дисплея, и с SEC-07 главный процесс принимает его только от них.
+    // Посылка из панели здесь изображала «другое окно» и теперь отвергается.
+    await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+    const widget = await waitForWidget(app);
+    await widget.evaluate(() => window.ipcRenderer.send('timer-control', 'start'));
     await control.waitForTimeout(2500);
 
     const remote = await readSounds(control);
     expect(count(remote, 'start'), `запуск из другого окна, журнал: ${JSON.stringify(remote)}`).toBe(1);
+    await control.evaluate(() => window.ipcRenderer.send('close-widget'));
 
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
     await app.close();

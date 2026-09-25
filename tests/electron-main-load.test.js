@@ -16,6 +16,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const Module = require('node:module');
+const { pathToFileURL } = require('node:url');
+const { SENDERS } = require('../ipc-senders');
 
 const repoRoot = path.join(__dirname, '..');
 
@@ -23,7 +25,10 @@ const repoRoot = path.join(__dirname, '..');
 
 function createStubs() {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-main-load-'));
-    const ipcHandlers = new Map();
+    // Обработчики, как их зарегистрировал главный процесс, — уже С проверкой
+    // отправителя (SEC-07). Звать их нужно событием от настоящего окна.
+    const ipcRaw = new Map();
+    const appHandlers = new Map();
     const noop = () => {};
 
     // Что главный процесс РАССЫЛАЕТ окнам.
@@ -49,9 +54,14 @@ function createStubs() {
             this._position = [opts.x || 0, opts.y || 0];
             this._minWidth = opts.minWidth || 0;
             this._minHeight = opts.minHeight || 0;
+            this._maxWidth = opts.maxWidth || 0;
+            this._maxHeight = opts.maxHeight || 0;
             this._fullscreen = !!opts.fullscreen;
             this._destroyed = false;
+            // Главный кадр: проверка отправителя сравнивает с ним senderFrame и
+            // берёт из него адрес страницы. Адрес ставит loadFile — как в Electron.
             this.webContents = {
+                mainFrame: { url: '' },
                 on: noop, once: noop,
                 send: (channel, payload) => { sent.push({ channel, payload }); },
                 isDestroyed: () => this._destroyed,
@@ -61,7 +71,12 @@ function createStubs() {
             created.push(this);
         }
         static getAllWindows() { return created; }
-        loadFile(file) { this._file = file; return Promise.resolve(); }
+        static fromWebContents(wc) { return created.find((w) => w.webContents === wc) || null; }
+        loadFile(file) {
+            this._file = file;
+            this.webContents.mainFrame.url = pathToFileURL(path.join(repoRoot, file)).href;
+            return Promise.resolve();
+        }
         // События окна ХРАНЯТСЯ, а не выбрасываются.
         //
         // Пока `on`/`once` были пустыми, подставка не умела главного, что
@@ -123,6 +138,12 @@ function createStubs() {
             if (Number.isFinite(b.width) && Number.isFinite(b.height)) { this._size = [b.width, b.height]; }
         }
         getMinimumSize() { return [this._minWidth || 0, this._minHeight || 0]; }
+        // Панель теперь реально создаётся в тестах (она — отправитель своих
+        // каналов, SEC-07), и её обработчики доходят до потолка и пола окна.
+        setMinimumSize(w, h) { this._minWidth = w; this._minHeight = h; }
+        getMaximumSize() { return [this._maxWidth || 0, this._maxHeight || 0]; }
+        setMaximumSize(w, h) { this._maxWidth = w; this._maxHeight = h; }
+        restore() {}
     }
 
     const electron = {
@@ -137,7 +158,10 @@ function createStubs() {
             // состояние прошлого прогона ещё и подмешивалось бы в следующий.
             getPath: () => userDataDir,
             isPackaged: false,
-            on: noop,
+            // События приложения ХРАНЯТСЯ: окно панели создаётся в whenReady
+            // (здесь он не резолвится) или по 'second-instance' — второй путь
+            // и нужен тестам, которым нужна панель как отправитель.
+            on: (event, fn) => { appHandlers.set(event, fn); },
             quit: noop,
             exit: noop,
             // Никогда не резолвится — блок whenReady() не должен исполняться,
@@ -148,7 +172,7 @@ function createStubs() {
         },
         BrowserWindow: StubBrowserWindow,
         ipcMain: {
-            on: (channel, handler) => { ipcHandlers.set(channel, handler); }
+            on: (channel, handler) => { ipcRaw.set(channel, handler); }
         },
         screen: {
             _displays: [
@@ -160,13 +184,78 @@ function createStubs() {
             getPrimaryDisplay() { return this._displays[0]; }
         },
         Menu: { setApplicationMenu: noop, buildFromTemplate: () => ({}) },
+        shell: { openExternal: () => Promise.resolve() },
         Tray: class { setToolTip() {} setContextMenu() {} on() {} },
         nativeImage: { createFromPath: () => ({ isEmpty: () => true }), createEmpty: () => ({}) },
         powerMonitor: { on: noop },
         session: { defaultSession: {} }
     };
 
-    return { electron, ipcHandlers, created, sent, lastSent, userDataDir };
+    const stubs = { electron, ipcRaw, appHandlers, created, sent, lastSent, userDataDir };
+    stubs.ipcHandlers = legitimateSenders(stubs);
+    return stubs;
+}
+
+/**
+ * Событие IPC от окна — то, что Electron передаёт обработчику.
+ * `subframe: true` — сообщение из iframe того же окна.
+ */
+function eventFrom(win, { subframe = false } = {}) {
+    const frame = subframe ? { url: win.webContents.mainFrame.url } : win.webContents.mainFrame;
+    return {
+        sender: win.webContents,
+        senderFrame: frame,
+        reply: (channel, payload) => win.webContents.send(channel, payload)
+    };
+}
+
+const ROLE_FILES = {
+    control: 'electron-control.html',
+    widget: 'electron-widget.html',
+    clock: 'electron-clock-widget.html',
+    display: 'display.html'
+};
+
+function liveWindow(stubs, role) {
+    return stubs.created.find((w) => w._file === ROLE_FILES[role] && !w.isDestroyed()) || null;
+}
+
+// Окно панели через штатный путь главного процесса (второй экземпляр).
+function openControl(stubs) {
+    const existing = liveWindow(stubs, 'control');
+    if (existing) { return existing; }
+    stubs.appHandlers.get('second-instance')();
+    return liveWindow(stubs, 'control');
+}
+
+/**
+ * `stubs.ipcHandlers.get(канал)(null, payload)` — «прислало окно, которому
+ * этот канал принадлежит».
+ *
+ * Тесты поведения обработчиков (их десятки) писались, когда отправитель не
+ * проверялся, и звали обработчик с `null` вместо события. Смысл у них один:
+ * «пришло штатное сообщение». Этот адаптер подставляет событие от первого
+ * ЖИВОГО окна из строки канала в таблице ipc-senders.js (панель при нужде
+ * открывает); явно переданное событие не трогает — им проверяется отказ.
+ */
+function legitimateSenders(stubs) {
+    return {
+        has: (channel) => stubs.ipcRaw.has(channel),
+        get size() { return stubs.ipcRaw.size; },
+        get(channel) {
+            const handler = stubs.ipcRaw.get(channel);
+            if (!handler) { return undefined; }
+            return (event, ...args) => {
+                if (event === null || event === undefined) {
+                    const roles = SENDERS[channel] || [];
+                    let win = roles.map((r) => liveWindow(stubs, r)).find(Boolean);
+                    if (!win && roles.includes('control')) { win = openControl(stubs); }
+                    event = win ? eventFrom(win) : {};
+                }
+                return handler(event, ...args);
+            };
+        }
+    };
 }
 
 // Загружает electron-main.js с подменённым 'electron' и 'electron-log/main'.
@@ -462,19 +551,14 @@ for (const c of REOPEN_CASES) {
 // --- Журнал докладов -------------------------------------------------------
 
 /**
- * Поддельный отправитель IPC — то, чем для главного процесса является окно.
+ * Событие от окна панели — единственного законного отправителя выгрузки.
  *
- * Обработчики, которые ОТВЕЧАЮТ спросившему, без него проверить нельзя:
- * `loadMain` окон не создаёт, и ответ уходил бы в никуда. Записанное сюда
- * попадает в тот же журнал `sent`, что и обычная рассылка.
+ * До SEC-07 здесь был «отправитель» без окна: главный процесс не спрашивал,
+ * кто пишет. Теперь такое событие отвергается до обработчика, и тест
+ * проверял бы тишину. Ответ панели попадает в тот же журнал `sent`.
  */
 function fakeEvent(stubs) {
-    return {
-        sender: {
-            isDestroyed: () => false,
-            send: (channel, payload) => { stubs.sent.push({ channel, payload }); }
-        }
-    };
+    return eventFrom(openControl(stubs));
 }
 
 /**
@@ -931,4 +1015,73 @@ test('SEC-11: и ошибка записи не приносит в журнал
     for (const line of stubs.logged) {
         assert.ok(!line.text.includes('имя-пользователя'), `в журнал ушёл полный путь: ${line.text}`);
     }
+});
+
+// --- SEC-07: кто вправе прислать канал ---------------------------------------
+
+test('SEC-07: каждый зарегистрированный канал проходит проверку отправителя', () => {
+    // Обработчик, зарегистрированный мимо обвязки, принял бы и чужое окно.
+    // Проверяем на КАЖДОМ канале: событие от окна, не ставшего ни одним из
+    // четырёх, обработчик до тела не пускает — ни один не должен бросить и
+    // ни один не должен ничего разослать.
+    const stubs = createStubs();
+    loadMain(stubs);
+    const stranger = new stubs.electron.BrowserWindow({});
+    stranger.loadFile('electron-control.html');
+    const before = stubs.sent.length;
+    for (const [channel, handler] of stubs.ipcRaw) {
+        assert.doesNotThrow(() => handler(eventFrom(stranger), {}), channel);
+    }
+    assert.equal(stubs.sent.length, before, 'чужое окно добилось рассылки');
+    assert.equal(stubs.created.length, 1, 'чужое окно открыло окно');
+});
+
+test('SEC-07: «Новое мероприятие» из виджета игнорируется, из панели — работает', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    const control = openControl(stubs);
+    openDisplay(stubs);
+    const widget = openWidget(stubs);
+
+    await runOvertimeTalk(stubs);
+    stubs.ipcHandlers.get('event-finish')(eventFrom(control));
+    stopTimer(stubs);
+    const total = () => stubs.lastSent('event-overrun-state').overrunSeconds;
+    assert.ok(total() > 0, 'нужен накопленный перелимит, иначе сброс нечем проверить');
+
+    stubs.ipcRaw.get('event-reset')(eventFrom(widget));
+    assert.ok(total() > 0, 'виджет обнулил деньги мероприятия');
+    stubs.ipcRaw.get('event-reset')(eventFrom(control, { subframe: true }));
+    assert.ok(total() > 0, 'iframe в окне панели обнулил деньги мероприятия');
+
+    stubs.ipcRaw.get('event-reset')(eventFrom(control));
+    assert.equal(total(), 0, 'панель обязана мочь начать новое мероприятие');
+    assert.ok(stubs.logged.some((l) => l.text.includes('отклонено event-reset')), 'отказ не оставил следа');
+});
+
+test('SEC-07: timer-command из часов работает (Space в окне — законный отправитель)', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    stubs.ipcRaw.get('open-clock-widget')(eventFrom(openControl(stubs)));
+    const clock = liveWindow(stubs, 'clock');
+    assert.ok(clock, 'часы не открылись');
+    stubs.ipcRaw.get('timer-command')(eventFrom(clock), { type: 'set', seconds: 42 });
+    assert.equal(stubs.lastSent('timer-state').remainingSeconds, 42);
+    // Настройки дисплея часам не принадлежат.
+    stubs.ipcRaw.get('display-settings-update')(eventFrom(clock), { eventTitle: 'чужое' });
+    assert.ok(!stubs.sent.some((m) => m.channel === 'display-settings-update'),
+        'часы разослали настройки дисплея');
+});
+
+test('SEC-07: reset-and-relaunch и quit-app из дисплея не исполняются', () => {
+    const stubs = createStubs();
+    let quits = 0;
+    stubs.electron.app.quit = () => { quits++; };
+    stubs.electron.app.relaunch = () => { quits++; };
+    loadMain(stubs);
+    openDisplay(stubs);
+    const display = liveWindow(stubs, 'display');
+    stubs.ipcRaw.get('quit-app')(eventFrom(display));
+    stubs.ipcRaw.get('reset-and-relaunch')(eventFrom(display));
+    assert.equal(quits, 0);
 });

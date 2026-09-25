@@ -14,38 +14,47 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 
 ### Send (renderer → main)
 
-| Channel | Purpose |
-|---------|---------|
-| `timer-command` | Start/pause/reset/set timer with payload `{ type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes }` |
-| `timer-control` | Keyboard shortcuts from display: `'start'` / `'pause'` / `'reset'` (plain string) |
-| `widget-colors-update` | `{ timer: '#hex', progress: '#hex' }` — widget only |
-| `clock-colors-update` | `{ timer: '#hex', progress: '#hex' }` — clock only |
-| `display-colors-update` | `{ timer: '#hex', progress: '#hex' }` — display only |
-| `widget-style-update` | `{ timerStyle, timerScale }` — widget style/scale |
-| `display-settings-update` | Display style, background, clock settings. `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local` |
-| `get-timer-state` | Request current timer state |
-| `get-displays` | Request list of available displays |
-| `open-releases-page` | Без payload: main открывает страницу релизов через `shell.openExternal`, адрес — КОНСТАНТА в main. URL из рендерера означал бы выполнение произвольного адреса руками ОС |
-| `open-widget` / `close-widget` | Toggle widget window |
-| `open-display` / `close-display` | Toggle display window |
-| `open-clock-widget` / `close-clock-widget` | Toggle clock widget |
-| `resize-control-window` | `{ width, height }` — validated with `Number.isFinite` + min bounds |
-| `control-drawer` | `{ open }` — ящик настроек. Отдельный канал: потолок окна двухуровневый (760×740 по содержимому, 1096×1100 с ящиком), и из ширины запроса уровень не выводится |
-| `control-collapse` | `{ collapsed, height }` — свернуть панель в полосу. Отдельный канал: `resize-control-window` зажимает высоту минимумом окна (660). Снимает и возвращает пол `minHeight`, держит ВЕРХНИЙ край, `height` в 36…120 |
-| `widget-resize` / `widget-move` / `widget-set-position` | Геометрия виджета. `widget-move` несёт `{deltaX, deltaY, first}`: `first` помечает начало жеста, и main держит размер окна до конца перетаскивания |
-| `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | Clock widget controls |
-| `clock-widget-move` | `{ deltaX, deltaY }` — move clock widget window |
-| `clock-widget-set-position` | `{ x, y }` — restore saved clock position (clamped to a live display) |
-| `display-move` | `{ deltaX, deltaY }` — move display window in windowed mode |
-| `display-layout` | `{ layout }` — применить раскладку (имя проверяется по реестру `display-layouts.js`). Отдельный канал: раскладка — действие, а не состояние; шлётся ПОСЛЕ тумблеров |
-| `sound-toggle` | Без payload: окно просит панель переключить мастер-звук (клавиша `Z`). Значение принадлежит панели — она же и играет; присланное окном значение спорило бы с ней. Тот же приём, что у `preset-apply` |
-| `event-finish` | Скрытый режим «47-й этаж»: завершить мероприятие — закрыть текущий перелимит и заморозить итог. Полезной нагрузки нет: величину знает главный процесс |
-| `event-reset` | Скрытый режим «47-й этаж»: новое мероприятие — обнулить накопитель. Полезной нагрузки нет |
-| `event-export` | Скрытый режим «47-й этаж»: выгрузить отчёт о перелимите в CSV. Полезной нагрузки нет: журнал и итог живут в главном процессе, ставка и название мероприятия приходят туда же с `display-settings-update` |
-| `ui-theme-update` | `{ theme: 'dark' \| 'light' }` — sent by the panel only; main validates against a whitelist and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide) |
-| `toggle-fullscreen` | Toggle fullscreen on the sender's window |
-| `reset-and-relaunch` | Clear all storage and quit |
-| `minimize-window` / `quit-app` | Window management |
+Столбец «Кто шлёт» — копия таблицы `ipc-senders.js` (SEC-07): главный процесс
+принимает канал ТОЛЬКО от этих окон, из главного кадра и со своей страницы;
+остальное отбрасывается с одной записью в журнал на канал. Новый канал без
+строки там не зарегистрируется — главный процесс упадёт при загрузке.
+
+| Channel | Кто шлёт (ipc-senders.js) | Purpose |
+|---------|------|---------|
+| `timer-command` | панель, виджет, часы, дисплей | Start/pause/reset/set timer with payload `{ type, seconds, deltaSeconds, allowNegative, overrunLimitSeconds, overrunIntervalMinutes }` |
+| `timer-control` | виджет, часы, дисплей | Keyboard shortcuts from display: `'start'` / `'pause'` / `'reset'` (plain string) |
+| `widget-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — widget only |
+| `clock-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — clock only |
+| `display-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — display only |
+| `widget-style-update` | панель | `{ timerStyle, timerScale }` — widget style/scale |
+| `display-settings-update` | панель | Display style, background, clock settings. `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local` |
+| `get-timer-state` | панель, виджет, часы, дисплей | Request current timer state |
+| `get-displays` | панель | Request list of available displays |
+| `open-releases-page` | панель | Без payload: main открывает страницу релизов через `shell.openExternal`, адрес — КОНСТАНТА в main. URL из рендерера означал бы выполнение произвольного адреса руками ОС |
+| `open-widget` / `close-widget` | open-widget: панель, часы, дисплей; close-widget: панель, виджет, часы, дисплей | Toggle widget window |
+| `open-display` / `close-display` | open-display: панель, виджет, часы; close-display: панель, виджет, часы, дисплей | Toggle display window |
+| `open-clock-widget` / `close-clock-widget` | open-clock-widget: панель, виджет, дисплей; close-clock-widget: панель, виджет, часы, дисплей | Toggle clock widget |
+| `resize-control-window` | панель | `{ width, height }` — validated with `Number.isFinite` + min bounds |
+| `control-drawer` | панель | `{ open }` — ящик настроек. Отдельный канал: потолок окна двухуровневый (760×740 по содержимому, 1096×1100 с ящиком), и из ширины запроса уровень не выводится |
+| `control-collapse` | панель | `{ collapsed, height }` — свернуть панель в полосу. Отдельный канал: `resize-control-window` зажимает высоту минимумом окна (660). Снимает и возвращает пол `minHeight`, держит ВЕРХНИЙ край, `height` в 36…120 |
+| `widget-resize` / `widget-move` / `widget-set-position` | виджет | Геометрия виджета. `widget-move` несёт `{deltaX, deltaY, first}`: `first` помечает начало жеста, и main держит размер окна до конца перетаскивания |
+| `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | clock-widget-resize: панель, часы; clock-widget-set-style: панель; clock-widget-settings: панель | Clock widget controls |
+| `clock-widget-move` | часы | `{ deltaX, deltaY }` — move clock widget window |
+| `clock-widget-set-position` | часы | `{ x, y }` — restore saved clock position (clamped to a live display) |
+| `display-move` | дисплей | `{ deltaX, deltaY }` — move display window in windowed mode |
+| `display-layout` | панель | `{ layout }` — применить раскладку (имя проверяется по реестру `display-layouts.js`). Отдельный канал: раскладка — действие, а не состояние; шлётся ПОСЛЕ тумблеров |
+| `sound-toggle` | виджет, часы, дисплей | Без payload: окно просит панель переключить мастер-звук (клавиша `Z`). Значение принадлежит панели — она же и играет; присланное окном значение спорило бы с ней. Тот же приём, что у `preset-apply` |
+| `event-finish` | панель | Скрытый режим «47-й этаж»: завершить мероприятие — закрыть текущий перелимит и заморозить итог. Полезной нагрузки нет: величину знает главный процесс |
+| `event-reset` | панель | Скрытый режим «47-й этаж»: новое мероприятие — обнулить накопитель. Полезной нагрузки нет |
+| `event-export` | панель | Скрытый режим «47-й этаж»: выгрузить отчёт о перелимите в CSV. Полезной нагрузки нет: журнал и итог живут в главном процессе, ставка и название мероприятия приходят туда же с `display-settings-update` |
+| `ui-theme-update` | панель | `{ theme: 'dark' \| 'light' }` — sent by the panel only; main validates against a whitelist and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide) |
+| `ui-lock-update` | панель | `{ locked }` — замок «Закрепить положение»; main рассылает всем окнам (как тему) |
+| `display-restore-state` | панель | Без payload: пресет вернул в профиль места и масштабы карточек — дисплей перечитывает их |
+| `report-scale` | виджет, часы, дисплей | `{ source, scalePct }` — окно сообщает свой масштаб панели |
+| `display-block-hidden` | дисплей | `{ block }` — блок закрыт крестиком в окне, панель снимает его тумблер |
+| `toggle-fullscreen` | дисплей | Toggle fullscreen on the sender's window |
+| `reset-and-relaunch` | панель | Clear all storage and quit |
+| `minimize-window` / `quit-app` | minimize-window: панель, дисплей; quit-app: панель | Window management |
 
 ### Receive (main → renderer)
 
