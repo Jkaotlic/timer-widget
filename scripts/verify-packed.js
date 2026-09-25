@@ -165,8 +165,9 @@ function checkHardening(source) {
     // попадала бы в счёт вовсе, и сравнение guards >= windows проходило бы
     // при окне без гарда.
     const windows = (code.match(/new BrowserWindow\(/g) || []).length;
+    // `devTools: false` — окно переноса настроек (SEC-12): гард строже.
     const guards = (code.match(
-        /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
+        /devTools:\s*(?:false|process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged)/g
     ) || []).length;
     if (windows === 0) { problems.push('в упакованном main нет ни одного BrowserWindow'); }
     if (guards < windows) {
@@ -198,9 +199,37 @@ function checkBridge(preloadSource, mainSource, expectedBlock, extractBlock) {
     if (/ALLOWED_CHANNELS/.test(preloadSource)) { problems.push('в упакованном preload.js остался общий белый список'); }
     const code = (mainSource || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
     const roles = [...code.matchAll(/additionalArguments:\s*\[windowArgument\('([a-z]+)'\)\]/g)].map((m) => m[1]);
+    // Окна с мостом — те, кому дан preload; им обязана достаться роль. Окно
+    // без моста одно — скрытое окно переноса настроек (SEC-12), и у него
+    // DevTools выключены наглухо: `devTools: false`.
     const windows = (code.match(/new BrowserWindow\(/g) || []).length;
-    if (roles.length < windows) { problems.push(`окон ${windows}, ролей моста ${roles.length} — окно без роли получит закрытый мост`); }
+    const bridged = (code.match(/preload:\s*path\.join\(__dirname, 'preload\.js'\)/g) || []).length;
+    const sealed = (code.match(/devTools:\s*false/g) || []).length;
+    if (roles.length < bridged) { problems.push(`окон с мостом ${bridged}, ролей моста ${roles.length} — окно без роли получит закрытый мост`); }
+    if (windows - bridged > Math.min(sealed, 1)) {
+        problems.push(`окон без моста ${windows - bridged} — допустимо одно, окно переноса настроек с devTools: false`);
+    }
     if (new Set(roles).size !== roles.length) { problems.push(`роль моста повторяется: ${roles.join(', ')}`); }
+    return problems;
+}
+
+// --- Окна на своей схеме (SEC-12) -------------------------------------------
+//
+// Окна грузятся с app://timer-widget/, а не с file://: схема регистрируется
+// привилегированной, у неё есть обработчик, и ни одна страница окна не
+// грузится loadFile. Страница переноса настроек грузится с file:// нарочно —
+// это единственный способ прочитать старое хранилище.
+function checkAppScheme(mainSource) {
+    if (mainSource === null) { return ['главный процесс не найден внутри app.asar']; }
+    const code = mainSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const problems = [];
+    if (!/protocol\.registerSchemesAsPrivileged\(/.test(code)) { problems.push('схема app не регистрируется привилегированной'); }
+    if (!/protocol\.handle\(/.test(code)) { problems.push('у схемы app нет обработчика (protocol.handle)'); }
+    const byScheme = (code.match(/\.loadURL\(pageUrl\('(?:electron-control|electron-widget|electron-clock-widget|display)\.html'\)\)/g) || []).length;
+    if (byScheme < 4) { problems.push(`окон на схеме app ${byScheme} из четырёх`); }
+    if (/\.loadFile\(\s*['"`](?:electron-control|electron-widget|electron-clock-widget|display)\.html/.test(code)) {
+        problems.push('окно снова грузится с file:// (loadFile страницы окна)');
+    }
     return problems;
 }
 
@@ -375,6 +404,14 @@ async function main() {
     }
     console.log('[verify-packed] OK: мост каждого окна открывает только свои каналы');
 
+    const schemeIssues = checkAppScheme(readPackedMainSource((file) => readAsarFile(asarPath, header, file), packed));
+    if (schemeIssues.length) {
+        console.error('\n[verify-packed] СХЕМА ОКОН НЕ ПРОШЛА ВОРОТА');
+        for (const p of schemeIssues) { console.error(`  ${p}`); }
+        process.exit(1);
+    }
+    console.log('[verify-packed] OK: окна грузятся со схемы app://, не с file://');
+
     const pkg = require(path.join(ROOT, 'package.json'));
     const executable = findElectronExecutable(asarPath, pkg);
     if (!executable) {
@@ -422,6 +459,7 @@ module.exports = {
     checkPacked,
     checkHardening,
     checkBridge,
+    checkAppScheme,
     mainProcessPaths,
     readPackedMainSource,
     findAsar,

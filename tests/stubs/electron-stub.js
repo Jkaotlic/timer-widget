@@ -19,10 +19,12 @@ module.exports = {
     BrowserWindow: class {
         constructor() { this.webContents = { on: noop, once: noop, setWindowOpenHandler: noop, setZoomFactor: noop, setZoomLevel: noop, setVisualZoomLevelLimits: noop }; }
         loadFile() { return { catch: noop }; }
+        loadURL() { return { catch: noop }; }
         on() {} once() {} isDestroyed() { return false; } getPosition() { return [0, 0]; } setPosition() {} setSize() {} setOpacity() {} setBounds() {} show() {} hide() {} focus() {} close() {} isVisible() { return false; } setAlwaysOnTop() {} setIgnoreMouseEvents() {}
         static getAllWindows() { return []; }
     },
     ipcMain: { on: noop, handle: noop, removeHandler: noop },
+    protocol: { registerSchemesAsPrivileged: noop, handle: noop },
     screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1920, height: 1080 }, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }), getAllDisplays: () => [], on: noop },
     Menu: { setApplicationMenu: noop, buildFromTemplate: () => ({}) },
     Tray: class { constructor() {} setToolTip() {} setContextMenu() {} on() {} },

@@ -2,6 +2,8 @@
 
 /**
  * SEC-06: навигация окон — только на четыре страницы приложения.
+ * С 25.09.2026 (SEC-12) страницы живут на схеме app://timer-widget/, и file://
+ * чужой целиком — даже файл из каталога приложения.
  *
  * Прежний `hardenWindow` пускал ЛЮБОЙ file://. Перетащенный на виджет HTML-файл
  * (или ссылка в нём) становился страницей окна — с preload-мостом, белым
@@ -18,8 +20,8 @@ const { pathToFileURL } = require('node:url');
 const guard = require('../navigation-guard');
 
 const APP_DIR = path.join(__dirname, '..');
-const ALLOWED = guard.appPageUrls(APP_DIR);
-const pageUrl = (page) => pathToFileURL(path.join(APP_DIR, page)).href;
+const ALLOWED = guard.appPageUrls();
+const pageUrl = (page) => `app://timer-widget/${page}`;
 
 test('четыре страницы приложения разрешены', () => {
     for (const page of guard.APP_PAGES) {
@@ -36,6 +38,8 @@ test('хеш и query не мешают: это та же страница', () 
 
 test('чужой file:// запрещён — даже рядом со страницами приложения', () => {
     const evil = [
+        // Прежние адреса окон — теперь чужие: окно с file:// загрузил не main.
+        ...guard.APP_PAGES.map((page) => pathToFileURL(path.join(APP_DIR, page)).href),
         pathToFileURL(path.join(APP_DIR, 'evil.html')).href,
         pathToFileURL(path.join(APP_DIR, 'tests', 'electron-control.html')).href,
         pathToFileURL(path.join(APP_DIR, '..', 'electron-control.html')).href,
@@ -47,8 +51,11 @@ test('чужой file:// запрещён — даже рядом со стра�
     }
 });
 
-test('не-file схемы и мусор запрещены', () => {
+test('чужие схемы, хосты и мусор запрещены', () => {
     for (const url of [
+        'app://other/electron-control.html', 'app://timer-widget:8080/display.html',
+        'app://user@timer-widget/display.html', 'app://timer-widget/evil.html',
+        'app://timer-widget/storage-migration.html', 'app://timer-widget/sub/display.html',
         'https://example.com/', 'http://127.0.0.1/', 'javascript:alert(1)',
         'data:text/html,<script>1</script>', 'about:blank', 'devtools://devtools/',
         '', 'не адрес', null, undefined, 42
@@ -61,8 +68,10 @@ test('обход через кодирование пути не проходи�
     // `%2e%2e` и двойной слэш нормализует URL-парсер; сравнивается уже
     // нормализованный адрес, поэтому «страница приложения этажом выше» — это
     // чужая страница, как бы её ни записали.
-    const base = pathToFileURL(APP_DIR).href;
+    const base = 'app://timer-widget';
     assert.equal(guard.isAppPageUrl(`${base}/sub/%2e%2e/evil.html`, ALLOWED), false);
+    assert.equal(guard.isAppPageUrl(`${base}/%2e%2e/%2e%2e/display.html`, ALLOWED), true,
+        'выше корня схемы не уйти: это та же страница');
     assert.equal(guard.isAppPageUrl(`${base}/sub/%2e%2e/display.html`, ALLOWED), true,
         'нормализованный путь к своей странице — та же страница');
 });

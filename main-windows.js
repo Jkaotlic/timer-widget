@@ -20,6 +20,10 @@ const { withoutBgImage } = require('./relay-payload');
 // Роль окна — аргумент его рендерера: по ней preload.js открывает только
 // каналы этого окна (таблица — ipc-senders.js). Без аргумента мост закрыт.
 const { windowArgument } = require('./ipc-senders');
+// Окна грузятся со своей схемы app://timer-widget/ (SEC-12), а не с file://:
+// адрес страницы строит app-scheme.js — та же формула, по которой
+// navigation-guard.js и проверка отправителя узнают свою страницу.
+const { pageUrl } = require('./app-scheme');
 
 // Уровень окна для виджета и часов — ВЫШЕ полоски меню macOS.
 //
@@ -116,7 +120,7 @@ function createWindows(deps) {
             show: !__screenshotMode
         });
 
-        windows.controlWindow.loadFile('electron-control.html').catch(err => log.error('loadFile failed:', err));
+        windows.controlWindow.loadURL(pageUrl('electron-control.html')).catch(err => log.error('loadURL failed:', err));
         hardenWindow(windows.controlWindow);
         bindRenderCrashHandler(windows.controlWindow, 'control');
         bindRenderConsole(windows.controlWindow, 'control');
@@ -195,7 +199,7 @@ function createWindows(deps) {
         if (!__screenshotMode) {
             windows.widgetWindow.setAlwaysOnTop(true, WINDOW_LEVEL_ABOVE_MENU_BAR);
         }
-        windows.widgetWindow.loadFile('electron-widget.html').catch(err => log.error('loadFile failed:', err));
+        windows.widgetWindow.loadURL(pageUrl('electron-widget.html')).catch(err => log.error('loadURL failed:', err));
         hardenWindow(windows.widgetWindow);
         bindRenderCrashHandler(windows.widgetWindow, 'widget');
         bindRenderConsole(windows.widgetWindow, 'widget');
@@ -267,7 +271,7 @@ function createWindows(deps) {
         if (!__screenshotMode) {
             windows.clockWidgetWindow.setAlwaysOnTop(true, WINDOW_LEVEL_ABOVE_MENU_BAR);
         }
-        windows.clockWidgetWindow.loadFile('electron-clock-widget.html').catch(err => log.error('loadFile failed:', err));
+        windows.clockWidgetWindow.loadURL(pageUrl('electron-clock-widget.html')).catch(err => log.error('loadURL failed:', err));
         hardenWindow(windows.clockWidgetWindow);
         bindRenderCrashHandler(windows.clockWidgetWindow, 'clock');
         bindRenderConsole(windows.clockWidgetWindow, 'clock');
@@ -356,7 +360,7 @@ function createWindows(deps) {
             }
         });
 
-        windows.displayWindow.loadFile('display.html').catch(err => log.error('loadFile failed:', err));
+        windows.displayWindow.loadURL(pageUrl('display.html')).catch(err => log.error('loadURL failed:', err));
         hardenWindow(windows.displayWindow);
         bindRenderCrashHandler(windows.displayWindow, 'display');
         bindRenderConsole(windows.displayWindow, 'display');

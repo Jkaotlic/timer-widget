@@ -481,3 +481,37 @@ test('checkBridge: настоящие preload.js и главный процес�
     const dupRole = main.replace("windowArgument('clock')", "windowArgument('control')");
     assert.match(check(preload, dupRole).join('\n'), /повторяется/);
 });
+
+// --- SEC-12: окна на схеме app:// на артефакте ------------------------------
+
+test('checkAppScheme: настоящий главный процесс проходит, возврат к file:// — нет', () => {
+    const { checkAppScheme } = require('../scripts/verify-packed');
+    const { readMainSource } = require('./helpers/main-source');
+    const main = readMainSource();
+    assert.deepEqual(checkAppScheme(main), [], 'репозиторий обязан проходить ворота');
+    assert.match(checkAppScheme(null)[0], /не найден/);
+
+    const back = main.replace(".loadURL(pageUrl('display.html'))", ".loadFile('display.html')");
+    assert.notEqual(back, main, 'проба не нашла загрузку дисплея — проверка ничего не проверила бы');
+    assert.match(checkAppScheme(back).join('\n'), /3 из четырёх/);
+    assert.match(checkAppScheme(back).join('\n'), /file:\/\//);
+
+    const noPriv = main.replace('protocol.registerSchemesAsPrivileged(', 'protocol.x(');
+    assert.match(checkAppScheme(noPriv).join('\n'), /привилегированной/);
+    const noHandle = main.replace('protocol.handle(', 'protocol.x(');
+    assert.match(checkAppScheme(noHandle).join('\n'), /обработчика/);
+});
+
+test('checkBridge: окно без моста допустимо одно и только с devTools: false', () => {
+    const bridge = require('../scripts/preload-channels');
+    const { readMainSource } = require('./helpers/main-source');
+    const preload = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+    const main = readMainSource();
+    const check = (m) => checkBridge(preload, m, bridge.renderBlock(), bridge.extractBlock);
+    assert.deepEqual(check(main), []);
+    const unsealed = main.replace('devTools: false', 'devTools: true');
+    assert.notEqual(unsealed, main, 'в главном процессе нет окна переноса с devTools: false');
+    assert.match(check(unsealed).join('\n'), /окон без моста 1/);
+    const second = `${main}\nnew BrowserWindow({ show: false, webPreferences: { devTools: false } });`;
+    assert.match(check(second).join('\n'), /окон без моста 2/);
+});

@@ -220,7 +220,8 @@ async function run() {
 
     const electronApp = await electron.launch({ args: appArgs, env });
     try {
-        const control = await electronApp.firstWindow();
+        // Панель — по адресу: первым окном бывает скрытое окно переноса настроек.
+        const control = await require('../e2e/launch').waitForControlWindow(electronApp);
         await control.waitForLoadState('domcontentloaded');
         await sleep(1200);
         await setWindowSize(electronApp, control, 400, 712);

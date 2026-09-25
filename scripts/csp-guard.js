@@ -45,7 +45,9 @@ const WINDOW_HTML = Object.freeze([
     'display.html'
 ]);
 
-// Почему каждая строка такая:
+// Сама строка живёт в app-scheme.js: её же схема app:// отдаёт ЗАГОЛОВКОМ
+// ответа страницы (действующая политика — пересечение meta и заголовка, так
+// что две копии разошлись бы молча). Почему каждая директива такая:
 //  - default-src 'self' — ресурсы только из каталога приложения;
 //  - script-src 'self' — только файлы; ни хешей, ни 'unsafe-inline', ни eval;
 //  - style-src 'self' — только таблицы-файлы. CSSOM из скриптов (el.style.x = …,
@@ -55,20 +57,7 @@ const WINDOW_HTML = Object.freeze([
 //    оно работает без сети, а данные с диска читает главный процесс;
 //  - base-uri / form-action / frame-src / worker-src 'none' — ни <base>, ни
 //    форм, ни фреймов, ни воркеров в окнах нет; открытое — это лазейка.
-const POLICY = [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self'",
-    "img-src 'self' data:",
-    "media-src 'self' data:",
-    "font-src 'self' data:",
-    "connect-src 'none'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'none'",
-    "frame-src 'none'",
-    "worker-src 'none'"
-].join('; ');
+const { CONTENT_SECURITY_POLICY: POLICY } = require('../app-scheme');
 
 // Все виды инлайна запрещены: политика не пускает ни один из них.
 const FORBIDDEN = Object.freeze(new Set(['inline-script', 'style-element', 'style-attr', 'handler', 'javascript-url']));
@@ -228,7 +217,7 @@ function main(argv) {
     if (bad) {
         console.error('\nИнлайн в окне браузер откажется исполнять или применять (CSP без \'unsafe-inline\').');
         console.error('Код — в файл окна (*-app.js), стиль — в его .css, состояние — классом.');
-        console.error('Политику меняют здесь, в POLICY, и переписывают meta: npm run csp:check -- --write');
+        console.error('Политику меняют в app-scheme.js (CONTENT_SECURITY_POLICY) и переписывают meta: npm run csp:check -- --write');
         process.exit(1);
     }
 }

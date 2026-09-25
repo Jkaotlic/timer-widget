@@ -25,6 +25,9 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  * @param {object} deps.log
  * @param {Function} deps.safelySendToWindow
  * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
+ * @param {() => void} deps.registerProtocol — обработчик схемы app:// (SEC-12)
+ * @param {() => Promise<{dispose: Function}>} deps.prepareStorage — перенос
+ *        localStorage file:// → app:// (main-storage-migration.js)
  * @param {object} deps.windows — реестр окон (main-state.js)
  * @param {object} deps.flags — флаги приложения (main-state.js)
  * @param {object} deps.timer — main-timer.js
@@ -39,6 +42,7 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
 function startApp(deps) {
     const {
         app, BrowserWindow, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
+        registerProtocol, prepareStorage,
         windows, flags, timer, recoverySnapshot, events, creators, tray
     } = deps;
     const __inTestMode = deps.inTestMode;
@@ -60,6 +64,9 @@ function startApp(deps) {
      * (`isQuitting`, удаление снимка восстановления) идемпотентны.
      */
     let __leavingFullScreenToQuit = false;
+
+    // Идёт перенос настроек file:// → app:// (до первого окна).
+    let __preparingStorage = false;
 
     app.on('before-quit', (event) => {
         const win = windows.displayWindow;
@@ -97,6 +104,10 @@ function startApp(deps) {
         app.quit();
     } else {
         app.on('second-instance', () => {
+            // Пока идёт перенос настроек, панели ещё нет — и создавать её
+            // рано: окно на пустом app:// записало бы умолчания раньше, чем
+            // туда придут настройки пользователя. Старт создаст её сам.
+            if (__preparingStorage) { return; }
             if (!windows.controlWindow) { createControlWindow(); return; }
             if (windows.controlWindow.isMinimized()) { windows.controlWindow.restore(); }
             if (!windows.controlWindow.isVisible()) { windows.controlWindow.show(); }
@@ -104,9 +115,12 @@ function startApp(deps) {
         });
     }
 
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
         // Duplicate instance — we already called app.quit() above; do nothing.
         if (!__singleInstance) { return; }
+
+        // Схема app:// — раньше любого окна: окна и страница миграции грузятся с неё.
+        registerProtocol();
 
         // Remove default Electron menu (File, Edit, View, Help)
         Menu.setApplicationMenu(null);
@@ -144,7 +158,25 @@ function startApp(deps) {
         // (см. foldPendingOnStart в main-event-overrun.js).
         events.foldPendingOnStart(hasRecovery ? timer.getState().remainingSeconds : null);
 
+        // Настройки пользователя — в новый origin ДО первого окна: панель,
+        // открытая на пустом app://, записала бы свои умолчания, и перенос
+        // (он не перезаписывает существующее) их бы уже не тронул. Сбой
+        // переноса старт не останавливает: приложение без настроек лучше
+        // приложения, которое не открывается.
+        let storage = { dispose: () => {} };
+        __preparingStorage = true;
+        try {
+            storage = await prepareStorage();
+        } catch (err) {
+            log.error('[migration] перенос настроек упал:', err && err.message ? err.message : err);
+        } finally {
+            __preparingStorage = false;
+        }
+
         createControlWindow();
+        // Скрытое окно переноса гасится ПОСЛЕ панели: закрытое последнее окно
+        // — это window-all-closed, а на нём Windows и Linux выходят.
+        storage.dispose();
 
         if (__screenshotMode) {
             const runner = require('./scripts/screenshot-runner');

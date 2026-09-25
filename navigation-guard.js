@@ -9,29 +9,28 @@
  * страницей окна — с preload-мостом, белым списком IPC и правом file:// читать
  * весь диск. «Не http» — не то же самое, что «наше».
  *
+ * С 25.09.2026 окна живут на своей схеме `app://timer-widget/…` (app-scheme.js,
+ * SEC-12), и «своя страница» — это адрес этой схемы. file:// теперь чужой
+ * ЦЕЛИКОМ, включая файлы из каталога приложения: окно с file:// — это окно,
+ * которое загрузил кто-то другой.
+ *
  * Сравнение — по НОРМАЛИЗОВАННОМУ адресу без хеша и query: URL-парсер сам
  * разворачивает `..`, `%2e%2e` и двойные слэши, поэтому записать чужую страницу
  * так, чтобы она совпала со своей, нельзя, а своя страница с `#якорем` остаётся
- * своей. Эталон строится тем же `pathToFileURL`, которым Chromium получает адрес
- * при `loadFile`, — две формулы одного адреса разошлись бы на пробеле или
- * кириллице в пути установки.
+ * своей. Эталон строится той же `pageUrl`, которой main-windows.js грузит окна.
  *
  * Модуль чистый (без require('electron')): предикат и обвязку webContents
  * проверяет tests/navigation-guard.test.js на подставках.
  */
 
-const path = require('path');
-const { pathToFileURL } = require('url');
+const AppScheme = require('./app-scheme');
 
 // Четыре окна — четыре страницы. Новое окно без строки здесь не откроется
-// навигацией, но loadFile его загрузит: loadFile — не навигация страницы, и
+// навигацией, но loadURL его загрузит: loadURL — не навигация страницы, и
 // will-navigate на него не срабатывает. Список держит только ПЕРЕХОДЫ.
-const APP_PAGES = Object.freeze([
-    'electron-control.html',
-    'electron-widget.html',
-    'electron-clock-widget.html',
-    'display.html'
-]);
+// Страница миграции хранилища сюда НЕ входит: у её окна нет моста, и
+// переходить на неё окну незачем.
+const APP_PAGES = AppScheme.WINDOW_PAGES;
 
 // Адрес без хеша и query в нормализованной форме, или null для мусора.
 function normalize(url) {
@@ -47,13 +46,13 @@ function normalize(url) {
     return parsed.href;
 }
 
-function appPageUrls(appDir, pages = APP_PAGES) {
-    return new Set(pages.map((page) => normalize(pathToFileURL(path.join(appDir, page)).href)));
+function appPageUrls(pages = APP_PAGES) {
+    return new Set(pages.map((page) => normalize(AppScheme.pageUrl(page))));
 }
 
 function isAppPageUrl(url, allowed) {
     const href = normalize(url);
-    if (href === null || !href.startsWith('file:')) { return false; }
+    if (href === null || !href.startsWith(`${AppScheme.ORIGIN}/`)) { return false; }
     return allowed.has(href);
 }
 
@@ -91,6 +90,7 @@ function guardWebContents(contents, allowed, onBlocked = () => {}) {
 
 // Что сказать в журнал об отвергнутом адресе: схема и последний сегмент пути.
 // Полный путь file:// — это домашний каталог и имя учётной записи.
+// (Чужой адрес бывает и file://, поэтому правило осталось и после app://.)
 function describeUrl(url) {
     if (typeof url !== 'string') { return String(url); }
     try {

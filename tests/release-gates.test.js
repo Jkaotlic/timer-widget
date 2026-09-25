@@ -138,6 +138,16 @@ function browserWindowBlocks(source) {
     return blocks;
 }
 
+// Окно БЕЗ моста — скрытое окно переноса настроек (main-storage-migration.js,
+// SEC-12): ни preload, ни роли, DevTools выключены наглухо, не показывается.
+// Любая другая форма окна без preload — ошибка, а не «ещё одно такое окно».
+const BRIDGED = /preload:\s*path\.join\(__dirname, 'preload\.js'\)/;
+function isBridgelessWindow(block) {
+    const code = codeOnly(block);
+    return !/preload:/.test(code) && !/additionalArguments:/.test(code)
+        && /devTools:\s*false/.test(code) && /show:\s*false/.test(code);
+}
+
 test('режим разработчика закрыт в КАЖДОМ окне, а не в четырёх известных', () => {
     const blocks = browserWindowBlocks(MAIN);
     assert.ok(blocks.length >= 4, `окон найдено ${blocks.length}, ожидалось не меньше четырёх`);
@@ -145,25 +155,29 @@ test('режим разработчика закрыт в КАЖДОМ окне,
     blocks.forEach((block, i) => {
         assert.match(
             block,
-            /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/,
+            /devTools:\s*(?:false|process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged)/,
             `окно №${i + 1}: DevTools без гарда «--dev И не собранное приложение»`
         );
     });
 });
 
 test('окна изолированы: sandbox, contextIsolation, без nodeIntegration', () => {
-    browserWindowBlocks(MAIN).forEach((block, i) => {
+    const blocks = browserWindowBlocks(MAIN);
+    blocks.forEach((block, i) => {
         assert.match(block, /nodeIntegration:\s*false/, `окно №${i + 1}: nodeIntegration не выключен`);
         assert.match(block, /contextIsolation:\s*true/, `окно №${i + 1}: contextIsolation не включён`);
         assert.match(block, /sandbox:\s*true/, `окно №${i + 1}: sandbox не включён`);
-        assert.match(block, /preload:\s*path\.join\(__dirname, 'preload\.js'\)/, `окно №${i + 1}: нет preload`);
+        assert.ok(BRIDGED.test(block) || isBridgelessWindow(block),
+            `окно №${i + 1}: нет preload, и это не окно переноса (без моста, скрытое, devTools: false)`);
     });
+    const bridgeless = blocks.filter((b) => !BRIDGED.test(b)).length;
+    assert.ok(bridgeless <= 1, `окон без моста ${bridgeless}: второе такое окно — повод пересмотреть ворота`);
 });
 
 test('у каждого окна СВОЯ роль моста, и все четыре разные', () => {
     // preload.js открывает каналы по роли из argv рендерера. Окно без роли —
     // закрытый мост; два окна с одной ролью — одно из них с чужими правами.
-    const roles = browserWindowBlocks(MAIN).map((block, i) => {
+    const roles = browserWindowBlocks(MAIN).filter((block) => BRIDGED.test(block)).map((block, i) => {
         const m = block.match(/additionalArguments:\s*\[windowArgument\('([a-z]+)'\)\]/);
         assert.ok(m, `окно №${i + 1}: роль моста не передана`);
         return m[1];
@@ -187,7 +201,7 @@ test('во ВСЁМ главном процессе нет ослабленны�
     // четвёркой. Сравниваются две величины, обе растущие вместе с кодом.
     const windows = (MAIN_CODE.match(/new BrowserWindow\(/g) || []).length;
     const guards = (MAIN_CODE.match(
-        /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
+        /devTools:\s*(?:false|process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged)/g
     ) || []).length;
     assert.ok(windows > 0, 'в главном процессе не найдено ни одного BrowserWindow — проверка ослепла');
     assert.ok(
@@ -454,13 +468,10 @@ test('фьюзы Electron: ни Node-режима, ни NODE_OPTIONS, ни --ins
         enableEmbeddedAsarIntegrityValidation: true,
         onlyLoadAppFromAsar: true,
         loadBrowserProcessSpecificV8Snapshot: false,
-        // ОСТАЁТСЯ включённым, и это замер, а не недосмотр: окна грузятся с
-        // file://, и без этого фьюза их origin непрозрачен — `localStorage`
-        // бросает «Access is denied for this document», панель падает на
-        // старте (проверено 25.09.2026: копия Electron с этим фьюзом, e2e
-        // windows-load-clean). Выключить можно только вместе с переездом окон
-        // на свою схему (protocol.handle) — а это смена origin и миграция всех
-        // настроек пользователя.
+        // ОСТАЁТСЯ включённым — храповик ниже («фьюз file:// держится ровно
+        // пока жива миграция»). Окна с SEC-12 живут на app:// и в нём не
+        // нуждаются; нуждается перенос настроек: он читает старое хранилище
+        // с file://, а без фьюза там «Access is denied for this document».
         grantFileProtocolExtraPrivileges: true,
         // identity: null — сборка без подписи, electron-builder её не ставит.
         // Перевёрнутые биты ломают штатную ad-hoc подпись Electron, и на Apple
@@ -474,6 +485,33 @@ test('фьюзы Electron: ни Node-режима, ни NODE_OPTIONS, ни --ins
     // Читалка фьюзов в verify-packed.js — прямая зависимость, а не случайно
     // приехавшая транзитивная: её версия обязана знать провод этого Electron.
     assert.ok(PKG.devDependencies['@electron/fuses'], '@electron/fuses не объявлен в devDependencies');
+});
+
+test('храповик SEC-12: фьюз file:// включён ровно пока жив перенос настроек', () => {
+    // Долг через два релиза (CLAUDE.md: «долг, не закрываемый сегодня,
+    // фиксируется храповиком»). Окна переехали на app://timer-widget/ и
+    // фьюзу grantFileProtocolExtraPrivileges больше не обязаны ничем. Обязан
+    // ему перенос настроек (main-storage-migration.js): старое хранилище
+    // живёт в origin file://, а без фьюза этот origin непрозрачен.
+    //
+    // Условие снятия: релиз с миграцией ВЫПУЩЕН, и принято решение, сколько
+    // релизов её держать (пользователь, перепрыгнувший через все релизы с
+    // миграцией, потеряет настройки — прочитать file:// без фьюза нельзя).
+    // Тогда в ОДНОМ коммите: удалить main-storage-migration.js и страницу
+    // storage-migration.html, поставить фьюз в false — этот тест требует
+    // именно пары. Оставить миграцию и выключить фьюз нельзя (она молча
+    // перестанет работать); убрать миграцию и оставить фьюз — тоже (долг
+    // останется без причины).
+    const migration = fs.existsSync(path.join(ROOT, 'main-storage-migration.js'));
+    const fuse = PKG.build.electronFuses.grantFileProtocolExtraPrivileges;
+    if (migration) {
+        assert.equal(fuse, true, 'перенос настроек читает file:// — без фьюза он молча вернёт «нечего переносить»');
+    } else {
+        assert.equal(fuse, false, 'переноса настроек больше нет — фьюз file:// обязан быть выключен');
+    }
+    // Окна на фьюз не опираются: ни одна страница окна не грузится с file://.
+    assert.doesNotMatch(MAIN_CODE, /\.loadFile\(\s*['"`](?:electron-control|electron-widget|electron-clock-widget|display)\.html/,
+        'окно снова грузится с file:// — тогда фьюз нужен окнам, и храповик врёт');
 });
 
 test('тик таймера ставится на границу секунды, а не setInterval(1000)', () => {

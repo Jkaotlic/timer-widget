@@ -34,9 +34,10 @@ test('BrowserWindow DevTools are enabled only in unpackaged --dev runs', () => {
     // без гарда, оставляет счётчик равным четырём — тест проходит на злом окне
     // (воспроизведено мутацией). Поэтому сравниваются две величины, растущие
     // вместе с кодом: гардов обязано быть не меньше, чем конструкторов окон.
+    // `devTools: false` (окно переноса настроек, SEC-12) — тоже гард, и строже.
     const windows = (source.match(/new BrowserWindow\(/g) || []).length;
     const guards = (source.match(
-        /devTools:\s*process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged/g
+        /devTools:\s*(?:false|process\.argv\.includes\('--dev'\)\s*&&\s*!app\.isPackaged)/g
     ) || []).length;
 
     assert.ok(windows >= 4, `окон найдено ${windows}, ожидалось не меньше четырёх`);

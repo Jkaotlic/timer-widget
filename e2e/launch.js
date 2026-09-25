@@ -56,7 +56,7 @@ async function launchApp(opts = {}) {
         args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`, ...(opts.args || [])],
         env: cleanEnv(opts.env)
     });
-    const control = await app.firstWindow();
+    const control = await waitForControlWindow(app);
     await control.waitForLoadState('domcontentloaded');
     // Панель досылает стартовые настройки с задержкой до 600 мс; ждём тишины,
     // иначе тест успевает прочитать промежуточное состояние.
@@ -64,4 +64,25 @@ async function launchApp(opts = {}) {
     return { app, control };
 }
 
-module.exports = { launchApp, cleanEnv, MAIN, USER_DATA_DIR };
+/**
+ * Окно панели — по АДРЕСУ, а не «первое окно».
+ *
+ * Первым окном бывает не панель: на профиле со старым хранилищем file:// до
+ * панели живёт скрытое окно переноса настроек (main-storage-migration.js), и
+ * `firstWindow()` вернул бы его — закрываемое сразу после появления панели.
+ * Опрос, а не событие: окно могло появиться раньше подписки.
+ */
+async function waitForControlWindow(app, timeout = 20000) {
+    const deadline = Date.now() + timeout;
+    for (;;) {
+        const control = app.windows().find((w) => w.url().includes('electron-control.html'));
+        if (control) { return control; }
+        if (Date.now() > deadline) {
+            throw new Error(`окно панели не появилось за ${timeout} мс; окна: `
+                + (app.windows().map((w) => w.url()).join(', ') || 'нет'));
+        }
+        await new Promise((r) => setTimeout(r, 50));
+    }
+}
+
+module.exports = { launchApp, waitForControlWindow, cleanEnv, MAIN, USER_DATA_DIR };

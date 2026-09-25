@@ -17,7 +17,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog, protocol } = require('electron');
 
 // Ключи отладки в СОБРАННОМ приложении — выход до первого окна (SEC-04).
 //
@@ -55,7 +55,12 @@ if (app.isPackaged && DEBUG_SWITCHES.some((name) => app.commandLine.hasSwitch(na
 //  • настоящий ipcMain (rawIpcMain) не покидает этот файл — модули получают
 //    только обвязку с проверкой отправителя (SEC-07).
 const NavigationGuard = require('./navigation-guard');
+const AppScheme = require('./app-scheme');
+const { createAppProtocolHandler, registerAppProtocol } = require('./main-app-protocol');
+const { migrateStorage, hasStorageDir } = require('./main-storage-migration');
 const IpcSenders = require('./ipc-senders');
+const fs = require('fs');
+const path = require('path');
 const log = require('electron-log/main');
 const { safelySendToWindow } = require('./utils');
 const CONFIG = require('./constants');
@@ -115,6 +120,17 @@ process.on('unhandledRejection', (reason) => {
 app.commandLine.appendSwitch('disable-component-update');
 app.commandLine.appendSwitch('disable-features', 'ChromeVariations,OptimizationHints');
 
+// Своя схема окон app://timer-widget/ (SEC-12) — регистрируется ДО `ready`:
+// привилегии схемы Chromium читает один раз при старте. Обработчик запросов
+// ставит main-lifecycle.js (registerProtocol) в whenReady, раньше первого окна.
+protocol.registerSchemesAsPrivileged([AppScheme.PRIVILEGED_SCHEME]);
+
+// Было ли у профиля хранилище ДО этого запуска — снимается сейчас, при
+// загрузке: Chromium создаёт каталог `Local Storage`, как только тронута
+// defaultSession, и в whenReady он есть уже и у нового профиля. Без каталога
+// переносить нечего, и скрытое окно переноса не создаётся вовсе.
+const __hadStorageAtStart = hasStorageDir(app.getPath('userData'));
+
 // Test-mode guard — node:test stubs 'electron', we skip runtime side-effects.
 const __inTestMode = process.env.NODE_TEST_CONTEXT !== undefined;
 
@@ -140,9 +156,8 @@ const flags = MainState.createAppFlags();
 // Переход разрешён ТОЛЬКО на четыре страницы приложения — сравнение адресов в
 // navigation-guard.js. Прежнее правило «всё, что file://» пускало в окно любой
 // HTML с диска вместе с preload-мостом: хватало перетащить файл на виджет.
-// Эталон считается от __dirname: внутри сборки это каталог app.asar, и loadFile
-// грузит страницы оттуда же.
-const APP_PAGE_URLS = NavigationGuard.appPageUrls(__dirname);
+// С SEC-12 свои страницы — адреса схемы app://timer-widget/, file:// чужой весь.
+const APP_PAGE_URLS = NavigationGuard.appPageUrls();
 
 function logBlockedNavigation(kind, url) {
     log.warn(`[nav] отклонено ${kind}: ${NavigationGuard.describeUrl(url)}`);
@@ -233,9 +248,30 @@ registerRelayIpc({
 registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, closing, creators, geometry });
 events.registerIpc(ipcMain);
 
+// --- Схема app:// и перенос настроек (SEC-12) --------------------------------
+//
+// Обработчик схемы отдаёт только файлы приложения (список — app-scheme.js);
+// каталог — __dirname, в сборке это app.asar. Перенос localStorage из file://
+// в app:// — один раз, до первого настоящего окна (main-storage-migration.js).
+const registerProtocol = () => registerAppProtocol(protocol, createAppProtocolHandler({
+    appDir: __dirname,
+    readFile: (file) => fs.promises.readFile(file),
+    readText: (rel) => fs.readFileSync(path.join(__dirname, rel), 'utf8'),
+    log
+}));
+const prepareStorage = () => migrateStorage({
+    userDataPath: getUserDataPath(),
+    hadStorageAtStart: __hadStorageAtStart,
+    appDir: __dirname,
+    BrowserWindow,
+    flushStorageData: () => getSession().defaultSession.flushStorageData(),
+    log
+});
+
 // --- Жизненный цикл: единственный экземпляр, старт, выход ------------------
 startApp({
     app, BrowserWindow, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
+    registerProtocol, prepareStorage,
     windows, flags, timer, recoverySnapshot, events, creators, tray,
     inTestMode: __inTestMode, screenshotMode: __screenshotMode, startupT0: __startupT0
 });

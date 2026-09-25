@@ -85,9 +85,19 @@ function createStubs() {
         }
         static getAllWindows() { return created; }
         static fromWebContents(wc) { return created.find((w) => w.webContents === wc) || null; }
+        // Прежний путь окон (file://). Окна приложения им больше не грузятся
+        // (SEC-12) — он остался для «чужого окна» в проверках отказа.
         loadFile(file) {
             this._file = file;
             this.webContents.mainFrame.url = pathToFileURL(path.join(repoRoot, file)).href;
+            return Promise.resolve();
+        }
+        // Окна приложения: app://timer-widget/<страница>. `_file` — имя
+        // страницы, по нему тесты находят окно по роли.
+        loadURL(url) {
+            this._url = url;
+            this._file = url.split('/').pop();
+            this.webContents.mainFrame.url = url;
             return Promise.resolve();
         }
         // События окна ХРАНЯТСЯ, а не выбрасываются.
@@ -201,7 +211,15 @@ function createStubs() {
         Tray: class { setToolTip() {} setContextMenu() {} on() {} },
         nativeImage: { createFromPath: () => ({ isEmpty: () => true }), createEmpty: () => ({}) },
         powerMonitor: { on: noop },
-        session: { defaultSession: {} }
+        session: { defaultSession: {} },
+        // Схема app:// (SEC-12): привилегии регистрируются при загрузке модуля,
+        // обработчик — в whenReady (здесь он не наступает).
+        protocol: {
+            privileged: [],
+            handled: new Map(),
+            registerSchemesAsPrivileged(list) { this.privileged.push(...list); },
+            handle(scheme, fn) { this.handled.set(scheme, fn); }
+        }
     };
 
     const stubs = { electron, ipcRaw, appHandlers, created, sent, lastSent, userDataDir };
@@ -1046,7 +1064,8 @@ test('SEC-07: каждый зарегистрированный канал пр�
     const stubs = createStubs();
     loadMain(stubs);
     const stranger = new stubs.electron.BrowserWindow({});
-    stranger.loadFile('electron-control.html');
+    // Своя страница на своей схеме — но окно не из реестра: отказ всё равно.
+    stranger.loadURL('app://timer-widget/electron-control.html');
     const before = stubs.sent.length;
     for (const [channel, handler] of stubs.ipcRaw) {
         assert.doesNotThrow(() => handler(eventFrom(stranger), {}), channel);
@@ -1456,4 +1475,41 @@ test('главный процесс шлёт окну только то, что 
     } finally {
         stopTimer(stubs);
     }
+});
+
+// --- SEC-12: окна на схеме app:// ---------------------------------------------
+
+test('SEC-12: схема app регистрируется привилегированной при загрузке — до ready', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    const { PRIVILEGED_SCHEME } = require('../app-scheme');
+    assert.deepEqual(stubs.electron.protocol.privileged, [PRIVILEGED_SCHEME]);
+});
+
+test('SEC-12: все четыре окна грузятся с app://timer-widget/, не с file://', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openControl(stubs);
+    openWidget(stubs);
+    stubs.ipcHandlers.get('open-clock-widget')(null);
+    openDisplay(stubs);
+    for (const role of Object.keys(ROLE_FILES)) {
+        const win = liveWindow(stubs, role);
+        assert.ok(win, `окно ${role} не открылось`);
+        assert.equal(win._url, `app://timer-widget/${ROLE_FILES[role]}`, role);
+    }
+});
+
+test('SEC-12: окно панели, оказавшееся на file://, для проверки отправителя чужое', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    const control = openControl(stubs);
+    const answers = () => stubs.sent.filter((m) => m.channel === 'displays-list').length;
+    stubs.ipcRaw.get('get-displays')(eventFrom(control));
+    assert.equal(answers(), 1, 'своя страница на app:// обязана получить ответ');
+    // Та же страница, но с диска — так её загрузил бы кто угодно, не main.
+    control.webContents.mainFrame.url = pathToFileURL(path.join(repoRoot, 'electron-control.html')).href;
+    stubs.ipcRaw.get('get-displays')(eventFrom(control));
+    assert.equal(answers(), 1, 'file:// прошёл проверку отправителя');
+    assert.ok(stubs.logged.some((l) => /get-displays: чужая страница/.test(l.text)));
 });
