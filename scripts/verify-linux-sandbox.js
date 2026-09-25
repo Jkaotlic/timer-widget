@@ -79,6 +79,11 @@ function checkDeb(debPath) {
     // там — запуск.
     const depends = execFileSync('dpkg-deb', ['-f', debPath, 'Depends'], { encoding: 'utf8' });
     console.log(`[linux-sandbox]   Depends: ${depends.trim()}`);
+    // ALSA — альтернативой с t64 ПЕРВЫМ: на Ubuntu 24.04 голое имя libasound2
+    // виртуальное, и apt выбрал liboss4-salsa-asound2 без настоящих символов ALSA.
+    if (!/libasound2t64\s*\|\s*libasound2\b/.test(depends)) {
+        fail('ALSA в Depends не как `libasound2t64 | libasound2` — на Ubuntu 24.04 apt подставит OSS-заглушку');
+    }
     for (const lib of ['libgbm1', 'libasound2', 'libnss3', 'libgtk-3-0']) {
         if (!new RegExp(`(^|[,|]\\s*)${lib.replace(/[.+]/g, '\\$&')}(\\s|,|\\(|$)`).test(depends)) {
             fail(`в Depends нет ${lib} — на чистой системе приложение не стартует`);

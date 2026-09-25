@@ -95,7 +95,9 @@ SBOM пакета (`--override-default-catalogers image`: по каталогу 
 
 Раннер набит библиотеками, контейнер — нет: контейнеры проверяют, что Depends
 пакета хватает для ЗАПУСКА (ставятся только xvfb, xauth, dbus). Так найдено
-отсутствие `libgbm1`/`libasound2` в штатном списке electron-builder.
+отсутствие `libgbm1`/`libasound2` в штатном списке electron-builder, а затем —
+что голое `libasound2` на Ubuntu 24.04 apt удовлетворяет OSS-заглушкой
+`liboss4-salsa-asound2` без символов ALSA; отсюда `libasound2t64 | libasound2`.
 
 Ячейка runner `userns` после запуска удаляет пакет и проверяет, что профиль
 выгружен из ядра и удалён, а `/usr/bin/timer-widget` исчез.
