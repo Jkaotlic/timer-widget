@@ -18,6 +18,29 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
 }
 
 const { app, BrowserWindow, ipcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog } = require('electron');
+
+// Ключи отладки в СОБРАННОМ приложении — выход до первого окна (SEC-04).
+//
+// `--remote-debugging-port/-pipe` открывают DevTools-протокол Chromium: через
+// него исполняется любой код в любом окне — мимо sandbox, CSP и белого списка
+// IPC, и гард `devTools: … && !app.isPackaged` в окнах тут не помогает, потому
+// что протокол живёт в самом Chromium, а не в окне. `--inspect*` в сборке уже
+// глушит фьюз EnableNodeCliInspectArguments (package.json → electronFuses);
+// проверка здесь — второй замок на случай сборки без фьюзов.
+//
+// Только при isPackaged: Playwright поднимает НЕсобранное приложение именно с
+// `--remote-debugging-port`, так он к нему и подключается.
+//
+// app.exit до `ready` лишь назначает выход, а модуль продолжил бы исполняться —
+// зарегистрировал бы IPC и дождался бы whenReady. process.exit гарантирует, что
+// после проверки не выполнится ни строки.
+const DEBUG_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk'];
+if (app.isPackaged && DEBUG_SWITCHES.some((name) => app.commandLine.hasSwitch(name))) {
+    console.error('[TimerWidget] ключи отладки в собранном приложении запрещены — выход');
+    app.exit(1);
+    process.exit(1);
+}
+
 const path = require('path');
 const fs = require('fs');
 const log = require('electron-log/main');
@@ -32,7 +55,13 @@ const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
 
 // Logger setup
-log.initialize();
+//
+// preload: false — без него electron-log регистрирует ВТОРОЙ preload в каждой
+// сессии: он кладёт в окна `window.__electronLog` и открывает канал
+// `__ELECTRON_LOG__` мимо белого списка preload.js (SEC-05). Рендерерам он не
+// нужен: их консоль попадает в журнал через `console-message`
+// (bindRenderConsole ниже).
+log.initialize({ preload: false });
 log.transports.file.level = 'info';
 log.transports.file.maxSize = 10 * 1024 * 1024; // 10 MB per file
 log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
@@ -2036,10 +2065,15 @@ ipcMain.on('event-export', async (event) => {
         }
 
         fs.writeFileSync(result.filePath, report.csv, 'utf8');
-        log.info(`[export] отчёт записан: ${result.filePath} (${report.rows} строк)`);
+        // В журнал — только ИМЯ файла (SEC-11): полный путь почти всегда содержит
+        // имя учётной записи, а журнал уходит в поддержку и на сканер ПСИ.
+        log.info(`[export] отчёт записан: ${path.basename(result.filePath)} (${report.rows} строк)`);
         answer({ ok: true, canceled: false, path: result.filePath, rows: report.rows });
     } catch (err) {
-        log.error('[export] отчёт не записан:', err);
+        // Сообщение fs несёт путь целиком («ENOENT: …, open '/Users/<имя>/…'»),
+        // поэтому в журнал — только код ошибки. Полный текст уходит в панель:
+        // он нужен человеку, который выбирал этот путь сам.
+        log.error(`[export] отчёт не записан: ${(err && (err.code || err.name)) || 'ошибка'}`);
         answer({ ok: false, canceled: false, error: (err && err.message) || String(err) });
     }
 });

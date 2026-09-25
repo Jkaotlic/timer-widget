@@ -171,10 +171,18 @@ function createStubs() {
 
 // Загружает electron-main.js с подменённым 'electron' и 'electron-log/main'.
 function loadMain(stubs) {
-    const logNoop = () => {};
+    // Журнал НЕ выбрасывается, а копится в `stubs.logged`: что главный процесс
+    // пишет в лог — тоже поведение (полный путь с именем пользователя в файле
+    // журнала — утечка, SEC-11), и проверять его можно только поймав записи.
+    // Параметры `log.initialize()` сохраняются по той же причине (SEC-05).
+    stubs.logged = [];
+    const record = (level) => (...args) => {
+        stubs.logged.push({ level, text: args.map((a) => String(a)).join(' ') });
+    };
     const logStub = {
-        initialize: logNoop,
-        info: logNoop, warn: logNoop, error: logNoop, debug: logNoop, verbose: logNoop,
+        initialize: (options) => { stubs.logInitialize = { called: true, options }; },
+        info: record('info'), warn: record('warn'), error: record('error'),
+        debug: record('debug'), verbose: record('verbose'),
         transports: { file: {}, console: {} }
     };
 
@@ -793,4 +801,134 @@ test('«Завершить» после «Нового мероприятия» 
 
     assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0);
     stopTimer(stubs);
+});
+
+// --- Безопасность главного процесса (ПСИ 2026-09-25) -----------------------
+
+test('SEC-11: в журнал уходит ИМЯ файла отчёта, а не полный путь', async () => {
+    // Полный путь сохранения — это почти всегда домашний каталог, то есть имя
+    // учётной записи пользователя (`/Users/<имя>/…`, `C:\Users\<имя>\…`).
+    // Файл журнала прикладывают к обращениям в поддержку и собирают сканером
+    // на ПСИ — утечка личных данных туда недопустима. Для разбора достаточно
+    // имени файла и числа строк: где он лежит, человек знает сам.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'export-log-'));
+    const target = path.join(dir, 'отчёт-журнал.csv');
+    const stubs = createStubs();
+    stubs.electron.dialog = {
+        showSaveDialog: async () => ({ canceled: false, filePath: target })
+    };
+    loadMain(stubs);
+    openDisplay(stubs);
+    try {
+        stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+        await new Promise((r) => setTimeout(r, 120));
+        assert.ok(fs.existsSync(target), 'выгрузка обязана пройти — иначе проверять нечего');
+
+        const exportLines = stubs.logged.filter((l) => l.text.includes('[export]'));
+        assert.ok(exportLines.length > 0, 'запись о выгрузке в журнале обязана остаться');
+        for (const line of stubs.logged) {
+            assert.ok(!line.text.includes(dir), `в журнал ушёл полный путь: ${line.text}`);
+        }
+        assert.ok(
+            exportLines.some((l) => l.text.includes('отчёт-журнал.csv')),
+            'имя файла в журнале обязано остаться — по нему запись и находят'
+        );
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('SEC-05: electron-log не вешает свой preload в окна', () => {
+    // `log.initialize()` без параметров регистрирует ВТОРОЙ preload в каждой
+    // сессии: он кладёт в окно `window.__electronLog` и открывает канал
+    // `__ELECTRON_LOG__` мимо белого списка preload.js. Рендерерам он не нужен:
+    // их консоль и так доходит до журнала через `console-message`
+    // (bindRenderConsole).
+    const stubs = createStubs();
+    loadMain(stubs);
+    assert.ok(stubs.logInitialize && stubs.logInitialize.called, 'log.initialize обязан вызываться');
+    assert.ok(stubs.logInitialize.options, 'log.initialize вызван без параметров — preload включён по умолчанию');
+    assert.equal(stubs.logInitialize.options.preload, false, 'preload electron-log обязан быть выключен');
+});
+
+// Грузит main «собранным» приложением с заданными ключами командной строки.
+// process.exit подменяется ИСКЛЮЧЕНИЕМ: настоящий выход не даёт исполниться
+// ни строке после себя, и подставка обязана вести себя так же — иначе тест
+// «ничего не создано» проверял бы продолжение, которого в жизни нет.
+function loadPackagedWith(switches) {
+    const stubs = createStubs();
+    const exits = [];
+    stubs.electron.app.isPackaged = true;
+    stubs.electron.app.exit = (code) => { exits.push(['app.exit', code]); };
+    stubs.electron.app.commandLine = {
+        appendSwitch: () => {},
+        hasSwitch: (name) => switches.includes(name)
+    };
+    const EXIT = new Error('process.exit');
+    const realExit = process.exit;
+    process.exit = (code) => { exits.push(['process.exit', code]); throw EXIT; };
+    let threw = null;
+    try {
+        loadMain(stubs);
+    } catch (err) {
+        threw = err;
+    } finally {
+        process.exit = realExit;
+    }
+    if (threw && threw !== EXIT) { throw threw; }
+    return { stubs, exits };
+}
+
+for (const sw of ['remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk']) {
+    test(`SEC-04: собранное приложение с --${sw} выходит до первого окна`, () => {
+        // Ключ отладки открывает DevTools-протокол: через него исполняется
+        // любой код в любом окне — мимо sandbox, CSP и белого списка IPC.
+        // Гард devTools в окнах тут не помогает: протокол живёт в Chromium.
+        const { stubs, exits } = loadPackagedWith([sw]);
+        assert.deepEqual(exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
+        assert.equal(stubs.created.length, 0, 'окно создано до выхода');
+        assert.equal(stubs.ipcHandlers.size, 0, 'IPC зарегистрирован до выхода — main продолжил работу');
+    });
+}
+
+test('SEC-04: без ключей отладки собранное приложение стартует', () => {
+    const { stubs, exits } = loadPackagedWith([]);
+    assert.deepEqual(exits, [], 'выход без ключа отладки — гард срабатывает не на то');
+    assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
+});
+
+test('SEC-04: в разработке ключ отладки разрешён (им пользуется Playwright)', () => {
+    // e2e поднимает НЕсобранное приложение с --remote-debugging-port — так
+    // Playwright к нему и подключается. Гард обязан смотреть на isPackaged.
+    const stubs = createStubs();
+    stubs.electron.app.commandLine = {
+        appendSwitch: () => {},
+        hasSwitch: (name) => name === 'remote-debugging-port'
+    };
+    let exited = false;
+    stubs.electron.app.exit = () => { exited = true; };
+    loadMain(stubs);
+    assert.equal(exited, false);
+    assert.ok(stubs.ipcHandlers.has('timer-command'));
+});
+
+test('SEC-11: и ошибка записи не приносит в журнал полный путь', async () => {
+    // Сообщение fs содержит путь целиком («ENOENT: …, open '/Users/<имя>/…'»),
+    // и `log.error(err)` уносил бы его в файл журнала мимо первой правки.
+    const stubs = createStubs();
+    const secretDir = path.join(os.tmpdir(), 'нет-такого-каталога-sec11', 'имя-пользователя');
+    stubs.electron.dialog = {
+        showSaveDialog: async () => ({ canceled: false, filePath: path.join(secretDir, 'отчёт.csv') })
+    };
+    loadMain(stubs);
+    openDisplay(stubs);
+
+    stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+    await new Promise((r) => setTimeout(r, 120));
+
+    assert.equal(stubs.lastSent('event-export-done').ok, false, 'запись обязана провалиться');
+    assert.ok(stubs.logged.some((l) => l.text.includes('[export]')), 'провал обязан остаться в журнале');
+    for (const line of stubs.logged) {
+        assert.ok(!line.text.includes('имя-пользователя'), `в журнал ушёл полный путь: ${line.text}`);
+    }
 });
