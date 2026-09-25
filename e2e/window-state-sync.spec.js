@@ -88,3 +88,42 @@ test('панель управления после перезагрузки ре
 
     await app.close();
 });
+
+// Состояние таймера глазами панели: просим снимок и ловим ответ.
+async function timerStateOf(control) {
+    return control.evaluate(() => new Promise((resolve) => {
+        const handler = (_e, state) => {
+            window.ipcRenderer.removeListener('timer-state', handler);
+            resolve({ isRunning: state.isRunning, isPaused: state.isPaused });
+        };
+        window.ipcRenderer.on('timer-state', handler);
+        window.ipcRenderer.send('get-timer-state');
+    }));
+}
+
+test('BUG-01: Space в часах ставит идущий таймер на паузу, а не только запускает', async () => {
+    // Часы решают «старт или пауза» по isRunning из timer-state, а его им не
+    // слали вовсе: пробел запускал таймер и больше ничего не умел.
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 300 }));
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
+        // Часы открываются ПОСЛЕ старта — проверяется и снимок при загрузке.
+        await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        await waitForClock(app);
+        const clock = await findWindow(app, 'clock');
+        expect(clock, 'часы должны открыться').not.toBeNull();
+        await expect.poll(() => timerStateOf(control)).toMatchObject({ isRunning: true });
+
+        await pressCode(clock, 'Space');
+        await expect.poll(() => timerStateOf(control), {
+            message: 'Space в часах обязан поставить идущий таймер на паузу'
+        }).toMatchObject({ isRunning: false, isPaused: true });
+
+        await pressCode(clock, 'Space');
+        await expect.poll(() => timerStateOf(control)).toMatchObject({ isRunning: true });
+    } finally {
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' })).catch(() => {});
+        await app.close();
+    }
+});

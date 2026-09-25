@@ -423,6 +423,10 @@ const timerController = createTimerController({
         safelySendToWindow(widgetWindow, 'timer-state', state);
         safelySendToWindow(displayWindow, 'timer-state', state);
         safelySendToWindow(controlWindow, 'timer-state', state);
+        // Часам состояние таймера нужно ради одной клавиши: Space решает
+        // «старт или пауза» по isRunning. Без рассылки пробел в часах только
+        // запускал и никогда не ставил на паузу (BUG-01).
+        safelySendToWindow(clockWidgetWindow, 'timer-state', state);
         // F-022: cheap path on every tick — just update the tooltip.
         // updateTrayMenu() handles Menu rebuild only when running state changes.
         if (typeof updateTrayMenu === 'function') { updateTrayMenu(); }
@@ -989,6 +993,10 @@ function createClockWidgetWindow() {
     bindRenderConsole(clockWidgetWindow, 'clock');
     bindWindowStateSnapshot(clockWidgetWindow);
     announceWindowOpened(clockWidgetWindow, 'clock-window-state', (win) => {
+        // Снимок при загрузке, как у виджета и дисплея: часы, открытые при
+        // идущем таймере, иначе считали бы его стоящим до первого тика — а
+        // на паузе тика нет вовсе (BUG-01).
+        safelySendToWindow(win, 'timer-state', timerState);
         // Настройки дисплея несут стиль часов (clockStyle) и цифры циферблата
         if (lastDisplaySettings) {
             safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);

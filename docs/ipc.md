@@ -60,7 +60,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 
 | Channel | Payload |
 |---------|---------|
-| `timer-state` | Full `timerState` object (see below) — broadcast every second |
+| `timer-state` | Full `timerState` object (see below) — broadcast every second to all four windows (clock: Space needs `isRunning`) + snapshot on load |
 | `widget-colors-update` | `{ timer, progress }` — per-window |
 | `clock-colors-update` | `{ timer, progress }` — per-window |
 | `display-colors-update` | `{ timer, progress }` — per-window |

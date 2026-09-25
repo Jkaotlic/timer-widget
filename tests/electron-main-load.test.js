@@ -60,10 +60,23 @@ function createStubs() {
             this._destroyed = false;
             // Главный кадр: проверка отправителя сравнивает с ним senderFrame и
             // берёт из него адрес страницы. Адрес ставит loadFile — как в Electron.
+            // События webContents ХРАНЯТСЯ, как и события окна: гидратация
+            // окна живёт на `did-finish-load`, и без этого «окно получило
+            // снимок при загрузке» было непроверяемо (BUG-01).
+            const wcEvents = new Map();
+            const wcOn = (event, fn) => {
+                if (!wcEvents.has(event)) { wcEvents.set(event, []); }
+                wcEvents.get(event).push(fn);
+            };
             this.webContents = {
                 mainFrame: { url: '' },
-                on: noop, once: noop,
-                send: (channel, payload) => { sent.push({ channel, payload }); },
+                on: wcOn, once: wcOn,
+                emit: (event, ...args) => {
+                    for (const fn of (wcEvents.get(event) || []).slice()) { fn(...args); }
+                },
+                // `win` — кому именно ушло: рассылка всем окнам и адресная
+                // отправка одному иначе неразличимы.
+                send: (channel, payload) => { sent.push({ channel, payload, win: this }); },
                 isDestroyed: () => this._destroyed,
                 setWindowOpenHandler: noop, setZoomFactor: noop,
                 setZoomLevel: noop, setVisualZoomLevelLimits: noop, openDevTools: noop
@@ -1186,4 +1199,31 @@ test('BUG-17: повторный клик, пока диалог открыт, �
     assert.equal(opened, 2, 'после закрытия диалога выгрузка заперлась навсегда');
     close({ canceled: true });
     await new Promise((r) => setTimeout(r, 20));
+});
+
+// --- BUG-01: часы знают, идёт ли таймер -------------------------------------
+
+test('BUG-01: часы получают timer-state — и в рассылке, и снимком при загрузке', () => {
+    // Space в часах решает «старт или пауза» по isRunning из timer-state.
+    // Часам его не слали вовсе — пробел запускал, но никогда не ставил на паузу.
+    const stubs = createStubs();
+    loadMain(stubs);
+    const cmdFromControl = (payload) => stubs.ipcHandlers.get('timer-command')(null, payload);
+    cmdFromControl({ type: 'set', seconds: 90 });
+    stubs.ipcRaw.get('open-clock-widget')(eventFrom(openControl(stubs)));
+    const clock = liveWindow(stubs, 'clock');
+    assert.ok(clock, 'часы не открылись');
+    const toClock = () => stubs.sent.filter((m) => m.win === clock && m.channel === 'timer-state');
+
+    // Снимок при загрузке: окно, открытое ПОСЛЕ старта, обязано знать состояние.
+    clock.webContents.emit('did-finish-load');
+    assert.equal(toClock().length, 1, 'часы не получили снимок состояния при загрузке');
+    assert.equal(toClock()[0].payload.remainingSeconds, 90);
+
+    // Рассылка: старт доходит до часов.
+    cmdFromControl({ type: 'start' });
+    assert.equal(toClock().at(-1).payload.isRunning, true, 'старт не дошёл до часов');
+    cmdFromControl({ type: 'pause' });
+    assert.equal(toClock().at(-1).payload.isRunning, false);
+    stopTimer(stubs);
 });
