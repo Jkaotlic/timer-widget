@@ -13,7 +13,8 @@
  *    законно расходятся после миграции старого файла (итог есть, записей нет)
  *    и при обрезке журнала. Итог — то, за что человек отвечает деньгами.
  * 2. СТОИМОСТЬ считается от секунд, а не сложением цен строк: два доклада по
- *    2 секунды при ставке «1000 за 60» стоят 1000, а не 2000. Это правило
+ *    2 секунды при ставке «1000 за 3» стоят 1000, а не 0 (сложение цен строк,
+ *    где каждая по 0). Это правило
  *    money-meter.js, и отчёт обязан ему следовать, а не заводить своё.
  */
 
@@ -210,4 +211,51 @@ test('BUG-15: идущий доклад без перелимита фильтр
 test('BUG-15: без идущего доклада настоящее расхождение по-прежнему названо', () => {
     const out = build({ overrunSeconds: 465 + 40 });
     assert.strictEqual(out.partial, true);
+});
+
+// SEC-09 (CWE-1236): ячейка, начинающаяся с = + - @ (и их полноширинных
+// двойников), табуляции или CR, Excel и LibreOffice читают как ФОРМУЛУ.
+// Название мероприятия вводит человек — а файл открывает другой человек.
+test('SEC-09: текст, похожий на формулу, обезврежен апострофом и кавычками', () => {
+    const cases = ['=1+1', '@SUM(A1)', '-2+3', '+7', '\t=1', '\r=1', '＝1', '＋1', '－1', '＠1'];
+    for (const text of cases) {
+        const cell = Report.csvCell(text);
+        assert.ok(cell.startsWith('"\''), `${JSON.stringify(text)} → ${JSON.stringify(cell)}: нет апострофа в кавычках`);
+        assert.equal(cell, `"'${text.replace(/"/g, '""')}"`);
+    }
+});
+
+test('SEC-09: название-формула в отчёте не начинается с формулы', () => {
+    const out = build({ title: '=HYPERLINK("http://example.com","x")' });
+    assert.match(out.csv, /Мероприятие;"'=HYPERLINK\(""http:\/\/example\.com"",""x""\)"/);
+});
+
+test('SEC-09: числа, которые печатает сам отчёт, не искажаются', () => {
+    // ЧИСЛО — не формула: отрицательное число остаётся числом.
+    assert.equal(Report.csvCell(-5), '-5');
+    assert.equal(Report.csvCell(3), '3');
+    // Обычный текст — без изменений.
+    assert.equal(Report.csvCell('00:02:15'), '00:02:15');
+    assert.equal(Report.csvCell('Итого'), 'Итого');
+    const out = build();
+    assert.doesNotMatch(out.csv, /'/, 'в штатном отчёте апострофов нет');
+});
+
+test('SEC-09: номер доклада с диска — не число, а текст-формула — тоже обезврежен', () => {
+    const out = build({ talks: [{ n: '=cmd', endedAt: TALKS[0].endedAt, overrunSeconds: 135 }], overrunSeconds: 135 });
+    assert.match(out.csv, /\r\n"'=cmd";/);
+});
+
+// DOC-02: пример из шапки модуля обязан быть тем, что модуль и делает.
+test('DOC-02: два доклада по 2 с при ставке «1000 за 3» стоят 1000, строки — по 0', () => {
+    const out = build({
+        talks: [
+            { n: 1, endedAt: TALKS[0].endedAt, overrunSeconds: 2 },
+            { n: 2, endedAt: TALKS[1].endedAt, overrunSeconds: 2 }
+        ],
+        overrunSeconds: 4, price: 1000, period: 3
+    });
+    assert.equal(out.totalCost, 1000);
+    // А при «1000 за 60» те же 4 секунды ещё не дотянули до ступени — 0.
+    assert.equal(build({ overrunSeconds: 4, talks: [], price: 1000, period: 60 }).totalCost, 0);
 });
