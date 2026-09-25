@@ -72,6 +72,48 @@ test('четыре окна загружаются без ошибок в кон
     }
 });
 
+test('мост каждого окна открыт по СВОЕЙ роли: своё проходит, чужое режется', async () => {
+    // preload.js берёт роль из process.argv (additionalArguments в
+    // main-windows.js). Unit-тест проверяет это на подставке; здесь — что
+    // настоящий Electron доносит аргумент до песочницы КАЖДОГО окна и окна не
+    // делят процесс с чужой ролью. Каналы берутся из таблицы, а не руками.
+    const { ROLES, RECEIVERS, SENDERS } = require('../ipc-senders');
+    const PAGE_OF = { control: 0, widget: 1, clock: 2, display: 3 };
+    const { app, control } = await launchApp();
+    try {
+        for (const role of ROLES) {
+            const w = WINDOWS[PAGE_OF[role]];
+            if (w.open) { await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open); }
+            const page = await w.get(app, control);
+            const errors = [];
+            const onConsole = (m) => { if (m.type() === 'error') { errors.push(m.text()); } };
+            page.on('console', onConsole);
+            const own = Object.keys(RECEIVERS).find((ch) => RECEIVERS[ch].includes(role));
+            const foreign = Object.keys(RECEIVERS).find((ch) => !RECEIVERS[ch].includes(role));
+            // Необратимое вне панели: мост обязан отрезать его ещё в окне.
+            const foreignSend = SENDERS['reset-and-relaunch'].includes(role) ? null : 'reset-and-relaunch';
+            await page.evaluate(({ own, foreign, foreignSend }) => {
+                const off = window.electronAPI.on(own, () => {});
+                off();
+                window.electronAPI.on(foreign, () => {});
+                if (foreignSend) { window.electronAPI.send(foreignSend); }
+            }, { own, foreign, foreignSend });
+            await page.waitForTimeout(150);
+            page.off('console', onConsole);
+            const blocked = errors.filter((t) => t.startsWith('Blocked attempt'));
+            expect(blocked.some((t) => t.includes(`channel: ${foreign} (окно ${role})`)),
+                `${role}: чужой канал ${foreign} не отрезан или роль не та:\n${errors.join('\n')}`).toBe(true);
+            expect(blocked.some((t) => t.includes(`channel: ${own} `)), `${role}: свой канал ${own} отрезан`).toBe(false);
+            if (foreignSend) {
+                expect(blocked.some((t) => t.includes(`channel: ${foreignSend} (окно ${role})`)),
+                    `${role}: ${foreignSend} прошёл через мост`).toBe(true);
+            }
+        }
+    } finally {
+        await app.close();
+    }
+});
+
 test('зонд самопроверки: падение скрипта в окне ВИДНО', async () => {
     // Раньше зонд подсовывал окну инлайновый <script> с повторным `const
     // CONFIG`. С CSP на хешах (SEC-08) такой скрипт браузер не исполняет вовсе

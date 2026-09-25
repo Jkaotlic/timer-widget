@@ -95,7 +95,10 @@ for (const target of WINDOWS) {
             // 400 % ТЕМ ЖЕ каналом, которым это делает Ctrl+колесо и ползунок
             // «Масштаб» в панели, — иначе тест проверял бы обходной путь.
             const size = target.base * 4;
-            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+            // Шлёт САМО окно: `widget-resize` мост панели не открывает, а главный
+            // процесс отвергает от неё (ipc-senders.js) — посылка из панели
+            // оставляла виджет прежнего размера, и тест проверял пустоту.
+            await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
                 { ch: target.resize, size });
             await win.waitForTimeout(700);
 
@@ -241,7 +244,7 @@ for (const target of WINDOWS) {
             await win.waitForTimeout(800);
 
             const size = target.base * 3;
-            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+            await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
                 { ch: target.resize, size });
             // Ждём дольше обычного: setBounds вызывает в рендерере resize, тот
             // пишет геометрию в localStorage, и записи надо дать случиться.
@@ -269,8 +272,11 @@ for (const target of WINDOWS) {
             // Профиль e2e ОДИН на весь прогон, поэтому спек, менявший
             // глобальное состояние, обязан его вернуть: иначе следующий файл
             // получит виджет чужого размера в чужом месте.
-            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                { ch: target.resize, size: target.base }).catch(() => {});
+            const alive = await waitForWindow(app, target.probe, { name: `окно ${target.name}`, timeout: 2000 }).catch(() => null);
+            if (alive) {
+                await alive.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+                    { ch: target.resize, size: target.base }).catch(() => {});
+            }
             await control.waitForTimeout(600).catch(() => {});
             await app.close();
         }
