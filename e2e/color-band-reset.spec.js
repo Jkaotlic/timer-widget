@@ -123,7 +123,9 @@ test('на чистом профиле выход из danger снимает В�
 });
 
 test('выбранный пользователем цвет виден в норме, но danger его перебивает', async () => {
-    await widget.evaluate((color) => {
+    // Цвета виджета шлёт ПАНЕЛЬ: главный процесс проверяет отправителя
+    // (ipc-senders.js), и посылка из самого виджета отвергается.
+    await control.evaluate((color) => {
         window.ipcRenderer.send('widget-colors-update', { timer: color, progress: color });
     }, USER_COLOR);
     await widget.waitForTimeout(400);

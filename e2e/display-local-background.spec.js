@@ -77,6 +77,11 @@ test('локальный фон: едет один раз, затемнение 
             { message: 'BUG-16: затемнение 0 % показано не нулём' }).toBe('rgba(0, 0, 0, 0)');
 
         // Набор названия: три нажатия — три посылки, и НИ ОДНОЙ с картинкой.
+        // Профиль e2e общий: поле могло остаться заполненным другой спекой,
+        // поэтому сначала пустое, и замер посылок — уже после очистки.
+        await control.locator('#eventTitleInput').fill('');
+        await control.locator('#eventTitleInput').dispatchEvent('input');
+        await expect.poll(async () => (await readDisplay(display)).title).not.toBe(null);
         const before = (await sizes()).length;
         await control.locator('#eventTitleInput').pressSequentially('Абв', { delay: 30 });
         await expect.poll(async () => (await sizes()).length - before).toBeGreaterThanOrEqual(3);

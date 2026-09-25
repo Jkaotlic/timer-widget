@@ -69,15 +69,19 @@ function metricsOf(app, urlPart) {
 for (const target of WINDOWS) {
     test(`${target.name}: после увеличения окно доезжает до верхнего края экрана`, async () => {
         const { app, control } = await launchApp();
+        // Размер и сдвиг шлёт САМО окно (Ctrl+колесо, перетаскивание): главный
+        // процесс проверяет отправителя (ipc-senders.js), и посылка из панели
+        // отвергается — как отверглась бы в приложении.
+        let win = null;
         try {
             await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await findWindow(app, target.url);
+            win = await findWindow(app, target.url);
             await win.waitForLoadState('domcontentloaded');
             await win.waitForTimeout(800);
 
             // 400 % тем же каналом, которым это делает Ctrl+колесо.
             const size = target.base * 4;
-            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+            await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
                 { ch: target.resize, size });
             await win.waitForTimeout(700);
 
@@ -86,7 +90,7 @@ for (const target of WINDOWS) {
 
             // Ровно до верхнего края экрана — тем же каналом, что и перетаскивание.
             const deltaY = before.screenBounds.y - before.bounds.y;
-            await control.evaluate(({ ch, deltaY }) => window.electronAPI.send(ch, { deltaX: 0, deltaY }),
+            await win.evaluate(({ ch, deltaY }) => window.electronAPI.send(ch, { deltaX: 0, deltaY }),
                 { ch: target.move, deltaY });
             await win.waitForTimeout(500);
 
@@ -97,8 +101,10 @@ for (const target of WINDOWS) {
                 + `(рабочая область начинается с ${after.workArea.y})`
             ).toBe(before.screenBounds.y);
         } finally {
-            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                { ch: target.resize, size: target.base }).catch(() => {});
+            if (win) {
+                await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+                    { ch: target.resize, size: target.base }).catch(() => {});
+            }
             await control.waitForTimeout(600).catch(() => {});
             await app.close();
         }
@@ -142,9 +148,9 @@ for (const target of WINDOWS) {
             const alive = await findWindow(app, target.url).catch(() => null);
             if (alive) {
                 await alive.evaluate((k) => localStorage.removeItem(k), target.storageKey).catch(() => {});
+                await alive.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
+                    { ch: target.resize, size: target.base }).catch(() => {});
             }
-            await control.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                { ch: target.resize, size: target.base }).catch(() => {});
             await control.waitForTimeout(600).catch(() => {});
             await app.close();
         }
