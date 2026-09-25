@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Timer Widget</title>
     <link rel="stylesheet" href="fonts.css">
@@ -26,7 +26,7 @@
 
     <div class="widget-container" id="widgetContainer">
         <!-- Фоновое изображение (для режима local/image) -->
-        <div class="widget-bg-image" id="widgetBgImage" style="display: none;">
+        <div class="widget-bg-image" id="widgetBgImage">
             <img id="widgetBgImg" src="" alt="">
             <div class="widget-bg-overlay" id="widgetBgOverlay"></div>
         </div>
@@ -98,7 +98,7 @@
             <div class="widget-flip-content" id="widgetFlipContent">
                 <div class="widget-flip-minus" id="wFlipMinus"><span class="widget-flip-minus-sign">−</span></div>
                 <!-- Группа часов (скрыта по умолчанию) -->
-                <div class="widget-flip-group widget-flip-hours" id="wFlipHoursGroup" style="display: none;">
+                <div class="widget-flip-group widget-flip-hours" id="wFlipHoursGroup">
                     <div class="widget-flip-card" id="wFlipHr1">
                         <div class="widget-flip-inner">
                             <span class="widget-flip-digit">0</span>
@@ -110,7 +110,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="widget-flip-separator widget-flip-hours-sep" id="wFlipHoursSep" style="display: none;">:</div>
+                <div class="widget-flip-separator widget-flip-hours-sep" id="wFlipHoursSep">:</div>
                 <!-- Группа минут -->
                 <div class="widget-flip-group">
                     <div class="widget-flip-card" id="wFlipMin1">
@@ -146,18 +146,18 @@
             <div class="widget-analog-content">
                 <div class="widget-analog-clock">
                     <!-- Деления -->
-                    <div class="widget-clock-tick quarter" style="transform: rotate(0deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(30deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(60deg);"></div>
-                    <div class="widget-clock-tick quarter" style="transform: rotate(90deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(120deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(150deg);"></div>
-                    <div class="widget-clock-tick quarter" style="transform: rotate(180deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(210deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(240deg);"></div>
-                    <div class="widget-clock-tick quarter" style="transform: rotate(270deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(300deg);"></div>
-                    <div class="widget-clock-tick" style="transform: rotate(330deg);"></div>
+                    <div class="widget-clock-tick quarter"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick quarter"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick quarter"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick quarter"></div>
+                    <div class="widget-clock-tick"></div>
+                    <div class="widget-clock-tick"></div>
                     
                     <!-- Цифры (скрыты по умолчанию) -->
                     <div class="widget-clock-numbers" id="widgetClockNumbers">

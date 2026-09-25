@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление Таймером</title>
     <link rel="stylesheet" href="fonts.css">
@@ -246,7 +246,7 @@
                              вместо попапа — ещё один слой поверх и так слоёного Esc
                              в этом окне это лишний способ его сломать. id — на
                              РЕАЛЬНОЙ обёртке контрола (см. урок #clockStyleRow). -->
-                        <div class="setting-block" id="widgetDigitsFontRow" style="display: none;">
+                        <div class="setting-block" id="widgetDigitsFontRow">
                             <span class="toggle-label">Шрифт цифр</span>
                             <div class="font-select" id="widgetDigitsFont" role="listbox"
                                  aria-label="Шрифт цифр виджета" data-value="inter"></div>
@@ -310,7 +310,7 @@
                         <div class="settings-group-title">
                             <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2h2.3L8 3.5v9L4.8 9.8H2.5z"/><path d="M10.8 6a2.8 2.8 0 0 1 0 4"/></svg></span>
                             Звуки
-                            <label class="toggle-switch" style="margin-left: auto;">
+                            <label class="toggle-switch">
                                 <input type="checkbox" id="soundMasterEnabled" checked aria-label="Все звуки">
                                 <span class="toggle-slider"></span>
                             </label>
@@ -461,7 +461,7 @@
                                 </div>
                             </div>
                             <!-- Видна только при «Цифрах» — см. #widgetDigitsFontRow выше. -->
-                            <div class="setting-block" id="clockDigitsFontRow" style="display: none;">
+                            <div class="setting-block" id="clockDigitsFontRow">
                                 <span class="toggle-label">Шрифт цифр</span>
                                 <div class="font-select" id="clockDigitsFont" role="listbox"
                                      aria-label="Шрифт цифр часов" data-value="inter"></div>
@@ -483,7 +483,7 @@
                                     <span class="toggle-slider"></span>
                                 </label>
                             </div>
-                            <div class="toggle-row" id="clockAnalogNumbersRow" style="display: none;">
+                            <div class="toggle-row" id="clockAnalogNumbersRow">
                                 <label class="toggle-label" for="clockShowAnalogNumbers">Цифры на циферблате</label>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="clockShowAnalogNumbers">
@@ -584,7 +584,7 @@
                                 </div>
                             </div>
                             <!-- Видна только при «Цифрах» — см. #widgetDigitsFontRow выше. -->
-                            <div class="setting-block" id="displayDigitsFontRow" style="display: none;">
+                            <div class="setting-block" id="displayDigitsFontRow">
                                 <span class="toggle-label">Шрифт цифр</span>
                                 <div class="font-select" id="displayDigitsFont" role="listbox"
                                      aria-label="Шрифт цифр дисплея" data-value="inter"></div>
@@ -772,7 +772,7 @@
                                             <span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10.5V2.8"/><path d="M5.2 5.6 8 2.8l2.8 2.8"/><path d="M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/></svg></span>
                                             <span class="text">Нажмите для выбора изображения</span>
                                         </div>
-                                        <img id="localBgImage" style="display: none;">
+                                        <img id="localBgImage">
                                         <div class="local-bg-actions">
                                             <button class="local-bg-action-btn change" id="changeBgBtn" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 7A5.2 5.2 0 0 0 4 4.4"/><path d="M2.8 9A5.2 5.2 0 0 0 12 11.6"/><path d="M3.6 1.8v2.8h2.8"/><path d="M12.4 14.2v-2.8H9.6"/></svg></button>
                                             <button class="local-bg-action-btn delete" id="deleteBgBtn" title="Удалить" aria-label="Удалить">✕</button>
@@ -780,12 +780,12 @@
                                     </div>
                                     <input type="file" class="hidden-file-input" id="bgFileInput"
                                            accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,.jpg,.jpeg,.png,.gif,.webp,.bmp">
-                                    <div class="bg-fit-options" id="bgFitOptions" style="display: none;">
+                                    <div class="bg-fit-options" id="bgFitOptions">
                                         <button class="bg-fit-btn active" data-fit="cover">Заполнить</button>
                                         <button class="bg-fit-btn" data-fit="contain">Вписать</button>
                                         <button class="bg-fit-btn" data-fit="tile">Плитка</button>
                                     </div>
-                                    <div class="bg-overlay-row" id="bgOverlayRow" style="display: none;">
+                                    <div class="bg-overlay-row" id="bgOverlayRow">
                                         <label>Затемнение:</label>
                                         <input type="range" id="bgOverlaySlider" min="0" max="80" value="30" aria-label="Прозрачность тёмного слоя фона">
                                         <span class="bg-overlay-value" id="bgOverlayValue">30%</span>

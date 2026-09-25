@@ -857,3 +857,24 @@
             outline: none;
             box-shadow: var(--tw-focus-ring);
         }
+
+        /* ---- Бывшие style="…" разметки (CSP `style-src 'self'`, 25.09.2026) ---- */
+
+        /* Угол деления — из его места среди соседей: sibling-index() (1-based).
+           До 25.09.2026 угол стоял в разметке, style="transform: rotate(…)" на каждом
+           делении, и строгая CSP (`style-src 'self'`) такой атрибут не применяет.
+           Условие: деления — ПЕРВЫЕ дети своего контейнера, подряд; элемент, вставленный
+           перед ними, сдвинет все углы. Углы меряет e2e/csp-strict.spec.js. */
+        .widget-analog-clock > .widget-analog-tick {
+            transform: rotate(calc((sibling-index() - 1) * 30deg));
+        }
+
+        /* Начальное «скрыто» шильдиков даты. Показывает и прячет их
+           updateDateTimezoneVisibility() инлайном через CSSOM ('block'/'none'),
+           который выигрывает у этого правила. У #analogDateBadge начального
+           «скрыто» не было и нет. */
+        #dateBadge,
+        #flipDateBadge,
+        #digitsDateBadge {
+            display: none;
+        }

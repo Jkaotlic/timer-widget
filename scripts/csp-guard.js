@@ -23,7 +23,8 @@
  *   - атрибута style="…";
  *   - обработчиков on*="…" (onclick и т.п. — это тоже инлайновый скрипт);
  *   - ссылок javascript: в href/src/action/formaction.
- * и что meta несёт ровно POLICY. В рантайме то же держит e2e
+ * что скрипты окон не рождают того же в рантайме (findInlineInScript) и что
+ * meta несёт ровно POLICY. В рантайме то же держит e2e
  * (windows-load-clean: ноль событий securitypolicyviolation).
  *
  * Разметку разбирает маленький сканер, а не регулярка по всему файлу:
@@ -57,7 +58,7 @@ const WINDOW_HTML = Object.freeze([
 const POLICY = [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self'",
     "img-src 'self' data:",
     "media-src 'self' data:",
     "font-src 'self' data:",
@@ -69,8 +70,8 @@ const POLICY = [
     "worker-src 'none'"
 ].join('; ');
 
-// Какие виды инлайна запрещены. Стили — следующим шагом того же прохода.
-const FORBIDDEN = Object.freeze(new Set(['inline-script', 'handler', 'javascript-url']));
+// Все виды инлайна запрещены: политика не пускает ни один из них.
+const FORBIDDEN = Object.freeze(new Set(['inline-script', 'style-element', 'style-attr', 'handler', 'javascript-url']));
 
 const META_RE = /(<meta http-equiv="Content-Security-Policy" content=")([^"]*)(">)/;
 
@@ -128,6 +129,51 @@ function findInline(html) {
     return out;
 }
 
+// Формы, которые строгая политика блокирует В РАНТАЙМЕ, — их рождает скрипт,
+// а не разметка, и сканер HTML их не видит:
+//   - style="…" и on*="…" внутри HTML-строки (шаблон для innerHTML и т.п.);
+//   - setAttribute('style' | 'on…', …) — тот же атрибут, выставленный руками;
+//   - <style>, собранный через createElement('style');
+//   - eval / new Function / строка в setTimeout — script-src без 'unsafe-eval'.
+// CSSOM (el.style.x = …, setProperty, cssText) политика НЕ трогает — это
+// разрешённый способ, и сканер его не ищет.
+const SCRIPT_RULES = Object.freeze([
+    ['style-attr', /<[a-zA-Z][\w:-]*\b[^<>]*\sstyle\s*=/],
+    ['handler', /<[a-zA-Z][\w:-]*\b[^<>]*\son[a-z]+\s*=/],
+    ['style-attr', /\.setAttribute\(\s*['"`]style['"`]/],
+    ['handler', /\.setAttribute\(\s*['"`]on[a-z]+['"`]/],
+    ['style-element', /createElement(?:NS)?\([^)]*['"`]style['"`]\s*\)/],
+    ['eval', /(?<![\w.$])eval\s*\(|\bnew\s+Function\s*\(|\bset(?:Timeout|Interval)\(\s*['"`]/]
+]);
+
+// Комментарии срезаются: пояснение «здесь был style="…"» нарушением не является.
+function stripComments(code) {
+    return code
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+        .replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+}
+
+/** Нарушения в JS: [{ kind, line, text }]. */
+function findInlineInScript(code) {
+    const out = [];
+    stripComments(code).split('\n').forEach((line, idx) => {
+        for (const [kind, re] of SCRIPT_RULES) {
+            if (re.test(line)) { out.push({ kind, line: idx + 1, text: line.trim().slice(0, 120) }); }
+        }
+    });
+    return out;
+}
+
+// Все скрипты, которые исполняются в окнах: <script src> четырёх страниц.
+function windowScripts() {
+    const files = new Set();
+    for (const file of WINDOW_HTML) {
+        const html = fs.readFileSync(path.join(ROOT, file), 'utf8');
+        for (const m of html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) { files.add(m[1]); }
+    }
+    return [...files];
+}
+
 function readPolicy(html) {
     const m = META_RE.exec(html);
     return m ? m[2] : null;
@@ -171,6 +217,14 @@ function main(argv) {
             console.error(`[csp-guard] ${file}:${p.line}  ${p.kind}  ${p.text}`);
         }
     }
+    for (const file of windowScripts()) {
+        const problems = findInlineInScript(fs.readFileSync(path.join(ROOT, file), 'utf8'));
+        if (problems.length === 0) { continue; }
+        bad++;
+        for (const p of problems) {
+            console.error(`[csp-guard] ${file}:${p.line}  ${p.kind}  ${p.text}`);
+        }
+    }
     if (bad) {
         console.error('\nИнлайн в окне браузер откажется исполнять или применять (CSP без \'unsafe-inline\').');
         console.error('Код — в файл окна (*-app.js), стиль — в его .css, состояние — классом.');
@@ -179,7 +233,9 @@ function main(argv) {
     }
 }
 
-module.exports = { WINDOW_HTML, POLICY, FORBIDDEN, findInline, readPolicy, checkHtml, rewriteHtml };
+module.exports = {
+    WINDOW_HTML, POLICY, FORBIDDEN, findInline, findInlineInScript, windowScripts, readPolicy, checkHtml, rewriteHtml
+};
 
 if (require.main === module) {
     main(process.argv.slice(2));

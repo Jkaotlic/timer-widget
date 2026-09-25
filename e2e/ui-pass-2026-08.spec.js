@@ -77,7 +77,9 @@ test('деления циферблата виджета стоят на одн�
     const m = await widget.evaluate(() => {
         // Деление на 3 часах (rotate(90deg)) и центр циферблата обязаны
         // совпадать по вертикали.
-        const q = document.querySelector('.widget-clock-tick.quarter[style*="90deg"]');
+        // Четвёртое деление: угол из места среди соседей (widget.css), а не
+        // из атрибута style — его строгая CSP не применяет.
+        const q = document.querySelectorAll('.widget-analog-clock > .widget-clock-tick')[3];
         const c = document.getElementById('widgetClockCenter');
         const qr = q.getBoundingClientRect();
         const cr = c.getBoundingClientRect();

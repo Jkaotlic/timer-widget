@@ -20,10 +20,11 @@ const { openDisplay, waitForWidget, waitForClock } = require('./window-ready');
  * зелёный означал бы и «ошибок нет», и «мы их не видим».
  */
 
-// `alive` — глобал, который ставит ИНЛАЙНОВЫЙ скрипт окна (у дисплея —
-// display-script.js, у него инлайновые только тема и подписка). С CSP на хешах
-// (SEC-08) блок с неверным хешем браузер не исполняет — и окно остаётся
-// разметкой без логики, а в консоли появляется «Refused to execute inline
+// `alive` — глобал, который ставит код страницы окна (control-app.js,
+// widget-app.js, clock-widget-app.js; у дисплея — display-script.js). До
+// 25.09.2026 это были инлайновые блоки под CSP на хешах; теперь CSP — `script-src
+// 'self'`, и инлайн, вернувшийся в разметку, браузер не исполнит — окно останется
+// разметкой без логики, а в консоли появится «Refused to execute inline
 // script». Первое ловит `alive`, второе — наблюдатель консоли.
 const WINDOWS = [
     { name: 'панель', get: async (app, control) => control, alive: 'timerController' },
@@ -48,12 +49,12 @@ test('четыре окна загружаются без ошибок в кон
             const page = await w.get(app, control);
             if (page !== control) { watch(page, w.name); }
             await page.waitForTimeout(200);
-            expect(await page.evaluate((g) => typeof window[g], w.alive), `${w.name}: инлайновый скрипт не исполнился`)
+            expect(await page.evaluate((g) => typeof window[g], w.alive), `${w.name}: код страницы окна не исполнился`)
                 .toBe('object');
-            // Первый инлайновый блок (<head>) ставит тему — свидетель того,
-            // что и его хеш принят.
+            // theme-init(-tone).js в <head> ставит тему — свидетель того, что
+            // и он исполнился до первого кадра.
             expect(await page.evaluate(() => document.documentElement.getAttribute('data-theme')),
-                `${w.name}: инлайновый скрипт в <head> не исполнился`).not.toBeNull();
+                `${w.name}: скрипт темы в <head> не исполнился`).not.toBeNull();
             if (w.drop) {
                 expect(await page.evaluate(() => typeof window.DropGuard), `${w.name}: drop-guard.js не загружен`)
                     .toBe('object');
@@ -116,7 +117,7 @@ test('мост каждого окна открыт по СВОЕЙ роли: с
 
 test('зонд самопроверки: падение скрипта в окне ВИДНО', async () => {
     // Раньше зонд подсовывал окну инлайновый <script> с повторным `const
-    // CONFIG`. С CSP на хешах (SEC-08) такой скрипт браузер не исполняет вовсе
+    // CONFIG`. Под CSP без 'unsafe-inline' (SEC-08) такой скрипт не исполняется
     // — поэтому падение здесь рождается в самой странице, из таймера: это тот
     // же путь «необработанное исключение в окне», которым падает и сломанный
     // модуль.
@@ -136,9 +137,10 @@ test('зонд самопроверки: падение скрипта в окн
 
 test('CSP не пускает внедрённый инлайновый скрипт', async () => {
     // Свидетель того, что политика ДЕЙСТВУЕТ, а не просто записана в meta:
-    // без 'unsafe-inline' скрипт, которого нет в списке хешей, не исполняется,
-    // и Chromium называет причину в консоли. Будь CSP сломана (опечатка в meta
-    // отбрасывает директиву целиком), глобал бы появился.
+    // `script-src 'self'` не пускает ни один инлайновый скрипт, и Chromium
+    // называет причину в консоли. Будь CSP сломана (опечатка в meta отбрасывает
+    // директиву целиком), глобал бы появился. То же для стиля: `style-src
+    // 'self'` не применяет внедрённый <style>.
     const { app, control } = await launchApp();
     const consoleErrors = [];
     control.on('console', (m) => { if (m.type() === 'error') { consoleErrors.push(m.text()); } });
@@ -147,10 +149,15 @@ test('CSP не пускает внедрённый инлайновый скри
             const s = document.createElement('script');
             s.textContent = 'window.__cspProbe = 1;';
             document.head.appendChild(s);
+            const st = document.createElement('style');
+            st.textContent = ':root { --csp-probe: 1; }';
+            document.head.appendChild(st);
         });
         await control.waitForTimeout(300);
         expect(await control.evaluate(() => typeof window.__cspProbe), 'внедрённый скрипт исполнился — CSP не действует')
             .toBe('undefined');
+        expect(await control.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--csp-probe')),
+            'внедрённый <style> применился — style-src не действует').toBe('');
         expect(consoleErrors.some((t) => /Content Security Policy/i.test(t)),
             `отказ CSP не виден в консоли:\n${consoleErrors.join('\n')}`).toBe(true);
     } finally {

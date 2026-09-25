@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clock Widget</title>
     <link rel="stylesheet" href="fonts.css">
@@ -87,7 +87,7 @@
                 <div class="time-display" id="timeDisplay">00:00</div>
                 <!-- Оба шильдика в одной колонке — см. .center-badges в стилях -->
                 <div class="center-badges">
-                    <div class="date-badge" id="dateBadge" style="display: none;"></div>
+                    <div class="date-badge" id="dateBadge"></div>
                     <div class="timezone-badge" id="timezoneBadge"></div>
                 </div>
             </div>
@@ -143,7 +143,7 @@
                 </div>
                 <!-- Дата и часовой пояс -->
                 <div class="widget-flip-info" id="widgetFlipInfo">
-                    <div class="date-badge" id="flipDateBadge" style="display: none;"></div>
+                    <div class="date-badge" id="flipDateBadge"></div>
                     <div class="timezone-badge" id="flipTimezoneBadge"></div>
                 </div>
             </div>
@@ -154,18 +154,18 @@
             <div class="widget-analog-content">
                 <div class="widget-analog-clock">
                     <!-- Деления -->
-                    <div class="widget-analog-tick quarter" style="transform: rotate(0deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(30deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(60deg);"></div>
-                <div class="widget-analog-tick quarter" style="transform: rotate(90deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(120deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(150deg);"></div>
-                <div class="widget-analog-tick quarter" style="transform: rotate(180deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(210deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(240deg);"></div>
-                <div class="widget-analog-tick quarter" style="transform: rotate(270deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(300deg);"></div>
-                <div class="widget-analog-tick" style="transform: rotate(330deg);"></div>
+                    <div class="widget-analog-tick quarter"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick quarter"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick quarter"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick quarter"></div>
+                <div class="widget-analog-tick"></div>
+                <div class="widget-analog-tick"></div>
                 
                 <!-- Цифры (скрыты по умолчанию) -->
                 <div class="widget-analog-numbers" id="clockAnalogNumbers">
@@ -207,7 +207,7 @@
             <!-- Дата и пояс переехали сюда из стиля LED вместе с самим стилем:
                  тумблеры «Дата» и «Часовой пояс» обязаны работать и здесь,
                  иначе объединённый стиль обещал бы то, чего не делает. -->
-            <div class="date-badge" id="digitsDateBadge" style="display: none;"></div>
+            <div class="date-badge" id="digitsDateBadge"></div>
             <div class="timezone-badge" id="digitsTimezoneBadge"></div>
         </div>
     </div>

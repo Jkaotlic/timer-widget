@@ -33,12 +33,12 @@ function measure() {
     const flip = document.getElementById('widgetFlip');
     const seps = Array.from(document.querySelectorAll('.widget-flip-separator'))
         // Скрытый разделитель часов участвует в замере только когда показан.
-        .filter((el) => el.style.display !== 'none');
+        .filter((el) => getComputedStyle(el).display !== 'none');
     const card = document.querySelector('.widget-flip-card');
 
     return {
         hasHoursClass: !!flip && flip.classList.contains('has-hours'),
-        hoursGroupShown: document.getElementById('wFlipHoursGroup').style.display !== 'none',
+        hoursGroupShown: getComputedStyle(document.getElementById('wFlipHoursGroup')).display !== 'none',
         separators: seps.map((el) => ({
             text: el.textContent.trim(),
             fontSizePx: parseFloat(getComputedStyle(el).fontSize),

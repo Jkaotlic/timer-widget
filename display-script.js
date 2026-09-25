@@ -2652,11 +2652,12 @@ class DisplayTimer {
             this.flipMinus.classList.toggle('visible', isNegative);
         }
 
-        // Показываем/скрываем часы
+        // Показываем/скрываем часы. Состояние — КЛАСС на #timerFlip, а не
+        // инлайн: скрыты часы и без скрипта (правило в display.css), поэтому
+        // в разметке нет style="display:none", который строгая CSP не пустит.
         const showHours = cells.hasHours;
+        if (this.timerFlip) { this.timerFlip.classList.toggle('has-hours', showHours); }
         if (this.flipHoursUnit && this.flipHoursSep) {
-            this.flipHoursUnit.style.display = showHours ? '' : 'none';
-            this.flipHoursSep.style.display = showHours ? '' : 'none';
             if (showHours && this.flipHr1 && this.flipHr2) {
                 this.updateFlipCard(this.flipHr1, cells.h1, 'hr1');
                 this.updateFlipCard(this.flipHr2, cells.h2, 'hr2');

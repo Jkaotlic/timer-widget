@@ -135,3 +135,49 @@ test('POLICY: только файлы — ни хешей, ни unsafe-*, зак
         assert.deepEqual(d[name], ["'self'", 'data:'], `${name}`);
     }
 });
+
+// Рантайм: то, что рождает скрипт. Каждое правило — с примером, который обязан
+// ловиться, и с соседом, который ловиться НЕ должен (CSSOM политика пускает).
+const SCRIPT_CASES = [
+    ["el.innerHTML = '<div style=\"x\">';", 'style-attr'],
+    ['o.innerHTML = `\n  <span class="a" style="color:red">`;', 'style-attr'],
+    ["el.insertAdjacentHTML('beforeend', '<b onclick=\"go()\">');", 'handler'],
+    ["el.setAttribute('style', 'color:red');", 'style-attr'],
+    ['el.setAttribute("onclick", "go()");', 'handler'],
+    ["const s = document.createElement('style');", 'style-element'],
+    ["document.createElementNS(NS, 'style')", 'style-element'],
+    ["eval('1');", 'eval'],
+    ["const f = new Function('return 1');", 'eval'],
+    ["setTimeout('go()', 10);", 'eval']
+];
+
+test('сканер скриптов ловит рантайм-инлайн и не трогает CSSOM', () => {
+    for (const [code, kind] of SCRIPT_CASES) {
+        assert.deepEqual(csp.findInlineInScript(code).map((p) => p.kind), [kind], `не пойман ${kind}: ${code}`);
+    }
+    const allowed = [
+        "el.style.display = 'none';",
+        "el.style.setProperty('--x', '1px');",
+        "el.style.cssText = 'color: red';",
+        "el.setAttribute('data-style', 'x');",
+        "el.classList.toggle('style', on);",
+        'setTimeout(() => go(), 10);',
+        'obj.eval(1); retrieval(2);',
+        '// здесь был <div style="x"> — пояснение, а не код',
+        '/* <b onclick="x"> */',
+        "if (a < b && c.style) { d.style = e; }"
+    ].join('\n');
+    assert.deepEqual(csp.findInlineInScript(allowed), []);
+});
+
+test('скрипты окон не рождают инлайна, который политика заблокирует', () => {
+    const scripts = csp.windowScripts();
+    // Список не пустой и содержит код страниц — иначе «чисто» было бы про ничто.
+    for (const f of ['control-app.js', 'widget-app.js', 'clock-widget-app.js', 'display-script.js', 'ui-feedback.js']) {
+        assert.ok(scripts.includes(f), `${f} не среди скриптов окон`);
+    }
+    for (const file of scripts) {
+        const found = csp.findInlineInScript(read(file));
+        assert.deepEqual(found.map((p) => `${p.line} ${p.kind} ${p.text}`), [], `${file}: инлайн в рантайме`);
+    }
+});

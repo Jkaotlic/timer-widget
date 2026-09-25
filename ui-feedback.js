@@ -27,7 +27,7 @@ const LoadingIndicator = {
             ? window.SecurityUtils.escapeHTML(message) 
             : message.replace(/[&<>"'/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'})[c]);
         overlay.innerHTML = `
-            <div style="text-align: center;">
+            <div class="loading-box">
                 <div class="loading-spinner"></div>
                 <div class="loading-text">${safeMessage}</div>
             </div>

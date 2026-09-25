@@ -149,7 +149,11 @@
                 const containerWidth = this.container.offsetWidth;
                 const containerHeight = this.container.offsetHeight;
                 
-                const hasHours = this.wFlipHoursGroup && this.wFlipHoursGroup.style.display !== 'none';
+                // Признак — класс has-hours, который ставит тот же updateFlip, что
+                // показывает группу часов. Не инлайн style.display: до первого
+                // тика его нет вовсе (скрыто правилом widget.css), и '' читалось
+                // бы как «часы показаны».
+                const hasHours = !!this.widgetFlip && this.widgetFlip.classList.contains('has-hours');
 
                 // Масштаб для flip (базовая ширина с запасом для возможного знака минуса:
                 // карточка минуса 25px + margin 4px ≈ 30px + буфер)

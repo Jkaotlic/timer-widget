@@ -1006,3 +1006,23 @@
                !important, порядок внутри @media значения не имеет. */
             .widget-hint { animation-duration: 4s !important; }
         }
+
+        /* ---- Бывшие style="…" разметки (CSP `style-src 'self'`, 25.09.2026) ---- */
+
+        /* Угол деления — из его места среди соседей: sibling-index() (1-based).
+           До 25.09.2026 угол стоял в разметке, style="transform: rotate(…)" на каждом
+           делении, и строгая CSP (`style-src 'self'`) такой атрибут не применяет.
+           Условие: деления — ПЕРВЫЕ дети своего контейнера, подряд; элемент, вставленный
+           перед ними, сдвинет все углы. Углы меряет e2e/csp-strict.spec.js. */
+        .widget-analog-clock > .widget-clock-tick {
+            transform: rotate(calc((sibling-index() - 1) * 30deg));
+        }
+
+        /* Начальное «скрыто». Показывает скрипт — инлайном через CSSOM
+           (el.style.display = 'flex'), который политика не трогает и который
+           выигрывает у этого правила; прячет он же, записью 'none'. */
+        #widgetBgImage,
+        #wFlipHoursGroup,
+        #wFlipHoursSep {
+            display: none;
+        }

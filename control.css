@@ -3499,6 +3499,12 @@ select optgroup,
     z-index: 9999;
 }
 
+/* Колонка «спиннер + подпись». Была style="text-align: center" в шаблоне
+   ui-feedback.js — строгая CSP такой атрибут в innerHTML не применяет. */
+.loading-box {
+    text-align: center;
+}
+
 .loading-spinner {
     width: 48px;
     height: 48px;
@@ -5171,4 +5177,25 @@ body.compact-panel-2 .transport-main {
 .event-status.is-finished::before {
     background: transparent;
     box-shadow: inset 0 0 0 1.5px var(--tw-fg-dim);
+}
+
+/* ---- Бывшие style="…" разметки (CSP `style-src 'self'`, 25.09.2026) ----
+   Строгая политика не применяет атрибут style, поэтому начальное «скрыто»
+   живёт здесь. Показывают и прячут эти ряды скрипты (panel-state.js,
+   control-app.js, local-background.js) инлайном через CSSOM —
+   el.style.display = 'flex' | 'block' | 'none', — который политика не трогает
+   и который выигрывает у этого правила. */
+#widgetDigitsFontRow,
+#clockDigitsFontRow,
+#displayDigitsFontRow,
+#clockAnalogNumbersRow,
+#localBgImage,
+#bgFitOptions,
+#bgOverlayRow {
+    display: none;
+}
+
+/* Мастер-тумблер «Звуки» прижат к правому краю заголовка группы. */
+.settings-group-title > .toggle-switch {
+    margin-left: auto;
 }

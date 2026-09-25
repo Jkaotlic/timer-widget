@@ -574,6 +574,12 @@ body.style-analog .info-block .mini-tick.quarter {
     top: 3px;
     transform-origin: center 47px;
 }
+/* Угол мини-деления — тем же приёмом, что у .clock-tick (см. ниже). Сдвиг
+   translateX(-50%) — часть того же transform, как и было в разметке. Правило
+   вне body.style-analog: так же безусловно стоял и прежний style="…". */
+.mini-clock > .mini-tick {
+    transform: translateX(-50%) rotate(calc((sibling-index() - 1) * 30deg));
+}
 
 /* ============================================================
    CIRCLE TIMER — the hero ring
@@ -955,6 +961,16 @@ body.flash-mode { animation: flash-bg 0.3s; }
    вдобавок единственное из трёх окон, куда правило «разделитель это точки»
    так и не дошло: тест, который его закреплял, находит окно по
    `#wFlipHoursGroup` и меряет ровно виджет таймера. */
+/* Часовая группа флипа скрыта, пока часов нет: состояние — класс has-hours
+   на #timerFlip (ставит updateFlipDisplay). Показанная группа получает свой
+   обычный display из правил ниже — ровно то, что давало прежнее
+   style.display = ''. До 25.09.2026 начальное «скрыто» было атрибутом
+   style="display:none", который строгая CSP не применяет. */
+.timer-flip:not(.has-hours) > #flipHoursUnit,
+.timer-flip:not(.has-hours) > #flipHoursSep {
+    display: none;
+}
+
 .flip-separator {
     font-size: 0;
     line-height: 1;
@@ -1159,6 +1175,15 @@ body.flash-mode { animation: flash-bg 0.3s; }
     width: 4px; height: 28px;
     background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
     top: 4%;
+}
+
+/* Угол деления — из его места среди соседей: sibling-index() (1-based).
+   До 25.09.2026 угол стоял в разметке, style="transform: rotate(…)" на каждом
+   делении, и строгая CSP (`style-src 'self'`) такой атрибут не применяет.
+   Условие: деления — ПЕРВЫЕ дети своего контейнера, подряд; элемент, вставленный
+   перед ними, сдвинет все углы. Углы меряет e2e/csp-strict.spec.js. */
+.clock-face > .clock-tick {
+    transform: rotate(calc((sibling-index() - 1) * 6deg));
 }
 
 .clock-numbers {
