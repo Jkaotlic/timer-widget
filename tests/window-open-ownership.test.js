@@ -25,13 +25,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { functionBody, ipcHandlerBody } = require('./helpers/source-scan');
+const { readMainSource } = require('./helpers/main-source');
 
-const repoRoot = path.join(__dirname, '..');
-const source = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+// Главный процесс целиком: create-функции и обработчики каналов живут в
+// разных модулях, а утверждения здесь — о связи между ними.
+const source = readMainSource();
 
 const WINDOWS = [
     {

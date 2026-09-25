@@ -2,11 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
-const repoRoot = path.join(__dirname, '..');
-const source = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+// Главный процесс целиком: точка входа и её модули main-*.js.
+const { readMainSource } = require('./helpers/main-source');
+const source = readMainSource();
 
 test('IPC handlers do not destructure renderer payloads in parameters', () => {
     const unsafeHandlers = [
@@ -83,9 +82,9 @@ test('свёртывание в полосу снимает пол минима�
     // Возврат пола обязателен: без него окно можно было бы растянуть мышью в
     // панель высотой 52 и получить обрезанную раскладку — ровно тот дефект,
     // который чинила задача про минимальную высоту.
-    const src = codeOnly(source);
-    const handler = /ipcMain\.on\('control-collapse'[\s\S]*?\n\}\);/.exec(src);
-    assert.ok(handler, 'обработчика control-collapse нет');
+    // Тело вырезается балансировкой скобок, а не поиском `\n});`: обработчик
+    // живёт внутри функции регистрации модуля, и отступ у него другой.
+    const handler = [codeOnly(ipcHandlerBody(source, 'control-collapse'))];
 
     assert.match(
         handler[0],

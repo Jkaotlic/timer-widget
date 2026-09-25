@@ -18,11 +18,14 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { codeOnly, ipcHandlerBody } = require('./helpers/source-scan');
+const { codeOnly, ipcHandlerBody, functionBody, balancedBlockAt } = require('./helpers/source-scan');
+const { readMainSource } = require('./helpers/main-source');
 
 const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
 
-const MAIN = codeOnly(read('electron-main.js'));
+// Главный процесс целиком — точка входа и модули main-*.js: накопитель,
+// окна и каналы живут в разных файлах.
+const MAIN = codeOnly(readMainSource());
 const VALIDATOR = read('channel-validator.js');
 const PRELOAD = read('preload.js');
 
@@ -51,9 +54,12 @@ test('состояние накопителя снимается окну на �
     // Правило проекта: окно, загруженное вторым, обязано узнать текущее
     // состояние. Рассылка на изменение этого не даёт — изменения может не
     // случиться до самого мероприятия.
-    const at = MAIN.indexOf("announceWindowOpened(displayWindow");
+    // Гидратация — колбэк announceWindowOpened внутри createDisplayWindow,
+    // вырезанный балансировкой скобок, а не «2500 символов после вызова».
+    const create = functionBody(MAIN, 'createDisplayWindow');
+    const at = create.indexOf('announceWindowOpened(');
     assert.ok(at > 0, 'не найдена гидратация окна дисплея');
-    const hydrate = MAIN.slice(at, at + 2500);
+    const hydrate = balancedBlockAt(create, at, 'гидратация дисплея');
     assert.ok(hydrate.includes("'event-overrun-state'"),
         'дисплей при открытии не получает накопитель');
 
@@ -410,9 +416,7 @@ test('payload накопителя собирается в ОДНОМ месте
 });
 
 test('накопитель едет и в панель: она показывает состояние мероприятия', () => {
-    const at = MAIN.indexOf('function broadcastEventOverrun');
-    assert.ok(at > 0, 'не найдена рассылка накопителя');
-    const body = MAIN.slice(at, MAIN.indexOf('\n}', at));
+    const body = functionBody(MAIN, 'broadcastEventOverrun');
     assert.ok(/displayWindow/.test(body) && /controlWindow/.test(body),
         'у накопителя по-прежнему один адресат — панели нечем отчитаться');
 });
@@ -421,9 +425,7 @@ test('панель получает накопитель на ЗАГРУЗКЕ, 
     // Панель, открытая посреди мероприятия (или перезагруженная
     // краш-обработчиком), обязана узнать, идёт оно или заморожено: изменения
     // может не случиться до самого конца.
-    const at = MAIN.indexOf('function createControlWindow');
-    assert.ok(at > 0, 'не найдена функция создания панели');
-    const body = MAIN.slice(at, MAIN.indexOf('\nfunction createWidgetWindow', at));
+    const body = functionBody(MAIN, 'createControlWindow');
     assert.ok(body.includes("'event-overrun-state'"),
         'панель при открытии не получает состояние мероприятия');
     // Само-проверка зонда: срез обязан покрывать привязки окна.
@@ -513,7 +515,7 @@ test('панель строит тумблер фильтра и шлёт его
 test('главный процесс берёт фильтр из настроек дисплея, а не из просьбы о выгрузке', () => {
     // У просьбы payload нет намеренно: всё, что нужно отчёту, главный процесс
     // уже знает. Фильтр — такая же настройка, как ставка.
-    const body = codeOnly(ipcHandlerBody(read('electron-main.js'), 'event-export'));
+    const body = codeOnly(ipcHandlerBody(readMainSource(), 'event-export'));
     assert.match(body, /onlyOverruns:\s*settings\.reportOnlyOverruns\s*===\s*true/,
         'отчёт собирается без фильтра');
 });

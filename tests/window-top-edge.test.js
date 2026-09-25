@@ -19,12 +19,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const { functionBody, codeOnly } = require('./helpers/source-scan');
 
-const repoRoot = path.join(__dirname, '..');
-const source = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+const { readMainSource } = require('./helpers/main-source');
+
+const source = readMainSource();
 
 const CREATORS = [
     { fn: 'createWidgetWindow', name: 'виджет' },

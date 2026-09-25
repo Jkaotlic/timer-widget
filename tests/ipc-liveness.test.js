@@ -61,8 +61,10 @@ const RENDERER_FILES = [
     'ipc-compat.js'
 ];
 
-// Сторона главного процесса: сам процесс и модули, из которых он шлёт события.
-const MAIN_FILES = ['electron-main.js', 'timer-controller.js', 'timer-engine.js', 'recovery.js'];
+// Сторона главного процесса: точка входа, её модули main-*.js и чистые
+// модули, из которых он шлёт события.
+const { mainProcessFiles, readMainSource } = require('./helpers/main-source');
+const MAIN_FILES = [...mainProcessFiles(), 'timer-controller.js', 'timer-engine.js', 'recovery.js'];
 
 const rendererSrc = RENDERER_FILES.map((f) => `\n/* ${f} */\n` + read(f)).join('\n');
 const mainSrc = MAIN_FILES.map((f) => `\n/* ${f} */\n` + read(f)).join('\n');
@@ -173,7 +175,7 @@ test('панель показывает, что время восстановл�
     assert.match(control, /removeListener\('timer-recovery-available'/);
 
     // И отправка на месте — иначе тест выше зелёный, а сообщать нечего.
-    assert.match(read('electron-main.js'), /safelySendToWindow\(controlWindow, 'timer-recovery-available'/);
+    assert.match(readMainSource(), /safelySendToWindow\(controlWindow, 'timer-recovery-available'/);
 });
 
 test('прозрачность часов больше не читается из ключа, которого никто не пишет', () => {
@@ -192,7 +194,7 @@ test('двусторонний IPC не открыт, пока принимаю�
     //
     // Инвариант двусторонний: если `ipcMain.handle` когда-нибудь появится,
     // `invoke` придётся вернуть — и тест об этом скажет.
-    const main = codeOnly(read('electron-main.js'));
+    const main = codeOnly(readMainSource());
     const preload = codeOnly(read('preload.js'));
 
     const hasHandlers = /ipcMain\.handle\(/.test(main);

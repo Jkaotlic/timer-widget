@@ -11,7 +11,7 @@
  *  3. окно, которое ШЛЁТ канал, но не записано в строку, — клавиша, которая
  *     перестала работать, и ни один unit-тест этого не увидит.
  *
- * Поведение на настоящем electron-main.js — в tests/electron-main-load.test.js.
+ * Поведение на настоящем главном процессе — в tests/electron-main-load.test.js.
  */
 
 const test = require('node:test');
@@ -58,8 +58,10 @@ function sentBy(role) {
     return out;
 }
 
+// Каналы главного процесса ЦЕЛИКОМ: обработчики зарегистрированы в модулях
+// main-*.js, и чтение одной точки входа не нашло бы ни одного.
 function mainChannels() {
-    const src = codeOnly(read('electron-main.js'));
+    const src = codeOnly(require('./helpers/main-source').readMainSource());
     return [...src.matchAll(/ipcMain\.(?:on|handle)\(\s*['"`]([^'"`]+)['"`]/g)].map((m) => m[1]);
 }
 

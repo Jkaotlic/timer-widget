@@ -181,7 +181,7 @@ test('мусорный отчёт отвергается и ничего не п
 });
 
 test('источники отчёта совпадают с теми, что пропускает главный процесс', () => {
-    const main = read('electron-main.js');
+    const main = require('./helpers/main-source').readMainSource();
     const allowed = main.match(/const SCALE_REPORT_SOURCES = new Set\(\[([^\]]+)\]\)/);
     assert.ok(allowed, 'в главном процессе не найден список источников');
     const fromMain = allowed[1].match(/'([^']+)'/g).map((s) => s.replace(/'/g, '')).sort();

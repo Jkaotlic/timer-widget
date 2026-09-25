@@ -97,7 +97,7 @@ test('канал ui-lock-update объявлен в ОБА конца и рас�
     assert.equal((validator.match(/'ui-lock-update'/g) || []).length, 2, 'канала нет в обоих списках валидатора');
     assert.equal((preload.match(/'ui-lock-update'/g) || []).length, 2, 'канала нет в обоих списках preload');
 
-    const main = codeOnly(read('electron-main.js'));
+    const main = codeOnly(require('./helpers/main-source').readMainSource());
     assert.match(main, /ipcMain\.on\('ui-lock-update'/, 'главный процесс не принимает канал');
     // Рассылка ВСЕМ четырём окнам, как у темы: замок общий для приложения.
     const relay = main.slice(main.indexOf("ipcMain.on('ui-lock-update'"));

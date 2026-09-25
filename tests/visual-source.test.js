@@ -19,6 +19,7 @@ const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
 // Реализация ОДНА на весь набор тестов: копий было три, и они разошлись.
 const { codeOnly } = require('./helpers/source-scan');
 const readCode = (file) => codeOnly(read(file));
+const { readMainSource } = require('./helpers/main-source');
 
 // Стили окна управления живут в отдельном control.css (вынесены из inline-<style>),
 // но проверки ниже описывают ОДНО окно как оно поставляется. Поэтому склеиваем
@@ -111,7 +112,8 @@ test('колонка панели при открытом ящике счита�
     // панели 1200 против левого края ящика 864.
     const controlHtml = readCode('electron-control.html');
     const constants = readCode('constants.js');
-    const main = readCode('electron-main.js');
+    // Главный процесс целиком: конструктор панели живёт в модуле окон.
+    const main = codeOnly(readMainSource());
 
     assert.match(constants, /CONTROL_WINDOW_MAX_WIDTH:\s*\d+/, 'потолок ширины не объявлен в CONFIG');
     // Потолок обязан быть ОДИН на главный процесс и панель, иначе они разъедутся.

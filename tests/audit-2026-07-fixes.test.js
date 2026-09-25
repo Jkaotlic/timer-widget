@@ -27,7 +27,8 @@ const readRaw = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
 // и раньше должны были идти по коду, а не по пояснениям к нему.
 // Реализация ОДНА на весь набор тестов: копий было три, и они разошлись —
 // две вырезали <!-- -->, третья нет.
-const { codeOnly } = require('./helpers/source-scan');
+const { codeOnly, functionBody, ipcHandlerBody } = require('./helpers/source-scan');
+const { readMainSource } = require('./helpers/main-source');
 const read = (file) => codeOnly(readRaw(file));
 
 // Стили окна управления живут в отдельном control.css (вынесены из inline-<style>),
@@ -46,7 +47,8 @@ const controlHtml = readControlSource();
 const widgetHtml = read('electron-widget.html');
 const clockHtml = read('electron-clock-widget.html');
 const displayScript = read('display-script.js');
-const mainSource = read('electron-main.js');
+// Главный процесс целиком — точка входа и модули main-*.js.
+const mainSource = readMainSource();
 
 // ---------------------------------------------------------------------------
 // Звук
@@ -306,8 +308,9 @@ test('сохранённая позиция восстанавливается �
     // восстановлено x = 3190). Поэтому здесь обязан быть setBounds через
     // fitRestoredBounds с порогом видимости, а не setPosition с сырой точкой и
     // не безусловная укладка целиком.
-    const body = mainSource.match(/function positionWindowClamped\(win, payload\) \{[\s\S]*?\n\}/);
-    assert.ok(body, 'тело positionWindowClamped не найдено');
+    // Балансировкой скобок: помощник живёт в фабрике модуля, и «первая `\n}`»
+    // была бы концом фабрики, а не функции.
+    const body = [functionBody(mainSource, 'positionWindowClamped')];
     assert.match(body[0], /win\.setBounds\(fitRestoredBounds\(/);
     assert.match(body[0], /WINDOW_MIN_VISIBLE_PX/,
         'порог видимости обязан участвовать, иначе правило снова «всё или ничего»');
@@ -630,8 +633,7 @@ test('канал report-scale объявлен в обоих вайтлиста�
 
 test('главный процесс валидирует источник и шлёт отчёт ТОЛЬКО в панель', () => {
     assert.match(mainSource, /SCALE_REPORT_SOURCES = new Set\(\['widget', 'clock', 'display', 'display-blocks'\]\)/);
-    const handler = mainSource.match(/ipcMain\.on\('report-scale',[\s\S]*?\n\}\);/);
-    assert.ok(handler, 'обработчик report-scale должен существовать');
+    const handler = [ipcHandlerBody(mainSource, 'report-scale')];
     assert.match(handler[0], /if \(!SCALE_REPORT_SOURCES\.has\(source\)\) \{ return; \}/);
     assert.match(handler[0], /Number\.isFinite\(scalePct\)/);
     // Широковещание вернуло бы значение отправителю и могло закольцеваться.

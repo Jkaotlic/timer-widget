@@ -129,10 +129,10 @@ test('канал темы есть в обоих списках и в обе с�
 });
 
 test('главный процесс рассылает тему во все окна и проверяет значение', () => {
-    const main = read('electron-main.js');
-    const handler = /ipcMain\.on\('ui-theme-update'[\s\S]*?\n\}\);/.exec(main);
-    assert.ok(handler, 'в главном процессе нет обработчика ui-theme-update');
-    const body = handler[0];
+    // Главный процесс целиком; тело — балансировкой скобок, а не до `\n});`:
+    // обработчик регистрируется внутри функции модуля.
+    const main = require('./helpers/main-source').readMainSource();
+    const body = require('./helpers/source-scan').ipcHandlerBody(main, 'ui-theme-update');
     assert.match(body, /isPayloadObject\(payload\)/, 'payload не проверяется на объект');
     assert.match(body, /UI_THEME_VALUES\.has\(theme\)/, 'значение темы не проверяется по белому списку');
     for (const win of ['controlWindow', 'widgetWindow', 'displayWindow', 'clockWidgetWindow']) {

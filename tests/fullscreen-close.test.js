@@ -23,19 +23,20 @@
  * первой строчки. Он не проявлялся в CI, потому что там один headless-экран, а
  * в живой работе это «закрыл дисплей клавишей D посреди доклада».
  *
- * Проверка source-level: обработчики живут в electron-main.js и в Node не
+ * Проверка source-level: обработчики живут в главном процессе и в Node не
  * импортируются. Утверждается И наличие правильного поведения, И отсутствие
  * старого — голый `.close()` на полноэкранном окне.
  */
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 
-const { codeOnly } = require('./helpers/source-scan');
+const { codeOnly, functionBody } = require('./helpers/source-scan');
+const { readMainSource } = require('./helpers/main-source');
 
-const MAIN = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'electron-main.js'), 'utf8'));
+// Главный процесс ЦЕЛИКОМ: проверка отсутствия голого `.close()` по одному
+// файлу стала бы зелёной, как только окно дисплея переехало в модуль.
+const MAIN = codeOnly(readMainSource());
 
 test('окно дисплея по-прежнему открывается полноэкранным', () => {
     // Само-проверка предпосылки: если бы окно перестало быть полноэкранным,
@@ -61,8 +62,9 @@ test('закрытие дисплея идёт через ОДНОГО помо�
 });
 
 test('помощник выходит из полноэкранного и ЖДЁТ события, а не паузы', () => {
-    const at = MAIN.indexOf('function closeDisplayWindow(');
-    const body = MAIN.slice(at, MAIN.indexOf('\n}', at));
+    // Балансировкой скобок: функция может жить внутри фабрики модуля, где
+    // «первая `\n}` после объявления» — уже конец фабрики.
+    const body = functionBody(MAIN, 'closeDisplayWindow');
 
     assert.match(body, /isFullScreen\(\)/,
         'помощник не спрашивает, полноэкранное ли окно');

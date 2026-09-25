@@ -71,9 +71,8 @@ test('размеры виджета по умолчанию имеют ЧИТА�
     // рендерере делает окно КВАДРАТНЫМ, и первое же масштабирование навсегда
     // превращало высоту в 250. Та же болезнь, что была у CONFIG.STORAGE_KEYS:
     // реестр без точки доступа не ломается, он тихо гниёт.
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const source = fs.readFileSync(path.join(__dirname, '..', 'electron-main.js'), 'utf8');
+    // Главный процесс целиком: конструктор окна живёт в модуле, а не в точке входа.
+    const source = require('./helpers/main-source').readMainSource();
 
     assert.match(source, /width:\s*CONFIG\.WIDGET_DEFAULT_WIDTH/,
         'конструктор окна виджета обязан читать CONFIG.WIDGET_DEFAULT_WIDTH');

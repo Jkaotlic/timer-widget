@@ -33,6 +33,8 @@ const {
     flatten,
     checkPacked,
     checkHardening,
+    mainProcessPaths,
+    readPackedMainSource,
     expectedFuseWire,
     fuseProblems,
     readFuseWire,
@@ -427,4 +429,31 @@ test('исполняемый файл находится по раскладке
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
+});
+
+test('ворота читают ВЕСЬ главный процесс из пакета, а не одну точку входа', () => {
+    // С 25.09.2026 окна создаются в модуле main-windows.js. Ворота по одному
+    // electron-main.js насчитали бы ноль окон — и либо упали бы на
+    // корректной сборке, либо (будь проверка «окон нет — нечего проверять»)
+    // пропустили бы окно без гарда в модуле.
+    const packed = ['electron-main.js', 'main-windows.js', 'main-timer.js', 'utils.js', 'fonts/main-x.js'];
+    assert.deepEqual(mainProcessPaths(packed), ['electron-main.js', 'main-timer.js', 'main-windows.js']);
+
+    const files = {
+        'electron-main.js': "require('./main-windows');",
+        'main-windows.js': "new BrowserWindow({ webPreferences: { devTools: true } });",
+        'main-timer.js': '',
+        'utils.js': "new BrowserWindow({ webPreferences: { sandbox: false } });"
+    };
+    const read = (f) => (f in files ? files[f] : null);
+    const src = readPackedMainSource(read, packed);
+    // Окно без гарда в МОДУЛЕ ловится…
+    assert.ok(checkHardening(src).some((p) => /режим разработчика/.test(p)),
+        'окно без гарда в модуле прошло ворота');
+    // …а посторонний файл в главный процесс не подмешивается.
+    assert.ok(!src.includes('sandbox: false'), 'в главный процесс попал не его файл');
+
+    // Нет точки входа — нет и проверки: null, и ворота падают.
+    assert.equal(readPackedMainSource(() => null, packed), null);
+    assert.equal(checkHardening(readPackedMainSource(() => null, packed)).length, 1);
 });

@@ -38,7 +38,12 @@ const { codeOnly } = require('./helpers/source-scan');
 const ROOT = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const PKG = JSON.parse(read('package.json'));
-const MAIN = read('electron-main.js');
+// Главный процесс ЦЕЛИКОМ — точка входа и её модули main-*.js. Проверки
+// отсутствия по одной точке входа были бы зелёными просто потому, что окна
+// создаются в другом файле.
+const { mainProcessFiles, readMainSource } = require('./helpers/main-source');
+const MAIN_FILES = mainProcessFiles();
+const MAIN = readMainSource();
 // Проверки ОТСУТСТВИЯ обязаны идти по коду: пояснение вида
 // «nodeIntegration: true здесь запрещён» уронило бы ворота релиза на самом
 // комментарии, который объясняет запрет (CLAUDE.md, Gotchas).
@@ -101,7 +106,7 @@ function matchingBrace(source, open) {
     return -1;
 }
 
-// Разбивает electron-main.js на блоки настроек окон: от `new BrowserWindow({`
+// Разбивает исходник главного процесса на блоки настроек окон: от `new BrowserWindow({`
 // до скобки, которая этот объект ЗАКРЫВАЕТ.
 //
 // Границу задаёт баланс скобок, а не отступ. Прежняя версия искала конец как
@@ -213,7 +218,7 @@ test('единственный внешний адрес уходит тольк
     // загрузило бы страницу В ОКНО приложения, мимо CSP и мимо изоляции), ни в
     // fetch/XMLHttpRequest (это и была бы та сетевая активность, которой здесь
     // быть не должно).
-    const main = read('electron-main.js');
+    const main = MAIN;
     assert.ok(main.includes(RELEASES_URL), 'адрес страницы релизов исчез из main — кнопка перестала работать?');
 
     assert.match(
@@ -265,7 +270,7 @@ test('в поставляемых файлах нет внешних сетев�
             // подпёрто отдельной проверкой ниже: адрес обязан уходить ТОЛЬКО в
             // shell.openExternal. Широкое «разрешим https в main» превратило бы
             // гейт в декорацию.
-            if (file === 'electron-main.js' && hit === RELEASES_URL) { continue; }
+            if (MAIN_FILES.includes(file) && hit === RELEASES_URL) { continue; }
             offenders.push(`${file}: ${hit}`);
         }
     }

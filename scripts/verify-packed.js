@@ -111,6 +111,39 @@ function readAsarFile(asarPath, header, relPath) {
     }
 }
 
+// Файлы главного процесса в пакете: точка входа и её модули `main-*.js` в
+// корне архива. С 25.09.2026 главный процесс разбит на модули, и окна создаются
+// уже не в electron-main.js: ворота по одной точке входа насчитали бы ноль
+// окон. Шаблон имени тот же, что в tests/helpers/main-source.js.
+const MAIN_ENTRY = 'electron-main.js';
+const MAIN_MODULE_RE = /^main-[a-z0-9-]+\.js$/;
+
+function mainProcessPaths(packedPaths) {
+    const modules = [...packedPaths].filter((p) => MAIN_MODULE_RE.test(p)).sort();
+    return [MAIN_ENTRY, ...modules];
+}
+
+/**
+ * Исходник главного процесса из пакета одной строкой, или null, если в пакете
+ * нет точки входа (тогда ворота обязаны упасть, а не «проверить пустоту»).
+ * Модуль, требуемый точкой входа, но не упакованный, ловит checkPacked ниже.
+ *
+ * @param {(p: string) => string|null} read — содержимое файла из архива
+ * @param {Iterable<string>} packedPaths
+ */
+function readPackedMainSource(read, packedPaths) {
+    const parts = [];
+    for (const file of mainProcessPaths(packedPaths)) {
+        const src = read(file);
+        if (src === null) {
+            if (file === MAIN_ENTRY) { return null; }
+            continue;
+        }
+        parts.push(`\n/* ${file} */\n${src}`);
+    }
+    return parts.join('\n');
+}
+
 // Ворота релиза, проверяемые НА УПАКОВАННОМ артефакте, а не на исходниках.
 // Unit-тесты читают файлы репозитория; здесь проверяется то, что реально уехало
 // в сборку — между этими двумя состояниями стоит electron-builder со своими
@@ -291,7 +324,11 @@ async function main() {
 
     // Ворота релиза на самом артефакте: режим разработчика закрыт, окна
     // изолированы, самообновления нет.
-    const hardening = checkHardening(readAsarFile(asarPath, header, 'electron-main.js'));
+    const mainFiles = mainProcessPaths(packed);
+    console.log(`[verify-packed] главный процесс: ${mainFiles.length} файл(ов)`);
+    const hardening = checkHardening(
+        readPackedMainSource((file) => readAsarFile(asarPath, header, file), packed)
+    );
     if (hardening.length) {
         console.error('\n[verify-packed] СБОРКА НЕ ПРОШЛА ВОРОТА');
         for (const p of hardening) { console.error(`  ${p}`); }
@@ -345,6 +382,8 @@ module.exports = {
     flatten,
     checkPacked,
     checkHardening,
+    mainProcessPaths,
+    readPackedMainSource,
     findAsar,
     countRepoFilesUnder,
     expectedFuseWire,

@@ -303,13 +303,19 @@ function loadMain(stubs) {
         return originalLoad.call(this, request, parent, isMain);
     };
 
-    const mainPath = require.resolve(path.join(repoRoot, 'electron-main.js'));
-    delete require.cache[mainPath];
+    // Точка входа И её модули main-*.js загружаются заново на каждый тест.
+    // Модули главного процесса electron не требуют (зависимости им передаёт
+    // точка входа), так что закэшированный модуль и так не держал бы чужую
+    // подставку; сброс — страховка на случай, если это правило нарушат.
+    const { mainProcessFiles } = require('./helpers/main-source');
+    const mainPaths = mainProcessFiles().map((f) => require.resolve(path.join(repoRoot, f)));
+    const mainPath = mainPaths[0];
+    for (const p of mainPaths) { delete require.cache[p]; }
     try {
         require(mainPath);
     } finally {
         Module._load = originalLoad;
-        delete require.cache[mainPath];
+        for (const p of mainPaths) { delete require.cache[p]; }
         if (savedRunAsNode !== undefined) {
             process.env.ELECTRON_RUN_AS_NODE = savedRunAsNode;
         }

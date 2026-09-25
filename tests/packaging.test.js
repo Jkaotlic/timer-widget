@@ -16,6 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { mainProcessFiles, readMainSource } = require('./helpers/main-source');
 
 const repoRoot = path.join(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
@@ -91,7 +92,7 @@ test('runtime app icon (build/icon.png) ships via extraResources', () => {
     // packaged. That only works if electron-builder copies build/icon.png into the
     // resources dir via `extraResources`. Guard against the icon silently
     // disappearing from the packaged app (blank tray/window icon).
-    const mainSrc = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+    const mainSrc = readMainSource();
     if (!/process\.resourcesPath/.test(mainSrc)) {
         return; // icon not resolved from resources — nothing to guard here
     }
@@ -108,7 +109,7 @@ test('runtime app icon (build/icon.png) ships via extraResources', () => {
 
 test('every local require() in main-process JS is listed in package.json build.files', () => {
     const mainJsFiles = [
-        'electron-main.js',
+        ...mainProcessFiles(),
         'preload.js',
         'recovery.js',
         'timer-engine.js',
@@ -175,7 +176,10 @@ test('каждый модуль, который требует главный п
     //
     // Ловится только упаковкой: `npm start` и все тесты читают файлы прямо из
     // каталога проекта.
-    const mainSrc = fs.readFileSync(path.join(repoRoot, 'electron-main.js'), 'utf8');
+    //
+    // Обход ТРАНЗИТИВНЫЙ, от точки входа: с 25.09.2026 главный процесс разбит
+    // на модули main-*.js, и чистые модули требует уже не electron-main.js, а
+    // они. Чтение одной точки входа нашло бы только модули main-*.js.
     const missing = [];
     const seen = new Set();
 
@@ -186,20 +190,30 @@ test('каждый модуль, который требует главный п
     const DEV_ONLY_PREFIX = 'scripts/';
 
     const requireRe = /require\(\s*'\.\/([^']+)'\s*\)/g;
-    let match;
-    while ((match = requireRe.exec(mainSrc)) !== null) {
-        const name = match[1].endsWith('.js') ? match[1] : `${match[1]}.js`;
-        if (seen.has(name)) { continue; }
-        seen.add(name);
-        if (name.startsWith(DEV_ONLY_PREFIX)) { continue; }
-        if (!fs.existsSync(path.join(repoRoot, name))) {
-            missing.push(`electron-main.js требует ${name}, которого нет на диске`);
-            continue;
-        }
-        if (!isPacked(name)) {
-            missing.push(`${name} требуется главным процессом, но не перечислен в build.files`);
+    const queue = ['electron-main.js'];
+    while (queue.length) {
+        const from = queue.shift();
+        const src = fs.readFileSync(path.join(repoRoot, from), 'utf8');
+        let match;
+        while ((match = requireRe.exec(src)) !== null) {
+            const name = match[1].endsWith('.js') ? match[1] : `${match[1]}.js`;
+            if (seen.has(name)) { continue; }
+            seen.add(name);
+            if (name.startsWith(DEV_ONLY_PREFIX)) { continue; }
+            if (!fs.existsSync(path.join(repoRoot, name))) {
+                missing.push(`${from} требует ${name}, которого нет на диске`);
+                continue;
+            }
+            if (!isPacked(name)) {
+                missing.push(`${name} требуется главным процессом (из ${from}), но не перечислен в build.files`);
+            }
+            queue.push(name);
         }
     }
+    // Само-проверка обхода: без транзитивности модуль, требуемый только
+    // модулем (atomic-write — из recovery и event-overrun-store), в счёт бы
+    // не попал.
+    assert.ok(seen.has('atomic-write.js'), 'обход не транзитивный — зонд видит только точку входа');
 
     assert.ok(seen.size > 0, 'зонд не нашёл НИ ОДНОГО require — регулярка сломана, и зелёный тут ничего не значит');
     assert.deepStrictEqual(missing, [], missing.join('\n'));
