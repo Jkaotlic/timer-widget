@@ -142,6 +142,7 @@
       "event-report.js",
       "navigation-guard.js",
       "ipc-senders.js",
+      "relay-payload.js",
       "drop-guard.js",
       "settings-schema.js",
       "clock-settings-schema.js",

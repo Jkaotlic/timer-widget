@@ -55,6 +55,7 @@ const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
 const NavigationGuard = require('./navigation-guard');
 const IpcSenders = require('./ipc-senders');
+const { sanitizeRelayPayload } = require('./relay-payload');
 
 // Logger setup
 //
@@ -1616,31 +1617,51 @@ ipcMain.on('control-collapse', (_event, payload) => {
     }
 });
 
+// Проверенная копия payload канала-ретранслятора или null — «не принимать»
+// (SEC-10). Правило одно на все ретрансляторы и живёт в relay-payload.js:
+// то, что главный процесс запоминает в last* и досылает окнам при открытии,
+// обязано быть плоским объектом разумного размера. Отказ — одна запись в
+// журнал на канал: payload в журнал не идёт.
+const logRelayRejected = IpcSenders.onceLogger((line) => log.warn(line));
+function acceptRelay(channel, payload) {
+    const clean = sanitizeRelayPayload(channel, payload);
+    if (clean === null) { logRelayRejected(channel, 'payload не прошёл проверку'); }
+    return clean;
+}
+
 // Per-window color updates (independent themes)
-ipcMain.on('widget-colors-update', (_event, colors) => {
+ipcMain.on('widget-colors-update', (_event, payload) => {
+    const colors = acceptRelay('widget-colors-update', payload);
+    if (colors === null) { return; }
     lastWidgetColors = colors;
     safelySendToWindow(widgetWindow, 'widget-colors-update', colors);
     safelySendToWindow(controlWindow, 'widget-colors-update', colors);
 });
 
-ipcMain.on('clock-colors-update', (_event, colors) => {
+ipcMain.on('clock-colors-update', (_event, payload) => {
+    const colors = acceptRelay('clock-colors-update', payload);
+    if (colors === null) { return; }
     lastClockColors = colors;
     safelySendToWindow(clockWidgetWindow, 'clock-colors-update', colors);
 });
 
-ipcMain.on('display-colors-update', (_event, colors) => {
+ipcMain.on('display-colors-update', (_event, payload) => {
+    const colors = acceptRelay('display-colors-update', payload);
+    if (colors === null) { return; }
     lastDisplayColors = colors;
     safelySendToWindow(displayWindow, 'display-colors-update', colors);
 });
 
 // Widget style update (independent from display style)
-ipcMain.on('widget-style-update', (_event, settings) => {
+ipcMain.on('widget-style-update', (_event, payload) => {
+    const settings = acceptRelay('widget-style-update', payload);
+    if (settings === null) { return; }
     lastWidgetStyle = settings;
     // Пол размера окна одинаков для всех стилей: полоса была только у LED, а
     // он слит с «Цифрами». Вызов оставлен здесь, потому что окно могло быть
     // создано раньше — пол ставится ровно один раз и в одном месте.
     applyWidgetMinimumSize();
-    applyWidgetAlwaysOnTop(isPayloadObject(settings) ? settings.alwaysOnTop : undefined);
+    applyWidgetAlwaysOnTop(settings.alwaysOnTop);
     safelySendToWindow(widgetWindow, 'widget-style-update', settings);
 });
 
@@ -1678,7 +1699,9 @@ function applyWidgetMinimumSize() {
 }
 
 // Рассылка настроек отображения fullscreen и widget (clockStyle/background)
-ipcMain.on('display-settings-update', (event, settings) => {
+ipcMain.on('display-settings-update', (event, payload) => {
+    const settings = acceptRelay('display-settings-update', payload);
+    if (settings === null) { return; }
     // Сохраняем настройки для синхронизации при открытии новых окон
     lastDisplaySettings = settings;
 
@@ -1798,19 +1821,24 @@ ipcMain.on('clock-widget-set-position', (_event, payload) => {
     positionWindowClamped(clockWidgetWindow, payload);
 });
 
-ipcMain.on('clock-widget-set-style', (event, style) => {
+ipcMain.on('clock-widget-set-style', (event, payload) => {
+    const style = acceptRelay('clock-widget-set-style', payload);
+    if (style === null) { return; }
     safelySendToWindow(clockWidgetWindow, 'set-clock-style', style);
 });
 
 // Настройки виджета часов (дата, часовой пояс и т.д.)
-ipcMain.on('clock-widget-settings', (event, settings) => {
+ipcMain.on('clock-widget-settings', (event, payload) => {
+    const settings = acceptRelay('clock-widget-settings', payload);
+    if (settings === null) { return; }
     // Снимок НАКАПЛИВАЕТСЯ: панель шлёт и частичные наборы (например только
     // три тумблера из девяти), а окну, открытому позже, нужна вся картина.
     // Простое присваивание отдало бы ему последнее сообщение и стёрло всё
-    // остальное.
-    if (isPayloadObject(settings)) {
-        lastClockSettings = Object.assign({}, lastClockSettings, settings);
-    }
+    // остальное. Накопленное проверяется ещё раз: потолки ключей и размера
+    // относятся к тому, что запомнено, а не к одному сообщению.
+    const merged = sanitizeRelayPayload('clock-widget-settings',
+        Object.assign({}, lastClockSettings, settings));
+    if (merged !== null) { lastClockSettings = merged; }
     safelySendToWindow(clockWidgetWindow, 'clock-settings', settings);
 });
 

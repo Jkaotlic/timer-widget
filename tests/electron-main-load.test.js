@@ -1085,3 +1085,51 @@ test('SEC-07: reset-and-relaunch и quit-app из дисплея не испол
     stubs.ipcRaw.get('reset-and-relaunch')(eventFrom(display));
     assert.equal(quits, 0);
 });
+
+// --- SEC-10: ретрансляторы помнят только проверенное ---------------------
+
+test('SEC-10: мусорный payload настроек дисплея не запоминается и не рассылается', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+    const relayed = () => stubs.sent.filter((m) => m.channel === 'display-settings-update');
+    const before = relayed().length;
+
+    for (const bad of [null, 'строка', [1, 2], 42]) {
+        stubs.ipcHandlers.get('display-settings-update')(null, bad);
+    }
+    assert.equal(relayed().length, before, 'не-объект разослан окнам');
+
+    stubs.ipcHandlers.get('display-settings-update')(null, { bgLocalImage: 'A'.repeat(20 * 1024 * 1024) });
+    assert.equal(relayed().length, before, '20 МБ строки разосланы окнам');
+});
+
+test('SEC-10: разосланы и запомнены только примитивы; название — не длиннее 60', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+    stubs.ipcHandlers.get('display-settings-update')(null, {
+        eventTitle: 'Длинное название '.repeat(20), nested: { evil: true }, bgMode: 'solid'
+    });
+    const relayed = stubs.lastSent('display-settings-update');
+    assert.deepEqual(Object.keys(relayed).sort(), ['bgMode', 'eventTitle']);
+    assert.equal(relayed.eventTitle.length, 60);
+
+    // Запомненное — то же проверенное: новое окно часов получает его досылкой.
+    stubs.ipcHandlers.get('open-clock-widget')(null);
+    const hydrated = stubs.lastSent('display-settings-update');
+    assert.equal(hydrated.eventTitle.length, 60);
+    assert.ok(!('nested' in hydrated));
+});
+
+test('SEC-10: цвета и стиль виджета — только плоский объект', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openWidget(stubs);
+    stubs.ipcHandlers.get('widget-colors-update')(null, 'не объект');
+    assert.equal(stubs.lastSent('widget-colors-update'), null);
+    stubs.ipcHandlers.get('widget-colors-update')(null, { timer: '#fff', x: { y: 1 } });
+    assert.deepEqual(stubs.lastSent('widget-colors-update'), { timer: '#fff' });
+    stubs.ipcHandlers.get('widget-style-update')(null, [1]);
+    assert.equal(stubs.lastSent('widget-style-update'), null);
+});
