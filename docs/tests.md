@@ -84,6 +84,7 @@
 | `settings-key-ownership.test.js` | `pickOwnSetting` + wiring: display/widget read their OWN key, ticks have one owner |
 | `color-validation-single-owner.test.js` | One colour validator (`SecurityUtils.isSafeColor`); weaker copies stay gone |
 | `release-gates.test.js` | DevTools guarded on EVERY window, isolation, no external URLs, local fonts, no auto-update, CSP per window, Linux: deb only, AppArmor `userns` + SUID as fallback, `--no-sandbox` in no target; navigation guard wired; `build.electronFuses` config |
+| `security-gate.test.js` | Ворота уязвимостей (`scripts/security-gate.js`, [docs/ci.md](ci.md)): high/critical и находка без оценки блокируют, неполный отчёт OSV — провал; `sbom.json` = lockfile; пустой SBOM артефакта — провал; версия Electron из бинаря, последний патч линии |
 | `verify-packed.test.js` (фьюзы) | SEC-03: читалка фьюзов из `scripts/verify-packed.js` — индексы из `@electron/fuses`, удалённый/отсутствующий фьюз — провал, живой неперевёрнутый бинарь Electron отвергается; поиск исполняемого файла по раскладке mac/win/linux |
 | `csp-hash.test.js` | SEC-08: CSP окон без `'unsafe-inline'` в script-src — хеши совпадают с инлайновыми блоками (эталон из спецификации CSP, CRLF, комментарии), закрыты base/form/frame/worker/connect; самопроверка «правка без пересчёта видна» |
 | `navigation-guard.test.js` | SEC-06: навигация окна — только на четыре свои страницы (хеш/query не мешают, `%2e%2e` не обходит); `window.open` и `<webview>` — отказ на каждом событии |
