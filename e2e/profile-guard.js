@@ -16,11 +16,11 @@
  *   - на ПЕРВОМ запуске в тесте снимается localStorage (все окна живут на
  *     одном origin app://timer-widget/, хранилище у них общее) — это «было»;
  *   - на КАЖДОМ `app.close()` (обёртка в launchApp) профиль сверяется с «было».
- *     Разница печатается с именем теста и ВОЗВРАЩАЕТСЯ: сначала закрывается
- *     дисплей (он дописывает места карточек из памяти на каждом изменении
- *     размера, в том числе при выходе из полноэкранного), потом «было»
- *     записывается обратно, и сверка повторяется. Чистый тест идёт своим
- *     обычным путём выхода — окна ему никто не закрывает;
+ *     Перед сверкой закрывается дисплей (он дописывает места карточек из
+ *     памяти на каждом изменении размера, в том числе при выходе из
+ *     полноэкранного — см. closeDisplayFirst). Разница печатается с именем
+ *     теста и ВОЗВРАЩАЕТСЯ: «было» записывается обратно, и сверка
+ *     повторяется;
  *   - что вернуть НЕ удалось, пишется в журнал на диске под именем теста;
  *   - на первом запуске СЛЕДУЮЩЕГО теста «было» сверяется с последним
  *     «стало»: так видно дописанное окном уже на выходе и оставленное убитым
@@ -230,11 +230,7 @@ async function snapshot(app) {
 async function restore(app, baseline) {
     const control = controlPage(app);
     if (!control) { return snapshot(app); }
-    // Дисплей держит места карточек в памяти и пишет их на каждом изменении
-    // размера — запись поверх открытого дисплея он бы перетёр на выходе.
-    const { waitForDisplayGone } = require('./window-ready');
-    await control.evaluate(() => window.ipcRenderer.send('close-display')).catch(() => {});
-    await waitForDisplayGone(app, { timeout: 10000 }).catch(() => {});
+    await closeDisplayFirst(app);
     let after = null;
     for (let attempt = 0; attempt < 3; attempt++) {
         await control.evaluate(([base, volatile]) => {
@@ -253,6 +249,26 @@ async function restore(app, baseline) {
         if (after && diffProfiles(baseline, after).length === 0) { break; }
     }
     return after;
+}
+
+/**
+ * Закрыть дисплей ДО сверки. Он держит места карточек в памяти и пишет их на
+ * каждом изменении размера — в том числе на выходе приложения, когда
+ * покидает полноэкранный режим. Спека, убравшая `displayBlockPositions` при
+ * открытом дисплее, получала ключ обратно уже после закрытия (прогон
+ * 26.09.2026: сдвинутая подпись из display-blocks уронила следующими
+ * display-timer-drag и display-timer-scale). Цена: выход приложения с
+ * открытым полноэкранным дисплеем в e2e больше не идёт мимоходом — закрытие
+ * полноэкранного окна проверяет каналом close-display сам дисплей и
+ * window-reopen-race.
+ */
+async function closeDisplayFirst(app) {
+    const control = controlPage(app);
+    if (!control) { return; }
+    const { findDisplay, waitForDisplayGone } = require('./window-ready');
+    if (!(await findDisplay(app))) { return; }
+    await control.evaluate(() => window.ipcRenderer.send('close-display')).catch(() => {});
+    await waitForDisplayGone(app, { timeout: 15000 }).catch(() => {});
 }
 
 const baselines = new Map();
@@ -291,6 +307,7 @@ async function watch(app, opts = {}) {
     app.close = async () => {
         try {
             const before = baselines.get(owner.id);
+            if (before && !opts.keepProfile) { await closeDisplayFirst(app); }
             let after = before ? await snapshot(app) : null;
             if (before && after) {
                 const ledger = readLedger();
