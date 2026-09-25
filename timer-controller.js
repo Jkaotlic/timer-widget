@@ -308,6 +308,17 @@ function createTimerController(deps = {}) {
         if (Number.isFinite(slept) && slept > 0) { sleepCreditMs += slept; }
     }
 
+    // Сколько миллисекунд до следующей целой секунды от якоря; null — таймер
+    // не идёт. Главный процесс ставит тик ровно сюда (плюс запас), а не
+    // setInterval(1000): тот на Windows срабатывает на миллисекунды РАНЬШЕ
+    // целой секунды по монотонным часам, шаг выходит нулём, и секунда
+    // засчитывается тиком позже — отсчёт перескакивает через цифру.
+    function msUntilNextSecond() {
+        if (!timerState.isRunning) { return null; }
+        const into = ((elapsedMs() % 1000) + 1000) % 1000;
+        return 1000 - into;
+    }
+
     // reconcileTimer equivalent: advance the timer to match real elapsed
     // time since the anchor. Returns true when the timer finished
     // (so electron-main can clear its interval), false otherwise.
@@ -367,6 +378,7 @@ function createTimerController(deps = {}) {
         setPreset,
         adjust,
         reconcile,
+        msUntilNextSecond,
         suspend,
         resume,
         finish,

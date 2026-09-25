@@ -667,3 +667,37 @@ test('BUG-07: onState отличает ход секунд (meta.tick) от ко
     c.pause();
     assert.deepEqual(metas.map((m) => !!(m && m.tick)), [false, false, true, false]);
 });
+
+// --- расписание тика: до границы секунды от якоря ---
+// setInterval(…, 1000) на Windows срабатывает на миллисекунды РАНЬШЕ целой
+// секунды по монотонным часам: шаг выходил нулевым, секунда засчитывалась
+// тиком позже — видимый отсчёт перескакивал, а доклад, законченный через
+// 1,3 с после старта, не считался начатым (CI windows, 25.09.2026).
+test('msUntilNextSecond: сколько осталось до следующей целой секунды от якоря', () => {
+    const h = makeHarness();
+    assert.equal(h.controller.msUntilNextSecond(), null, 'в покое тика нет');
+    h.controller.setPreset(30);
+    h.controller.start();
+    assert.equal(h.controller.msUntilNextSecond(), 1000);
+    h.advanceMs(300);
+    assert.equal(h.controller.msUntilNextSecond(), 700);
+    h.advanceMs(700);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 29);
+    assert.equal(h.controller.msUntilNextSecond(), 1000, 'ровно на границе — следующая целая секунда');
+    h.advanceMs(1990);
+    assert.equal(h.controller.msUntilNextSecond(), 10, 'опоздавший тик ещё не сверен — меряется от якоря, а не от показанного');
+    h.controller.pause();
+    assert.equal(h.controller.msUntilNextSecond(), null, 'на паузе тика нет');
+});
+
+test('msUntilNextSecond учитывает перенесённую долю после паузы', () => {
+    const h = makeHarness();
+    h.controller.setPreset(30);
+    h.controller.start();
+    h.advanceMs(400);
+    h.controller.pause();
+    h.advanceMs(5000);
+    h.controller.start();
+    assert.equal(h.controller.msUntilNextSecond(), 600, 'доля 400 мс перенесена через паузу (BUG-05)');
+});

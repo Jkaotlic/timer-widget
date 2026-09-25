@@ -464,3 +464,12 @@ test('фьюзы Electron: ни Node-режима, ни NODE_OPTIONS, ни --ins
     // приехавшая транзитивная: её версия обязана знать провод этого Electron.
     assert.ok(PKG.devDependencies['@electron/fuses'], '@electron/fuses не объявлен в devDependencies');
 });
+
+test('тик таймера ставится на границу секунды, а не setInterval(1000)', () => {
+    // setInterval срабатывает раньше целой секунды по монотонным часам
+    // (Windows): шаг выходил нулём, секунда пропадала до следующего тика.
+    const code = codeOnly(MAIN);
+    assert.ok(!/setInterval\(\s*reconcileTimer/.test(code), 'вернулся setInterval(reconcileTimer, …)');
+    assert.match(code, /msUntilNextSecond\(\)/, 'тик не спрашивает контроллер, сколько до границы секунды');
+    assert.match(code, /TIMER_TICK_MARGIN_MS/, 'тик без запаса после границы');
+});

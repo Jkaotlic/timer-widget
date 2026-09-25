@@ -89,9 +89,24 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
 
     function clearTimerInterval() {
         if (timerInterval) {
-            clearInterval(timerInterval);
+            clearTimeout(timerInterval);
             timerInterval = null;
         }
+    }
+
+    // Тик ставится на границу секунды от якоря отсчёта плюс запас, а не
+    // setInterval(1000): тот на Windows срабатывает на миллисекунды раньше целой
+    // секунды, сверка давала нулевой шаг, и секунда засчитывалась тиком позже —
+    // отсчёт перескакивал, а доклад, законченный через 1,3 с, не считался начатым.
+    // Следующий тик ставится после каждого, пока таймер идёт.
+    function scheduleTimerTick() {
+        const wait = timerController.msUntilNextSecond();
+        if (wait === null) { timerInterval = null; return; }
+        timerInterval = setTimeout(() => {
+            timerInterval = null;
+            reconcileTimer();
+            if (timerController.getState().isRunning && !timerInterval) { scheduleTimerTick(); }
+        }, wait + (CONFIG.TIMER_TICK_MARGIN_MS || 25));
     }
 
     // Thin wrapper preserved so the screenshot-runner's applyTimerState and any
@@ -120,7 +135,7 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
         // (state isRunning), so no second interval is created.
         if (timerController.start()) {
             clearTimerInterval(); // belt-and-suspenders: never leak a prior interval
-            timerInterval = setInterval(reconcileTimer, CONFIG.TIMER_TICK_INTERVAL || 1000);
+            scheduleTimerTick();
         }
     }
 
