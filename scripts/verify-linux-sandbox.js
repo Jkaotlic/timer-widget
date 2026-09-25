@@ -73,6 +73,18 @@ function checkDeb(debPath) {
         fail('postrm не выгружает профиль AppArmor — он останется в системе после удаления');
     }
 
+    // Depends: штатный список electron-builder не знает libgbm1 и libasound2 —
+    // пакет ставился на чистую систему и падал на старте (job
+    // deb-launch-container, 25.09.2026). Здесь — быстрая проверка списка,
+    // там — запуск.
+    const depends = execFileSync('dpkg-deb', ['-f', debPath, 'Depends'], { encoding: 'utf8' });
+    console.log(`[linux-sandbox]   Depends: ${depends.trim()}`);
+    for (const lib of ['libgbm1', 'libasound2', 'libnss3', 'libgtk-3-0']) {
+        if (!new RegExp(`(^|[,|]\\s*)${lib.replace(/[.+]/g, '\\$&')}(\\s|,|\\(|$)`).test(depends)) {
+            fail(`в Depends нет ${lib} — на чистой системе приложение не стартует`);
+        }
+    }
+
     // Строка запуска в .desktop не должна отключать песочницу.
     const list = execFileSync('dpkg-deb', ['-c', debPath], { encoding: 'utf8' });
     const desktopEntry = list.split('\n').find((l) => l.includes('.desktop'));
