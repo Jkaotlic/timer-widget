@@ -67,9 +67,9 @@ function startApp(deps) {
             __leavingFullScreenToQuit = true;
             event.preventDefault();
             const again = () => app.quit();
-            const timer = setTimeout(again, FULLSCREEN_EXIT_TIMEOUT_MS);
+            const fallback = setTimeout(again, FULLSCREEN_EXIT_TIMEOUT_MS);
             win.once('leave-full-screen', () => {
-                clearTimeout(timer);
+                clearTimeout(fallback);
                 setTimeout(again, 120);
             });
             win.setFullScreen(false);
