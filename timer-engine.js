@@ -109,7 +109,7 @@ function tick(state, config = {}, stepSeconds = 1) {
     return { state: newState, events, finished: shouldFinish };
 }
 
-// Потолок таймера — 99:59:59, тот же, что у ручного ввода (utils.js parseTime).
+// Потолок таймера — 99:59:59, тот же, что у ручного ввода (utils.js parseManualTime).
 // Главный процесс принимал любое конечное число: `set 90.5` показывал
 // «00:01:30.5», а `adjust 1e308` дважды давал Infinity и дальше NaN во всех
 // окнах (BUG-12). Минус ограничен тем же модулем: формат ЧЧ:ММ:СС не покажет

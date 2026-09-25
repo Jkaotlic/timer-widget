@@ -23,7 +23,7 @@
 
 | File | Covers |
 |------|--------|
-| `time-utils.test.js` | `formatTime`, `formatTimeShort`, `parseTime`, `parseManualTime` |
+| `time-utils.test.js` | `formatTime`, `formatTimeShort`, `parseManualTime` (строгий формат) |
 | `security.test.js` | `isValidDataURL`, `isValidURL`, `validateImageSource`, `safeJSONParse`, `escapeHTML` |
 | `security-extended.test.js` | `safeSetBackgroundImage` |
 | `status-progress.test.js` | `getTimerStatus`, `calculateProgress` |

@@ -60,64 +60,33 @@ function formatTimeShort(totalSeconds) {
 }
 
 /**
- * Парсит строку времени HH:MM:SS в секунды
- * @param {string} timeString - время в формате HH:MM:SS или MM:SS
- * @returns {number} - количество секунд
- */
-function parseTime(timeString) {
-    if (!timeString || typeof timeString !== 'string') {return 0;}
-
-    const isNegative = timeString.startsWith('-');
-    const cleaned = timeString.replace('-', '').trim();
-    const parts = cleaned.split(':').map(p => parseInt(p) || 0);
-
-    let total = 0;
-    if (parts.length === 3) {
-        // HH:MM:SS
-        total = parts[0] * 3600 + parts[1] * 60 + parts[2];
-    } else if (parts.length === 2) {
-        // MM:SS
-        total = parts[0] * 60 + parts[1];
-    } else if (parts.length === 1) {
-        // SS
-        total = parts[0];
-    }
-
-    return isNegative ? -total : total;
-}
-
-/**
- * Умный парсинг ручного ввода времени.
- * Голое число = секунды; X:Y = мин:сек; X:Y:Z = час:мин:сек.
- * Ограничивает максимумом 99:59:59 (359999 секунд).
+ * Разбор ручного ввода времени.
+ * Голое число = секунды; X:Y = мин:сек; X:Y:Z = час:мин:сек. Потолок 99:59:59
+ * (359999 секунд).
+ *
+ * Формат СТРОГИЙ (BUG-13): прежний разбор выбрасывал всё, кроме цифр и
+ * двоеточий, и складывал обрывки — «1,5» становилось 15 секундами, «99:99» —
+ * 6039, «5 мин» — 5, «-5» — 5. Поле показывало уверенный ответ на то, чего
+ * человек не писал. Всё, что не совпало с форматом, — null: поле подсветит
+ * «не понял формат». Поля после двоеточия меньше 60, ведущее — любое.
  * @param {string} input - строка времени
  * @returns {number|null} - количество секунд или null при невалидном вводе
  */
+const MANUAL_TIME_RE = /^\d+(?::\d{1,2}){0,2}$/;
+
 function parseManualTime(input) {
+    if (typeof input !== 'string') { return null; }
     const trimmed = input.trim();
-    if (!trimmed) { return null; }
-    // Remove all non-digit and non-colon chars
-    const clean = trimmed.replace(/[^\d:]/g, '');
-    if (!clean) { return null; }
+    if (!MANUAL_TIME_RE.test(trimmed)) { return null; }
 
-    const parts = clean.split(':');
-    let seconds;
-
-    if (parts.length === 1) {
-        // Bare number = seconds
-        seconds = parseInt(parts[0]) || 0;
-    } else if (parts.length === 2) {
-        // MM:SS
-        seconds = ((parseInt(parts[0]) || 0) * 60) + (parseInt(parts[1]) || 0);
-    } else if (parts.length === 3) {
-        // HH:MM:SS
-        seconds = ((parseInt(parts[0]) || 0) * 3600) + ((parseInt(parts[1]) || 0) * 60) + (parseInt(parts[2]) || 0);
-    } else {
-        return null;
-    }
+    const parts = trimmed.split(':').map((part) => parseInt(part, 10));
+    // Ведущее поле — в своих единицах без потолка («90:00» — полтора часа
+    // минутами), остальные — минуты и секунды, им 60 уже не бывает.
+    if (parts.slice(1).some((n) => n >= 60)) { return null; }
+    const seconds = parts.reduce((acc, n) => acc * 60 + n, 0);
 
     // Max 99:59:59
-    if (seconds > 359999 || seconds < 0) { return null; }
+    if (seconds > 359999) { return null; }
     return seconds;
 }
 
@@ -211,7 +180,6 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         formatTime,
         formatTimeShort,
-        parseTime,
         parseManualTime,
         debounce,
         getTimerStatus,
@@ -227,7 +195,6 @@ if (typeof window !== 'undefined') {
     window.TimeUtils = {
         formatTime,
         formatTimeShort,
-        parseTime,
         parseManualTime,
         getTimerStatus,
         calculateProgress,

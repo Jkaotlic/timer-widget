@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { getTimerStatus, calculateProgress, parseTime, isValidNumber, clamp } = require('../utils');
+const { getTimerStatus, calculateProgress, isValidNumber, clamp } = require('../utils');
 
 // --- getTimerStatus edge cases ---
 
@@ -41,29 +41,6 @@ test('calculateProgress: halfway', () => {
 
 test('calculateProgress: both zero returns 0', () => {
     assert.equal(calculateProgress(0, 0), 0);
-});
-
-// --- parseTime edge cases ---
-
-test('parseTime: empty string returns 0', () => {
-    assert.equal(parseTime(''), 0);
-});
-
-test('parseTime: null returns 0', () => {
-    assert.equal(parseTime(null), 0);
-});
-
-test('parseTime: non-string returns 0', () => {
-    assert.equal(parseTime(123), 0);
-    assert.equal(parseTime(undefined), 0);
-});
-
-test('parseTime: non-numeric parts treated as 0', () => {
-    assert.equal(parseTime('abc:xyz'), 0);
-});
-
-test('parseTime: large values beyond normal range', () => {
-    assert.equal(parseTime('99:99:99'), 99 * 3600 + 99 * 60 + 99);
 });
 
 // --- isValidNumber ---

@@ -1236,7 +1236,7 @@ JS» — прятать было нечего, и пользователь ви�
 
 ### Manual time input
 
-- **Manual time input**: Smart parsing in control panel — bare number = seconds, `X:Y` = min:sec, `X:Y:Z` = hr:min:sec. Max 99:59:59. Uses `parseManualTime()` function.
+- **Manual time input**: Smart parsing in control panel — bare number = seconds, `X:Y` = min:sec, `X:Y:Z` = hr:min:sec. Max 99:59:59, fields after a colon < 60, anything else is rejected (BUG-13: the old parser kept only digits and colons, so «1,5» became 15 s). Uses `parseManualTime()` function.
 
 ---
 

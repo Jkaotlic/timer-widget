@@ -266,7 +266,7 @@ timer-widget/
 ├── ipc-compat.js               # Совместимость ipcRenderer → electronAPI
 ├── channel-validator.js        # Whitelist IPC каналов
 ├── constants.js                # Константы, IPC каналы, ключи storage
-├── utils.js                    # formatTime, parseTime, debounce, safelySendToWindow
+├── utils.js                    # formatTime, parseManualTime, debounce, safelySendToWindow
 ├── security.js                 # Валидация: data URL, изображения, escapeHTML
 ├── fonts.css                   # @font-face локальных шрифтов — один на все окна
 ├── design-tokens.css           # CSS custom properties (палитра, тени, блюры, тайминги)
