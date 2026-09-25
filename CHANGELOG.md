@@ -12,6 +12,21 @@ deb с работающей песочницей, в сборке перевёр
 
 ### Security
 
+- **deb запускается на чистой системе.** В зависимостях пакета не хватало
+  `libgbm1` и ALSA: `apt install` проходил, а приложение падало на старте
+  (Ubuntu 22.04 и Debian 12 — нет `libgbm.so.1`; на Ubuntu 24.04 голый
+  `libasound2` закрывался заглушкой `liboss4-salsa-asound2` без
+  `snd_device_name_get_hint`). Теперь `libgbm1` и `libasound2t64 | libasound2`;
+  найдено новой проверкой запуском.
+- **Ворота уязвимостей в CI и в релизе.** `npm audit --audit-level=high`,
+  OSV-Scanner по lockfile и SBOM, Grype по SBOM собранного deb; SBOM обязан
+  совпадать с lockfile, Electron — последний патч своей линии (в релизе —
+  обязательно). Релиз не собирается, пока ворота красные.
+- **deb ставится и запускается в CI.** Ubuntu 24.04 на настоящем ядре
+  (путь AppArmor и путь SUID) и контейнеры Ubuntu 24.04 / 22.04 / Debian 12:
+  приложение стартует от обычного пользователя без `--no-sandbox`, рендереры
+  под seccomp, при удалении профиль AppArmor выгружается. Dependabot следит за
+  патчами Electron.
 - **Linux — только deb, песочница без исключений.** `--no-sandbox` нет ни в
   одной цели. Пакет ставит профиль AppArmor с `userns` (Ubuntu 24.04+), а
   SUID-root на `chrome-sandbox` — лишь там, где ядро закрывает user namespaces
