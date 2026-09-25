@@ -3484,6 +3484,13 @@ class DisplayTimer {
 
         this._handlers.windowDragMousemove = (e) => {
             if (!isWindowDrag) { return; }
+            // Потерянный mouseup (кнопку отпустили над чужим окном) — окно
+            // прилипало к курсору (BUG-19, то же правило, что у виджета и
+            // часов в WindowGeometry.bindWindowDrag).
+            if (typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
+                isWindowDrag = false;
+                return;
+            }
             const dx = e.screenX - winDragStartX;
             const dy = e.screenY - winDragStartY;
             if (dx !== 0 || dy !== 0) {

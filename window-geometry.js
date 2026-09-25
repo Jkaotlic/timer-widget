@@ -402,6 +402,15 @@ function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) 
 
     handlers.onMouseMove = (e) => {
         if (!isDragging) { return; }
+        // mouseup может не дойти: кнопку отпустили над чужим окном, над
+        // системным меню, во время alt-tab. Без этой проверки окно прилипало к
+        // курсору (BUG-19). Маска `buttons` — правда о кнопке ПРЯМО СЕЙЧАС.
+        // Синтетическое событие в e2e обязано нести `buttons: 1`, как
+        // настоящее; фальшивое в Node без поля не трогаем.
+        if (typeof e.buttons === 'number' && (e.buttons & 1) === 0) {
+            handlers.onMouseUp();
+            return;
+        }
         const dx = e.screenX - dragStartX;
         const dy = e.screenY - dragStartY;
         if (dx !== 0 || dy !== 0) {

@@ -157,7 +157,7 @@ test('замок держит ОКНО виджета, а панель прод�
 
         const drag = (page, dx, dy) => page.evaluate(async ([ddx, ddy]) => {
             const wait = (ms) => new Promise((res) => setTimeout(res, ms));
-            const o = (x, y) => ({ bubbles: true, cancelable: true, button: 0, screenX: x, screenY: y, clientX: x, clientY: y });
+            const o = (x, y) => ({ bubbles: true, cancelable: true, button: 0, buttons: 1, screenX: x, screenY: y, clientX: x, clientY: y });
             const container = document.querySelector('.widget-container') || document.body;
             container.dispatchEvent(new MouseEvent('mousedown', o(300, 300)));
             await wait(40);

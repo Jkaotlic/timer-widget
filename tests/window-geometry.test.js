@@ -231,6 +231,9 @@ function mouseEvent(extra = {}) {
     let prevented = false;
     return {
         button: 0,
+        // Настоящее событие несёт маску зажатых кнопок; фальшивое — «левая
+        // зажата», как во время любого жеста.
+        buttons: 1,
         screenX: 100,
         screenY: 100,
         target: { closest: () => null },
@@ -709,3 +712,28 @@ test('отложенная запись тоже сверяется с разм�
 // Проверять их отсутствие незачем — на несуществующий экспорт упадёт любой
 // вызов. То, что рамка объединённого стиля растёт от КЕГЛЯ, а не от окна,
 // проверяет tests/digits-style.test.js.
+
+// BUG-19: mouseup может не дойти (отпустили кнопку над другим окном, над
+// системным меню, во время alt-tab) — и окно «прилипало» к курсору: каждое
+// движение без кнопки продолжало его тащить. Маска `buttons` в mousemove —
+// правда о кнопке прямо сейчас.
+test('BUG-19: движение без зажатой левой кнопки завершает жест, а не тащит окно', () => {
+    const { container, doc, moves, drops } = setupDrag();
+    container.fire('mousedown', mouseEvent({ screenX: 100, screenY: 100 }));
+    doc.fire('mousemove', mouseEvent({ screenX: 110, screenY: 100 }));
+    // mouseup потерялся — кнопка уже отпущена.
+    doc.fire('mousemove', mouseEvent({ screenX: 150, screenY: 150, buttons: 0 }));
+    doc.fire('mousemove', mouseEvent({ screenX: 200, screenY: 200, buttons: 0 }));
+    assert.deepEqual(moves, [{ deltaX: 10, deltaY: 0, first: true }]);
+    assert.equal(drops(), 1, 'конец жеста обязан сохранить позицию, как mouseup');
+    // Запоздалый mouseup второй раз не роняет.
+    doc.fire('mouseup', mouseEvent({ buttons: 0 }));
+    assert.equal(drops(), 1);
+});
+
+test('BUG-19: правая кнопка, зажатая вместо левой, жест тоже завершает', () => {
+    const { container, doc, moves } = setupDrag();
+    container.fire('mousedown', mouseEvent({ screenX: 100, screenY: 100 }));
+    doc.fire('mousemove', mouseEvent({ screenX: 150, screenY: 150, buttons: 2 }));
+    assert.deepEqual(moves, []);
+});

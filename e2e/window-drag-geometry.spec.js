@@ -80,7 +80,7 @@ function dragBy(page, dx, dy, opts = {}) {
 
         target.dispatchEvent(new MouseEvent('mousedown', { ...base, ...mods }));
         document.dispatchEvent(new MouseEvent('mousemove', {
-            ...base, ...mods, screenX: base.screenX + dx, screenY: base.screenY + dy
+            ...base, ...mods, buttons: 1, screenX: base.screenX + dx, screenY: base.screenY + dy
         }));
         document.dispatchEvent(new MouseEvent('mouseup', { ...base, ...mods }));
         return true;

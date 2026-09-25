@@ -64,7 +64,7 @@ const press = (page, screenX, screenY) => page.evaluate(({ x, y }) => {
 
 const moveTo = (page, screenX, screenY) => page.evaluate(({ x, y }) => {
     document.dispatchEvent(
-        new MouseEvent('mousemove', { bubbles: true, cancelable: true, button: 0, screenX: x, screenY: y }));
+        new MouseEvent('mousemove', { bubbles: true, cancelable: true, button: 0, buttons: 1, screenX: x, screenY: y }));
 }, { x: screenX, y: screenY });
 
 const release = (page) => page.evaluate(() => {
@@ -146,7 +146,7 @@ test('дисплей: размер, заданный между жестами, 
         const opts = (x, y) => ({ bubbles: true, cancelable: true, button: 0, screenX: x, screenY: y });
         target.dispatchEvent(new MouseEvent('mousedown', opts(600, 600)));
         for (let i = 1; i <= 4; i++) {
-            document.dispatchEvent(new MouseEvent('mousemove', opts(600 + i * 10, 600 + i * 6)));
+            document.dispatchEvent(new MouseEvent('mousemove', { ...opts(600 + i * 10, 600 + i * 6), buttons: 1 }));
         }
         document.dispatchEvent(new MouseEvent('mouseup', opts(640, 624)));
     });
