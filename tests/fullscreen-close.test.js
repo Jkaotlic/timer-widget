@@ -54,6 +54,11 @@ test('закрытие дисплея идёт через ОДНОГО помо�
     // Обе обязаны идти одной дорогой — вторая манера закрывать это вторая
     // манера падать.
     const bare = MAIN.match(/displayWindow\.close\(\)/g) || [];
+    // Само-проверка зонда: окно живёт в реестре (`windows.displayWindow`), и
+    // регулярка обязана видеть голое закрытие и в этой форме — иначе ноль
+    // значил бы «регулярка ослепла», а не «закрытие одно».
+    assert.equal(('windows.displayWindow.close()'.match(/displayWindow\.close\(\)/g) || []).length, 1,
+        'зонд не видит голое закрытие окна из реестра');
     assert.equal(bare.length, 0,
         `голый displayWindow.close() остался в ${bare.length} месте(ах) — окно закроют полноэкранным`);
     const calls = MAIN.match(/closeDisplayWindow\(/g) || [];

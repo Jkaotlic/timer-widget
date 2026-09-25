@@ -100,13 +100,14 @@ test('канал ui-lock-update объявлен в ОБА конца и рас�
     const main = codeOnly(require('./helpers/main-source').readMainSource());
     assert.match(main, /ipcMain\.on\('ui-lock-update'/, 'главный процесс не принимает канал');
     // Рассылка ВСЕМ четырём окнам, как у темы: замок общий для приложения.
-    const relay = main.slice(main.indexOf("ipcMain.on('ui-lock-update'"));
+    // Тело — балансировкой скобок; окна — поля общего реестра (main-state.js).
+    const relay = require('./helpers/source-scan.js').ipcHandlerBody(main, 'ui-lock-update');
     assert.match(
-        relay.slice(0, 600),
-        /\[controlWindow, widgetWindow, displayWindow, clockWidgetWindow\]/,
+        relay,
+        /\[windows\.controlWindow, windows\.widgetWindow, windows\.displayWindow, windows\.clockWidgetWindow\]/,
         'замок рассылается не всем окнам'
     );
-    assert.match(relay.slice(0, 600), /typeof locked !== 'boolean'/, 'payload замка не проверяется на тип');
+    assert.match(relay, /typeof locked !== 'boolean'/, 'payload замка не проверяется на тип');
 });
 
 test('панель ставит замок кнопкой и сообщает о нём при старте', () => {

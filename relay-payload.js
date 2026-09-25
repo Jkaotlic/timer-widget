@@ -130,6 +130,18 @@ function withoutBgImage(settings) {
     return out;
 }
 
+/**
+ * Payload канала — объект (а не null, строка или число).
+ *
+ * Самая первая проверка любого обработчика главного процесса, читающего поля
+ * payload: `payload = {}` спасает только от undefined, а явный null доходил до
+ * деструктуризации и ронял обработчик. Живёт здесь, а не в одном из модулей
+ * main-*.js, потому что её зовут все: геометрия, таймер, окна, ретрансляторы.
+ */
+function isPayloadObject(payload) {
+    return payload !== null && typeof payload === 'object';
+}
+
 module.exports = {
-    sanitizeRelayPayload, RELAY_LIMITS, EVENT_TITLE_MAX, mergeDisplaySettings, withoutBgImage
+    sanitizeRelayPayload, RELAY_LIMITS, EVENT_TITLE_MAX, mergeDisplaySettings, withoutBgImage, isPayloadObject
 };

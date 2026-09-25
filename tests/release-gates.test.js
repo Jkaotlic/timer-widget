@@ -419,8 +419,10 @@ test('навигация и новые окна заблокированы', () 
     // Прежнее правило «любой file://» не вернулось.
     assert.doesNotMatch(MAIN_CODE, /startsWith\('file:\/\/'\)/, 'навигация снова пускает любой file://');
     assert.match(MAIN, /hardenWindow\(/, 'hardenWindow не применяется');
-    // hardenWindow вызывается для каждого окна.
-    const calls = (MAIN.match(/hardenWindow\((?!window)/g) || []).length;
+    // hardenWindow вызывается для каждого окна. Считаются ВЫЗОВЫ на окне
+    // реестра (main-state.js), а не упоминания: объявление `hardenWindow(win)`
+    // в счёт не идёт.
+    const calls = (MAIN_CODE.match(/hardenWindow\(windows\.\w+Window\)/g) || []).length;
     assert.ok(calls >= 4, `hardenWindow применён ${calls} раз, окон не меньше четырёх`);
 });
 

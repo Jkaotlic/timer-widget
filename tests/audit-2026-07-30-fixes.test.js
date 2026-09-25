@@ -258,8 +258,10 @@ test('главный процесс досылает состояние окон
         'once() не сработает после win.reload() из bindRenderCrashHandler'
     );
 
-    // Подключено ко всем четырём окнам.
-    const wired = [...src.matchAll(/^ {4}bindWindowStateSnapshot\((\w+)\);/gm)].map((m) => m[1]);
+    // Подключено ко всем четырём окнам. Окна — поля общего реестра
+    // (main-state.js), вызовы — внутри фабрики main-windows.js, поэтому отступ
+    // не фиксирован.
+    const wired = [...src.matchAll(/^\s+bindWindowStateSnapshot\(windows\.(\w+)\);/gm)].map((m) => m[1]);
     assert.deepEqual(
         wired.sort(),
         ['clockWidgetWindow', 'controlWindow', 'displayWindow', 'widgetWindow'],

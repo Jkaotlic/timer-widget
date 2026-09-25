@@ -67,7 +67,8 @@ for (const win of WINDOWS) {
         const body = functionBody(source, win.create);
         assert.match(
             body,
-            new RegExp(`announceWindowOpened\\([A-Za-z_$][\\w$]*,\\s*'${win.channel}'`),
+            // Первый аргумент — окно из реестра (`windows.widgetWindow`).
+            new RegExp(`announceWindowOpened\\([A-Za-z_$][\\w$.]*,\\s*'${win.channel}'`),
             `${win.create} должна объявлять открытие сама — иначе путь через трей проходит мимо всех окон`
         );
     });
@@ -159,7 +160,7 @@ test('главный процесс ПОМНИТ настройки часов, 
     // не было в последнем сообщении.
     assert.match(
         body,
-        /(\.\.\.\s*\(?\s*lastClockSettings|Object\.assign\(\s*\{\s*\}\s*,\s*lastClockSettings)/,
+        /(\.\.\.\s*\(?\s*(?:relay\.)?lastClockSettings|Object\.assign\(\s*\{\s*\}\s*,\s*(?:relay\.)?lastClockSettings)/,
         'снимок настроек часов обязан НАКАПЛИВАТЬСЯ: панель шлёт и частичные наборы. '
         + 'Годится и спред, и Object.assign — проверяется накопление, а не синтаксис'
     );

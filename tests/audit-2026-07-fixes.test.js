@@ -319,8 +319,9 @@ test('сохранённая позиция восстанавливается �
     assert.doesNotMatch(body[0], /win\.setBounds\(fitScaledBounds\(/,
         'безусловная укладка целиком отменяет свисание за край');
     // Оба окна ходят через общий помощник.
-    assert.match(mainSource, /ipcMain\.on\('widget-set-position',[\s\S]{0,120}?positionWindowClamped\(widgetWindow, payload\)/);
-    assert.match(mainSource, /ipcMain\.on\('clock-widget-set-position',[\s\S]{0,120}?positionWindowClamped\(clockWidgetWindow, payload\)/);
+    // Окна — поля общего реестра (main-state.js).
+    assert.match(mainSource, /ipcMain\.on\('widget-set-position',[\s\S]{0,120}?positionWindowClamped\(windows\.widgetWindow, payload\)/);
+    assert.match(mainSource, /ipcMain\.on\('clock-widget-set-position',[\s\S]{0,120}?positionWindowClamped\(windows\.clockWidgetWindow, payload\)/);
 });
 
 test('масштаб из панели не затирает масштаб, выставленный на самом виджете', () => {
@@ -637,7 +638,7 @@ test('главный процесс валидирует источник и ш�
     assert.match(handler[0], /if \(!SCALE_REPORT_SOURCES\.has\(source\)\) \{ return; \}/);
     assert.match(handler[0], /Number\.isFinite\(scalePct\)/);
     // Широковещание вернуло бы значение отправителю и могло закольцеваться.
-    assert.match(handler[0], /safelySendToWindow\(controlWindow, 'scale-report'/);
+    assert.match(handler[0], /safelySendToWindow\(windows\.controlWindow, 'scale-report'/);
     assert.doesNotMatch(handler[0], /broadcast/);
 });
 

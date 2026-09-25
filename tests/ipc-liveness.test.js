@@ -175,7 +175,7 @@ test('панель показывает, что время восстановл�
     assert.match(control, /removeListener\('timer-recovery-available'/);
 
     // И отправка на месте — иначе тест выше зелёный, а сообщать нечего.
-    assert.match(readMainSource(), /safelySendToWindow\(controlWindow, 'timer-recovery-available'/);
+    assert.match(readMainSource(), /safelySendToWindow\(windows\.controlWindow, 'timer-recovery-available'/);
 });
 
 test('прозрачность часов больше не читается из ключа, которого никто не пишет', () => {
