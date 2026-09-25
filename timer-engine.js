@@ -80,7 +80,10 @@ function tick(state, config = {}, stepSeconds = 1) {
     if (nextRemaining < 0 && allowNegative) {
         const intervalSec = overrunIntervalMinutes * 60;
         const absNext = Math.abs(nextRemaining);
-        const absPrev = Math.abs(prevRemaining);
+        // Перелимит «до шага» — ноль, если таймер ещё был в плюсе. Модуль
+        // прежде брал |prev|: шаг 130 → -120 сравнивал две «минуты» до нуля с
+        // двумя минутами после и терял пересечение отметки -60 (BUG-11).
+        const absPrev = Math.max(0, -prevRemaining);
         if (Math.floor(absNext / intervalSec) > Math.floor(absPrev / intervalSec)) {
             events.push('timer-overrun-minute');
         }

@@ -381,3 +381,16 @@ test('BUG-12: дробная поправка режется к нулю, а н�
     assert.equal(adjust(s, -0.9, true).remainingSeconds, 100);
     assert.equal(adjust(s, 30.7, true).remainingSeconds, 130);
 });
+
+test('BUG-11: шаг через ноль (130 → -120) отдаёт событие минуты перелимита', () => {
+    // Модуль брал |prev| и тогда, когда prev ещё положителен: 130 с «до нуля»
+    // считались двумя минутами перелимита, и пересечение отметки -60 терялось.
+    const { events } = tick(makeState({ remainingSeconds: 130 }), { allowNegative: true }, 250);
+    assert.ok(events.includes('timer-reached-zero'));
+    assert.equal(events.filter((e) => e === 'timer-overrun-minute').length, 1);
+});
+
+test('BUG-11: шаг через ноль, не дошедший до отметки (30 → -20), события минуты не даёт', () => {
+    const { events } = tick(makeState({ remainingSeconds: 30 }), { allowNegative: true }, 50);
+    assert.ok(!events.includes('timer-overrun-minute'));
+});
