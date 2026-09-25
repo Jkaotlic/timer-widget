@@ -1265,3 +1265,59 @@ test('BUG-07: краш-обработчик в покое снимка не пи
     handler(new Error('проверка'));
     assert.equal(fs.existsSync(snapshot), false, 'снимок покоя «восстановит» то, что и так на экране, с пометкой о сбое');
 });
+
+// --- BUG-04: живой перелимит на выходе и при сбое ---------------------------
+
+const OverrunStoreForTests = require('../event-overrun-store');
+
+test('BUG-04: выход посреди перелимита записывает его в накопитель и журнал', async () => {
+    // Дисплей не открываем: полноэкранный дисплей откладывает выход (первый
+    // before-quit только выводит его из полноэкранного режима).
+    const stubs = createStubs();
+    loadMain(stubs);
+    await runOvertimeTalk(stubs);
+    try {
+        stubs.appHandlers.get('before-quit')({ preventDefault() {} });
+        const store = OverrunStoreForTests.loadStore(stubs.userDataDir);
+        assert.ok(store.overrunSeconds >= 1, 'живой перелимит потерян на выходе');
+        assert.equal(store.finished, false, 'выход не завершает мероприятие');
+        assert.equal(store.talks.length, 1, 'прерванный выходом доклад — тоже строка журнала');
+        assert.equal(store.talks[0].overrunSeconds, store.overrunSeconds);
+        assert.ok(!store.pending);
+
+        // Повторный before-quit не считает секунды ещё раз: строка журнала
+        // уже записана, и они повисли бы в итоге без строки.
+        await wait(1100);
+        stubs.appHandlers.get('before-quit')({ preventDefault() {} });
+        assert.equal(OverrunStoreForTests.loadStore(stubs.userDataDir).overrunSeconds, store.overrunSeconds);
+    } finally {
+        // Упавшая проверка не должна оставлять таймер в минусе: он держит
+        // цикл событий, и прогон висит вместо того, чтобы упасть.
+        stopTimer(stubs);
+    }
+});
+
+test('BUG-04: сбой пишет живой перелимит в pending, не трогая итог процесса', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+    await runOvertimeTalk(stubs);
+    try {
+        process.listeners('uncaughtException').at(-1)(new Error('проверка'));
+        const afterCrash = OverrunStoreForTests.loadStore(stubs.userDataDir);
+        assert.ok(afterCrash.pending && afterCrash.pending.liveSeconds >= 1, 'живой перелимит не записан');
+        assert.equal(afterCrash.overrunSeconds, 0, 'итог сложен сразу — процесс, живущий дальше, посчитает дважды');
+
+        // Процесс пережил исключение: доклад кончается штатно, секунды — один раз.
+        cmd(stubs, { type: 'reset' });
+        await wait(50);
+        const closed = OverrunStoreForTests.loadStore(stubs.userDataDir);
+        assert.ok(!closed.pending, 'штатная запись обязана снять pending');
+        assert.equal(closed.overrunSeconds, closed.talks[0].overrunSeconds);
+        assert.ok(closed.overrunSeconds >= afterCrash.pending.liveSeconds);
+    } finally {
+        // Упавшая проверка не должна оставлять таймер в минусе: он держит
+        // цикл событий, и прогон висит вместо того, чтобы упасть.
+        stopTimer(stubs);
+    }
+});

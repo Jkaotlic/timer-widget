@@ -93,11 +93,90 @@ function normalizeStore(data) {
     if (data === null || typeof data !== 'object') { return empty; }
     const raw = Number(data.overrunSeconds);
     const seconds = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
-    return {
+    const store = {
         overrunSeconds: seconds,
         finished: !!data.finished,
         talks: normalizeTalks(data.talks)
     };
+    // Замороженному итогу живой перелимит не принадлежит (как и в памяти:
+    // accrueOverrun после «Завершить» его не копит).
+    const pending = store.finished ? null : normalizePending(data.pending);
+    if (pending) { store.pending = pending; }
+    return store;
+}
+
+/**
+ * Живой перелимит, записанный краш-обработчиком (BUG-04), или null.
+ *
+ * Секунды текущего минуса в итог не входят, пока доклад не кончился, — и
+ * сбой посреди перелимита терял их целиком. Сложить их в итог прямо в
+ * обработчике нельзя: после uncaughtException процесс может жить дальше, и
+ * следующий тик посчитал бы те же секунды ещё раз. Поэтому они пишутся
+ * РЯДОМ с итогом и складываются в него при следующем запуске (foldPending).
+ *
+ * `talkSeconds` — перелимит всего прерванного доклада (для строки журнала);
+ * null — доклад строки не получает (отсечён «Новым мероприятием»).
+ */
+function normalizePending(raw) {
+    if (raw === null || typeof raw !== 'object') { return null; }
+    const live = Number(raw.liveSeconds);
+    if (!Number.isFinite(live) || live <= 0) { return null; }
+    const endedAt = typeof raw.endedAt === 'string' && !Number.isNaN(Date.parse(raw.endedAt))
+        ? raw.endedAt : null;
+    const talk = raw.talkSeconds === null || raw.talkSeconds === undefined ? null : Number(raw.talkSeconds);
+    return {
+        liveSeconds: Math.floor(live),
+        talkSeconds: Number.isFinite(talk) && talk >= 0 ? Math.floor(talk) : null,
+        endedAt
+    };
+}
+
+/**
+ * Свернуть pending в итог — ровно один раз, на запуске.
+ *
+ * Два исхода, и различает их то, поднял ли запуск таймер из снимка
+ * восстановления:
+ *  - не поднял (снимок протух, выход был не падением) — доклад кончился
+ *    вместе с процессом: секунды в итог, строка в журнал;
+ *  - поднял в минусе — доклад продолжается. Секунды в итог, но минус
+ *    восстановленного таймера уже посчитан в них, поэтому он становится
+ *    отсечкой (excludedLiveSeconds) — иначе дисплей и конец доклада сложили
+ *    бы его второй раз. Строки нет: её допишет конец доклада, с перелимитом
+ *    из resumeTalk.
+ *
+ * @param {object} store — результат normalizeStore
+ * @param {{restoredRemaining: number|null}} opts — остаток поднятого таймера
+ * @returns {{store: object, excludedLiveSeconds: number, resumed: boolean,
+ *            resumeTalk: ({overrun: number}|null), changed: boolean}}
+ */
+function foldPending(store, opts = {}) {
+    const pending = store && store.pending;
+    const clean = Object.assign({}, store);
+    delete clean.pending;
+    if (!pending) {
+        return { store: clean, excludedLiveSeconds: 0, resumed: false, resumeTalk: null, changed: false };
+    }
+    clean.overrunSeconds = store.overrunSeconds + pending.liveSeconds;
+    const restored = Number(opts.restoredRemaining);
+    const resumed = opts.restoredRemaining !== null && opts.restoredRemaining !== undefined
+        && Number.isFinite(restored) && restored < 0;
+    if (resumed) {
+        return {
+            store: clean,
+            excludedLiveSeconds: Math.floor(-restored),
+            resumed: true,
+            resumeTalk: pending.talkSeconds === null ? null : { overrun: pending.talkSeconds },
+            changed: true
+        };
+    }
+    if (pending.talkSeconds !== null) {
+        clean.talks = normalizeTalks(store.talks.concat([{
+            // Без даты секунды не теряются: доклад датируется запуском.
+            endedAt: pending.endedAt || new Date().toISOString(),
+            overrunSeconds: pending.talkSeconds
+        }]));
+    }
+    return { store: clean, excludedLiveSeconds: 0, resumed: false, resumeTalk: null, changed: true };
 }
 
 /**
@@ -140,6 +219,7 @@ module.exports = {
     MAX_TALKS,
     getStorePath,
     normalizeStore,
+    foldPending,
     loadStore,
     saveStore
 };

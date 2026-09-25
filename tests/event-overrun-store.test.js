@@ -167,3 +167,83 @@ test('журнал переживает запись и чтение с диск
         fs.rmSync(dir, { recursive: true, force: true });
     }
 });
+
+// --- BUG-04: живой перелимит переживает сбой --------------------------------
+//
+// Секунды текущего минуса в накопитель не входят до конца доклада. Сбой
+// посреди перелимита терял их целиком. Краш-обработчик пишет их ОТДЕЛЬНЫМ
+// полем `pending`, не трогая итог в памяти (процесс после uncaughtException
+// может жить дальше — сложить сразу значило бы посчитать дважды); запуск
+// складывает их в итог ровно один раз.
+
+const MoneyMeter = require('../money-meter');
+
+test('BUG-04: pending переживает запись и чтение', () => {
+    const dir = tempDir();
+    const endedAt = '2026-09-25T10:00:00.000Z';
+    Store.saveStore(dir, { overrunSeconds: 100, talks: [],
+        pending: { liveSeconds: 45, talkSeconds: 60, endedAt } });
+    assert.deepStrictEqual(Store.loadStore(dir).pending, { liveSeconds: 45, talkSeconds: 60, endedAt });
+});
+
+test('BUG-04: мусорный pending и pending завершённого мероприятия отбрасываются', () => {
+    assert.ok(!Store.normalizeStore({ overrunSeconds: 5, pending: { liveSeconds: -3 } }).pending);
+    assert.ok(!Store.normalizeStore({ overrunSeconds: 5, pending: 'x' }).pending);
+    assert.ok(!Store.normalizeStore({ overrunSeconds: 5, finished: true,
+        pending: { liveSeconds: 30, talkSeconds: 30, endedAt: '2026-09-25T10:00:00.000Z' } }).pending);
+});
+
+test('BUG-04: без восстановления таймера pending — итог плюс закрытый доклад', () => {
+    const store = Store.normalizeStore({ overrunSeconds: 100, talks: [
+        { endedAt: '2026-09-25T09:00:00.000Z', overrunSeconds: 100 }
+    ], pending: { liveSeconds: 45, talkSeconds: 45, endedAt: '2026-09-25T10:00:00.000Z' } });
+    const out = Store.foldPending(store, { restoredRemaining: null });
+    assert.strictEqual(out.store.overrunSeconds, 145);
+    assert.ok(!out.store.pending, 'pending обязан исчезнуть после свёртки');
+    assert.deepStrictEqual(out.store.talks.map((t) => t.overrunSeconds), [100, 45]);
+    assert.strictEqual(out.resumeTalk, null);
+    assert.strictEqual(out.excludedLiveSeconds, 0);
+});
+
+test('BUG-04: восстановленный минус не считается второй раз', () => {
+    // Сбой на -45 с; снимок восстановления поднимает таймер на -45. Эти 45 с
+    // уже сложены в итог из pending — живой перелимит обязан начаться с нуля,
+    // а доклад — продолжиться, а не распасться на две строки.
+    const before = { overrunSeconds: 100, talks: [] };
+    const liveAtCrash = 45;
+    const shownBefore = MoneyMeter.totalSeconds(before.overrunSeconds, -45, 0);
+
+    const store = Store.normalizeStore(Object.assign({}, before, {
+        pending: { liveSeconds: liveAtCrash, talkSeconds: 45, endedAt: '2026-09-25T10:00:00.000Z' }
+    }));
+    const out = Store.foldPending(store, { restoredRemaining: -45 });
+    assert.strictEqual(out.store.talks.length, 0, 'доклад продолжается — строки ещё нет');
+    assert.deepStrictEqual(out.resumeTalk, { overrun: 45 });
+    assert.strictEqual(
+        MoneyMeter.totalSeconds(out.store.overrunSeconds, -45, out.excludedLiveSeconds),
+        shownBefore,
+        'итог после перезапуска разошёлся с итогом до сбоя'
+    );
+    // Таймер пошёл дальше: каждая новая секунда минуса — ровно одна секунда итога.
+    assert.strictEqual(
+        MoneyMeter.totalSeconds(out.store.overrunSeconds, -50, out.excludedLiveSeconds),
+        shownBefore + 5
+    );
+});
+
+test('BUG-04: доклад, отсечённый «Новым мероприятием», строки не получает', () => {
+    const store = Store.normalizeStore({ overrunSeconds: 0,
+        pending: { liveSeconds: 20, talkSeconds: null, endedAt: '2026-09-25T10:00:00.000Z' } });
+    const out = Store.foldPending(store, { restoredRemaining: null });
+    assert.strictEqual(out.store.overrunSeconds, 20);
+    assert.strictEqual(out.store.talks.length, 0);
+});
+
+test('BUG-04: без pending свёртка ничего не меняет', () => {
+    const store = Store.normalizeStore({ overrunSeconds: 7 });
+    const out = Store.foldPending(store, { restoredRemaining: -30 });
+    assert.strictEqual(out.store.overrunSeconds, 7);
+    assert.strictEqual(out.excludedLiveSeconds, 0, 'без pending минус снимка ещё никто не посчитал');
+    assert.strictEqual(out.resumeTalk, null);
+    assert.strictEqual(out.changed, false);
+});

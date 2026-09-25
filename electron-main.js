@@ -74,13 +74,16 @@ log.info(`TimerWidget starting — version ${app.getVersion()}, platform ${proce
 // Crash handlers
 // Снимок — только если есть что восстанавливать: в покое запись снимка
 // «восстановила» бы то, что и так на экране, с пометкой о сбое (BUG-07).
+// Живой перелимит — туда же, в pending накопителя (BUG-04).
 process.on('uncaughtException', (err) => {
     log.error('UNCAUGHT EXCEPTION:', err && err.stack ? err.stack : err);
     try { persistRecoverySnapshot(); } catch { /* best effort */ }
+    try { persistPendingOverrun(); } catch { /* best effort */ }
 });
 process.on('unhandledRejection', (reason) => {
     log.error('UNHANDLED REJECTION:', reason);
     try { persistRecoverySnapshot(); } catch { /* best effort */ }
+    try { persistPendingOverrun(); } catch { /* best effort */ }
 });
 
 // Chromium phones home by default: Component Updater → update.googleapis.com /
@@ -366,6 +369,69 @@ function appendTalk(seconds) {
         endedAt: talk.endedAt,
         overrunSeconds: talk.overrunSeconds
     }));
+}
+
+/**
+ * Получит ли текущий доклад строку журнала, если закрыть его сейчас.
+ *
+ * ОДНО условие на всех, кто закрывает доклад не выходом из минуса:
+ * «Завершить мероприятие», выход из приложения, сбой и черновая строка
+ * выгрузки. Копии этого условия разошлись бы, и отчёт перестал бы сходиться
+ * с итогом по-разному в каждом из путей.
+ */
+function currentTalkRecordable() {
+    return !eventOverrun.finished && !currentTalk.skip
+        && (currentTalk.elapsed || liveOverrunSeconds > 0);
+}
+
+/**
+ * Выход из приложения посреди доклада (BUG-04).
+ *
+ * Живой перелимит лежит только в памяти — в накопитель он переезжает, когда
+ * таймер выходит из минуса. Выход посреди перелимита терял его целиком: итог,
+ * объявленный залу, после перезапуска оказывался меньше. Здесь доклад
+ * закрывается так же, как «Завершить мероприятие», но итог НЕ замораживается.
+ *
+ * Закрывается ОДИН раз: пока приложение доделывает выход, таймер тикает
+ * дальше, а before-quit бывает повторным (app.quit() из страховки, второй
+ * выход) — строка журнала уже записана, и секунды после неё в отчёте
+ * повисли бы без строки. Текущий минус заодно отсекается, как «Новым
+ * мероприятием», чтобы дисплей до закрытия не прибавлял их к итогу.
+ */
+let talkClosedOnQuit = false;
+function closeTalkOnQuit() {
+    if (talkClosedOnQuit) { return; }
+    talkClosedOnQuit = true;
+    const record = currentTalkRecordable();
+    if (!record && liveOverrunSeconds <= 0) { return; }
+    eventOverrun = Object.assign({}, eventOverrun, {
+        overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
+        talks: record ? appendTalk(currentTalk.overrun + liveOverrunSeconds) : eventOverrun.talks
+    });
+    liveOverrunSeconds = 0;
+    excludedLiveSeconds = MoneyMeter.overrunSeconds(timerState.remainingSeconds);
+    currentTalk = Object.assign(freshTalk(), { active: true, skip: true });
+    persistEventOverrun();
+}
+
+/**
+ * Сбой посреди перелимита (BUG-04): живые секунды — на диск, в поле
+ * `pending`, итог в памяти не трогаем.
+ *
+ * Сложить их в итог здесь нельзя: после uncaughtException процесс может жить
+ * дальше, и конец доклада посчитал бы те же секунды второй раз. Следующий
+ * запуск складывает pending ровно один раз (OverrunStore.foldPending), а
+ * любая штатная запись до того просто его перезаписывает — секунды к тому
+ * моменту ещё в памяти.
+ */
+function persistPendingOverrun() {
+    if (liveOverrunSeconds <= 0 || eventOverrun.finished) { return; }
+    const pending = {
+        liveSeconds: liveOverrunSeconds,
+        talkSeconds: currentTalkRecordable() ? currentTalk.overrun + liveOverrunSeconds : null,
+        endedAt: new Date().toISOString()
+    };
+    OverrunStore.saveStore(app.getPath('userData'), Object.assign({}, eventOverrun, { pending }), log);
 }
 
 function accrueOverrun(state) {
@@ -1350,6 +1416,10 @@ app.on('before-quit', (event) => {
     }
 
     isQuitting = true;
+    // Живой перелимит — в накопитель до выхода (BUG-04). Снимок
+    // восстановления ниже стирается, таймер не вернётся — значит, доклад
+    // кончился вместе с приложением.
+    closeTalkOnQuit();
     // Stop the periodic save BEFORE unlinking, so an in-flight 10s tick can't
     // re-create the recovery file after we delete it.
     if (recoverySaveInterval) { clearInterval(recoverySaveInterval); recoverySaveInterval = null; }
@@ -1424,6 +1494,21 @@ app.whenReady().then(() => {
         timerState = timerController.getState();
         // control window may also offer an explicit resume via timer-recovery-available
     }
+
+    // Живой перелимит, записанный при сбое (BUG-04), — в итог ровно один раз.
+    // Поднятый в минусе таймер продолжает прерванный доклад: его минус уже
+    // в итоге и становится отсечкой, а строку журнала допишет конец доклада.
+    const folded = OverrunStore.foldPending(eventOverrun, {
+        restoredRemaining: hasRecovery ? timerState.remainingSeconds : null
+    });
+    eventOverrun = folded.store;
+    if (folded.resumed) {
+        excludedLiveSeconds = folded.excludedLiveSeconds;
+        currentTalk = folded.resumeTalk
+            ? Object.assign(freshTalk(), { active: true, elapsed: true, overrun: folded.resumeTalk.overrun })
+            : Object.assign(freshTalk(), { active: true, skip: true });
+    }
+    if (folded.changed) { persistEventOverrun(); }
 
     createControlWindow();
 
@@ -2111,8 +2196,7 @@ ipcMain.on('event-finish', () => {
     // Последний доклад тоже запись: иначе он окажется в итоге, но не в
     // разбивке, и суммы в отчёте разойдутся без всякой причины. Записывается
     // он, только если шёл, — завершение из покоя доклада не выдумывает.
-    const record = !eventOverrun.finished && !currentTalk.skip
-        && (currentTalk.elapsed || liveOverrunSeconds > 0);
+    const record = currentTalkRecordable();
     eventOverrun = {
         overrunSeconds: eventOverrun.overrunSeconds + liveOverrunSeconds,
         finished: true,
