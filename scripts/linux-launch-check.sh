@@ -147,8 +147,6 @@ if [ "$READY" = 1 ]; then
         [ "$SECCOMP" = 2 ] && ok "рендерер $r под seccomp-bpf" || fail "рендерер $r без seccomp-фильтра (Seccomp: $SECCOMP)"
         R_USERNS=$(readlink "/proc/$r/ns/user")
         R_PIDNS=$(readlink "/proc/$r/ns/pid")
-        SBX=$(tr '\0' '\n' < "/proc/$r/environ" 2>/dev/null | grep -c '^SBX_' || true)
-        echo "  рендерер $r: переменных SBX_* (метка SUID-помощника) — $SBX"
         if [ "$EXPECT" = userns ]; then
             [ "$R_USERNS" != "$MAIN_USERNS" ] && ok "рендерер $r в своём user namespace — путь userns" \
                 || fail "рендерер $r в user namespace браузера — userns-песочница не поднялась"

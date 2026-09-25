@@ -96,3 +96,9 @@ test('последний патч ищется в своей мажорной л
     assert.equal(gate.latestInMajor(v, '45.0.0'), '45.0.0');
     assert.ok(gate.compareSemver('44.10.0', '44.4.5') > 0, 'сравнение числовое, а не строковое');
 });
+
+test('SBOM артефакта: пустой каталог — провал, а не «чисто»', () => {
+    const pkg = { dependencies: { 'electron-log': '^5.4.4' } };
+    assert.deepEqual(gate.missingRuntimeDeps(pkg, { components: [] }), ['electron-log']);
+    assert.deepEqual(gate.missingRuntimeDeps(pkg, { components: [{ name: 'electron-log', version: '5.4.4' }] }), []);
+});

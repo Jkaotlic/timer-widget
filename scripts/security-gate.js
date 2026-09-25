@@ -25,6 +25,14 @@
  *       SBOM прикладывается к релизу и читается сканером приёмки — устаревший
  *       SBOM сообщает ему чужие версии. «SBOM протухает молча» случилось в 2.7.1.
  *
+ *   artifact-sbom <sbom.json>
+ *       SBOM СОБРАННОГО пакета (syft по распакованному deb и app.asar) обязан
+ *       содержать каждую runtime-зависимость из package.json. Замер 25.09.2026:
+ *       Grype по каталогу молча каталогизировал 0 пакетов — для каталога syft
+ *       читает только lock-файлы, а package.json внутри node_modules видит лишь
+ *       с каталогизаторами «образа». Без этой проверки скан артефакта зелёный
+ *       потому, что пуст.
+ *
  *   electron [--binary <путь>] [--require-latest]
  *       Версия Electron в lockfile = в SBOM = (если дан --binary) в собранном
  *       бинаре (строка `Electron/X.Y.Z`). Затем — отставание от последнего
@@ -241,12 +249,39 @@ function cmdElectron(args) {
     return failed ? 1 : 0;
 }
 
+/**
+ * Имена runtime-зависимостей, которых нет в SBOM собранного пакета.
+ * Пустой SBOM артефакта — не «чисто», а «сканер ничего не увидел».
+ */
+function missingRuntimeDeps(pkg, sbom) {
+    const names = new Set([...packageSetFromSbom(sbom)].map((x) => x.slice(0, x.lastIndexOf('@'))));
+    return Object.keys(pkg.dependencies || {}).filter((n) => !names.has(n));
+}
+
+function cmdArtifactSbom(file) {
+    if (!file || !fs.existsSync(file)) {
+        console.error(`::error::SBOM артефакта не найден: ${file}`);
+        return 1;
+    }
+    const sbom = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const total = packageSetFromSbom(sbom).size;
+    const missing = missingRuntimeDeps(readJson('package.json'), sbom);
+    if (missing.length) {
+        console.error(`::error::в SBOM собранного пакета нет runtime-зависимостей: ${missing.join(', ')} — ` +
+            'каталогизатор не заглянул в app.asar, скан артефакта пуст');
+        return 1;
+    }
+    console.log(`[security] SBOM артефакта: ${total} компонентов, все runtime-зависимости на месте`);
+    return 0;
+}
+
 function main(argv) {
     const [cmd, ...rest] = argv;
     if (cmd === 'osv') { return cmdOsv(rest[0]); }
+    if (cmd === 'artifact-sbom') { return cmdArtifactSbom(rest[0]); }
     if (cmd === 'sbom-sync') { return cmdSbomSync(); }
     if (cmd === 'electron') { return cmdElectron(rest); }
-    console.error('использование: security-gate.js osv <report.json> | sbom-sync | electron [--binary <путь>] [--require-latest]');
+    console.error('использование: security-gate.js osv <report.json> | sbom-sync | artifact-sbom <sbom.json> | electron [--binary <путь>] [--require-latest]');
     return 2;
 }
 
@@ -259,6 +294,7 @@ module.exports = {
     packageSetFromSbom,
     diffSets,
     classifyOsvReport,
+    missingRuntimeDeps,
     electronVersionInBinary,
     latestInMajor,
     compareSemver

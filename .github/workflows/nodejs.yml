@@ -320,10 +320,21 @@ jobs:
           find scan-root/app-asar-extracted -name package.json -path '*node_modules*' | sed 's|.*/node_modules/||' | sort
       - name: Electron в бинаре = lockfile = SBOM
         run: node scripts/security-gate.js electron --binary "$(find scan-root/opt -maxdepth 2 -name timer-widget -type f)"
+      # Grype по КАТАЛОГУ молча каталогизирует 0 пакетов (первый прогон
+      # 25.09.2026): для каталога syft читает только lock-файлы. Каталогизаторы
+      # «образа» видят package.json внутри распакованного app.asar. Поэтому
+      # SBOM строит syft явно, проверяется его полнота, и Grype сканирует его.
+      - name: Download Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      - name: SBOM of the built deb
+        run: ${{ steps.syft.outputs.cmd }} dir:scan-root --override-default-catalogers image -o cyclonedx-json=deb-sbom.cdx.json -o table
+      - name: SBOM артефакта не пуст (все runtime-зависимости найдены)
+        run: node scripts/security-gate.js artifact-sbom deb-sbom.cdx.json
       - name: Grype (high/critical блокирует)
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
-          path: scan-root
+          sbom: deb-sbom.cdx.json
           fail-build: true
           severity-cutoff: high
           output-format: table
