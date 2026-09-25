@@ -447,7 +447,7 @@
 
 ### Inline styles in HTML
 
-- **Inline styles in HTML**: Each HTML file has ~1000+ lines of inline CSS/JS. CSP requires `unsafe-inline`. No external CSS frameworks.
+- **Inline styles in HTML**: Each HTML file has ~1000+ lines of inline CSS/JS. CSP держит `unsafe-inline` только для стилей; инлайновые скрипты — по sha256 (`npm run csp:hash -- --write` после правки, SEC-08 от 25.09.2026). No external CSS frameworks.
 
 ---
 

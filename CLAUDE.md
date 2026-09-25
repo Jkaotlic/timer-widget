@@ -97,7 +97,7 @@ Rules when working here:
 
 - Window references are global (`controlWindow`, `widgetWindow`, `displayWindow`, `clockWidgetWindow`). Always use `safelySendToWindow()` to avoid "Object has been destroyed" crashes.
 - Renderer windows persist settings in `localStorage`. Storage keys are defined in `constants.js` (`STORAGE_KEYS`).
-- Each HTML file is self-contained with inline `<script>` and `<style>` blocks (CSP allows `unsafe-inline`).
+- Each HTML file is self-contained with inline `<script>` and `<style>` blocks. CSP: `style-src 'unsafe-inline'`, но инлайновые `<script>` разрешены ТОЛЬКО по sha256 — после правки любого из них `npm run csp:hash -- --write` (владелец политики — `scripts/csp-hash.js`, сверку держит `tests/csp-hash.test.js`).
 - JS-based window drag: Widget and clock windows use JavaScript mousedown/mousemove + IPC (`widget-move`, `clock-widget-move`) instead of `-webkit-app-region: drag`. This is because on Windows, transparent frameless windows with `drag` on parent elements intercept ALL mouse events before `no-drag` children.
 - Scaling: Widget and clock — Ctrl+wheel (30–600 %, пол окна = размер при 30 %). Display — Ctrl+wheel context-sensitive (hover on info-block → block scale, else → timer) + Shift+wheel for blocks.
 

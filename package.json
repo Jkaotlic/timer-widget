@@ -17,6 +17,7 @@
     "visual:check": "node scripts/run-electron.js --screenshot --visual-check",
     "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5",
     "notice": "node scripts/generate-notice.js",
+    "csp:hash": "node scripts/csp-hash.js",
     "build": "npx --yes electron-builder",
     "build:win": "npx --yes electron-builder --win",
     "build:mac": "npx --yes electron-builder --mac",
