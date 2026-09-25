@@ -16,14 +16,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { isSafeColor } = require('../security');
 const { codeOnly } = require('./helpers/source-scan');
+const { readSource } = require('./helpers/window-source');
 
-const repoRoot = path.join(__dirname, '..');
-const read = (file) => codeOnly(fs.readFileSync(path.join(repoRoot, file), 'utf8'));
+const read = (file) => codeOnly(readSource(file));
 
 // Файлы, которые красят что-либо значением из хранилища или из IPC.
 const PAINTING_FILES = ['electron-widget.html', 'electron-clock-widget.html', 'display-script.js'];

@@ -25,11 +25,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
-const repoRoot = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+const read = (file) => readSource(file);
 
 const { ALLOWED_CHANNELS } = require('../channel-validator.js');
 
@@ -63,6 +60,7 @@ const RENDERER_FILES = [
 // Сторона главного процесса: точка входа, её модули main-*.js и чистые
 // модули, из которых он шлёт события.
 const { mainProcessFiles, readMainSource } = require('./helpers/main-source');
+const { readSource } = require('./helpers/window-source');
 const MAIN_FILES = [...mainProcessFiles(), 'timer-controller.js', 'timer-engine.js', 'recovery.js'];
 
 const rendererSrc = RENDERER_FILES.map((f) => `\n/* ${f} */\n` + read(f)).join('\n');

@@ -50,6 +50,32 @@ module.exports = [
     },
   },
   {
+    // Page scripts of the four windows — until 25.09.2026 their inline
+    // <script> blocks (moved out for CSP `script-src 'self'`). They keep the
+    // exact rules they had as inline HTML above: classic scripts, not
+    // CommonJS, sharing window-scope globals with the other scripts of the
+    // page, so no-undef stays off for the same reason.
+    files: [
+      'theme-init.js', 'theme-init-tone.js',
+      'control-app.js', 'control-theme-sync.js',
+      'widget-app.js', 'widget-theme-sync.js',
+      'clock-widget-app.js', 'clock-widget-theme-sync.js',
+      'display-theme-sync.js',
+    ],
+    languageOptions: {
+      sourceType: 'script',
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: {
+      'no-undef': 'off',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'no-case-declarations': 'error',
+      'no-useless-assignment': 'error',
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**', '.superpowers/**'],
   },
 ];

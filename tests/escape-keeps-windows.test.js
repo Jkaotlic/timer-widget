@@ -21,11 +21,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 const { codeOnly } = require('./helpers/source-scan');
+const { readSource } = require('./helpers/window-source');
 
-const read = (name) => codeOnly(fs.readFileSync(path.join(__dirname, '..', name), 'utf8'));
+const read = (name) => codeOnly(readSource(name));
 
 /**
  * Ветка `case '<клавиша>':` вместе с телом — до следующего `case` или конца

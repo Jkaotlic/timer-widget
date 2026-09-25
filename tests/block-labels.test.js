@@ -25,15 +25,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const Layouts = require('../display-layouts');
 const Schema = require('../settings-schema');
 const { collectBlockLabels } = require('../panel-display');
 const { codeOnly } = require('./helpers/source-scan');
+const { readSource } = require('./helpers/window-source');
 
-const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
+const read = (name) => readSource(name);
 
 const LABELLED = ['currentTime', 'eventTime', 'endTime', 'timeLeft'];
 

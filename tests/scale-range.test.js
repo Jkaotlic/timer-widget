@@ -2,16 +2,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
 
 const CONFIG = require('../constants.js');
 const WindowGeometry = require('../window-geometry.js');
 const DisplayLayouts = require('../display-layouts.js');
 const SCHEMA = require('../settings-schema.js');
 const { codeOnly } = require('./helpers/source-scan.js');
+const { readSource } = require('./helpers/window-source');
 
-const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+const read = (f) => readSource(f);
 
 /**
  * Диапазон масштаба обязан быть ДОСТИЖИМ целиком.

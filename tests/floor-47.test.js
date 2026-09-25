@@ -15,13 +15,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { codeOnly, ipcHandlerBody, functionBody, balancedBlockAt } = require('./helpers/source-scan');
 const { readMainSource } = require('./helpers/main-source');
 
-const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
+const read = (name) => readSource(name);
 
 // Главный процесс целиком — точка входа и модули main-*.js: накопитель,
 // окна и каналы живут в разных файлах.
@@ -78,6 +76,7 @@ test('таблица каналов в docs/ipc.md описывает все т�
 // ── Реестр, таблица настроек, разметка ────────────────────────────────────
 
 const Layouts = require('../display-layouts');
+const { readSource } = require('./helpers/window-source');
 const Schema = require('../settings-schema');
 
 const SECRET = ['overrunCost', 'totalCost'];

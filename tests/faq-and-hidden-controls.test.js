@@ -36,12 +36,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
+const { readSource } = require('./helpers/window-source');
+
 const ROOT = path.join(__dirname, '..');
-const HTML = fs.readFileSync(path.join(ROOT, 'electron-control.html'), 'utf8');
-const CSS = fs.readFileSync(path.join(ROOT, 'control.css'), 'utf8');
+const HTML = readSource('electron-control.html');
+const CSS = readSource('control.css');
 const PKG = require(path.join(ROOT, 'package.json'));
 
 // Проверять надо КОД, а не прозу о коде: комментарии в этих файлах намеренно
@@ -78,7 +79,7 @@ test('настройки часов достижимы из UI, а не спря
 });
 
 test('окно часов реально исполняет то, что теперь можно включить', () => {
-    const clock = fs.readFileSync(path.join(ROOT, 'electron-clock-widget.html'), 'utf8');
+    const clock = readSource('electron-clock-widget.html');
     for (const key of ['showSeconds', 'format24h', 'showTimezone']) {
         assert.match(
             clock,
@@ -283,7 +284,7 @@ test('каждая буквенная горячая клавиша панели
     const handled = [...HTML_CODE.matchAll(/event\.code === 'Key([A-Z])'/g)].map((m) => m[1]);
     assert.ok(handled.length >= 5, `буквенных клавиш найдено подозрительно мало: ${handled.length}`);
 
-    const overlay = fs.readFileSync(path.join(ROOT, 'shortcuts-help.js'), 'utf8');
+    const overlay = readSource('shortcuts-help.js');
     const missingOverlay = handled.filter((k) => !new RegExp(`\\['${k}',`).test(overlay));
     assert.deepStrictEqual(missingOverlay, [], `нет в накладке F1: ${missingOverlay.join(', ')}`);
 

@@ -12,11 +12,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
-const repoRoot = path.join(__dirname, '..');
-const readRaw = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+const readRaw = (file) => readSource(file);
 
 // Все исходники читаются БЕЗ комментариев. Утверждение о наличии, пущенное по
 // сырому тексту, доказывает лишь то, что нужные слова где-то написаны:
@@ -29,6 +26,7 @@ const readRaw = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
 // две вырезали <!-- -->, третья нет.
 const { codeOnly, functionBody, ipcHandlerBody } = require('./helpers/source-scan');
 const { readMainSource } = require('./helpers/main-source');
+const { readSource } = require('./helpers/window-source');
 const read = (file) => codeOnly(readRaw(file));
 
 // Стили окна управления живут в отдельном control.css (вынесены из inline-<style>),
@@ -189,7 +187,7 @@ test('ползунки масштаба совпадают по диапазон
     // четыре вызова setupScaleValueEdit, и тест сверял копии друг с другом;
     // теперь ввод читает границы у самого ползунка, а копий нет вовсе.
     // Проверка утверждает ОТСУТСТВИЕ, поэтому ниже стоит её самопроверка.
-    const scaleInput = fs.readFileSync(path.join(__dirname, '..', 'scale-input.js'), 'utf8');
+    const scaleInput = readSource('scale-input.js');
     assert.match(scaleInput, /const minVal = Number\(sliderEl\.min\);/);
     assert.match(scaleInput, /const maxVal = Number\(sliderEl\.max\);/);
     const NUMERIC_BOUNDS_ARG = /setupScaleValueEdit\([^)]*?\n\s*\d+,\s*\d+,/g;

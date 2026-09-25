@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repoRoot = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+const read = (file) => readSource(file);
 
 // Утверждение о НАЛИЧИИ обязано смотреть на код, а не на текст о коде:
 // закомментированная строка удовлетворяет assert.match ровно так же, как живая,
@@ -20,6 +20,7 @@ const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
 const { codeOnly } = require('./helpers/source-scan');
 const readCode = (file) => codeOnly(read(file));
 const { readMainSource } = require('./helpers/main-source');
+const { readSource } = require('./helpers/window-source');
 
 // Стили окна управления живут в отдельном control.css (вынесены из inline-<style>),
 // но проверки ниже описывают ОДНО окно как оно поставляется. Поэтому склеиваем

@@ -1,0 +1,1008 @@
+/*
+ * widget.css — стили окна виджета таймера (electron-widget.html).
+ *
+ * До 25.09.2026 — inline-<style> окна; вынесен без правок ради CSP
+ * `style-src 'self'`. Подключается ПОСЛЕДНИМ из таблиц окна, на месте
+ * прежнего <style>: порядок каскада тот же (закреплён тестом).
+ *
+ * Отступ в 8 пробелов — от HTML, и оставлен намеренно: source-level тесты
+ * режут код по отступу (`\n {16}\};`), и сдвиг отступа молча сдвинул бы их
+ * срезы. Тесты читают окно через tests/helpers/window-source.js.
+ */
+        /* Палитра этого окна живёт в surface-tones.css.
+
+           Здесь стоял ПИН «светлое по тёмному» под [data-theme="light"] — 40
+           строк перечисления, третья копия одного и того же набора (вторая — в
+           display.css, первая — светлая тема в design-tokens.css). Он означал
+           «виджет светлую тему не принимает», и просьба 18.08.2026 звучала
+           ровно наоборот: «чтобы вид тёмной и светлой темы отражался на виджет».
+
+           Пин снят не в пользу темы, а в пользу ТОНА: решает яркость того, что
+           реально под цифрами, — подложка стиля, если пользователь её задал,
+           иначе тема. Считает RendererShared.surfaceTone(), класс ставит
+           UITheme.applyTone(). */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            font-family: var(--tw-font-sans);
+            /* Подложки НЕТ. Здесь стояло `rgba(0, 0, 0, 0.01)` с объяснением
+               «near-transparent background enables drag/hit-testing on Windows»,
+               и она же была той «еле заметной прямоугольной плёнкой», которую
+               видно у круга и «Цифр»: своего фона у этих двух стилей нет вовсе,
+               так что единственное, что там красилось, — это окно.
+               Цена снятия принята сознательно: на Windows клики проваливаются
+               сквозь ПОЛНОСТЬЮ прозрачные пиксели, то есть тащить виджет за
+               пустоту вокруг цифр больше нельзя — только за сам таймер. Взамен
+               появилась настоящая полная прозрачность и настраиваемый фон:
+               --surface-paint (см. surfacePaint в renderer-shared.js). */
+            background: transparent;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Widget container — no outer shadow (transparent Electron window) */
+        .widget-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            container-type: size;
+            container-name: widget;
+        }
+
+        /* ============================================
+           СТИЛЬ: КРУГОВОЙ (Circle)
+           ============================================ */
+        .circular-widget {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5%;
+            box-sizing: border-box;
+        }
+
+        .widget-svg {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            pointer-events: none;
+        }
+
+        /* Glass face backdrop behind the ring */
+        /* Подложки нет. Редизайн 2026-08-12: на любом фоне читаются только
+           цифры, тонкая дуга и мягкая тень под текстом. Заливка круга шла из
+           настроек фона ДИСПЛЕЯ (своего контрола «фон виджета» в панели нет
+           вообще) — то есть она ещё и была чужой. */
+        /* Градиент кольца. Владелец значения по умолчанию — это правило;
+           пользовательский цвет приходит переменной с documentElement, и его
+           сброс — удаление переменной, а не запись «обратно синего». */
+        #widgetGradient stop:first-child { stop-color: var(--timer-color-stop, #0a84ff); }
+        #widgetGradient stop:last-child { stop-color: var(--progress-color-stop, #30d158); }
+
+        .bg-circle {
+            /* Своей заливки у круга нет — но теперь есть пользовательская.
+               Значение приходит переменной с documentElement, дефолт (её
+               отсутствие) принадлежит этому правилу: сброс фона в панели просто
+               удаляет переменную. */
+            fill: var(--surface-paint, var(--style-face));
+            stroke: none;
+        }
+
+        /* Background image mode */
+        .widget-bg-image {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 92%;
+            height: 92%;
+            border-radius: 50%;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .widget-bg-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .widget-bg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+        }
+
+        /* Decorative inner ring */
+        .inner-glow {
+            fill: none;
+            stroke: var(--tw-overlay-light);
+            stroke-width: 1;
+        }
+
+        /* Progress track (background) */
+        .progress-track {
+            fill: none;
+            /* Было 0.08 → ≈1.2:1 на циферблате: у прогресса не было опорной
+               шкалы, дуга висела в пустоте. Замер на измеренном фоне
+               rgb(22,20,44): 0.35 даёт rgb(104,102,118) → 3.18:1, порог для
+               нетекстовой графики взят. 0.32 давало бы 2.85:1 — компенсировать
+               альфой ниже 0.35 нельзя, только толщиной. */
+            stroke: var(--tw-track);
+            stroke-width: 6;
+        }
+
+        /* Progress ring — blue→green gradient @ 135° */
+        .progress-bar {
+            fill: none;
+            stroke: url(#widgetGradient);
+            stroke-width: 6;
+            stroke-linecap: round;
+            transition: stroke-dashoffset var(--tw-dur-slow) var(--tw-ease);
+        }
+
+        .progress-bar[data-status="warning"] {
+            stroke: url(#warningGradient);
+        }
+
+        .progress-bar[data-status="danger"],
+        .progress-bar[data-status="overtime"] {
+            stroke: url(#dangerGradient);
+
+            animation: pulse-glow 1s ease-in-out infinite;
+        }
+
+        /* Стопы обоих градиентов — из полос. См. разбор в display.css. */
+        #dangerGradient stop:first-child  { stop-color: var(--tw-band-danger); }
+        #dangerGradient stop:last-child   { stop-color: var(--tw-band-danger-deep); }
+        #warningGradient stop:first-child { stop-color: var(--tw-band-warning); }
+        #warningGradient stop:last-child  { stop-color: var(--tw-band-warning-deep); }
+
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.6; }
+        }
+
+        /* Делений на кольце виджета БОЛЬШЕ НЕТ — ни разметки, ни правил, ни
+           тумблера. Это кольцо обратного отсчёта, а не циферблат: засечки на нём
+           не сообщали ничего и только шумели. Настройка осталась у ЧАСОВ, где
+           круглый циферблат настоящий, и живёт теперь в их вкладке. */
+
+        /* Centered time + status */
+        .center-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            width: 72%;
+            height: 48%;
+            display: grid;
+            grid-template-rows: 1fr auto 1fr;
+            align-items: center;
+            justify-items: center;
+        }
+
+        .time-display {
+            /* Размер подогнан так, чтобы даже вариант с минусом (-MM:SS, 6 символов)
+               умещался внутри кольца круга с запасом на padding 5%. */
+            font-size: clamp(1.2rem, min(15vw, 15vh), 16rem);
+            font-weight: 200;
+            /* Цвет пользователя красит САМИ ЦИФРЫ. До редизайна 2026-08-12 он
+               приходил только ореолом (--timer-glow), и снятие ореола молча
+               унесло бы с собой настройку «Цвет цифр» для круглого стиля:
+               цифры остались бы белыми при любом выборе. Полосы состояния
+               ниже перебивают это правило — они сильнее по специфичности. */
+            color: var(--timer-color, var(--tw-fg));
+            font-family: var(--tw-font-display);
+            letter-spacing: 0.02em;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            /* Цвет пользователя приходит ПЕРЕМЕННОЙ (--timer-color, её ставит
+               applyColors на documentElement), а не инлайном на этом элементе.
+               Разница не косметическая: инлайн бьёт любое правило, поэтому
+               пока цвет писался инлайном, правила [data-status] ниже были
+               мертвы, и полосам приходилось писать свой цвет инлайном тоже — а
+               значит и СНИМАТЬ его вручную при возврате в норму. Ветка снятия
+               и оказалась дырявой на свежем профиле.
+               Ореол снят редизайном 2026-08-12: цвет уже несёт состояние.
+               Осталась мягкая тень — она не красит, а отделяет цифры от
+               произвольного фона. */
+            /* Токеном: на светлом тоне тёмная тень под тёмными цифрами не
+               помогает вовсе, а нужен наоборот светлый ореол — окно прозрачно
+               и лежит на чужих обоях. См. --style-ink-shadow. */
+            text-shadow: var(--style-ink-shadow);
+            transition: color var(--tw-dur-base) var(--tw-ease),
+                        text-shadow var(--tw-dur-base) var(--tw-ease);
+            white-space: nowrap;
+            grid-row: 2;
+        }
+
+        .time-display[data-status="warning"] {
+            color: var(--tw-band-warning);
+        }
+
+        .time-display[data-status="danger"],
+        .time-display[data-status="overtime"] {
+            /* Полоса, а не литерал: она ссылка на красный акцент и потому
+               следует тону окна. Переменной `--glow-color` здесь больше нет —
+               её не читало ни одно правило (внешние свечения сняты редизайном
+               12.08.2026, объявления пережили своих читателей). */
+            color: var(--tw-band-danger);
+            /* Убираем letter-spacing в перерасходе — «-» + 5 цифр уже шире обычного */
+            letter-spacing: 0;
+            animation: time-pulse 1s ease-in-out infinite;
+        }
+
+        /* ЦИФРЫ по центру кольца, знак висит слева и ширины не занимает.
+           Замер в перерасходе показывал сдвиг цифр на +16px от центра кольца —
+           внутри круга это читается как поломка, потому что точка отсчёта для
+           глаза именно кольцо. Контейнер сжат по содержимому и центрирован, знак
+           абсолютный от его левого края. Минус остаётся ВНУТРИ кольца: запас до
+           обводки 33.6px (замерено). См. e2e/overtime-centering.spec.js. */
+        .time-display {
+            position: relative;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .time-display .tm-sign {
+        position: absolute;
+        right: 100%;
+        /* По вертикали — по СЕРЕДИНЕ цифр, а не от верхнего края: при уменьшенном
+           кегле знак, привязанный к top: 0, выглядит надстрочным. */
+        top: 50%;
+        transform: translateY(-50%);
+        /* Знак мельче цифр и ближе к ним: полноразмерный минус с зазором 0.2em
+           висел отдельным пятном и тянул композицию влево. Уменьшённый читается
+           как приставленный к числу знак, и свес втрое меньше. */
+        font-size: 0.62em;
+        margin-right: 0.1em;
+        }
+
+        /* Наклона карточки здесь БОЛЬШЕ НЕТ: перекидывание рисуют створки из
+           flip-card.css (одна копия на три окна), а этот блок был имитацией —
+           поворот всей карточки на 12° без перспективы давал 0.79 пикселя
+           движения, то есть не давал ничего. */
+        @media (prefers-reduced-motion: reduce) {
+            .widget-flip-card.flipping .widget-flip-inner { animation: none; }
+        }
+
+        @keyframes time-pulse {
+            0%, 100% { transform: scale(1); }
+            50%     { transform: scale(1.015); }
+        }
+
+        /* Status chip — pill, backdrop-blur, 3 semantic tiers */
+        /* Скрыта, пока панель не включит «Подпись состояния». Это ДЕФОЛТ
+           редизайна 2026-08-12, а не забытая настройка: цвет дуги уже
+           говорит то же самое, а место на виджете дороже слова. */
+        .status-badge { display: none; }
+        body.status-label-on .status-badge { display: block; }
+
+        .status-badge {
+            grid-row: 3;
+            align-self: start;
+            margin-top: clamp(6px, 2vh, 16px);
+            /* Нижняя граница clamp срабатывала уже на ШТАТНОМ окне 250px:
+               подпись печаталась 8px (высота прописных ≈6px) при цифрах 27px —
+               разрыв 4.5×. Поднятая нижняя граница даёт 10px, а уменьшенный
+               вертикальный padding компенсирует прирост высоты пилюли. */
+            padding: clamp(3px, 1.2vh, 9px) clamp(8px, 3.4vw, 20px);
+            border-radius: var(--tw-r-pill);
+            font-size: clamp(0.625rem, min(3.4vw, 3.4vh), 5rem);
+            font-weight: 600;
+            font-family: var(--tw-font-sans);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            background: var(--tw-overlay-medium);
+            color: var(--tw-fg-secondary);
+            -webkit-backdrop-filter: var(--tw-blur-xs);
+            backdrop-filter: var(--tw-blur-xs);
+            border: 1px solid transparent;
+            transition: background var(--tw-dur-base) var(--tw-ease),
+                        color var(--tw-dur-base) var(--tw-ease),
+                        border-color var(--tw-dur-base) var(--tw-ease);
+        }
+
+        .status-badge.running {
+            background: rgba(48, 209, 88, 0.18);
+            color: var(--tw-green);
+            border-color: rgba(48, 209, 88, 0.32);
+        }
+
+        /* Перерасход раньше переиспользовал .running и красился в ЗЕЛЁНЫЙ, хотя
+           цифры в этот момент красные, а панель управления и полноэкранный режим
+           показывают красный статус. Свой класс убирает это расхождение. */
+        .status-badge.overtime {
+            background: rgba(255, 69, 58, 0.2);
+            color: var(--tw-red);
+            border-color: rgba(255, 69, 58, 0.32);
+            animation: badge-pulse 0.8s ease-in-out infinite;
+        }
+
+        /* Единая палитра статусов на все три окна (см. CLAUDE.md). */
+        .status-badge.paused {
+            background: rgba(255, 159, 10, 0.2);
+            color: var(--tw-orange);
+            border-color: rgba(255, 159, 10, 0.32);
+        }
+
+        /* Завершено — красный БЕЗ пульсации: пульсирует только перерасход,
+           этим два красных состояния и различаются. */
+        .status-badge.finished {
+            background: rgba(255, 69, 58, 0.2);
+            color: var(--tw-red);
+            border-color: rgba(255, 69, 58, 0.32);
+        }
+
+        @keyframes badge-pulse {
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.6; }
+        }
+
+        /* Стиля LED больше нет: он был теми же цифрами в тёмной коробке, и
+           после того, как фон окна стал настройкой, отличался от «Цифр» только
+           рамкой и отсутствием выбора шрифта. Оба свойства теперь у «Цифр»
+           (см. .widget-digits-time), а профили со старым значением переводит
+           RendererShared.migrateTimerStyle. */
+
+        /* ============================================
+           СТИЛЬ: ПЕРЕКИДНЫЕ ЧАСЫ (Flip)
+           — Inter 600, split-flap cards, gradient colon
+           ============================================ */
+        .widget-flip {
+            display: none;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            padding: 5%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .widget-flip.active {
+            display: flex;
+        }
+
+        .widget-flip-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transform-origin: center;
+            transform: scale(var(--flip-scale, 1));
+        }
+
+        .widget-flip-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* Colon separator: two gradient dots (blue→green, stacked).
+           Kit recipe — sound-tab.html / widget.html flip-colon.
+           Text content of the separator is hidden (font-size 0) so it
+           doesn't render a glyph; pseudo-elements paint the dots. */
+        .widget-flip-separator {
+            font-size: 0;
+            line-height: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 0 6px;
+            height: 90px;
+        }
+        .widget-flip-separator::before,
+        .widget-flip-separator::after {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            /* Цвет — ТОТ ЖЕ, что у цифр рядом, включая значение по умолчанию.
+               Красить точки через `color` нельзя, их рисуют псевдоэлементы,
+               поэтому переменная одна, а свойства разные.
+
+               Здесь стоял фирменный сине-зелёный градиент «как значение по
+               умолчанию». Замер 14.08.2026: цифры `rgb(255,255,255)`, точки
+               `linear-gradient(135deg, rgb(10,132,255), rgb(48,209,88))` — то
+               есть у пользователя, не выбравшего цвет, двоеточие было цветным
+               рядом с белыми цифрами. Именно это он дважды назвал «странным
+               двоеточием», а я дважды искал причину в форме и размере. */
+            background: var(--timer-color, var(--tw-fg));
+        }
+        /* Status colors for separator dots — must override background, not color,
+           because the dots are painted by pseudo-elements. data-status is set by
+           updateFlipDisplay() alongside the per-card status. */
+        .widget-flip-separator[data-status="warning"]::before,
+        .widget-flip-separator[data-status="warning"]::after {
+            background: var(--tw-band-warning);
+        }
+        .widget-flip-separator[data-status="danger"]::before,
+        .widget-flip-separator[data-status="danger"]::after,
+        .widget-flip-separator[data-status="overtime"]::before,
+        .widget-flip-separator[data-status="overtime"]::after {
+            background: var(--tw-band-danger);
+        }
+
+        .widget-flip-minus {
+            position: relative;
+            width: 25px;
+            height: 45px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            /* Карточка минуса — такая же подложка флипа, как у цифр, и красится
+               той же переменной. Без этой строки при выбранном фоне минус
+               оставался тёмным рядом с перекрашенными карточками.
+               Значит и непрозрачна она по тому же правилу: стоять полупрозрачной
+               рядом с непрозрачными карточками — тот же дефект наоборот. */
+            /* Стопы — ТЕ ЖЕ, что у .widget-flip-inner. Раньше два нижних стояли
+               переставленными местами (21,21,32 / 10,10,21 против 10,10,15 /
+               21,21,32), и карточка минуса была темнее соседних сверху и
+               светлее снизу. На глаз это выглядело просто «другой карточкой». */
+            background: var(--surface-solid, var(--style-plate));
+            border-radius: var(--tw-r-sm);
+            box-shadow: inset 0 1px 0 var(--style-edge),
+                        inset 0 -2px 4px var(--style-hinge);
+            margin-right: 4px;
+        }
+
+        .widget-flip-minus-sign {
+            font-family: var(--tw-font-sans);
+            font-size: 32px;
+            font-weight: 700;
+            /* ТА ЖЕ полоса, что у цифр рядом. Здесь стоял `--tw-red` (#ff453a)
+               при цифрах в `--tw-band-danger` (тогда #ff4444) — два разных
+               красных в сантиметре друг от друга, замерено 14.08.2026. Минус —
+               знак ЧИСЛА, и цвет берёт у числа. С 18.08.2026 спорить стало не о
+               чем: полоса САМА объявлена ссылкой на `--tw-red`, так что оба
+               выражения дают один цвет и оба следуют тону окна. */
+            color: var(--tw-band-danger);
+            text-shadow: var(--style-ink-shadow);
+        }
+
+        .widget-flip-minus.visible {
+            display: flex;
+        }
+
+        .widget-flip-card {
+            position: relative;
+            width: 62px;
+            height: 90px;
+            /* Перспектива обязательна, иначе перекидывания НЕ ВИДНО: rotateX без
+               неё — это плоское сжатие по вертикали на cos(угол).
+
+               Объявляется как ПЕРЕМЕННАЯ, а сам `perspective` стоит в
+               flip-card.css на `.fc-flip` — прямом родителе створок. Раньше
+               `perspective: 260px` стояло прямо здесь и не действовало вовсе:
+               створки этой карточке ВНУКИ, а промежуточный `.widget-flip-inner`
+               не может нести `preserve-3d` из-за `overflow: hidden`. Разбор —
+               в flip-card.css.
+
+               Значение ≈2.8 высоты карточки, поэтому у каждого размера своё. */
+            --fc-perspective: 250px;
+        }
+
+        .widget-flip-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            /* Была единственная НЕПРОЗРАЧНАЯ поверхность в стеклянном окне:
+               плоские тёмные прямоугольники рядом со стеклянной LED-панелью и
+               циферблатом. Образец взят у окна часов один в один.
+               backdrop-filter сюда НЕ добавлять: у карточек часов его нет, а
+               родитель .widget-flip-card.flipping крутится по rotateX —
+               backdrop-filter заводит собственный контекст композитинга и на
+               3D ведёт себя по-разному на платформах.
+               Все тени только inset: окно transparent + hasShadow: false. */
+            /* НЕПРОЗРАЧНАЯ по построению — ни `--surface-alpha`, ни альфы в
+               стопах здесь нет, и выбранный цвет приходит переменной
+               `--surface-solid`, из которой прозрачность вынута.
+
+               Карточка перекидыша — пластина, с которой створки берут свой фон
+               (цепочка `inherit` в flip-card.css). Полупрозрачная подложка
+               означала бы, что сквозь падающую створку видно и цифру под ней,
+               и рабочий стол. Ползунок прозрачности для этого стиля в панели
+               спрятан, но спрятанный контрол не мешает значению, выставленному
+               при другом стиле, доехать сюда, — поэтому запрет живёт ЗДЕСЬ, а
+               не в панели. Закреплено e2e/window-surface-color.spec.js. */
+            background: var(--surface-solid, var(--style-plate));
+            border-radius: var(--tw-r-sm);
+            border: 1px solid var(--tw-border-strong);
+            box-shadow: inset 0 1px 0 var(--style-edge);
+            overflow: hidden;
+        }
+
+        /* Split-flap hairline — clipped inside opaque card (overflow:hidden) */
+        .widget-flip-inner::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(180deg,
+                var(--style-hinge) 0%,
+                var(--style-hinge) 50%,
+                var(--style-gloss) 50%,
+                var(--style-gloss) 100%);
+            z-index: 10;
+        }
+
+        .widget-flip-digit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: var(--tw-font-sans);
+            font-size: 52px;
+            font-weight: 600;
+            color: var(--timer-color, var(--tw-fg));
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            text-shadow: var(--style-ink-shadow);
+        }
+
+        .widget-flip-card[data-status="warning"] .widget-flip-digit { color: var(--tw-band-warning); }
+        .widget-flip-card[data-status="danger"]   .widget-flip-digit,
+        .widget-flip-card[data-status="overtime"] .widget-flip-digit { color: var(--tw-band-danger); }
+        /* Мигание перерасхода принадлежит ВСЕМУ табло, а не каждой карточке
+           по отдельности.
+
+           Правило стояло на `.widget-flip-card[data-status]`, и карточка минуса
+           (у неё свой класс, и `data-status` ей никто не ставил) не мигала
+           вовсе — знак жил рядом с мигающими цифрами своей жизнью.
+
+           Просто выдать ей ту же анимацию мало: карточки начинают мигать уже на
+           `danger`, а минус ПОЯВЛЯЕТСЯ только в перерасходе, и его анимация
+           стартовала бы позже — с собственной фазой. Совпадение фаз даёт только
+           общий владелец: ОДНА анимация на контейнере, под которым и цифры, и
+           разделители, и знак. Замер до правки: размах прозрачности цифр 0.30,
+           минуса 0.00, расхождение фаз 0.30 — e2e/overtime-minus.spec.js. */
+        .widget-flip-content[data-status="danger"],
+        .widget-flip-content[data-status="overtime"] {
+            animation: widget-flip-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes widget-flip-pulse {
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.7; }
+        }
+
+        /* Adaptive sizing for 6-digit mode (H:MM:SS) */
+        .widget-flip.has-hours .widget-flip-card {
+            width: 44px;
+            height: 64px;
+            /* Карточка ниже — перспектива обязана сжаться вместе с ней, иначе
+               наклон у шести цифр читался бы слабее, чем у четырёх. */
+            --fc-perspective: 180px;
+        }
+
+        /* Разделитель здесь рисуется ДВУМЯ ТОЧКАМИ через ::before/::after, а сам
+           текстовый ':' погашен `font-size: 0` в базовом правиле. Раньше в этом
+           месте стояло `font-size: 36px` — оно возвращало глиф двоеточия к жизни,
+           и в режиме с часами разделитель показывал одновременно и двоеточие, и
+           пару точек. Шрифт обязан остаться нулевым; под карточку 44×64
+           подгоняем сами точки и высоту колонки. */
+        .widget-flip.has-hours .widget-flip-separator {
+            height: 64px;
+            gap: 8px;
+            margin: 0 4px;
+        }
+
+        .widget-flip.has-hours .widget-flip-separator::before,
+        .widget-flip.has-hours .widget-flip-separator::after {
+            width: 4px;
+            height: 4px;
+        }
+
+        .widget-flip.has-hours .widget-flip-digit {
+            font-size: 36px;
+        }
+
+        /* Скрытие неактивных стилей - все скрыты по умолчанию */
+        .circular-widget,
+        .widget-flip,
+        .widget-analog,
+        .widget-digits {
+            display: none !important;
+        }
+
+        /* Показываем только активный */
+        .circular-widget.active { display: flex !important; }
+        .widget-flip.active { display: flex !important; }
+        .widget-analog.active { display: flex !important; }
+        .widget-digits.active { display: flex !important; }
+
+        /* ============================================
+           СТИЛЬ: АНАЛОГОВЫЕ ЧАСЫ (Analog)
+           — Radial face, gradient hour hand, red second hand
+           ============================================ */
+        .widget-analog {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            padding: 5%;
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        .widget-analog-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform-origin: center;
+            transform: scale(var(--analog-scale, 1));
+        }
+
+        .widget-analog-clock {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            /* Заливка циферблата — токен тона, но с СОБСТВЕННОЙ прозрачностью:
+               --style-dial её не несёт, а окно прозрачно, и ползунок «Фон»
+               обязан гасить циферблат и без выбранного цвета. Поэтому стопы
+               остаются здесь, а тон меняет только их цвет. */
+            background: var(--surface-paint,
+                radial-gradient(circle at 50% 50%,
+                    var(--style-dial-inner) 0%,
+                    var(--style-dial-outer) 100%));
+            -webkit-backdrop-filter: var(--tw-blur-sm);
+            backdrop-filter: var(--tw-blur-sm);
+            border: 1px solid var(--tw-border-strong);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Tick marks on clock face */
+        .widget-clock-tick {
+            position: absolute;
+            width: 2px;
+            height: 6px;
+            background: var(--style-tick);
+            left: 50%;
+            /* 11px, а не 8%. Правило простое: `top` + вертикаль
+               transform-origin обязаны дать РОВНО середину padding-бокса
+               циферблата, иначе деления вращаются вокруг оси, смещённой
+               относительно центральной точки.
+
+               Циферблат 150px с рамкой 1px → padding-бокс 148 → середина 74.
+               8% от 148 = 11.83, плюс 63 = 74.83: ось была на 0.83px ниже
+               центра. На глаз это ничто, но масштаб её множит — при
+               увеличении окна до 600px замер давал уже 2.82px, а на раннере
+               CI 3.60px, и тест «деления стоят на одной оси» падал.
+               11 + 63 = 74 ровно. */
+            top: 11px;
+            transform-origin: 50% 63px;
+            border-radius: 1px;
+        }
+
+        /* Индивидуального top у классов больше нет: он сдвигал точку вращения,
+           и деления на 3 и 9 часах висели ВЫШЕ горизонтальной оси циферблата
+           (замер: 23.5px на кадре 800px). При едином top: 8% и общей
+           transform-origin все двенадцать делений вращаются вокруг настоящего
+           центра, а растут только внутрь — за счёт высоты. */
+        .widget-clock-tick.major {
+            width: 2px;
+            height: 10px;
+            background: var(--style-tick-strong);
+        }
+
+        .widget-clock-tick.quarter {
+            width: 3px;
+            height: 14px;
+            background: var(--tw-ring);
+        }
+
+        /* Hands */
+        .widget-clock-hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: 50% 100%;
+            border-radius: 2px;
+        }
+
+        /* Часовой стрелки не было ВООБЩЕ: таймер на 1:30 и таймер на 30 минут
+           показывали одинаковое положение стрелок. На таймерах короче часа это
+           выглядело правдоподобно — 0 часов и есть 12, — поэтому дефект и жил.
+           Разметка, стиль и формула взяты у полноэкранного окна, где это
+           работает: ((absSecs / 3600) % 12) * 30 градусов. */
+        .widget-hand-hour {
+            width: 4px;
+            height: 32px;
+            background: var(--style-hand);
+            margin-left: -2px;
+            z-index: 2;
+        }
+
+        .widget-hand-minute {
+            width: 3px;
+            height: 48px;
+            /* Была залита фирменным сине-зелёным, тогда как на дисплее и в
+               часах минутная белая: расходился ровно этот один элемент. */
+            background: var(--style-hand);
+            margin-left: -1.5px;
+            z-index: 3;
+        }
+
+        .widget-hand-second {
+            width: 2px;
+            height: 57px;
+            background: var(--tw-red);
+            margin-left: -1px;
+            z-index: 4;
+        }
+
+        .widget-clock-center {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            /* Тот же приём, что у цифр аналога: цвет темы — переменная, чтобы
+               правило [data-status="danger"] ниже могло его перебить каскадом. */
+            background: var(--timer-center-bg, var(--tw-ring));
+            border-radius: 50%;
+            border: 2px solid var(--style-center-rim);
+            z-index: 5;
+        }
+
+        /* Digital time under the face */
+        .widget-analog-digital {
+            position: absolute;
+            bottom: 20%;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            font-family: var(--tw-font-mono);
+            font-size: 14px;
+            /* Цвет пользователя приходит переменной (её ставит applyColors), а
+               не инлайном: инлайн бил бы правило [data-status] ниже. */
+            color: var(--timer-analog-color, var(--tw-fg-muted));
+            font-variant-numeric: tabular-nums;
+            text-shadow: var(--style-ink-shadow);
+        }
+
+        /* Numerals 12/3/6/9 */
+        .widget-clock-numbers {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+        .widget-clock-numbers.visible {
+            display: block;
+        }
+
+        .widget-clock-number {
+            position: absolute;
+            font-family: var(--tw-font-sans);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--tw-fg-muted);
+            transform: translate(-50%, -50%);
+        }
+
+        .widget-clock-number.n12 { top: 15%; left: 50%; }
+        .widget-clock-number.n3  { top: 50%; left: 88%; }
+        .widget-clock-number.n6  { top: 85%; left: 50%; }
+        .widget-clock-number.n9  { top: 50%; left: 12%; }
+
+        /* Warning / danger for hands */
+        .widget-hand-minute[data-status="warning"],
+        .widget-hand-second[data-status="warning"] {
+            filter: hue-rotate(-30deg) saturate(1.5);
+        }
+
+        .widget-hand-minute[data-status="danger"],
+        .widget-hand-second[data-status="danger"],
+        .widget-hand-minute[data-status="overtime"],
+        .widget-hand-second[data-status="overtime"] {
+            background: #ff453a !important;
+            animation: widget-hand-pulse 0.8s ease-in-out infinite;
+        }
+
+        .widget-clock-center[data-status="danger"],
+        .widget-clock-center[data-status="overtime"] {
+            background: #ff453a;
+            animation: widget-center-pulse 1s ease-in-out infinite;
+        }
+
+        .widget-analog-digital[data-status="danger"],
+        .widget-analog-digital[data-status="overtime"] {
+            /* rgba(255,69,58,0.7), а не непрозрачный #ff453a — и это НЕ смена
+               оформления, а перенос того, что рисовалось на самом деле.
+               Цвет полосы писал инлайном ладдер в updateAnalogDisplay(), и
+               инлайн бил это правило: замер показывал rgba(255,69,58,0.7).
+               То есть правило было мертво, а значение в нём — тем, что кто-то
+               когда-то имел в виду, но пользователь никогда не видел.
+               Приводим правило к отрисованному, инлайн убираем. */
+            color: rgba(255, 69, 58, 0.7);
+            text-shadow: var(--style-ink-shadow);
+            animation: widget-analog-text-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes widget-hand-pulse {
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.6; }
+        }
+        @keyframes widget-center-pulse {
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.6; }
+        }
+        @keyframes widget-analog-text-pulse {
+            0%, 100% { opacity: 1; }
+            50%     { opacity: 0.7; }
+        }
+
+        /* ============================================
+           СТИЛЬ: ЦИФРЫ — только время, окно прозрачное
+           ============================================ */
+        .widget-digits {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            /* Фон живёт на самих цифрах (.widget-digits-time), а не здесь:
+               он обязан ОБНИМАТЬ время, а не заливать окно целиком. */
+        }
+        .widget-digits.active { display: flex !important; }
+
+        /* Центрируются ЦИФРЫ, не надпись: см. .digits-time в display.html —
+           там же история двух неудачных итераций. */
+        .widget-digits-time {
+            position: relative;
+            width: fit-content;
+            margin-inline: auto;
+            font-size: var(--digits-font-size, 40px);
+            /* Рамка вокруг цифр: поля и скругление в долях КЕГЛЯ, чтобы расти
+               вместе с ним. Фон по умолчанию прозрачный — рамка появляется
+               ровно тогда, когда пользователь задал цвет. Это и есть бывший
+               стиль LED: те же цифры в тёмной коробке, только коробка теперь
+               настраивается, а шрифт выбирается.
+               Значения совпадают с FRAME_PAD_*_EM в digits-style.js — по ним
+               считается подгонка кегля (проверяется тестом). */
+            background: var(--surface-paint, var(--style-face));
+            padding: 0.18em 0.34em;
+            border-radius: 0.22em;
+
+            line-height: 1;
+            white-space: nowrap;
+            color: var(--timer-color, var(--tw-fg));
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Полосы «Цифр». Раньше их не было вовсе: цвет полосы писал инлайном
+           ладдер в updateDisplay(), и правил CSS для этого стиля не
+           существовало — то есть состояние нельзя было ни переопределить темой,
+           ни увидеть в стилях. Значения перенесены из того ладдера дословно. */
+        .widget-digits-time[data-status="warning"] { color: var(--tw-band-warning); }
+        .widget-digits-time[data-status="danger"],
+        .widget-digits-time[data-status="overtime"] { color: var(--tw-band-danger); }
+
+        /* Знак стоит абсолютом, поэтому его точка отсчёта — ПАДДИНГ-бокс рамки,
+           а не сами цифры: `right: 100%` уносит его ещё и за левое поле рамки.
+           Замер до правки: зазор 0.40 кегля вместо задуманных 0.10, знак
+           целиком снаружи рамки и обрезан краем окна (запас под него подгонка
+           считает по SIGN_GAP_EM = 0.1, а не по 0.4). Поле надо вычесть.
+
+           Числа поделены на 0.62 потому, что `em` в свойствах ЭТОГО элемента
+           считается от его собственного кегля, а зазор и поле заданы в кегле
+           ЦИФР. Все три константы — SIGN_GAP_EM, FRAME_PAD_X_EM и
+           SIGN_FONT_RATIO из digits-style.js, там же по ним считается подгонка;
+           совпадение проверяет tests/digits-style.test.js. */
+        .widget-digits-sign {
+            position: absolute;
+            right: 100%;
+            top: 50%;
+            /* Центрируется БОКС, а глаз видит чернила: где чернила минуса сидят
+               внутри бокса, решает шрифт. Поправку меряет `measureSignShift()`
+               (digits-style.js) и отдаёт долей кегля — в пикселях она зависела
+               бы и от подгонки, и от масштаба окна. Без неё Playfair Display
+               уводил знак вверх на 0.119 кегля. */
+            transform: translateY(calc(-50% + var(--digits-font-size, 40px) * var(--digits-sign-shift, 0)));
+            font-size: 0.62em;
+            margin-right: calc((0.1em - 0.34em) / 0.62);
+        }
+
+        .widget-digits-probe {
+            position: absolute;
+            visibility: hidden;
+            white-space: nowrap;
+            pointer-events: none;
+            left: -9999px;
+            top: 0;
+        }
+
+        /* First-run hint strip — inset shadow only, no outer */
+        .widget-hint {
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            background: rgba(0, 0, 0, 0.6);
+            color: var(--tw-fg-secondary);
+            font-size: 10px;
+            font-family: var(--tw-font-sans);
+            letter-spacing: 0.2px;
+            padding: 4px 10px;
+            border-radius: var(--tw-r-sm);
+            border: 1px solid var(--tw-border);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            opacity: 0;
+            animation: hintFade 4s var(--tw-ease) forwards;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        @keyframes hintFade {
+            0%   { opacity: 0; }
+            15%  { opacity: 1; }
+            75%  { opacity: 1; }
+            100% { opacity: 0; display: none; }
+        }
+
+        /* Focus-visible — a11y, mandatory */
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [role="button"]:focus-visible,
+        [tabindex]:focus-visible {
+            outline: none;
+            box-shadow: var(--tw-focus-ring);
+        }
+
+        /* Reduced motion — collapse durations and kill pulses */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 1ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 1ms !important;
+                scroll-behavior: auto !important;
+            }
+            /* Сплошное animation-duration: 1ms убивает не движение, а
+               ИНФОРМАЦИЮ: hintFade идёт с forwards, поэтому подсказка
+               мгновенно доезжает до последнего кадра (opacity 0 + display none)
+               и не появляется вовсе. Движения в ней и нет — анимируется только
+               opacity, а «reduce» требует убрать движение, не кросс-фейд.
+               Селектор класса (0,1,0) выигрывает у `*` (0,0,0) при равном
+               !important, порядок внутри @media значения не имеет. */
+            .widget-hint { animation-duration: 4s !important; }
+        }

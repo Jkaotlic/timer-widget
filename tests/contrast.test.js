@@ -22,11 +22,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const { codeOnly } = require('./helpers/source-scan.js');
+const { readSource } = require('./helpers/window-source');
 
-const TOKENS = fs.readFileSync(path.join(__dirname, '..', 'design-tokens.css'), 'utf8');
+const TOKENS = readSource('design-tokens.css');
 
 // --- WCAG 2.1 relative luminance + contrast ratio ---
 function channelToLinear(c) {
@@ -263,7 +262,7 @@ test('красный перерасхода читаем как крупный �
 test('faint используется только для заливок, но не для текста', () => {
     // --tw-fg-faint (10% белого) для текста непригоден в принципе. Тест
     // фиксирует, что им не начали красить color: иначе подпись станет невидимой.
-    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+    const control = readSource('control.css');
     const asColor = [...control.matchAll(/(^|[\s;{])color:\s*var\(--tw-fg-faint\)/gm)];
     assert.equal(
         asColor.length, 0,
@@ -287,7 +286,7 @@ test('.font-option.active (список шрифтов) проходит пор�
     // заливке. Тест читает ПРАВИЛА ИЗ control.css регуляркой (а не дублирует
     // литералы руками), чтобы правка кнопки в CSS без обновления этого теста
     // проверялась на РЕАЛЬНОМ значении, а не на переписанной вручную копии.
-    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+    const control = readSource('control.css');
 
     // Тёмная: собственное правило `.font-option.active { ... }`, НЕ внутри
     // [data-theme="light"] — оно начинается с начала строки без префикса.
@@ -343,7 +342,7 @@ test('.bg-mode-btn.active — предсуществующий дефект ко
     // начинался с нуля. Если однажды кто-то поднимет контраст выше порога —
     // этот тест немедленно потребует поднять и здесь заявленный порог, а не
     // останется тихо устаревшим утверждением «менее X:1».
-    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+    const control = readSource('control.css');
     // Селектор с 08.09.2026 — список: `.hero-mode-btn.active` присоединён
     // через запятую (тот же дефект, повторно заводить декларации не стали).
     // `[^{}]*` вместо `\s*` переживает вторую строку селектора до `{`.
@@ -432,7 +431,7 @@ const PINNED_BACKDROPS = ['tw-bg-timer', 'tw-bg-led', 'tw-bg-surface'];
 function readWindowCss(file) {
     // Комментарии снимаем до разбора: в шапке пина прозой перечислено, чего в
     // нём не хватало, и без чистки эти слова попали бы в список «использованных».
-    return fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+    return readSource(file)
         .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
@@ -579,7 +578,7 @@ test('каждое из трёх окон подключает surface-tones.css
     // Гейт считает ОКНА, а не совпадения: файл, потерявший ссылку, тихо
     // получил бы палитру панели — светлый текст на светлом или наоборот.
     for (const file of ['electron-widget.html', 'electron-clock-widget.html', 'display.html']) {
-        const html = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const html = readSource(file);
         assert.match(html, /<link rel="stylesheet" href="surface-tones\.css">/, `${file}: нет surface-tones.css`);
     }
 });
@@ -605,7 +604,7 @@ const THEMES = [
 test('список тем в тесте совпадает с панелью управления', () => {
     // Сетки свотчей уехали из inline-скрипта панели в theme-grid.js: страж
     // control-decomposition сработал на объёме кода внутри HTML.
-    const control = fs.readFileSync(path.join(__dirname, '..', 'theme-grid.js'), 'utf8');
+    const control = readSource('theme-grid.js');
     const found = [...control.matchAll(/\{ name: '([^']+)', t1: '(#[0-9a-fA-F]{6})', t2: '#[0-9a-fA-F]{6}', bg: '(#[0-9a-fA-F]{6})' \}/g)]
         .map((m) => [m[1], m[2], m[3]]);
     assert.deepEqual(found, THEMES, 'темы в панели изменились — обнови список в тесте и перемерь контраст');
@@ -630,7 +629,7 @@ test('стопы холста дисплея в тесте совпадают с
     // Пин — предсказание, и считать его надо по подтверждающей стороне: если
     // стопы в display-script поменяются, модель обязана упасть, а не тихо
     // мерить прошлогодний фон.
-    const code = fs.readFileSync(path.join(__dirname, '..', 'display-script.js'), 'utf8');
+    const code = readSource('display-script.js');
     for (const stop of [...DISPLAY_CANVAS_DARK, ...DISPLAY_CANVAS_LIGHT]) {
         assert.ok(
             code.includes(stop),
@@ -653,7 +652,7 @@ test('подписи info-блоков читаемы во всех темах (
     };
 
     // Проверка проверки: модель обязана читать ТУ ЖЕ краску, что и правило.
-    const displayCss = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    const displayCss = readSource('display.css');
     assert.match(
         displayCss,
         /\.info-label \{[\s\S]*?color: var\(--info-color-dim, var\(--tw-fg-secondary\)\)/,
@@ -692,7 +691,7 @@ test('подпись блока — ОДИН тон на все четыре с�
     // Теперь у «Цифр» перебивки нет вовсе, и подпись наследует базовое
     // правило .info-label с --tw-fg-secondary, контраст которого считается
     // выше в этом же файле.
-    const display = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    const display = readSource('display.css');
     const bare = display.replace(/\/\*[\s\S]*?\*\//g, '');
     assert.ok(
         !/body\.style-digits \.info-label \{/.test(bare),
@@ -707,14 +706,14 @@ test('подпись блока — ОДИН тон на все четыре с�
     );
     // Токен зелёной подписи должен уйти следом: мёртвый токен переживает
     // решение и возвращается в код при первой же правке рядом.
-    const tones = fs.readFileSync(path.join(__dirname, '..', 'surface-tones.css'), 'utf8');
+    const tones = readSource('surface-tones.css');
     assert.ok(!/--style-led-label/.test(tones), 'осиротевший токен --style-led-label остался в палитре');
 });
 
 test('тема красит ЗНАЧЕНИЕ info-блока, но не подпись', () => {
     // Защита от возврата: если --info-color-dim снова начнут задавать из темы,
     // подписи опять уедут ниже порога во всех темах разом.
-    const script = fs.readFileSync(path.join(__dirname, '..', 'display-script.js'), 'utf8');
+    const script = readSource('display-script.js');
     const code = script.replace(/^[ \t]*\/\/.*$/gm, '');
     // Переменные дисплея ставятся и снимаются одним помощником (setVar):
     // односторонняя запись пережила бы «Сбросить всё». Проверяется тот же
@@ -757,7 +756,7 @@ test('тема красит ЗНАЧЕНИЕ info-блока, но не подп
    ============================================================ */
 
 test('фон выпадающего списка не задан литералом и читаем в обеих темах', () => {
-    const control = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8'));
+    const control = codeOnly(readSource('control.css'));
     assert.ok(
         !/#1c1c1e/i.test(control),
         'литерал #1c1c1e вернулся в control.css: в светлой теме он даёт 1.01:1 под --tw-fg'
@@ -805,7 +804,7 @@ test('индикатор открытого окна виден в обеих т
     // вернуться — именно она делала точку невидимой. Проверяется ОТСУТСТВИЕ
     // старого поведения, а не только наличие нового: иначе регрессия
     // проскользнёт молча.
-    const control = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8'));
+    const control = codeOnly(readSource('control.css'));
     const lightActive = /\[data-theme="light"\]\s*\.quick-window-btn\.active\s*\{[^}]*\}/.exec(control);
     if (lightActive) {
         assert.ok(
@@ -836,7 +835,7 @@ test('.preset-slot.active (применённая ячейка вида) чит�
     //
     // Тест читает правило ИЗ control.css, а не повторяет литералы: правка в CSS
     // без правки теста обязана проверяться на настоящем значении.
-    const control = fs.readFileSync(path.join(__dirname, '..', 'control.css'), 'utf8');
+    const control = readSource('control.css');
     const rule = /^\.preset-slot\.active\s*\{([^}]*)\}/m.exec(control);
     assert.ok(rule, 'не найдено правило .preset-slot.active');
     const bgTok = /background:\s*var\(--([a-z0-9-]+)\)/.exec(rule[1]);

@@ -19,13 +19,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const UILock = require(path.join(ROOT, 'ui-lock.js'));
 const { codeOnly } = require('./helpers/source-scan.js');
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const { readSource } = require('./helpers/window-source');
+const read = (f) => readSource(f);
 
 const WINDOWS = [
     'electron-control.html',

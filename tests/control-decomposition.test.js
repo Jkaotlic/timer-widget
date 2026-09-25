@@ -14,12 +14,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { readSource, readRaw } = require('./helpers/window-source');
 
-const repoRoot = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+const read = (file) => readSource(file);
 const controlHtml = read('electron-control.html');
+
+// Код страницы панели. До 25.09.2026 — её inline-<script>, с тех пор
+// control-app.js (CSP `script-src 'self'`). Шапка файла, объясняющая переезд,
+// не считается: храповики ниже меряют то же, что мерили до переезда.
+const pageScript = () => readRaw('control-app.js').replace(/^\/\*[\s\S]*?\*\/\n/, '');
 const pkg = JSON.parse(read('package.json'));
 
 // Модули, вынесенные из inline-скрипта панели.
@@ -36,7 +39,11 @@ const EXTRACTED = [
 ];
 
 test('окно управления больше не god-файл', () => {
-    const lines = controlHtml.split('\n').length;
+    // Страница = разметка + её собственный скрипт, как и до переезда скрипта в
+    // control-app.js 25.09.2026: потолок остался тем же числом и меряет ту же
+    // сумму, а не одну разметку (иначе он молча ослаб бы на 1900 строк).
+    const lines = readRaw('electron-control.html').split('\n').length
+        + pageScript().split('\n').length;
     // Было 7300+. Порог с запасом: он не про красоту числа, а про то, чтобы
     // случайный возврат кода внутрь файла бросался в глаза на ревью.
     //
@@ -132,11 +139,10 @@ test('inline-скрипт панели не разрастается', () => {
     // Именно объём КОДА внутри HTML был исходной проблемой (в нём не видно
     // дубликатов), а не длина файла как таковая. Проверка отдельно от общей:
     // статическая разметка справки может расти, скрипт — нет.
-    const lines = controlHtml.split('\n');
-    const start = lines.findIndex((l) => l.trim() === '<script>');
-    const end = lines.reduce((acc, l, i) => (l.trim() === '</script>' ? i : acc), -1);
-    assert.ok(start > 0 && end > start, 'не найден inline-<script> панели');
-    const scriptLines = end - start;
+    // С 25.09.2026 этот скрипт — control-app.js (CSP запрещает инлайн), потолок
+    // тот же: вынос из HTML в файл логику не уменьшил ни на строку.
+    const scriptLines = pageScript().split('\n').length;
+    assert.ok(scriptLines > 1000, `control-app.js подозрительно короткий: ${scriptLines} строк — код потерян при переносе?`);
     assert.ok(
         scriptLines < 2000,
         `inline-скрипт панели разросся до ${scriptLines} строк — выносите модуль, а не дописывайте здесь`
@@ -261,13 +267,13 @@ test('у каждого модуля есть заголовочный комм�
 // ---------------------------------------------------------------------------
 
 test('стили дисплея вынесены в display.css, инлайнового <style> не осталось', () => {
-    const displayHtml = fs.readFileSync(path.join(repoRoot, 'display.html'), 'utf8');
+    const displayHtml = readSource('display.html');
     assert.doesNotMatch(displayHtml, /<style>/, 'в display.html вернулся inline-<style>');
     assert.match(displayHtml, /<link rel="stylesheet" href="display\.css">/);
 
     // Файл обязан существовать и быть непустым: перенос, потерявший содержимое,
     // проходит проверку «инлайна нет» с блеском.
-    const css = fs.readFileSync(path.join(repoRoot, 'display.css'), 'utf8');
+    const css = readSource('display.css');
     assert.ok(css.split('\n').length > 1000, `display.css подозрительно короткий: ${css.split('\n').length} строк`);
 });
 
@@ -281,7 +287,7 @@ test('таблицы стилей дисплея подключены в пра�
     //      пользователю, а не теме), и порядок она не решает: её селекторы
     //      специфичнее (0,2,0) — но подключается она всё равно ПОСЛЕ токенов,
     //      которыми пользуется.
-    const displayHtml = fs.readFileSync(path.join(repoRoot, 'display.html'), 'utf8');
+    const displayHtml = readSource('display.html');
     const order = [...displayHtml.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)]
         .map((m) => m[1]);
     // flip-card.css встал ТРЕТЬИМ, а не последним, и это то же требование, а не
@@ -297,7 +303,7 @@ test('таблицы стилей дисплея подключены в пра�
 test('display.css перечислен в build.files', () => {
     // Ровно так в 2.3.2 потерялся design-tokens.css: файл был, в списке — нет,
     // и упакованное приложение рисовало окно без единого токена.
-    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+    const pkg = JSON.parse(readSource('package.json'));
     assert.ok(
         pkg.build.files.includes('display.css'),
         'display.css отсутствует в build.files — в собранном приложении окно останется без стилей'

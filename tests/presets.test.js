@@ -14,14 +14,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const Presets = require(path.join(ROOT, 'presets.js'));
 const PanelPresets = require(path.join(ROOT, 'panel-presets.js'));
 const { codeOnly } = require('./helpers/source-scan.js');
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const { readSource } = require('./helpers/window-source');
+const read = (f) => readSource(f);
 
 function fakeStorage(initial = {}) {
     const data = { ...initial };

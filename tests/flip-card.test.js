@@ -13,6 +13,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { flipCardTo, FLIP_CLASS, FLIP_DURATION_MS } = require('../flip-card');
+const { readSource } = require('./helpers/window-source');
 
 // Двойник карточки: узел с цифрой внутри и список классов.
 function fakeCard(initial = '0') {
@@ -95,9 +96,7 @@ test('длительность в JS покрывает ОБЕ фазы пере
     // верхней створки, затем подъём нижней с той же задержкой. Прежние
     // «правила на окно» проверять больше нечего — их нет, и это проверяется
     // отдельно ниже.
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const css = fs.readFileSync(path.join(__dirname, '..', 'flip-card.css'), 'utf8');
+    const css = readSource('flip-card.css');
 
     const fall = css.match(/\.fc-leaf-top \{[^}]*animation: fc-fall ([\d.]+)s/s);
     const rise = css.match(/\.fc-leaf-bottom \{[^}]*animation: fc-rise ([\d.]+)s [^;]*?([\d.]+)s forwards/s);
@@ -130,14 +129,12 @@ test('длительность в JS покрывает ОБЕ фазы пере
 test('наклона карточки в окнах больше нет — механика перекидывания одна', () => {
     // Он и был «анимацией, которой не видно»: rotateX всей карточки без
     // перспективы даёт плоское сжатие на cos(угол), замерено 0.79 px.
-    const fs = require('node:fs');
-    const path = require('node:path');
     for (const file of ['display.css', 'electron-widget.html', 'electron-clock-widget.html']) {
-        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const src = readSource(file);
         assert.doesNotMatch(src, /@keyframes (widget-)?flip-animation/, `${file}: вернулся собственный наклон`);
     }
     for (const file of ['display.html', 'electron-widget.html', 'electron-clock-widget.html']) {
-        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const src = readSource(file);
         assert.match(src, /<link rel="stylesheet" href="flip-card\.css">/, `${file}: не подключена общая таблица`);
     }
 });
@@ -150,9 +147,7 @@ test('перспектива объявлена на прямом родител
     // рисовалось плоское сжатие: ширина створки 42.19 px по всей дуге падения.
     // Движение меряет e2e; здесь проверяется, что владелец свойства ОДИН и что
     // ни одно окно не осталось без значения.
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const read = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    const read = (f) => readSource(f);
 
     const css = read('flip-card.css');
     assert.match(
@@ -183,9 +178,7 @@ test('перспектива объявлена на прямом родител
 });
 
 test('«меньше движения» гасит перекидывание, и не только в CSS', () => {
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const css = fs.readFileSync(path.join(__dirname, '..', 'flip-card.css'), 'utf8');
+    const css = readSource('flip-card.css');
     assert.match(
         css,
         /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none/,
@@ -193,16 +186,14 @@ test('«меньше движения» гасит перекидывание, �
     );
     // Одного CSS мало: неподвижный слой со СТАРОЙ цифрой висел бы поверх новой
     // всё время жизни слоёв. Поэтому модуль их вообще не строит.
-    const js = fs.readFileSync(path.join(__dirname, '..', 'flip-card.js'), 'utf8');
+    const js = readSource('flip-card.js');
     assert.match(js, /prefers-reduced-motion: reduce/, 'модуль обязан проверять предпочтение сам');
 });
 
 test('все три окна используют общую реализацию, а не свою копию', () => {
     // Три копии этой логики уже однажды разъехались — см. аудит 2026-07-29.
-    const fs = require('node:fs');
-    const path = require('node:path');
     for (const file of ['display-script.js', 'electron-widget.html', 'electron-clock-widget.html']) {
-        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const src = readSource(file);
         assert.match(src, /window\.FlipCard\.flipCardTo\(/, `${file} должен звать общий flipCardTo`);
         assert.doesNotMatch(src, /classList\.add\('flipping'\)/, `${file} не должен навешивать класс сам`);
     }

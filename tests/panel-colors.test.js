@@ -1,13 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
 const path = require('path');
 const { codeOnly, styleToken } = require('./helpers/source-scan');
 
 const { mergeColors, PanelColorsMixin, SURFACE_TARGETS } = require('../panel-colors');
+const { readSource } = require('./helpers/window-source');
 
 const ROOT = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+const read = (file) => readSource(file);
 
 /* ───────────────────────────── сборка объекта цветов ─────────────────────── */
 
@@ -322,7 +322,7 @@ test('сброс окна обнуляет ВСЕ поля цвета, а не �
     // СВОЯ копия списка полей, и в ней его не было. Список теперь один, у
     // сборщика; тест проверяет, что сброс перечисляет именно его.
     const { COLOR_FIELDS, mergeColors } = require(path.join(ROOT, 'panel-colors.js'));
-    const reset = fs.readFileSync(path.join(ROOT, 'panel-reset.js'), 'utf8');
+    const reset = readSource('panel-reset.js');
     assert.match(codeOnly(reset), /window\.PanelColorFields/,
         'сброс перечисляет поля цвета сам — это вторая копия списка');
 

@@ -15,6 +15,7 @@ const {
     clearProbeCache
 } = require('../digits-style');
 const DigitsStyle = require('../digits-style');
+const { readSource } = require('./helpers/window-source');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -48,7 +49,7 @@ test('реестр: каждый файл лежит в fonts/', () => {
 });
 
 test('реестр: каждый файл объявлен в fonts.css', () => {
-    const css = fs.readFileSync(path.join(ROOT, 'fonts.css'), 'utf8');
+    const css = readSource('fonts.css');
     for (const font of DIGIT_FONTS) {
         for (const file of font.files) {
             assert.ok(css.includes(`fonts/${file}`), `${font.id}: fonts/${file} нет в fonts.css`);
@@ -101,15 +102,13 @@ test('fitScale: запас под знак минуса сужает досту�
 test('поля рамки в CSS совпадают с теми, по которым считается подгонка', () => {
     // Разойдутся — подогнанные цифры вылезут за собственную рамку, и увидеть
     // это можно будет только глазом на конкретном размере окна.
-    const fs = require('node:fs');
-    const path = require('node:path');
     const expected = `padding: ${DigitsStyle.FRAME_PAD_Y_EM}em ${DigitsStyle.FRAME_PAD_X_EM}em`;
     for (const [file, selector] of [
         ['electron-widget.html', '.widget-digits-time'],
         ['electron-clock-widget.html', '.clock-digits-time'],
         ['display.css', '.digits-time']
     ]) {
-        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const src = readSource(file);
         const rule = src.match(new RegExp(`^\\s*\\${selector} \\{[^}]*\\}`, 'm'));
         assert.ok(rule, `${file}: не найдено правило ${selector}`);
         assert.ok(
@@ -174,14 +173,12 @@ test('посадка знака минуса в CSS совпадает с той
     // целиком снаружи рамки и обрезан краем окна). Деление на SIGN_FONT_RATIO
     // переводит обе величины из кегля цифр в собственный кегль знака: `em` в
     // свойствах знака считается от него.
-    const fs = require('node:fs');
-    const path = require('node:path');
     const expected = `margin-right: calc((${DigitsStyle.SIGN_GAP_EM}em - ${DigitsStyle.FRAME_PAD_X_EM}em) / ${DigitsStyle.SIGN_FONT_RATIO})`;
     for (const [file, selector] of [
         ['electron-widget.html', '.widget-digits-sign'],
         ['display.css', '.digits-sign']
     ]) {
-        const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+        const src = readSource(file);
         const rule = src.match(new RegExp(`^\\s*\\${selector} \\{[^}]*\\}`, 'm'));
         assert.ok(rule, `${file}: не найдено правило ${selector}`);
         assert.ok(
@@ -380,7 +377,7 @@ test('значение блока в «Цифрах» набирается ЦВ�
     //   противоречило собственному комментарию строкой выше («значение —
     //   выбранным шрифтом»), расходилось с «Флипом», где на том же месте стоит
     //   `--tw-fg`, и красило блок под табло, которое само уже не зелёное.
-    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    const css = readSource('display.css');
 
     // Комментарии срезаются ДО проверки отсутствия: рядом с правилом стоит
     // объяснение, в котором `--tw-led-green` упомянут по имени, и без среза
@@ -428,7 +425,7 @@ test('дисплей: кегль «Цифр» подгоняется по НЕт
     // возврат к 100 % выглядел как 150 %. Габаритные offsetWidth/offsetHeight
     // трансформации не видят — это единственная рама, в которую можно вписывать
     // то, что саму раму потом растянет.
-    const src = fs.readFileSync(path.join(ROOT, 'display-script.js'), 'utf8');
+    const src = readSource('display-script.js');
     const body = codeOnly(methodBody(src, 'updateDigitsScale'));
 
     assert.match(body, /offsetWidth/, 'подгонка не берёт ширину раскладки');
@@ -447,7 +444,7 @@ test('дисплей: потолок масштаба считается по ч
     // блок — квадратная рама --timer-box (55vh): чернил в ней 487px из 722px,
     // и в потолок упирался воздух вокруг цифр. Отсюда «Таймер уже во всю
     // высоту» при цифрах в треть экрана.
-    const src = fs.readFileSync(path.join(ROOT, 'display-script.js'), 'utf8');
+    const src = readSource('display-script.js');
     const fit = codeOnly(methodBody(src, 'fitTimerScale'));
 
     assert.match(fit, /this\.timerInkBox\(/,

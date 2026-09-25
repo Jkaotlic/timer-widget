@@ -14,10 +14,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { readSource } = require('./helpers/window-source');
 
-const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+const read = (file) => readSource(file);
 
 // ---------------------------------------------------------------------------
 // BUG-1 — разделитель flip в виджете таймера

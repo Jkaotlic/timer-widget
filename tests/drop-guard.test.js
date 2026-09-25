@@ -12,10 +12,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const DropGuard = require('../drop-guard');
+const { readSource } = require('./helpers/window-source');
 
 function fakeDocument() {
     const listeners = new Map();
@@ -63,11 +62,10 @@ test('модуль подключён в виджете, часах и дисп�
     // Панель держит свою зону сброса звука (custom-sounds.js); общий гаситель
     // уровня документа у неё уже есть и знает про зону. Второй, не знающий,
     // здесь только мешал бы.
-    const root = path.join(__dirname, '..');
     for (const file of ['electron-widget.html', 'electron-clock-widget.html', 'display.html']) {
-        const html = fs.readFileSync(path.join(root, file), 'utf8');
+        const html = readSource(file);
         assert.match(html, /<script src="drop-guard\.js"><\/script>/, `${file}: drop-guard.js не подключён`);
     }
-    const control = fs.readFileSync(path.join(root, 'electron-control.html'), 'utf8');
+    const control = readSource('electron-control.html');
     assert.doesNotMatch(control, /drop-guard\.js/);
 });

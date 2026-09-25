@@ -22,12 +22,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { codeOnly } = require('./helpers/source-scan');
+const { readSource } = require('./helpers/window-source');
 
-const repoRoot = path.join(__dirname, '..');
 
 /** Тело `loadBackgroundSettings()` из файла — по балансировке скобок. */
 function loadBackgroundBody(src) {
@@ -52,7 +50,7 @@ const CASES = [
 
 for (const { file, who } of CASES) {
     test(`${who}: loadBackgroundSettings не уходит молча`, () => {
-        const src = fs.readFileSync(path.join(repoRoot, file), 'utf8');
+        const src = readSource(file);
         const body = codeOnly(loadBackgroundBody(src));
 
         // Две причины не применить настройки, и обе обязаны быть названы:
@@ -79,7 +77,7 @@ for (const { file, who } of CASES) {
 }
 
 test('виджет: сорванная инициализация — это ошибка со стеком, а не warning', () => {
-    const src = fs.readFileSync(path.join(repoRoot, 'electron-widget.html'), 'utf8');
+    const src = readSource('electron-widget.html');
     const code = codeOnly(src);
 
     // Сюда попадает окно, у которого не отработали настройки, цвета ИЛИ фон:

@@ -11,6 +11,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { BUILT_IN_PRESETS, playBuiltInPreset } = require('../sound-bank');
+const { readSource } = require('./helpers/window-source');
 
 // Минимальный двойник AudioContext, считающий созданные и остановленные узлы.
 function fakeContext() {
@@ -155,9 +156,7 @@ test('реестр списков и банк звуков совпадают В
 });
 
 test('панель строит списки звуков модулем, а не разметкой', () => {
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const html = fs.readFileSync(path.join(__dirname, '..', 'electron-control.html'), 'utf8');
+    const html = readSource('electron-control.html');
     assert.match(html, /<script src="sound-presets\.js"><\/script>/, 'панель не подключает реестр звуков');
     assert.match(html, /SoundPresets\.buildSoundSelects\(document\)/, 'списки никто не строит');
     // И разметка больше не ведёт свою копию набора.

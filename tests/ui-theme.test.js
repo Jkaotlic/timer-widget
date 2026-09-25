@@ -18,13 +18,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const UITheme = require(path.join(ROOT, 'ui-theme.js'));
 const CONFIG = require(path.join(ROOT, 'constants.js'));
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const { readSource } = require('./helpers/window-source');
+const read = (f) => readSource(f);
 
 const WINDOWS = [
     'electron-control.html',
@@ -153,7 +153,7 @@ test('кнопка переключения темы в панели: состо
     // разметке панели осталась кнопка и один вызов проводки.
     assert.match(html, /<script src="panel-titlebar\.js"><\/script>/, 'панель не подключает panel-titlebar.js');
     assert.match(html, /window\.PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
-    const titlebar = fs.readFileSync(path.join(ROOT, 'panel-titlebar.js'), 'utf8');
+    const titlebar = readSource('panel-titlebar.js');
     assert.match(titlebar, /theme\.applyTheme\(value\)/, 'тема не применяется локально');
     assert.match(titlebar, /theme\.storeTheme\(value\)/, 'тема не сохраняется');
     assert.match(titlebar, /setAttribute\('aria-pressed', String\(isLight\)\)/, 'aria-pressed не обновляется');

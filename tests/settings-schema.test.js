@@ -15,10 +15,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const Schema = require('../settings-schema.js');
+const { readSource } = require('./helpers/window-source');
 const { SETTINGS_DESCRIPTORS, MANUAL_KEYS, settingValue, applyStoredSettings, collectSettings } = Schema;
 
 // --- поддельный DOM -------------------------------------------------------
@@ -275,9 +275,8 @@ test('круговой рейс: собранное раскладывается
 
 // --- связь с панелью ------------------------------------------------------
 
-const repoRoot = path.join(__dirname, '..');
-const controlHtml = fs.readFileSync(path.join(repoRoot, 'electron-control.html'), 'utf8');
-const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+const controlHtml = readSource('electron-control.html');
+const pkg = JSON.parse(readSource('package.json'));
 
 test('модуль подключён в панели и попадает в сборку', () => {
     // Без первого — панель падает при загрузке; без второго модуль исчезает из
@@ -481,7 +480,7 @@ test('resetKeys возвращает к умолчанию ТОЛЬКО назв
 test('resetKeys и resetOwnedSettings — одна механика сброса контрола', () => {
     // Две функции, но знание «как вернуть контрол к умолчанию» одно: чекбокс
     // ставится в checked, остальные — в value, у ползунка обновляется подпись.
-    const source = fs.readFileSync(path.join(__dirname, '..', 'settings-schema.js'), 'utf8');
+    const source = readSource('settings-schema.js');
     const resets = source.match(/el\.checked = !!descriptor\.def/g) || [];
     assert.equal(resets.length, 1, 'механика сброса контрола скопирована ещё раз');
 });

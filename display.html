@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-J1aw5gAe+TWlTRTEwW902CjRYgPUzLjuo+pMICUL1Eg=' 'sha256-m9OmrEpHXC7t8mH9uhW5HlsisWa67G18vPZO7gPUCT4='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Таймер - Полноэкранное отображение</title>
     <link rel="stylesheet" href="fonts.css">
@@ -16,7 +16,7 @@
          кадра, иначе окно успевает показать чужое состояние. -->
     <script src="ui-lock.js"></script>
     <script src="drop-guard.js"></script>
-    <script>window.UITheme.initTheme(); window.UILock.initLock();</script>
+    <script src="theme-init.js"></script>
     <link rel="stylesheet" href="flip-card.css">
     <link rel="stylesheet" href="surface-tones.css">
     <link rel="stylesheet" href="display.css">
@@ -430,6 +430,6 @@
     <script src="digits-style.js"></script>
     <script src="display-script.js"></script>
     <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script>window.UITheme.bindThemeSync(window.ipcRenderer, () => window.displayTimer && window.displayTimer.onThemeChanged());</script>
+    <script src="display-theme-sync.js"></script>
 </body>
 </html>

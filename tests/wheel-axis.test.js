@@ -21,16 +21,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { codeOnly } = require('./helpers/source-scan.js');
+const { readSource } = require('./helpers/window-source');
 
-const ROOT = path.join(__dirname, '..');
 const WINDOWS = ['display-script.js', 'electron-widget.html', 'electron-clock-widget.html'];
 
 for (const file of WINDOWS) {
-    const code = codeOnly(fs.readFileSync(path.join(ROOT, file), 'utf8'));
+    const code = codeOnly(readSource(file));
 
     test(`${file}: направление берётся из ОСИ, по которой пришло движение`, () => {
         assert.match(

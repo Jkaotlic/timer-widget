@@ -12,13 +12,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 const { fits, decideCompact } = require(path.join(ROOT, 'panel-compact.js'));
 const { codeOnly } = require('./helpers/source-scan.js');
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const { readSource } = require('./helpers/window-source');
+const read = (f) => readSource(f);
 
 test('«влезло ровно» — это влезло, а не «почти»', () => {
     assert.equal(fits(700, 700), true);

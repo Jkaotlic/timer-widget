@@ -20,14 +20,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { codeOnly } = require('./helpers/source-scan.js');
 const CONFIG = require('../constants');
+const { readSource } = require('./helpers/window-source');
 
-const ROOT = path.join(__dirname, '..');
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const read = (f) => readSource(f);
 
 // Файлы, где живёт обработчик клавиш пресетов.
 const HANDLERS = [

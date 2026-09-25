@@ -12,11 +12,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('fs');
-const path = require('path');
 const { codeOnly } = require('./helpers/source-scan');
 
 const { fillDisplaySelect } = require('../panel-display.js');
+const { readSource } = require('./helpers/window-source');
 
 function fakeDoc() {
     return {
@@ -67,10 +66,10 @@ test('BUG-18: мусор и кавычки из хранилища не роня
 });
 
 test('BUG-18: в панели не осталось селектора из данных хранилища', () => {
-    const html = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'electron-control.html'), 'utf8'));
+    const html = codeOnly(readSource('electron-control.html'));
     assert.doesNotMatch(html, /option\[value="\$\{savedDisplay\}"\]/);
     assert.doesNotMatch(html, /updateDisplaysList\(displays\)\s*\{/, 'метод снова живёт в inline-скрипте');
-    const mod = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'panel-display.js'), 'utf8'));
+    const mod = codeOnly(readSource('panel-display.js'));
     assert.match(mod, /updateDisplaysList\(displays\)\s*\{/);
     // Самопроверка регулярки на старом тексте.
     assert.match('select.querySelector(`option[value="${savedDisplay}"]`)', /option\[value="\$\{savedDisplay\}"\]/);

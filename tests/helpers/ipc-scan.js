@@ -17,6 +17,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { codeOnly, maskNonCode, balancedBlockAt, afterBalanced } = require('./source-scan');
+const { WINDOW_OWN, readSource } = require('./window-source');
 
 const repoRoot = path.join(__dirname, '..', '..');
 const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
@@ -30,9 +31,13 @@ const PAGES = Object.freeze({
 
 // Страница и её <script src> по отдельности: подписка внутри общей функции
 // модуля (bindLockSync) считается окну, только если окно эту функцию зовёт.
+// Страница — вместе со СВОИМИ файлами (widget-app.js…, tests/helpers/window-source.js):
+// до 25.09.2026 это был её inline-<script>, и он остаётся кодом страницы.
 function roleFiles(role) {
-    const html = read(PAGES[role]);
-    const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
+    const html = readSource(PAGES[role]);
+    const own = WINDOW_OWN[PAGES[role]];
+    const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1])
+        .filter((f) => !own.includes(f));
     return [
         { file: PAGES[role], code: codeOnly(html), page: true },
         ...srcs.map((f) => ({ file: f, code: codeOnly(read(f)), page: false }))

@@ -15,12 +15,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const path = require('node:path');
 const { codeOnly, styleToken } = require('./helpers/source-scan');
+const { readSource } = require('./helpers/window-source');
 
 const ROOT = path.join(__dirname, '..');
-const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+const read = (f) => readSource(f);
 
 const CSS = read('control.css');
 const CSS_CODE = codeOnly(CSS);
@@ -411,7 +411,7 @@ test('цвет полосы у «Цифр» на дисплее принадле
         'в ветку «Цифр» вернулся цветовой литерал — цвет полосы принадлежит CSS');
 
     // Единственный источник значения — правило CSS, и оно берёт токен.
-    const css = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
+    const css = readSource('display.css');
     assert.match(css, /\.digits-time\.warning \{[^}]*color: var\(--tw-band-warning\)/,
         '.digits-time.warning обязано красить ТОКЕНОМ полосы, а не литералом');
 });

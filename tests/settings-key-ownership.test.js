@@ -23,18 +23,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { pickOwnSetting } = require('../renderer-shared');
 const { codeOnly } = require('./helpers/source-scan');
+const { readSource } = require('./helpers/window-source');
 
 // Локальное имя оставлено читаемым: во всех проверках ниже речь именно о выборе
 // «своё имя против общего».
 const pickDisplaySetting = pickOwnSetting;
 
-const repoRoot = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
+const read = (file) => readSource(file);
 
 test('своё имя главнее общего, когда в наборе есть оба', () => {
     // Случай хранилища: displayExtSettings несёт ОБА поля, и `timerStyle` там —
