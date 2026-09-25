@@ -126,7 +126,7 @@ let clockWidgetWindow = null;
 // Состояние таймера
 // The timer state machine lives in ./timer-controller.js (Electron-free, unit
 // tested with a fake clock). The controller OWNS timerState/timerConfig, the
-// monotonic update counter, and the wall-clock anchors. This process keeps the
+// monotonic update counter, and the countdown anchors. This process keeps the
 // real setInterval (timerInterval) and feeds the controller a real clock + the
 // IPC broadcast callbacks. `timerState` below is a read-only mirror kept in sync
 // via the onState callback so the rest of this file (tray, recovery, IPC reply,
@@ -412,6 +412,10 @@ function accrueOverrun(state) {
 const timerController = createTimerController({
     engine: timerEngine,
     now: Date.now,
+    // Отсчёт — по монотонным часам: перевод системных часов не должен ни
+    // замораживать таймер, ни проваливать его в минус (BUG-03). Сон машины
+    // controller узнаёт от powerMonitor (suspend/resume ниже).
+    monotonic: () => performance.now(),
     // FIX BUG-013: Безопасная отправка IPC сообщений
     onState: (state) => {
         timerState = state;
@@ -752,7 +756,7 @@ function announceWindowOpened(win, stateChannel, hydrate) {
     broadcastWindowState(stateChannel, { isOpen: true });
 }
 
-// Advance the timer to match real elapsed wall-clock time since the anchor.
+// Advance the timer to match real elapsed time since the anchor.
 // Called every interval tick AND on powerMonitor 'resume' so the displayed time
 // snaps back to reality immediately after the machine wakes from sleep. The
 // controller does the arithmetic + event/emit; here we just clear the real
@@ -776,8 +780,12 @@ function handleTimerStart() {
 }
 
 function handleTimerPause() {
+    // Сначала пауза, потом интервал: пауза сверяет натикавшее (BUG-05), и
+    // таймер обязан успеть досчитать. Интервал снимается в любом исходе — после
+    // pause() таймер не идёт, даже если это был финиш при сверке.
+    const paused = timerController.pause();
     clearTimerInterval();
-    timerController.pause();
+    return paused;
 }
 
 function handleTimerReset() {
@@ -1338,9 +1346,17 @@ app.whenReady().then(() => {
     // Remove default Electron menu (File, Edit, View, Help)
     Menu.setApplicationMenu(null);
 
-    // Snap the countdown back to real time the instant the machine wakes from
-    // sleep (setInterval doesn't fire while suspended). Safe no-op when stopped.
-    try { powerMonitor.on('resume', reconcileTimer); } catch (err) { log.warn('powerMonitor resume hook failed:', err); }
+    // Сон машины. Отсчёт идёт по монотонным часам, а они во сне стоят (macOS,
+    // Linux), поэтому сон controller засчитывает сам: suspend запоминает обе
+    // пары часов, resume добавляет разницу (BUG-03). После пробуждения сразу
+    // сверяемся — setInterval во сне не тикал. Safe no-op when stopped.
+    try {
+        powerMonitor.on('suspend', () => timerController.suspend());
+        powerMonitor.on('resume', () => {
+            timerController.resume();
+            reconcileTimer();
+        });
+    } catch (err) { log.warn('powerMonitor hooks failed:', err); }
 
     // Deny every renderer permission request (camera/mic/geo/notifications/…).
     // This is a purely offline timer — it never needs any web/device permission.
@@ -1454,6 +1470,9 @@ ipcMain.on('timer-command', (_event, payload) => {
             // the wall-clock reconcile continues from the new value instead of
             // "correcting" the on-the-fly adjustment away on the next tick.
             timerController.adjust(deltaSeconds);
+            // Поправка сперва сверяет натикавшее, и сверка может закончить
+            // таймер — тогда интервалу тикать больше нечего.
+            if (!timerController.getState().isRunning) { clearTimerInterval(); }
             emittedByCommand = true;
             break;
         }
@@ -1463,8 +1482,9 @@ ipcMain.on('timer-command', (_event, payload) => {
             break;
         }
         case 'pause': {
-            handleTimerPause();
-            emittedByCommand = true;
+            // Пауза не идущего таймера ничего не рассылает (BUG-02) — тогда
+            // смену настроек из этой же посылки разошлёт общий emit ниже.
+            emittedByCommand = handleTimerPause();
             break;
         }
         case 'reset': {

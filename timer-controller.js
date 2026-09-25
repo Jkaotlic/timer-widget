@@ -15,19 +15,28 @@
  * Dependencies are injected via the factory so tests can supply a fake clock
  * and spy callbacks:
  *
- *   createTimerController({ engine, now, onState, onEvent, scheduler })
+ *   createTimerController({ engine, now, monotonic, onState, onEvent })
  *
  *   - engine    : require('./timer-engine') — the pure arithmetic module.
  *   - now       : () => number — wall-clock source (electron-main: Date.now).
- *   - onState   : (state) => void — fired on every state emit with the FULL,
- *                 broadcast-ready state object. electron-main does the actual
- *                 safelySendToWindow(...) to the 4 windows + tray update here.
+ *                 Только для штампа `timestamp` и для замера СНА (suspend/resume).
+ *   - monotonic : () => number — монотонные миллисекунды (electron-main:
+ *                 performance.now). По ним идёт отсчёт — см. «Два вида часов».
+ *   - onState   : (state, meta) => void — fired on every state emit with the
+ *                 FULL, broadcast-ready state object. `meta.tick === true` —
+ *                 это ход секунд, а не команда (главному процессу это нужно,
+ *                 чтобы не писать снимок восстановления каждую секунду).
  *   - onEvent   : (name) => void — fired for boundary events
  *                 ('timer-reached-zero' / 'timer-minute' / 'timer-overrun-minute')
  *                 so electron-main can broadcast them.
- *   - scheduler : { setTimeout, clearTimeout } — optional; defaults to global
- *                 timers. Used only for the reset race-guard window so tests can
- *                 drive it deterministically.
+ *
+ * Два вида часов (BUG-03). Отсчёт шёл по Date.now — ради того, чтобы сон
+ * машины засчитывался: во сне setInterval не тикает, а стенные часы идут. Но
+ * стенные часы переводят: перевод на час назад замораживал таймер на час,
+ * вперёд — проваливал его и начислял деньги за перелимит, которого не было.
+ * Теперь ход меряется монотонными часами, а сон учитывается ЯВНО: главный
+ * процесс зовёт suspend()/resume() по powerMonitor, и сколько стенных часов
+ * прошло между ними, сверх того, что показали монотонные, — это и есть сон.
  *
  * patch() is the emitTimerState equivalent: merge partial → stamp
  * overrunLimitSeconds/allowNegative/timestamp/updateCounter → bump counter →
@@ -38,9 +47,9 @@
 function createTimerController(deps = {}) {
     const engine = deps.engine;
     const now = typeof deps.now === 'function' ? deps.now : Date.now;
+    const monotonic = typeof deps.monotonic === 'function' ? deps.monotonic : () => performance.now();
     const onState = typeof deps.onState === 'function' ? deps.onState : () => {};
     const onEvent = typeof deps.onEvent === 'function' ? deps.onEvent : () => {};
-    const scheduler = deps.scheduler || { setTimeout, clearTimeout };
 
     if (!engine || typeof engine.tick !== 'function') {
         throw new Error('createTimerController requires an engine with a tick() method');
@@ -66,17 +75,35 @@ function createTimerController(deps = {}) {
         overrunIntervalMinutes: 1
     };
 
-    // Wall-clock anchor for drift-free countdown. We never assume exactly one
-    // second elapsed per interval fire; instead each reconcile computes how many
-    // whole seconds SHOULD have passed since the anchor and advances the engine
-    // by that step. This keeps the timer accurate across event-loop jitter and
-    // OS sleep/resume.
-    let timerAnchorReal = 0;       // now() captured when the run/anchor began
+    // Anchor for drift-free countdown. We never assume exactly one second
+    // elapsed per interval fire; instead each reconcile computes how many whole
+    // seconds SHOULD have passed since the anchor and advances the engine by
+    // that step. This keeps the timer accurate across event-loop jitter; OS
+    // sleep is added explicitly (sleepCreditMs, see suspend/resume).
+    let timerAnchorMono = 0;       // monotonic() captured when the run/anchor began
     let timerAnchorRemaining = 0;  // remainingSeconds at that anchor
+    let sleepCreditMs = 0;         // сон машины с момента якоря (монотонные его не видят)
+    let suspendMark = null;        // { wall, mono } — где застал suspend()
 
-    function reanchor() {
-        timerAnchorReal = now();
+    // Доля секунды, натикавшая к следующему видимому шагу, — вне хода её нет.
+    // Пауза забирала её с собой: каждый цикл «пауза — старт» удлинял таймер
+    // почти на секунду (BUG-05). Теперь она переносится в новый якорь.
+    let carryMs = 0;
+
+    function elapsedMs() {
+        return monotonic() - timerAnchorMono + sleepCreditMs;
+    }
+
+    // Натикавшее сверх целых секунд, уже показанных с момента якоря.
+    function pendingFractionMs() {
+        const shown = (timerAnchorRemaining - timerState.remainingSeconds) * 1000;
+        return Math.min(999, Math.max(0, elapsedMs() - shown));
+    }
+
+    function reanchor(fractionMs = 0) {
+        timerAnchorMono = monotonic() - fractionMs;
         timerAnchorRemaining = timerState.remainingSeconds;
+        sleepCreditMs = 0;
     }
 
     function getState() {
@@ -88,7 +115,7 @@ function createTimerController(deps = {}) {
     }
 
     // emitTimerState equivalent: merge + stamp + bump counter + notify.
-    function patch(partial = {}) {
+    function patch(partial = {}, meta = {}) {
         // FIX BUG-012: Увеличиваем монотонный счетчик при каждом обновлении
         timerUpdateCounter++;
 
@@ -101,7 +128,7 @@ function createTimerController(deps = {}) {
             updateCounter: timerUpdateCounter  // Монотонный счетчик
         };
 
-        onState(timerState);
+        onState(timerState, meta);
         return timerState;
     }
 
@@ -141,6 +168,7 @@ function createTimerController(deps = {}) {
     // finishTimer equivalent. Does NOT touch any real interval (electron-main
     // clears its interval when start()/reconcile() report a non-running state).
     function finish(finalRemaining) {
+        carryMs = 0;
         const remaining = finalRemaining !== undefined
             ? finalRemaining
             : (timerConfig.allowNegative
@@ -172,40 +200,50 @@ function createTimerController(deps = {}) {
             finished: started.finished
         });
 
-        // Anchor the countdown to wall-clock time at the moment we start running.
-        reanchor();
+        // Якорь ставится С долей секунды, недотиканной до паузы (BUG-05).
+        reanchor(carryMs);
+        carryMs = 0;
         return true;
     }
 
-    // handleTimerPause equivalent.
+    // handleTimerPause equivalent. Returns true when the timer actually paused.
+    //
+    // Пауза — только у идущего таймера (BUG-02). Без охраны пауза из финиша
+    // снимала защёлку `finished` — и следующий старт повторял звук и вспышку
+    // конца, — а из покоя рисовала «паузу», которой не было (клавиша S дисплея
+    // шлёт pause безусловно).
     function pause() {
+        if (!timerState.isRunning) { return false; }
+        // Сначала забрать натикавшее: целые секунды, которые тик ещё не
+        // показал, и долю следующей (BUG-05). Сверка может и закончить таймер —
+        // тогда ставить на паузу уже нечего.
+        if (reconcile()) { return false; }
+        carryMs = pendingFractionMs();
         const paused = engine.pause(timerState);
         patch({
             isRunning: paused.isRunning,
             isPaused: paused.isPaused,
             finished: paused.finished
         });
+        return true;
     }
 
-    // handleTimerReset equivalent, including the ~100ms race guard so concurrent
-    // reset requests cannot overlap. The guard window is driven by the injected
-    // scheduler (defaults to global setTimeout) so tests stay deterministic.
-    let isResetting = false;
+    // handleTimerReset equivalent.
+    //
+    // Охраны «не чаще раза в 100 мс» больше нет (BUG-06). Сброс синхронен и
+    // идемпотентен — перекрываться ему не с чем, — а главный процесс снимает
+    // интервал ДО вызова: проглоченный охраной сброс оставлял isRunning=true
+    // без единого тика, «идёт», который стоит.
     function reset() {
-        if (isResetting) { return; }
-        isResetting = true;
-        try {
-            const resetState = engine.reset(timerState);
-            patch({
-                totalSeconds: resetState.totalSeconds,
-                remainingSeconds: resetState.remainingSeconds,
-                isRunning: resetState.isRunning,
-                isPaused: resetState.isPaused,
-                finished: resetState.finished
-            });
-        } finally {
-            scheduler.setTimeout(() => { isResetting = false; }, 100);
-        }
+        carryMs = 0;
+        const resetState = engine.reset(timerState);
+        patch({
+            totalSeconds: resetState.totalSeconds,
+            remainingSeconds: resetState.remainingSeconds,
+            isRunning: resetState.isRunning,
+            isPaused: resetState.isPaused,
+            finished: resetState.finished
+        });
     }
 
     // 'set' command equivalent. Ignored while running (matches the original
@@ -218,6 +256,7 @@ function createTimerController(deps = {}) {
         // Не-число — не команда (BUG-12). Движок превратил бы его в 0, и
         // посылка `seconds: true` молча обнуляла бы таймер.
         if (engine.toWholeSeconds(seconds) === null) { return false; }
+        carryMs = 0;
         const presetState = engine.setPreset(timerState, seconds);
         patch({
             totalSeconds: presetState.totalSeconds,
@@ -234,22 +273,48 @@ function createTimerController(deps = {}) {
     // reconcile continues from the new value instead of "correcting" the
     // on-the-fly adjustment away.
     function adjust(deltaSeconds) {
+        // Натикавшее до поправки — сначала в состояние: иначе новый якорь
+        // молча выбросил бы и его, и долю секунды (та же потеря, что BUG-05).
+        // Если сверка закончила таймер, поправка ложится на законченный —
+        // как у любого остановленного: нажатие «+30» не проглатывается.
+        let fractionMs = 0;
+        if (timerState.isRunning && !reconcile()) {
+            fractionMs = pendingFractionMs();
+        }
         const adjustedState = engine.adjust(timerState, deltaSeconds, timerConfig.allowNegative);
         patch({
             totalSeconds: adjustedState.totalSeconds,
             remainingSeconds: adjustedState.remainingSeconds,
             finished: adjustedState.finished
         });
-        if (timerState.isRunning) { reanchor(); }
+        if (timerState.isRunning) { reanchor(fractionMs); }
+    }
+
+    // Машина засыпает: запомнить обе пары часов. Зовётся всегда — таймер могут
+    // запустить и остановить и после этого, решает resume().
+    function suspend() {
+        suspendMark = { wall: now(), mono: monotonic() };
+    }
+
+    // Машина проснулась: сон = стенной ход минус монотонный. Разность, а не
+    // стенной ход целиком: там, где монотонные часы во сне идут (часть
+    // Windows-машин), сон иначе посчитался бы дважды. Отрицательной она
+    // бывает, если часы перевели во сне назад, — тогда сна не засчитываем.
+    function resume() {
+        const mark = suspendMark;
+        suspendMark = null;
+        if (!mark || !timerState.isRunning) { return; }
+        const slept = (now() - mark.wall) - (monotonic() - mark.mono);
+        if (Number.isFinite(slept) && slept > 0) { sleepCreditMs += slept; }
     }
 
     // reconcileTimer equivalent: advance the timer to match real elapsed
-    // wall-clock time since the anchor. Returns true when the timer finished
+    // time since the anchor. Returns true when the timer finished
     // (so electron-main can clear its interval), false otherwise.
     function reconcile() {
         if (!timerState.isRunning) { return false; }
 
-        const target = timerAnchorRemaining - Math.floor((now() - timerAnchorReal) / 1000);
+        const target = timerAnchorRemaining - Math.floor(elapsedMs() / 1000);
         const step = timerState.remainingSeconds - target;
         // Less than a whole second has elapsed since the last visible decrement.
         if (step < 1) { return false; }
@@ -270,7 +335,7 @@ function createTimerController(deps = {}) {
         patch({
             remainingSeconds: nextState.remainingSeconds,
             finished: false
-        });
+        }, { tick: true });
         return false;
     }
 
@@ -302,6 +367,8 @@ function createTimerController(deps = {}) {
         setPreset,
         adjust,
         reconcile,
+        suspend,
+        resume,
         finish,
         restoreState
     };

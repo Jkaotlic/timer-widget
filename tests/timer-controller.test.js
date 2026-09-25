@@ -4,10 +4,10 @@
  * timer-controller.test.js
  *
  * Tests the timer state machine extracted from electron-main.js. Uses the REAL
- * timer-engine (injected) plus a fake clock + fake scheduler so the reconcile /
- * reset-race-guard / anchor logic is fully deterministic and synchronous.
+ * timer-engine (injected) plus fake wall + monotonic clocks so the reconcile /
+ * sleep / anchor logic is fully deterministic and synchronous.
  *
- * The glue covered here (reconcile wall-clock catch-up, reset race-guard,
+ * The glue covered here (reconcile catch-up, suspend/resume sleep credit,
  * adjust+re-anchor, start guard, setConfig merge, updateCounter monotonicity,
  * single-fire boundary events) was previously untestable inline in electron-main.
  */
@@ -21,21 +21,17 @@ const { createTimerController } = require('../timer-controller');
 // the spy buffers and clock controls.
 function makeHarness(initial = {}) {
     let nowMs = initial.startMs !== undefined ? initial.startMs : 1_000_000;
+    // Монотонные часы идут отдельно от стенных (BUG-03): перевод системных
+    // часов двигает только стенные, сон машины на macOS — тоже только их.
+    let monoMs = 0;
     const states = [];   // every onState payload, in order
     const events = [];   // every onEvent name, in order
-    // Fake scheduler: capture pending callbacks so tests can flush them on demand.
-    const pending = [];
-    const scheduler = {
-        setTimeout: (fn, _ms) => { pending.push(fn); return pending.length - 1; },
-        clearTimeout: () => {}
-    };
-
     const controller = createTimerController({
         engine,
         now: () => nowMs,
+        monotonic: () => monoMs,
         onState: (s) => states.push(s),
-        onEvent: (n) => events.push(n),
-        scheduler
+        onEvent: (n) => events.push(n)
     });
 
     return {
@@ -43,12 +39,19 @@ function makeHarness(initial = {}) {
         states,
         events,
         // Advance the fake clock by N seconds (wall-clock).
-        advance: (sec) => { nowMs += sec * 1000; },
-        advanceMs: (ms) => { nowMs += ms; },
+        advance: (sec) => { nowMs += sec * 1000; monoMs += sec * 1000; },
+        advanceMs: (ms) => { nowMs += ms; monoMs += ms; },
         setNow: (ms) => { nowMs = ms; },
-        // Run all captured scheduler callbacks (e.g. the reset-guard release).
-        flushTimers: () => { const fns = pending.splice(0); fns.forEach((fn) => fn()); },
-        pendingCount: () => pending.length
+        // Перевод системных часов: стенные прыгают, реальное время — нет.
+        jumpWall: (sec) => { nowMs += sec * 1000; },
+        // Сон машины. На macOS/Linux монотонные часы во сне стоят, на части
+        // Windows-машин идут — `monoCounts` проверяет, что сон не посчитан дважды.
+        sleep: (sec, { monoCounts = false } = {}) => {
+            controller.suspend();
+            nowMs += sec * 1000;
+            if (monoCounts) { monoMs += sec * 1000; }
+            controller.resume();
+        }
     };
 }
 
@@ -380,7 +383,7 @@ test('adjust: non-finite delta is treated as 0 (engine guard preserved)', () => 
     assert.equal(h.controller.getState().remainingSeconds, 100);
 });
 
-// --- reset + race guard ---
+// --- reset ---
 
 test('reset: restores to presetSeconds and clears flags', () => {
     const h = makeHarness();
@@ -394,39 +397,6 @@ test('reset: restores to presetSeconds and clears flags', () => {
     assert.equal(s.totalSeconds, 300);
     assert.equal(s.isRunning, false);
     assert.equal(s.finished, false);
-});
-
-test('reset: race guard blocks a second reset within the ~100ms window', () => {
-    const h = makeHarness();
-    h.controller.setPreset(300);
-    h.controller.adjust(100); // remaining 400, total 400, preset still 300
-    const counterBefore = h.controller.getState().updateCounter;
-
-    h.controller.reset();              // first reset emits
-    const counterAfterFirst = h.controller.getState().updateCounter;
-    assert.equal(counterAfterFirst, counterBefore + 1);
-    assert.equal(h.controller.getState().remainingSeconds, 300);
-
-    // Mutate again then attempt a concurrent reset — should be ignored (guarded).
-    h.controller.adjust(100); // remaining 400 again
-    const counterMid = h.controller.getState().updateCounter;
-    h.controller.reset();
-    assert.equal(h.controller.getState().updateCounter, counterMid); // no emit
-    assert.equal(h.controller.getState().remainingSeconds, 400);     // unchanged
-
-    // Release the guard (scheduler callback) → reset works again.
-    h.flushTimers();
-    h.controller.reset();
-    assert.equal(h.controller.getState().remainingSeconds, 300);
-});
-
-test('reset: guard schedules exactly one release per reset', () => {
-    const h = makeHarness();
-    h.controller.setPreset(60);
-    h.controller.reset();
-    assert.equal(h.pendingCount(), 1);
-    h.flushTimers();
-    assert.equal(h.pendingCount(), 0);
 });
 
 // --- restoreState (crash recovery) ---
@@ -508,4 +478,175 @@ test('BUG-12: adjust 1e308 дважды не даёт Infinity/NaN', () => {
     const s = h.controller.getState();
     assert.ok(Number.isFinite(s.remainingSeconds) && Number.isFinite(s.totalSeconds));
     assert.equal(s.remainingSeconds, 359999);
+});
+
+// --- BUG-02: пауза — только у идущего таймера --------------------------------
+
+test('BUG-02: пауза из покоя ничего не делает — ложной «паузы» нет', () => {
+    const h = makeHarness();
+    h.controller.setPreset(60);
+    const emits = h.states.length;
+    assert.equal(h.controller.pause(), false);
+    assert.equal(h.controller.getState().isPaused, false);
+    assert.equal(h.states.length, emits, 'пауза из покоя разослала состояние');
+});
+
+test('BUG-02: пауза после финиша не снимает защёлку finished', () => {
+    const h = makeHarness();
+    h.controller.setPreset(2);
+    h.controller.start();
+    h.advance(3);
+    assert.equal(h.controller.reconcile(), true);
+    assert.equal(h.controller.pause(), false);
+    const s = h.controller.getState();
+    assert.equal(s.finished, true, 'защёлка конца снята — следующий старт повторит звук конца');
+    assert.equal(s.isPaused, false);
+});
+
+test('BUG-02: вторая пауза подряд не рассылает состояние', () => {
+    const h = makeHarness();
+    h.controller.setPreset(60);
+    h.controller.start();
+    assert.equal(h.controller.pause(), true);
+    const emits = h.states.length;
+    assert.equal(h.controller.pause(), false);
+    assert.equal(h.states.length, emits);
+});
+
+// --- BUG-05: пауза не теряет натикавшее --------------------------------------
+
+test('BUG-05: пауза забирает целые секунды, которые тик ещё не успел показать', () => {
+    const h = makeHarness();
+    h.controller.setPreset(60);
+    h.controller.start();
+    h.advanceMs(2500); // тик не пришёл (задержка цикла событий)
+    h.controller.pause();
+    assert.equal(h.controller.getState().remainingSeconds, 58);
+});
+
+test('BUG-05: доля секунды переживает паузу — цикл пауз не удлиняет таймер', () => {
+    const h = makeHarness();
+    h.controller.setPreset(60);
+    // Десять циклов «0,7 с идёт — пауза — старт»: всего 7 с реального хода.
+    for (let i = 0; i < 10; i++) {
+        h.controller.start();
+        h.advanceMs(700);
+        h.controller.reconcile();
+        h.controller.pause();
+        h.advance(5); // на паузе время не идёт в счёт
+    }
+    assert.equal(h.controller.getState().remainingSeconds, 53);
+});
+
+test('BUG-05: сброс и новый пресет не наследуют долю секунды прошлого хода', () => {
+    const h = makeHarness();
+    h.controller.setPreset(60);
+    h.controller.start();
+    h.advanceMs(900);
+    h.controller.pause();
+    h.controller.reset();
+    h.controller.start();
+    h.advanceMs(200);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 60);
+});
+
+// --- BUG-06: сброс всегда останавливает таймер ------------------------------
+
+test('BUG-06: сброс → старт → сброс быстрее 100 мс останавливает таймер', () => {
+    // Главный процесс снимает интервал ДО reset(); охрана 100 мс глотала
+    // второй сброс, и таймер оставался «идёт» без единого тика.
+    const h = makeHarness();
+    h.controller.setPreset(60);
+    h.controller.start();
+    h.controller.reset();
+    h.controller.start();
+    h.controller.reset();
+    const s = h.controller.getState();
+    assert.equal(s.isRunning, false);
+    assert.equal(s.remainingSeconds, 60);
+});
+
+// --- BUG-03: скачок системных часов и сон машины ---------------------------
+
+test('BUG-03: часы переведены на час назад — таймер идёт дальше, а не стоит час', () => {
+    const h = makeHarness();
+    h.controller.setPreset(600);
+    h.controller.start();
+    h.advance(10);
+    h.controller.reconcile();
+    h.jumpWall(-3600);
+    h.advance(5);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 585);
+});
+
+test('BUG-03: часы переведены на час вперёд — время не проваливается, минус не начисляется', () => {
+    const h = makeHarness();
+    h.controller.setConfig({ allowNegative: true });
+    h.controller.setPreset(600);
+    h.controller.start();
+    h.advance(10);
+    h.controller.reconcile();
+    h.jumpWall(3600);
+    h.advance(5);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 585);
+});
+
+test('BUG-03: сон машины 10 минут засчитывается (монотонные часы во сне стоят)', () => {
+    const h = makeHarness();
+    h.controller.setPreset(1800);
+    h.controller.start();
+    h.advance(10);
+    h.controller.reconcile();
+    h.sleep(600);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 1190);
+});
+
+test('BUG-03: сон не считается дважды, если монотонные часы во сне шли', () => {
+    const h = makeHarness();
+    h.controller.setPreset(1800);
+    h.controller.start();
+    h.sleep(600, { monoCounts: true });
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 1200);
+});
+
+test('BUG-03: сон на паузе не списывает время', () => {
+    const h = makeHarness();
+    h.controller.setPreset(1800);
+    h.controller.start();
+    h.advance(10);
+    h.controller.pause();
+    h.sleep(600);
+    h.controller.start();
+    h.advance(1);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 1789);
+});
+
+test('BUG-03: часы переведены назад во время сна — сон не даёт отрицательного хода', () => {
+    const h = makeHarness();
+    h.controller.setPreset(1800);
+    h.controller.start();
+    h.controller.suspend();
+    h.jumpWall(-3600);
+    h.controller.resume();
+    h.advance(3);
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 1797);
+});
+
+test('BUG-05: поправка на ходу не теряет натикавшее до неё', () => {
+    const h = makeHarness();
+    h.controller.setPreset(100);
+    h.controller.start();
+    h.advanceMs(2600); // тик опоздал
+    h.controller.adjust(30);
+    assert.equal(h.controller.getState().remainingSeconds, 128);
+    h.advanceMs(400); // доля 0,6 с сохранилась: ещё 0,4 — и шаг
+    h.controller.reconcile();
+    assert.equal(h.controller.getState().remainingSeconds, 127);
 });
