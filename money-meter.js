@@ -41,6 +41,18 @@ function safeSeconds(value) {
 }
 
 /**
+ * Рубли, округлённые до копеек (BUG-14).
+ *
+ * 100 ступеней по 0.29 ₽ в двоичной арифметике — 28.999999999999996, и
+ * печать с округлением ВНИЗ объявляла залу «28 ₽» вместо 29. Округление
+ * вниз законно для СТУПЕНЕЙ и для копеек при печати, но не для погрешности
+ * умножения — её снимают до того, как резать.
+ */
+function toCents(rubles) {
+    return Math.round(rubles * 100) / 100;
+}
+
+/**
  * Цена перелимита ступенями.
  *
  * Период ≤ 0 означает «считать нечем» и даёт 0 ₽, а не деление на ноль.
@@ -50,7 +62,7 @@ function overrunCost(seconds, price, period) {
     const p = toNumber(price, 0);
     const per = Math.floor(toNumber(period, 0));
     if (per <= 0 || p <= 0 || s <= 0) { return 0; }
-    return Math.floor(s / per) * p;
+    return toCents(Math.floor(s / per) * p);
 }
 
 /**
@@ -101,7 +113,7 @@ const NBSP = '\u00A0';
  */
 function formatMoney(rubles) {
     const n = toNumber(rubles, 0);
-    const whole = n > 0 ? Math.floor(n) : 0;
+    const whole = n > 0 ? Math.floor(toCents(n)) : 0;
     const grouped = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
     return `${grouped}${NBSP}₽`;
 }
