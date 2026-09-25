@@ -73,6 +73,23 @@ function checkDeb(debPath) {
         fail('postrm не выгружает профиль AppArmor — он останется в системе после удаления');
     }
 
+    // Depends: штатный список electron-builder не знает libgbm1 и libasound2 —
+    // пакет ставился на чистую систему и падал на старте (job
+    // deb-launch-container, 25.09.2026). Здесь — быстрая проверка списка,
+    // там — запуск.
+    const depends = execFileSync('dpkg-deb', ['-f', debPath, 'Depends'], { encoding: 'utf8' });
+    console.log(`[linux-sandbox]   Depends: ${depends.trim()}`);
+    // ALSA — альтернативой с t64 ПЕРВЫМ: на Ubuntu 24.04 голое имя libasound2
+    // виртуальное, и apt выбрал liboss4-salsa-asound2 без настоящих символов ALSA.
+    if (!/libasound2t64\s*\|\s*libasound2\b/.test(depends)) {
+        fail('ALSA в Depends не как `libasound2t64 | libasound2` — на Ubuntu 24.04 apt подставит OSS-заглушку');
+    }
+    for (const lib of ['libgbm1', 'libasound2', 'libnss3', 'libgtk-3-0']) {
+        if (!new RegExp(`(^|[,|]\\s*)${lib.replace(/[.+]/g, '\\$&')}(\\s|,|\\(|$)`).test(depends)) {
+            fail(`в Depends нет ${lib} — на чистой системе приложение не стартует`);
+        }
+    }
+
     // Строка запуска в .desktop не должна отключать песочницу.
     const list = execFileSync('dpkg-deb', ['-c', debPath], { encoding: 'utf8' });
     const desktopEntry = list.split('\n').find((l) => l.includes('.desktop'));

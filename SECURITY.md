@@ -305,9 +305,34 @@ base64. Сверх потолка payload отвергается целиком,
 
 ## Как проверить самостоятельно
 
+CI делает всё это сам на каждом прогоне, а релиз — до сборки артефактов
+(подробно — [docs/ci.md](docs/ci.md)):
+
+- **уязвимости**: `npm audit --audit-level=high` и OSV-Scanner по
+  `package-lock.json` и `sbom.json`; Grype по SBOM, построенному из
+  распакованного deb и `app.asar`. High и critical валят сборку, dev-зависимости
+  включены. Принятые находки — только в `osv-scanner.toml` / `.grype.yaml` с
+  причиной и сроком; сейчас их нет;
+- **Electron/Chromium**: Chromium внутри бинаря сканеры не опознают, поэтому
+  версия Electron сверяется трижды — lockfile, SBOM и строка `Electron/X.Y.Z` в
+  собранном бинаре — и сравнивается с последним патчем своей линии: в релизе
+  отставание — провал (CVE Chromium закрываются патч-релизами Electron);
+- **SBOM**: `sbom.json`, прикладываемый к релизу, совпадает с lockfile;
+- **песочница на живой системе**: deb ставится на Ubuntu 24.04 (ядро раннера с
+  AppArmor) и в чистые ubuntu:24.04, ubuntu:22.04, debian:12; приложение
+  запускается обычным пользователем без `--no-sandbox` и обязано прожить 15 с
+  после готовности, а его рендереры — работать под seccomp-bpf в своём
+  namespace. Проверяются оба пути: user namespaces через профиль AppArmor и
+  SUID-помощник. После удаления пакета профиль выгружен из ядра.
+
+Вручную:
+
 ```sh
-npm audit                      # уязвимости зависимостей (весь граф)
+npm audit --audit-level=high   # уязвимости зависимостей (весь граф, как в CI)
 npm audit --omit=dev           # то, что попадает в приложение
+node scripts/security-gate.js sbom-sync   # sbom.json совпадает с lockfile
+node scripts/security-gate.js electron    # Electron: lockfile = SBOM, последний патч
+cp sbom.json sbom.cdx.json && osv-scanner -L package-lock.json -L sbom.cdx.json
 npm run ci                     # lint + unit-тесты, включая release-gates
 npm run csp:check              # CSP окон: политика в meta, ни одного инлайна
 
@@ -321,6 +346,9 @@ npx @electron/fuses read --app dist/win-unpacked/TimerWidget.exe
 # Linux, на машине с dpkg-deb:
 npx electron-builder --linux deb
 node scripts/verify-linux-sandbox.js
+# установить и запустить в песочнице (от root; запуск — от APP_USER):
+sudo apt-get install -y ./dist/TimerWidget-*.deb xvfb
+sudo APP_USER="$USER" bash scripts/linux-launch-check.sh --expect userns   # или suid
 ```
 
 ## Известные ограничения

@@ -222,3 +222,206 @@ jobs:
         run: npx electron-builder --linux deb
       - name: Verify sandbox setup in packages
         run: node scripts/verify-linux-sandbox.js
+      # Тот же deb уходит на скан и на установку в чистые системы (jobs ниже):
+      # пакет собирается ОДИН раз, проверяется ровно он.
+      - name: Upload deb for install tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-deb
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 3
+
+  # ==========================================================================
+  # Ворота уязвимостей по lockfile и SBOM. Сборка 2.9.0 не прошла ПСИ по
+  # критическим уязвимостям Linux-версии; сканер приёмки читал package-lock.json
+  # и sbom.json, то есть то же, что есть здесь. Порог — high: high и critical
+  # валят job, ниже — предупреждение. Dev-инструментарий включён НАМЕРЕННО:
+  # сканер приёмки не отличает dev от runtime. Принятые находки — только
+  # записью с причиной и сроком в osv-scanner.toml (сейчас их нет).
+  # Подробно: docs/ci.md.
+  # ==========================================================================
+  security:
+    name: security (npm audit + OSV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      # npm audit читает lockfile — установка зависимостей не нужна.
+      - name: npm audit (high и выше блокирует, dev включён)
+        run: npm audit --audit-level=high
+      # SBOM прикладывается к релизу и читается сканером приёмки: устаревший
+      # SBOM сообщает ему чужие версии.
+      - name: SBOM совпадает с lockfile
+        run: node scripts/security-gate.js sbom-sync
+      # OSV-Scanner распознаёт CycloneDX только по имени файла (*.cdx.json).
+      - name: Prepare SBOM for OSV-Scanner
+        run: cp sbom.json sbom.cdx.json && rm -f osv-results.json
+      # Сканер выходит с 1 и при находках, и при собственном сбое; решает
+      # следующий шаг по отчёту — он же ловит отсутствие отчёта.
+      - name: OSV-Scanner (lockfile + SBOM)
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        continue-on-error: true
+        with:
+          scan-args: |-
+            --format=json
+            --all-packages
+            --output-file=osv-results.json
+            --config=osv-scanner.toml
+            --lockfile=package-lock.json
+            --lockfile=sbom.cdx.json
+      - name: Gate on OSV findings (high/critical или без оценки — провал)
+        run: node scripts/security-gate.js osv osv-results.json
+      # Chromium внутри бинаря сканеры не видят — только Electron в lockfile.
+      # Отставание от последнего патча линии = известные CVE Chromium; в CI это
+      # предупреждение, в релизе — провал (release.yml, --require-latest).
+      - name: Electron — версия и свежесть
+        run: node scripts/security-gate.js electron
+      - name: Upload OSV report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: osv-results
+          path: osv-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ==========================================================================
+  # Скан СОБРАННОГО deb: то, что реально уезжает пользователю, а не lockfile.
+  # Grype не опознаёт Electron по бинарю (замер: syft по linux-unpacked —
+  # «No packages discovered»), поэтому app.asar распаковывается — так видны
+  # npm-пакеты, уехавшие в приложение, — а версия Electron сверяется со
+  # строкой `Electron/X.Y.Z` в самом бинаре: SBOM обязан говорить сканеру
+  # правду о том, что внутри.
+  # ==========================================================================
+  deb-scan:
+    name: deb scan (Grype)
+    needs: linux-sandbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-deb
+          path: deb
+      - name: Unpack deb and app.asar
+        run: |
+          DEB=$(ls deb/*.deb)
+          dpkg-deb -x "$DEB" scan-root
+          ASAR=$(find scan-root -path '*/resources/app.asar')
+          npx --yes @electron/asar@3.4.1 extract "$ASAR" scan-root/app-asar-extracted
+          find scan-root/app-asar-extracted -name package.json -path '*node_modules*' | sed 's|.*/node_modules/||' | sort
+      - name: Electron в бинаре = lockfile = SBOM
+        run: node scripts/security-gate.js electron --binary "$(find scan-root/opt -maxdepth 2 -name timer-widget -type f)"
+      # Grype по КАТАЛОГУ молча каталогизирует 0 пакетов (первый прогон
+      # 25.09.2026): для каталога syft читает только lock-файлы. Каталогизаторы
+      # «образа» видят package.json внутри распакованного app.asar. Поэтому
+      # SBOM строит syft явно, проверяется его полнота, и Grype сканирует его.
+      - name: Download Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      - name: SBOM of the built deb
+        run: ${{ steps.syft.outputs.cmd }} dir:scan-root --override-default-catalogers image -o cyclonedx-json=deb-sbom.cdx.json -o table
+      - name: SBOM артефакта не пуст (все runtime-зависимости найдены)
+        run: node scripts/security-gate.js artifact-sbom deb-sbom.cdx.json
+      - name: Grype (high/critical блокирует)
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: deb-sbom.cdx.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+          config: .grype.yaml
+
+  # ==========================================================================
+  # Установка deb и ЗАПУСК приложения на настоящем ядре раннера (Ubuntu 24.04,
+  # AppArmor включён). Самая ценная проверка: `verify-linux-sandbox.js` читает
+  # пакет, а здесь видно, что приложение у обычного пользователя поднимается
+  # БЕЗ `--no-sandbox` и его рендереры реально в песочнице (свой namespace,
+  # seccomp-bpf). Два пути песочницы — две ячейки матрицы:
+  #   userns — kernel.apparmor_restrict_unprivileged_userns=1: работает только
+  #            через профиль AppArmor из пакета; chrome-sandbox 0755;
+  #   suid   — user.max_user_namespaces=0 (как ядро без userns): postinst
+  #            обязан выдать chrome-sandbox 4755 root, и работает SUID-помощник.
+  # Проверки — scripts/linux-launch-check.sh.
+  # ==========================================================================
+  deb-launch-runner:
+    name: deb install + launch (runner, ${{ matrix.path }})
+    needs: linux-sandbox
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        path: [userns, suid]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-deb
+          path: deb
+      - name: Kernel knobs for the ${{ matrix.path }} path
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
+          if [ "${{ matrix.path }}" = suid ]; then
+            sudo sysctl -w user.max_user_namespaces=0
+          fi
+      - name: Install deb
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xauth dbus ./deb/*.deb
+      - name: Launch as non-root user in the sandbox
+        run: sudo APP_USER="$(id -un)" ALIVE_SECONDS=15 bash scripts/linux-launch-check.sh --expect ${{ matrix.path }}
+      # postrm обязан выгрузить профиль из ядра и убрать файл — иначе после
+      # удаления пакета в системе остаётся разрешение userns для пути /opt.
+      - name: Remove deb — AppArmor profile goes away
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get remove -y timer-widget
+          if [ -e /etc/apparmor.d/timer-widget ]; then echo "::error::профиль остался в /etc/apparmor.d"; exit 1; fi
+          if sudo grep -q '^timer-widget ' /sys/kernel/security/apparmor/profiles; then echo "::error::профиль остался загружен в ядре"; exit 1; fi
+          if [ -e /usr/bin/timer-widget ]; then echo "::error::/usr/bin/timer-widget остался"; exit 1; fi
+          echo "[remove] OK: профиль выгружен и удалён, ссылки нет"
+
+  # ==========================================================================
+  # Установка deb в чистые дистрибутивы. Раннер набит библиотеками, а контейнер
+  # — нет: здесь проверяется, что Depends пакета хватает для ЗАПУСКА (поставлены
+  # только xvfb и dbus). AppArmor-утилит в контейнере нет, ядро — раннера с
+  # kernel.apparmor_restrict_unprivileged_userns=1, поэтому postinst обязан
+  # выбрать запасной путь: SUID-помощник. Ему нужны CAP_SYS_ADMIN и свободный
+  # clone(), отсюда --privileged — без него песочница Chromium в Docker не
+  # поднимается ни одним способом.
+  # ==========================================================================
+  deb-launch-container:
+    name: deb install + launch (${{ matrix.image }}, suid)
+    needs: linux-sandbox
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:24.04', 'ubuntu:22.04', 'debian:12']
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged --shm-size=1g
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-deb
+          path: deb
+      - name: Kernel knob (host kernel, shared)
+        run: echo 1 > /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+      - name: Install deb into a clean system
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends xvfb xauth dbus ./deb/*.deb
+          useradd -m tester
+      - name: Launch as non-root user in the sandbox
+        run: APP_USER=tester ALIVE_SECONDS=15 bash scripts/linux-launch-check.sh --expect suid

@@ -152,21 +152,21 @@ test asserts BOTH the correct behaviour and the absence of the old broken one.
 
 ## CI
 
-GitHub Actions (`.github/workflows/nodejs.yml`), Node 22:
+GitHub Actions, Node 22. Что делает каждый job, пороги сканеров, какой путь
+песочницы проверяет каждая ячейка — [docs/ci.md](docs/ci.md).
 
-| Job | Where | What |
-|-----|-------|------|
-| `build` | ubuntu-latest | `npm run ci`, затем неблокирующие `visual:check` под xvfb и `coverage`. Визуальному шагу нужен `chmod 4755` + root на `chrome-sandbox`, иначе Chromium падает с кодом 133 |
-| `e2e` | ubuntu + windows + macos | `npx playwright test` — the ONLY thing exercising the real Electron runtime. Linux under `xvfb-run`; `fail-fast: false`; report uploaded per-OS on failure |
-| `pack` | ubuntu + windows | `electron-builder --dir`, then `node scripts/verify-packed.js` (assets + release gates on the real `app.asar` + Electron fuses read back from the packed binary) |
-| `linux-sandbox` | ubuntu-latest | builds the deb (the only Linux target), then `node scripts/verify-linux-sandbox.js`: AppArmor `userns` profile, SUID only without user namespaces, no `--no-sandbox`. Release runs it too. Not checkable from macOS |
+| Job | What |
+|-----|------|
+| `build` | `npm run ci` + `visual:check` под xvfb (`chmod 4755` на `chrome-sandbox`, иначе код 133) |
+| `e2e` | ubuntu + windows + macos, the ONLY real Electron runtime |
+| `pack` | `electron-builder --dir` + `verify-packed.js` on the real `app.asar` |
+| `linux-sandbox` | builds the deb once, `verify-linux-sandbox.js`, uploads it |
+| `security` | `npm audit` + OSV по lockfile/SBOM; high/critical валят, dev включён |
+| `deb-scan` | Grype по SBOM собранного deb; Electron в бинаре = lockfile |
+| `deb-launch-*` | установка deb и запуск без `--no-sandbox`: runner (userns / suid), контейнеры (suid, Depends) |
 
-Release workflow builds on macOS (Intel + ARM) and Windows with Node 22.
-
-- **`pack` catches what `tests/packaging.test.js` cannot**: the unit test checks
-  the *list* in `package.json`, `verify-packed.js` opens the real `app.asar`
-  (so `design-tokens.css` went missing in 2.3.2); its parser is tested on the
-  **real** `default_app.asar`.
+Release: те же ворота до сборки, Electron — последний патч линии. Принятая
+находка — только в `osv-scanner.toml` / `.grype.yaml` с причиной и сроком.
 
 ## Gotchas
 Каждый пункт — правило, которое можно нарушить и не заметить. Полный разбор
