@@ -215,6 +215,9 @@ function createTimerController(deps = {}) {
     // change still gets its own emit when set was skipped while running).
     function setPreset(seconds) {
         if (timerState.isRunning) { return false; }
+        // Не-число — не команда (BUG-12). Движок превратил бы его в 0, и
+        // посылка `seconds: true` молча обнуляла бы таймер.
+        if (engine.toWholeSeconds(seconds) === null) { return false; }
         const presetState = engine.setPreset(timerState, seconds);
         patch({
             totalSeconds: presetState.totalSeconds,

@@ -106,6 +106,32 @@ function tick(state, config = {}, stepSeconds = 1) {
     return { state: newState, events, finished: shouldFinish };
 }
 
+// Потолок таймера — 99:59:59, тот же, что у ручного ввода (utils.js parseTime).
+// Главный процесс принимал любое конечное число: `set 90.5` показывал
+// «00:01:30.5», а `adjust 1e308` дважды давал Infinity и дальше NaN во всех
+// окнах (BUG-12). Минус ограничен тем же модулем: формат ЧЧ:ММ:СС не покажет
+// больше и со знаком.
+const MAX_SECONDS = 359999;
+
+/**
+ * Целые секунды из присланного значения или null.
+ *
+ * Только настоящее число: `true` — не «одна секунда», а '90' — не число
+ * (окна шлют числа; строка здесь — чужая посылка). Дробь режется К НУЛЮ:
+ * поправка -0.5 не должна становиться -1.
+ *
+ * @param {unknown} value
+ * @returns {number|null}
+ */
+function toWholeSeconds(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) { return null; }
+    return Math.trunc(value);
+}
+
+function clampSeconds(value, min) {
+    return Math.min(MAX_SECONDS, Math.max(min, value));
+}
+
 /**
  * Adjust remaining by delta seconds.
  * totalSeconds grows to match if new remaining exceeds it (so progress bars remain sane).
@@ -116,11 +142,9 @@ function tick(state, config = {}, stepSeconds = 1) {
  * @returns {Object} new state
  */
 function adjust(state, deltaSeconds, allowNegative = false) {
-    const n = Number(deltaSeconds);
-    const delta = Number.isFinite(n) ? n : 0;
-    const rawNext = state.remainingSeconds + delta;
-    const nextRemaining = allowNegative ? rawNext : Math.max(0, rawNext);
-    const nextTotal = Math.max(state.totalSeconds, nextRemaining);
+    const delta = toWholeSeconds(deltaSeconds) || 0;
+    const nextRemaining = clampSeconds(state.remainingSeconds + delta, allowNegative ? -MAX_SECONDS : 0);
+    const nextTotal = Math.min(MAX_SECONDS, Math.max(state.totalSeconds, nextRemaining));
     return {
         ...state,
         totalSeconds: nextTotal,
@@ -156,8 +180,8 @@ function reset(state) {
  * @returns {Object} new state
  */
 function setPreset(state, seconds) {
-    const n = Number(seconds);
-    const next = Number.isFinite(n) ? Math.max(0, n) : 0;
+    const whole = toWholeSeconds(seconds);
+    const next = whole === null ? 0 : clampSeconds(whole, 0);
     return {
         ...state,
         totalSeconds: next,
@@ -200,6 +224,8 @@ function pause(state) {
 }
 
 module.exports = {
+    MAX_SECONDS,
+    toWholeSeconds,
     tick,
     adjust,
     reset,

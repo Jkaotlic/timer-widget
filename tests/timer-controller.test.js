@@ -477,3 +477,35 @@ test('integration: set → start → tick → pause → reset emits a coherent s
         assert.ok(counters[i] > counters[i - 1], `counter not monotonic at ${i}`);
     }
 });
+
+// --- BUG-12: команда с мусором не ставит таймер ------------------------------
+
+test('BUG-12: set с не-числом отвергается — таймер не сбрасывается в ноль', () => {
+    const h = makeHarness();
+    h.controller.setPreset(300);
+    const emits = h.states.length;
+    for (const bad of [true, '90', undefined, null, NaN, Infinity]) {
+        assert.equal(h.controller.setPreset(bad), false, String(bad));
+    }
+    assert.equal(h.states.length, emits, 'отвергнутая команда разослала состояние');
+    assert.equal(h.controller.getState().remainingSeconds, 300);
+});
+
+test('BUG-12: set 90.5 ставит 90, set 1e308 — 99:59:59', () => {
+    const h = makeHarness();
+    h.controller.setPreset(90.5);
+    assert.equal(h.controller.getState().remainingSeconds, 90);
+    h.controller.setPreset(1e308);
+    assert.equal(h.controller.getState().remainingSeconds, 359999);
+});
+
+test('BUG-12: adjust 1e308 дважды не даёт Infinity/NaN', () => {
+    const h = makeHarness();
+    h.controller.setConfig({ allowNegative: true });
+    h.controller.setPreset(100);
+    h.controller.adjust(1e308);
+    h.controller.adjust(1e308);
+    const s = h.controller.getState();
+    assert.ok(Number.isFinite(s.remainingSeconds) && Number.isFinite(s.totalSeconds));
+    assert.equal(s.remainingSeconds, 359999);
+});

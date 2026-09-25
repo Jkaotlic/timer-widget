@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { tick, adjust, reset, setPreset, start, pause } = require('../timer-engine');
+const { tick, adjust, reset, setPreset, start, pause, MAX_SECONDS } = require('../timer-engine');
 
 // Helper to build a fresh state object
 function makeState(overrides = {}) {
@@ -331,4 +331,53 @@ test('all functions return new state objects (no mutation)', () => {
     assert.doesNotThrow(() => setPreset(state, 60));
     assert.doesNotThrow(() => start(state));
     assert.doesNotThrow(() => pause(state));
+});
+
+// --- BUG-12: целые секунды в пределах 99:59:59 -------------------------------
+//
+// Главный процесс принимал любое конечное число: `set 90.5` показывал
+// «00:01:30.5», а `adjust 1e308` дважды давал Infinity, и дальше NaN во всех
+// четырёх окнах. Потолок — тот же 99:59:59, что у ручного ввода (utils.js).
+
+test('BUG-12: setPreset отбрасывает дробную часть', () => {
+    const next = setPreset(makeState(), 90.5);
+    assert.equal(next.totalSeconds, 90);
+    assert.equal(next.remainingSeconds, 90);
+    assert.equal(next.presetSeconds, 90);
+});
+
+test('BUG-12: setPreset зажат в [0, 359999]', () => {
+    assert.equal(setPreset(makeState(), 1e308).remainingSeconds, MAX_SECONDS);
+    assert.equal(setPreset(makeState(), 360000).presetSeconds, MAX_SECONDS);
+    assert.equal(setPreset(makeState(), -5).remainingSeconds, 0);
+});
+
+test('BUG-12: не-число — не секунды (true не становится единицей)', () => {
+    for (const bad of [true, '90', null, {}, [60]]) {
+        assert.equal(setPreset(makeState(), bad).remainingSeconds, 0, JSON.stringify(bad));
+        assert.equal(adjust(makeState({ remainingSeconds: 100 }), bad, true).remainingSeconds, 100,
+            JSON.stringify(bad));
+    }
+});
+
+test('BUG-12: adjust 1e308 дважды остаётся конечным и в пределах', () => {
+    let s = makeState({ remainingSeconds: 100, totalSeconds: 100 });
+    s = adjust(s, 1e308, true);
+    s = adjust(s, 1e308, true);
+    assert.equal(s.remainingSeconds, MAX_SECONDS);
+    assert.equal(s.totalSeconds, MAX_SECONDS);
+});
+
+test('BUG-12: минус тоже ограничен, и без минуса — ноль', () => {
+    const s = makeState({ remainingSeconds: 100 });
+    assert.equal(adjust(s, -1e308, true).remainingSeconds, -MAX_SECONDS);
+    assert.equal(adjust(s, -1e308, false).remainingSeconds, 0);
+});
+
+test('BUG-12: дробная поправка режется к нулю, а не вниз', () => {
+    // -0.5 «вниз» дало бы -1: поправка, которой не просили.
+    const s = makeState({ remainingSeconds: 100 });
+    assert.equal(adjust(s, 0.9, true).remainingSeconds, 100);
+    assert.equal(adjust(s, -0.9, true).remainingSeconds, 100);
+    assert.equal(adjust(s, 30.7, true).remainingSeconds, 130);
 });
