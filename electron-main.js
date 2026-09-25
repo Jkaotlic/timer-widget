@@ -2251,6 +2251,12 @@ ipcMain.on('event-export', async () => {
             // Фильтр — такая же настройка дисплея, как ставка: у просьбы о
             // выгрузке payload нет, и отдельного источника у него быть не должно.
             onlyOverruns: settings.reportOnlyOverruns === true,
+            // Идущий доклад — строкой «идёт» (BUG-15): его перелимит уже в
+            // итоге выше, и без строки отчёт посреди доклада всегда кончался
+            // ложным «журнал обрезан». Условие строки — то же, что у закрытия.
+            current: currentTalkRecordable()
+                ? { overrunSeconds: currentTalk.overrun + liveOverrunSeconds }
+                : null,
             now: new Date()
         });
 

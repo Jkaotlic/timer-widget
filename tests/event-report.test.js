@@ -181,3 +181,33 @@ test('фильтр не делает разбивку «неполной»', () 
     const out = build({ talks: MIXED, overrunSeconds: 135, onlyOverruns: true });
     assert.equal(out.partial, false);
 });
+
+// --- BUG-15: выгрузка посреди доклада ---------------------------------------
+//
+// Итог выгрузки — тот, что на экране: накопленное плюс текущий минус. А
+// строки были только закрытыми докладами — и отчёт, снятый посреди доклада,
+// ВСЕГДА кончался ложным «журнал обрезан». Идущий доклад теперь печатается
+// строкой с пометкой «идёт» и входит в сверку.
+
+test('BUG-15: идущий доклад — строка «идёт», и разбивка сходится с итогом', () => {
+    const out = build({ overrunSeconds: 465 + 40, current: { overrunSeconds: 40 } });
+    assert.strictEqual(out.partial, false, 'посреди доклада отчёт не должен называть журнал обрезанным');
+    assert.doesNotMatch(out.csv, /разбивка неполна/);
+    const rows = out.csv.split('\r\n');
+    const live = rows.find((r) => r.includes('идёт'));
+    assert.ok(live, 'идущий доклад обязан быть строкой');
+    assert.match(live, /^3;/, 'номер — место доклада в мероприятии');
+    assert.match(live, /00:00:40/);
+    assert.strictEqual(out.rows, 3);
+});
+
+test('BUG-15: идущий доклад без перелимита фильтр прячет, но в сверке он есть', () => {
+    const out = build({ current: { overrunSeconds: 0 }, onlyOverruns: true });
+    assert.strictEqual(out.partial, false);
+    assert.doesNotMatch(out.csv, /идёт/);
+});
+
+test('BUG-15: без идущего доклада настоящее расхождение по-прежнему названо', () => {
+    const out = build({ overrunSeconds: 465 + 40 });
+    assert.strictEqual(out.partial, true);
+});

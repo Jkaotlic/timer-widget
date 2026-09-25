@@ -96,8 +96,18 @@ function safeTalks(raw) {
  * @param {number} input.period — за сколько секунд ставка
  * @param {Date}   input.now — «сейчас», для даты при пустом журнале
  * @param {boolean} [input.onlyOverruns] — печатать только доклады с перелимитом
+ * @param {{overrunSeconds: number}|null} [input.current] — идущий доклад, если
+ *        выгрузка снята посреди него (строка «идёт»)
  * @returns {{csv: string, rows: number, totalSeconds: number, totalCost: number, partial: boolean}}
  */
+/** Идущий доклад или null: вход главного процесса, но проверяется как чужой. */
+function safeCurrent(raw) {
+    if (raw === null || typeof raw !== 'object') { return null; }
+    const seconds = Number(raw.overrunSeconds);
+    if (!Number.isFinite(seconds) || seconds < 0) { return null; }
+    return { overrunSeconds: Math.floor(seconds) };
+}
+
 function buildReportCSV(input) {
     const data = input || {};
     const talks = safeTalks(data.talks);
@@ -120,12 +130,20 @@ function buildReportCSV(input) {
     // Расхождение с итогом считается по ВСЕМУ журналу, а не по напечатанным
     // строкам: скрытые фильтром нули на сумму секунд не влияют, и тревога о
     // «неполной разбивке» из-за фильтра была бы ложной.
-    const sumOfRows = talks.reduce((acc, talk) => acc + Math.floor(Number(talk.overrunSeconds)), 0);
+    //
+    // Идущий доклад входит в сверку наравне с закрытыми (BUG-15): итог — тот,
+    // что на экране, и в нём уже есть его перелимит. Без этой строки отчёт,
+    // снятый посреди доклада, всегда кончался ложным «журнал обрезан».
+    const current = safeCurrent(data.current);
+    const all = current
+        ? talks.concat([{ n: talks.length + 1, endedAt: null, overrunSeconds: current.overrunSeconds, live: true }])
+        : talks;
+    const sumOfRows = all.reduce((acc, talk) => acc + Math.floor(Number(talk.overrunSeconds)), 0);
     const partial = sumOfRows !== totalSeconds;
     const onlyOverruns = data.onlyOverruns === true;
     const printed = onlyOverruns
-        ? talks.filter((talk) => Math.floor(Number(talk.overrunSeconds)) > 0)
-        : talks;
+        ? all.filter((talk) => Math.floor(Number(talk.overrunSeconds)) > 0)
+        : all;
 
     // Дата мероприятия — из ПЕРВОЙ записи: отдельного «начала мероприятия» в
     // приложении нет, а первый закрытый доклад точно случился. Пустой журнал
@@ -155,7 +173,8 @@ function buildReportCSV(input) {
         const seconds = Math.floor(Number(talk.overrunSeconds));
         const cells = [
             talk.n,
-            formatClock(new Date(talk.endedAt)),
+            // Окончания у идущего доклада ещё нет — есть честное «идёт».
+            talk.live ? 'идёт' : formatClock(new Date(talk.endedAt)),
             TimeLib.formatTime(seconds)
         ];
         if (withMoney) {

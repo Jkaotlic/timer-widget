@@ -1321,3 +1321,24 @@ test('BUG-04: сбой пишет живой перелимит в pending, не
         stopTimer(stubs);
     }
 });
+
+// --- BUG-15: выгрузка посреди доклада --------------------------------------
+
+test('BUG-15: выгрузка посреди перелимита не называет журнал обрезанным', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'export-live-'));
+    const target = path.join(dir, 'отчёт.csv');
+    const stubs = createStubs();
+    stubs.electron.dialog = { showSaveDialog: async () => ({ canceled: false, filePath: target }) };
+    loadMain(stubs);
+    try {
+        await runOvertimeTalk(stubs);
+        stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+        await wait(120);
+        const csv = fs.readFileSync(target, 'utf8');
+        assert.doesNotMatch(csv, /разбивка неполна/, 'итог с живым минусом сверялся без идущего доклада');
+        assert.match(csv, /идёт/, 'идущий доклад обязан быть строкой отчёта');
+    } finally {
+        stopTimer(stubs);
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
