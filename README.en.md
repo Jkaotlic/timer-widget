@@ -210,7 +210,7 @@ Download from [**Releases**](../../releases/latest):
 
 > **macOS**: the app is not signed with an Apple Developer certificate. On first launch:
 > 1. Open the DMG and drag the app into Applications
-> 2. **Right-click** TimerWidget → **Open** → confirm
+> 2. Launch it; when macOS says it cannot verify the developer, open System Settings → Privacy & Security and click **Open Anyway**
 >
 > Or from terminal: `xattr -cr /Applications/TimerWidget.app`
 
@@ -222,9 +222,10 @@ Download from [**Releases**](../../releases/latest):
 | | Format | File |
 |:--|:-------|:-----|
 | <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | DEB | `TimerWidget-*-amd64.deb` |
-| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | AppImage | `TimerWidget-*.AppImage` |
 
-`chrome-sandbox` is installed without the SUID bit (0755); the app runs with `--no-sandbox`, so user namespaces are not required.
+Install: `sudo apt install ./TimerWidget-*-amd64.deb`.
+
+Only a deb is shipped, and the Chromium sandbox is always on: no build uses `--no-sandbox`. On Ubuntu 24.04+ the package installs an AppArmor profile that allows user namespaces; the SUID bit on `chrome-sandbox` is set only where the kernel has no user namespaces at all. Removing the package removes the AppArmor profile. AppImage is no longer released — see [SECURITY.md](SECURITY.md) (in Russian).
 
 </details>
 
@@ -275,7 +276,8 @@ timer-widget/
 ├── build/
 │   ├── icon.png                # App icon (1024×1024)
 │   ├── after-pack.js           # electron-builder hook
-│   └── linux-after-install.sh  # chmod 0755 chrome-sandbox without SUID
+│   ├── linux-after-install.sh  # deb postinst: AppArmor profile, SUID only without user namespaces
+│   └── linux-post-remove.sh    # deb postrm: unloads the AppArmor profile, purges settings
 ├── scripts/
 │   ├── run-electron.js         # Wrapper: clears ELECTRON_RUN_AS_NODE
 │   └── screenshot-runner.js    # Headless harness for visual review
@@ -308,7 +310,7 @@ timer-widget/
 - **Per-window IPC channels.** Colors, styles and settings are sent to specific windows (`widget-colors-update`, `clock-colors-update`, `display-colors-update`) instead of globally — prevents "color bleeding" between windows
 - **Monotonic synchronization.** `updateCounter` guarantees ordered updates without depending on system clocks
 - **Context isolation + sandbox** on all windows. Renderers have no access to Node.js APIs
-- **DevTools disabled** in all production windows (`devTools: false`)
+- **DevTools disabled** in the packaged app (`devTools` only with `--dev` and `!app.isPackaged`)
 
 ---
 
@@ -320,18 +322,22 @@ timer-widget/
 <br>
 
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` on all windows
-- `devTools: false` — developer console unavailable in production
+- Window DevTools only with `--dev` in an unpackaged app; a packaged app started with `--remote-debugging-*` / `--inspect*` exits before the first window
+- Electron fuses: no `RunAsNode`, `NODE_OPTIONS` or `--inspect`; `app.asar` is checked against its build-time hash
 - IPC whitelist with direction validation (send / receive) in `preload.js` and `channel-validator.js`
-- `hardenWindow()` blocks navigation to non-file:// URLs and denies `window.open`
+- The main process checks the sender of every IPC channel (`ipc-senders.js`) and the shape of relayed payloads (`relay-payload.js`)
+- Navigation only to the app's own four pages (`navigation-guard.js`); `window.open` and `<webview>` are denied
+- CSP: inline scripts allowed by sha256, no `'unsafe-inline'`; `connect-src 'none'`
 - **No HTTP/HTTPS loading.** Background images are accepted only as local `data:` URLs
 - Numeric IPC inputs: checks for `NaN`, `Infinity`, min/max bounds
 - Images: MIME + magic-bytes validation (WebP checks RIFF+WEBP signature, ≤10 MB)
 - Audio: MIME + magic bytes for MP3 / WAV / OGG / FLAC / WebM / AAC, ≤5 MB
 - SVG blocked in data URLs (XSS vector)
-- CSS injection: colors validated via regex, URLs parsed via `URL()` constructor
+- CSS injection: colors go through one validator (`isSafeColor`)
 - Chromium Component Updater disabled (`disable-component-update` + `disable-features=ChromeVariations,OptimizationHints`) — the app never calls home
 - electron-builder `afterPack` strips external political content from `LICENSES.chromium.html`
-- On Linux, `chrome-sandbox` is installed without the SUID bit (0755)
+- Linux: deb only, no `--no-sandbox`; AppArmor profile for user namespaces, SUID on `chrome-sandbox` only where they are missing
+- Full description and known limitations — [SECURITY.md](SECURITY.md)
 
 </details>
 

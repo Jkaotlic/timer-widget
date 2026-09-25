@@ -209,7 +209,7 @@
 
 > **macOS**: приложение не подписано Apple Developer сертификатом. При первом запуске:
 > 1. Откройте DMG и перетащите приложение в Applications
-> 2. **Правый клик** на TimerWidget → **Открыть** → подтвердите запуск
+> 2. Запустите; когда система скажет, что не может проверить разработчика, откройте «Системные настройки» → «Конфиденциальность и безопасность» и нажмите **«Открыть всё равно»**
 >
 > Или в терминале: `xattr -cr /Applications/TimerWidget.app`
 
@@ -221,9 +221,10 @@
 | | Формат | Файл |
 |:--|:-------|:-----|
 | <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | DEB | `TimerWidget-*-amd64.deb` |
-| <img src="https://cdn.simpleicons.org/linux/FCC624" width="16"> | AppImage | `TimerWidget-*.AppImage` |
 
-`chrome-sandbox` ставится без SUID-бита (0755), приложение запускается с `--no-sandbox` — система user namespaces не требуется.
+Установка: `sudo apt install ./TimerWidget-*-amd64.deb`.
+
+Поставляется только deb, и песочница Chromium в нём работает всегда: `--no-sandbox` нет ни в одной сборке. На Ubuntu 24.04+ пакет ставит профиль AppArmor, разрешающий user namespaces; SUID-бит на `chrome-sandbox` выставляется лишь там, где user namespaces в ядре нет вовсе. При удалении пакета профиль AppArmor удаляется. AppImage больше не выпускается — подробности в [SECURITY.md](SECURITY.md#песочница-в-linux).
 
 </details>
 
@@ -274,7 +275,8 @@ timer-widget/
 ├── build/
 │   ├── icon.png                # Иконка приложения (1024×1024)
 │   ├── after-pack.js           # electron-builder hook
-│   └── linux-after-install.sh  # chmod 0755 chrome-sandbox без SUID
+│   ├── linux-after-install.sh  # deb postinst: профиль AppArmor, SUID только без user namespaces
+│   └── linux-post-remove.sh    # deb postrm: выгрузка профиля AppArmor, purge настроек
 ├── scripts/
 │   ├── run-electron.js         # Wrapper: сбрасывает ELECTRON_RUN_AS_NODE
 │   └── screenshot-runner.js    # Headless harness для визуального ревью
@@ -307,7 +309,7 @@ timer-widget/
 - **Per-window IPC-каналы.** Цвета, стили и настройки отправляются в конкретное окно (`widget-colors-update`, `clock-colors-update`, `display-colors-update`), а не глобально — чтобы избежать «перетекания» цветов между окнами
 - **Монотонная синхронизация.** `updateCounter` гарантирует порядок обновлений без зависимости от системных часов
 - **Context isolation + sandbox** на всех окнах. Рендереры не имеют доступа к Node.js API
-- **DevTools отключены** во всех production-окнах (`devTools: false`)
+- **DevTools отключены** в собранном приложении (`devTools` только при `--dev` и `!app.isPackaged`)
 
 ---
 
@@ -319,18 +321,22 @@ timer-widget/
 <br>
 
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` на всех окнах
-- `devTools: false` — консоль разработчика недоступна в production
+- DevTools окон — только при `--dev` в несобранном приложении; собранное с `--remote-debugging-*` / `--inspect*` выходит до первого окна
+- Фьюзы Electron: без `RunAsNode`, `NODE_OPTIONS` и `--inspect`, `app.asar` сверяется с хешем
 - IPC whitelist с валидацией направления (send / receive) в `preload.js` и `channel-validator.js`
-- `hardenWindow()` блокирует навигацию на не-file:// URL и запрещает `window.open`
+- Главный процесс проверяет отправителя каждого IPC-канала (`ipc-senders.js`) и форму payload ретрансляторов (`relay-payload.js`)
+- Навигация — только на четыре собственные страницы (`navigation-guard.js`), `window.open` и `<webview>` запрещены
+- CSP: инлайновые скрипты разрешены по sha256, без `'unsafe-inline'`; `connect-src 'none'`
 - **Никакой загрузки по HTTP/HTTPS.** Фоновые изображения принимаются только как локальные `data:` URL
 - Числовые IPC-инпуты: проверка на `NaN`, `Infinity`, min/max bounds
 - Изображения: валидация MIME + magic bytes (WebP проверяет RIFF+WEBP сигнатуру, ≤10 MB)
 - Аудио: MIME + magic bytes для MP3 / WAV / OGG / FLAC / WebM / AAC, ≤5 MB
 - SVG заблокирован в data URL (вектор XSS)
-- CSS injection: цвета валидируются regex, URL проверяются через `URL()` конструктор
+- CSS injection: цвета проходят один валидатор (`isSafeColor`)
 - Chromium Component Updater выключен (`disable-component-update` + `disable-features=ChromeVariations,OptimizationHints`) — приложение не ходит в сеть
 - electron-builder `afterPack` очищает `LICENSES.chromium.html` от внешнего политического контента в зависимостях
-- На Linux `chrome-sandbox` устанавливается без SUID-бита (0755)
+- Linux: только deb, без `--no-sandbox`; профиль AppArmor для user namespaces, SUID на `chrome-sandbox` — только где их нет
+- Полное описание и известные ограничения — [SECURITY.md](SECURITY.md)
 
 </details>
 
