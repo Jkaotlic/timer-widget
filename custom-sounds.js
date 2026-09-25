@@ -17,6 +17,51 @@
  * так же, как во всех остальных модулях рендерера: сборщика в проекте нет.
  */
 
+/**
+ * Список звуков из хранилища — только правильной формы (BUG-21).
+ *
+ * `customSounds` — чужие данные: профиль мог испортиться, старая версия могла
+ * записать другую форму. Не-массив ронял панель на `.some` / `.find`, запись
+ * без имени — на отрисовке списка. Здесь всё, что не «массив объектов с
+ * именем и данными строками», отбрасывается.
+ */
+function sanitizeCustomSounds(raw) {
+    if (!Array.isArray(raw)) { return []; }
+    return raw.filter((s) => s && typeof s === 'object'
+        && typeof s.name === 'string' && typeof s.data === 'string');
+}
+
+/** Прочитать список звуков из хранилища — один вход на все методы. */
+function readCustomSounds() {
+    return sanitizeCustomSounds(window.safeJSONParse(localStorage.getItem('customSounds'), []));
+}
+
+/**
+ * Играть можно только звук: `new Audio()` получает строку из хранилища, и
+ * без проверки туда доехало бы что угодно — страница, файл с диска, адрес в
+ * сети. Загрузка кладёт только `data:audio/…` (readAsDataURL от файла с
+ * проверенным MIME), значит всё остальное — не наше.
+ */
+function isPlayableSoundData(data) {
+    return typeof data === 'string' && data.startsWith('data:audio/');
+}
+
+/**
+ * Добавить звук или заменить одноимённый — и СКАЗАТЬ, что заменили.
+ *
+ * Имя звука — имя файла без расширения, поэтому «a.mp3» заменяет уже
+ * добавленный «a.wav». Ключ не меняется намеренно: по нему события хранят
+ * выбор (`custom:a`), и смена ключа молча отвязала бы их от звука. Замена
+ * законна, но тихой быть не должна — вызывающий показывает тост.
+ */
+function mergeCustomSound(list, name, data) {
+    const replaced = list.some((s) => s.name === name);
+    const updated = replaced
+        ? list.map((s) => (s.name === name ? { ...s, data } : s))
+        : [...list, { name, data }];
+    return { updated, replaced };
+}
+
 const CustomSoundsMixin = {
     // Показать/скрыть kit-style error banner для загрузки звука.
     showSoundUploadError(title, msg) {
@@ -99,9 +144,18 @@ const CustomSoundsMixin = {
                 return;
             }
 
-            // Magic bytes validation
-            const audioBuffer = await file.slice(0, 12).arrayBuffer();
-            const audioBytes = new Uint8Array(audioBuffer);
+            // Magic bytes validation. Чтение файла может отказать (файл
+            // удалили или он на отключённом диске) — отказ вне try уходил
+            // необработанным, и пользователь не видел ничего (BUG-21).
+            let audioBytes;
+            try {
+                audioBytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+            } catch {
+                window.Toast.show('Ошибка чтения звукового файла', 'error');
+                this.showSoundUploadError('Файл не прочитан', `${file.name} не удалось открыть`);
+                event.target.value = '';
+                return;
+            }
             const isMP3 = (audioBytes[0] === 0xFF && (audioBytes[1] & 0xE0) === 0xE0) ||
                           (audioBytes[0] === 0x49 && audioBytes[1] === 0x44 && audioBytes[2] === 0x33);
             const isWAV = audioBytes[0] === 0x52 && audioBytes[1] === 0x49 &&
@@ -128,14 +182,8 @@ const CustomSoundsMixin = {
                 const base64 = e.target.result;
                 const name = file.name.replace(/\.[^.]+$/, ''); // Убираем расширение
                 
-                // Сохраняем в localStorage
-                const customSounds = window.safeJSONParse(localStorage.getItem('customSounds'), []);
-                
-                // Обновляем иммутабельно
-                const hasExisting = customSounds.some(s => s.name === name);
-                const updated = hasExisting
-                    ? customSounds.map(s => s.name === name ? { ...s, data: base64 } : s)
-                    : [...customSounds, { name, data: base64 }];
+                // Сохраняем в localStorage; замена одноимённого — не молча.
+                const { updated, replaced } = mergeCustomSound(readCustomSounds(), name, base64);
 
                 const storageResult = window.RendererStorage.safeSetJSON(
                     localStorage,
@@ -154,6 +202,9 @@ const CustomSoundsMixin = {
                     );
                     return;
                 }
+                if (replaced) {
+                    window.Toast.show(`Звук «${name}» заменён новым файлом`, 'warning', 3000);
+                }
                 this.loadCustomSounds();
             };
             reader.onerror = () => {
@@ -165,7 +216,7 @@ const CustomSoundsMixin = {
     },
 
     loadCustomSounds() {
-            const customSounds = window.safeJSONParse(localStorage.getItem('customSounds'), []);
+            const customSounds = readCustomSounds();
             const listEl = document.getElementById('customSoundList');
             
             // Очищаем список
@@ -262,17 +313,16 @@ const CustomSoundsMixin = {
     },
 
     async playCustomSound(name) {
-            const customSounds = window.safeJSONParse(localStorage.getItem('customSounds'), []);
-            const sound = customSounds.find(s => s.name === name);
-            if (!sound) {
-                // Кастомный звук не найден — проиграем стандартный beep
+            const sound = readCustomSounds().find(s => s.name === name);
+            if (!sound || !isPlayableSoundData(sound.data)) {
+                // Звука нет или в хранилище не звук — стандартный beep
                 await this.beep(880, 0.15);
                 return;
             }
 
-            const audio = new Audio(sound.data);
-            audio.volume = 0.5;
             try {
+                const audio = new Audio(sound.data);
+                audio.volume = 0.5;
                 await audio.play();
             } catch (err) {
                 console.error('Error playing custom sound:', err);
@@ -282,8 +332,7 @@ const CustomSoundsMixin = {
     },
 
     deleteCustomSound(name) {
-            const customSounds = window.safeJSONParse(localStorage.getItem('customSounds'), []);
-            const filtered = customSounds.filter(s => s.name !== name);
+            const filtered = readCustomSounds().filter(s => s.name !== name);
             const storageResult = window.RendererStorage.safeSetJSON(
                 localStorage,
                 'customSounds',
@@ -322,6 +371,11 @@ const CustomSoundsMixin = {
             }
     }
 };
+
+// Node (тесты)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };
+}
 
 if (typeof window !== 'undefined') {
     window.CustomSoundsMixin = CustomSoundsMixin;
