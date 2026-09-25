@@ -1227,3 +1227,41 @@ test('BUG-01: часы получают timer-state — и в рассылке, 
     assert.equal(toClock().at(-1).payload.isRunning, false);
     stopTimer(stubs);
 });
+
+// --- BUG-07: снимок восстановления следует за состоянием --------------------
+
+test('BUG-07: снимок пишется на паузе и стирается сбросом и новым пресетом', () => {
+    // Снимок писался только на ходу и не стирался никогда: сбой в течение
+    // пяти минут после сброса «восстанавливал» давно сброшенный отсчёт.
+    const stubs = createStubs();
+    loadMain(stubs);
+    const snapshot = path.join(stubs.userDataDir, 'last-state.json');
+    const read = () => (fs.existsSync(snapshot) ? JSON.parse(fs.readFileSync(snapshot, 'utf8')) : null);
+
+    cmd(stubs, { type: 'set', seconds: 60 });
+    assert.equal(read(), null, 'пресет в покое — не повод для восстановления');
+    cmd(stubs, { type: 'start' });
+    assert.equal(read() && read().isRunning, true, 'старт обязан записать снимок сразу, а не через 10 с');
+    cmd(stubs, { type: 'pause' });
+    assert.ok(read(), 'пауза — тоже состояние, которое стоит восстановить');
+    assert.equal(read().isRunning, false);
+    cmd(stubs, { type: 'reset' });
+    assert.equal(read(), null, 'сброс обязан стереть снимок');
+
+    cmd(stubs, { type: 'start' });
+    cmd(stubs, { type: 'pause' });
+    cmd(stubs, { type: 'set', seconds: 90 });
+    assert.equal(read(), null, 'новый пресет обязан стереть снимок');
+    stopTimer(stubs);
+});
+
+test('BUG-07: краш-обработчик в покое снимка не пишет', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    const snapshot = path.join(stubs.userDataDir, 'last-state.json');
+    cmd(stubs, { type: 'set', seconds: 60 });
+    // Последний подписчик — обработчик только что загруженного главного процесса.
+    const handler = process.listeners('uncaughtException').at(-1);
+    handler(new Error('проверка'));
+    assert.equal(fs.existsSync(snapshot), false, 'снимок покоя «восстановит» то, что и так на экране, с пометкой о сбое');
+});

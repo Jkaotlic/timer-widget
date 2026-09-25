@@ -650,3 +650,20 @@ test('BUG-05: поправка на ходу не теряет натикавш�
     h.controller.reconcile();
     assert.equal(h.controller.getState().remainingSeconds, 127);
 });
+
+// --- BUG-07: ход секунд помечен, команда — нет -------------------------------
+
+test('BUG-07: onState отличает ход секунд (meta.tick) от команды', () => {
+    const metas = [];
+    let mono = 0;
+    const c = createTimerController({
+        engine, now: () => 0, monotonic: () => mono,
+        onState: (_s, meta) => metas.push(meta)
+    });
+    c.setPreset(60);
+    c.start();
+    mono += 1000;
+    c.reconcile();
+    c.pause();
+    assert.deepEqual(metas.map((m) => !!(m && m.tick)), [false, false, true, false]);
+});

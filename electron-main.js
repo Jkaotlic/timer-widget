@@ -72,13 +72,15 @@ log.transports.console.level = process.argv.includes('--dev') ? 'debug' : 'warn'
 log.info(`TimerWidget starting — version ${app.getVersion()}, platform ${process.platform}`);
 
 // Crash handlers
+// Снимок — только если есть что восстанавливать: в покое запись снимка
+// «восстановила» бы то, что и так на экране, с пометкой о сбое (BUG-07).
 process.on('uncaughtException', (err) => {
     log.error('UNCAUGHT EXCEPTION:', err && err.stack ? err.stack : err);
-    try { saveTimerStateToFileSync(); } catch { /* best effort */ }
+    try { persistRecoverySnapshot(); } catch { /* best effort */ }
 });
 process.on('unhandledRejection', (reason) => {
     log.error('UNHANDLED REJECTION:', reason);
-    try { saveTimerStateToFileSync(); } catch { /* best effort */ }
+    try { persistRecoverySnapshot(); } catch { /* best effort */ }
 });
 
 // Chromium phones home by default: Component Updater → update.googleapis.com /
@@ -417,9 +419,12 @@ const timerController = createTimerController({
     // controller узнаёт от powerMonitor (suspend/resume ниже).
     monotonic: () => performance.now(),
     // FIX BUG-013: Безопасная отправка IPC сообщений
-    onState: (state) => {
+    onState: (state, meta) => {
         timerState = state;
         accrueOverrun(state);
+        // Снимок восстановления следует за КОМАНДАМИ, а не за ходом секунд:
+        // ход досыпает периодическая запись раз в 10 с (BUG-07).
+        if (!(meta && meta.tick)) { persistRecoverySnapshot(); }
         safelySendToWindow(widgetWindow, 'timer-state', state);
         safelySendToWindow(displayWindow, 'timer-state', state);
         safelySendToWindow(controlWindow, 'timer-state', state);
@@ -1139,14 +1144,39 @@ function clearSavedTimerState() {
 // Set early so the recovery interval and before-quit can both see it.
 let isQuitting = false;
 
-// Persist state every 10 seconds while timer is running.
+/**
+ * Есть ли что восстанавливать после сбоя: таймер идёт, стоит на паузе или
+ * остановлен посреди отсчёта. Покой (сброс, новый пресет) и финиш — нет.
+ */
+function worthRecovering(state) {
+    return !state.finished && (state.isRunning || state.isPaused || !isAtRest(state));
+}
+
+/**
+ * ОДНО место, решающее судьбу снимка восстановления (BUG-07).
+ *
+ * Снимок писался только на ходу и не стирался ни паузой, ни сбросом, ни
+ * финишем: сбой в течение пяти минут после сброса поднимал давно сброшенный
+ * отсчёт с пометкой «восстановлено после сбоя», а пауза, длившаяся дольше
+ * пяти минут, не восстанавливалась вовсе. Теперь каждая команда либо пишет
+ * снимок, либо стирает его, а на выходе (isQuitting) не делается ничего:
+ * before-quit стирает снимок сам и воскрешать его нельзя.
+ */
+function persistRecoverySnapshot() {
+    if (isQuitting) { return; }
+    if (worthRecovering(timerState)) { saveTimerStateToFileSync(); }
+    else { clearSavedTimerState(); }
+}
+
+// Persist state every 10 seconds while there is something to recover —
+// на паузе тоже: иначе снимок паузы протухал бы через пять минут.
 // Keep the id so we can stop it on quit — otherwise a fire during teardown can
 // re-create last-state.json after before-quit already unlinked it (phantom resume).
 let recoverySaveInterval = null;
 if (!__inTestMode) {
     recoverySaveInterval = setInterval(() => {
         if (isQuitting) { return; }
-        if (timerState.isRunning) { saveTimerStateToFileSync(); }
+        if (worthRecovering(timerState)) { saveTimerStateToFileSync(); }
     }, 10000);
 }
 
