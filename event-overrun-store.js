@@ -20,6 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomicSync } = require('./atomic-write');
 
 const STORE_FILENAME = 'event-overrun.json';
 
@@ -121,9 +122,14 @@ function loadStore(userDataPath, logger) {
  * приложения. Асинхронная запись здесь потеряла бы итог при закрытии окна
  * сразу после «Завершить мероприятие».
  */
+/**
+ * И атомарная (BUG-09): прямая запись поверх старого файла сначала обрезает
+ * его, и сбой в этот миг оставлял битый JSON — loadStore читал его как ноль,
+ * итог мероприятия пропадал. Сорвавшаяся запись теперь оставляет прежний файл.
+ */
 function saveStore(userDataPath, state, logger) {
     try {
-        fs.writeFileSync(getStorePath(userDataPath), JSON.stringify(normalizeStore(state)));
+        writeFileAtomicSync(getStorePath(userDataPath), JSON.stringify(normalizeStore(state)));
     } catch (err) {
         if (logger && logger.error) { logger.error('saveStore failed:', err); }
     }

@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomicSync } = require('./atomic-write');
 
 const STATE_FILENAME = 'last-state.json';
 const MAX_AGE_MS = 5 * 60 * 1000;
@@ -22,37 +23,14 @@ function getRecoveryStatePath(userDataPath) {
 }
 
 /**
- * Write timer state to disk asynchronously — won't block the event loop
- * during the 10s periodic save.
+ * Write timer state to disk SYNCHRONOUSLY and atomically.
  *
- * @param {string} userDataPath
- * @param {object} timerState     — { totalSeconds, remainingSeconds, presetSeconds, isRunning }
- * @param {object} [logger]       — optional electron-log-like object with .error
- * @returns {Promise<void>}
- */
-function saveTimerStateToFile(userDataPath, timerState, logger) {
-    try {
-        const statePath = getRecoveryStatePath(userDataPath);
-        const data = JSON.stringify({
-            totalSeconds: timerState.totalSeconds,
-            remainingSeconds: timerState.remainingSeconds,
-            presetSeconds: timerState.presetSeconds,
-            isRunning: timerState.isRunning,
-            savedAt: Date.now()
-        });
-        return fs.promises.writeFile(statePath, data).catch(err => {
-            if (logger && logger.error) { logger.error('saveTimerStateToFile:', err); }
-        });
-    } catch (err) {
-        if (logger && logger.error) { logger.error('saveTimerStateToFile:', err); }
-        return Promise.resolve();
-    }
-}
-
-/**
- * Write timer state to disk SYNCHRONOUSLY — for crash handlers
- * (uncaughtException / unhandledRejection) where the process may terminate
- * before an async write flushes. The periodic 10s save stays async (above).
+ * Асинхронного варианта больше нет. Он писал НЕ атомарно, а главное —
+ * завершался когда угодно: запись, начатая тиком за миг до сброса, ложилась
+ * на диск ПОСЛЕ удаления снимка и воскрешала его (снимок «идёт» после
+ * сброса — BUG-07). Файл — полторы сотни байт; синхронная запись раз в
+ * десять секунд цикл событий не держит, зато порядок записей и удалений
+ * теперь тот, в котором их позвали.
  *
  * @param {string} userDataPath
  * @param {object} timerState
@@ -68,7 +46,9 @@ function saveTimerStateToFileSync(userDataPath, timerState, logger) {
             isRunning: timerState.isRunning,
             savedAt: Date.now()
         });
-        fs.writeFileSync(statePath, data);
+        // Атомарно (BUG-09): сорвавшаяся запись оставляет прежний снимок, а
+        // не обрезанный JSON.
+        writeFileAtomicSync(statePath, data);
     } catch (err) {
         if (logger && logger.error) { logger.error('saveTimerStateToFileSync:', err); }
     }
@@ -123,7 +103,6 @@ function isRecoveryValid(data, now) {
 
 module.exports = {
     getRecoveryStatePath,
-    saveTimerStateToFile,
     saveTimerStateToFileSync,
     loadSavedTimerState,
     clearSavedTimerState,

@@ -130,6 +130,7 @@
       "timer-controller.js",
       "recovery.js",
       "event-overrun-store.js",
+      "atomic-write.js",
       "preload.js",
       "ipc-compat.js",
       "security.js",

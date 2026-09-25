@@ -1122,12 +1122,8 @@ function createDisplayWindow(displayIndex) {
 // Implementation lives in ./recovery.js (pure, no electron deps) — thin wrappers
 // below inject the userData path & electron-log logger.
 // ============================================================================
-function saveTimerStateToFile() {
-    return recovery.saveTimerStateToFile(app.getPath('userData'), timerState, log);
-}
-
-// Synchronous variant for crash handlers — guarantees the snapshot hits disk
-// before the handler returns (the async path may not flush before the process dies).
+// Запись синхронная и атомарная (recovery.js объясняет, почему не async):
+// краш-обработчику она нужна до возврата, а периодической — порядок записей.
 function saveTimerStateToFileSync() {
     recovery.saveTimerStateToFileSync(app.getPath('userData'), timerState, log);
 }
@@ -1150,7 +1146,7 @@ let recoverySaveInterval = null;
 if (!__inTestMode) {
     recoverySaveInterval = setInterval(() => {
         if (isQuitting) { return; }
-        if (timerState.isRunning) { saveTimerStateToFile(); }
+        if (timerState.isRunning) { saveTimerStateToFileSync(); }
     }, 10000);
 }
 
