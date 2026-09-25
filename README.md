@@ -224,7 +224,7 @@
 
 Установка: `sudo apt install ./TimerWidget-*-amd64.deb`.
 
-Поставляется только deb, и песочница Chromium в нём работает всегда: `--no-sandbox` нет ни в одной сборке. На Ubuntu 24.04+ пакет ставит профиль AppArmor, разрешающий user namespaces; SUID-бит на `chrome-sandbox` выставляется лишь там, где user namespaces в ядре нет вовсе. При удалении пакета профиль AppArmor удаляется. AppImage больше не выпускается — подробности в [SECURITY.md](SECURITY.md#песочница-в-linux).
+Поставляется только deb, и песочница Chromium в нём работает всегда: `--no-sandbox` нет ни в одной сборке. На Ubuntu 24.04+ пакет ставит профиль AppArmor, разрешающий user namespaces; SUID-бит на `chrome-sandbox` выставляется лишь там, где ядро закрывает user namespaces обычным пользователям. При удалении пакета профиль AppArmor удаляется. AppImage больше не выпускается — подробности в [SECURITY.md](SECURITY.md#песочница-в-linux).
 
 </details>
 
@@ -275,7 +275,7 @@ timer-widget/
 ├── build/
 │   ├── icon.png                # Иконка приложения (1024×1024)
 │   ├── after-pack.js           # electron-builder hook
-│   ├── linux-after-install.sh  # deb postinst: профиль AppArmor, SUID только без user namespaces
+│   ├── linux-after-install.sh  # deb postinst: профиль AppArmor, SUID только где userns закрыты
 │   └── linux-post-remove.sh    # deb postrm: выгрузка профиля AppArmor, purge настроек
 ├── scripts/
 │   ├── run-electron.js         # Wrapper: сбрасывает ELECTRON_RUN_AS_NODE

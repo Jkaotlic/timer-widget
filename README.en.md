@@ -225,7 +225,7 @@ Download from [**Releases**](../../releases/latest):
 
 Install: `sudo apt install ./TimerWidget-*-amd64.deb`.
 
-Only a deb is shipped, and the Chromium sandbox is always on: no build uses `--no-sandbox`. On Ubuntu 24.04+ the package installs an AppArmor profile that allows user namespaces; the SUID bit on `chrome-sandbox` is set only where the kernel has no user namespaces at all. Removing the package removes the AppArmor profile. AppImage is no longer released — see [SECURITY.md](SECURITY.md) (in Russian).
+Only a deb is shipped, and the Chromium sandbox is always on: no build uses `--no-sandbox`. On Ubuntu 24.04+ the package installs an AppArmor profile that allows user namespaces; the SUID bit on `chrome-sandbox` is set only where the kernel denies user namespaces to regular users. Removing the package removes the AppArmor profile. AppImage is no longer released — see [SECURITY.md](SECURITY.md) (in Russian).
 
 </details>
 
@@ -276,7 +276,7 @@ timer-widget/
 ├── build/
 │   ├── icon.png                # App icon (1024×1024)
 │   ├── after-pack.js           # electron-builder hook
-│   ├── linux-after-install.sh  # deb postinst: AppArmor profile, SUID only without user namespaces
+│   ├── linux-after-install.sh  # deb postinst: AppArmor profile, SUID only where userns is denied
 │   └── linux-post-remove.sh    # deb postrm: unloads the AppArmor profile, purges settings
 ├── scripts/
 │   ├── run-electron.js         # Wrapper: clears ELECTRON_RUN_AS_NODE
@@ -336,7 +336,7 @@ timer-widget/
 - CSS injection: colors go through one validator (`isSafeColor`)
 - Chromium Component Updater disabled (`disable-component-update` + `disable-features=ChromeVariations,OptimizationHints`) — the app never calls home
 - electron-builder `afterPack` strips external political content from `LICENSES.chromium.html`
-- Linux: deb only, no `--no-sandbox`; AppArmor profile for user namespaces, SUID on `chrome-sandbox` only where they are missing
+- Linux: deb only, no `--no-sandbox`; AppArmor profile for user namespaces, SUID on `chrome-sandbox` only where the kernel denies them to regular users
 - Full description and known limitations — [SECURITY.md](SECURITY.md)
 
 </details>

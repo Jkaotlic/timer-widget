@@ -1,6 +1,6 @@
 {
   "name": "timer-widget",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "description": "Прозрачный таймер-виджет для рабочего стола",
   "main": "electron-main.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "visual:audit": "node scripts/visual-audit.js",
     "visual:baseline": "node scripts/visual-baseline.js",
     "visual:check": "node scripts/run-electron.js --screenshot --visual-check",
-    "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5",
+    "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5 && node scripts/sbom-normalize.js",
     "notice": "node scripts/generate-notice.js",
     "csp:hash": "node scripts/csp-hash.js",
     "build": "npx --yes electron-builder",
