@@ -29,6 +29,7 @@
 | `status-progress.test.js` | `getTimerStatus`, `calculateProgress` |
 | `validation-utils.test.js` | `isValidNumber`, `clamp` |
 | `display-bg-image.test.js` | BUG-10: картинка фона в payload только при смене (`attachChangedBgImage`), дисплей держит копию и не декодирует её заново |
+| `display-select.test.js` | BUG-18: список мониторов строится без CSS-селектора из данных хранилища (`fillDisplaySelect`) |
 | `custom-sounds.test.js` | BUG-21: испорченное хранилище звуков, только `data:audio/` в `Audio`, нечитаемый файл, замена по базовому имени — с тостом |
 | `debounce-send.test.js` | `debounce`, `safelySendToWindow` |
 | `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS`, preload/validator sync |
@@ -95,6 +96,8 @@ e2e specs (`npx playwright test`, `workers: 1`):
 |------|--------|
 | `app.spec.js` | Boot, presets, start/pause/reset round trip |
 | `status-and-colors.spec.js` | Colour bands, status priority, Esc layering, overrun limit, module wiring |
+| `display-select.spec.js` | BUG-18: список мониторов строится в живой панели и при кавычке в `selectedDisplay` |
+| `custom-sounds.spec.js` | BUG-21: испорченное хранилище звуков не роняет список; одноимённый файл заменяет звук с тостом |
 | `display-local-background.spec.js` | Локальный фон по настоящему пути: картинка едет один раз (BUG-10), затемнение 0 % (BUG-16), досылка переоткрытому дисплею, удаление |
 | `flip-animation.spec.js` | Перекидывание ВИДНО в трёх окнах: створки меряются покадрово, не по классу |
 | `flip-hours-layout.spec.js` | Flip separator stays dots (never a glyph) in H:MM:SS, measured |

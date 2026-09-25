@@ -106,7 +106,47 @@ function attachChangedBgImage(settings, image, lastSent) {
     return image;
 }
 
+/**
+ * Список мониторов: «Авто» и по опции на экран, выбор — из сохранённого.
+ *
+ * Сохранённое значение (`selectedDisplay`) пришло из хранилища, то есть это
+ * чужие данные. Прежде оно встраивалось в CSS-селектор
+ * `option[value="${saved}"]`, и кавычка в нём роняла querySelector
+ * исключением — список мониторов не строился вовсе (BUG-18). Значение
+ * СРАВНИВАЕТСЯ с опциями, а в селектор не попадает никогда.
+ *
+ * @param {HTMLSelectElement} select
+ * @param {Array<{bounds: {x:number, y:number, width:number, height:number}}>} displays
+ * @param {string|null} saved
+ * @param {Document} doc
+ */
+function fillDisplaySelect(select, displays, saved, doc) {
+    select.replaceChildren();
+    const auto = doc.createElement('option');
+    auto.value = 'auto';
+    auto.textContent = 'Авто';
+    select.appendChild(auto);
+
+    (Array.isArray(displays) ? displays : []).forEach((display, index) => {
+        const option = doc.createElement('option');
+        option.value = index.toString();
+        const isPrimary = display.bounds.x === 0 && display.bounds.y === 0;
+        const label = isPrimary ? 'Основной' : `Монитор ${index + 1}`;
+        option.textContent = `${label} (${display.bounds.width}×${display.bounds.height})`;
+        select.appendChild(option);
+    });
+
+    const known = Array.from(select.options).some((o) => o.value === saved);
+    select.value = known ? saved : 'auto';
+}
+
 const PanelDisplayMixin = {
+
+    /** Список мониторов пришёл от главного процесса — перестроить выбор. */
+    updateDisplaysList(displays) {
+        fillDisplaySelect(this.displaySelectEl, displays, localStorage.getItem('selectedDisplay'), document);
+    },
+
 
     /**
      * Единственная сборка payload канала `display-settings-update`.
@@ -919,7 +959,7 @@ const PanelDisplayMixin = {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-    PanelDisplayMixin, collectDisplayToggles, collectBlockLabels, attachChangedBgImage,
+    PanelDisplayMixin, collectDisplayToggles, collectBlockLabels, attachChangedBgImage, fillDisplaySelect,
     BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
 };
 }
