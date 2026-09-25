@@ -1969,7 +1969,7 @@ class DisplayTimer {
             if (localBgImage) {
                 settings.bgLocalImage = localBgImage;
                 settings.bgLocalFit = localBgSettings.fit || 'cover';
-                settings.bgLocalOverlay = localBgSettings.overlay || 30;
+                settings.bgLocalOverlay = window.RendererShared.bgOverlayPercent(localBgSettings.overlay);
             }
         }
 
@@ -2129,7 +2129,7 @@ class DisplayTimer {
         } else if (mode === 'local' && settings.bgLocalImage) {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';
-            const overlay = settings.bgLocalOverlay || 30;
+            const overlay = window.RendererShared.bgOverlayPercent(settings.bgLocalOverlay);
 
             // Создаём или обновляем оверлей
             this.applyLocalBackground(settings.bgLocalImage, fit, overlay);

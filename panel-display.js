@@ -116,7 +116,7 @@ const PanelDisplayMixin = {
             bgGrad2: document.getElementById('bgGrad2').value,
             bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
             bgLocalFit: localBgSettings.fit || 'cover',
-            bgLocalOverlay: localBgSettings.overlay || 30,
+            bgLocalOverlay: window.RendererShared.bgOverlayPercent(localBgSettings.overlay),
             eventTime: this.eventTimeInputEl.value,
             endTime: this.endTimeInputEl.value,
             eventTitle: this.eventTitleInputEl ? this.eventTitleInputEl.value : '',

@@ -772,6 +772,27 @@ function signedSecondsUntilClock(nowSeconds, clock) {
 }
 
 // ---------------------------------------------------------------------------
+// bgOverlayPercent(value) → затемнение фона дисплея, % (BUG-16)
+// ---------------------------------------------------------------------------
+/** Затемнение картинки фона по умолчанию — то же, что `value` ползунка. */
+const DEFAULT_BG_OVERLAY = 30;
+
+/**
+ * Затемнение локального фона в процентах, [0, 100].
+ *
+ * `overlay || 30` в трёх местах превращал законный 0 в 30: ползунок стоял
+ * на 0 %, а дисплей темнил картинку на 30 %. Ноль — значение, умолчание — для
+ * ОТСУТСТВИЯ и мусора; и знает его одно место.
+ */
+function bgOverlayPercent(value) {
+    let n = NaN;
+    if (typeof value === 'number') { n = value; }
+    else if (typeof value === 'string' && value.trim() !== '') { n = Number(value); }
+    if (!Number.isFinite(n)) { return DEFAULT_BG_OVERLAY; }
+    return Math.max(0, Math.min(100, n));
+}
+
+// ---------------------------------------------------------------------------
 // eventClockDistances(now, 'HH:MM', 'HH:MM') → { toStart, toEnd } (BUG-08)
 // ---------------------------------------------------------------------------
 const EVENT_DAY = 86400;
@@ -910,6 +931,8 @@ const RendererShared = {
     secondsUntilClock,
     signedSecondsUntilClock,
     eventClockDistances,
+    bgOverlayPercent,
+    DEFAULT_BG_OVERLAY,
     migrateDisplayBlocks,
     timerLifecycleStatus,
     timerColorBand,

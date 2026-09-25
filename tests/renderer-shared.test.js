@@ -997,3 +997,40 @@ test('BUG-08: мусор в одной отметке даёт 0 ей, а дру
     assert.deepEqual(eventClockDistances(hm(14), null, undefined), { toStart: 0, toEnd: 0 });
     assert.deepEqual(eventClockDistances(NaN, '10:00', '12:00'), { toStart: 0, toEnd: 0 });
 });
+
+// ---------------------------------------------------------------------------
+// bgOverlayPercent — затемнение фона (BUG-16)
+// ---------------------------------------------------------------------------
+// `overlay || 30` превращал законный 0 в 30: снять затемнение с картинки было
+// невозможно — ползунок стоял на 0 %, а дисплей темнил на 30 %.
+const { bgOverlayPercent, DEFAULT_BG_OVERLAY } = require('../renderer-shared');
+
+test('BUG-16: затемнение 0 % — это 0, а не умолчание', () => {
+    assert.equal(bgOverlayPercent(0), 0);
+    assert.equal(bgOverlayPercent('0'), 0);
+});
+
+test('BUG-16: отсутствие и мусор дают умолчание, число — себя в [0, 100]', () => {
+    assert.equal(DEFAULT_BG_OVERLAY, 30);
+    for (const v of [undefined, null, '', 'abc', NaN, Infinity, {}]) {
+        assert.equal(bgOverlayPercent(v), 30, JSON.stringify(v));
+    }
+    assert.equal(bgOverlayPercent(45), 45);
+    assert.equal(bgOverlayPercent('15'), 15);
+    assert.equal(bgOverlayPercent(-5), 0);
+    assert.equal(bgOverlayPercent(150), 100);
+});
+
+test('BUG-16: ни одного `overlay || 30` в панели и дисплее — умолчание у bgOverlayPercent', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const { codeOnly } = require('./helpers/source-scan');
+    for (const file of ['panel-display.js', 'display-script.js', 'local-background.js']) {
+        const src = codeOnly(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'));
+        assert.doesNotMatch(src, /[Oo]verlay\s*\|\|\s*\d/, `${file}: вернулось «|| число» у затемнения`);
+    }
+    const panel = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'panel-display.js'), 'utf8'));
+    assert.match(panel, /bgLocalOverlay:\s*window\.RendererShared\.bgOverlayPercent\(/);
+    // Самопроверка регулярки: на старом тексте она обязана сработать.
+    assert.match('bgLocalOverlay: localBgSettings.overlay || 30,', /[Oo]verlay\s*\|\|\s*\d/);
+});
