@@ -27,7 +27,7 @@ Channel whitelist defined in `channel-validator.js`, used by `preload.js`.
 | `clock-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — clock only |
 | `display-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — display only |
 | `widget-style-update` | панель | `{ timerStyle, timerScale }` — widget style/scale |
-| `display-settings-update` | панель | Display style, background, clock settings. `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local` |
+| `display-settings-update` | панель | Display style, background, clock settings. `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local`. `bgLocalImage` есть в payload только при СМЕНЕ картинки (BUG-10): ключа нет — «без изменений», `''` — «картинки нет»; main помнит последнюю и досылает её дисплею при открытии, виджету и часам — никогда |
 | `get-timer-state` | панель, виджет, часы, дисплей | Request current timer state |
 | `get-displays` | панель | Request list of available displays |
 | `open-releases-page` | панель | Без payload: main открывает страницу релизов через `shell.openExternal`, адрес — КОНСТАНТА в main. URL из рендерера означал бы выполнение произвольного адреса руками ОС |

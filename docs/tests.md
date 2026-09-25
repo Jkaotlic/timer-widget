@@ -28,6 +28,8 @@
 | `security-extended.test.js` | `safeSetBackgroundImage` |
 | `status-progress.test.js` | `getTimerStatus`, `calculateProgress` |
 | `validation-utils.test.js` | `isValidNumber`, `clamp` |
+| `display-bg-image.test.js` | BUG-10: картинка фона в payload только при смене (`attachChangedBgImage`), дисплей держит копию и не декодирует её заново |
+| `custom-sounds.test.js` | BUG-21: испорченное хранилище звуков, только `data:audio/` в `Audio`, нечитаемый файл, замена по базовому имени — с тостом |
 | `debounce-send.test.js` | `debounce`, `safelySendToWindow` |
 | `channel-validator.test.js` | `isValidChannel`, `ALLOWED_CHANNELS`, preload/validator sync |
 | `ipc-liveness.test.js` | Every whitelisted channel has BOTH ends. The whitelist is a permission, not proof of life |
@@ -93,6 +95,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 |------|--------|
 | `app.spec.js` | Boot, presets, start/pause/reset round trip |
 | `status-and-colors.spec.js` | Colour bands, status priority, Esc layering, overrun limit, module wiring |
+| `display-local-background.spec.js` | Локальный фон по настоящему пути: картинка едет один раз (BUG-10), затемнение 0 % (BUG-16), досылка переоткрытому дисплею, удаление |
 | `flip-animation.spec.js` | Перекидывание ВИДНО в трёх окнах: створки меряются покадрово, не по классу |
 | `flip-hours-layout.spec.js` | Flip separator stays dots (never a glyph) in H:MM:SS, measured |
 | `window-state-sync.spec.js` | A window loaded second knows which windows are already open |

@@ -87,6 +87,25 @@ function collectDisplayToggles(doc) {
     return out;
 }
 
+/**
+ * Картинка фона — в payload только при СМЕНЕ (BUG-10).
+ *
+ * Весь фон — до ~13 М символов base64 — уходил в `display-settings-update` на
+ * каждое нажатие клавиши в названии мероприятия и каждый шаг ползунка, а
+ * главный процесс пересылал его дисплею и часам. Отсутствие ключа теперь
+ * значит «без изменений», пустая строка — «картинки нет». Главный процесс
+ * помнит последнюю и досылает её окну, открытому позже; дисплей держит копию.
+ *
+ * @param {object} settings — собираемый payload (дополняется на месте)
+ * @param {string} image — картинка, которую дисплей должен показывать сейчас
+ * @param {string|undefined} lastSent — последняя отправленная
+ * @returns {string} новая «последняя отправленная»
+ */
+function attachChangedBgImage(settings, image, lastSent) {
+    if (image !== lastSent) { settings.bgLocalImage = image; }
+    return image;
+}
+
 const PanelDisplayMixin = {
 
     /**
@@ -100,7 +119,11 @@ const PanelDisplayMixin = {
         this.saveExtSettings();
 
         const parse = window.SecurityUtils.safeJSONParse;
-        const localBgImage = localStorage.getItem('localBgImage') || '';
+        // Хранилище читается только в режиме «Файл»: строка до 13 М символов
+        // на каждое нажатие клавиши не нужна и внутри панели.
+        const localBgImage = this.currentBgMode === 'local'
+            ? (localStorage.getItem('localBgImage') || '')
+            : '';
         const localBgSettings = parse(localStorage.getItem('localBgSettings'), {});
 
         const styleEl = this.displayTimerStyleEl || this.timerStyleEl;
@@ -114,7 +137,6 @@ const PanelDisplayMixin = {
             bgSolid: document.getElementById('bgSolidColor').value,
             bgGrad1: document.getElementById('bgGrad1').value,
             bgGrad2: document.getElementById('bgGrad2').value,
-            bgLocalImage: this.currentBgMode === 'local' ? localBgImage : '',
             bgLocalFit: localBgSettings.fit || 'cover',
             bgLocalOverlay: window.RendererShared.bgOverlayPercent(localBgSettings.overlay),
             eventTime: this.eventTimeInputEl.value,
@@ -147,6 +169,10 @@ const PanelDisplayMixin = {
             floor47Unlocked: this.isFloor47Unlocked(),
             reportOnlyOverruns: this.reportOnlyOverrunsEl ? this.reportOnlyOverrunsEl.checked : false
         }, collectDisplayToggles(document), collectBlockLabels(document));
+
+        // Картинка — только при смене: см. attachChangedBgImage (BUG-10).
+        this._sentBgLocalImage = attachChangedBgImage(
+            settings, this.currentBgMode === 'local' ? localBgImage : '', this._sentBgLocalImage);
 
         window.ipcRenderer.send('display-settings-update', settings);
     },
@@ -893,7 +919,7 @@ const PanelDisplayMixin = {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-    PanelDisplayMixin, collectDisplayToggles, collectBlockLabels,
+    PanelDisplayMixin, collectDisplayToggles, collectBlockLabels, attachChangedBgImage,
     BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
 };
 }

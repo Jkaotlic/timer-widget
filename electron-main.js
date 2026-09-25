@@ -55,7 +55,7 @@ const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
 const NavigationGuard = require('./navigation-guard');
 const IpcSenders = require('./ipc-senders');
-const { sanitizeRelayPayload } = require('./relay-payload');
+const { sanitizeRelayPayload, mergeDisplaySettings, withoutBgImage } = require('./relay-payload');
 
 // Logger setup
 //
@@ -995,9 +995,10 @@ function createWidgetWindow() {
     bindWindowStateSnapshot(widgetWindow);
     announceWindowOpened(widgetWindow, 'widget-window-state', (win) => {
         safelySendToWindow(win, 'timer-state', timerState);
-        // Сохранённые настройки дисплея (виджет берёт оттуда фон)
+        // Сохранённые настройки дисплея (виджет берёт оттуда фон) — без
+        // картинки: её рисует только дисплей (BUG-10).
         if (lastDisplaySettings) {
-            safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
+            safelySendToWindow(win, 'display-settings-update', withoutBgImage(lastDisplaySettings));
         }
         // Цвета и стиль — только свои, адресными каналами
         if (lastWidgetColors) {
@@ -1068,9 +1069,10 @@ function createClockWidgetWindow() {
         // идущем таймере, иначе считали бы его стоящим до первого тика — а
         // на паузе тика нет вовсе (BUG-01).
         safelySendToWindow(win, 'timer-state', timerState);
-        // Настройки дисплея несут стиль часов (clockStyle) и цифры циферблата
+        // Настройки дисплея несут стиль часов (clockStyle) и цифры циферблата;
+        // картинку фона часы не рисуют (BUG-10).
         if (lastDisplaySettings) {
-            safelySendToWindow(win, 'display-settings-update', lastDisplaySettings);
+            safelySendToWindow(win, 'display-settings-update', withoutBgImage(lastDisplaySettings));
         }
         // Свои настройки окна часов — тумблеры даты, пояса, секунд и формата.
         if (lastClockSettings) {
@@ -1841,11 +1843,14 @@ function applyWidgetMinimumSize() {
 ipcMain.on('display-settings-update', (event, payload) => {
     const settings = acceptRelay('display-settings-update', payload);
     if (settings === null) { return; }
-    // Сохраняем настройки для синхронизации при открытии новых окон
-    lastDisplaySettings = settings;
+    // Сохраняем настройки для синхронизации при открытии новых окон. Картинка
+    // фона едет только при смене (BUG-10): без ключа запомненная остаётся.
+    lastDisplaySettings = mergeDisplaySettings(lastDisplaySettings, settings);
 
+    // Открытым окнам — ровно пришедшее: дисплей держит свою копию картинки,
+    // и 13 МБ на каждое нажатие клавиши не едут и отсюда. Часам фон не нужен.
     safelySendToWindow(displayWindow, 'display-settings-update', settings);
-    safelySendToWindow(clockWidgetWindow, 'display-settings-update', settings);
+    safelySendToWindow(clockWidgetWindow, 'display-settings-update', withoutBgImage(settings));
 });
 
 // Обработчик намеренно тонкий: рассылка состояния и досылка настроек живут в

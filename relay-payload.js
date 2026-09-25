@@ -101,4 +101,35 @@ function sanitizeRelayPayload(channel, payload) {
     return out;
 }
 
-module.exports = { sanitizeRelayPayload, RELAY_LIMITS, EVENT_TITLE_MAX };
+/**
+ * Запомнить настройки дисплея, не теряя картинку фона (BUG-10).
+ *
+ * Панель слала весь фон — до ~13 М символов base64 — на каждое нажатие
+ * клавиши в названии мероприятия и каждый шаг ползунка. Теперь `bgLocalImage`
+ * едет только при СМЕНЕ: ключа нет — «без изменений», пустая строка —
+ * «картинки нет». Главный процесс помнит последнюю, потому что досылает
+ * настройки окну, открытому позже, и оно обязано получить фон целиком.
+ */
+function mergeDisplaySettings(prev, incoming) {
+    const out = Object.assign({}, incoming);
+    const hasOwn = Object.prototype.hasOwnProperty;
+    if (!hasOwn.call(out, 'bgLocalImage') && prev && hasOwn.call(prev, 'bgLocalImage')) {
+        out.bgLocalImage = prev.bgLocalImage;
+    }
+    return out;
+}
+
+/**
+ * Те же настройки без картинки — для окон, которые фона дисплея не рисуют
+ * (виджет, часы): им эти мегабайты незачем ни по каналу, ни в памяти окна.
+ */
+function withoutBgImage(settings) {
+    if (!settings) { return settings; }
+    const out = Object.assign({}, settings);
+    delete out.bgLocalImage;
+    return out;
+}
+
+module.exports = {
+    sanitizeRelayPayload, RELAY_LIMITS, EVENT_TITLE_MAX, mergeDisplaySettings, withoutBgImage
+};

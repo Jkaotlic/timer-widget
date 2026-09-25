@@ -1135,6 +1135,48 @@ test('SEC-10: разосланы и запомнены только примит
     assert.ok(!('nested' in hydrated));
 });
 
+// --- BUG-10: картинка фона едет только при смене --------------------------
+
+test('BUG-10: payload без картинки не стирает её; дисплей, открытый позже, получает её досылкой', async () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    openDisplay(stubs);
+    stubs.ipcHandlers.get('open-clock-widget')(null);
+    const IMG = 'data:image/png;base64,' + 'A'.repeat(4096);
+    const send = (p) => stubs.ipcHandlers.get('display-settings-update')(null, p);
+    const sentTo = (role) => stubs.sent
+        .filter((m) => m.channel === 'display-settings-update' && m.win && m.win._file === ROLE_FILES[role]);
+
+    send({ bgMode: 'local', bgLocalImage: IMG, eventTitle: 'a' });
+    assert.ok(sentTo('display').at(-1).payload.bgLocalImage === IMG, 'новая картинка не дошла до дисплея');
+    assert.ok(!('bgLocalImage' in sentTo('clock').at(-1).payload), 'часам картинка не нужна — и не шлётся');
+
+    // Нажатие клавиши в названии: картинки в payload нет — и дальше её нет.
+    send({ bgMode: 'local', eventTitle: 'ab' });
+    const typed = sentTo('display').at(-1).payload;
+    assert.equal(typed.eventTitle, 'ab');
+    assert.ok(!('bgLocalImage' in typed), 'картинка разослана повторно без изменений');
+
+    // Дисплей закрыли и открыли: досылка несёт и картинку, и свежее название.
+    // Закрытие полноэкранного окна не мгновенно — открытие ждёт его (см. тест
+    // close→open выше), поэтому пауза.
+    const reopen = async () => {
+        stubs.ipcHandlers.get('close-display')(null);
+        openDisplay(stubs);
+        await new Promise((r) => setTimeout(r, 400));
+        liveWindow(stubs, 'display').webContents.emit('did-finish-load');
+    };
+    await reopen();
+    const hydrated = sentTo('display').at(-1).payload;
+    assert.ok(hydrated.bgLocalImage === IMG, 'окно, открытое позже, осталось без фона');
+    assert.equal(hydrated.eventTitle, 'ab');
+
+    // Пустая строка — картинку убрали: досылка тоже без неё.
+    send({ bgMode: 'solid', bgLocalImage: '' });
+    await reopen();
+    assert.equal(sentTo('display').at(-1).payload.bgLocalImage, '');
+});
+
 test('SEC-10: цвета и стиль виджета — только плоский объект', () => {
     const stubs = createStubs();
     loadMain(stubs);

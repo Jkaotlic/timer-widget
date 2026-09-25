@@ -86,3 +86,40 @@ test('стиль часов — короткая строка, иначе отк
 test('канал без правила — ошибка программиста, а не молчаливый пропуск', () => {
     assert.throws(() => sanitizeRelayPayload('timer-command', {}), /нет правила/);
 });
+
+// ---------------------------------------------------------------------------
+// BUG-10: картинка фона едет только при СМЕНЕ
+// ---------------------------------------------------------------------------
+// Панель слала весь фон (до ~13 М символов base64) на каждое нажатие клавиши
+// в названии и каждый шаг ползунка. Теперь ключа `bgLocalImage` в payload нет,
+// пока картинка не сменилась; главный процесс помнит последнюю и досылает её
+// окну, открытому позже. Пустая строка — «картинки нет» (удалена или режим не
+// «Файл»), отсутствие ключа — «без изменений».
+const { mergeDisplaySettings, withoutBgImage } = require('../relay-payload');
+
+test('BUG-10: payload без картинки сохраняет прежнюю картинку в запомненном', () => {
+    const prev = { bgMode: 'local', bgLocalImage: 'data:image/png;base64,AAA', eventTitle: 'a' };
+    const merged = mergeDisplaySettings(prev, { bgMode: 'local', eventTitle: 'ab' });
+    assert.deepEqual(merged, { bgMode: 'local', eventTitle: 'ab', bgLocalImage: 'data:image/png;base64,AAA' });
+    assert.equal(prev.eventTitle, 'a', 'прежний объект не мутируется');
+});
+
+test('BUG-10: пустая строка УБИРАЕТ картинку, новая — заменяет', () => {
+    const prev = { bgLocalImage: 'data:image/png;base64,AAA' };
+    assert.equal(mergeDisplaySettings(prev, { bgLocalImage: '' }).bgLocalImage, '');
+    assert.equal(mergeDisplaySettings(prev, { bgLocalImage: 'data:image/png;base64,BBB' }).bgLocalImage,
+        'data:image/png;base64,BBB');
+});
+
+test('BUG-10: без прежних настроек — копия пришедших, картинки не выдумывается', () => {
+    const merged = mergeDisplaySettings(null, { bgMode: 'solid' });
+    assert.deepEqual(merged, { bgMode: 'solid' });
+    assert.ok(!('bgLocalImage' in merged));
+});
+
+test('BUG-10: окнам без фона (виджет, часы) картинка не отправляется вовсе', () => {
+    const s = { bgMode: 'local', bgLocalImage: 'data:image/png;base64,AAA', clockStyle: 'flip' };
+    assert.deepEqual(withoutBgImage(s), { bgMode: 'local', clockStyle: 'flip' });
+    assert.ok('bgLocalImage' in s, 'исходник не мутируется');
+    assert.equal(withoutBgImage(null), null);
+});

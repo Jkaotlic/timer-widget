@@ -2093,6 +2093,13 @@ class DisplayTimer {
         // приходили один раз при открытии окна.
         this._bgSettings = settings;
 
+        // Картинка фона приходит только при СМЕНЕ (BUG-10): ключа нет — «без
+        // изменений», пустая строка — «картинки нет». Копия живёт здесь.
+        if (Object.prototype.hasOwnProperty.call(settings, 'bgLocalImage')) {
+            this._bgLocalImage = settings.bgLocalImage || '';
+        }
+        const localImage = this._bgLocalImage || '';
+
         // Страж яркости: цвет текста решает ФОН, а не тема. Режим передаётся уже
         // РАЗРЕШЁННЫЙ: первая версия отдавала сырой settings.bgMode, и на
         // профиле без сохранённого фона страж видел undefined, откатывался к
@@ -2126,13 +2133,13 @@ class DisplayTimer {
             bg = this._themeIsLight()
                 ? 'linear-gradient(135deg, #ffffff 0%, #ececf3 100%)'
                 : 'linear-gradient(135deg, #0f0c29 0%, #302b63 100%)';
-        } else if (mode === 'local' && settings.bgLocalImage) {
+        } else if (mode === 'local' && localImage) {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';
             const overlay = window.RendererShared.bgOverlayPercent(settings.bgLocalOverlay);
 
             // Создаём или обновляем оверлей
-            this.applyLocalBackground(settings.bgLocalImage, fit, overlay);
+            this.applyLocalBackground(localImage, fit, overlay);
             document.body.classList.add('custom-bg');
             return; // Не применяем стандартный фон
         }
@@ -2187,8 +2194,14 @@ class DisplayTimer {
     }
 
     applyLocalBackground(imageData, fit, overlay) {
-        // Удаляем старый оверлей если есть
-        this.removeLocalBackgroundOverlay();
+        // Та же картинка — только размещение и затемнение. Снять и поставить
+        // её заново значило бы декодировать мегабайты на каждое нажатие
+        // клавиши в названии и каждый шаг ползунка (BUG-10).
+        const sameImage = !!document.getElementById('bgOverlay') && this._appliedBgImage === imageData;
+        if (!sameImage) {
+            // Удаляем старый оверлей если есть
+            this.removeLocalBackgroundOverlay();
+        }
 
         // Настройки размещения
         let bgSize, bgRepeat, bgPosition;
@@ -2207,12 +2220,15 @@ class DisplayTimer {
         }
 
         // Безопасная установка фона с валидацией (FIX BUG-004: XSS prevention)
-        if (window.SecurityUtils) {
+        if (sameImage) {
+            // Картинка уже стоит и уже проверена.
+        } else if (window.SecurityUtils) {
             const success = window.SecurityUtils.safeSetBackgroundImage(document.body, imageData);
             if (!success) {
                 console.error('Failed to set background image: invalid or unsafe URL');
                 return;
             }
+            this._appliedBgImage = imageData;
         } else {
             console.error('SecurityUtils not loaded, background image rejected for security');
             return;
@@ -2244,6 +2260,7 @@ class DisplayTimer {
     }
 
     removeLocalBackgroundOverlay() {
+        this._appliedBgImage = null;
         const overlayEl = document.getElementById('bgOverlay');
         if (overlayEl) {
             overlayEl.remove();
