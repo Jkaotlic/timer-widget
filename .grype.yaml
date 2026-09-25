@@ -1,0 +1,14 @@
+# Grype: скан СОБРАННОГО deb (CI: job `deb-scan`, релиз: job `build-linux`).
+#
+# Порог: high и critical валят сборку (`severity-cutoff: high` в workflow).
+# Принятых находок сейчас НЕТ. Запись добавляется только с комментарием:
+# id, почему не применима, срок пересмотра — как в osv-scanner.toml.
+#
+# Что Grype здесь видит и чего НЕ видит. Бинарь Electron (Chromium внутри)
+# ни Syft, ни Trivy по сигнатуре не опознают — замер 25.09.2026: syft по
+# linux-unpacked дал «No packages discovered». Поэтому job распаковывает
+# app.asar: так видны npm-пакеты, действительно уехавшие в приложение. Версию
+# Electron проверяют lockfile/SBOM (osv-scanner) и `security-gate.js electron`,
+# который сверяет её со строкой `Electron/X.Y.Z` в самом бинаре.
+ignore: []
+#  - vulnerability: GHSA-xxxx-xxxx-xxxx   # почему не применима; пересмотреть до ГГГГ-ММ-ДД

@@ -1,0 +1,48 @@
+# Обновления зависимостей.
+#
+# Зачем. Исправления Chromium приходят в Electron ПАТЧ-релизами, а сканер
+# приёмки видит устаревший Chromium по версии Electron в lockfile/SBOM: 44.1.1
+# отставал на три патча. Раз в неделю — один PR на Electron и по одному на
+# остальные группы, а не россыпь по пакету.
+#
+# После PR на npm: `npm run sbom` и закоммитить sbom.json — CI сверяет SBOM с
+# lockfile (tests/security-gate.test.js) и без этого будет красным. Это
+# намеренно: SBOM уходит в релиз и читается сканером приёмки.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Патчи и миноры Electron — своей группой: это обновление Chromium, его
+      # вливают быстро и не ждут вместе с линтером.
+      electron:
+        patterns: ["electron"]
+        update-types: ["minor", "patch"]
+      # Остальной dev-инструментарий — одним PR.
+      dev-tooling:
+        dependency-type: development
+        exclude-patterns: ["electron"]
+        update-types: ["minor", "patch"]
+      runtime:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+    # Мажоры (в том числе Electron 45) приходят отдельными PR: смена мажора
+    # Electron — это смена Chromium и Node, её проверяют по e2e руками.
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]

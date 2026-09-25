@@ -9,7 +9,43 @@ permissions:
   contents: write
 
 jobs:
+  # Ворота уязвимостей ДО сборки: релиз с известной high/critical не
+  # собирается вовсе. Те же проверки, что job `security` в nodejs.yml, плюс
+  # строже одно: Electron обязан стоять на последнем патче своей линии —
+  # Chromium-исправления приходят патч-релизами Electron, и в CI отставание
+  # лишь предупреждение. Подробно: docs/ci.md.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: npm audit (high и выше блокирует, dev включён)
+        run: npm audit --audit-level=high
+      - name: SBOM совпадает с lockfile
+        run: node scripts/security-gate.js sbom-sync
+      - name: Prepare SBOM for OSV-Scanner
+        run: cp sbom.json sbom.cdx.json && rm -f osv-results.json
+      - name: OSV-Scanner (lockfile + SBOM)
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        continue-on-error: true
+        with:
+          scan-args: |-
+            --format=json
+            --all-packages
+            --output-file=osv-results.json
+            --config=osv-scanner.toml
+            --lockfile=package-lock.json
+            --lockfile=sbom.cdx.json
+      - name: Gate on OSV findings (high/critical или без оценки — провал)
+        run: node scripts/security-gate.js osv osv-results.json
+      - name: Electron — последний патч своей линии (иначе провал)
+        run: node scripts/security-gate.js electron --require-latest
+
   build-macos-intel:
+    needs: security
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -45,6 +81,7 @@ jobs:
           retention-days: 5
 
   build-macos-arm:
+    needs: security
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
@@ -80,6 +117,7 @@ jobs:
           retention-days: 5
 
   build-windows:
+    needs: security
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -113,6 +151,7 @@ jobs:
           retention-days: 5
 
   build-linux:
+    needs: security
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -141,6 +180,40 @@ jobs:
       # песочница и профиль AppArmor видны только в готовом postinst.
       - name: Verify sandbox setup in the shipped package
         run: node scripts/verify-linux-sandbox.js
+
+      # Скан ТОГО deb, что уходит в релиз: Grype по распакованному пакету и
+      # app.asar, версия Electron в бинаре = lockfile = SBOM. Как job
+      # `deb-scan` в nodejs.yml.
+      - name: Unpack deb and app.asar for scanning
+        run: |
+          DEB=$(ls dist/*.deb)
+          dpkg-deb -x "$DEB" scan-root
+          ASAR=$(find scan-root -path '*/resources/app.asar')
+          npx --yes @electron/asar@3.4.1 extract "$ASAR" scan-root/app-asar-extracted
+
+      - name: Electron в бинаре = lockfile = SBOM
+        run: node scripts/security-gate.js electron --binary "$(find scan-root/opt -maxdepth 2 -name timer-widget -type f)" --require-latest
+
+      # Grype по каталогу видит 0 пакетов — SBOM строит syft с
+      # каталогизаторами образа, полнота проверяется (см. deb-scan в nodejs.yml).
+      - name: Download Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+
+      - name: SBOM of the shipped deb
+        run: ${{ steps.syft.outputs.cmd }} dir:scan-root --override-default-catalogers image -o cyclonedx-json=deb-sbom.cdx.json -o table
+
+      - name: SBOM артефакта не пуст
+        run: node scripts/security-gate.js artifact-sbom deb-sbom.cdx.json
+
+      - name: Grype on the shipped deb (high/critical блокирует)
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          sbom: deb-sbom.cdx.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: table
+          config: .grype.yaml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7

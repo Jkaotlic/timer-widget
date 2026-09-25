@@ -58,3 +58,8 @@ coverage/
 
 # Разборы и аудиты — рабочий стол, а не продукт (глобальное правило)
 analysis/
+
+# Отчёты сканеров уязвимостей (CI: job security / deb-scan)
+osv-results.json
+sbom.cdx.json
+scan-root/
