@@ -84,9 +84,8 @@ test('все три окна шлют sound-toggle по клавише Z', () =>
 test('канал объявлен в обоих списках — и в валидаторе, и в мосте', () => {
     // Оба конца проверяет tests/ipc-liveness.test.js; здесь — что канал вообще
     // объявлен, иначе preload молча отбросит посылку.
-    for (const file of ['channel-validator.js', 'preload.js']) {
-        const src = read(file);
-        const hits = (src.match(/'sound-toggle'/g) || []).length;
-        assert.equal(hits, 2, `${file}: канал sound-toggle объявлен ${hits} раз вместо двух (send + receive)`);
-    }
+    // Мост по окнам: шлют три окна с клавишей Z, слушает панель.
+    const { bridgeRoles } = require('./helpers/ipc-scan');
+    assert.deepEqual(bridgeRoles('sound-toggle', 'send'), ['widget', 'clock', 'display']);
+    assert.deepEqual(bridgeRoles('sound-toggle', 'receive'), ['control']);
 });

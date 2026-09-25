@@ -18,6 +18,7 @@
     "sbom": "npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5 && node scripts/sbom-normalize.js",
     "notice": "node scripts/generate-notice.js",
     "csp:hash": "node scripts/csp-hash.js",
+    "preload:channels": "node scripts/preload-channels.js",
     "build": "npx --yes electron-builder",
     "build:win": "npx --yes electron-builder --win",
     "build:mac": "npx --yes electron-builder --mac",

@@ -33,6 +33,7 @@ const {
     flatten,
     checkPacked,
     checkHardening,
+    checkBridge,
     mainProcessPaths,
     readPackedMainSource,
     expectedFuseWire,
@@ -456,4 +457,27 @@ test('ворота читают ВЕСЬ главный процесс из па
     // Нет точки входа — нет и проверки: null, и ворота падают.
     assert.equal(readPackedMainSource(() => null, packed), null);
     assert.equal(checkHardening(readPackedMainSource(() => null, packed)).length, 1);
+});
+
+// --- Мост по окнам на артефакте ---------------------------------------------
+
+test('checkBridge: настоящие preload.js и главный процесс проходят, порча — нет', () => {
+    const bridge = require('../scripts/preload-channels');
+    const { readMainSource } = require('./helpers/main-source');
+    const preload = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+    const main = readMainSource();
+    const check = (p, m) => checkBridge(p, m, bridge.renderBlock(), bridge.extractBlock);
+
+    assert.deepEqual(check(preload, main), [], 'репозиторий обязан проходить ворота');
+
+    assert.match(check(null, main)[0], /preload\.js не найден/);
+    assert.match(check('const x = 1;', main).join('\n'), /нет таблицы/);
+    const stale = preload.replace("'quit-app'", "'quit-app', 'evil'");
+    assert.match(check(stale, main).join('\n'), /отстала/);
+    assert.match(check(preload + '\nconst ALLOWED_CHANNELS = {};', main).join('\n'), /общий белый список/);
+    const noRole = main.replace("additionalArguments: [windowArgument('widget')],", '');
+    assert.notEqual(noRole, main, 'проба не нашла строку роли — проверка ничего не проверила бы');
+    assert.match(check(preload, noRole).join('\n'), /окно без роли/);
+    const dupRole = main.replace("windowArgument('clock')", "windowArgument('control')");
+    assert.match(check(preload, dupRole).join('\n'), /повторяется/);
 });

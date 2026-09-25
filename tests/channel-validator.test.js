@@ -50,25 +50,13 @@ test('ALLOWED_CHANNELS has expected structure', () => {
     assert.equal(ALLOWED_CHANNELS.receive.length, new Set(ALLOWED_CHANNELS.receive).size);
 });
 
-test('channel-validator.js channels match preload.js inline channels', () => {
-    const fs = require('fs');
-    const path = require('path');
-    const preloadSource = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf-8');
-
-    // Extract send channels from preload.js
-    const sendMatch = preloadSource.match(/send:\s*\[([\s\S]*?)\]/);
-    const receiveMatch = preloadSource.match(/receive:\s*\[([\s\S]*?)\]/);
-    assert.ok(sendMatch, 'preload.js should have send channels');
-    assert.ok(receiveMatch, 'preload.js should have receive channels');
-
-    const extractChannels = (str) =>
-        str.match(/'([^']+)'/g).map(s => s.replace(/'/g, '')).sort();
-
-    const preloadSend = extractChannels(sendMatch[1]);
-    const preloadReceive = extractChannels(receiveMatch[1]);
-    const validatorSend = [...ALLOWED_CHANNELS.send].sort();
-    const validatorReceive = [...ALLOWED_CHANNELS.receive].sort();
-
-    assert.deepEqual(preloadSend, validatorSend, 'Send channels must be identical in preload.js and channel-validator.js');
-    assert.deepEqual(preloadReceive, validatorReceive, 'Receive channels must be identical in preload.js and channel-validator.js');
+test('channel-validator.js — вид на ipc-senders.js, а не своя копия', () => {
+    // До 25.09.2026 здесь сверялись два рукописных списка (валидатор и preload).
+    // Теперь источник один — таблицы ipc-senders.js; мосты окон собираются из
+    // них генератором (tests/preload-channels.test.js), валидатор — их объединение.
+    const { SENDERS, RECEIVERS } = require('../ipc-senders');
+    assert.deepEqual([...ALLOWED_CHANNELS.send].sort(), Object.keys(SENDERS).sort());
+    assert.deepEqual([...ALLOWED_CHANNELS.receive].sort(), Object.keys(RECEIVERS).sort());
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'channel-validator.js'), 'utf8');
+    assert.doesNotMatch(src, /'timer-command'/, 'в валидаторе снова рукописный список каналов');
 });

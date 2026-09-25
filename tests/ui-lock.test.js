@@ -89,13 +89,12 @@ test('каждое из четырёх окон подключает ui-lock.js 
 });
 
 test('канал ui-lock-update объявлен в ОБА конца и рассылается всем окнам', () => {
-    const validator = read('channel-validator.js');
-    const preload = read('preload.js');
-    // Канал двусторонний: панель шлёт, все окна принимают. В валидаторе два
-    // списка, и попадание только в один — это «шлём в никуда» или «слушаем
-    // то, чего не пришлют».
-    assert.equal((validator.match(/'ui-lock-update'/g) || []).length, 2, 'канала нет в обоих списках валидатора');
-    assert.equal((preload.match(/'ui-lock-update'/g) || []).length, 2, 'канала нет в обоих списках preload');
+    const { bridgeRoles } = require('./helpers/ipc-scan');
+    // Канал двусторонний: панель шлёт, три других окна принимают (сама панель
+    // bindLockSync не зовёт). Мост без одной из сторон — это «шлём в никуда»
+    // или «слушаем то, чего не пришлют».
+    assert.deepEqual(bridgeRoles('ui-lock-update', 'send'), ['control'], 'замок шлёт только панель');
+    assert.deepEqual(bridgeRoles('ui-lock-update', 'receive'), ['widget', 'clock', 'display'], 'замок не слышат окна');
 
     const main = codeOnly(require('./helpers/main-source').readMainSource());
     assert.match(main, /ipcMain\.on\('ui-lock-update'/, 'главный процесс не принимает канал');

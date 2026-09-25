@@ -1390,3 +1390,70 @@ test('BUG-15: выгрузка посреди перелимита не назы
         fs.rmSync(dir, { recursive: true, force: true });
     }
 });
+
+// --- Мост по окнам: роль уходит в рендерер ----------------------------------
+
+test('каждое окно получает СВОЮ роль аргументом рендерера и общий preload', () => {
+    // preload.js открывает каналы по роли из process.argv (tests/preload-channels.test.js).
+    // Окно без аргумента получило бы закрытый мост — окно без клавиш; окно с
+    // чужой ролью — чужие права. Проверяем на настоящих create-функциях.
+    const { windowArgument } = require('../ipc-senders');
+    const stubs = createStubs();
+    loadMain(stubs);
+    try {
+        openControl(stubs);
+        openWidget(stubs);
+        stubs.ipcHandlers.get('open-clock-widget')(null);
+        openDisplay(stubs);
+        for (const role of Object.keys(ROLE_FILES)) {
+            const win = liveWindow(stubs, role);
+            assert.ok(win, `${role}: окно не открылось`);
+            const wp = win.opts.webPreferences;
+            assert.deepEqual(wp.additionalArguments, [windowArgument(role)], `${role}: не та роль`);
+            assert.equal(path.basename(wp.preload), 'preload.js');
+            assert.equal(wp.sandbox, true);
+        }
+    } finally {
+        stopTimer(stubs);
+    }
+});
+
+test('главный процесс шлёт окну только то, что открыто в его мосте', async () => {
+    // Иначе мост молча проглотил бы сообщение: главный процесс «сказал», окно не
+    // услышало. Гоняем штатную жизнь: открытие всех окон, таймер, рассылки.
+    const { channelsFor } = require('../ipc-senders');
+    const stubs = createStubs();
+    loadMain(stubs);
+    try {
+        openControl(stubs);
+        openWidget(stubs);
+        stubs.ipcHandlers.get('open-clock-widget')(null);
+        openDisplay(stubs);
+        for (const win of stubs.created) { win.webContents.emit('did-finish-load'); }
+        stubs.ipcHandlers.get('get-displays')(null);
+        stubs.ipcHandlers.get('ui-theme-update')(null, { theme: 'light' });
+        stubs.ipcHandlers.get('ui-lock-update')(null, { locked: true });
+        stubs.ipcHandlers.get('display-settings-update')(null, { timerStyle: 'circle' });
+        await runOvertimeTalk(stubs, 1300);
+        const roleOf = (win) => Object.keys(ROLE_FILES).find((r) => win && win._file === ROLE_FILES[r]);
+        const stray = new Set();
+        for (const m of stubs.sent) {
+            const role = roleOf(m.win);
+            if (!role) { continue; }
+            if (!channelsFor(role).receive.includes(m.channel)) { stray.add(`${role} ← ${m.channel}`); }
+        }
+        assert.ok(stubs.sent.length > 20, 'рассылок подозрительно мало — сценарий не отработал');
+        // Храповик: широковещания «всем окнам», которые адресат не слушал и ДО
+        // разбиения моста (слушателя в окне нет — сообщение и раньше падало в
+        // пустоту; мост входящих не режет, он режет подписку). Новые строки
+        // сюда не дописывают — канал добавляют в RECEIVERS или не шлют.
+        const KNOWN_UNHEARD = [
+            'widget ← widget-window-state', 'clock ← clock-window-state', 'display ← display-window-state',
+            'control ← ui-lock-update', 'widget ← timer-reached-zero', 'display ← timer-reached-zero'
+        ];
+        assert.deepEqual([...stray].filter((s) => !KNOWN_UNHEARD.includes(s)), [], 'окно получает канал, закрытый в его мосте');
+        assert.ok(KNOWN_UNHEARD.length <= 6, 'храповик только убывает');
+    } finally {
+        stopTimer(stubs);
+    }
+});

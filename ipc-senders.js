@@ -3,8 +3,8 @@
 /**
  * ipc-senders.js — КТО вправе прислать каждый канал (SEC-07).
  *
- * Белый список preload.js один на все четыре окна: он отвечает на вопрос
- * «существует ли такой канал», но не «чей он». Поэтому виджет — или страница,
+ * До 25.09.2026 белый список preload.js был один на все четыре окна: он
+ * отвечал на вопрос «существует ли такой канал», но не «чей он». Виджет — или страница,
  * оказавшаяся в его окне, — мог позвать `reset-and-relaunch` (стирает весь
  * профиль), `quit-app`, `event-reset` (обнуляет деньги мероприятия). Ни один
  * обработчик в главном процессе не смотрел, откуда пришло сообщение.
@@ -31,9 +31,10 @@ const ALL = ROLES;
 // Канал → окна, которым разрешено его прислать.
 const SENDERS = Object.freeze({
     // --- Состояние таймера ---------------------------------------------------
-    // Часы сегодня состояние не запрашивают (BUG-01), но канал только ЧИТАЕТ:
-    // разрешение ничего не открывает, а починка часов не должна упереться сюда.
-    'get-timer-state': ['control', 'widget', 'clock', 'display'],
+    // Часы состояние не запрашивают: снимок им досылает главный процесс при
+    // загрузке (BUG-01). Строка — ровно те, кто шлёт: с 25.09.2026 из неё же
+    // собирается мост окна, и лишнее окно здесь — открытый в нём канал.
+    'get-timer-state': ['control', 'widget', 'display'],
     // Space/цифры в окнах ставят пресет и паузу этим же каналом.
     'timer-command': ALL,
     'timer-control': ['widget', 'clock', 'display'],
@@ -181,4 +182,74 @@ function onceLogger(write) {
     };
 }
 
-module.exports = { ROLES, SENDERS, createSenderGate, guardIpcMain, onceLogger };
+// Канал → окна, которые его СЛУШАЮТ (main → renderer).
+//
+// Главному процессу эта таблица не нужна — адресата он выбирает сам. Она нужна
+// мосту: из SENDERS и RECEIVERS собирается список каналов, открытых в preload
+// каждого окна (channelsFor → scripts/preload-channels.js → preload.js).
+// Списана с подписок окон (`.on('…'` в странице и её модулях); сверку в обе
+// стороны держит tests/preload-channels.test.js.
+const RECEIVERS = Object.freeze({
+    'timer-state': ALL,
+    'ui-theme-update': ALL,
+    // Замок шлёт панель — сама она его не слушает (bindLockSync не зовёт).
+    'ui-lock-update': ['widget', 'clock', 'display'],
+    'display-settings-update': ['widget', 'clock', 'display'],
+
+    // Каждое окно знает, открыты ли ДВА других (клавиши W / C / D).
+    'widget-window-state': ['control', 'clock', 'display'],
+    'clock-window-state': ['control', 'widget', 'display'],
+    'display-window-state': ['control', 'widget', 'clock'],
+
+    // --- Панель ------------------------------------------------------------------
+    'timer-minute': ['control'],
+    'timer-reached-zero': ['control'],
+    'timer-overrun-minute': ['control'],
+    'timer-recovery-available': ['control'],
+    'displays-list': ['control'],
+    'scale-report': ['control'],
+    'block-hidden': ['control'],
+    'preset-apply': ['control'],
+    'sound-toggle': ['control'],
+    'event-export-done': ['control'],
+    'event-overrun-state': ['control', 'display'],
+
+    // --- Виджет и часы -----------------------------------------------------------
+    'widget-colors-update': ['widget'],
+    'widget-style-update': ['widget'],
+    'clock-colors-update': ['clock'],
+    'set-clock-style': ['clock'],
+    'clock-settings': ['clock'],
+    'window-geometry': ['widget', 'clock'],
+
+    // --- Дисплей -----------------------------------------------------------------
+    'display-colors-update': ['display'],
+    'display-layout': ['display'],
+    'display-restore-state': ['display']
+});
+
+// Роль окна доходит до его preload аргументом командной строки рендерера
+// (`webPreferences.additionalArguments` → `process.argv`). Префикс один на
+// главный процесс, генератор моста и тесты.
+const ROLE_ARG_PREFIX = '--tw-window=';
+
+function windowArgument(role) {
+    if (!ROLES.includes(role)) { throw new Error(`ipc-senders: неизвестное окно «${role}»`); }
+    return ROLE_ARG_PREFIX + role;
+}
+
+/**
+ * Каналы, открытые в мосте окна: что оно вправе слать и что слушает.
+ * @param {string} role
+ * @returns {{send: string[], receive: string[]}}
+ */
+function channelsFor(role) {
+    if (!ROLES.includes(role)) { throw new Error(`ipc-senders: неизвестное окно «${role}»`); }
+    const pick = (table) => Object.keys(table).filter((ch) => table[ch].includes(role));
+    return { send: pick(SENDERS), receive: pick(RECEIVERS) };
+}
+
+module.exports = {
+    ROLES, SENDERS, RECEIVERS, ROLE_ARG_PREFIX,
+    channelsFor, windowArgument, createSenderGate, guardIpcMain, onceLogger
+};

@@ -16,47 +16,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 
 const { codeOnly } = require('./helpers/source-scan');
 const { ROLES, SENDERS, createSenderGate, guardIpcMain, onceLogger } = require('../ipc-senders');
 const { ALLOWED_CHANNELS } = require('../channel-validator');
 
-const repoRoot = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
-
-const PAGES = {
-    control: 'electron-control.html',
-    widget: 'electron-widget.html',
-    clock: 'electron-clock-widget.html',
-    display: 'display.html'
-};
-
-// Страница + все её <script src>: канал шлёт не только инлайн-код окна, но и
-// модули, подключённые к нему (панель — двадцать с лишним файлов).
-function roleCode(role) {
-    const html = read(PAGES[role]);
-    const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
-    return codeOnly([html, ...srcs.map(read)].join('\n'));
-}
-
-// Каналы, которые окно действительно ОТПРАВЛЯЕТ: литералы внутри `send(…)`
-// (включая тернарник «открыть/закрыть») и поля конфигурации геометрии
-// (`move: 'widget-move'` — window-geometry.js шлёт их через send(channels.x)).
-function sentBy(role) {
-    const code = roleCode(role);
-    const out = new Set();
-    for (const m of code.matchAll(/\bsend\(([^)]*)/g)) {
-        for (const lit of m[1].matchAll(/['"`]([a-z-]+)['"`]/g)) {
-            if (ALLOWED_CHANNELS.send.includes(lit[1])) { out.add(lit[1]); }
-        }
-    }
-    for (const m of code.matchAll(/\b(?:move|resize|position):\s*['"`]([a-z-]+)['"`]/g)) {
-        if (ALLOWED_CHANNELS.send.includes(m[1])) { out.add(m[1]); }
-    }
-    return out;
-}
+// Что окно шлёт — общий сканер (страница + её <script src>): тот же, по
+// которому сверяются мосты окон (tests/preload-channels.test.js).
+const { PAGES, sentBy } = require('./helpers/ipc-scan');
 
 // Каналы главного процесса ЦЕЛИКОМ: обработчики зарегистрированы в модулях
 // main-*.js, и чтение одной точки входа не нашло бы ни одного.
@@ -65,14 +32,11 @@ function mainChannels() {
     return [...src.matchAll(/ipcMain\.(?:on|handle)\(\s*['"`]([^'"`]+)['"`]/g)].map((m) => m[1]);
 }
 
-function preloadSendList() {
-    const src = read('preload.js');
-    const block = src.slice(src.indexOf('send: ['), src.indexOf('receive: ['));
-    return [...codeOnly(block).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
-}
-
 test('у КАЖДОГО канала есть строка в таблице отправителей', () => {
-    const channels = new Set([...mainChannels(), ...ALLOWED_CHANNELS.send, ...preloadSendList()]);
+    // Плюс всё, что окна шлют: канал, которого нет в таблице, но который шлёт
+    // окно, — тоже сирота (мост его не откроет, клавиша молча умрёт).
+    const channels = new Set([...mainChannels(), ...ALLOWED_CHANNELS.send,
+        ...ROLES.flatMap((r) => [...sentBy(r)])]);
     assert.ok(channels.size > 30, `сканер нашёл подозрительно мало каналов: ${channels.size}`);
     const orphans = [...channels].filter((ch) => !SENDERS[ch]);
     assert.deepEqual(orphans, [], 'канал без владельца: ' + orphans.join(', '));

@@ -179,6 +179,31 @@ function checkHardening(source) {
     return problems;
 }
 
+// --- Мост по окнам ----------------------------------------------------------
+//
+// preload.js открывает каналы по роли окна из argv рендерера; таблица в нём
+// сгенерирована из ipc-senders.js. На артефакте проверяется, что уехала именно
+// свежая таблица (а не старый общий список) и что главный процесс раздаёт
+// роли всем окнам — четырём разным.
+function checkBridge(preloadSource, mainSource, expectedBlock, extractBlock) {
+    const problems = [];
+    if (preloadSource === null) { return ['preload.js не найден внутри app.asar']; }
+    let block;
+    try { block = extractBlock(preloadSource); } catch { block = null; }
+    if (block === null) {
+        problems.push('в упакованном preload.js нет таблицы каналов по окнам');
+    } else if (block !== expectedBlock) {
+        problems.push('таблица каналов в упакованном preload.js отстала от ipc-senders.js');
+    }
+    if (/ALLOWED_CHANNELS/.test(preloadSource)) { problems.push('в упакованном preload.js остался общий белый список'); }
+    const code = (mainSource || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const roles = [...code.matchAll(/additionalArguments:\s*\[windowArgument\('([a-z]+)'\)\]/g)].map((m) => m[1]);
+    const windows = (code.match(/new BrowserWindow\(/g) || []).length;
+    if (roles.length < windows) { problems.push(`окон ${windows}, ролей моста ${roles.length} — окно без роли получит закрытый мост`); }
+    if (new Set(roles).size !== roles.length) { problems.push(`роль моста повторяется: ${roles.join(', ')}`); }
+    return problems;
+}
+
 // --- Фьюзы Electron (SEC-03) ----------------------------------------------
 //
 // build.electronFuses в package.json — НАМЕРЕНИЕ; биты переворачивает
@@ -336,6 +361,20 @@ async function main() {
     }
     console.log('[verify-packed] OK: режим разработчика закрыт, окна изолированы, автообновления нет');
 
+    const bridge = require('./preload-channels');
+    const bridgeIssues = checkBridge(
+        packed.has('preload.js') ? readAsarFile(asarPath, header, 'preload.js') : null,
+        readPackedMainSource((file) => readAsarFile(asarPath, header, file), packed),
+        bridge.renderBlock(),
+        bridge.extractBlock
+    );
+    if (bridgeIssues.length) {
+        console.error('\n[verify-packed] МОСТ ОКОН НЕ ПРОШЁЛ ВОРОТА');
+        for (const p of bridgeIssues) { console.error(`  ${p}`); }
+        process.exit(1);
+    }
+    console.log('[verify-packed] OK: мост каждого окна открывает только свои каналы');
+
     const pkg = require(path.join(ROOT, 'package.json'));
     const executable = findElectronExecutable(asarPath, pkg);
     if (!executable) {
@@ -382,6 +421,7 @@ module.exports = {
     flatten,
     checkPacked,
     checkHardening,
+    checkBridge,
     mainProcessPaths,
     readPackedMainSource,
     findAsar,

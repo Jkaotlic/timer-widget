@@ -623,13 +623,10 @@ test('розовый из палитры статусов убран во все
 // в панели на старом значении — два источника правды расходились.
 // ---------------------------------------------------------------------------
 
-test('канал report-scale объявлен в обоих вайтлистах', () => {
-    const validator = read('channel-validator.js');
-    const preload = read('preload.js');
-    for (const src of [validator, preload]) {
-        assert.match(src, /'report-scale'/);
-        assert.match(src, /'scale-report'/);
-    }
+test('канал report-scale открыт в мостах окон, отчёт scale-report — только в панели', () => {
+    const { bridgeRoles } = require('./helpers/ipc-scan');
+    assert.deepEqual(bridgeRoles('report-scale', 'send'), ['widget', 'clock', 'display']);
+    assert.deepEqual(bridgeRoles('scale-report', 'receive'), ['control']);
 });
 
 test('главный процесс валидирует источник и шлёт отчёт ТОЛЬКО в панель', () => {

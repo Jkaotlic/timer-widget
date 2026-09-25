@@ -17,6 +17,9 @@
 
 const path = require('path');
 const { withoutBgImage } = require('./relay-payload');
+// Роль окна — аргумент его рендерера: по ней preload.js открывает только
+// каналы этого окна (таблица — ipc-senders.js). Без аргумента мост закрыт.
+const { windowArgument } = require('./ipc-senders');
 
 // Уровень окна для виджета и часов — ВЫШЕ полоски меню macOS.
 //
@@ -101,6 +104,7 @@ function createWindows(deps) {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
+                additionalArguments: [windowArgument('control')],
                 sandbox: true,
                 devTools: process.argv.includes('--dev') && !app.isPackaged
             },
@@ -180,6 +184,7 @@ function createWindows(deps) {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
+                additionalArguments: [windowArgument('widget')],
                 sandbox: true,
                 devTools: process.argv.includes('--dev') && !app.isPackaged
             },
@@ -253,6 +258,7 @@ function createWindows(deps) {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
+                additionalArguments: [windowArgument('clock')],
                 sandbox: true,
                 devTools: process.argv.includes('--dev') && !app.isPackaged
             },
@@ -344,6 +350,7 @@ function createWindows(deps) {
                 nodeIntegration: false,
                 contextIsolation: true,
                 preload: path.join(__dirname, 'preload.js'),
+                additionalArguments: [windowArgument('display')],
                 sandbox: true,
                 devTools: process.argv.includes('--dev') && !app.isPackaged
             }

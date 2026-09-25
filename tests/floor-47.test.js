@@ -26,15 +26,14 @@ const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8')
 // Главный процесс целиком — точка входа и модули main-*.js: накопитель,
 // окна и каналы живут в разных файлах.
 const MAIN = codeOnly(readMainSource());
-const VALIDATOR = read('channel-validator.js');
-const PRELOAD = read('preload.js');
+const { bridgeRoles } = require('./helpers/ipc-scan');
 
-test('три канала объявлены в ОБОИХ белых списках', () => {
-    const channels = ['event-finish', 'event-reset', 'event-overrun-state'];
-    for (const ch of channels) {
-        assert.ok(VALIDATOR.includes(`'${ch}'`), `channel-validator.js не знает канала ${ch}`);
-        assert.ok(PRELOAD.includes(`'${ch}'`), `preload.js не знает канала ${ch}`);
-    }
+test('три канала открыты в мостах ровно тех окон, что ими пользуются', () => {
+    // Команды мероприятия шлёт только панель; накопитель слушают дисплей
+    // (деньги залу) и панель (строка «Идёт / Завершено»).
+    assert.deepEqual(bridgeRoles('event-finish', 'send'), ['control']);
+    assert.deepEqual(bridgeRoles('event-reset', 'send'), ['control']);
+    assert.deepEqual(bridgeRoles('event-overrun-state', 'receive'), ['control', 'display']);
 });
 
 test('у каждого канала есть оба конца в главном процессе', () => {
@@ -435,13 +434,11 @@ test('панель получает накопитель на ЗАГРУЗКЕ, 
 // --- Выгрузка отчёта -------------------------------------------------------
 
 test('каналы выгрузки объявлены в обоих списках и в обе стороны', () => {
-    // Правило проекта: канал объявляется в channel-validator.js И в preload.js,
-    // и у него обязаны быть ОБА конца. Белый список — это разрешение, а не
-    // доказательство жизни.
-    assert.ok(VALIDATOR.includes("'event-export'"), 'event-export не разрешён валидатором');
-    assert.ok(PRELOAD.includes("'event-export'"), 'event-export не разрешён preload');
-    assert.ok(VALIDATOR.includes("'event-export-done'"), 'ответ не разрешён валидатором');
-    assert.ok(PRELOAD.includes("'event-export-done'"), 'ответ не разрешён preload');
+    // Правило проекта: канал объявляется в ipc-senders.js (SENDERS и
+    // RECEIVERS, из них собирается мост окна), и у него обязаны быть ОБА
+    // конца. Белый список — это разрешение, а не доказательство жизни.
+    assert.deepEqual(bridgeRoles('event-export', 'send'), ['control'], 'event-export не открыт в мосте панели');
+    assert.deepEqual(bridgeRoles('event-export-done', 'receive'), ['control'], 'ответ не открыт в мосте панели');
     assert.match(MAIN, /ipcMain\.on\('event-export'/, 'у канала нет конца в главном процессе');
 });
 

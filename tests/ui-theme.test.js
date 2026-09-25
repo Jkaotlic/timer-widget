@@ -119,13 +119,10 @@ test('канал темы есть в обоих списках и в обе с�
     const validator = require(path.join(ROOT, 'channel-validator.js'));
     assert.ok(validator.isValidChannel('ui-theme-update', 'send'), 'канал не разрешён на отправку');
     assert.ok(validator.isValidChannel('ui-theme-update', 'receive'), 'канал не разрешён на приём');
-    // preload.js дублирует список руками (sandbox запрещает require) — оба обязаны совпадать.
-    const preload = read('preload.js');
-    assert.equal(
-        (preload.match(/'ui-theme-update'/g) || []).length,
-        2,
-        'в preload.js канал темы обязан быть и в send, и в receive'
-    );
+    // Мост по окнам (таблица сгенерирована из ipc-senders.js): шлёт панель, слышат все.
+    const { bridgeRoles } = require('./helpers/ipc-scan');
+    assert.deepEqual(bridgeRoles('ui-theme-update', 'send'), ['control']);
+    assert.deepEqual(bridgeRoles('ui-theme-update', 'receive'), ['control', 'widget', 'clock', 'display']);
 });
 
 test('главный процесс рассылает тему во все окна и проверяет значение', () => {
