@@ -771,6 +771,68 @@ function signedSecondsUntilClock(nowSeconds, clock) {
     return mark - now;
 }
 
+// ---------------------------------------------------------------------------
+// eventClockDistances(now, 'HH:MM', 'HH:MM') → { toStart, toEnd } (BUG-08)
+// ---------------------------------------------------------------------------
+const EVENT_DAY = 86400;
+/** Сколько минус после конца мероприятия ещё показывается как перерасход. */
+const EVENT_OVERRUN_GRACE = 6 * 3600;
+
+/**
+ * Знаковые расстояния от «сейчас» до начала и до конца мероприятия — с
+ * пониманием полуночи.
+ *
+ * `signedSecondsUntilClock` вычитает секунды-с-полуночи и потому считает
+ * мероприятие СЕГОДНЯШНИМ всегда. Через полночь это давало сутки ошибки:
+ * в 23:00 при конце 01:00 «До конца» — −22:00:00 красным, в 23:50 при
+ * начале 00:10 «До начала» — −23:40:00. Даты у отметок нет, есть только
+ * время суток, поэтому «какие это сутки» решается здесь, одним правилом:
+ *
+ * 1. Конец раньше начала — мероприятие через полночь: конец — завтра.
+ * 2. «Сейчас» внутри мероприятия (сегодняшнего, вчерашнего через полночь
+ *    или завтрашнего) — считаем от него.
+ * 3. Снаружи — между концом одного и началом следующего. Первые
+ *    `EVENT_OVERRUN_GRACE` после конца (но не дальше середины промежутка)
+ *    экран показывает перерасход прошедшего; дальше — отсчёт до следующего.
+ *    Иначе утро перед вечерним мероприятием читалось бы как «кончилось
+ *    вчера», а вечер перед ранним — как «началось сутки назад».
+ *
+ * Мусор в отметке даёт ей 0 («отметка сейчас», как у signedSecondsUntilClock:
+ * минус из мусора не выдумывается), а сутки выбираются по второй.
+ *
+ * @param {number} nowSeconds — секунды с начала суток
+ * @param {string} startClock — 'HH:MM'
+ * @param {string} endClock — 'HH:MM'
+ * @returns {{toStart: number, toEnd: number}}
+ */
+function eventClockDistances(nowSeconds, startClock, endClock) {
+    const now = Number(nowSeconds);
+    const startMark = clockToSeconds(startClock);
+    const endMark = clockToSeconds(endClock);
+    if (!Number.isFinite(now) || (startMark === null && endMark === null)) {
+        return { toStart: 0, toEnd: 0 };
+    }
+
+    const start = startMark === null ? endMark : startMark;
+    let end = endMark === null ? startMark : endMark;
+    if (end < start) { end += EVENT_DAY; }
+
+    const candidates = [now - EVENT_DAY, now, now + EVENT_DAY];
+    let anchor = candidates.find((c) => c >= start && c <= end);
+    if (anchor === undefined) {
+        const gap = EVENT_DAY - (end - start);
+        const grace = Math.min(EVENT_OVERRUN_GRACE, gap / 2);
+        const after = candidates.filter((c) => c > end).reduce((a, b) => Math.min(a, b), Infinity);
+        const before = candidates.filter((c) => c < start).reduce((a, b) => Math.max(a, b), -Infinity);
+        anchor = (after - end) < grace ? after : before;
+    }
+
+    return {
+        toStart: startMark === null ? 0 : start - anchor,
+        toEnd: endMark === null ? 0 : end - anchor
+    };
+}
+
 /**
  * Сколько осталось до времени окончания мероприятия — для блока «До
  * завершения» на дисплее.
@@ -847,6 +909,7 @@ const RendererShared = {
     clockToSeconds,
     secondsUntilClock,
     signedSecondsUntilClock,
+    eventClockDistances,
     migrateDisplayBlocks,
     timerLifecycleStatus,
     timerColorBand,

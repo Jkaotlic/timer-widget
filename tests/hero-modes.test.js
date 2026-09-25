@@ -94,8 +94,10 @@ test('heroTotal: у «до конца» тотал — длина меропри
     }), 6 * 3600);
 });
 
-test('heroTotal: конец не позже начала даёт ноль, а не отрицательный тотал', () => {
-    for (const [start, end] of [['16:00', '10:00'], ['10:00', '10:00'], ['мусор', '10:00']]) {
+test('heroTotal: пустое мероприятие и мусор дают ноль, а не отрицательный тотал', () => {
+    // Конец раньше начала — мероприятие через полночь (BUG-08), у него тотал
+    // есть; см. тест ниже.
+    for (const [start, end] of [['10:00', '10:00'], ['мусор', '10:00'], ['10:00', 'мусор']]) {
         assert.equal(HeroModes.heroTotal({
             mode: 'to-end', totalSeconds: 600, startClock: start, endClock: end
         }), 0);
@@ -129,4 +131,16 @@ test('часы — единственный режим, у которого чи
     for (const junk of [undefined, null, '', 'to-mars', 42, {}]) {
         assert.equal(HeroModes.isClockMode(junk), false);
     }
+});
+
+// BUG-08: герой берёт расстояния у eventClockDistances, а не вычитает сам.
+test('BUG-08: герой «до конца» / «до начала» через полночь', () => {
+    const base = { nowSeconds: 23 * 3600, startClock: '22:00', endClock: '01:00' };
+    assert.equal(HeroModes.heroSeconds({ ...base, mode: 'to-end' }), 2 * 3600);
+    assert.equal(HeroModes.heroSeconds({ nowSeconds: 23 * 3600 + 50 * 60, startClock: '00:10',
+        endClock: '12:00', mode: 'to-start' }), 20 * 60);
+});
+
+test('BUG-08: у мероприятия через полночь тотал — его длина', () => {
+    assert.equal(HeroModes.heroTotal({ mode: 'to-end', startClock: '22:00', endClock: '01:00' }), 3 * 3600);
 });

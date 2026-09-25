@@ -116,11 +116,13 @@ function heroSeconds(state) {
     if (mode === 'current') {
         return Math.min(SECONDS_PER_DAY - 1, Math.max(0, Math.floor(now)));
     }
+    // Обе отметки идут в расчёт вместе: какие это сутки, решает мероприятие
+    // целиком, а не одна отметка (BUG-08, полночь).
     if (mode === 'to-start') {
-        return HeroShared.signedSecondsUntilClock(now, s.startClock);
+        return HeroShared.eventClockDistances(now, s.startClock, s.endClock).toStart;
     }
     if (mode === 'to-end') {
-        return HeroShared.signedSecondsUntilClock(now, s.endClock);
+        return HeroShared.eventClockDistances(now, s.startClock, s.endClock).toEnd;
     }
     return Math.floor(heroNumber(s.remainingSeconds, 0));
 }
@@ -130,9 +132,10 @@ function heroSeconds(state) {
  * (кроме минуса, который красит сам timerColorBand).
  *
  * У «до конца» тотал есть и он осмыслен — длина мероприятия. У «до начала»
- * тотала нет: расстояние до старта не доля чего-либо. Мероприятие с концом не
- * позже начала (в том числе через полночь) тотала не имеет — отрицательная
- * доля выдала бы полосы задом наперёд.
+ * тотала нет: расстояние до старта не доля чего-либо. Конец раньше начала —
+ * мероприятие через полночь (BUG-08), его длина — до завтрашнего конца. Конец,
+ * равный началу, и мусор тотала не дают: нулевая или отрицательная доля
+ * выдала бы полосы задом наперёд.
  */
 function heroTotal(state) {
     const s = state || {};
@@ -146,7 +149,7 @@ function heroTotal(state) {
         const startMark = HeroShared.clockToSeconds(s.startClock);
         const endMark = HeroShared.clockToSeconds(s.endClock);
         if (startMark === null || endMark === null) { return 0; }
-        const span = endMark - startMark;
+        const span = endMark < startMark ? endMark + SECONDS_PER_DAY - startMark : endMark - startMark;
         return span > 0 ? span : 0;
     }
     return 0;

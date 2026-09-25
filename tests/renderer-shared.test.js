@@ -935,3 +935,65 @@ test('surfaceTone: нечитаемый цвет откатывается к т�
         assert.equal(surfaceTone({ color: junk, theme: 'light' }), 'light', `цвет ${String(junk)}`);
     }
 });
+
+// ---------------------------------------------------------------------------
+// eventClockDistances — «до начала» и «до конца» через полночь (BUG-08)
+// ---------------------------------------------------------------------------
+// Прямое вычитание секунд-с-полуночи считало мероприятие СЕГОДНЯШНИМ всегда:
+// в 23:00 при конце 01:00 «До конца» показывало −22:00:00 красным, а в 23:50
+// при начале 00:10 «До начала» — −23:40:00. Зал видел перерасход на сутки.
+const { eventClockDistances } = require('../renderer-shared');
+const hm = (h, m = 0, s = 0) => h * 3600 + m * 60 + s;
+
+test('BUG-08: мероприятие через полночь — «до конца» в 23:00 при конце 01:00 = 2 часа', () => {
+    const d = eventClockDistances(hm(23), '22:00', '01:00');
+    assert.equal(d.toEnd, hm(2));
+    assert.equal(d.toStart, -hm(1), 'началось час назад');
+});
+
+test('BUG-08: после полуночи то же мероприятие ещё идёт', () => {
+    const d = eventClockDistances(hm(0, 30), '22:00', '01:00');
+    assert.equal(d.toEnd, hm(0, 30));
+    assert.equal(d.toStart, -hm(2, 30));
+});
+
+test('BUG-08: «до начала» в 23:50 при начале 00:10 — 20 минут, а не −23:40', () => {
+    assert.equal(eventClockDistances(hm(23, 50), '00:10', '02:00').toStart, hm(0, 20));
+    // Конец по умолчанию (12:00) картины не меняет.
+    assert.equal(eventClockDistances(hm(23, 50), '00:10', '12:00').toStart, hm(0, 20));
+});
+
+test('BUG-08: сразу после конца — честный минус, в том числе через полночь', () => {
+    assert.equal(eventClockDistances(hm(18, 5), '09:00', '18:00').toEnd, -hm(0, 5));
+    assert.equal(eventClockDistances(hm(1, 30), '22:00', '01:00').toEnd, -hm(0, 30));
+    assert.equal(eventClockDistances(hm(0, 10), '20:00', '23:50').toEnd, -hm(0, 20));
+});
+
+test('BUG-08: дневное мероприятие считается как раньше', () => {
+    // Внутри.
+    assert.deepEqual(eventClockDistances(hm(14), '10:00', '16:00'), { toStart: -hm(4), toEnd: hm(2) });
+    // Утро перед вечерним мероприятием — отсчёт ДО него, а не «кончилось вчера».
+    assert.deepEqual(eventClockDistances(hm(7), '20:00', '21:00'), { toStart: hm(13), toEnd: hm(14) });
+    // Длинный день: 13 часов до конца — не повод переносить на вчера.
+    assert.equal(eventClockDistances(hm(9), '08:00', '23:00').toEnd, hm(14));
+});
+
+test('BUG-08: минус после конца живёт не дольше льготы, потом — отсчёт до завтра', () => {
+    // 5 часов после конца — ещё перерасход.
+    assert.equal(eventClockDistances(hm(23), '09:00', '18:00').toEnd, -hm(5));
+    // 10 часов после конца — ближе к завтрашнему, чем к вчерашнему.
+    assert.equal(eventClockDistances(hm(4), '09:00', '18:00').toStart, hm(5));
+});
+
+test('BUG-08: короткий промежуток между сутками делится пополам, а не по льготе', () => {
+    // 08:00–04:00 (+1): промежуток 4 часа; в 07:00 до начала час — это «скоро».
+    assert.equal(eventClockDistances(hm(7), '08:00', '04:00').toStart, hm(1));
+    assert.equal(eventClockDistances(hm(5), '08:00', '04:00').toEnd, -hm(1));
+});
+
+test('BUG-08: мусор в одной отметке даёт 0 ей, а другая считается от себя', () => {
+    assert.deepEqual(eventClockDistances(hm(23, 50), 'мусор', '00:10'), { toStart: 0, toEnd: hm(0, 20) });
+    assert.deepEqual(eventClockDistances(hm(14), '15:00', null), { toStart: hm(1), toEnd: 0 });
+    assert.deepEqual(eventClockDistances(hm(14), null, undefined), { toStart: 0, toEnd: 0 });
+    assert.deepEqual(eventClockDistances(NaN, '10:00', '12:00'), { toStart: 0, toEnd: 0 });
+});
