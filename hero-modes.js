@@ -155,6 +155,28 @@ function heroTotal(state) {
     return 0;
 }
 
+/** Лимит перерасхода по умолчанию для доли кольца в минусе, секунд. */
+const DEFAULT_OVERRUN_SPAN = 300;
+
+/**
+ * Доля кольца/полосы для героя: [0, 1] в плюсе, [−1, 0] в минусе.
+ *
+ * Плюс зажат сверху (BUG-20): до начала мероприятия «до конца» больше его
+ * длины, и доля 3 рисовала кольцо с перехлёстом. Минус идёт «обратным ходом»
+ * от 0 к −1 за лимит перерасхода (0 = лимита нет → 300 с), как было в
+ * display-script (FIX BUG-016).
+ */
+function heroProgress(secs, total, overrunLimitSeconds) {
+    const t = heroNumber(total, 0);
+    const s = heroNumber(secs, 0);
+    if (t <= 0) { return 0; }
+    if (s < 0) {
+        const limit = heroNumber(overrunLimitSeconds, 0) > 0 ? heroNumber(overrunLimitSeconds, 0) : DEFAULT_OVERRUN_SPAN;
+        return -Math.min(1, Math.abs(s) / limit);
+    }
+    return Math.min(1, Math.round((s / t) * 1000) / 1000);
+}
+
 const HeroModes = {
     HERO_MODES,
     HERO_MODE_IDS,
@@ -164,7 +186,8 @@ const HeroModes = {
     isClockMode,
     heroCaption,
     heroSeconds,
-    heroTotal
+    heroTotal,
+    heroProgress
 };
 
 // Node.js (тесты)

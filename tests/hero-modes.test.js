@@ -144,3 +144,20 @@ test('BUG-08: герой «до конца» / «до начала» через 
 test('BUG-08: у мероприятия через полночь тотал — его длина', () => {
     assert.equal(HeroModes.heroTotal({ mode: 'to-end', startClock: '22:00', endClock: '01:00' }), 3 * 3600);
 });
+
+// BUG-20: до начала мероприятия «до конца» больше его длины — доля кольца
+// уходила за 1 (кольцо рисовалось с перехлёстом). Доля — в [0, 1], минус —
+// в [−1, 0] от лимита перерасхода.
+test('BUG-20: доля прогресса героя зажата в [0, 1] до начала мероприятия', () => {
+    assert.equal(HeroModes.heroProgress(3 * 3600, 3600, 0), 1);
+    assert.equal(HeroModes.heroProgress(1800, 3600, 0), 0.5);
+    assert.equal(HeroModes.heroProgress(0, 3600, 0), 0);
+    assert.equal(HeroModes.heroProgress(100, 0, 0), 0, 'без тотала доли нет');
+});
+
+test('BUG-20: минус идёт от 0 к −1 по лимиту перерасхода (300 с по умолчанию)', () => {
+    assert.equal(HeroModes.heroProgress(-150, 3600, 0), -0.5);
+    assert.equal(HeroModes.heroProgress(-60, 3600, 120), -0.5);
+    assert.equal(HeroModes.heroProgress(-9999, 3600, 120), -1);
+    assert.ok(Number.isFinite(HeroModes.heroProgress(NaN, 3600, 0)));
+});

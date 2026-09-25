@@ -582,3 +582,10 @@ test('«Сбросить всё» у виджета и часов режима �
             `сброс ${target} тронул режим центрального времени полноэкранного окна`);
     }
 });
+
+test('BUG-20: calculateProgressValue берёт долю у HeroModes.heroProgress, своей формулы нет', () => {
+    const body = SRC.match(/calculateProgressValue\(\)\s*\{[\s\S]*?\n {4}\}/);
+    assert.ok(body, 'метод calculateProgressValue не найден');
+    assert.match(body[0], /window\.HeroModes\.heroProgress\(/);
+    assert.doesNotMatch(body[0], /secs \/ total/, 'вторая копия формулы доли вернулась');
+});

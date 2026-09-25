@@ -2478,18 +2478,12 @@ class DisplayTimer {
     }
 
     // Вспомогательная функция для вычисления прогресса (для кэширования)
+    // Формула доли живёт в HeroModes.heroProgress: там она зажата в [0, 1]
+    // (BUG-20 — до начала мероприятия доля уходила за 1) и проверена в Node.
     calculateProgressValue() {
         const total = this._heroTotal();
         if (total === 0) { return 0; }
-
-        const secs = this._heroSeconds();
-        // FIX BUG-016: в перерасходе прогресс идёт от 0 к -1 — «обратный» ход.
-        if (secs < 0) {
-            const overrunLimit = this.overrunLimitSeconds || 300;
-            return -Math.min(1, Math.abs(secs) / overrunLimit);
-        }
-
-        return Math.round((secs / total) * 1000) / 1000;
+        return window.HeroModes.heroProgress(this._heroSeconds(), total, this.overrunLimitSeconds);
     }
 
     // Полоса срочности — общая для всех окон (RendererShared.timerColorBand).
