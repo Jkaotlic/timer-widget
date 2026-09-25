@@ -29,15 +29,6 @@ else
     ln -sf "$APP_DIR/${executable}" '/usr/bin/${executable}'
 fi
 
-if [ -e "$SANDBOX" ]; then
-    chown root:root "$SANDBOX" || true
-    if { [[ -L /proc/self/ns/user ]] && unshare --user true; } 2>/dev/null; then
-        chmod 0755 "$SANDBOX" || true
-    else
-        chmod 4755 "$SANDBOX" || true
-    fi
-fi
-
 if hash update-mime-database 2>/dev/null; then
     update-mime-database /usr/share/mime || true
 fi
@@ -46,19 +37,46 @@ if hash update-desktop-database 2>/dev/null; then
     update-desktop-database /usr/share/applications || true
 fi
 
+APPARMOR_PROFILE_INSTALLED=0
 # Профиль AppArmor (Ubuntu 24.04+). Пробная загрузка без ядра отсеивает старый
 # AppArmor без abi/4.0 (Ubuntu 22.04) — там профиль и не нужен.
 if apparmor_status --enabled > /dev/null 2>&1; then
     APPARMOR_PROFILE_SOURCE="$APP_DIR/resources/apparmor-profile"
     APPARMOR_PROFILE_TARGET='/etc/apparmor.d/${executable}'
     if apparmor_parser --skip-kernel-load --debug "$APPARMOR_PROFILE_SOURCE" > /dev/null 2>&1; then
-        cp -f "$APPARMOR_PROFILE_SOURCE" "$APPARMOR_PROFILE_TARGET"
+        cp -f "$APPARMOR_PROFILE_SOURCE" "$APPARMOR_PROFILE_TARGET" && APPARMOR_PROFILE_INSTALLED=1
         # В chroot (сборка образов) живая загрузка профиля бессмысленна.
         if ! { [ -x '/usr/bin/ischroot' ] && /usr/bin/ischroot; } && hash apparmor_parser 2>/dev/null; then
             apparmor_parser --replace --write-cache --skip-read-cache "$APPARMOR_PROFILE_TARGET" || true
         fi
     else
         echo "Skipping the AppArmor profile: this AppArmor does not support the bundled profile"
+    fi
+fi
+
+# Нужен ли SUID. Решают настройки ЯДРА, а не пробный `unshare --user true`:
+# postinst идёт от root, а root создаёт user namespace и там, где обычному
+# пользователю это запрещено (Debian: kernel.unprivileged_userns_clone=0) —
+# проба проходила, помощник получал 0755, и у пользователя приложение не
+# стартовало. Штатный шаблон electron-builder ошибается так же.
+userns_blocked_for_users() {
+    [ -L /proc/self/ns/user ] || return 0
+    [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null)" = "0" ] && return 0
+    [ "$(cat /proc/sys/user/max_user_namespaces 2>/dev/null)" = "0" ] && return 0
+    # Ubuntu 24.04+: без профиля AppArmor user namespaces приложению закрыты.
+    if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" = "1" ] \
+        && [ "$APPARMOR_PROFILE_INSTALLED" != "1" ]; then
+        return 0
+    fi
+    return 1
+}
+
+if [ -e "$SANDBOX" ]; then
+    chown root:root "$SANDBOX" || true
+    if userns_blocked_for_users; then
+        chmod 4755 "$SANDBOX" || true
+    else
+        chmod 0755 "$SANDBOX" || true
     fi
 fi
 

@@ -370,7 +370,14 @@ test('песочница Linux: ни одна цель не отключает �
     // поверхность атаки, которую сканер помечает сам по себе.
     assert.equal(PKG.build.deb.afterInstall, 'build/linux-after-install.sh', 'postinst не подключён');
     const afterInstall = code('build/linux-after-install.sh');
-    assert.match(afterInstall, /unshare --user true/, 'postinst не проверяет user namespaces перед SUID');
+    assert.match(afterInstall, /unprivileged_userns_clone/, 'postinst не смотрит, закрыты ли user namespaces обычным пользователям');
+    assert.match(afterInstall, /apparmor_restrict_unprivileged_userns/, 'postinst не учитывает ограничение AppArmor в Ubuntu 24.04+');
+    // Проба `unshare` от root проходит и там, где пользователю запрещено.
+    assert.ok(!/unshare --user true/.test(afterInstall), 'SUID снова решается пробой от root');
+    assert.ok(
+        afterInstall.indexOf('APPARMOR_PROFILE_TARGET=') < afterInstall.indexOf('chmod 4755'),
+        'профиль AppArmor обязан ставиться ДО решения про SUID'
+    );
     assert.match(afterInstall, /chmod 4755/, 'нет запасного SUID для ядер без user namespaces');
     assert.match(afterInstall, /chown root:root/, 'SUID без владельца root бесполезен');
     assert.match(afterInstall, /chmod 0755/, 'при рабочих user namespaces SUID обязан сниматься');

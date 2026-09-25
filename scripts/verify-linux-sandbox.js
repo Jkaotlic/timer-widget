@@ -52,8 +52,8 @@ function checkDeb(debPath) {
         .filter((l) => !l.trim().startsWith('#'))
         .join('\n');
 
-    if (!/unshare --user true/.test(code)) {
-        fail('postinst не проверяет user namespaces — SUID-root ставится там, где не нужен');
+    if (!/unprivileged_userns_clone/.test(code) || /unshare --user true/.test(code)) {
+        fail('postinst решает про SUID не по настройкам ядра — проба от root проходит и там, где пользователю запрещено');
     }
     if (!/chmod\s+4755/.test(code)) {
         fail('в postinst нет запасного `chmod 4755` — на ядрах без user namespaces приложение не стартует');
