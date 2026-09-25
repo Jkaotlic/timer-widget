@@ -461,6 +461,30 @@ function displayWindows(stubs) {
     return stubs.created.filter((w) => w._file === 'display.html');
 }
 
+/**
+ * Ждать УСЛОВИЯ, а не паузы: `true`, как только оно выполнилось, `false` по
+ * бюджету (проверки после ожидания тогда падают со своим сообщением).
+ *
+ * Паузы здесь были «таймер главного процесса + запас» (120 мс выхода из
+ * полноэкранного, тик раз в секунду, асинхронный диалог) — на занятом
+ * раннере CI запас съедается, и тест краснеет на здоровом коде.
+ */
+async function until(predicate, timeoutMs = 5000) {
+    const deadline = Date.now() + timeoutMs;
+    while (!predicate()) {
+        if (Date.now() > deadline) { return false; }
+        await new Promise((r) => setTimeout(r, 10));
+    }
+    return true;
+}
+
+/**
+ * Окно отрицательной проверки («ничего не возродилось»). Отсутствие события
+ * условием не дождёшься: после того, как всё закрылось, даём циклу ещё
+ * несколько оборотов — отложенное открытие ставится на следующий.
+ */
+const REBIRTH_GRACE_MS = 100;
+
 test('«закрыть» и сразу «открыть»: окно дисплея остаётся, и оно ОДНО', async () => {
     // Поведенческая половина разбора «закрывающееся окно — не открытое».
     // Source-тест (electron-main-source.test.js) проверяет, что вопрос задан;
@@ -484,7 +508,7 @@ test('«закрыть» и сразу «открыть»: окно диспле
     // кнопкой, а раннер CI получает сам собой из-за медленной машины.
     stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
 
-    await new Promise((r) => setTimeout(r, 400));
+    await until(() => first.isDestroyed() && displayWindows(stubs).some((w) => w !== first && !w.isDestroyed()));
 
     assert.equal(first.isDestroyed(), true, 'старое окно обязано закрыться');
     const alive = displayWindows(stubs).filter((w) => !w.isDestroyed());
@@ -504,7 +528,9 @@ test('два «открыть» во время закрытия дают одн
     stubs.ipcHandlers.get('close-display')(null);
     stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
     stubs.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
-    await new Promise((r) => setTimeout(r, 400));
+    await until(() => displayWindows(stubs)[0].isDestroyed()
+        && displayWindows(stubs).some((w) => !w.isDestroyed()));
+    await new Promise((r) => setTimeout(r, REBIRTH_GRACE_MS));
 
     assert.equal(
         displayWindows(stubs).filter((w) => !w.isDestroyed()).length, 1,
@@ -518,7 +544,8 @@ test('два «открыть» во время закрытия дают одн
     stubs2.ipcHandlers.get('close-display')(null);
     stubs2.ipcHandlers.get('open-display')(null, { displayIndex: 'auto' });
     stubs2.ipcHandlers.get('close-display')(null);
-    await new Promise((r) => setTimeout(r, 400));
+    await until(() => displayWindows(stubs2).every((w) => w.isDestroyed()));
+    await new Promise((r) => setTimeout(r, REBIRTH_GRACE_MS));
 
     assert.equal(
         displayWindows(stubs2).filter((w) => !w.isDestroyed()).length, 0,
@@ -557,7 +584,7 @@ for (const c of REOPEN_CASES) {
 
         stubs.ipcHandlers.get(c.close)(null);
         stubs.ipcHandlers.get(c.open)(null);
-        await new Promise((r) => setTimeout(r, 100));
+        await until(() => windowsOf(stubs, c.file).some((w) => w !== first && !w.isDestroyed()));
 
         const alive = windowsOf(stubs, c.file).filter((w) => !w.isDestroyed());
         assert.equal(
@@ -576,7 +603,8 @@ for (const c of REOPEN_CASES) {
         stubs.ipcHandlers.get(c.close)(null);
         stubs.ipcHandlers.get(c.open)(null);
         stubs.ipcHandlers.get(c.close)(null);
-        await new Promise((r) => setTimeout(r, 100));
+        await until(() => windowsOf(stubs, c.file).every((w) => w.isDestroyed()));
+        await new Promise((r) => setTimeout(r, REBIRTH_GRACE_MS));
 
         assert.equal(
             windowsOf(stubs, c.file).filter((w) => !w.isDestroyed()).length, 0,
@@ -624,20 +652,58 @@ function openDisplay(stubs) {
 }
 
 /**
+ * Ждать состояния таймера УСЛОВИЕМ, а не паузой.
+ *
+ * Тик ставится на границу секунды от старта (+25 мс, main-timer.js), и пауза
+ * «1300 мс = один тик» верна лишь на свободной машине: на занятом раннере CI
+ * таймер тикал позже, доклад выходил нулевым, и тест падал на здоровом коде
+ * (BUG-04 — дважды в job build). Условие ждёт ровно то, что тесту нужно, с
+ * бюджетом, который на зелёном прогоне не тратится.
+ *
+ * Читается последняя рассылка `timer-state` — поэтому окно должно быть
+ * открыто (`observeTimer`): без окон главный процесс шлёт в никуда.
+ */
+async function waitForTimer(stubs, predicate, what, timeoutMs = 10000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        const state = stubs.lastSent('timer-state');
+        if (state && predicate(state)) { return state; }
+        if (Date.now() > deadline) {
+            throw new Error(`таймер не дошёл до «${what}» за ${timeoutMs} мс; последнее состояние: ${JSON.stringify(state)}`);
+        }
+        await new Promise((r) => setTimeout(r, 10));
+    }
+}
+
+/** Дождаться `n` целых секунд хода от текущего показания. */
+async function waitForTicks(stubs, n = 1) {
+    const from = stubs.lastSent('timer-state');
+    assert.ok(from, 'нет ни одной рассылки timer-state — окно не открыто (observeTimer)');
+    return waitForTimer(stubs, (s) => s.remainingSeconds <= from.remainingSeconds - n,
+        `${n} с хода от ${from.remainingSeconds}`);
+}
+
+/** Открыть окно-наблюдателя, если ни одного нет: рассылку состояния видно только в окне. */
+function observeTimer(stubs) {
+    if (!stubs.created.some((w) => !w.isDestroyed())) { openWidget(stubs); }
+}
+
+/**
  * Провести доклад с перелимитом: короткий пресет, старт, уход в минус.
  *
- * Ждать нужно ДОЛЬШЕ секунды сверх пресета: перелимит считается целыми
- * секундами (`Math.floor` в money-meter.js), и доклад, просроченный на 300 мс,
- * стоит ноль — накопитель его не заметит, а тест решит, что журнал сломан.
+ * Ждём минуса в ЦЕЛУЮ секунду: перелимит считается целыми секундами
+ * (`Math.floor` в money-meter.js), и доклад, просроченный на 300 мс, стоит
+ * ноль — накопитель его не заметит, а тест решит, что журнал сломан.
  */
-async function runOvertimeTalk(stubs, ms = 2600) {
+async function runOvertimeTalk(stubs) {
+    observeTimer(stubs);
     // `allowNegative: true` обязателен: без него таймер ОСТАНАВЛИВАЕТСЯ на
     // нуле, перелимита не возникает вовсе, и тест про журнал проверял бы
     // тишину. Перелимит — это про минус, а минус в приложении разрешается
     // настройкой.
     stubs.ipcHandlers.get('timer-command')(null, { type: 'set', seconds: 1, allowNegative: true });
     stubs.ipcHandlers.get('timer-command')(null, { type: 'start', allowNegative: true });
-    await new Promise((r) => setTimeout(r, ms));
+    await waitForTimer(stubs, (s) => s.isRunning && s.remainingSeconds <= -1, 'минус в целую секунду');
 }
 
 test('закрытый доклад попадает в журнал, а не только в итог', async () => {
@@ -713,7 +779,7 @@ test('event-export пишет НАСТОЯЩИЙ файл и отвечает р
         stopTimer(stubs);
 
         stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
-        await new Promise((r) => setTimeout(r, 120));
+        await until(() => stubs.lastSent('event-export-done'));
 
         assert.ok(fs.existsSync(target), 'файл обязан появиться на диске');
         const csv = fs.readFileSync(target, 'utf8');
@@ -739,7 +805,7 @@ test('отмена диалога — не ошибка', async () => {
     openDisplay(stubs);
 
     stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
-    await new Promise((r) => setTimeout(r, 120));
+    await until(() => stubs.lastSent('event-export-done'));
 
     const answer = stubs.lastSent('event-export-done');
     assert.equal(answer.ok, false);
@@ -759,7 +825,7 @@ test('ошибка записи доходит до панели, а не тон
     openDisplay(stubs);
 
     stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
-    await new Promise((r) => setTimeout(r, 120));
+    await until(() => stubs.lastSent('event-export-done'));
 
     const answer = stubs.lastSent('event-export-done');
     assert.equal(answer.ok, false);
@@ -783,7 +849,7 @@ test('уложившийся доклад попадает в журнал с н
 
     cmd(stubs, { type: 'set', seconds: 5 });
     cmd(stubs, { type: 'start' });
-    await wait(1300);
+    await waitForTicks(stubs);
     cmd(stubs, { type: 'reset' });
     await wait(50);
 
@@ -833,7 +899,7 @@ test('выход из минуса посреди доклада не дроби
 
     await runOvertimeTalk(stubs);
     cmd(stubs, { type: 'adjust', deltaSeconds: 60 });
-    await wait(1200);
+    await waitForTicks(stubs);
     cmd(stubs, { type: 'reset' });
     await wait(50);
 
@@ -851,7 +917,7 @@ test('после «Завершить» новые доклады в журна�
     stubs.ipcHandlers.get('event-finish')(null);
     cmd(stubs, { type: 'set', seconds: 5 });
     cmd(stubs, { type: 'start' });
-    await wait(1300);
+    await waitForTicks(stubs);
     cmd(stubs, { type: 'reset' });
     await wait(50);
 
@@ -868,13 +934,13 @@ test('доклад, шедший во время «Нового мероприя
 
     cmd(stubs, { type: 'set', seconds: 5 });
     cmd(stubs, { type: 'start' });
-    await wait(1300);
+    await waitForTicks(stubs);
     stubs.ipcHandlers.get('event-reset')(null);
     // Доклад ПРОДОЛЖАЕТСЯ после отсечки хотя бы тик. Без этой паузы тест
     // проходил по признаку «секунда не прошла», а не по самой отсечке: первая
     // версия сбрасывала таймер сразу, и снятая отсечка оставалась зелёной —
     // поймано мутацией.
-    await wait(1300);
+    await waitForTicks(stubs);
     cmd(stubs, { type: 'reset' });
     await wait(50);
 
@@ -882,7 +948,7 @@ test('доклад, шедший во время «Нового мероприя
 
     // А следующий доклад — уже законная запись нового мероприятия.
     cmd(stubs, { type: 'start' });
-    await wait(1300);
+    await waitForTicks(stubs);
     cmd(stubs, { type: 'reset' });
     await wait(50);
     assert.equal(stubs.lastSent('event-overrun-state').talksCount, 1);
@@ -897,7 +963,7 @@ test('«Завершить» посреди уложившегося докла�
 
     cmd(stubs, { type: 'set', seconds: 30 });
     cmd(stubs, { type: 'start' });
-    await wait(1300);
+    await waitForTicks(stubs);
     stubs.ipcHandlers.get('event-finish')(null);
 
     const payload = stubs.lastSent('event-overrun-state');
@@ -915,9 +981,9 @@ test('«Завершить» после «Нового мероприятия» 
 
     cmd(stubs, { type: 'set', seconds: 30 });
     cmd(stubs, { type: 'start' });
-    await wait(1300);
+    await waitForTicks(stubs);
     stubs.ipcHandlers.get('event-reset')(null);
-    await wait(1300);
+    await waitForTicks(stubs);
     stubs.ipcHandlers.get('event-finish')(null);
 
     assert.equal(stubs.lastSent('event-overrun-state').talksCount, 0);
@@ -942,7 +1008,7 @@ test('SEC-11: в журнал уходит ИМЯ файла отчёта, а н
     openDisplay(stubs);
     try {
         stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
-        await new Promise((r) => setTimeout(r, 120));
+        await until(() => stubs.lastSent('event-export-done'));
         assert.ok(fs.existsSync(target), 'выгрузка обязана пройти — иначе проверять нечего');
 
         const exportLines = stubs.logged.filter((l) => l.text.includes('[export]'));
@@ -1045,7 +1111,7 @@ test('SEC-11: и ошибка записи не приносит в журнал
     openDisplay(stubs);
 
     stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
-    await new Promise((r) => setTimeout(r, 120));
+    await until(() => stubs.lastSent('event-export-done'));
 
     assert.equal(stubs.lastSent('event-export-done').ok, false, 'запись обязана провалиться');
     assert.ok(stubs.logged.some((l) => l.text.includes('[export]')), 'провал обязан остаться в журнале');
@@ -1184,11 +1250,12 @@ test('BUG-10: payload без картинки не стирает её; дисп
 
     // Дисплей закрыли и открыли: досылка несёт и картинку, и свежее название.
     // Закрытие полноэкранного окна не мгновенно — открытие ждёт его (см. тест
-    // close→open выше), поэтому пауза.
+    // close→open выше), поэтому ждём НОВОЕ окно условием.
     const reopen = async () => {
+        const before = liveWindow(stubs, 'display');
         stubs.ipcHandlers.get('close-display')(null);
         openDisplay(stubs);
-        await new Promise((r) => setTimeout(r, 400));
+        await until(() => { const w = liveWindow(stubs, 'display'); return !!w && w !== before; });
         liveWindow(stubs, 'display').webContents.emit('did-finish-load');
     };
     await reopen();
@@ -1354,7 +1421,7 @@ test('BUG-04: выход посреди перелимита записывае�
 
         // Повторный before-quit не считает секунды ещё раз: строка журнала
         // уже записана, и они повисли бы в итоге без строки.
-        await wait(1100);
+        await waitForTicks(stubs);
         stubs.appHandlers.get('before-quit')({ preventDefault() {} });
         assert.equal(OverrunStoreForTests.loadStore(stubs.userDataDir).overrunSeconds, store.overrunSeconds);
     } finally {
@@ -1400,7 +1467,7 @@ test('BUG-15: выгрузка посреди перелимита не назы
     try {
         await runOvertimeTalk(stubs);
         stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
-        await wait(120);
+        await until(() => stubs.lastSent('event-export-done'));
         const csv = fs.readFileSync(target, 'utf8');
         assert.doesNotMatch(csv, /разбивка неполна/, 'итог с живым минусом сверялся без идущего доклада');
         assert.match(csv, /идёт/, 'идущий доклад обязан быть строкой отчёта');
@@ -1453,7 +1520,7 @@ test('главный процесс шлёт окну только то, что 
         stubs.ipcHandlers.get('ui-theme-update')(null, { theme: 'light' });
         stubs.ipcHandlers.get('ui-lock-update')(null, { locked: true });
         stubs.ipcHandlers.get('display-settings-update')(null, { timerStyle: 'circle' });
-        await runOvertimeTalk(stubs, 1300);
+        await runOvertimeTalk(stubs);
         const roleOf = (win) => Object.keys(ROLE_FILES).find((r) => win && win._file === ROLE_FILES[r]);
         const stray = new Set();
         for (const m of stubs.sent) {
