@@ -12,8 +12,11 @@
  * пакета — в 2.3.2 таким образом пропал design-tokens.css, и приложение
  * запускалось без половины стилей.
  *
- * Зависимостей нет намеренно: формат заголовка asar простой и стабильный, а
- * тянуть @electron/asar ради одного чтения в проект без бандлера незачем.
+ * Для asar зависимостей нет намеренно: формат заголовка простой и стабильный,
+ * а тянуть @electron/asar ради одного чтения в проект без бандлера незачем.
+ * Фьюзы — наоборот, читаются через @electron/fuses (devDependency): формат
+ * провода меняется вместе с Electron, и знать его должен тот же пакет, которым
+ * electron-builder биты переворачивает, а не моя копия его представлений.
  *
  * Формат asar — ЧЕТЫРЕ uint32 перед JSON, а не три:
  *   [0..3]   uint32  payload size внешнего pickle (всегда 4)
@@ -143,6 +146,83 @@ function checkHardening(source) {
     return problems;
 }
 
+// --- Фьюзы Electron (SEC-03) ----------------------------------------------
+//
+// build.electronFuses в package.json — НАМЕРЕНИЕ; биты переворачивает
+// electron-builder при упаковке. Здесь они читаются обратно из собранного
+// бинаря: шаг, тихо не сработавший (другая версия сборщика, выключенная опция,
+// universal-сборка с `disableFuses`), оставил бы приложение полноценной Node с
+// --inspect и NODE_OPTIONS — при зелёном юнит-тесте конфига.
+
+// { ИмяФьюза: [индекс в проводе, ожидаемое значение] } из конфига.
+// Ключи конфига — те же имена со строчной буквы (runAsNode → RunAsNode); ключ
+// без фьюза (resetAdHocDarwinSignature — это действие, а не бит) пропускается.
+function expectedFuseWire(config) {
+    const { FuseV1Options } = require('@electron/fuses');
+    const wire = {};
+    for (const [key, value] of Object.entries(config || {})) {
+        const name = key[0].toUpperCase() + key.slice(1);
+        if (typeof FuseV1Options[name] !== 'number') { continue; }
+        wire[name] = [FuseV1Options[name], value];
+    }
+    return wire;
+}
+
+async function readFuseWire(executablePath) {
+    const { getCurrentFuseWire } = require('@electron/fuses');
+    return getCurrentFuseWire(executablePath);
+}
+
+// Список расхождений провода с конфигом; пустой — всё перевёрнуто как надо.
+// Состояние в проводе — байт: '0' выключен, '1' включён, 'r' фьюз удалён из
+// этой версии Electron (обещание конфига тогда не исполняется — это провал).
+function fuseProblems(wire, config) {
+    const expected = expectedFuseWire(config);
+    if (Object.keys(expected).length === 0) {
+        return ['build.electronFuses пуст — фьюзы в сборке не переворачиваются вовсе'];
+    }
+    const problems = [];
+    for (const [name, [index, want]] of Object.entries(expected)) {
+        const state = wire[index];
+        if (state === undefined) {
+            problems.push(`${name}: в проводе этого Electron нет фьюза №${index}`);
+        } else if (state === 'r'.charCodeAt(0)) {
+            problems.push(`${name}: фьюз удалён из этой версии Electron, конфиг не исполняется`);
+        } else if (state !== (want ? '1' : '0').charCodeAt(0)) {
+            const got = String.fromCharCode(state);
+            problems.push(`${name}: в бинаре «${got}», ожидалось «${want ? 1 : 0}»`);
+        }
+    }
+    return problems;
+}
+
+// Исполняемый файл Electron рядом с app.asar. macOS — сам .app (читалка
+// @electron/fuses сама идёт в Electron Framework), Windows — <productName>.exe,
+// Linux — executableName (у electron-builder по умолчанию — имя пакета в нижнем
+// регистре).
+function findElectronExecutable(asarPath, pkg) {
+    const appMatch = /^(.*?\.app)(?:[\\/]|$)/.exec(asarPath);
+    if (appMatch) { return fs.existsSync(appMatch[1]) ? appMatch[1] : null; }
+
+    const outDir = path.dirname(path.dirname(asarPath));
+    const build = pkg.build || {};
+    const productName = build.productName || pkg.productName || pkg.name;
+    const linuxName = (build.linux && build.linux.executableName) || build.executableName;
+    const candidates = [
+        `${productName}.exe`,
+        linuxName,
+        String(pkg.name || '').toLowerCase(),
+        String(productName).toLowerCase()
+    ].filter(Boolean);
+    for (const name of candidates) {
+        const full = path.join(outDir, name);
+        try {
+            if (fs.statSync(full).isFile()) { return full; }
+        } catch { /* нет такого — следующий */ }
+    }
+    return null;
+}
+
 // Сверяет плоский список файлов пакета с объявленным build.files.
 // Чистая функция — её и гоняет tests/verify-packed.test.js.
 function checkPacked(packedList, declared, countRepoFiles) {
@@ -196,7 +276,7 @@ function countRepoFilesUnder(root, dir) {
     return total;
 }
 
-function main() {
+async function main() {
     const distDir = path.join(ROOT, 'dist');
     const asarPath = findAsar(distDir);
     if (!asarPath) {
@@ -219,7 +299,21 @@ function main() {
     }
     console.log('[verify-packed] OK: режим разработчика закрыт, окна изолированы, автообновления нет');
 
-    const declared = require(path.join(ROOT, 'package.json')).build.files;
+    const pkg = require(path.join(ROOT, 'package.json'));
+    const executable = findElectronExecutable(asarPath, pkg);
+    if (!executable) {
+        console.error('\n[verify-packed] не найден исполняемый файл Electron рядом с app.asar — фьюзы не проверить');
+        process.exit(1);
+    }
+    const fuseIssues = fuseProblems(await readFuseWire(executable), pkg.build.electronFuses);
+    if (fuseIssues.length) {
+        console.error(`\n[verify-packed] ФЬЮЗЫ НЕ ПЕРЕВЁРНУТЫ в ${path.relative(ROOT, executable)}`);
+        for (const p of fuseIssues) { console.error(`  ${p}`); }
+        process.exit(1);
+    }
+    console.log(`[verify-packed] OK: фьюзы Electron перевёрнуты (${Object.keys(expectedFuseWire(pkg.build.electronFuses)).length} шт.)`);
+
+    const declared = pkg.build.files;
     const { missing, emptyGlobs } = checkPacked(
         [...packed],
         declared,
@@ -252,10 +346,17 @@ module.exports = {
     checkPacked,
     checkHardening,
     findAsar,
-    countRepoFilesUnder
+    countRepoFilesUnder,
+    expectedFuseWire,
+    readFuseWire,
+    fuseProblems,
+    findElectronExecutable
 };
 
 // Запуск как скрипт — но не при импорте из теста.
 if (require.main === module) {
-    main();
+    main().catch((err) => {
+        console.error('[verify-packed] сбой проверки:', err && err.stack ? err.stack : err);
+        process.exit(1);
+    });
 }

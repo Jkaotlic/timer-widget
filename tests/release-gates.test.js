@@ -411,3 +411,42 @@ test('навигация и новые окна заблокированы', () 
     const calls = (MAIN.match(/hardenWindow\((?!window)/g) || []).length;
     assert.ok(calls >= 4, `hardenWindow применён ${calls} раз, окон не меньше четырёх`);
 });
+
+test('фьюзы Electron: ни Node-режима, ни NODE_OPTIONS, ни --inspect, asar сверяется', () => {
+    // Фьюзы — биты в самом бинаре Electron, их переворачивает electron-builder
+    // при упаковке (build.electronFuses). Без них собранное приложение — это
+    // полноценная Node с правами пользователя: ELECTRON_RUN_AS_NODE=1 превращает
+    // его в интерпретатор, NODE_OPTIONS=--require подгружает чужой код в main,
+    // --inspect открывает отладчик, а подменённый app.asar исполняется молча.
+    // Здесь держится КОНФИГ, а scripts/verify-packed.js читает биты обратно из
+    // собранного бинаря (CI, джоба pack) — конфиг, который electron-builder
+    // тихо не применил, этот тест не увидит.
+    assert.deepEqual(PKG.build.electronFuses, {
+        runAsNode: false,
+        enableCookieEncryption: true,
+        enableNodeOptionsEnvironmentVariable: false,
+        enableNodeCliInspectArguments: false,
+        enableEmbeddedAsarIntegrityValidation: true,
+        onlyLoadAppFromAsar: true,
+        loadBrowserProcessSpecificV8Snapshot: false,
+        // ОСТАЁТСЯ включённым, и это замер, а не недосмотр: окна грузятся с
+        // file://, и без этого фьюза их origin непрозрачен — `localStorage`
+        // бросает «Access is denied for this document», панель падает на
+        // старте (проверено 25.09.2026: копия Electron с этим фьюзом, e2e
+        // windows-load-clean). Выключить можно только вместе с переездом окон
+        // на свою схему (protocol.handle) — а это смена origin и миграция всех
+        // настроек пользователя.
+        grantFileProtocolExtraPrivileges: true,
+        // identity: null — сборка без подписи, electron-builder её не ставит.
+        // Перевёрнутые биты ломают штатную ad-hoc подпись Electron, и на Apple
+        // Silicon неподписанный бинарь убивается ядром при запуске. Переподпись
+        // ad-hoc делает @electron/fuses сразу после переворота.
+        resetAdHocDarwinSignature: true
+    });
+    // Сверка asar и «только из asar» без самого asar — пустые обещания.
+    assert.notEqual(PKG.build.asar, false, 'asar выключен — фьюзы целостности бессмысленны');
+    assert.notEqual(PKG.build.disableAsarIntegrity, true, 'хеш asar не пишется — сверять будет нечего');
+    // Читалка фьюзов в verify-packed.js — прямая зависимость, а не случайно
+    // приехавшая транзитивная: её версия обязана знать провод этого Electron.
+    assert.ok(PKG.devDependencies['@electron/fuses'], '@electron/fuses не объявлен в devDependencies');
+});

@@ -32,7 +32,11 @@ const {
     readAsarFile,
     flatten,
     checkPacked,
-    checkHardening
+    checkHardening,
+    expectedFuseWire,
+    fuseProblems,
+    readFuseWire,
+    findElectronExecutable
 } = require('../scripts/verify-packed');
 
 function buildAsar(header) {
@@ -294,4 +298,133 @@ test('второе окно без гарда не проходит ворота
         problems.some((p) => /окон 2, гардов devTools 1/.test(p)),
         `ожидалось указание на нехватку гарда, получено: ${problems.join('; ')}`
     );
+});
+
+// --- Фьюзы Electron (SEC-03) ------------------------------------------------
+//
+// Конфиг фьюзов проверяет tests/release-gates.test.js, но конфиг — это
+// намерение. Здесь проверяется читалка, которой verify-packed.js сверяет БИТЫ
+// в собранном бинаре: electron-builder, тихо не применивший конфиг (другая
+// версия, выключенный шаг), оставил бы сборку открытой при зелёном юните.
+
+const FUSES = require('../package.json').build.electronFuses;
+const SENTINEL = 'dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX';
+
+// Бинарь-подделка: мусор, сентинел, версия провода, длина, состояния.
+function fakeBinary(states) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fuses-'));
+    const file = path.join(dir, 'electron');
+    fs.writeFileSync(file, Buffer.concat([
+        Buffer.alloc(64, 7),
+        Buffer.from(SENTINEL, 'ascii'),
+        Buffer.from([1, states.length]),
+        Buffer.from(states, 'ascii'),
+        Buffer.alloc(64, 7)
+    ]));
+    return { dir, file };
+}
+
+test('ожидаемый провод строится из build.electronFuses по индексам фьюзов', () => {
+    const wire = expectedFuseWire(FUSES);
+    // Индексы — из @electron/fuses (FuseV1Options), а не из порядка ключей.
+    assert.deepEqual(wire, {
+        RunAsNode: [0, false],
+        EnableCookieEncryption: [1, true],
+        EnableNodeOptionsEnvironmentVariable: [2, false],
+        EnableNodeCliInspectArguments: [3, false],
+        EnableEmbeddedAsarIntegrityValidation: [4, true],
+        OnlyLoadAppFromAsar: [5, true],
+        LoadBrowserProcessSpecificV8Snapshot: [6, false],
+        GrantFileProtocolExtraPrivileges: [7, true]
+    });
+});
+
+test('перевёрнутый как надо провод проходит, незнакомый хвост не мешает', async () => {
+    // Девятый бит (индекс 8) у Electron 44 есть, а @electron/fuses 1.8.0 его
+    // не знает — electron-builder его не трогает, и сверять его не с чем.
+    const { dir, file } = fakeBinary('01001101' + '1');
+    try {
+        assert.deepEqual(fuseProblems(await readFuseWire(file), FUSES), []);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('каждый неперевёрнутый фьюз называется поимённо', async () => {
+    const { dir, file } = fakeBinary('11001100');
+    try {
+        const problems = fuseProblems(await readFuseWire(file), FUSES);
+        assert.equal(problems.length, 2, problems.join('\n'));
+        assert.ok(problems.some((p) => p.includes('RunAsNode')));
+        assert.ok(problems.some((p) => p.includes('GrantFileProtocolExtraPrivileges')));
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('удалённый или отсутствующий фьюз — провал, а не «ну и ладно»', async () => {
+    // 'r' — фьюз удалён из этой версии Electron: обещание конфига не
+    // исполняется, и сборка обязана это назвать, а не пройти.
+    const { dir, file } = fakeBinary('r1001');
+    try {
+        const problems = fuseProblems(await readFuseWire(file), FUSES);
+        assert.ok(problems.some((p) => p.includes('RunAsNode') && p.includes('удал')), problems.join('\n'));
+        assert.ok(problems.some((p) => p.includes('OnlyLoadAppFromAsar')), 'короткий провод не замечен');
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('пустой конфиг фьюзов — провал, а не пустая зелёная сверка', () => {
+    assert.ok(fuseProblems({ version: '1', 0: 48 }, undefined).length > 0);
+    assert.ok(fuseProblems({ version: '1', 0: 48 }, {}).length > 0);
+});
+
+test('НАСТОЯЩИЙ бинарь Electron читается, и неперевёрнутый не проходит', async () => {
+    // Самопроверка на живом образце, а не на подделке по моему представлению
+    // о формате (урок первого парсера asar): штатный бинарь из node_modules
+    // собран с RunAsNode=1, и ворота обязаны его отвергнуть.
+    const candidates = [
+        'node_modules/electron/dist/Electron.app',
+        'node_modules/electron/dist/electron',
+        'node_modules/electron/dist/electron.exe'
+    ].map((p) => path.join(__dirname, '..', p));
+    const real = candidates.find((p) => fs.existsSync(p));
+    if (!real) {
+        console.log('  (electron не установлен — пропуск сверки с живым бинарём)');
+        return;
+    }
+    const wire = await readFuseWire(real);
+    assert.equal(wire.version, '1');
+    assert.equal(wire[0], '1'.charCodeAt(0), 'штатный Electron собран с RunAsNode включённым');
+    const problems = fuseProblems(wire, FUSES);
+    assert.ok(problems.some((p) => p.includes('RunAsNode')), 'неперевёрнутый бинарь прошёл ворота');
+});
+
+test('исполняемый файл находится по раскладке каждой ОС', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'layout-'));
+    const touch = (p) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, ''); };
+    const pkg = { name: 'timer-widget', build: { productName: 'TimerWidget' } };
+    try {
+        const win = path.join(root, 'win-unpacked');
+        touch(path.join(win, 'resources', 'app.asar'));
+        touch(path.join(win, 'TimerWidget.exe'));
+        assert.equal(findElectronExecutable(path.join(win, 'resources', 'app.asar'), pkg), path.join(win, 'TimerWidget.exe'));
+
+        const lin = path.join(root, 'linux-unpacked');
+        touch(path.join(lin, 'resources', 'app.asar'));
+        touch(path.join(lin, 'timer-widget'));
+        assert.equal(findElectronExecutable(path.join(lin, 'resources', 'app.asar'), pkg), path.join(lin, 'timer-widget'));
+
+        const app = path.join(root, 'mac-arm64', 'TimerWidget.app');
+        const asar = path.join(app, 'Contents', 'Resources', 'app.asar');
+        touch(asar);
+        assert.equal(findElectronExecutable(asar, pkg), app);
+
+        const empty = path.join(root, 'nothing');
+        touch(path.join(empty, 'resources', 'app.asar'));
+        assert.equal(findElectronExecutable(path.join(empty, 'resources', 'app.asar'), pkg), null);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
 });
