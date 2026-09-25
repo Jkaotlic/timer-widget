@@ -1263,10 +1263,11 @@ class DisplayTimer {
 
             // «До завершения» — расстояние от системных часов до времени
             // «Конец». С таймером доклада не связано: тот считает заданную
-            // длительность, а это — сколько идти до конца мероприятия.
+            // длительность, а это — сколько идти до конца мероприятия. Формула
+            // одна с героем «До конца» (полночь понимает, начало участвует).
             if (this.timeLeftValueEl) {
                 const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-                const left = window.RendererShared.secondsUntilClock(nowSeconds, this.endTime);
+                const left = window.RendererShared.secondsUntilEventEnd(nowSeconds, this.eventTime, this.endTime);
                 // formatTime всегда даёт HH:MM:SS — «02:04:21» с фотографии.
                 this.timeLeftValueEl.textContent = window.TimeUtils.formatTime(left);
                 // Стрелки мини-циферблата этого блока крутит ДЛИТЕЛЬНОСТЬ, а не

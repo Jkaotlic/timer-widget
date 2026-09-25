@@ -153,6 +153,7 @@ test('аналог: «До завершения» показывает ОСТА�
     // циферблат этого стиля крутит стрелки ровно длительностью, и блок обязан
     // повторять ЕГО арифметику, а не заводить свою.
     const { app, control } = await launchApp();
+    let saved = null;
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
@@ -162,26 +163,33 @@ test('аналог: «До завершения» показывает ОСТА�
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
 
-        // Время окончания задаётся ОТНОСИТЕЛЬНО СЕЙЧАС, а не числом «12:00».
-        // «До завершения» считает расстояние от системных часов до этого
-        // момента, и прошедшее время даёт НОЛЬ (это осознанное поведение, см.
-        // secondsUntilClock). Спека с прибитым «12:00» зеленела утром и падала
-        // вечером: обе стрелки честно стояли на 12 при значении 00:00:00 —
-        // ровно тот класс дефекта, что уже разбирался как «время — скрытый
-        // параметр проверки».
+        // Расписание задаётся ОТНОСИТЕЛЬНО СЕЙЧАС, а не числом «12:00»:
+        // «До завершения» считает расстояние от системных часов до конца, и
+        // прошедший конец даёт НОЛЬ. Спека с прибитым «12:00» зеленела утром и
+        // падала вечером: обе стрелки честно стояли на 12 при 00:00:00 — класс
+        // «время — скрытый параметр проверки». Начало тоже ставится: с 26.09.2026
+        // блок считает той же формулой, что герой (secondsUntilEventEnd), и
+        // конец раньше начала — это мероприятие через полночь. Час назад → через
+        // два часа верно в любое время суток, переход через полночь формула
+        // понимает сама.
+        saved = await control.evaluate(() => ({
+            start: document.getElementById('eventTimeInput').value,
+            end: document.getElementById('endTimeInput').value
+        }));
         const endTime = await control.evaluate(() => {
-            const now = new Date();
-            // +2 часа, но не за полночь: после неё «завтра» снова означает ноль.
-            const end = new Date(now.getTime() + 2 * 3600 * 1000);
-            const value = end.getDate() === now.getDate()
-                ? `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
-                : '23:59';
-            const el = document.getElementById('endTimeInput');
-            el.value = value;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
+            const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const now = Date.now();
+            const set = (id, value) => {
+                const el = document.getElementById(id);
+                el.value = value;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+            set('eventTimeInput', hhmm(new Date(now - 3600 * 1000)));
+            const value = hhmm(new Date(now + 2 * 3600 * 1000));
+            set('endTimeInput', value);
             return value;
         });
-        console.log(`   время окончания на сегодня: ${endTime}`);
+        console.log(`   время окончания: ${endTime}`);
 
         await control.click('#displayTimerStyle button[data-val="analog"]');
         await display.waitForTimeout(1200);
@@ -230,11 +238,14 @@ test('аналог: «До завершения» показывает ОСТА�
             'обе стрелки на 12 при ненулевом остатке — блок никто не крутит'
         ).toBeGreaterThan(0);
     } finally {
-        // Профиль общий: возвращаем время окончания к умолчанию.
-        await control.evaluate(() => {
-            const el = document.getElementById('endTimeInput');
-            if (el) { el.value = '12:00'; el.dispatchEvent(new Event('change', { bubbles: true })); }
-        }).catch(() => {});
+        // Профиль общий: возвращаем расписание, каким оно было до теста.
+        await control.evaluate((v) => {
+            if (!v) { return; }
+            for (const [id, value] of [['eventTimeInput', v.start], ['endTimeInput', v.end]]) {
+                const el = document.getElementById(id);
+                if (el) { el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); }
+            }
+        }, saved).catch(() => {});
         // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
         // настроек, и если он закрылся, клик ждёт видимости и молча падает по
         // таймауту (в `finally` это ещё и незаметно). Соседние спеки открывают

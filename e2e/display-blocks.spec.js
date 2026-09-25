@@ -366,28 +366,49 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
 
 test('«До завершения» считает до времени окончания, а не по таймеру', async () => {
     const { app, control } = await launchApp();
+    let saved = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
         const display = await waitForDisplay(app);
         await control.waitForTimeout(2200);
 
-        // Ставим «Конец» на 40 минут вперёд от системного времени.
+        // Мероприятие ВОКРУГ «сейчас»: начало 20 минут назад, конец через 40.
+        // Часы берутся из окна, а не из числа в тесте: время суток — скрытый
+        // параметр (прибитое «+40 минут» без начала падало ближе к полуночи,
+        // а с начальным «10:00» утром читалось как мероприятие через полночь).
+        // Около полуночи одна из отметок сама переходит сутки — это и есть
+        // проверка полуночи, а не повод её обходить: формула та же, что у героя.
+        saved = await control.evaluate(() => ({
+            start: document.getElementById('eventTimeInput').value,
+            end: document.getElementById('endTimeInput').value
+        }));
         const target = await control.evaluate(() => {
-            const now = new Date();
-            const then = new Date(now.getTime() + 40 * 60 * 1000);
-            const hh = String(then.getHours()).padStart(2, '0');
-            const mm = String(then.getMinutes()).padStart(2, '0');
-            const el = document.getElementById('endTimeInput');
-            el.value = `${hh}:${mm}`;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
+            const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+            const now = Date.now();
+            const set = (id, value) => {
+                const el = document.getElementById(id);
+                el.value = value;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+            const start = hhmm(new Date(now - 20 * 60 * 1000));
+            const end = hhmm(new Date(now + 40 * 60 * 1000));
+            set('eventTimeInput', start);
+            set('endTimeInput', end);
             document.getElementById('showTimeLeft').checked = true;
             document.getElementById('showTimeLeft').dispatchEvent(new Event('change', { bubbles: true }));
-            return `${hh}:${mm}`;
+            return `${start}–${end}`;
         });
-        await display.waitForTimeout(1500);
+        // Ждём УСЛОВИЕМ: блок перешёл на новое расписание (тик раз в секунду).
+        // Условие — то же окно, что проверяется ниже: прежнее значение (до
+        // «12:00») тоже больше 38 минут и прошло бы одностороннюю проверку.
+        await display.waitForFunction(() => {
+            const t = document.getElementById('timeLeftValue').textContent.split(':').map(Number);
+            const sec = t[0] * 3600 + t[1] * 60 + t[2];
+            return t.length === 3 && sec > 38 * 60 && sec <= 40 * 60;
+        }, null, { timeout: 10000 }).catch(() => {});
 
         const shown = await display.evaluate(() => document.getElementById('timeLeftValue').textContent);
-        console.log(`«Конец» ${target} → до завершения ${shown}`);
+        console.log(`мероприятие ${target} → до завершения ${shown}`);
 
         const parts = shown.split(':').map(Number);
         const seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -396,11 +417,14 @@ test('«До завершения» считает до времени окон�
         expect(seconds, `ожидалось около 40 минут, показано ${shown}`).toBeLessThanOrEqual(40 * 60);
     } finally {
         await setToggle(control, 'showTimeLeft', false).catch(() => {});
-        await control.evaluate(() => {
-            const el = document.getElementById('endTimeInput');
-            el.value = '12:00';
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        }).catch(() => {});
+        await control.evaluate((v) => {
+            if (!v) { return; }
+            for (const [id, value] of [['eventTimeInput', v.start], ['endTimeInput', v.end]]) {
+                const el = document.getElementById(id);
+                el.value = value;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }, saved).catch(() => {});
         await app.close();
     }
 });

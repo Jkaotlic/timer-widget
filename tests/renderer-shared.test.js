@@ -321,9 +321,9 @@ test('endsAt: мусор даёт null, а не NaN в подписи', () => {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// secondsUntilClock — блок «До завершения» (17.08.2026)
+// secondsUntilEventEnd — блок «До завершения» (17.08.2026, полночь — 26.09.2026)
 // ---------------------------------------------------------------------------
-const { clockToSeconds, secondsUntilClock, signedSecondsUntilClock } = require('../renderer-shared');
+const { clockToSeconds, secondsUntilEventEnd, signedSecondsUntilClock, eventClockDistances: eventDistancesForBlock } = require('../renderer-shared');
 
 test('clockToSeconds: парсит HH:MM и возвращает секунды с начала суток', () => {
     // 10:30 — 10 часов * 3600 + 30 минут * 60 = 37800 секунд
@@ -364,26 +364,47 @@ test('clockToSeconds: невалидные входы возвращают null'
     assert.equal(clockToSeconds({}), null);
 });
 
-test('secondsUntilClock: считает от текущего момента до времени «Конец»', () => {
+test('secondsUntilEventEnd: считает от текущего момента до времени «Конец»', () => {
     // 12:55:39 → 15:00 = 2 ч 4 мин 21 с (числа с фотографии пользователя).
-    assert.equal(secondsUntilClock(12 * 3600 + 55 * 60 + 39, '15:00'), 2 * 3600 + 4 * 60 + 21);
+    assert.equal(secondsUntilEventEnd(12 * 3600 + 55 * 60 + 39, '10:00', '15:00'), 2 * 3600 + 4 * 60 + 21);
 });
 
-test('secondsUntilClock: время уже прошло — ноль, а не сутки до завтра', () => {
+test('secondsUntilEventEnd: время уже прошло — ноль, а не сутки до завтра', () => {
     // Перенос на следующие сутки дал бы в 15:01 бодрое «23:59:00» сразу после
     // окончания мероприятия. Ноль читается как «закончилось».
-    assert.equal(secondsUntilClock(15 * 3600 + 60, '15:00'), 0);
+    assert.equal(secondsUntilEventEnd(15 * 3600 + 60, '10:00', '15:00'), 0);
 });
 
-test('secondsUntilClock: ровно в момент окончания — ноль', () => {
-    assert.equal(secondsUntilClock(15 * 3600, '15:00'), 0);
+test('secondsUntilEventEnd: ровно в момент окончания — ноль', () => {
+    assert.equal(secondsUntilEventEnd(15 * 3600, '10:00', '15:00'), 0);
 });
 
-test('secondsUntilClock: мусор даёт 0, а не NaN', () => {
-    for (const bad of [undefined, null, '', 'abc', '25:00', '12:99', '12', 12]) {
-        assert.equal(secondsUntilClock(3600, bad), 0, `вход ${JSON.stringify(bad)}`);
+test('secondsUntilEventEnd: конец после полуночи — остаток, а не ноль (было 0 до 26.09.2026)', () => {
+    // 23:30, мероприятие 22:00–00:10: до конца 40 минут. Кламп прежней
+    // secondsUntilClock видел «00:10 сегодня» позади и давал 00:00:00.
+    assert.equal(secondsUntilEventEnd(23 * 3600 + 30 * 60, '22:00', '00:10'), 40 * 60);
+    // И после полуночи тот же отсчёт продолжается.
+    assert.equal(secondsUntilEventEnd(5 * 60, '22:00', '00:10'), 5 * 60);
+});
+
+test('secondsUntilEventEnd: ОДНА формула с героем «До конца» — отличается только клампом', () => {
+    const hm = (h, m = 0) => h * 3600 + m * 60;
+    const cases = [
+        [hm(23, 30), '22:00', '00:10'], [hm(0, 30), '22:00', '01:00'],
+        [hm(14), '10:00', '16:00'], [hm(18, 5), '09:00', '18:00'],
+        [hm(7), '20:00', '21:00'], [hm(1, 30), '22:00', '01:00']
+    ];
+    for (const [now, start, end] of cases) {
+        assert.equal(secondsUntilEventEnd(now, start, end),
+            Math.max(0, eventDistancesForBlock(now, start, end).toEnd), `${now} ${start}–${end}`);
     }
-    assert.equal(secondsUntilClock(NaN, '15:00'), 0);
+});
+
+test('secondsUntilEventEnd: мусор даёт 0, а не NaN', () => {
+    for (const bad of [undefined, null, '', 'abc', '25:00', '12:99', '12', 12]) {
+        assert.equal(secondsUntilEventEnd(3600, bad, bad), 0, `вход ${JSON.stringify(bad)}`);
+    }
+    assert.equal(secondsUntilEventEnd(NaN, '10:00', '15:00'), 0);
 });
 
 test('signedSecondsUntilClock уходит в минус на прошедшей отметке', () => {
@@ -408,12 +429,10 @@ test('signedSecondsUntilClock на мусоре даёт ноль, а не ми�
     assert.equal(signedSecondsUntilClock(now, null), 0);
 });
 
-test('secondsUntilClock по-прежнему клампит в ноль', () => {
-    // Старое поведение не изменилось: плашка «До завершения» не имеет права
-    // показать минус или перенос на следующие сутки.
-    const now = 15 * 3600 + 1 * 60;
-    assert.equal(secondsUntilClock(now, '15:00'), 0);
-    assert.equal(secondsUntilClock(now, '15:30'), 1740);
+test('secondsUntilClock больше не экспортируется: у «До завершения» одна формула с героем', () => {
+    // Кламп по ОДНОЙ отметке не знал полуночи; оставленная рядом, она снова
+    // нашла бы потребителя.
+    assert.equal(require('../renderer-shared').secondsUntilClock, undefined);
 });
 
 // ---------------------------------------------------------------------------

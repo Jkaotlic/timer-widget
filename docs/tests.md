@@ -59,7 +59,7 @@
 | `e2e-budget.test.js` | `test.setTimeout` в e2e только ПОДНИМАЕТ бюджет из `playwright.config.js` |
 | `sound-hotkey.test.js` | Клавиша `Z` и мастер-звук: у звука ОДИН владелец (`#soundMasterEnabled`), тумблер строки и посылки окон идут через `toggleSoundMaster` |
 | `atomic-write.test.js` | Атомарная запись (tmp + fsync + rename): сорвавшаяся запись оставляет старый файл — накопитель и снимок восстановления (BUG-09) |
-| `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint`, `fitBlockScale`, `topBandReserve`, `heroFrameShrink` |
+| `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint`, `fitBlockScale`, `topBandReserve`, `heroFrameShrink`, `secondsUntilEventEnd` (полночь, одна формула с героем) |
 | `renderer-storage.test.js` | Quota-safe localStorage helpers |
 | `display-layouts.test.js` | Реестр ↔ тумблеры в оба конца, масштабы, доли в пиксели, непересечение раскладок |
 | `panel-colors.test.js` | Сборка объекта цветов (патч дополняет, `null` удаляет), проводка и подложка в обоих окнах у пяти стилей |

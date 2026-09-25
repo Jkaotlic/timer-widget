@@ -3466,7 +3466,9 @@ settle-loop поверх настоящего окна дисплея (тот ж
 
 **Сноска про соседа.** Разбор `'HH:MM'` для новых величин действительно живёт в
 одном месте — `RendererShared.clockToSeconds()`, из которой построены
-`signedSecondsUntilClock` и `secondsUntilClock`. Но «единственный в проекте, кто
+`signedSecondsUntilClock` и `eventClockDistances` (а из неё — `secondsUntilEventEnd`
+блока «До завершения»; прежняя `secondsUntilClock` по одной отметке удалена
+26.09.2026 — она не знала полуночи). Но «единственный в проекте, кто
 знает этот формат» сказать нельзя: `updateStaticMiniClock()` в
 `display-script.js` разбирает ту же строку своими `split(':')` + `parseInt`. Он
 предсуществующий, у него другой потребитель (стрелки мини-циферблата на
