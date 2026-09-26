@@ -308,3 +308,55 @@ test('код, уходящий в окно, самодостаточен: без
     assert.deepEqual(M.writeMissingEntries(fakeStorage({ k: 'v' }), { k: 'z', n: '1' }),
         { written: 1, skipped: 1, failed: 0 });
 });
+
+// --- Сверка после переноса ----------------------------------------------------
+// flushStorageData() в Chromium нельзя дождаться: сбой в миллисекунды после
+// метки мог оставить app:// пустым при метке «done» — и перенос больше не
+// повторялся, хотя старое хранилище цело. Второй запуск один раз сверяет.
+
+test('сверка: метка «done», а app:// пуст — перенос повторяется', async () => {
+    const env = makeEnv({
+        file: { a: '1', b: '2' },
+        marker: { version: 1, status: 'done', keys: 2, written: 2, skipped: 0 }
+    });
+    const res = await M.migrateStorage(env.deps);
+    res.dispose();
+    assert.equal(res.outcome, 'done');
+    assert.equal(env.origins.app.getItem('a'), '1');
+    assert.equal(env.origins.app.getItem('b'), '2');
+});
+
+test('сверка: app:// на месте — метка помечается сверенной, переноса нет', async () => {
+    const env = makeEnv({
+        file: { a: '1' }, app: { a: '1' },
+        marker: { version: 1, status: 'done', keys: 1, written: 1, skipped: 0 }
+    });
+    const res = await M.migrateStorage(env.deps);
+    res.dispose();
+    assert.equal(res.outcome, 'already-done');
+    assert.equal(env.readMarker().verified, true);
+    assert.ok(!env.events.some((e) => e.startsWith('loadFile')), 'сверка не читает старое хранилище');
+});
+
+test('сверка один раз: сверенная метка окна не открывает', async () => {
+    const env = makeEnv({
+        file: { a: '1' },
+        marker: { version: 1, status: 'done', keys: 1, verified: true }
+    });
+    const res = await M.migrateStorage(env.deps);
+    res.dispose();
+    assert.equal(res.outcome, 'already-done');
+    assert.equal(env.created.length, 0);
+});
+
+test('сверка зависла — старт не ждёт её вечно, метка остаётся несверенной', async () => {
+    const env = makeEnv({
+        file: { a: '1' }, app: { a: '1' }, hang: 'exec:app',
+        marker: { version: 1, status: 'done', keys: 1 }
+    });
+    const res = await M.migrateStorage(env.deps);
+    res.dispose();
+    assert.equal(res.outcome, 'already-done');
+    assert.notEqual(env.readMarker().verified, true);
+    assert.ok(env.created.every((w) => w.destroyed), 'окно сверки не погашено');
+});

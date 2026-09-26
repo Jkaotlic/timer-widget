@@ -130,13 +130,28 @@ test('перенос настроек: всё из file:// доходит до a
             await app.close();
         }
 
-        // --- Второй запуск: метка есть, перенос не повторяется ---
+        // --- Второй запуск: перенос не повторяется, метка только СВЕРЯЕТСЯ ---
+        // Сверка один раз смотрит, что app:// не пуст (сброс на диск Chromium
+        // не дождаться), и дописывает в метку «verified» — остальные поля те же.
+        const first = JSON.parse(fs.readFileSync(path.join(dir, MARKER), 'utf8'));
+        expect(first.verified, 'сверка — дело ВТОРОГО запуска').not.toBe(true);
+        ({ app, control } = await start(dir));
+        try {
+            const second = JSON.parse(fs.readFileSync(path.join(dir, MARKER), 'utf8'));
+            expect(second.verified, 'второй запуск не сверил перенос').toBe(true);
+            expect({ ...second, verified: undefined, at: undefined }, 'перенос шёл второй раз')
+                .toEqual({ ...first, verified: undefined, at: undefined });
+            expect((await readKeys(control, ['e2eMigrationProbe'])).e2eMigrationProbe).toBe('новое');
+            expect((await readKeys(control, ['localBgImage'])).localBgImage).toBe(SEED.localBgImage);
+        } finally {
+            await app.close();
+        }
+
+        // --- Третий запуск: сверенная метка не трогается вовсе ---
         const markerText = fs.readFileSync(path.join(dir, MARKER), 'utf8');
         ({ app, control } = await start(dir));
         try {
-            expect(fs.readFileSync(path.join(dir, MARKER), 'utf8'), 'метка переписана — перенос шёл второй раз').toBe(markerText);
-            expect((await readKeys(control, ['e2eMigrationProbe'])).e2eMigrationProbe).toBe('новое');
-            expect((await readKeys(control, ['localBgImage'])).localBgImage).toBe(SEED.localBgImage);
+            expect(fs.readFileSync(path.join(dir, MARKER), 'utf8'), 'сверенная метка переписана').toBe(markerText);
         } finally {
             await app.close();
         }

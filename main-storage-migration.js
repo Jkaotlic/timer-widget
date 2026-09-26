@@ -157,6 +157,11 @@ function withTimeout(promise, ms, step) {
  *   закрытое последнее окно — это window-all-closed, а на нём Windows и Linux
  *   выходят из приложения.
  */
+// Метка «перенесено» с ключами, ещё не сверенная со вторым запуском.
+function needsVerification(marker) {
+    return Number(marker.keys) > 0 && marker.verified !== true;
+}
+
 async function migrateStorage(deps) {
     const { userDataPath, appDir, BrowserWindow, flushStorageData, log } = deps;
     const timeoutMs = deps.timeoutMs || STEP_TIMEOUT_MS;
@@ -166,9 +171,37 @@ async function migrateStorage(deps) {
         if (win && !win.isDestroyed()) { win.destroy(); }
         win = null;
     };
+    const createHiddenWindow = () => new BrowserWindow({
+        show: false,
+        width: 200,
+        height: 100,
+        skipTaskbar: true,
+        // Без preload: у окна нет моста, значит, и IPC. Код в него
+        // приносит только главный процесс — executeJavaScript.
+        webPreferences: {
+            sandbox: true,
+            contextIsolation: true,
+            nodeIntegration: false,
+            devTools: false,
+            spellcheck: false
+        }
+    });
 
     const marker = readMarker(markerFile);
-    if (marker && (marker.status === 'done' || marker.status === 'gave-up')) {
+    if (marker && marker.status === 'done' && needsVerification(marker)) {
+        // flushStorageData() в Chromium нельзя дождаться: сбой в миллисекунды
+        // после метки мог оставить app:// пустым при метке «done», и перенос
+        // больше не повторялся бы, хотя старое хранилище цело. Второй запуск
+        // ОДИН раз сверяет: пусто — переносим заново, есть ключи — метка
+        // «сверено». Сбой самой сверки старт не держит: повторим в следующий раз.
+        const count = await countAppKeys();
+        if (count === 0) {
+            log.warn('[migration] метка «перенесено», а app:// пуст — переношу заново');
+        } else {
+            if (count > 0) { writeMarker(markerFile, { ...marker, verified: true }); }
+            return { outcome: 'already-done', dispose };
+        }
+    } else if (marker && (marker.status === 'done' || marker.status === 'gave-up')) {
         return { outcome: 'already-done', dispose };
     }
     const attempts = (marker && Number.isInteger(marker.attempts) ? marker.attempts : 0) + 1;
@@ -180,21 +213,7 @@ async function migrateStorage(deps) {
 
     let entries = null;
     try {
-        win = new BrowserWindow({
-            show: false,
-            width: 200,
-            height: 100,
-            skipTaskbar: true,
-            // Без preload: у окна нет моста, значит, и IPC. Код в него
-            // приносит только главный процесс — executeJavaScript.
-            webPreferences: {
-                sandbox: true,
-                contextIsolation: true,
-                nodeIntegration: false,
-                devTools: false,
-                spellcheck: false
-            }
-        });
+        if (!win || win.isDestroyed()) { win = createHiddenWindow(); }
         await withTimeout(win.loadFile(path.join(appDir, MIGRATION_PAGE)), timeoutMs, 'загрузка file://');
         entries = parseEntries(await withTimeout(
             win.webContents.executeJavaScript(`(${readAllEntries.toString()})(localStorage)`),
@@ -235,6 +254,20 @@ async function migrateStorage(deps) {
     } catch (err) {
         const keys = entries ? Object.keys(entries).length : 0;
         return finishFailed(`сбой: ${err && err.message ? err.message : err}`, { keys, written: 0, skipped: 0, failed: keys });
+    }
+
+    // Сколько ключей в app:// — через скрытое окно; null — сверить не вышло.
+    async function countAppKeys() {
+        try {
+            win = createHiddenWindow();
+            await withTimeout(win.loadURL(AppScheme.pageUrl(MIGRATION_PAGE)), timeoutMs, 'сверка app://');
+            const n = await withTimeout(win.webContents.executeJavaScript('localStorage.length'), timeoutMs, 'сверка app://');
+            return Number.isInteger(n) ? n : null;
+        } catch (err) {
+            log.warn(`[migration] сверка не удалась: ${err && err.message ? err.message : err}`);
+            dispose();
+            return null;
+        }
     }
 
     function finishFailed(why, counts) {
