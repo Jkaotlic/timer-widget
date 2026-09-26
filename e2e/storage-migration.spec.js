@@ -54,13 +54,22 @@ function noisePng(side) {
 function seed(dir, entries) {
     const file = path.join(dir, '..', `${path.basename(dir)}-seed.json`);
     fs.writeFileSync(file, JSON.stringify(entries));
-    const res = spawnSync(ELECTRON, [SEEDER, `--user-data-dir=${dir}`], {
+    // На Linux — тот же флаг, что ставит сам Playwright в electron.launch
+    // (chromiumSandbox: false): у chrome-sandbox из node_modules нет SUID, а
+    // раннер Ubuntu 24.04 режет user namespaces. Песочницу ПРОДУКТА проверяют
+    // джобы запуска deb, а не этот посев.
+    const args = [SEEDER, `--user-data-dir=${dir}`];
+    if (process.platform === 'linux') { args.push('--no-sandbox'); }
+    const res = spawnSync(ELECTRON, args, {
         env: cleanEnv({ TW_SEED_FILE: file }), encoding: 'utf8', timeout: 60000
     });
     fs.rmSync(file, { force: true });
     const out = `${res.stdout}\n${res.stderr}`;
     const m = /SEEDED (\d+)/.exec(out);
-    if (!m) { throw new Error(`посев file:// не удался: ${out.slice(0, 600)}`); }
+    if (!m) {
+        throw new Error(`посев file:// не удался: код ${res.status}, сигнал ${res.signal}, `
+            + `ошибка ${res.error && res.error.message}; вывод: ${out.slice(0, 600)}`);
+    }
     return Number(m[1]);
 }
 

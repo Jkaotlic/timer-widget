@@ -105,7 +105,9 @@ test('ни одного нарушения CSP: четыре окна, все с
         const tabs = await control.$$eval('.tab-btn[data-tab]', (els) => [...new Set(els.map((e) => e.dataset.tab))]);
         expect(tabs.length, 'вкладки ящика не найдены').toBeGreaterThanOrEqual(4);
         for (const tab of tabs) {
-            await control.click(`.tab-btn[data-tab="${tab}"]`);
+            // Клик по DOM, а не по координатам: на экране CI открытый ящик
+        // ложится поверх кнопок вкладок, а проверке нужна сама вкладка.
+        await control.$eval(`.tab-btn[data-tab="${tab}"]`, (el) => el.click());
             await control.waitForTimeout(250);
         }
         // Все стили во всех трёх окнах — у каждого своя разметка и свои правила.
