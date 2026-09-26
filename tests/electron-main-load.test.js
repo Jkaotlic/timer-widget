@@ -1190,6 +1190,21 @@ test('SEC-07: reset-and-relaunch и quit-app из дисплея не испол
     assert.equal(quits, 0);
 });
 
+test('«Сбросить всё» помечает перенос настроек сверенным: сверка не отменит сброс', async () => {
+    const stubs = createStubs();
+    let quitted = false;
+    stubs.electron.app.quit = () => { quitted = true; };
+    loadMain(stubs);
+    const marker = path.join(stubs.userDataDir, 'storage-migration.json');
+    fs.writeFileSync(marker, JSON.stringify({ version: 1, status: 'done', keys: 5 }));
+    stubs.ipcRaw.get('reset-and-relaunch')(eventFrom(openControl(stubs)));
+    await until(() => quitted);
+    const m = JSON.parse(fs.readFileSync(marker, 'utf8'));
+    assert.equal(m.status, 'done');
+    assert.equal(m.verified, true);
+    assert.equal(m.reason, 'reset');
+});
+
 // --- SEC-10: ретрансляторы помнят только проверенное ---------------------
 
 test('SEC-10: мусорный payload настроек дисплея не запоминается и не рассылается', () => {

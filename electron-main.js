@@ -57,7 +57,7 @@ if (app.isPackaged && DEBUG_SWITCHES.some((name) => app.commandLine.hasSwitch(na
 const NavigationGuard = require('./navigation-guard');
 const AppScheme = require('./app-scheme');
 const { createAppProtocolHandler, registerAppProtocol } = require('./main-app-protocol');
-const { migrateStorage, hasStorageDir } = require('./main-storage-migration');
+const { migrateStorage, hasStorageDir, markSettledAfterReset } = require('./main-storage-migration');
 const IpcSenders = require('./ipc-senders');
 const fs = require('fs');
 const path = require('path');
@@ -238,7 +238,8 @@ const tray = createTrayController({
 timer.registerIpc(ipcMain);
 registerControlIpc({
     ipcMain, windows, screen, CONFIG, shell, app, log, getSession,
-    clearTimerInterval: () => timer.clearTimerInterval()
+    clearTimerInterval: () => timer.clearTimerInterval(),
+    settleMigration: () => markSettledAfterReset(app.getPath('userData'))
 });
 registerRelayIpc({
     ipcMain, windows, relay, safelySendToWindow, log,

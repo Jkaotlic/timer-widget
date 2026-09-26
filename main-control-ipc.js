@@ -32,7 +32,7 @@ const RELEASES_URL = 'https://github.com/Jkaotlic/timer-widget/releases';
  * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
  * @param {() => void} deps.clearTimerInterval — main-timer.js
  */
-function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval }) {
+function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval, settleMigration }) {
     // Изменение размера окна управления
     // size.width / size.height опциональны: если поле не передано (или не Finite),
     // соответствующее измерение не меняется. Это нужно, чтобы drawer open/close
@@ -186,6 +186,13 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             ]);
         } catch (err) {
             log.error('Storage clear failed:', err);
+        }
+        // Сброс сильнее переноса: без метки сверка следующего запуска увидела
+        // бы пустой app:// и вернула старые настройки из file://.
+        try {
+            if (settleMigration) { settleMigration(); }
+        } catch (err) {
+            log.warn('метка переноса после сброса не записана:', err && err.message);
         }
         app.quit();
     });

@@ -360,3 +360,58 @@ test('сверка зависла — старт не ждёт её вечно, 
     assert.notEqual(env.readMarker().verified, true);
     assert.ok(env.created.every((w) => w.destroyed), 'окно сверки не погашено');
 });
+
+// --- Повтор после провала: старое хранилище побеждает ------------------------
+// Провалившаяся попытка не держит старт: окна открываются на пустом app:// и
+// сами пишут туда умолчания (геометрия, флаг подсказки). Правило «существующее
+// не трогаем» превращало их в «уже есть», и старые значения этих ключей не
+// переезжали никогда. При повторе (метка pending) app:// целиком моложе
+// провала, поэтому значение из file:// побеждает; ключи, которых в file:// нет,
+// остаются.
+test('повтор после провала: старое значение побеждает записанное приложением после сбоя', async () => {
+    const env = makeEnv({ file: { widgetGeometry: '{"x":500}', theme: 'light' }, hang: 'loadFile' });
+    const first = await M.migrateStorage(env.deps);
+    first.dispose();
+    assert.equal(first.outcome, 'retry');
+
+    // Сессия после провала: приложение записало свои умолчания.
+    env.origins.app.setItem('widgetGeometry', '{"x":0}');
+    env.origins.app.setItem('onboardingShown', 'true');
+
+    // Второй запуск — на том же профиле: app:// с умолчаниями и метка pending.
+    const again = makeEnv({
+        file: { widgetGeometry: '{"x":500}', theme: 'light' },
+        app: Object.fromEntries(env.origins.app.map),
+        marker: env.readMarker()
+    });
+    const second = await M.migrateStorage(again.deps);
+    second.dispose();
+    assert.equal(second.outcome, 'done');
+    assert.equal(again.origins.app.getItem('widgetGeometry'), '{"x":500}', 'умолчание после провала заслонило старое значение');
+    assert.equal(again.origins.app.getItem('theme'), 'light');
+    assert.equal(again.origins.app.getItem('onboardingShown'), 'true', 'ключ, которого нет в file://, пропал');
+});
+
+test('первая попытка: существующее в app:// по-прежнему не перезаписывается', async () => {
+    const env = makeEnv({ file: { shared: 'old' }, app: { shared: 'new' } });
+    const res = await M.migrateStorage(env.deps);
+    res.dispose();
+    assert.equal(env.origins.app.getItem('shared'), 'new');
+});
+
+// --- Сброс ---------------------------------------------------------------------
+test('сброс помечает перенос завершённым и сверенным: сверка не вернёт старое', async () => {
+    const env = makeEnv({
+        file: { a: '1' },
+        marker: { version: 1, status: 'done', keys: 1 }
+    });
+    M.markSettledAfterReset(env.dir);
+    const marker = env.readMarker();
+    assert.equal(marker.status, 'done');
+    assert.equal(marker.verified, true);
+    const res = await M.migrateStorage(env.deps);
+    res.dispose();
+    assert.equal(res.outcome, 'already-done');
+    assert.equal(env.created.length, 0);
+    assert.equal(env.origins.app.length, 0, 'сброс отменён старыми настройками');
+});

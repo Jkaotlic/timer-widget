@@ -79,10 +79,11 @@ function readAllEntries(storage) {
     return JSON.stringify(out);
 }
 
-function writeMissingEntries(storage, entries) {
+function writeMissingEntries(storage, entries, overwrite) {
     const result = { written: 0, skipped: 0, failed: 0 };
     for (const key of Object.keys(entries)) {
-        if (storage.getItem(key) !== null) { result.skipped++; continue; }
+        const current = storage.getItem(key);
+        if (current === entries[key] || (current !== null && !overwrite)) { result.skipped++; continue; }
         try {
             storage.setItem(key, entries[key]);
             if (storage.getItem(key) === entries[key]) { result.written++; } else { result.failed++; }
@@ -157,6 +158,15 @@ function withTimeout(promise, ms, step) {
  *   закрытое последнее окно — это window-all-closed, а на нём Windows и Linux
  *   выходят из приложения.
  */
+/**
+ * «Сбросить всё» ставит метку «перенесено и сверено». Иначе сверка второго
+ * запуска увидела бы пустой app:// и вернула старые настройки из file:// —
+ * если сброс не дочистил тот origin, он отменил бы сам себя.
+ */
+function markSettledAfterReset(userDataPath) {
+    writeMarker(path.join(userDataPath, MARKER_FILE), { status: 'done', reason: 'reset', keys: 0, verified: true });
+}
+
 // Метка «перенесено» с ключами, ещё не сверенная со вторым запуском.
 function needsVerification(marker) {
     return Number(marker.keys) > 0 && marker.verified !== true;
@@ -205,6 +215,12 @@ async function migrateStorage(deps) {
         return { outcome: 'already-done', dispose };
     }
     const attempts = (marker && Number.isInteger(marker.attempts) ? marker.attempts : 0) + 1;
+    // Повтор после провала: окна прошлой сессии открылись на пустом app:// и
+    // сами записали туда умолчания (геометрия, флаг подсказки). «Существующее не
+    // трогаем» сделало бы их вечными, а старые значения этих ключей — потерянными.
+    // Всё в app:// моложе провала, поэтому значение из file:// побеждает; цена —
+    // правка, сделанная пользователем в той же неудачной сессии, уступит старой.
+    const overwrite = !!(marker && marker.status === 'pending');
 
     if (!deps.hadStorageAtStart) {
         writeMarker(markerFile, { status: 'done', reason: 'fresh', keys: 0 });
@@ -232,7 +248,7 @@ async function migrateStorage(deps) {
         const payload = JSON.stringify(JSON.stringify(entries));
         const result = await withTimeout(
             win.webContents.executeJavaScript(
-                `(${writeMissingEntries.toString()})(localStorage, JSON.parse(${payload}))`
+                `(${writeMissingEntries.toString()})(localStorage, JSON.parse(${payload}), ${overwrite})`
             ),
             timeoutMs, 'запись app://'
         );
@@ -285,5 +301,5 @@ async function migrateStorage(deps) {
 
 module.exports = {
     MARKER_FILE, MAX_ATTEMPTS, MIGRATION_PAGE,
-    hasStorageDir, migrateStorage, parseEntries, readAllEntries, writeMissingEntries
+    hasStorageDir, markSettledAfterReset, migrateStorage, parseEntries, readAllEntries, writeMissingEntries
 };
