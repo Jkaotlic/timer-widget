@@ -146,7 +146,9 @@ test('обработчики каналов регистрируются в мо
 
 test('SEC-04: гард ключей отладки стоит раньше любого локального модуля', () => {
     const entry = codeOnly(read(MAIN_ENTRY));
-    const guard = entry.indexOf('DEBUG_SWITCHES.some(');
+    // R1 (ПСИ 2026-09-28): DEBUG_SWITCHES (4 ключа, .some()) стал
+    // FORBIDDEN_SWITCHES (21 ключ, .find() — чтобы лог назвал КОНКРЕТНЫЙ ключ).
+    const guard = entry.indexOf('FORBIDDEN_SWITCHES.find(');
     const firstLocal = entry.search(/require\(\s*'\.\//);
     assert.ok(guard > 0, 'гард ключей отладки исчез из точки входа');
     assert.ok(firstLocal > 0, 'зонд не нашёл ни одного локального require');
