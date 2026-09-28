@@ -150,6 +150,7 @@ test('SEC-04: гард ключей отладки стоит раньше лю�
     // FORBIDDEN_SWITCHES (21 ключ, .find() — чтобы лог назвал КОНКРЕТНЫЙ ключ).
     const guard = entry.indexOf('FORBIDDEN_SWITCHES.find(');
     const firstLocal = entry.search(/require\(\s*'\.\//);
+    assert.doesNotMatch(entry, /DEBUG_SWITCHES/, 'старое имя константы обязано быть удалено целиком, а не просто перестать использоваться');
     assert.ok(guard > 0, 'гард ключей отладки исчез из точки входа');
     assert.ok(firstLocal > 0, 'зонд не нашёл ни одного локального require');
     assert.ok(guard < firstLocal, 'модуль главного процесса загружается ДО гарда ключей отладки');
