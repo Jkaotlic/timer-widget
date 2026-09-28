@@ -92,14 +92,35 @@ const FORBIDDEN_SWITCHES = [
 //
 // Совпадение — ТОЧНОЕ имя, не префикс: `--no-sandbox-foo` не обязан совпасть
 // с `no-sandbox`, а `--inspect` — с `inspect-brk` (и наоборот). Принимаются
-// обе формы, которые понимает Chromium: `--name`/`--name=значение` и
+// обе формы, которые понимает Chromium везде: `--name`/`--name=значение` и
 // однодефисная `-name`/`-name=значение`.
-function findForbiddenArgv(argv, names) {
-    const SWITCH_RE = /^--?([^=]+)(?:=.*)?$/;
+//
+// `platform` — параметр, а не молчаливое чтение `process.platform` внутри
+// (fix-round-3, 28.09.2026, найдено повторным ревью): у Chromium на Windows
+// РАЗБОР ключей командной строки отличается от POSIX в двух местах
+// (base/command_line.cc, kSwitchPrefixes):
+//  - третий допустимый префикс — одиночный `/` (`/no-sandbox` — настоящий
+//    ключ на Windows). На POSIX `/` НЕ префикс ключа ни в коем случае: так
+//    начинается абсолютный путь (argv[0] деб-пакета — `/opt/TimerWidget/…`),
+//    и трактовать его как ключ значило бы отказывать в запуске по имени
+//    каталога;
+//  - имя ключа приводится к нижнему регистру ДО сравнения — `--No-Sandbox` и
+//    `--NO-SANDBOX` там работают как `no-sandbox`. На POSIX регистр значащий.
+// Старый гард на app.commandLine.hasSwitch() (fix-round-2) закрывал оба
+// случая бесплатно — Chromium сам нормализовал ключ до того, как гард его
+// увидел. Прямое чтение process.argv эту нормализацию потеряло: тест на
+// argv-регресс (round 2) проверял только POSIX-форму, и `/no-sandbox`/
+// `--No-Sandbox` на собранном Windows (NSIS и portable, оба в build.files)
+// проходили бы мимо гарда необнаруженными.
+function findForbiddenArgv(argv, names, platform = process.platform) {
+    const isWin = platform === 'win32';
+    const SWITCH_RE = isWin ? /^(?:--?|\/)([^=]+)(?:=.*)?$/ : /^--?([^=]+)(?:=.*)?$/;
     for (const raw of argv) {
         if (typeof raw !== 'string') { continue; }
         const m = SWITCH_RE.exec(raw);
-        if (m && names.includes(m[1])) { return m[1]; }
+        if (!m) { continue; }
+        const name = isWin ? m[1].toLowerCase() : m[1];
+        if (names.includes(name)) { return name; }
     }
     return undefined;
 }

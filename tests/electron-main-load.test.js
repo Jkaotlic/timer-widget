@@ -1038,25 +1038,30 @@ test('SEC-05: electron-log не вешает свой preload в окна', () =
     assert.equal(stubs.logInitialize.options.preload, false, 'preload electron-log обязан быть выключен');
 });
 
-// Грузит main «собранным» приложением с заданными аргументами командной
-// строки. `argvFlags` — ЛИТЕРАЛЬНЫЕ элементы process.argv, с дефисами
-// («--no-sandbox», «-no-sandbox», «--remote-debugging-port=9222») — гард
-// смотрит на process.argv, а не на app.commandLine.hasSwitch() (fix-round-2:
-// Electron сам дописывает свои ключи в итоговую командную строку Chromium,
-// см. комментарий у findForbiddenArgv в electron-main.js).
-// process.exit подменяется ИСКЛЮЧЕНИЕМ: настоящий выход не даёт исполниться
-// ни строке после себя, и подставка обязана вести себя так же — иначе тест
-// «ничего не создано» проверял бы продолжение, которого в жизни нет.
-function loadPackagedWith(argvFlags) {
+// Общее ядро: грузит main «собранным» приложением (isPackaged=true),
+// process.exit подменён ИСКЛЮЧЕНИЕМ (настоящий выход не даёт исполниться ни
+// строке после себя, и подставка обязана вести себя так же — иначе тест
+// «ничего не создано» проверял бы продолжение, которого в жизни нет).
+// `customizeStubs(stubs)` — тонкая настройка сверх isPackaged/exit (стабы
+// commandLine и т.п., см. fix-round-2). `argv` — ПОЛНАЯ замена process.argv
+// (не добавление — некоторым сценариям round-3 важно, что стоит В ПОЗИЦИИ
+// argv[0], где у настоящего процесса лежит путь к исполняемому файлу).
+// `platform` подменяет process.platform (дескриптор configurable — Node это
+// разрешает) — гард fix-round-3 читает её как параметр по умолчанию
+// (`platform = process.platform`), вычисляемый заново при каждом вызове.
+function loadPackagedGuard(customizeStubs, { argv, platform } = {}) {
     const stubs = createStubs();
-    const exits = [];
     stubs.electron.app.isPackaged = true;
+    const exits = [];
     stubs.electron.app.exit = (code) => { exits.push(['app.exit', code]); };
+    if (customizeStubs) { customizeStubs(stubs); }
     const EXIT = new Error('process.exit');
     const realExit = process.exit;
     process.exit = (code) => { exits.push(['process.exit', code]); throw EXIT; };
     const savedArgv = process.argv;
-    process.argv = [...process.argv, ...argvFlags];
+    if (argv) { process.argv = argv; }
+    const platformDesc = platform ? Object.getOwnPropertyDescriptor(process, 'platform') : null;
+    if (platform) { Object.defineProperty(process, 'platform', { value: platform, configurable: true }); }
     let threw = null;
     try {
         loadMain(stubs);
@@ -1064,10 +1069,22 @@ function loadPackagedWith(argvFlags) {
         threw = err;
     } finally {
         process.exit = realExit;
-        process.argv = savedArgv;
+        if (argv) { process.argv = savedArgv; }
+        if (platformDesc) { Object.defineProperty(process, 'platform', platformDesc); }
     }
     if (threw && threw !== EXIT) { throw threw; }
     return { stubs, exits };
+}
+
+// Удобная форма: `argvFlags` — ЛИТЕРАЛЬНЫЕ элементы, ДОБАВЛЯЕМЫЕ к
+// process.argv, с дефисами («--no-sandbox», «-no-sandbox»,
+// «--remote-debugging-port=9222») — гард смотрит на process.argv, а не на
+// app.commandLine.hasSwitch() (fix-round-2: Electron сам дописывает свои
+// ключи в итоговую командную строку Chromium, см. комментарий у
+// findForbiddenArgv в electron-main.js). `opts.platform` — см.
+// loadPackagedGuard (fix-round-3: платформенная матрица разбора ключей).
+function loadPackagedWith(argvFlags, opts = {}) {
+    return loadPackagedGuard(null, { argv: [...process.argv, ...argvFlags], platform: opts.platform });
 }
 
 // Список — литерал ТЕСТА, а не ссылка на производственную константу (R1,
@@ -1149,32 +1166,18 @@ test('SEC-04/R1 fix-round-2: Electron сам дописывает --allow-file-a
     // «передано пользователем». Подставка ниже воссоздаёт ровно это: hasSwitch
     // отвечает true для этого ключа (как ответил бы настоящий Electron), а
     // process.argv его вовсе не содержит (как в жизни — никто не передавал).
-    const stubs = createStubs();
-    stubs.electron.app.isPackaged = true;
-    stubs.electron.app.commandLine = {
-        appendSwitch: () => {},
-        hasSwitch: (name) => name === 'allow-file-access-from-files'
-    };
-    let exited = false;
-    stubs.electron.app.exit = () => { exited = true; };
-    // process.exit подменяется ИСКЛЮЧЕНИЕМ, как в loadPackagedWith: если гард
-    // (по ошибке или на РЕАЛЬНОМ старом коде до fix-round-2) всё же сработает,
+    // loadPackagedGuard уже подменяет process.exit ИСКЛЮЧЕНИЕМ: если гард (по
+    // ошибке или на РЕАЛЬНОМ старом коде до fix-round-2) всё же сработает,
     // настоящий process.exit(1) убил бы весь процесс `node --test` целиком —
     // тест обязан упасть как ОДИН тест, а не обрушить весь прогон.
-    const EXIT = new Error('process.exit');
-    const realExit = process.exit;
-    process.exit = () => { throw EXIT; };
-    let threw = null;
-    try {
-        loadMain(stubs);
-    } catch (err) {
-        threw = err;
-    } finally {
-        process.exit = realExit;
-    }
-    if (threw && threw !== EXIT) { throw threw; }
-    assert.equal(
-        exited, false,
+    const { stubs, exits } = loadPackagedGuard((s) => {
+        s.electron.app.commandLine = {
+            appendSwitch: () => {},
+            hasSwitch: (name) => name === 'allow-file-access-from-files'
+        };
+    });
+    assert.deepEqual(
+        exits, [],
         'гард обязан смотреть на process.argv, а не на app.commandLine.hasSwitch — иначе собственная дописка Electron роняет собранный deb (CI 36398413388)'
     );
     assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
@@ -1192,6 +1195,56 @@ for (const argvFlag of ['--no-sandbox', '-no-sandbox', '--remote-debugging-port=
 test('SEC-04/R1 fix-round-2: --no-sandbox-foo НЕ совпадает с no-sandbox (точное имя, не префикс)', () => {
     const { stubs, exits } = loadPackagedWith(['--no-sandbox-foo']);
     assert.deepEqual(exits, [], 'похожий, но не точно совпадающий ключ не обязан приводить к выходу');
+    assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
+});
+
+// fix-round-3 (28.09.2026, повторное ревью): у Chromium РАЗБОР ключей
+// командной строки платформенный (base/command_line.cc, kSwitchPrefixes) —
+// на Windows третий префикс `/` и имя приводится к нижнему регистру ДО
+// сравнения, на POSIX нет ни того, ни другого (регистр значащий, а `/` —
+// начало абсолютного пути, не префикс ключа). Старый гард на
+// app.commandLine.hasSwitch() закрывал оба случая бесплатно — Chromium сам
+// нормализовал ключ раньше, чем гард его увидел; прямое чтение process.argv
+// (fix-round-2) эту нормализацию потеряло и открыло бы Windows-обход.
+// Платформа передаётся через loadPackagedGuard/loadPackagedWith — обёртка
+// подменяет configurable process.platform на время вызова loadMain(), и
+// findForbiddenArgv() читает её ЗАНОВО каждый раз (параметр по умолчанию), а
+// не запоминает при первой загрузке модуля.
+for (const flag of ['/no-sandbox', '/NO-SANDBOX=1', '--No-Sandbox', '-Inspect']) {
+    test(`SEC-04/R1 fix-round-3: Windows — argv «${flag}» выходит до первого окна ('/' и регистр — только там)`, () => {
+        const { stubs, exits } = loadPackagedWith([flag], { platform: 'win32' });
+        assert.deepEqual(exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
+        assert.equal(stubs.created.length, 0, 'окно создано до выхода');
+        assert.equal(stubs.ipcHandlers.size, 0, 'IPC зарегистрирован до выхода — main продолжил работу');
+    });
+}
+
+for (const flag of ['--No-Sandbox', '/no-sandbox']) {
+    test(`SEC-04/R1 fix-round-3: не-Windows — argv «${flag}» НЕ отказано (регистр значащий, «/» не префикс на POSIX)`, () => {
+        const { stubs, exits } = loadPackagedWith([flag], { platform: 'linux' });
+        assert.deepEqual(exits, [], 'на POSIX эта форма не совпадает ни с одним запрещённым именем');
+        assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
+    });
+}
+
+test('SEC-04/R1 fix-round-3: путь argv[0] деб-пакета (/opt/TimerWidget/timer-widget) не принимается за ключ на POSIX', () => {
+    // «/» на POSIX — начало абсолютного пути, а не префикс ключа: argv[0]
+    // собранного deb выглядит ровно так, и трактовать его как ключ значило
+    // бы отказывать в запуске по имени собственного каталога установки.
+    const { stubs, exits } = loadPackagedGuard(null, {
+        argv: ['/opt/TimerWidget/timer-widget'],
+        platform: 'linux'
+    });
+    assert.deepEqual(exits, []);
+    assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
+});
+
+test('SEC-04/R1 fix-round-3: путь argv[0] Windows-сборки (C:\\Program Files\\TimerWidget\\TimerWidget.exe) не принимается за ключ', () => {
+    const { stubs, exits } = loadPackagedGuard(null, {
+        argv: ['C:\\Program Files\\TimerWidget\\TimerWidget.exe'],
+        platform: 'win32'
+    });
+    assert.deepEqual(exits, []);
     assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
 });
 
