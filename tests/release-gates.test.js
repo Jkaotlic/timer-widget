@@ -424,6 +424,12 @@ test('песочница Linux: ни одна цель не отключает �
     assert.match(afterRemove, /apparmor_parser --remove/, 'postrm не выгружает профиль AppArmor');
     assert.match(afterRemove, /rm -f "\$APPARMOR_PROFILE_DEST"/, 'postrm не удаляет файл профиля');
     assert.match(afterRemove, /update-alternatives --remove/, 'postrm не снимает ссылку alternatives');
+    // lintian W: command-with-path-in-maintainer-script — команды ищутся по
+    // PATH, наличие проверяет `command -v`.
+    for (const [name, src] of [['postinst', afterInstall], ['postrm', afterRemove]]) {
+        assert.doesNotMatch(src, /\/usr\/bin\/ischroot/, `${name} вызывает ischroot по абсолютному пути`);
+        assert.match(src, /command -v ischroot/, `${name} не проверяет ischroot через command -v`);
+    }
 
     // ПСИ 28.09.2026: purge ходил от root по /home/* и удалял
     // ~/.config|.cache/timer-widget у ВСЕХ пользователей. Пакет не владеет

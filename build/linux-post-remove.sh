@@ -20,7 +20,7 @@ fi
 APPARMOR_PROFILE_DEST='/etc/apparmor.d/${executable}'
 if [ -f "$APPARMOR_PROFILE_DEST" ]; then
     if apparmor_status --enabled > /dev/null 2>&1; then
-        if ! { [ -x '/usr/bin/ischroot' ] && /usr/bin/ischroot; } && hash apparmor_parser 2>/dev/null; then
+        if ! { command -v ischroot >/dev/null 2>&1 && ischroot; } && hash apparmor_parser 2>/dev/null; then
             apparmor_parser --remove "$APPARMOR_PROFILE_DEST" || true
         fi
     fi

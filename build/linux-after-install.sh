@@ -46,7 +46,7 @@ if apparmor_status --enabled > /dev/null 2>&1; then
     if apparmor_parser --skip-kernel-load --debug "$APPARMOR_PROFILE_SOURCE" > /dev/null 2>&1; then
         cp -f "$APPARMOR_PROFILE_SOURCE" "$APPARMOR_PROFILE_TARGET" && APPARMOR_PROFILE_INSTALLED=1
         # В chroot (сборка образов) живая загрузка профиля бессмысленна.
-        if ! { [ -x '/usr/bin/ischroot' ] && /usr/bin/ischroot; } && hash apparmor_parser 2>/dev/null; then
+        if ! { command -v ischroot >/dev/null 2>&1 && ischroot; } && hash apparmor_parser 2>/dev/null; then
             apparmor_parser --replace --write-cache --skip-read-cache "$APPARMOR_PROFILE_TARGET" || true
         fi
     else
