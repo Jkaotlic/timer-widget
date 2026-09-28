@@ -63,7 +63,7 @@ node --test tests/perf.test.js
 ## Потенциальные оптимизации (НЕ применены, ждут подтверждения)
 
 1. **Debounce broadcast** — сейчас `timer-state` шлётся 4 окнам каждую секунду безусловно. Можно шлать только при изменении `remainingSeconds` (но тогда `updateCounter` должен быть не-монотонным — рисковано). Экономия: до 3 IPC/сек в idle.
-2. **Lazy-load окон** — widget/clock/display создаются по требованию, но сразу `loadFile`. Можно отложить до `show()` через `BrowserWindow({ show: false })` + `loadFile` только перед показом. Экономия: ~200 ms startup.
+2. **Lazy-load окон** — widget/clock/display создаются по требованию, но сразу `loadURL(app://…)`. Можно отложить до `show()` через `BrowserWindow({ show: false })` + `loadURL` только перед показом. Экономия: ~200 ms startup.
 3. **Icon preload** — `build/icon.png` 1.6 MB (1024×1024). Для Tray достаточно 32×32. Создать 3 размера (16, 32, 256) и грузить нужный.
 4. **CSS `@font-face` preload hints** — добавить `<link rel="preload" as="font">` в HTML для критичных весов (400 + 200).
 5. **IPC batching** — если в будущем добавим частые IPC (color-picker drag), batch в rAF.

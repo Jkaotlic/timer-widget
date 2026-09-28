@@ -195,7 +195,7 @@ Release: те же ворота до сборки, Electron — последни
 - **Место элемента — доля окна, значит и РАЗМЕР доля: потолок в `clamp()` делает одну раскладку двумя; мера окна — у `:root` (CRITICAL)** — [разбор](docs/lessons.md#a-position-is-a-fraction-so-the-size-must-be-one-too)
 - **Полноэкранный переход ждут СОБЫТИЕМ: `setBounds` посреди него роняет Electron — а выглядит как срыв СЛЕДУЮЩЕГО теста** — [разбор](docs/lessons.md#a-fullscreen-transition-is-a-condition-not-a-duration)
 - **Escape окон НЕ гасит: закрытие — за буквами W / C / D, Esc — за слоями интерфейса** — [разбор](docs/lessons.md#escape-does-not-close-windows)
-- **Мастер-звук: владелец — чекбокс `#soundMasterEnabled`, тумблер строки — его ВИД, входы через `toggleSoundMaster`** — [разбор](docs/lessons.md#escape-does-not-close-windows)
+- **Мастер-звук: владелец — чекбокс `#soundMasterEnabled`, тумблер строки — его ВИД, входы через `toggleSoundMaster`** — [разбор](docs/lessons.md#master-sound-has-one-owner)
 - **Раскладка знает ВСЮ колонку героя и меряет её НЕСДВИНУТОЙ: величину, которую сама пересчитывает, обнуляй до замера** — [разбор](docs/lessons.md#a-layout-must-know-the-whole-hero-and-measure-it-unshifted)
 - **Плита блока — ТРИ свойства (заливка, тень, `backdrop-filter`), снимается ОДИН раз в базе; сняв, пересчитай контраст** — [разбор](docs/lessons.md#a-plate-is-three-properties-and-removing-it-moves-the-backdrop)
 - **Карточка сверху и центрированная колонка — два способа сказать «где»: колонка уступает полосу (отступ — на ПОЛОВИНУ себя), мало — рама (CRITICAL)** — [разбор](docs/lessons.md#a-fixed-card-and-a-centred-column-are-two-ways-to-say-where)
