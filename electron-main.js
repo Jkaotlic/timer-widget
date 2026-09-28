@@ -19,24 +19,63 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
 
 const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog, protocol } = require('electron');
 
-// Ключи отладки в СОБРАННОМ приложении — выход до первого окна (SEC-04).
+// Ключи, ослабляющие изоляцию СОБРАННОГО приложения, — выход до первого окна
+// (SEC-04, добивка перед повторной сдачей ПСИ, R1 в
+// docs/superpowers/specs/2026-09-28-psi-hardening.md). Список разбит на классы
+// по тому, ЧТО каждый ключ открывает:
 //
-// `--remote-debugging-port/-pipe` открывают DevTools-протокол Chromium: через
-// него исполняется любой код в любом окне — мимо sandbox, CSP и белого списка
-// IPC, и гард `devTools: … && !app.isPackaged` в окнах тут не помогает, потому
-// что протокол живёт в самом Chromium, а не в окне. `--inspect*` в сборке уже
-// глушит фьюз EnableNodeCliInspectArguments (package.json → electronFuses);
-// проверка здесь — второй замок на случай сборки без фьюзов.
+//  - отладка: `--remote-debugging-port/-pipe` открывают DevTools-протокол
+//    Chromium — через него исполняется любой код в любом окне, мимо sandbox,
+//    CSP и белого списка IPC. `--inspect*` в сборке уже глушит фьюз
+//    EnableNodeCliInspectArguments (package.json → electronFuses); проверка
+//    здесь — второй замок на случай сборки без фьюзов. Гард
+//    `devTools: … && !app.isPackaged` в окнах тут не помогает: протокол живёт
+//    в самом Chromium, а не в окне;
+//  - снятие песочницы Chromium: `--no-sandbox` и соседи выключают ту же
+//    защиту, что даёт `sandbox: true` у каждого окна (main-windows.js) — ключ
+//    командной строки её просто обходит. `--disable-sandbox` в самом Chromium
+//    не существует, но заблокировать его дёшево — вдруг появится;
+//  - подмена запуска дочерних процессов: `--renderer-cmd-prefix`,
+//    `--gpu-launcher`, `--utility-cmd-prefix`, `--browser-subprocess-path`
+//    заставляют Chromium исполнить произвольный бинарник вместо
+//    рендерера/GPU/утилитного процесса; `--js-flags` передаёт V8 флаги
+//    исполнения (например, разрешающие небезопасный код) в те же процессы;
+//  - объединение процессов: `--single-process`/`--in-process-gpu`/`--no-zygote`
+//    сводят рендерер и главный процесс в один — рендерер получает те же
+//    права, что и он;
+//  - снятие изоляции origin/CSP: `--disable-web-security`,
+//    `--disable-site-isolation-trials`;
+//  - `--allow-file-access-from-files` — file:// читает file://, обходя CSP
+//    страницы даже с фьюзом file:// не тронутым;
+//  - `--remote-allow-origins` — открывает DevTools-протокол произвольному
+//    origin (та же дыра, что `--remote-debugging-port`, с другой стороны).
+//
+// `--zygote-cmd-prefix` НЕ в списке: Chromium форкает zygote-процесс до
+// исполнения этого файла (main-процесс — уже потомок zygote), проверка в JS
+// физически не успевает. Это задокументированный, а не забытый пробел —
+// закрывается только правами локального пользователя (SECURITY.md).
 //
 // Только при isPackaged: Playwright поднимает НЕсобранное приложение именно с
-// `--remote-debugging-port`, так он к нему и подключается.
+// `--remote-debugging-port` (и e2e/CI используют `--no-sandbox` в контейнерах
+// без пользовательских неймспейсов) — так к нему и подключаются.
 //
 // app.exit до `ready` лишь назначает выход, а модуль продолжил бы исполняться —
 // зарегистрировал бы IPC и дождался бы whenReady. process.exit гарантирует, что
 // после проверки не выполнится ни строки.
-const DEBUG_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk'];
-if (app.isPackaged && DEBUG_SWITCHES.some((name) => app.commandLine.hasSwitch(name))) {
-    console.error('[TimerWidget] ключи отладки в собранном приложении запрещены — выход');
+const FORBIDDEN_SWITCHES = [
+    'remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk',
+    'no-sandbox', 'disable-sandbox', 'disable-gpu-sandbox', 'disable-setuid-sandbox',
+    'disable-namespace-sandbox', 'disable-seccomp-filter-sandbox',
+    'disable-web-security', 'disable-site-isolation-trials',
+    'single-process', 'in-process-gpu', 'no-zygote',
+    'renderer-cmd-prefix', 'gpu-launcher', 'utility-cmd-prefix', 'browser-subprocess-path', 'js-flags',
+    'allow-file-access-from-files', 'remote-allow-origins'
+];
+const __forbiddenSwitchFound = app.isPackaged
+    ? FORBIDDEN_SWITCHES.find((name) => app.commandLine.hasSwitch(name))
+    : undefined;
+if (__forbiddenSwitchFound) {
+    console.error(`[TimerWidget] ключ «--${__forbiddenSwitchFound}» ослабляет изоляцию собранного приложения — выход`);
     app.exit(1);
     process.exit(1);
 }

@@ -1066,11 +1066,28 @@ function loadPackagedWith(switches) {
     return { stubs, exits };
 }
 
-for (const sw of ['remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk']) {
-    test(`SEC-04: собранное приложение с --${sw} выходит до первого окна`, () => {
-        // Ключ отладки открывает DevTools-протокол: через него исполняется
-        // любой код в любом окне — мимо sandbox, CSP и белого списка IPC.
-        // Гард devTools в окнах тут не помогает: протокол живёт в Chromium.
+// Список — литерал ТЕСТА, а не ссылка на производственную константу (R1,
+// docs/superpowers/specs/2026-09-28-psi-hardening.md): иначе тест стерегёт
+// «код помнит сам себя» вместо «код знает весь список из спеки». Ровно
+// zygote-cmd-prefix из спеки сюда не входит — Chromium форкает zygote-процесс
+// до исполнения JS главного процесса, проверка в электрон-main.js его не
+// увидит физически (см. комментарий у FORBIDDEN_SWITCHES).
+const FORBIDDEN_SWITCHES_SPEC = [
+    'remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk',
+    'no-sandbox', 'disable-sandbox', 'disable-gpu-sandbox', 'disable-setuid-sandbox',
+    'disable-namespace-sandbox', 'disable-seccomp-filter-sandbox',
+    'disable-web-security', 'disable-site-isolation-trials',
+    'single-process', 'in-process-gpu', 'no-zygote',
+    'renderer-cmd-prefix', 'gpu-launcher', 'utility-cmd-prefix', 'browser-subprocess-path', 'js-flags',
+    'allow-file-access-from-files', 'remote-allow-origins'
+];
+
+for (const sw of FORBIDDEN_SWITCHES_SPEC) {
+    test(`SEC-04/R1: собранное приложение с --${sw} выходит до первого окна`, () => {
+        // Ключ либо открывает DevTools-протокол (исполнение любого кода мимо
+        // sandbox/CSP/белого списка IPC), либо снимает саму песочницу Chromium,
+        // либо подменяет запуск дочерних процессов чужим бинарником/флагами —
+        // гард devTools в окнах тут не помогает: дыра не в окне, а в Chromium.
         const { stubs, exits } = loadPackagedWith([sw]);
         assert.deepEqual(exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
         assert.equal(stubs.created.length, 0, 'окно создано до выхода');
@@ -1091,6 +1108,22 @@ test('SEC-04: в разработке ключ отладки разрешён (
     stubs.electron.app.commandLine = {
         appendSwitch: () => {},
         hasSwitch: (name) => name === 'remote-debugging-port'
+    };
+    let exited = false;
+    stubs.electron.app.exit = () => { exited = true; };
+    loadMain(stubs);
+    assert.equal(exited, false);
+    assert.ok(stubs.ipcHandlers.has('timer-command'));
+});
+
+test('R1: несобранное приложение с --no-sandbox НЕ выходит (visual:check и e2e запускают dev-сборку без песочницы ОС)', () => {
+    // Тот же гард, что и выше: только isPackaged решает, выходить ли. На
+    // несобранном приложении --no-sandbox — рабочий режим CI-песочниц
+    // (linux-sandbox, деб-контейнеры), а не находка аудита.
+    const stubs = createStubs();
+    stubs.electron.app.commandLine = {
+        appendSwitch: () => {},
+        hasSwitch: (name) => name === 'no-sandbox'
     };
     let exited = false;
     stubs.electron.app.exit = () => { exited = true; };
