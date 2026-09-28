@@ -369,13 +369,21 @@ jobs:
   # Проверки — scripts/linux-launch-check.sh.
   # ==========================================================================
   deb-launch-runner:
-    name: deb install + launch (runner, ${{ matrix.path }})
+    name: deb install + launch (runner, ${{ matrix.path }}, ${{ matrix.install }})
     needs: linux-sandbox
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         path: [userns, suid]
+        install: [fresh]
+        # Обновление с ОПУБЛИКОВАННОГО 2.11.0 — своя ячейка: провал виден по
+        # имени job, а не теряется среди шагов чистой установки. На обновлении
+        # отрабатывает postrm СТАРОГО пакета (снимает alternatives и профиль
+        # AppArmor), затем postinst нового ставит их заново — это и проверяется.
+        include:
+          - path: userns
+            install: upgrade
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -389,11 +397,53 @@ jobs:
             sudo sysctl -w user.max_user_namespaces=0
           fi
       - name: Install deb
+        if: matrix.install == 'fresh'
         run: |
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xauth dbus ./deb/*.deb
+      # Опубликованный пакет сверяется с SHA256SUMS.txt того же релиза: база
+      # обновления — ровно то, что стоит у пользователей.
+      - name: Install published v2.11.0 (base for upgrade)
+        if: matrix.install == 'upgrade'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v2.11.0 --repo "$GITHUB_REPOSITORY" -D old -p 'TimerWidget-2.11.0-amd64.deb' -p 'SHA256SUMS.txt'
+          (cd old && sha256sum -c --ignore-missing SHA256SUMS.txt)
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb xauth dbus ./old/TimerWidget-2.11.0-amd64.deb
+          dpkg-query -W -f='[upgrade] установлен ${Package} ${Version} (${Status})\n' timer-widget
+      # apt ставит новый deb поверх, только если его версия СТАРШЕ. Пока версия
+      # в package.json не поднята, apt ответил бы «уже новейшая» и не сделал
+      # ничего — тогда тот же путь сценариев (postrm upgrade старого, postinst
+      # нового) проходит dpkg -i. Обновление доказывается СОДЕРЖИМЫМ: app.asar
+      # на диске обязан совпасть с app.asar из собранного deb.
+      - name: Upgrade to the built deb
+        if: matrix.install == 'upgrade'
+        run: |
+          NEW=$(ls deb/*.deb)
+          OLD_V=$(dpkg-query -W -f='${Version}' timer-widget)
+          NEW_V=$(dpkg-deb -f "$NEW" Version)
+          echo "[upgrade] $OLD_V -> $NEW_V"
+          if dpkg --compare-versions "$NEW_V" gt "$OLD_V"; then
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "./$NEW"
+          else
+            echo "::warning::версия собранного deb ($NEW_V) не старше опубликованной ($OLD_V): apt не обновит, путь сценариев проходит dpkg -i"
+            sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$NEW"
+          fi
+          dpkg-query -W -f='[upgrade] установлен ${Package} ${Version} (${Status})\n' timer-widget
+          WANT=$(dpkg-deb --fsys-tarfile "$NEW" | tar -xO ./opt/TimerWidget/resources/app.asar | sha256sum | cut -d' ' -f1)
+          HAVE=$(sha256sum /opt/TimerWidget/resources/app.asar | cut -d' ' -f1)
+          echo "[upgrade] app.asar: в deb $WANT, на диске $HAVE"
+          if [ "$WANT" != "$HAVE" ]; then echo "::error::на диске app.asar не из собранного deb — обновление не состоялось"; exit 1; fi
+          ls -l /usr/bin/timer-widget /etc/alternatives/timer-widget /etc/apparmor.d/timer-widget /opt/TimerWidget/chrome-sandbox || true
       - name: Launch as non-root user in the sandbox
         run: sudo APP_USER="$(id -un)" ALIVE_SECONDS=15 bash scripts/linux-launch-check.sh --expect ${{ matrix.path }}
+      # Гард FORBIDDEN_SWITCHES (electron-main.js): собранное приложение с
+      # --no-sandbox выходит с кодом 1 до первого окна. Идёт ПОСЛЕ успешного
+      # запуска: иначе «код 1» мог бы значить «не стартует вообще».
+      - name: Refuses --no-sandbox (exit 1, no window)
+        run: sudo APP_USER="$(id -un)" bash scripts/linux-launch-check.sh --expect-refuse-switch no-sandbox
       # postrm обязан выгрузить профиль из ядра и убрать файл — иначе после
       # удаления пакета в системе остаётся разрешение userns для пути /opt.
       - name: Remove deb — AppArmor profile goes away
@@ -403,6 +453,24 @@ jobs:
           if sudo grep -q '^timer-widget ' /sys/kernel/security/apparmor/profiles; then echo "::error::профиль остался загружен в ядре"; exit 1; fi
           if [ -e /usr/bin/timer-widget ]; then echo "::error::/usr/bin/timer-widget остался"; exit 1; fi
           echo "[remove] OK: профиль выгружен и удалён, ссылки нет"
+      # purge после remove: пакет в состоянии rc, отрабатывает postrm purge.
+      # Он убирает alternatives и профиль, но НЕ трогает домашние каталоги —
+      # метка в ~/.config/timer-widget обязана пережить purge.
+      - name: Purge deb — package traces gone, user settings kept
+        run: |
+          mkdir -p "$HOME/.config/timer-widget"
+          echo keep > "$HOME/.config/timer-widget/purge-marker"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y timer-widget
+          FAIL=0
+          ls -ld /etc/apparmor.d/timer-widget /usr/bin/timer-widget /etc/alternatives/timer-widget /opt/TimerWidget 2>&1 || true
+          if [ -e /etc/apparmor.d/timer-widget ]; then echo "::error::после purge остался /etc/apparmor.d/timer-widget"; FAIL=1; fi
+          if [ -e /usr/bin/timer-widget ] || [ -L /usr/bin/timer-widget ]; then echo "::error::после purge остался /usr/bin/timer-widget"; FAIL=1; fi
+          if update-alternatives --query timer-widget >/dev/null 2>&1; then echo "::error::после purge осталась группа alternatives timer-widget"; update-alternatives --query timer-widget; FAIL=1; fi
+          if [ -e /opt/TimerWidget ]; then echo "::error::после purge остался /opt/TimerWidget"; FAIL=1; fi
+          if dpkg-query -W -f='${Status}' timer-widget 2>/dev/null | grep -qE '(^| )(installed|config-files)$'; then echo "::error::dpkg всё ещё знает пакет: $(dpkg-query -W -f='${Status}' timer-widget)"; FAIL=1; fi
+          if [ "$(cat "$HOME/.config/timer-widget/purge-marker" 2>/dev/null)" != keep ]; then echo "::error::purge удалил настройки пользователя (~/.config/timer-widget)"; FAIL=1; fi
+          [ "$FAIL" = 0 ] && echo "[purge] OK: профиль, ссылка, alternatives и /opt убраны; ~/.config/timer-widget цел"
+          exit $FAIL
 
   # ==========================================================================
   # Установка deb в чистые дистрибутивы. Раннер набит библиотеками, а контейнер

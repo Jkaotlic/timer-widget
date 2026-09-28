@@ -69,7 +69,7 @@
 | `display-timer.test.js` | `validateBlockPositions`, `canSafelyStore` |
 | `perf.test.js` | Hot-path performance budgets |
 | `packaging.test.js` | Каждый ресурс перечислен в `build.files`; метаданные deb для lintian: synopsis, Section `utils`, Recommends без `libappindicator3-1`, copyright DEP-5 и переопределения lintian (у каждого тега причина) кладутся парами в `deb.fpm` |
-| `ci-workflows.test.js` | Шаги CI, которые не должны исчезнуть молча: lintian по собранному deb |
+| `ci-workflows.test.js` | Шаги CI, которые не должны исчезнуть молча: lintian по собранному deb; отказ собранного приложения от `--no-sandbox` (код 1 + строка гарда, 124 — провал); purge без следов пакета и с целыми настройками; ячейка обновления с опубликованного 2.11.0 |
 | `electron-main-source.test.js` | IPC payload hardening, DevTools gating, icon path |
 | `main-modules.test.js` | Модули `main-*.js`: нет сирот, electron только в точке входа (регулярка + загрузка с ловушкой), `rawIpcMain` не покидает точку входа, гард SEC-04 раньше первого `require` — [docs/main-process.md](main-process.md) |
 | `visual-source.test.js` | Layout/centering invariants, release-doc freshness |

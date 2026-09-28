@@ -14,19 +14,30 @@
 #   --expect suid     запасной: ядро закрывает userns пользователю,
 #                     chrome-sandbox 4755 root.
 #
+#   --expect-refuse-switch <ключ>
+#                     собранное приложение обязано ОТКАЗАТЬСЯ стартовать с
+#                     `--<ключ>` (гард FORBIDDEN_SWITCHES в electron-main.js):
+#                     выход с кодом 1 и строкой гарда, без единого окна. Без
+#                     --expect выполняется только эта проверка — отдельным
+#                     шагом CI, чтобы провал был виден по имени шага.
+#
 # Окружение: APP_USER — обычный пользователь для запуска (обязателен, root
 # запускать Chromium без --no-sandbox не даёт вовсе); ALIVE_SECONDS — сколько
 # приложение обязано прожить после готовности (по умолчанию 15).
 set -u
 
 EXPECT=""
+REFUSE_SWITCH=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --expect) EXPECT="$2"; shift 2 ;;
+        --expect-refuse-switch) REFUSE_SWITCH="$2"; shift 2 ;;
         *) echo "неизвестный аргумент: $1"; exit 2 ;;
     esac
 done
-case "$EXPECT" in userns|suid) ;; *) echo "нужен --expect userns|suid"; exit 2 ;; esac
+if [ -z "$REFUSE_SWITCH" ] || [ -n "$EXPECT" ]; then
+    case "$EXPECT" in userns|suid) ;; *) echo "нужен --expect userns|suid и/или --expect-refuse-switch <ключ>"; exit 2 ;; esac
+fi
 : "${APP_USER:?нужен APP_USER — обычный пользователь для запуска}"
 ALIVE_SECONDS="${ALIVE_SECONDS:-15}"
 
@@ -36,6 +47,63 @@ SANDBOX="$APP_DIR/chrome-sandbox"
 FAILS=0
 fail() { echo "::error::$*"; FAILS=$((FAILS + 1)); }
 ok() { echo "[launch] OK: $*"; }
+# dbus-run-session — если есть: без шины сессии Chromium только ворчит в лог.
+DBUS=""
+command -v dbus-run-session >/dev/null 2>&1 && DBUS="dbus-run-session --"
+APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
+
+# Процессы приложения ищутся по /proc/<pid>/exe, а не по командной строке:
+# браузер запущен через /usr/bin (ссылка alternatives), дети — через
+# /proc/self/exe, и argv[0] у них разный.
+app_pids() {
+    for d in /proc/[0-9]*; do
+        case "$(readlink "$d/exe" 2>/dev/null)" in "$APP_DIR"/*) echo "${d#/proc/}" ;; esac
+    done
+}
+
+# Отказ от ключа. Ожидается РОВНО код 1 и строка гарда: 124 — timeout, то есть
+# ключ принят и приложение работало без защиты; 0 — вышло «успешно»; иной код
+# — упало, а не отказалось. Код 1 без строки гарда — тоже падение.
+refuse_switch_check() {
+    local sw="$1" udd out log
+    echo "== запуск от $APP_USER с --$sw: собранное приложение обязано отказаться =="
+    udd=$(runuser -u "$APP_USER" -- mktemp -d /tmp/tw-refuse.XXXXXX)
+    out=$(mktemp /tmp/tw-refuse-out.XXXXXX)
+    chmod 666 "$out"
+    log="$udd/logs/main.log"
+    runuser -u "$APP_USER" -- env -u ELECTRON_RUN_AS_NODE HOME="$APP_HOME" \
+        timeout --kill-after=5 20 $DBUS xvfb-run -a -s '-screen 0 1920x1080x24' "/usr/bin/$EXE" "--$sw" "--user-data-dir=$udd" >"$out" 2>&1
+    RC=$?
+    echo "  код выхода: $RC"
+    echo "  вывод приложения:"; sed 's/^/  | /' "$out"
+    case "$RC" in
+        1) ;;
+        124|137) fail "--$sw: за 20 с приложение не завершилось (код $RC) — ключ принят, гард не сработал" ;;
+        0) fail "--$sw: приложение вышло с кодом 0 — ожидался отказ с кодом 1" ;;
+        *) fail "--$sw: код $RC — приложение упало, а не отказалось (ожидался 1)" ;;
+    esac
+    if [ "$RC" = 1 ]; then
+        if grep -q "ключ «--$sw» ослабляет изоляцию" "$out"; then
+            ok "--$sw отвергнут гардом: $(grep -m1 'ослабляет изоляцию' "$out")"
+        else
+            fail "--$sw: код 1, но строки гарда в выводе нет — это падение, а не отказ"
+        fi
+    fi
+    if grep -q 'control window ready' "$log" 2>/dev/null; then
+        fail "--$sw: окно панели успело открыться — гард обязан сработать до окон"
+        cat "$log"
+    fi
+    for p in $(app_pids); do kill -9 "$p" 2>/dev/null || true; done
+}
+
+if [ -n "$REFUSE_SWITCH" ]; then
+    refuse_switch_check "$REFUSE_SWITCH"
+    if [ -z "$EXPECT" ]; then
+        if [ "$FAILS" -gt 0 ]; then echo "[launch] ПРОВАЛ: $FAILS"; exit 1; fi
+        echo "[launch] OK: --$REFUSE_SWITCH отвергнут собранным приложением"
+        exit 0
+    fi
+fi
 
 echo "== ядро и AppArmor =="
 for f in /proc/sys/kernel/unprivileged_userns_clone /proc/sys/user/max_user_namespaces \
@@ -80,10 +148,7 @@ UDD=$(runuser -u "$APP_USER" -- mktemp -d /tmp/tw-profile.XXXXXX)
 OUT=$(mktemp /tmp/tw-out.XXXXXX)
 chmod 666 "$OUT"
 LOG="$UDD/logs/main.log"
-# dbus-run-session — если есть: без шины сессии Chromium только ворчит в лог.
-DBUS=""
-command -v dbus-run-session >/dev/null 2>&1 && DBUS="dbus-run-session --"
-runuser -u "$APP_USER" -- env -u ELECTRON_RUN_AS_NODE HOME="$(getent passwd "$APP_USER" | cut -d: -f6)" \
+runuser -u "$APP_USER" -- env -u ELECTRON_RUN_AS_NODE HOME="$APP_HOME" \
     $DBUS xvfb-run -a -s '-screen 0 1920x1080x24' "/usr/bin/$EXE" "--user-data-dir=$UDD" >"$OUT" 2>&1 &
 LAUNCHER=$!
 
@@ -99,14 +164,6 @@ else
     fail "за 90 с нет 'control window ready' в $LOG"
 fi
 
-# Процессы приложения ищутся по /proc/<pid>/exe, а не по командной строке:
-# браузер запущен через /usr/bin (ссылка alternatives), дети — через
-# /proc/self/exe, и argv[0] у них разный.
-app_pids() {
-    for d in /proc/[0-9]*; do
-        case "$(readlink "$d/exe" 2>/dev/null)" in "$APP_DIR"/*) echo "${d#/proc/}" ;; esac
-    done
-}
 main_pid() {
     for p in $(app_pids); do
         [ "$(readlink "/proc/$p/exe")" = "$APP_DIR/$EXE" ] || continue

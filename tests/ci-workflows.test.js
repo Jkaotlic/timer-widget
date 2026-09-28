@@ -74,3 +74,63 @@ test('lintian гоняется по собранному deb и валит сб�
         'lintian обязан идти после сборки и до выкладки deb — битый пакет не должен уезжать на установку');
     assert.doesNotMatch(stepBlock(job, 'lintian') || '', /continue-on-error:\s*true/, 'шаг lintian неблокирующий');
 });
+
+// ── P3: установленный deb на живой системе ──────────────────────────────────
+const LAUNCH_CHECK = fs.readFileSync(path.join(ROOT, 'scripts', 'linux-launch-check.sh'), 'utf8');
+/** Скрипт без строк-комментариев: пояснение не засчитывается как проверка. */
+const launchCode = LAUNCH_CHECK.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+
+test('launch-check умеет требовать ОТКАЗ собранного приложения от ключа', () => {
+    assert.match(launchCode, /--expect-refuse-switch\)/, 'нет разбора --expect-refuse-switch');
+    // Ограничение по времени обязательно: без него «принял ключ и работает»
+    // выглядело бы как зависший шаг, а не как провал проверки.
+    assert.match(launchCode, /timeout[^\n]*\b20\b[^\n]*"\/usr\/bin\/\$EXE" "--\$/, 'запуск с ключом не ограничен timeout 20');
+    assert.match(launchCode, /runuser -u "\$APP_USER"[^\n]*\\\n\s*timeout /, 'отказ проверяется не от обычного пользователя');
+    // Ожидается ровно 1: 124 — timeout (ключ принят, приложение работало),
+    // 0 — вышло «успешно», иное — упало. Все три — провал.
+    assert.match(launchCode, /"\$RC" = 1/, 'код отказа не сверяется с 1');
+    assert.match(launchCode, /\b124[|)]/, 'код 124 (timeout) не разобран отдельно');
+    // Код 1 бывает и у падения: отказ подтверждается строкой гарда.
+    assert.match(launchCode, /ослабляет изоляцию/, 'код 1 не сверен с сообщением гарда electron-main.js');
+    const guard = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
+    assert.match(guard, /ослабляет изоляцию собранного приложения — выход/, 'сообщение гарда изменилось — launch-check ищет старое');
+});
+
+const RUNNER = yamlCode(jobBlock(NODEJS, 'deb-launch-runner') || '');
+
+test('deb-launch-runner: --no-sandbox отвергается собранным приложением', () => {
+    assert.ok(RUNNER, 'нет job deb-launch-runner');
+    assert.match(RUNNER, /linux-launch-check\.sh --expect-refuse-switch no-sandbox/, 'нет шага отказа от --no-sandbox');
+    const launch = RUNNER.indexOf('--expect ${{ matrix.path }}');
+    const refuse = RUNNER.indexOf('--expect-refuse-switch no-sandbox');
+    assert.ok(launch > -1 && launch < refuse, 'отказ проверяется до успешного запуска — «код 1» мог бы значить «не стартует вовсе»');
+});
+
+test('deb-launch-runner: purge убирает профиль AppArmor и ссылку, но не трогает $HOME', () => {
+    const purge = stepBlock(RUNNER, 'Purge');
+    assert.ok(purge, 'нет шага Purge');
+    assert.match(purge, /apt-get purge -y timer-widget/, 'шаг не делает apt-get purge');
+    assert.match(purge, /\/etc\/apparmor\.d\/timer-widget/, 'после purge не проверяется профиль AppArmor');
+    assert.match(purge, /\/usr\/bin\/timer-widget/, 'после purge не проверяется /usr/bin/timer-widget');
+    assert.match(purge, /update-alternatives --query timer-widget/, 'после purge не проверяется alternatives');
+    // P2 на живой системе: метка в ~/.config/timer-widget переживает purge.
+    assert.match(purge, /\.config\/timer-widget\/[^\s"]+/, 'не проверено, что purge не тронул настройки пользователя');
+});
+
+test('deb-launch-runner: обновление с опубликованного 2.11.0 — отдельная ячейка матрицы', () => {
+    assert.match(RUNNER, /install: \[fresh\]/, 'нет оси install в матрице');
+    assert.match(RUNNER, /include:\s*\n\s*- path: userns\s*\n\s*install: upgrade/, 'нет ячейки install: upgrade');
+    const base = stepBlock(RUNNER, 'Install published');
+    assert.ok(base, 'нет шага установки опубликованной версии');
+    assert.match(base, /if: matrix\.install == 'upgrade'/, 'база обновления ставится не только в своей ячейке');
+    assert.match(base, /gh release download v2\.11\.0[^\n]*-p 'TimerWidget-2\.11\.0-amd64\.deb'/, 'не качается опубликованный deb 2.11.0');
+    assert.match(base, /GH_TOKEN: \$\{\{ github\.token \}\}/, 'gh без GH_TOKEN не скачает релиз');
+    assert.match(base, /sha256sum -c/, 'опубликованный deb не сверен с SHA256SUMS.txt');
+    const upgrade = stepBlock(RUNNER, 'Upgrade');
+    assert.ok(upgrade, 'нет шага обновления до собранного deb');
+    assert.match(upgrade, /if: matrix\.install == 'upgrade'/);
+    // Обновление доказывается СОДЕРЖИМЫМ: app.asar на диске = из нового deb.
+    assert.match(upgrade, /app\.asar/, 'не проверено, что на диске оказался новый app.asar');
+    const fresh = stepBlock(RUNNER, 'Install deb');
+    assert.match(fresh, /if: matrix\.install == 'fresh'/, 'чистая установка идёт и в ячейке обновления');
+});
