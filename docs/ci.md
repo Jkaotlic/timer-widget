@@ -129,9 +129,13 @@ Electron — своя группа (Chromium-исправления; 44.1.1 от
 
 ## Сторонние actions
 
-Закреплены по полному SHA с комментарием версии: `google/osv-scanner-action`,
-`anchore/scan-action`, `anchore/sbom-action/download-syft`. Второй сканер
-артефакта (Trivy) не добавлен: Electron по бинарю он не опознаёт так же, как
+ВСЕ сторонние actions (с 28.09.2026 и `actions/checkout`, `setup-node`,
+`upload-artifact`, `download-artifact`, `softprops/action-gh-release`)
+закреплены полным SHA коммита с комментарием точной версии (`# v7.0.1`): тег
+изменяем, и передвинутый тег исполнил бы чужой код с токеном репозитория.
+`tests/ci-workflows.test.js` валит `npm test` на любой `uses:` без SHA.
+
+Второй сканер артефакта (Trivy) не добавлен: Electron по бинарю он не опознаёт так же, как
 Grype, а npm-пакеты `app.asar` уже в SBOM. Обновляет SHA Dependabot.
 Образ OSV-Scanner action берёт по тегу (`ghcr.io/google/osv-scanner-action:v2.6.0`)
 — это закрепляет SHA самого action, не digest образа.

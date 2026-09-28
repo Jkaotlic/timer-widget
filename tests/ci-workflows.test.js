@@ -134,3 +134,40 @@ test('deb-launch-runner: обновление с опубликованного 
     const fresh = stepBlock(RUNNER, 'Install deb');
     assert.match(fresh, /if: matrix\.install == 'fresh'/, 'чистая установка идёт и в ячейке обновления');
 });
+
+// ── P4: сторонние actions закреплены SHA ─────────────────────────────────────
+// Тег (`@v7`) — изменяемая ссылка: владелец action или тот, кто угнал его
+// репозиторий, передвигает тег, и следующий прогон CI и релиза исполняет чужой
+// код с токеном репозитория. Полный SHA коммита неизменяем; комментарий
+// `# vX.Y.Z` — для человека и для Dependabot, который обновляет и SHA, и его.
+const PINNED = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/;
+
+/** Все `uses:` workflow, кроме локальных (`./`) и docker://. */
+function thirdPartyUses(src) {
+    return src.split('\n')
+        .map((l) => l.match(/^\s*(?:- )?uses:\s*(.+?)\s*$/))
+        .filter(Boolean)
+        .map((m) => m[1])
+        .filter((u) => !u.startsWith('./') && !u.startsWith('docker://'));
+}
+
+test('каждая сторонняя action закреплена полным SHA с комментарием-версией', () => {
+    // Проверка себя: зонд находит `uses:` в обеих формах и отличает тег от SHA.
+    const sample = '      - uses: actions/checkout@v7\n        uses: a/b@0123456789abcdef0123456789abcdef01234567 # v1.2.3\n      - uses: ./local\n';
+    const found = thirdPartyUses(sample);
+    assert.deepEqual(found, ['actions/checkout@v7', 'a/b@0123456789abcdef0123456789abcdef01234567 # v1.2.3']);
+    assert.equal(found.filter((u) => !PINNED.test(u)).length, 1, 'зонд не видит незакреплённую action');
+    assert.ok(!PINNED.test('a/b@0123456789abcdef0123456789abcdef01234567'), 'SHA без комментария-версии засчитан');
+
+    const files = fs.readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
+    let total = 0;
+    const loose = [];
+    for (const f of files) {
+        for (const u of thirdPartyUses(read(f))) {
+            total++;
+            if (!PINNED.test(u)) { loose.push(`${f}: ${u}`); }
+        }
+    }
+    assert.ok(total >= 10, `найдено всего ${total} uses — зонд сломан`);
+    assert.deepEqual(loose, [], `не закреплены SHA:\n${loose.join('\n')}`);
+});
