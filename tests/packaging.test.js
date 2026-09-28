@@ -267,6 +267,10 @@ test('deb: непустой synopsis, раздел utils, Recommends без liba
         'lintian сочтёт первую строку описания повтором synopsis (сравнение по [a-z0-9])');
     assert.strictEqual(asciiCore('Таймер для зала'), asciiCore('Прозрачный таймер'), 'зонд сравнения lintian сломан');
     assert.strictEqual(deb.packageCategory, 'utils', 'Section в control обязан быть utils, а не default');
+    // CI 28.09.2026: E: missing-dependency-on-libc (chrome-sandbox и ещё 5
+    // ELF-файлов). Штатный список electron-builder libc6 не называет, а
+    // deb.depends его ЗАМЕНЯЕТ, а не дополняет.
+    assert.ok((deb.depends || []).some((d) => /^libc6\b/.test(d)), 'в deb.depends нет libc6 — lintian: missing-dependency-on-libc');
     const recommends = [].concat(deb.recommends || []);
     assert.ok(recommends.length > 0,
         'deb.recommends не задан — electron-builder подставит свой libappindicator3-1');
