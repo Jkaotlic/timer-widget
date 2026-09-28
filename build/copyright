@@ -1,0 +1,42 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: TimerWidget
+Upstream-Contact: https://github.com/Jkaotlic/timer-widget/issues
+Source: https://github.com/Jkaotlic/timer-widget
+Comment: Пакет собран electron-builder из исходников по адресу Source.
+ Внутри /opt/TimerWidget лежит среда Electron (Chromium + Node.js) в том
+ виде, в каком её выпускает проект Electron; их лицензии поставляются
+ рядом с бинарником, а атрибуции npm-зависимостей приложения — в файле
+ NOTICE внутри /opt/TimerWidget/resources/app.asar.
+
+Files: *
+Copyright: 2024-2026 Jkaotlic
+License: MIT
+
+Files: opt/TimerWidget/timer-widget opt/TimerWidget/*.so opt/TimerWidget/*.pak
+ opt/TimerWidget/*.bin opt/TimerWidget/*.dat opt/TimerWidget/chrome-sandbox
+ opt/TimerWidget/chrome_crashpad_handler opt/TimerWidget/locales/*
+Copyright: Electron contributors; 2013-2020 GitHub Inc.; The Chromium Authors
+License: Electron-and-Chromium
+ Electron распространяется по лицензии MIT, полный текст —
+ /opt/TimerWidget/LICENSE.electron.txt. Chromium и его сторонние компоненты
+ — по набору лицензий (BSD-3-Clause, LGPL-2.1, MPL и др.), полный перечень с
+ текстами — /opt/TimerWidget/LICENSES.chromium.html.
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.

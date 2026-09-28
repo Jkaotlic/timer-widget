@@ -218,3 +218,73 @@ test('каждый модуль, который требует главный п
     assert.ok(seen.size > 0, 'зонд не нашёл НИ ОДНОГО require — регулярка сломана, и зелёный тут ничего не значит');
     assert.deepStrictEqual(missing, [], missing.join('\n'));
 });
+
+// ПСИ 28.09.2026: lintian по опубликованному deb 2.11.0 давал error-теги,
+// которые чинит конфиг, а не обёртка: нет /usr/share/doc/<пакет>/copyright
+// (Debian Policy 12.5), пустой synopsis в Description, `Section: default` и
+// Recommends на libappindicator3-1, которого нет ни в Debian 12, ни в Ubuntu
+// 24.04. Сам lintian гоняется в CI (job linux-sandbox) по собранному пакету;
+// здесь — то, что видно без сборки, чтобы откат ловился за секунды.
+const DOC_COPYRIGHT = '/usr/share/doc/timer-widget/copyright';
+const LINTIAN_OVERRIDES = '/usr/share/lintian/overrides/timer-widget';
+
+/** Пары «источник=назначение» из deb.fpm — так fpm кладёт лишние файлы. */
+function fpmMappings() {
+    return (pkg.build.deb.fpm || [])
+        .filter((a) => !a.startsWith('-') && a.includes('='))
+        .map((a) => { const i = a.indexOf('='); return { src: a.slice(0, i), dest: a.slice(i + 1) }; });
+}
+
+test('deb: непустой synopsis, раздел utils, Recommends без libappindicator3-1', () => {
+    const { linux, deb } = pkg.build;
+    assert.ok(typeof linux.synopsis === 'string' && linux.synopsis.trim().length > 0,
+        'build.linux.synopsis пуст — первая строка Description в control будет пустой');
+    assert.ok(linux.synopsis.length <= 80, 'synopsis длиннее 80 символов (Debian Policy 3.4.1)');
+    assert.ok(!/\.$/.test(linux.synopsis.trim()), 'synopsis не заканчивается точкой (Debian Policy 3.4.1)');
+    assert.ok(typeof linux.description === 'string' && linux.description.trim() !== linux.synopsis.trim(),
+        'длинное описание обязано отличаться от synopsis — иначе Description повторяет сам себя');
+    assert.strictEqual(deb.packageCategory, 'utils', 'Section в control обязан быть utils, а не default');
+    const recommends = [].concat(deb.recommends || []);
+    assert.ok(recommends.length > 0,
+        'deb.recommends не задан — electron-builder подставит свой libappindicator3-1');
+    assert.ok(!recommends.some((r) => /(^|[\s|])libappindicator3-1\b/.test(r)),
+        'Recommends ссылается на libappindicator3-1 — его нет в Debian 12 и Ubuntu 24.04');
+});
+
+test('deb: copyright в формате DEP-5 ложится в /usr/share/doc/timer-widget/', () => {
+    const mappings = fpmMappings();
+    const copyright = mappings.find((m) => m.dest === DOC_COPYRIGHT);
+    assert.ok(copyright, `в deb.fpm нет пары «файл=${DOC_COPYRIGHT}»`);
+    const text = fs.readFileSync(path.join(repoRoot, copyright.src), 'utf8');
+    assert.match(text, /^Format: https:\/\/www\.debian\.org\/doc\/packaging-manuals\/copyright-format\/1\.0\/\n/,
+        'первая строка — заголовок DEP-5');
+    assert.match(text, /^Files: \*\nCopyright: [^\n]*Jkaotlic\nLicense: MIT\n/m, 'нет стансы MIT для приложения');
+    // Текст MIT — тот же, что в LICENSE репозитория, а не пересказ.
+    const mitBody = fs.readFileSync(path.join(repoRoot, 'LICENSE'), 'utf8')
+        .split('\n').slice(4).join('\n').trim().split('\n')[0];
+    assert.ok(text.includes(mitBody), 'текст MIT в copyright расходится с LICENSE');
+    assert.match(text, /\/opt\/TimerWidget\/LICENSE\.electron\.txt/, 'нет ссылки на лицензию Electron');
+    assert.match(text, /\/opt\/TimerWidget\/LICENSES\.chromium\.html/, 'нет ссылки на лицензии Chromium');
+    // fpm перестаёт разбирать ключи на первом позиционном аргументе, а
+    // electron-builder добавляет свои пары ПОСЛЕ deb.fpm: ключ за парой молча
+    // стал бы путём к файлу.
+    const fpm = pkg.build.deb.fpm;
+    const firstPair = fpm.findIndex((a) => !a.startsWith('-') && a.includes('='));
+    assert.ok(fpm.slice(firstPair).every((a) => !a.startsWith('-')), 'ключ fpm стоит после пары файлов — fpm его не прочтёт');
+    // Проверка себя: зонд пар видит пару там, где она есть.
+    assert.deepStrictEqual(
+        ['--x', 'a=b'].filter((a) => !a.startsWith('-') && a.includes('=')), ['a=b'],
+        'зонд пар fpm сломан');
+});
+
+test('deb: переопределения lintian — в пакете, и у каждого тега причина', () => {
+    const overrides = fpmMappings().find((m) => m.dest === LINTIAN_OVERRIDES);
+    assert.ok(overrides, `в deb.fpm нет пары «файл=${LINTIAN_OVERRIDES}» — теги Electron уронят lintian`);
+    const lines = fs.readFileSync(path.join(repoRoot, overrides.src), 'utf8').split('\n');
+    const tags = lines.map((l, i) => ({ l, i })).filter(({ l }) => l.trim() && !l.trim().startsWith('#'));
+    assert.ok(tags.length > 0, 'файл переопределений пуст — уберите его из deb.fpm');
+    for (const { l, i } of tags) {
+        assert.match(l, /^timer-widget: [a-z0-9-]+/, `строка ${i + 1}: не «пакет: тег»`);
+        assert.ok(i > 0 && lines[i - 1].trim().startsWith('#'), `строка ${i + 1} (${l}): у тега нет комментария-причины`);
+    }
+});

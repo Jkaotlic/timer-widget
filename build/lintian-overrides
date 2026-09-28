@@ -1,0 +1,14 @@
+# Переопределения lintian для deb TimerWidget (ставятся в
+# /usr/share/lintian/overrides/timer-widget). Здесь ТОЛЬКО теги, которые
+# неустранимы для приложения на Electron; остальное чинится в конфиге сборки.
+# CI (job linux-sandbox) гоняет `lintian --fail-on error` по собранному пакету.
+
+# electron-builder ставит приложение целиком в /opt/TimerWidget: Electron ищет
+# ресурсы (app.asar, *.pak, locales/) рядом с бинарником, и раскладка по FHS
+# (/usr/lib + /usr/share) потребовала бы пересборки самого Electron.
+timer-widget: dir-or-file-in-opt
+# Chromium статически собран со своими копиями zlib, libpng, libjpeg и др.
+# (third_party/ Chromium) — это часть бинарника Electron, отвязать её от
+# системных библиотек можно только пересборкой Chromium. Их версии и лицензии
+# ведёт проект Electron: /opt/TimerWidget/LICENSES.chromium.html.
+timer-widget: embedded-library
