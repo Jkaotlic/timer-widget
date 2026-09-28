@@ -12,3 +12,8 @@ timer-widget: dir-or-file-in-opt
 # системных библиотек можно только пересборкой Chromium. Их версии и лицензии
 # ведёт проект Electron: /opt/TimerWidget/LICENSES.chromium.html.
 timer-widget: embedded-library
+# libvulkan.so.1 — загрузчик Vulkan, который Electron кладёт в свой дистрибутив
+# без удаления отладочных символов. Бинарники Electron мы не пересобираем и не
+# правим (strip изменил бы файл, выпущенный и проверенный проектом Electron);
+# остальные его ELF-файлы lintian считает стрипнутыми.
+timer-widget: unstripped-binary-or-object [opt/TimerWidget/libvulkan.so.1]

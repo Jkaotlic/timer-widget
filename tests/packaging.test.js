@@ -314,4 +314,12 @@ test('deb: переопределения lintian — в пакете, и у к�
         assert.match(l, /^timer-widget: [a-z0-9-]+/, `строка ${i + 1}: не «пакет: тег»`);
         assert.ok(i > 0 && lines[i - 1].trim().startsWith('#'), `строка ${i + 1} (${l}): у тега нет комментария-причины`);
     }
+    // Список закрыт: новое переопределение — осознанная правка теста, а не
+    // тихий способ заглушить lintian. Теги из CI 28.09.2026; то, что чинится
+    // конфигом (libc6, права .so, описание), починено, а не переопределено.
+    assert.deepStrictEqual(tags.map(({ l }) => l.trim()).sort(), [
+        'timer-widget: dir-or-file-in-opt',
+        'timer-widget: embedded-library',
+        'timer-widget: unstripped-binary-or-object [opt/TimerWidget/libvulkan.so.1]'
+    ]);
 });
