@@ -165,3 +165,38 @@ test('SEC-04: гард ключей отладки стоит раньше лю�
     const tail = entry.slice(guard, guard + 400);
     assert.match(tail, /app\.exit\(1\);\s*process\.exit\(1\);/, 'гард не выходит немедленно');
 });
+
+/**
+ * Строки кода, читающие ключ `--dev`, у которых НЕТ второго замка
+ * `!app.isPackaged` в той же строке. Ищется сам литерал ключа, а не
+ * `includes(` — чтение через indexOf/some/регулярку тоже чтение.
+ */
+function devReadsWithoutPackagedGuard(code) {
+    const reads = code.split('\n').filter((l) => /['"`]--dev['"`]/.test(l));
+    return { reads, unguarded: reads.filter((l) => !/!\s*app\.isPackaged\b/.test(l)) };
+}
+
+test('2.12.1: каждое чтение --dev в главном процессе требует ещё и !app.isPackaged', () => {
+    // Первый замок — гард FORBIDDEN_SWITCHES: собранное приложение с --dev
+    // выходит до первого окна. Второй — здесь: даже если ключ когда-нибудь
+    // выпадет из списка, подробный лог, монитор памяти и DevTools в сборке не
+    // включатся. Требование ПСИ — «режим разработчика выключен жёстко».
+    //
+    // Проба проверяет себя: плохую строку видит, хорошую пропускает.
+    const bad = devReadsWithoutPackagedGuard("log.level = process.argv.includes('--dev') ? 'debug' : 'warn';");
+    assert.equal(bad.unguarded.length, 1, 'проба не видит чтение --dev без замка');
+    const good = devReadsWithoutPackagedGuard("if (process.argv.includes('--dev') && !app.isPackaged) {");
+    assert.equal(good.reads.length, 1, 'проба не находит чтение --dev');
+    assert.equal(good.unguarded.length, 0, 'проба ругается на строку с замком');
+
+    let total = 0;
+    const offenders = [];
+    for (const file of mainProcessFiles()) {
+        const { reads, unguarded } = devReadsWithoutPackagedGuard(codeOnly(read(file)));
+        total += reads.length;
+        for (const l of unguarded) { offenders.push(`${file}: ${l.trim()}`); }
+    }
+    // Лог, монитор памяти, devTools четырёх окон, openDevTools панели.
+    assert.ok(total >= 7, `чтений --dev найдено ${total} — проба ослепла?`);
+    assert.deepEqual(offenders, [], `чтение --dev без !app.isPackaged:\n${offenders.join('\n')}`);
+});

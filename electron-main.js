@@ -190,7 +190,9 @@ log.initialize({ preload: false });
 log.transports.file.level = 'info';
 log.transports.file.maxSize = 10 * 1024 * 1024; // 10 MB per file
 log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
-log.transports.console.level = process.argv.includes('--dev') ? 'debug' : 'warn';
+// Второй замок режима разработчика: собранное приложение с --dev уже вышло
+// выше (FORBIDDEN_SWITCHES), но и без того подробный лог в сборке не включится.
+log.transports.console.level = (process.argv.includes('--dev') && !app.isPackaged) ? 'debug' : 'warn';
 log.info(`TimerWidget starting — version ${app.getVersion()}, platform ${process.platform}`);
 
 // Crash handlers
@@ -256,8 +258,8 @@ const __inTestMode = !app.isPackaged && process.env.NODE_TEST_CONTEXT !== undefi
 // `!app.isPackaged` — та же причина, что у __inTestMode выше (R3).
 const __screenshotMode = !app.isPackaged && process.argv.includes('--screenshot');
 
-// Runtime memory monitor (dev only, not in tests).
-if (process.argv.includes('--dev') && !__inTestMode) {
+// Runtime memory monitor (dev only, not in tests, never in the packaged app).
+if (process.argv.includes('--dev') && !app.isPackaged && !__inTestMode) {
     const memoryMonitorInterval = setInterval(() => {
         const mem = process.memoryUsage();
         log.debug(`[perf] heap: ${(mem.heapUsed/1024/1024).toFixed(1)}MB rss: ${(mem.rss/1024/1024).toFixed(1)}MB`);
