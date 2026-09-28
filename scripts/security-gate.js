@@ -312,10 +312,23 @@ function osvExceptionProblems(toml, today) {
     for (const raw of toml.split('\n')) {
         const line = raw.trim();
         if (!line || line.startsWith('#')) { continue; }
-        const header = line.match(/^\[\[?\s*([A-Za-z0-9_.]+)\s*\]\]?/);
-        if (header) { current = { kind: header[1], fields: {} }; tables.push(current); continue; }
+        const header = line.match(/^\[(\[?)\s*([A-Za-z0-9_.]+)\s*\]\]?/);
+        if (header) {
+            const [, isArray, name] = header;
+            const parent = tables[tables.length - 1];
+            // `[PackageOverrides.vulnerability]` после `[[PackageOverrides]]` —
+            // подтаблица ТОЙ ЖЕ записи: её ключи идут в запись с префиксом,
+            // иначе `ignore = true` в ней обходил бы проверку срока.
+            if (!isArray && parent && name.startsWith(`${parent.kind}.`)) {
+                current = { prefix: `${name.slice(parent.kind.length + 1)}.`, fields: parent.fields };
+            } else {
+                current = { kind: name, prefix: '', fields: {} };
+                tables.push(current);
+            }
+            continue;
+        }
         const kv = line.match(/^([A-Za-z0-9_.]+)\s*=\s*(.*)$/);
-        if (kv && current) { current.fields[kv[1]] = tomlValue(kv[2]); }
+        if (kv && current) { current.fields[current.prefix + kv[1]] = tomlValue(kv[2]); }
     }
     const problems = [];
     for (const { kind, fields } of tables) {

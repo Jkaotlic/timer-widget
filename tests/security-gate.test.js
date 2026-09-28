@@ -126,6 +126,10 @@ test('исключения OSV: без причины, без срока или 
     }
     // Переопределение пакета с ignore — тоже исключение, срок у него effectiveUntil.
     assert.equal(gate.osvExceptionProblems('[[PackageOverrides]]\nname = "x"\nignore = true\nreason = "r"\n', TODAY).length, 1);
+    // Подтаблица записи — та же запись: `ignore` под [PackageOverrides.vulnerability].
+    const sub = '[[PackageOverrides]]\nname = "x"\nreason = "r"\n[PackageOverrides.vulnerability]\nignore = true\n';
+    assert.equal(gate.osvExceptionProblems(sub, TODAY).length, 1, 'подтаблица vulnerability обходит проверку срока');
+    assert.deepEqual(gate.osvExceptionProblems(sub.replace('reason = "r"\n', 'reason = "r"\neffectiveUntil = 2027-01-01\n'), TODAY), []);
     // Закомментированный образец — не запись.
     assert.deepEqual(gate.osvExceptionProblems('# [[IgnoredVulns]]\n# id = "X"\n', TODAY), []);
 });
