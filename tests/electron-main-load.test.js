@@ -1038,22 +1038,25 @@ test('SEC-05: electron-log не вешает свой preload в окна', () =
     assert.equal(stubs.logInitialize.options.preload, false, 'preload electron-log обязан быть выключен');
 });
 
-// Грузит main «собранным» приложением с заданными ключами командной строки.
+// Грузит main «собранным» приложением с заданными аргументами командной
+// строки. `argvFlags` — ЛИТЕРАЛЬНЫЕ элементы process.argv, с дефисами
+// («--no-sandbox», «-no-sandbox», «--remote-debugging-port=9222») — гард
+// смотрит на process.argv, а не на app.commandLine.hasSwitch() (fix-round-2:
+// Electron сам дописывает свои ключи в итоговую командную строку Chromium,
+// см. комментарий у findForbiddenArgv в electron-main.js).
 // process.exit подменяется ИСКЛЮЧЕНИЕМ: настоящий выход не даёт исполниться
 // ни строке после себя, и подставка обязана вести себя так же — иначе тест
 // «ничего не создано» проверял бы продолжение, которого в жизни нет.
-function loadPackagedWith(switches) {
+function loadPackagedWith(argvFlags) {
     const stubs = createStubs();
     const exits = [];
     stubs.electron.app.isPackaged = true;
     stubs.electron.app.exit = (code) => { exits.push(['app.exit', code]); };
-    stubs.electron.app.commandLine = {
-        appendSwitch: () => {},
-        hasSwitch: (name) => switches.includes(name)
-    };
     const EXIT = new Error('process.exit');
     const realExit = process.exit;
     process.exit = (code) => { exits.push(['process.exit', code]); throw EXIT; };
+    const savedArgv = process.argv;
+    process.argv = [...process.argv, ...argvFlags];
     let threw = null;
     try {
         loadMain(stubs);
@@ -1061,6 +1064,7 @@ function loadPackagedWith(switches) {
         threw = err;
     } finally {
         process.exit = realExit;
+        process.argv = savedArgv;
     }
     if (threw && threw !== EXIT) { throw threw; }
     return { stubs, exits };
@@ -1088,7 +1092,7 @@ for (const sw of FORBIDDEN_SWITCHES_SPEC) {
         // sandbox/CSP/белого списка IPC), либо снимает саму песочницу Chromium,
         // либо подменяет запуск дочерних процессов чужим бинарником/флагами —
         // гард devTools в окнах тут не помогает: дыра не в окне, а в Chromium.
-        const { stubs, exits } = loadPackagedWith([sw]);
+        const { stubs, exits } = loadPackagedWith([`--${sw}`]);
         assert.deepEqual(exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
         assert.equal(stubs.created.length, 0, 'окно создано до выхода');
         assert.equal(stubs.ipcHandlers.size, 0, 'IPC зарегистрирован до выхода — main продолжил работу');
@@ -1105,13 +1109,15 @@ test('SEC-04: в разработке ключ отладки разрешён (
     // e2e поднимает НЕсобранное приложение с --remote-debugging-port — так
     // Playwright к нему и подключается. Гард обязан смотреть на isPackaged.
     const stubs = createStubs();
-    stubs.electron.app.commandLine = {
-        appendSwitch: () => {},
-        hasSwitch: (name) => name === 'remote-debugging-port'
-    };
     let exited = false;
     stubs.electron.app.exit = () => { exited = true; };
-    loadMain(stubs);
+    const savedArgv = process.argv;
+    process.argv = [...process.argv, '--remote-debugging-port=9222'];
+    try {
+        loadMain(stubs);
+    } finally {
+        process.argv = savedArgv;
+    }
     assert.equal(exited, false);
     assert.ok(stubs.ipcHandlers.has('timer-command'));
 });
@@ -1121,15 +1127,72 @@ test('R1: несобранное приложение с --no-sandbox НЕ вы�
     // несобранном приложении --no-sandbox — рабочий режим CI-песочниц
     // (linux-sandbox, деб-контейнеры), а не находка аудита.
     const stubs = createStubs();
+    let exited = false;
+    stubs.electron.app.exit = () => { exited = true; };
+    const savedArgv = process.argv;
+    process.argv = [...process.argv, '--no-sandbox'];
+    try {
+        loadMain(stubs);
+    } finally {
+        process.argv = savedArgv;
+    }
+    assert.equal(exited, false);
+    assert.ok(stubs.ipcHandlers.has('timer-command'));
+});
+
+test('SEC-04/R1 fix-round-2: Electron сам дописывает --allow-file-access-from-files в командную строку — гард не смотрит на app.commandLine.hasSwitch()', () => {
+    // Регресс, пойманный в CI (прогон 36398413388, все шесть ячеек «deb
+    // install + launch»): собранный deb падал на КАЖДОМ старте, хотя никто
+    // не передавал этот ключ. Фьюз GrantFileProtocolExtraPrivileges заставляет
+    // Electron дописать `--allow-file-access-from-files` в ИТОГОВУЮ командную
+    // строку Chromium, и app.commandLine.hasSwitch() эту дописку видит как
+    // «передано пользователем». Подставка ниже воссоздаёт ровно это: hasSwitch
+    // отвечает true для этого ключа (как ответил бы настоящий Electron), а
+    // process.argv его вовсе не содержит (как в жизни — никто не передавал).
+    const stubs = createStubs();
+    stubs.electron.app.isPackaged = true;
     stubs.electron.app.commandLine = {
         appendSwitch: () => {},
-        hasSwitch: (name) => name === 'no-sandbox'
+        hasSwitch: (name) => name === 'allow-file-access-from-files'
     };
     let exited = false;
     stubs.electron.app.exit = () => { exited = true; };
-    loadMain(stubs);
-    assert.equal(exited, false);
-    assert.ok(stubs.ipcHandlers.has('timer-command'));
+    // process.exit подменяется ИСКЛЮЧЕНИЕМ, как в loadPackagedWith: если гард
+    // (по ошибке или на РЕАЛЬНОМ старом коде до fix-round-2) всё же сработает,
+    // настоящий process.exit(1) убил бы весь процесс `node --test` целиком —
+    // тест обязан упасть как ОДИН тест, а не обрушить весь прогон.
+    const EXIT = new Error('process.exit');
+    const realExit = process.exit;
+    process.exit = () => { throw EXIT; };
+    let threw = null;
+    try {
+        loadMain(stubs);
+    } catch (err) {
+        threw = err;
+    } finally {
+        process.exit = realExit;
+    }
+    if (threw && threw !== EXIT) { throw threw; }
+    assert.equal(
+        exited, false,
+        'гард обязан смотреть на process.argv, а не на app.commandLine.hasSwitch — иначе собственная дописка Electron роняет собранный deb (CI 36398413388)'
+    );
+    assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
+});
+
+for (const argvFlag of ['--no-sandbox', '-no-sandbox', '--remote-debugging-port=9222', '--js-flags=--expose-gc']) {
+    test(`SEC-04/R1 fix-round-2: собранное приложение с argv «${argvFlag}» выходит до первого окна`, () => {
+        const { stubs, exits } = loadPackagedWith([argvFlag]);
+        assert.deepEqual(exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
+        assert.equal(stubs.created.length, 0, 'окно создано до выхода');
+        assert.equal(stubs.ipcHandlers.size, 0, 'IPC зарегистрирован до выхода — main продолжил работу');
+    });
+}
+
+test('SEC-04/R1 fix-round-2: --no-sandbox-foo НЕ совпадает с no-sandbox (точное имя, не префикс)', () => {
+    const { stubs, exits } = loadPackagedWith(['--no-sandbox-foo']);
+    assert.deepEqual(exits, [], 'похожий, но не точно совпадающий ключ не обязан приводить к выходу');
+    assert.ok(stubs.ipcHandlers.has('timer-command'), 'main не дошёл до регистрации каналов');
 });
 
 test('R3: собранное приложение под node --test и --screenshot всё равно запрашивает единственный экземпляр', () => {

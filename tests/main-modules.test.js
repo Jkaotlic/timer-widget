@@ -147,10 +147,17 @@ test('обработчики каналов регистрируются в мо
 test('SEC-04: гард ключей отладки стоит раньше любого локального модуля', () => {
     const entry = codeOnly(read(MAIN_ENTRY));
     // R1 (ПСИ 2026-09-28): DEBUG_SWITCHES (4 ключа, .some()) стал
-    // FORBIDDEN_SWITCHES (21 ключ, .find() — чтобы лог назвал КОНКРЕТНЫЙ ключ).
-    const guard = entry.indexOf('FORBIDDEN_SWITCHES.find(');
+    // FORBIDDEN_SWITCHES (21 ключ). fix-round-2 (28.09.2026, CI 36398413388):
+    // гард смотрит на process.argv через findForbiddenArgv(), а не на
+    // app.commandLine.hasSwitch() — Electron сам дописывает свои ключи
+    // (allow-file-access-from-files под фьюзом GrantFileProtocolExtraPrivileges)
+    // в ИТОГОВУЮ командную строку Chromium, и hasSwitch() видел бы их как
+    // «передано пользователем»: собранный deb падал на каждом старте без
+    // единого переданного ключа.
+    const guard = entry.indexOf('findForbiddenArgv(process.argv, FORBIDDEN_SWITCHES)');
     const firstLocal = entry.search(/require\(\s*'\.\//);
     assert.doesNotMatch(entry, /DEBUG_SWITCHES/, 'старое имя константы обязано быть удалено целиком, а не просто перестать использоваться');
+    assert.doesNotMatch(entry, /commandLine\.hasSwitch/, 'гард обязан смотреть на process.argv, а не на итоговую командную строку Chromium (commandLine.hasSwitch — CI 36398413388)');
     assert.ok(guard > 0, 'гард ключей отладки исчез из точки входа');
     assert.ok(firstLocal > 0, 'зонд не нашёл ни одного локального require');
     assert.ok(guard < firstLocal, 'модуль главного процесса загружается ДО гарда ключей отладки');

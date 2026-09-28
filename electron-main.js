@@ -77,8 +77,35 @@ const FORBIDDEN_SWITCHES = [
     'renderer-cmd-prefix', 'gpu-launcher', 'utility-cmd-prefix', 'browser-subprocess-path', 'js-flags',
     'allow-file-access-from-files', 'remote-allow-origins'
 ];
+
+// Смотрим на process.argv, а НЕ на app.commandLine.hasSwitch() (fix-round-2,
+// 28.09.2026): деб-запуск в CI (прогон 36398413388, все шесть ячеек «deb
+// install + launch») поймал собранный пакет, падающий на КАЖДОМ старте со
+// строкой «ключ «--allow-file-access-from-files» ослабляет изоляцию…» — хотя
+// НИКТО такой ключ не передавал. Причина: сборка держит фьюз
+// GrantFileProtocolExtraPrivileges (package.json → electronFuses, нужен
+// localStorage на file:// при переносе настроек), и Electron САМ дописывает
+// `--allow-file-access-from-files` в ИТОГОВУЮ командную строку Chromium ради
+// этого фьюза. `app.commandLine.hasSwitch()` читает ИТОГОВУЮ строку — она
+// видит и то, что дописал сам Electron, а не только то, что передал
+// пользователь. `process.argv` — то, с чем реально запустили процесс.
+//
+// Совпадение — ТОЧНОЕ имя, не префикс: `--no-sandbox-foo` не обязан совпасть
+// с `no-sandbox`, а `--inspect` — с `inspect-brk` (и наоборот). Принимаются
+// обе формы, которые понимает Chromium: `--name`/`--name=значение` и
+// однодефисная `-name`/`-name=значение`.
+function findForbiddenArgv(argv, names) {
+    const SWITCH_RE = /^--?([^=]+)(?:=.*)?$/;
+    for (const raw of argv) {
+        if (typeof raw !== 'string') { continue; }
+        const m = SWITCH_RE.exec(raw);
+        if (m && names.includes(m[1])) { return m[1]; }
+    }
+    return undefined;
+}
+
 const __forbiddenSwitchFound = app.isPackaged
-    ? FORBIDDEN_SWITCHES.find((name) => app.commandLine.hasSwitch(name))
+    ? findForbiddenArgv(process.argv, FORBIDDEN_SWITCHES)
     : undefined;
 if (__forbiddenSwitchFound) {
     console.error(`[TimerWidget] ключ «--${__forbiddenSwitchFound}» ослабляет изоляцию собранного приложения — выход`);
