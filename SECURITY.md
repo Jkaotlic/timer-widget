@@ -358,7 +358,9 @@ base64. Сверх потолка payload отвергается целиком,
   остаётся `0755`: лишний SUID-бинарник — сам по себе поверхность атаки.
 
 При удалении пакета профиль AppArmor выгружается и удаляется
-(`build/linux-post-remove.sh`).
+(`build/linux-post-remove.sh`). Домашние каталоги пакет не трогает и на
+`purge`: скрипт от root не ходит по путям, которыми владеют пользователи;
+настройки убираются руками — [docs/UNINSTALL.md](docs/UNINSTALL.md#linux-deb).
 
 Проверяется `tests/release-gates.test.js` и, на собранном пакете,
 `scripts/verify-linux-sandbox.js` — в CI и в релизе, на том самом deb, что

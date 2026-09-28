@@ -44,17 +44,27 @@ sudo apt remove timer-widget
 (`/etc/apparmor.d/`, ставился на Ubuntu 24.04+ ради user namespaces песочницы)
 и ссылку в `/usr/bin`. Настройки пользователей остаются.
 
-### Полная очистка (удаляет настройки всех пользователей)
+### Полная очистка
 
 ```bash
 sudo apt purge timer-widget
 ```
 
-При `purge` запускается скрипт [`build/linux-post-remove.sh`](../build/linux-post-remove.sh), который удаляет `~/.config/timer-widget` и `~/.cache/timer-widget` у всех пользователей системы.
+`purge` удаляет всё, что поставил пакет, но **не трогает домашние каталоги**:
+настройки — данные пользователя, а не файлы пакета. До 2.12 скрипт
+[`build/linux-post-remove.sh`](../build/linux-post-remove.sh) на `purge`
+удалял их у всех пользователей системы; это убрано — скрипт от root не ходит
+по путям, которыми владеют пользователи.
+
+Настройки каждый пользователь удаляет у себя сам (приложение должно быть
+закрыто):
+
+```bash
+rm -rf ~/.config/timer-widget ~/.cache/timer-widget
+```
 
 AppImage больше не выпускается. Если он остался от прежних версий — удалите
-файл `TimerWidget-*.AppImage`, а настройки — командой
-`rm -rf ~/.config/timer-widget ~/.cache/timer-widget`.
+файл `TimerWidget-*.AppImage`, а настройки — той же командой.
 
 ## Что именно хранится
 

@@ -277,7 +277,7 @@ timer-widget/
 │   ├── icon.png                # App icon (1024×1024)
 │   ├── after-pack.js           # electron-builder hook
 │   ├── linux-after-install.sh  # deb postinst: AppArmor profile, SUID only where userns is denied
-│   └── linux-post-remove.sh    # deb postrm: unloads the AppArmor profile, purges settings
+│   └── linux-post-remove.sh    # deb postrm: unloads the AppArmor profile (leaves $HOME alone)
 ├── scripts/
 │   ├── run-electron.js         # Wrapper: clears ELECTRON_RUN_AS_NODE
 │   └── screenshot-runner.js    # Headless harness for visual review

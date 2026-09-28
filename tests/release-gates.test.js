@@ -414,7 +414,7 @@ test('песочница Linux: ни одна цель не отключает �
     assert.match(afterInstall, /\/etc\/apparmor\.d\//, 'postinst не ставит профиль AppArmor');
     assert.match(afterInstall, /apparmor_parser --skip-kernel-load/, 'профиль ставится без пробной загрузки');
 
-    // postrm: профиль выгружается и удаляется, purge не идёт по симлинкам.
+    // postrm: профиль выгружается и удаляется, ссылка alternatives снимается.
     assert.equal(PKG.build.deb.afterRemove, 'build/linux-post-remove.sh', 'postrm подключён мимо electron-builder');
     assert.ok(
         !(PKG.build.deb.fpm || []).some((a) => a.startsWith('--after-remove')),
@@ -422,7 +422,29 @@ test('песочница Linux: ни одна цель не отключает �
     );
     const afterRemove = code('build/linux-post-remove.sh');
     assert.match(afterRemove, /apparmor_parser --remove/, 'postrm не выгружает профиль AppArmor');
-    assert.match(afterRemove, /-L /, 'purge удаляет каталоги, не проверив симлинк');
+    assert.match(afterRemove, /rm -f "\$APPARMOR_PROFILE_DEST"/, 'postrm не удаляет файл профиля');
+    assert.match(afterRemove, /update-alternatives --remove/, 'postrm не снимает ссылку alternatives');
+
+    // ПСИ 28.09.2026: purge ходил от root по /home/* и удалял
+    // ~/.config|.cache/timer-widget у ВСЕХ пользователей. Пакет не владеет
+    // домашними каталогами (dpkg ими не владеет), а root-скрипт по путям,
+    // которыми владеют пользователи, — поверхность атаки даже со сторожем
+    // симлинков. Как убрать настройки руками — docs/UNINSTALL.md.
+    assert.doesNotMatch(afterRemove, /\/home\//, 'postrm снова ходит по домашним каталогам');
+    assert.doesNotMatch(afterRemove, /\/root\b/, 'postrm снова трогает /root');
+    assert.doesNotMatch(afterRemove, /rm -rf/, 'postrm снова удаляет каталоги рекурсивно');
+    assert.doesNotMatch(afterRemove, /purge_dir/, 'вернулась чистка настроек пользователей');
+    assert.doesNotMatch(afterRemove, /\$HOME|~\//, 'postrm снова трогает $HOME');
+    // Зонд отсутствия проверен на себе: на старом теле скрипта он срабатывает.
+    const OLD = 'for userdir in /home/* /root; do\n    purge_dir "$userdir" .config\ndone\nrm -rf --one-file-system "$base"';
+    assert.match(OLD, /\/home\//);
+    assert.match(OLD, /rm -rf/);
+    assert.match(OLD, /purge_dir/);
+    // Пояснение, почему $HOME не трогается, осталось в скрипте для читателя.
+    assert.match(read('build/linux-post-remove.sh'), /^#.*UNINSTALL\.md/m, 'postrm не говорит, где написано про ручное удаление настроек');
+    assert.match(read('docs/UNINSTALL.md'), /rm -rf ~\/\.config\/timer-widget ~\/\.cache\/timer-widget/,
+        'docs/UNINSTALL.md не говорит, как убрать настройки руками');
+    assert.doesNotMatch(read('docs/UNINSTALL.md'), /удаляет[^\n]*у всех пользователей/, 'UNINSTALL.md обещает чистку, которой нет');
 });
 
 test('навигация и новые окна заблокированы', () => {
