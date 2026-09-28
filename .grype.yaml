@@ -1,8 +1,10 @@
 # Grype: скан СОБРАННОГО deb (CI: job `deb-scan`, релиз: job `build-linux`).
 #
 # Порог: high и critical валят сборку (`severity-cutoff: high` в workflow).
-# Принятых находок сейчас НЕТ. Запись добавляется только с комментарием:
-# id, почему не применима, срок пересмотра — как в osv-scanner.toml.
+# Принятых находок сейчас НЕТ. Запись добавляется только блочным списком и с
+# комментарием `# reason: … until: ГГГГ-ММ-ДД` в той же строке или строкой
+# выше; срок — в будущем. Без комментария или с истёкшим сроком падает
+# `npm test` (tests/security-gate.test.js).
 #
 # Что Grype здесь видит и чего НЕ видит. Бинарь Electron (Chromium внутри)
 # ни Syft, ни Trivy по сигнатуре не опознают — замер 25.09.2026: syft по
@@ -11,4 +13,5 @@
 # Electron проверяют lockfile/SBOM (osv-scanner) и `security-gate.js electron`,
 # который сверяет её со строкой `Electron/X.Y.Z` в самом бинаре.
 ignore: []
-#  - vulnerability: GHSA-xxxx-xxxx-xxxx   # почему не применима; пересмотреть до ГГГГ-ММ-ДД
+#  # reason: почему не применима к приложению until: 2026-12-31
+#  - vulnerability: GHSA-xxxx-xxxx-xxxx

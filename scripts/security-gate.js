@@ -275,6 +275,105 @@ function cmdArtifactSbom(file) {
     return 0;
 }
 
+// ── Принятые находки: причина и срок ────────────────────────────────────────
+// Исключение без срока — вечное: находка пропадает из отчёта навсегда, а
+// сканер приёмки видит её по-прежнему. Поэтому у каждого исключения обязаны
+// быть причина и срок пересмотра в будущем; срок «сегодня» уже истёк.
+// Разбор построчный: оба файла малы, а парсер TOML/YAML ради них — новая
+// зависимость в цепочке поставки. Проверяется tests/security-gate.test.js.
+const ISO_DATE = /(\d{4}-\d{2}-\d{2})/;
+
+/** Значение TOML без хвостового комментария; строка в кавычках — без кавычек. */
+function tomlValue(raw) {
+    const v = raw.trim();
+    if (v.startsWith('"')) {
+        const end = v.indexOf('"', 1);
+        return end === -1 ? v.slice(1) : v.slice(1, end);
+    }
+    return v.replace(/\s+#.*$/, '').trim();
+}
+
+function checkUntil(label, until, today) {
+    const m = (until || '').match(ISO_DATE);
+    if (!m) { return `${label}: нет срока пересмотра (ГГГГ-ММ-ДД)`; }
+    if (m[1] <= today) { return `${label}: срок ${m[1]} истёк (сегодня ${today}) — пересмотреть или снять`; }
+    return null;
+}
+
+/**
+ * Записи osv-scanner.toml без причины/срока или с истёкшим сроком.
+ * `[[IgnoredVulns]]` — срок `ignoreUntil`; `[[PackageOverrides]]` с `ignore`
+ * — тоже исключение, срок `effectiveUntil`.
+ * @returns {string[]} пусто — всё в порядке
+ */
+function osvExceptionProblems(toml, today) {
+    const tables = [];
+    let current = null;
+    for (const raw of toml.split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('#')) { continue; }
+        const header = line.match(/^\[\[?\s*([A-Za-z0-9_.]+)\s*\]\]?/);
+        if (header) { current = { kind: header[1], fields: {} }; tables.push(current); continue; }
+        const kv = line.match(/^([A-Za-z0-9_.]+)\s*=\s*(.*)$/);
+        if (kv && current) { current.fields[kv[1]] = tomlValue(kv[2]); }
+    }
+    const problems = [];
+    for (const { kind, fields } of tables) {
+        let untilKey;
+        if (kind === 'IgnoredVulns') {
+            untilKey = 'ignoreUntil';
+        } else if (kind === 'PackageOverrides' && (fields.ignore === 'true' || fields['vulnerability.ignore'] === 'true')) {
+            untilKey = 'effectiveUntil';
+        } else {
+            continue;
+        }
+        const label = `osv-scanner.toml [[${kind}]] ${fields.id || fields.name || '(без id)'}`;
+        if (!fields.reason) { problems.push(`${label}: нет причины (reason)`); }
+        const late = checkUntil(label, fields[untilKey], today);
+        if (late) { problems.push(late); }
+    }
+    return problems;
+}
+
+/**
+ * Записи `ignore:` в .grype.yaml без соседнего комментария
+ * `# reason: … until: ГГГГ-ММ-ДД` (в той же строке или строкой выше) или с
+ * истёкшим сроком. Список в строку (`ignore: [...]`) отвергается: построчно
+ * его не разобрать, а пропустить — значит не проверить.
+ * @returns {string[]}
+ */
+function grypeExceptionProblems(yaml, today) {
+    const lines = yaml.split('\n');
+    const at = lines.findIndex((l) => /^ignore:/.test(l));
+    if (at === -1) { return []; }
+    const inline = lines[at].replace(/^ignore:\s*/, '').replace(/\s+#.*$/, '').trim();
+    if (inline && inline !== '[]') {
+        return [`.grype.yaml: ignore записан в строку (${inline}) — нужен блочный список, у каждой записи свой комментарий`];
+    }
+    const problems = [];
+    let itemIndent = null;
+    for (let k = at + 1; k < lines.length; k++) {
+        const line = lines[k];
+        if (/^[A-Za-z_]/.test(line)) { break; } // следующий ключ верхнего уровня
+        const item = line.match(/^(\s*)- (.*)$/);
+        if (!item) { continue; }
+        if (itemIndent === null) { itemIndent = item[1].length; }
+        if (item[1].length !== itemIndent) { continue; } // вложенный список внутри записи
+        const trailing = (item[2].match(/\s#\s*(.*)$/) || [])[1];
+        const above = lines[k - 1].trim();
+        const note = trailing || (above.startsWith('#') ? above.replace(/^#\s*/, '') : '');
+        const label = `.grype.yaml ignore: ${item[2].replace(/\s+#.*$/, '').trim()}`;
+        const m = note.match(/reason:\s*(\S.*?)\s+until:\s*(\S+)/);
+        if (!m) {
+            problems.push(`${label}: нет комментария «# reason: … until: ГГГГ-ММ-ДД»`);
+            continue;
+        }
+        const late = checkUntil(label, m[2], today);
+        if (late) { problems.push(late); }
+    }
+    return problems;
+}
+
 function main(argv) {
     const [cmd, ...rest] = argv;
     if (cmd === 'osv') { return cmdOsv(rest[0]); }
@@ -297,5 +396,7 @@ module.exports = {
     missingRuntimeDeps,
     electronVersionInBinary,
     latestInMajor,
-    compareSemver
+    compareSemver,
+    osvExceptionProblems,
+    grypeExceptionProblems
 };

@@ -63,7 +63,10 @@ SBOM пакета (`--override-default-catalogers image`: по каталогу 
 (`anchore/scan-action`, по SHA) сканирует этот SBOM с `severity-cutoff: high`.
 
 Принятые находки: `osv-scanner.toml` и `.grype.yaml` — только с причиной и
-сроком пересмотра. Сейчас их нет. Сначала — обновление или `overrides`.
+сроком пересмотра в будущем (`reason` + `ignoreUntil`; у Grype — комментарий
+`# reason: … until: ГГГГ-ММ-ДД` при записи). Без них или с истёкшим сроком
+падает `npm test` (`security-gate.js` → `osvExceptionProblems` /
+`grypeExceptionProblems`). Сейчас их нет. Сначала — обновление или `overrides`.
 
 `release.yml`: job `security` (те же шаги, Electron с `--require-latest`) —
 `needs` у всех четырёх сборок; `build-linux` повторяет `deb-scan` на том

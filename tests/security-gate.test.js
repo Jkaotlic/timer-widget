@@ -102,3 +102,59 @@ test('SBOM артефакта: пустой каталог — провал, а 
     assert.deepEqual(gate.missingRuntimeDeps(pkg, { components: [] }), ['electron-log']);
     assert.deepEqual(gate.missingRuntimeDeps(pkg, { components: [{ name: 'electron-log', version: '5.4.4' }] }), []);
 });
+
+// ── P5: принятые находки сканеров ────────────────────────────────────────────
+// Исключение в osv-scanner.toml / .grype.yaml глушит находку навсегда, если у
+// него нет срока: «принятая» уязвимость молча становится вечной, а приёмка
+// видит её в своём сканере. Каждое исключение обязано нести причину и срок, и
+// истёкший срок валит сборку — пересмотр перестаёт зависеть от памяти.
+const TODAY = '2026-09-28';
+
+test('исключения OSV: без причины, без срока или с истёкшим сроком — провал (проверка себя)', () => {
+    const expired = '[[IgnoredVulns]]\nid = "GHSA-aaaa-bbbb-cccc"\nignoreUntil = 2026-01-31\nreason = "только dev"\n';
+    const problems = gate.osvExceptionProblems(expired, TODAY);
+    assert.equal(problems.length, 1, 'истёкший срок не пойман');
+    assert.match(problems[0], /GHSA-aaaa-bbbb-cccc.*2026-01-31/);
+    // Срок «сегодня» — уже истёк: пересмотреть надо было до него.
+    assert.equal(gate.osvExceptionProblems(expired.replace('2026-01-31', TODAY), TODAY).length, 1);
+    assert.equal(gate.osvExceptionProblems('[[IgnoredVulns]]\nid = "X"\nreason = "r"\n', TODAY).length, 1, 'нет срока');
+    assert.equal(gate.osvExceptionProblems('[[IgnoredVulns]]\nid = "X"\nignoreUntil = 2027-01-01\n', TODAY).length, 1, 'нет причины');
+    assert.equal(gate.osvExceptionProblems('[[IgnoredVulns]]\nid = "X"\nignoreUntil = 2027-01-01\nreason = ""\n', TODAY).length, 1, 'пустая причина');
+    // Правильные записи проходят — во всех написаниях даты TOML.
+    for (const d of ['2027-01-01', '"2027-01-01"', '2027-01-01T00:00:00Z']) {
+        assert.deepEqual(gate.osvExceptionProblems(`[[IgnoredVulns]]\nid = "X"\nignoreUntil = ${d}\nreason = "r"\n`, TODAY), [], d);
+    }
+    // Переопределение пакета с ignore — тоже исключение, срок у него effectiveUntil.
+    assert.equal(gate.osvExceptionProblems('[[PackageOverrides]]\nname = "x"\nignore = true\nreason = "r"\n', TODAY).length, 1);
+    // Закомментированный образец — не запись.
+    assert.deepEqual(gate.osvExceptionProblems('# [[IgnoredVulns]]\n# id = "X"\n', TODAY), []);
+});
+
+test('исключения Grype: у каждой записи ignore — «# reason: … until: ГГГГ-ММ-ДД» в будущем (проверка себя)', () => {
+    const expired = 'ignore:\n  # reason: не достижимо из приложения until: 2026-01-31\n  - vulnerability: CVE-2026-0001\n';
+    const problems = gate.grypeExceptionProblems(expired, TODAY);
+    assert.equal(problems.length, 1, 'истёкший срок не пойман');
+    assert.match(problems[0], /CVE-2026-0001.*2026-01-31/);
+    assert.deepEqual(gate.grypeExceptionProblems(expired.replace('2026-01-31', '2027-03-01'), TODAY), []);
+    // Комментарий в той же строке тоже годится.
+    assert.deepEqual(gate.grypeExceptionProblems('ignore:\n  - vulnerability: CVE-1 # reason: x until: 2027-01-01\n', TODAY), []);
+    assert.equal(gate.grypeExceptionProblems('ignore:\n  - vulnerability: CVE-1\n', TODAY).length, 1, 'запись без комментария');
+    assert.equal(gate.grypeExceptionProblems('ignore:\n  - vulnerability: CVE-1 # until: 2027-01-01\n', TODAY).length, 1, 'нет причины');
+    assert.equal(gate.grypeExceptionProblems('ignore:\n  - vulnerability: CVE-1 # reason: x\n', TODAY).length, 1, 'нет срока');
+    // Поля записи (`package:` под `- vulnerability:`) — не отдельные записи.
+    assert.deepEqual(gate.grypeExceptionProblems(
+        'ignore:\n  # reason: x until: 2027-01-01\n  - vulnerability: CVE-1\n    package:\n      name: y\nother: 1\n', TODAY), []);
+    // Непустой список в строку не разобрать построчно — отвергается, а не пропускается.
+    assert.equal(gate.grypeExceptionProblems('ignore: [{vulnerability: CVE-1}]\n', TODAY).length, 1);
+    assert.deepEqual(gate.grypeExceptionProblems('ignore: []\n', TODAY), []);
+});
+
+test('реальные osv-scanner.toml и .grype.yaml: у каждого исключения причина и срок в будущем', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const osv = fs.readFileSync(path.join(__dirname, '..', 'osv-scanner.toml'), 'utf8');
+    const grype = fs.readFileSync(path.join(__dirname, '..', '.grype.yaml'), 'utf8');
+    // Зонд прочёл файл, а не пустоту: ключ ignore у Grype обязан быть.
+    assert.match(grype, /^ignore:/m, '.grype.yaml без ключа ignore — зонд не на что проверять');
+    assert.deepEqual(gate.osvExceptionProblems(osv, today), []);
+    assert.deepEqual(gate.grypeExceptionProblems(grype, today), []);
+});
