@@ -222,6 +222,22 @@ jobs:
         run: npx electron-builder --linux deb
       - name: Verify sandbox setup in packages
         run: node scripts/verify-linux-sandbox.js
+      # lintian — тот же инструмент, которым deb проверяет приёмка (ПСИ
+      # 28.09.2026: нет copyright, пустой synopsis, Section: default, Recommends
+      # на несуществующий пакет). Валит только error; warning печатается.
+      # Теги, неустранимые для Electron, — в build/lintian-overrides (ставится
+      # в пакет), каждый с причиной; --show-overrides показывает, что сработало.
+      - name: lintian (error валит сборку)
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq lintian
+          lintian --version
+          DEB=$(ls dist/*.deb)
+          set +e
+          lintian --fail-on error --info --show-overrides --no-tag-display-limit "$DEB"
+          RC=$?
+          echo "[lintian] exit=$RC"
+          exit $RC
       # Тот же deb уходит на скан и на установку в чистые системы (jobs ниже):
       # пакет собирается ОДИН раз, проверяется ровно он.
       - name: Upload deb for install tests

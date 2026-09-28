@@ -9,7 +9,7 @@
 | `unit-cross-platform` | windows + macos | `npm run lint` + `npm test` — класс «ломается только не на Linux» (CRLF) |
 | `e2e` | ubuntu + windows + macos | `npx playwright test` — настоящий рантайм. Linux под `xvfb-run`; `fail-fast: false` |
 | `pack` | ubuntu + windows | `electron-builder --dir` + `scripts/verify-packed.js`: состав `app.asar`, релизные гейты, фьюзы |
-| `linux-sandbox` | ubuntu-latest | собирает deb ОДИН раз, `scripts/verify-linux-sandbox.js` (postinst, профиль AppArmor, Depends, нет `--no-sandbox`), выкладывает deb артефактом `linux-deb` |
+| `linux-sandbox` | ubuntu-latest | собирает deb ОДИН раз, `scripts/verify-linux-sandbox.js` (postinst, профиль AppArmor, Depends, нет `--no-sandbox`), `lintian --fail-on error` (неустранимые для Electron теги — в `build/lintian-overrides` с причиной), выкладывает deb артефактом `linux-deb` |
 | `security` | ubuntu-latest | ворота уязвимостей по lockfile и SBOM — ниже |
 | `deb-scan` | ubuntu-latest | скан СОБРАННОГО deb — ниже |
 | `deb-launch-runner` | ubuntu-24.04, матрица `userns` / `suid` | установка deb на ядро раннера и запуск — ниже |
