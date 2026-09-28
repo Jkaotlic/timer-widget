@@ -328,10 +328,21 @@ function osvExceptionProblems(toml, today) {
             continue;
         }
         const kv = line.match(/^([A-Za-z0-9_.]+)\s*=\s*(.*)$/);
-        if (kv && current) { current.fields[current.prefix + kv[1]] = tomlValue(kv[2]); }
+        if (kv && current) {
+            // Inline-таблица (`vulnerability = { ignore = true }`) или массив
+            // таблиц в строку — валидный TOML, но построчно его не разобрать.
+            // Пропустить значило бы не проверить: запись отвергается.
+            if (/^(\{|\[\s*\{)/.test(kv[2].trim())) { current.fields['\0inline'] = kv[1]; }
+            current.fields[current.prefix + kv[1]] = tomlValue(kv[2]);
+        }
     }
     const problems = [];
     for (const { kind, fields } of tables) {
+        if (fields['\0inline'] && (kind === 'IgnoredVulns' || kind === 'PackageOverrides')) {
+            problems.push(`osv-scanner.toml [[${kind}]] ${fields.id || fields.name || '(без id)'}: ` +
+                `\`${fields['\0inline']} = {…}\` — inline-таблицу проверка не разбирает — запишите подтаблицей с reason и effectiveUntil`);
+            continue;
+        }
         let untilKey;
         if (kind === 'IgnoredVulns') {
             untilKey = 'ignoreUntil';

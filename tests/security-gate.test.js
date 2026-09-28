@@ -130,6 +130,15 @@ test('исключения OSV: без причины, без срока или 
     const sub = '[[PackageOverrides]]\nname = "x"\nreason = "r"\n[PackageOverrides.vulnerability]\nignore = true\n';
     assert.equal(gate.osvExceptionProblems(sub, TODAY).length, 1, 'подтаблица vulnerability обходит проверку срока');
     assert.deepEqual(gate.osvExceptionProblems(sub.replace('reason = "r"\n', 'reason = "r"\neffectiveUntil = 2027-01-01\n'), TODAY), []);
+    // Inline-таблица (`vulnerability = { ignore = true }`) — валидный TOML,
+    // построчно не разбирается: отвергается, а не пропускается (fail closed).
+    const inline = '[[PackageOverrides]]\nname = "a"\nvulnerability = { ignore = true }\n';
+    assert.equal(gate.osvExceptionProblems(inline, TODAY).length, 1, 'inline-таблица обходит проверку');
+    assert.match(gate.osvExceptionProblems(inline, TODAY)[0], /inline-таблицу/);
+    assert.equal(gate.osvExceptionProblems('[[IgnoredVulns]]\nid = "X"\nignoreUntil = 2027-01-01\nreason = "r"\nx = [{ a = 1 }]\n', TODAY).length, 1,
+        'inline-массив таблиц обходит проверку');
+    // Строка с фигурной скобкой внутри кавычек — не inline-таблица.
+    assert.deepEqual(gate.osvExceptionProblems('[[IgnoredVulns]]\nid = "X"\nignoreUntil = 2027-01-01\nreason = "см. {issue}"\n', TODAY), []);
     // Закомментированный образец — не запись.
     assert.deepEqual(gate.osvExceptionProblems('# [[IgnoredVulns]]\n# id = "X"\n', TODAY), []);
 });
