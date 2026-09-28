@@ -74,6 +74,10 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
         if (!isPayloadObject(payload)) { return; }
         const { deltaX, deltaY, first } = payload;
         if (!win || win.isDestroyed() || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) { return; }
+        // R6 (2026-09-28-psi-hardening): подделанный или испорченный payload
+        // канала `*-move` может нести дельту вне разумного диапазона — игнор
+        // без исключения, окно не двигаем вовсе.
+        if (Math.abs(deltaX) > CONFIG.MAX_MOVE_DELTA || Math.abs(deltaY) > CONFIG.MAX_MOVE_DELTA) { return; }
 
         const bounds = win.getBounds();
         // Начало жеста помечает рендерер (bindWindowDrag): иначе границу жеста
