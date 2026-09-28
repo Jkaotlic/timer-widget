@@ -181,6 +181,10 @@ jobs:
       - name: Verify sandbox setup in the shipped package
         run: node scripts/verify-linux-sandbox.js
 
+      # lintian по ТОМУ deb, что уходит в релиз, — тем же скриптом, что CI.
+      - name: lintian (error валит релиз)
+        run: bash scripts/lintian-check.sh "$(ls dist/*.deb)"
+
       # Скан ТОГО deb, что уходит в релиз: Grype по распакованному пакету и
       # app.asar, версия Electron в бинаре = lockfile = SBOM. Как job
       # `deb-scan` в nodejs.yml.

@@ -62,18 +62,37 @@ test('срезы job и шага режут по структуре (прове�
     assert.ok(jobBlock(NODEJS, 'linux-sandbox'), 'в nodejs.yml нет job linux-sandbox — срез сломан или job переименован');
 });
 
-test('lintian гоняется по собранному deb и валит сборку на error', () => {
-    const job = yamlCode(jobBlock(NODEJS, 'linux-sandbox'));
-    assert.match(job, /apt-get install[^\n]*\blintian\b/, 'lintian не ставится в job linux-sandbox');
-    assert.match(job, /lintian --fail-on error\b[^\n]*--info\b[^\n]*"\$DEB"/,
-        'lintian запускается без --fail-on error / --info или не по собранному deb');
-    const build = job.indexOf('electron-builder --linux deb');
-    const lint = job.indexOf('lintian --fail-on');
-    const upload = job.indexOf('upload-artifact');
-    assert.ok(build > -1 && build < lint && lint < upload,
-        'lintian обязан идти после сборки и до выкладки deb — битый пакет не должен уезжать на установку');
-    assert.doesNotMatch(stepBlock(job, 'lintian') || '', /continue-on-error:\s*true/, 'шаг lintian неблокирующий');
+const LINTIAN_CHECK = fs.readFileSync(path.join(ROOT, 'scripts', 'lintian-check.sh'), 'utf8');
+const lintianCode = LINTIAN_CHECK.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+
+test('lintian-check.sh: error валит, вывод полный, код выхода печатается', () => {
+    assert.match(lintianCode, /apt-get install[^\n]*\blintian\b/, 'скрипт не ставит lintian');
+    assert.match(lintianCode, /lintian --fail-on error\b[^\n]*--info\b[^\n]*"\$DEB"/,
+        'lintian без --fail-on error / --info или не по переданному deb');
+    assert.match(lintianCode, /--show-overrides/, 'не видно, какие переопределения сработали');
+    assert.match(lintianCode, /exit "?\$RC"?/, 'код lintian не возвращается наружу');
 });
+
+// Один скрипт на CI и релиз: тело шага, скопированное в два workflow,
+// расходится при первой правке — релиз проверял бы пакет не так, как CI.
+for (const [file, jobName, buildCmd] of [
+    ['nodejs.yml', 'linux-sandbox', 'electron-builder --linux deb'],
+    ['release.yml', 'build-linux', 'electron-builder --linux']
+]) {
+    test(`${file} ${jobName}: lintian по собранному deb — после сборки, до выкладки`, () => {
+        const job = yamlCode(jobBlock(read(file), jobName) || '');
+        assert.ok(job, `нет job ${jobName}`);
+        const step = stepBlock(job, 'lintian');
+        assert.ok(step, `в ${jobName} нет шага lintian`);
+        assert.match(step, /bash scripts\/lintian-check\.sh "?\$\(ls dist\/\*\.deb\)"?/, 'шаг не зовёт общий scripts/lintian-check.sh по собранному deb');
+        assert.doesNotMatch(step, /continue-on-error:\s*true/, 'шаг lintian неблокирующий');
+        const build = job.indexOf(buildCmd);
+        const lint = job.indexOf('lintian-check.sh');
+        const upload = job.indexOf('upload-artifact');
+        assert.ok(build > -1 && build < lint && lint < upload,
+            'lintian обязан идти после сборки и до выкладки deb — битый пакет не должен уезжать дальше');
+    });
+}
 
 // ── P3: установленный deb на живой системе ──────────────────────────────────
 const LAUNCH_CHECK = fs.readFileSync(path.join(ROOT, 'scripts', 'linux-launch-check.sh'), 'utf8');
