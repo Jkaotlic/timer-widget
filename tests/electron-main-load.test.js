@@ -1132,6 +1132,49 @@ test('R1: несобранное приложение с --no-sandbox НЕ вы�
     assert.ok(stubs.ipcHandlers.has('timer-command'));
 });
 
+test('R3: собранное приложение под node --test и --screenshot всё равно запрашивает единственный экземпляр', () => {
+    // NODE_TEST_CONTEXT реально стоит в окружении — этот файл сам выполняется
+    // под `node --test`. Раньше __inTestMode/__screenshotMode смотрели только
+    // на неё и включались в СОБРАННОМ приложении точно так же, как в тестах, —
+    // а вместе с ними выключался single-instance-lock и другие тестовые
+    // ответвления, которых в реальной сборке быть не должно. Признак того, что
+    // режимы НЕ включились, — реальный вызов requestSingleInstanceLock():
+    // при __inTestMode/__screenshotMode он вовсе не вызывается (флаг короткого
+    // замыкания стоит раньше него).
+    const stubs = createStubs();
+    stubs.electron.app.isPackaged = true;
+    stubs.electron.app.commandLine = { appendSwitch: () => {}, hasSwitch: () => false };
+    let singleInstanceCalls = 0;
+    stubs.electron.app.requestSingleInstanceLock = () => { singleInstanceCalls++; return true; };
+    const savedArgv = process.argv;
+    process.argv = [...process.argv, '--screenshot'];
+    try {
+        loadMain(stubs);
+    } finally {
+        process.argv = savedArgv;
+    }
+    assert.equal(
+        singleInstanceCalls, 1,
+        'собранное приложение обязано запросить блокировку единственного экземпляра — тестовый/съёмочный режим не должен включаться в сборке'
+    );
+});
+
+test('R3: несобранное приложение под node --test и --screenshot по-прежнему пропускает блокировку (поведение не сломано)', () => {
+    // Обратная сторона предыдущего теста (review focus constraints.md: не
+    // сломать e2e/screenshot-runner на несобранном приложении).
+    const stubs = createStubs(); // isPackaged: false по умолчанию
+    let singleInstanceCalls = 0;
+    stubs.electron.app.requestSingleInstanceLock = () => { singleInstanceCalls++; return true; };
+    const savedArgv = process.argv;
+    process.argv = [...process.argv, '--screenshot'];
+    try {
+        loadMain(stubs);
+    } finally {
+        process.argv = savedArgv;
+    }
+    assert.equal(singleInstanceCalls, 0, 'несобранное приложение под node --test обязано пропускать блокировку, как раньше');
+});
+
 test('SEC-11: и ошибка записи не приносит в журнал полный путь', async () => {
     // Сообщение fs содержит путь целиком («ENOENT: …, open '/Users/<имя>/…'»),
     // и `log.error(err)` уносил бы его в файл журнала мимо первой правки.

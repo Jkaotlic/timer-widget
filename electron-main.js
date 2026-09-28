@@ -170,15 +170,35 @@ protocol.registerSchemesAsPrivileged([AppScheme.PRIVILEGED_SCHEME]);
 // переносить нечего, и скрытое окно переноса не создаётся вовсе.
 const __hadStorageAtStart = hasStorageDir(app.getPath('userData'));
 
-// Test-mode guard — node:test stubs 'electron', we skip runtime side-effects.
-const __inTestMode = process.env.NODE_TEST_CONTEXT !== undefined;
+// Сырой признак: исполняемся ли мы под `node --test` вообще. Electron там
+// подставной (tests/electron-main-load.test.js), поэтому по нему выключают
+// побочные эффекты с РЕАЛЬНЫМИ таймерами — периодическую запись восстановления
+// (main-recovery.js) и монитор памяти ниже. Признак НЕ зависит от isPackaged:
+// это чистая деталь тестового окружения, а не то, что должен уметь снимать с
+// себя собранный бинарник (то ниже, с другим именем).
+const __nodeTestContext = process.env.NODE_TEST_CONTEXT !== undefined;
+
+// Test-mode guard, которому main-lifecycle.js и main-windows.js доверяют
+// снять single-instance-lock и спрятать окна за экран (--screenshot).
+//
+// `!app.isPackaged` — R3 (2026-09-28 ПСИ): без него СОБРАННОЕ приложение,
+// унаследовавшее NODE_TEST_CONTEXT из окружения (или запущенное с
+// `--screenshot`), включило бы тот же бесконтрольный режим — снятый
+// single-instance-lock у распространяемого бинарника означает, что вторая
+// невидимая копия может запуститься рядом с первой. Признак НАМЕРЕННО другой,
+// чем __nodeTestContext выше: тому не нужен isPackaged (он про тестовый
+// раннер), этому нужен (он про доверие ключам собранного приложения).
+const __inTestMode = !app.isPackaged && __nodeTestContext;
 
 // Screenshot mode — scripted capture sequence (see scripts/screenshot-runner.js).
 // When active, all windows boot hidden/offscreen so the desktop isn't disturbed.
-const __screenshotMode = process.argv.includes('--screenshot');
+// `!app.isPackaged` — та же причина, что у __inTestMode выше (R3).
+const __screenshotMode = !app.isPackaged && process.argv.includes('--screenshot');
 
-// Runtime memory monitor (dev only, not in tests)
-if (process.argv.includes('--dev') && !__inTestMode) {
+// Runtime memory monitor (dev only, not in tests). __nodeTestContext, а не
+// __inTestMode: под node:test с подставным isPackaged=true (тесты SEC-04/R1)
+// монитору всё равно нельзя заводить настоящий setInterval.
+if (process.argv.includes('--dev') && !__nodeTestContext) {
     setInterval(() => {
         const mem = process.memoryUsage();
         log.debug(`[perf] heap: ${(mem.heapUsed/1024/1024).toFixed(1)}MB rss: ${(mem.rss/1024/1024).toFixed(1)}MB`);
@@ -251,7 +271,9 @@ const events = createEventOverrun({
     getTimerState: () => timer.getState()
 });
 const recoverySnapshot = createRecoverySnapshot({
-    getUserDataPath, flags, isAtRest, log, inTestMode: __inTestMode,
+    // __nodeTestContext, не __inTestMode: периодическая запись на диск — забота
+    // тестового раннера, а не барьера R3 (см. комментарий у __nodeTestContext).
+    getUserDataPath, flags, isAtRest, log, inTestMode: __nodeTestContext,
     getTimerState: () => timer.getState()
 });
 const timer = createTimer({
