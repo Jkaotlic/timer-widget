@@ -1175,6 +1175,39 @@ test('R3: несобранное приложение под node --test и --sc
     assert.equal(singleInstanceCalls, 0, 'несобранное приложение под node --test обязано пропускать блокировку, как раньше');
 });
 
+test('R3 fix-round-1: собранное приложение с NODE_TEST_CONTEXT в env всё равно заводит периодическую запись восстановления (unref\'нутую)', () => {
+    // Находка ревью: __inTestMode раньше был ДВУМЯ разными флагами — гейтом
+    // R3 (single-instance/screenshot) и сырым «мы под node:test», который
+    // main-recovery.js получал БЕЗ поправки на isPackaged. Собранное
+    // приложение с унаследованной NODE_TEST_CONTEXT пропускало бы
+    // периодическую запись — а это находка не про R3 (доверие ключам
+    // сборки), а обычная функциональность, которая обязана идти у любого
+    // собранного приложения независимо от env. Флаг — один
+    // (!app.isPackaged && NODE_TEST_CONTEXT), интервал теперь unref'нут
+    // (main-recovery.js) — так процесс node:test не зависает на настоящем
+    // 10-секундном таймере.
+    const realSetInterval = global.setInterval;
+    const calls = [];
+    global.setInterval = (fn, ms) => {
+        const handle = { unref: () => { calls[calls.length - 1].unrefed = true; } };
+        calls.push({ ms, unrefed: false });
+        return handle;
+    };
+    const stubs = createStubs();
+    stubs.electron.app.isPackaged = true;
+    stubs.electron.app.commandLine = { appendSwitch: () => {}, hasSwitch: () => false };
+    try {
+        loadMain(stubs);
+    } finally {
+        global.setInterval = realSetInterval;
+    }
+    assert.deepEqual(
+        calls.map((c) => c.ms), [10000],
+        'периодическая запись восстановления обязана планироваться и у собранного приложения — R3 не должен её выключать через NODE_TEST_CONTEXT'
+    );
+    assert.equal(calls[0].unrefed, true, 'таймер обязан быть unref\'нут, иначе он один держит процесс node:test живым');
+});
+
 test('SEC-11: и ошибка записи не приносит в журнал полный путь', async () => {
     // Сообщение fs содержит путь целиком («ENOENT: …, open '/Users/<имя>/…'»),
     // и `log.error(err)` уносил бы его в файл журнала мимо первой правки.

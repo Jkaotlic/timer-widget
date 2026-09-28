@@ -20,7 +20,12 @@ const recovery = require('./recovery');
  * @param {object} deps.flags — флаги приложения (main-state.js), читается isQuitting
  * @param {(state: object) => boolean} deps.isAtRest — покой таймера (main-event-overrun.js)
  * @param {object} deps.log
- * @param {boolean} deps.inTestMode — под node:test периодической записи нет
+ * @param {boolean} deps.inTestMode — гейтится по `!app.isPackaged`
+ *        (electron-main.js, R3): у СОБРАННОГО приложения периодическая запись
+ *        идёт всегда, независимо от того, что унаследовано в env — это не
+ *        детектор node:test. Под node:test с подставным isPackaged=true
+ *        (tests/electron-main-load.test.js) интервал заводится настоящий,
+ *        поэтому он unref'нут ниже.
  */
 function createRecoverySnapshot({ getUserDataPath, getTimerState, flags, isAtRest, log, inTestMode }) {
     // Запись синхронная и атомарная (recovery.js объясняет, почему не async):
@@ -71,6 +76,17 @@ function createRecoverySnapshot({ getUserDataPath, getTimerState, flags, isAtRes
             if (flags.isQuitting) { return; }
             if (worthRecovering(getTimerState())) { saveTimerStateToFileSync(); }
         }, 10000);
+        // unref(): в Electron цикл событий главного процесса и так не
+        // закрывается — его держат открытые окна и живой IPC, а не этот
+        // таймер. Без unref() он был бы ЕДИНСТВЕННЫМ, что мешает процессу
+        // завершиться в сценарии, для которого он и не задуман: под
+        // node:test с подставным isPackaged=true (см. R3,
+        // tests/electron-main-load.test.js — `inTestMode` там гейтится
+        // строго по !isPackaged, а не по факту node:test, и интервал под
+        // такой подставкой заводится настоящий).
+        if (typeof recoverySaveInterval.unref === 'function') {
+            recoverySaveInterval.unref();
+        }
     }
 
     /** Stop the periodic save BEFORE unlinking (before-quit). */

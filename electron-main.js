@@ -170,39 +170,41 @@ protocol.registerSchemesAsPrivileged([AppScheme.PRIVILEGED_SCHEME]);
 // переносить нечего, и скрытое окно переноса не создаётся вовсе.
 const __hadStorageAtStart = hasStorageDir(app.getPath('userData'));
 
-// Сырой признак: исполняемся ли мы под `node --test` вообще. Electron там
-// подставной (tests/electron-main-load.test.js), поэтому по нему выключают
-// побочные эффекты с РЕАЛЬНЫМИ таймерами — периодическую запись восстановления
-// (main-recovery.js) и монитор памяти ниже. Признак НЕ зависит от isPackaged:
-// это чистая деталь тестового окружения, а не то, что должен уметь снимать с
-// себя собранный бинарник (то ниже, с другим именем).
-const __nodeTestContext = process.env.NODE_TEST_CONTEXT !== undefined;
-
 // Test-mode guard, которому main-lifecycle.js и main-windows.js доверяют
-// снять single-instance-lock и спрятать окна за экран (--screenshot).
+// снять single-instance-lock и спрятать окна за экран (--screenshot), а
+// main-recovery.js — не заводить периодическую запись восстановления.
 //
-// `!app.isPackaged` — R3 (2026-09-28 ПСИ): без него СОБРАННОЕ приложение,
-// унаследовавшее NODE_TEST_CONTEXT из окружения (или запущенное с
-// `--screenshot`), включило бы тот же бесконтрольный режим — снятый
-// single-instance-lock у распространяемого бинарника означает, что вторая
-// невидимая копия может запуститься рядом с первой. Признак НАМЕРЕННО другой,
-// чем __nodeTestContext выше: тому не нужен isPackaged (он про тестовый
-// раннер), этому нужен (он про доверие ключам собранного приложения).
-const __inTestMode = !app.isPackaged && __nodeTestContext;
+// `!app.isPackaged` — R3 (2026-09-28 ПСИ, поправлено ревью fix-round-1): без
+// него СОБРАННОЕ приложение, унаследовавшее NODE_TEST_CONTEXT из окружения
+// (или запущенное с `--screenshot`), включило бы тот же бесконтрольный
+// режим — снятый single-instance-lock у распространяемого бинарника означает,
+// что вторая невидимая копия может запуститься рядом с первой, а невыключенная
+// периодическая запись, наоборот, ДОЛЖНА идти у любого собранного приложения
+// независимо от того, что унаследовано в env. Флаг — ЕДИНСТВЕННЫЙ: раньше
+// здесь был второй, «сырой», не зависящий от isPackaged — он решал ту же
+// задачу неверно (main-recovery.js пропускал бы периодическую запись у
+// СОБРАННОГО приложения с чужой NODE_TEST_CONTEXT в env, что и было находкой
+// ревью). Правильное решение — не второй флаг, а `.unref()` у самого
+// интервала (main-recovery.js): под node:test с подставным isPackaged=true
+// (SEC-04/R1, R3) он всё равно заводится по-настоящему, но не держит процесс.
+const __inTestMode = !app.isPackaged && process.env.NODE_TEST_CONTEXT !== undefined;
 
 // Screenshot mode — scripted capture sequence (see scripts/screenshot-runner.js).
 // When active, all windows boot hidden/offscreen so the desktop isn't disturbed.
 // `!app.isPackaged` — та же причина, что у __inTestMode выше (R3).
 const __screenshotMode = !app.isPackaged && process.argv.includes('--screenshot');
 
-// Runtime memory monitor (dev only, not in tests). __nodeTestContext, а не
-// __inTestMode: под node:test с подставным isPackaged=true (тесты SEC-04/R1)
-// монитору всё равно нельзя заводить настоящий setInterval.
-if (process.argv.includes('--dev') && !__nodeTestContext) {
-    setInterval(() => {
+// Runtime memory monitor (dev only, not in tests).
+if (process.argv.includes('--dev') && !__inTestMode) {
+    const memoryMonitorInterval = setInterval(() => {
         const mem = process.memoryUsage();
         log.debug(`[perf] heap: ${(mem.heapUsed/1024/1024).toFixed(1)}MB rss: ${(mem.rss/1024/1024).toFixed(1)}MB`);
     }, 60000);
+    // unref() — та же причина, что у recoverySaveInterval в main-recovery.js:
+    // монитор — диагностика, а не то, что обязано держать процесс живым, и
+    // под node:test с подставным isPackaged=true+--dev он был бы висящим
+    // таймером без унрефа.
+    if (typeof memoryMonitorInterval.unref === 'function') { memoryMonitorInterval.unref(); }
 }
 
 // Общее изменяемое состояние — один владелец на весь главный процесс.
@@ -271,9 +273,7 @@ const events = createEventOverrun({
     getTimerState: () => timer.getState()
 });
 const recoverySnapshot = createRecoverySnapshot({
-    // __nodeTestContext, не __inTestMode: периодическая запись на диск — забота
-    // тестового раннера, а не барьера R3 (см. комментарий у __nodeTestContext).
-    getUserDataPath, flags, isAtRest, log, inTestMode: __nodeTestContext,
+    getUserDataPath, flags, isAtRest, log, inTestMode: __inTestMode,
     getTimerState: () => timer.getState()
 });
 const timer = createTimer({
