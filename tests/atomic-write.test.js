@@ -23,6 +23,7 @@ const path = require('node:path');
 const { writeFileAtomicSync } = require('../atomic-write');
 const OverrunStore = require('../event-overrun-store');
 const recovery = require('../recovery');
+const { codeOnly } = require('./helpers/source-scan');
 
 function tmpDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-write-'));
@@ -80,4 +81,38 @@ test('снимок восстановления: сорвавшаяся запи
     assert.ok(saved, 'снимок пропал');
     assert.equal(saved.remainingSeconds, 200);
     assert.deepEqual(leftovers(dir, 'last-state.json'), []);
+});
+
+// R7 (docs/superpowers/specs/2026-09-28-psi-hardening.md, добивка перед
+// повторной сдачей ПСИ): временный файл создаётся `wx` (эксклюзивно) с
+// правами 0o600 — файл состояния может содержать итог перелимита (деньги),
+// читать его не должен никто, кроме владельца процесса.
+test('R7: права созданного файла — 0o600 (POSIX)', { skip: process.platform === 'win32' }, () => {
+    const dir = tmpDir();
+    const file = path.join(dir, 'state.json');
+    writeFileAtomicSync(file, '{"a":1}');
+    const mode = fs.statSync(file).mode & 0o777;
+    assert.equal(mode, 0o600, `права файла обязаны быть 0o600, получены ${mode.toString(8)}`);
+});
+
+// constraints.md, review focus #3: залежавшийся `.tmp` от прошлого сбоя с
+// ТЕМ ЖЕ pid (перезапуск процесса переиспользует pid) не должен ронять
+// новую запись на EEXIST — `wx` бросает именно на существующем файле.
+test('R7: залежавшийся tmp того же имени не мешает следующей записи', () => {
+    const dir = tmpDir();
+    const file = path.join(dir, 'state.json');
+    const tmpPath = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmpPath, 'мусор от прошлого краха');
+
+    assert.doesNotThrow(() => writeFileAtomicSync(file, '{"a":1}'));
+    assert.equal(fs.readFileSync(file, 'utf8'), '{"a":1}');
+    assert.deepEqual(leftovers(dir, 'state.json'), []);
+});
+
+test('R7 source-level: временный файл открывается wx с правами 0o600, а не просто w', () => {
+    const src = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'atomic-write.js'), 'utf8'));
+    assert.match(src, /openSync\(tmpPath,\s*'wx',\s*0o600\)/,
+        'atomic-write.js обязан открывать временный файл эксклюзивно (wx) с правами 0o600');
+    assert.doesNotMatch(src, /openSync\(tmpPath,\s*'w'\)/,
+        'старое открытие без wx/0o600 не должно остаться в коде');
 });

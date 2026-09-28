@@ -28,7 +28,14 @@ function writeFileAtomicSync(filePath, data) {
     const tmpPath = `${filePath}.${process.pid}.tmp`;
     let fd = null;
     try {
-        fd = fs.openSync(tmpPath, 'w');
+        // Залежавшийся `.tmp` того же pid (например, от прошлого краха этого
+        // же процесса до rename) не должен ронять запись на EEXIST — `wx`
+        // бросает именно на существующем файле. Убираем его заранее, а не
+        // ловим EEXIST в catch: там уже нет пути «попробовать снова».
+        try { fs.unlinkSync(tmpPath); } catch { /* его могло и не быть */ }
+        // 0o600: файл состояния может нести итог перелимита (деньги) —
+        // читать и писать его должен только владелец процесса.
+        fd = fs.openSync(tmpPath, 'wx', 0o600);
         fs.writeSync(fd, data);
         fs.fsyncSync(fd);
         fs.closeSync(fd);
