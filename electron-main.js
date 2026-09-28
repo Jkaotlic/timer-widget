@@ -51,7 +51,14 @@ const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage
 //  - `--allow-file-access-from-files` — file:// читает file://, обходя CSP
 //    страницы даже с фьюзом file:// не тронутым;
 //  - `--remote-allow-origins` — открывает DevTools-протокол произвольному
-//    origin (та же дыра, что `--remote-debugging-port`, с другой стороны).
+//    origin (та же дыра, что `--remote-debugging-port`, с другой стороны);
+//  - режим разработчика (2.12.1, требование ПСИ «выключен везде, жёстко»):
+//    свой ключ приложения `--dev` (в сборке включал подробный лог и монитор
+//    памяти; DevTools он не открывал и не открывает) и отладочные ключи
+//    Chromium — `--enable-logging`, `--v`, `--vmodule` (подробный журнал
+//    Chromium), `--auto-open-devtools-for-tabs`. Опасности в них меньше, чем в
+//    остальных, но собранная версия не должна иметь ни одного входа в режим
+//    разработчика — отказ проще доказать, чем «включается, но безвредно».
 //
 // `--zygote-cmd-prefix` НЕ в списке: САМ браузерный (главный) процесс форкает
 // zygote-процесс на старте, ДО того как управление доходит до JS этого
@@ -75,7 +82,8 @@ const FORBIDDEN_SWITCHES = [
     'disable-web-security', 'disable-site-isolation-trials',
     'single-process', 'in-process-gpu', 'no-zygote',
     'renderer-cmd-prefix', 'gpu-launcher', 'utility-cmd-prefix', 'browser-subprocess-path', 'js-flags',
-    'allow-file-access-from-files', 'remote-allow-origins'
+    'allow-file-access-from-files', 'remote-allow-origins',
+    'dev', 'enable-logging', 'v', 'vmodule', 'auto-open-devtools-for-tabs'
 ];
 
 // Смотрим на process.argv, а НЕ на app.commandLine.hasSwitch() (fix-round-2,

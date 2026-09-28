@@ -1100,7 +1100,10 @@ const FORBIDDEN_SWITCHES_SPEC = [
     'disable-web-security', 'disable-site-isolation-trials',
     'single-process', 'in-process-gpu', 'no-zygote',
     'renderer-cmd-prefix', 'gpu-launcher', 'utility-cmd-prefix', 'browser-subprocess-path', 'js-flags',
-    'allow-file-access-from-files', 'remote-allow-origins'
+    'allow-file-access-from-files', 'remote-allow-origins',
+    // Режим разработчика (2.12.1, требование ПСИ «выключен везде, жёстко»):
+    // свой ключ приложения и отладочные ключи Chromium.
+    'dev', 'enable-logging', 'v', 'vmodule', 'auto-open-devtools-for-tabs'
 ];
 
 for (const sw of FORBIDDEN_SWITCHES_SPEC) {
@@ -1115,6 +1118,33 @@ for (const sw of FORBIDDEN_SWITCHES_SPEC) {
         assert.equal(stubs.ipcHandlers.size, 0, 'IPC зарегистрирован до выхода — main продолжил работу');
     });
 }
+
+// Режим разработчика — в тех формах, в которых его реально набирают: со
+// значением, однодефисная `-v` (Chromium принимает её как ключ `v`), маска
+// vmodule. Каждая — выход с кодом 1 до первого окна, как у ключей изоляции.
+for (const argvFlag of ['--dev', '--enable-logging=stderr', '-v', '--v=1', '--vmodule=*=1', '--auto-open-devtools-for-tabs']) {
+    test(`2.12.1 режим разработчика: собранное приложение с argv «${argvFlag}» выходит до первого окна`, () => {
+        const { stubs, exits } = loadPackagedWith([argvFlag]);
+        assert.deepEqual(exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
+        assert.equal(stubs.created.length, 0, 'окно создано до выхода');
+        assert.equal(stubs.ipcHandlers.size, 0, 'IPC зарегистрирован до выхода — main продолжил работу');
+    });
+}
+
+test('2.12.1 режим разработчика: НЕсобранное приложение с --dev стартует (npm run dev)', () => {
+    const stubs = createStubs();
+    let exited = false;
+    stubs.electron.app.exit = () => { exited = true; };
+    const savedArgv = process.argv;
+    process.argv = [...process.argv, '--dev'];
+    try {
+        loadMain(stubs);
+    } finally {
+        process.argv = savedArgv;
+    }
+    assert.equal(exited, false, 'гард режима разработчика обязан смотреть на isPackaged');
+    assert.ok(stubs.ipcHandlers.has('timer-command'));
+});
 
 test('SEC-04: без ключей отладки собранное приложение стартует', () => {
     const { stubs, exits } = loadPackagedWith([]);
