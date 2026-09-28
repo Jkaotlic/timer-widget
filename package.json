@@ -121,6 +121,7 @@
       "packageCategory": "utils",
       "fpm": [
         "--deb-no-default-config-files",
+        "--description=Прозрачный таймер-виджет для рабочего стола\nTimerWidget — таймер для выступлений и мероприятий:\nмини-виджет поверх окон, часы и полноэкранный дисплей\nдля зала. Работает автономно, без сети.",
         "build/copyright=/usr/share/doc/timer-widget/copyright",
         "build/lintian-overrides=/usr/share/lintian/overrides/timer-widget"
       ],

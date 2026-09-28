@@ -243,6 +243,29 @@ test('deb: непустой synopsis, раздел utils, Recommends без liba
     assert.ok(!/\.$/.test(linux.synopsis.trim()), 'synopsis не заканчивается точкой (Debian Policy 3.4.1)');
     assert.ok(typeof linux.description === 'string' && linux.description.trim() !== linux.synopsis.trim(),
         'длинное описание обязано отличаться от synopsis — иначе Description повторяет сам себя');
+    // Description в control. electron-builder склеивает его как
+    // `${synopsis}\n ${description}` — пробел в начале длинного описания
+    // (W: description-starts-with-leading-spaces), а всё описание одной
+    // строкой (W: extended-description-line-too-long). Поэтому поле целиком
+    // задано ключом --description в deb.fpm: fpm берёт последнее значение.
+    const descArg = (deb.fpm || []).find((a) => a.startsWith('--description='));
+    assert.ok(descArg, 'в deb.fpm нет --description=… — Description собирает electron-builder с пробелом и одной строкой');
+    const [first, ...extended] = descArg.slice('--description='.length).split('\n');
+    assert.strictEqual(first, linux.synopsis, 'первая строка Description обязана быть synopsis');
+    assert.ok(extended.length >= 1 && extended.length <= 3, 'длинное описание — 1–3 строки');
+    for (const line of extended) {
+        assert.ok(line.length > 0 && !/^\s/.test(line), `строка описания пустая или с пробелом в начале: «${line}»`);
+        assert.ok(line.length <= 80, `строка описания длиннее 80 символов: «${line}»`);
+    }
+    // lintian (fields/description) считает synopsis продублированным, если
+    // первая строка описания совпадает с ним после удаления всего, кроме
+    // [a-zA-Z0-9]. Русский текст сводится к пустой строке с обеих сторон —
+    // CI 28.09.2026: E: description-synopsis-is-duplicated. Первой строке
+    // нужны латинские буквы или цифры, которых нет в synopsis.
+    const asciiCore = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    assert.notStrictEqual(asciiCore(extended[0]), asciiCore(first),
+        'lintian сочтёт первую строку описания повтором synopsis (сравнение по [a-z0-9])');
+    assert.strictEqual(asciiCore('Таймер для зала'), asciiCore('Прозрачный таймер'), 'зонд сравнения lintian сломан');
     assert.strictEqual(deb.packageCategory, 'utils', 'Section в control обязан быть utils, а не default');
     const recommends = [].concat(deb.recommends || []);
     assert.ok(recommends.length > 0,
