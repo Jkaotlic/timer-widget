@@ -68,6 +68,15 @@ const CONTENT_SECURITY_POLICY = [
     "worker-src 'none'"
 ].join('; ');
 
+// Заголовок ответа несёт директиву ШИРЕ, чем meta, — R4 (ПСИ 2026-09-28):
+// frame-ancestors в meta-теге CSP браузер игнорирует (спецификация прямо это
+// запрещает), поэтому запрет «не встраивать окно в чужой <iframe>» может жить
+// только в заголовке. Строка ОДНА: заголовок строится ИЗ
+// CONTENT_SECURITY_POLICY суффиксом, а не второй копией текста политики,
+// которая может разойтись с первой молча (та же ловушка, что держит
+// scripts/csp-guard.js в курсе meta).
+const RESPONSE_CONTENT_SECURITY_POLICY = `${CONTENT_SECURITY_POLICY}; frame-ancestors 'none'`;
+
 const MIME_TYPES = Object.freeze({
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
@@ -177,9 +186,11 @@ function resolveAppRequest(url, allowed) {
 }
 
 /**
- * Заголовки успешного ответа. CSP — заголовком у страниц (та же строка, что в
- * meta: действующая политика — пересечение, так что расхождение сузило бы её
- * молча). nosniff — у всех: скрипт или стиль с чужим MIME не исполнится.
+ * Заголовки успешного ответа. CSP — заголовком у страниц: RESPONSE_CONTENT_
+ * SECURITY_POLICY несёт ВСЁ, что meta (действующая политика — пересечение,
+ * так что расхождение сузило бы её молча), плюс frame-ancestors 'none' (R4,
+ * meta эту директиву не умеет). nosniff — у всех: скрипт или стиль с чужим
+ * MIME не исполнится.
  */
 function responseHeaders(resolved) {
     const headers = {
@@ -187,12 +198,12 @@ function responseHeaders(resolved) {
         'X-Content-Type-Options': 'nosniff',
         'Cache-Control': 'no-cache'
     };
-    if (resolved.isHtml) { headers['Content-Security-Policy'] = CONTENT_SECURITY_POLICY; }
+    if (resolved.isHtml) { headers['Content-Security-Policy'] = RESPONSE_CONTENT_SECURITY_POLICY; }
     return headers;
 }
 
 module.exports = {
     SCHEME, HOST, ORIGIN, PRIVILEGED_SCHEME, WINDOW_PAGES, MIGRATION_PAGE,
-    CONTENT_SECURITY_POLICY, MIME_TYPES, ASSET_DIRS,
+    CONTENT_SECURITY_POLICY, RESPONSE_CONTENT_SECURITY_POLICY, MIME_TYPES, ASSET_DIRS,
     pageUrl, collectWebFiles, resolveAppRequest, responseHeaders
 };

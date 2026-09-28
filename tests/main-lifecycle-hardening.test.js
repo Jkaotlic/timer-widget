@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * R2 (docs/superpowers/specs/2026-09-28-psi-hardening.md, добивка перед
- * повторной сдачей ПСИ): в whenReady главный процесс обязан явно выключить
- * орфографию (сеть) — поверх уже стоящего запрета разрешений
- * (setPermissionRequestHandler/setPermissionCheckHandler).
+ * R2/R4 (docs/superpowers/specs/2026-09-28-psi-hardening.md, добивка перед
+ * повторной сдачей ПСИ): в whenReady главный процесс обязан явно закрыть
+ * орфографию (сеть), устройства и захват экрана — поверх уже стоящего запрета
+ * разрешений (setPermissionRequestHandler/setPermissionCheckHandler).
  *
  * main-lifecycle.js electron не требует (аргументы передаёт точка входа) —
  * поэтому startApp() тестируется здесь напрямую, минимальными подставками, а
@@ -70,7 +70,9 @@ test('R2: whenReady выключает орфографию — setSpellCheckerE
     const session = {
         setSpellCheckerEnabled: (v) => calls.push(['setSpellCheckerEnabled', v]),
         setPermissionRequestHandler: () => {},
-        setPermissionCheckHandler: () => {}
+        setPermissionCheckHandler: () => {},
+        setDevicePermissionHandler: () => {},
+        setDisplayMediaRequestHandler: () => {}
     };
     const { deps, ready } = makeDeps(session);
     startApp(deps);
@@ -78,8 +80,40 @@ test('R2: whenReady выключает орфографию — setSpellCheckerE
     assert.deepEqual(calls.find((c) => c[0] === 'setSpellCheckerEnabled'), ['setSpellCheckerEnabled', false]);
 });
 
-test('R2: отсутствие setSpellCheckerEnabled не обрывает регистрацию остальных обработчиков той же сессии', () => {
-    // Оба вызова стоят в ОДНОМ try (main-lifecycle.js): без typeof-гарда
+test('R4: whenReady явно запрещает устройства — setDevicePermissionHandler возвращает false', async () => {
+    let handler = null;
+    const session = {
+        setPermissionRequestHandler: () => {},
+        setPermissionCheckHandler: () => {},
+        setDevicePermissionHandler: (fn) => { handler = fn; },
+        setDisplayMediaRequestHandler: () => {}
+    };
+    const { deps, ready } = makeDeps(session);
+    startApp(deps);
+    await ready;
+    assert.equal(typeof handler, 'function', 'setDevicePermissionHandler обязан получить функцию');
+    assert.equal(handler({}, 'hid', {}), false, 'обработчик обязан отказывать любому устройству');
+});
+
+test('R4: whenReady отказывает захвату экрана — setDisplayMediaRequestHandler без источника', async () => {
+    let handler = null;
+    const session = {
+        setPermissionRequestHandler: () => {},
+        setPermissionCheckHandler: () => {},
+        setDevicePermissionHandler: () => {},
+        setDisplayMediaRequestHandler: (fn) => { handler = fn; }
+    };
+    const { deps, ready } = makeDeps(session);
+    startApp(deps);
+    await ready;
+    assert.equal(typeof handler, 'function', 'setDisplayMediaRequestHandler обязан получить функцию');
+    let callbackArg = 'не вызван';
+    handler({}, (arg) => { callbackArg = arg; });
+    assert.deepEqual(callbackArg, {}, 'callback обязан быть вызван без видео/аудио источника — это отказ getDisplayMedia()');
+});
+
+test('R2/R4: отсутствие setSpellCheckerEnabled не обрывает регистрацию остальных обработчиков той же сессии', () => {
+    // Все вызовы стоят в ОДНОМ try (main-lifecycle.js): без typeof-гарда
     // обращение к отсутствующему методу бросило бы TypeError, и всё, что
     // написано в try ПОСЛЕ него — включая уже существовавший
     // setPermissionRequestHandler, — не выполнилось бы вовсе, поймай его
@@ -89,21 +123,24 @@ test('R2: отсутствие setSpellCheckerEnabled не обрывает ре
     const session = {
         // setSpellCheckerEnabled нет — как в старых стабах тестов.
         setPermissionRequestHandler: () => calls.push('setPermissionRequestHandler'),
-        setPermissionCheckHandler: () => calls.push('setPermissionCheckHandler')
+        setPermissionCheckHandler: () => calls.push('setPermissionCheckHandler'),
+        setDevicePermissionHandler: () => calls.push('setDevicePermissionHandler'),
+        setDisplayMediaRequestHandler: () => calls.push('setDisplayMediaRequestHandler')
     };
     const { deps, ready } = makeDeps(session);
     startApp(deps);
     return ready.then(() => {
-        assert.deepEqual(calls, ['setPermissionRequestHandler', 'setPermissionCheckHandler']);
+        assert.deepEqual(calls, [
+            'setPermissionRequestHandler', 'setPermissionCheckHandler',
+            'setDevicePermissionHandler', 'setDisplayMediaRequestHandler'
+        ]);
     });
 });
 
-test('R2: подставка без setSpellCheckerEnabled/setPermissionRequestHandler/setPermissionCheckHandler не роняет whenReady (constraints.md review focus #5)', () => {
+test('R2/R4: подставка без ЛЮБОГО из пяти методов не роняет whenReady (constraints.md review focus #5)', () => {
     // У старых стабов тестов (createStubs() в electron-main-load.test.js)
     // `session.defaultSession` — вовсе `{}`. whenReady обязан дойти до
-    // createControlWindow, а не оборваться на первом отсутствующем методе
-    // (существующий catch уже это гарантировал — тест фиксирует, что R2 его
-    // не сломал).
+    // createControlWindow, а не оборваться на первом отсутствующем методе.
     const { deps, ready } = makeDeps({});
     startApp(deps);
     return ready; // резолвится только если createControlWindow был вызван — whenReady дошёл до конца

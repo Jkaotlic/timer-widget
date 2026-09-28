@@ -132,14 +132,15 @@ function startApp(deps) {
         // This is a purely offline timer — it never needs any web/device permission.
         // Defense-in-depth on top of sandbox/contextIsolation/CSP/will-navigate.
         //
-        // R2 (добивка перед повторной сдачей ПСИ, 2026-09-28): вызов ниже под
-        // `typeof … === 'function'` — метод стоит с версии Electron, которая
-        // новее подставок старых тестов (`session.defaultSession` там может
-        // быть `{}`, см. tests/main-lifecycle-hardening.test.js). Гард — не
-        // только «не упасть»: оба вызова стоят в ОДНОМ try, и необработанное
-        // исключение от отсутствующего метода обрывало бы try ПОСЛЕ первого
-        // брошенного — уже существовавший setPermissionRequestHandler просто
-        // не выполнился бы.
+        // R2/R4 (добивка перед повторной сдачей ПСИ, 2026-09-28): три вызова
+        // ниже под `typeof … === 'function'` — сами методы стоят с версии
+        // Electron, которая новее подставок старых тестов
+        // (`session.defaultSession` там может быть `{}`, см.
+        // tests/main-lifecycle-hardening.test.js). Гард — не только «не упасть»:
+        // все вызовы стоят в ОДНОМ try, и необработанное исключение от
+        // отсутствующего метода обрывало бы try ПОСЛЕ первого брошенного —
+        // соседние строки, включая уже существовавший
+        // setPermissionRequestHandler, просто не выполнились бы.
         try {
             const session = getSession();
             // Орфография тянет словарь Hunspell по сети (R2) — офлайновому
@@ -151,6 +152,17 @@ function startApp(deps) {
             }
             session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
             session.defaultSession.setPermissionCheckHandler(() => false);
+            // Явный запрет устройств (WebHID/WebUSB/WebSerial/Bluetooth, …) и
+            // захвата экрана (getDisplayMedia) — R4. Второй замок над тем же
+            // setPermissionRequestHandler: некоторые запросы устройств идут
+            // отдельным API мимо обычного permission-потока.
+            if (typeof session.defaultSession.setDevicePermissionHandler === 'function') {
+                session.defaultSession.setDevicePermissionHandler(() => false);
+            }
+            if (typeof session.defaultSession.setDisplayMediaRequestHandler === 'function') {
+                // callback без источника — отказ getDisplayMedia() без подвешивания промиса вызывающей страницы.
+                session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => callback({}));
+            }
         } catch (err) {
             log.warn('Permission handler setup failed:', err);
         }

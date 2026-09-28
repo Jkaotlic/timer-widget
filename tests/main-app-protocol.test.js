@@ -35,7 +35,9 @@ test('страница окна: 200, тело — файл, CSP и nosniff за
     const res = await handler(req('app://timer-widget/electron-control.html'));
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('content-type'), 'text/html; charset=utf-8');
-    assert.equal(res.headers.get('content-security-policy'), S.CONTENT_SECURITY_POLICY);
+    // R4 (ПСИ 2026-09-28): заголовок несёт frame-ancestors 'none' сверх
+    // meta-политики — meta эту директиву не поддерживает (app-scheme.js).
+    assert.equal(res.headers.get('content-security-policy'), S.RESPONSE_CONTENT_SECURITY_POLICY);
     assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
     const body = await res.text();
     assert.equal(body, fs.readFileSync(path.join(ROOT, 'electron-control.html'), 'utf8'));

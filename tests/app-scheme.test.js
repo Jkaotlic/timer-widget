@@ -150,9 +150,16 @@ test('отказы различимы: 403 — не наш адрес, 404 — �
     assert.equal(S.resolveAppRequest('app://timer-widget/evil.html', ALLOWED).status, 404);
 });
 
-test('заголовки: CSP заголовком у страниц, nosniff у всех', () => {
+test('заголовки: CSP заголовком у страниц (плюс frame-ancestors), nosniff у всех', () => {
+    // R4 (ПСИ 2026-09-28): frame-ancestors 'none' добавлен ТОЛЬКО заголовку —
+    // meta-тег CSP эту директиву не поддерживает (спецификация её там прямо
+    // запрещает), поэтому meta намеренно остаётся прежней строкой
+    // (CONTENT_SECURITY_POLICY), а заголовок — этой же строкой плюс суффикс:
+    // одна строка-источник, а не две копии, которые могли бы разойтись молча.
     const html = S.responseHeaders(S.resolveAppRequest('app://timer-widget/display.html', ALLOWED));
-    assert.equal(html['Content-Security-Policy'], S.CONTENT_SECURITY_POLICY);
+    assert.equal(html['Content-Security-Policy'], S.RESPONSE_CONTENT_SECURITY_POLICY);
+    assert.equal(html['Content-Security-Policy'], `${S.CONTENT_SECURITY_POLICY}; frame-ancestors 'none'`);
+    assert.notEqual(html['Content-Security-Policy'], S.CONTENT_SECURITY_POLICY, 'заголовок обязан НЕСТИ frame-ancestors сверх meta-политики');
     assert.equal(html['X-Content-Type-Options'], 'nosniff');
     assert.equal(html['Content-Type'], 'text/html; charset=utf-8');
 
