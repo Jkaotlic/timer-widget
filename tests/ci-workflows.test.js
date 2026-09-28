@@ -113,6 +113,10 @@ test('deb-launch-runner: purge убирает профиль AppArmor и ссы�
     assert.match(purge, /\/etc\/apparmor\.d\/timer-widget/, 'после purge не проверяется профиль AppArmor');
     assert.match(purge, /\/usr\/bin\/timer-widget/, 'после purge не проверяется /usr/bin/timer-widget');
     assert.match(purge, /update-alternatives --query timer-widget/, 'после purge не проверяется alternatives');
+    // purge по пакету, которого dpkg уже не помнит, «проходит», ничего не
+    // запустив. До purge пакет обязан быть установлен, и это проверено.
+    const status = purge.indexOf("'install ok installed'");
+    assert.ok(status > -1 && status < purge.indexOf('apt-get purge'), 'до purge не проверено, что пакет установлен');
     // P2 на живой системе: метка в ~/.config/timer-widget переживает purge.
     assert.match(purge, /\.config\/timer-widget\/[^\s"]+/, 'не проверено, что purge не тронул настройки пользователя');
 });

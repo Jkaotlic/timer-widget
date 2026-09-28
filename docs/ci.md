@@ -111,9 +111,11 @@ SBOM пакета (`--override-default-catalogers image`: по каталогу 
   приложение работало, 0 или иной код — не отказ. Шаг идёт после запуска,
   иначе «код 1» мог бы значить «не стартует вовсе»;
 - **remove**: профиль выгружен из ядра и удалён, `/usr/bin/timer-widget` исчез;
-- **purge**: нет профиля, ссылки, группы alternatives, `/opt/TimerWidget`,
-  dpkg пакет не помнит — и метка в `~/.config/timer-widget` цела: postrm
-  домашние каталоги не трогает.
+- **purge**: пакет ставится заново и перед purge проверяется
+  `install ok installed` (conffiles у него нет, и после remove dpkg может его
+  не помнить — тогда purge «прошёл» бы вхолостую); после purge нет профиля,
+  ссылки, группы alternatives, `/opt/TimerWidget`, dpkg пакет не помнит — и
+  метка в `~/.config/timer-widget` цела: postrm домашние каталоги не трогает.
 
 Ячейка `userns, upgrade` ставит ОПУБЛИКОВАННЫЙ `TimerWidget-2.11.0-amd64.deb`
 (`gh release download`, сверка с `SHA256SUMS.txt` релиза), затем собранный deb

@@ -453,13 +453,21 @@ jobs:
           if sudo grep -q '^timer-widget ' /sys/kernel/security/apparmor/profiles; then echo "::error::профиль остался загружен в ядре"; exit 1; fi
           if [ -e /usr/bin/timer-widget ]; then echo "::error::/usr/bin/timer-widget остался"; exit 1; fi
           echo "[remove] OK: профиль выгружен и удалён, ссылки нет"
-      # purge после remove: пакет в состоянии rc, отрабатывает postrm purge.
-      # Он убирает alternatives и профиль, но НЕ трогает домашние каталоги —
-      # метка в ~/.config/timer-widget обязана пережить purge.
+      # purge — по УСТАНОВЛЕННОМУ пакету: conffiles у него нет
+      # (--deb-no-default-config-files), и после remove dpkg может не держать
+      # его в состоянии rc — тогда purge «прошёл» бы, ничего не запустив.
+      # Поэтому пакет ставится заново, статус печатается и проверяется, и
+      # purge прогоняет postrm remove + purge. Он убирает alternatives и
+      # профиль, но НЕ трогает домашние каталоги — метка в
+      # ~/.config/timer-widget обязана пережить purge.
       - name: Purge deb — package traces gone, user settings kept
         run: |
           mkdir -p "$HOME/.config/timer-widget"
           echo keep > "$HOME/.config/timer-widget/purge-marker"
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ./deb/*.deb
+          BEFORE=$(dpkg-query -W -f='${Status}' timer-widget 2>&1 || true)
+          echo "[purge] до purge: $BEFORE"
+          if [ "$BEFORE" != 'install ok installed' ]; then echo "::error::перед purge пакет не установлен ($BEFORE) — purge ничего бы не доказал"; exit 1; fi
           sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y timer-widget
           FAIL=0
           ls -ld /etc/apparmor.d/timer-widget /usr/bin/timer-widget /etc/alternatives/timer-widget /opt/TimerWidget 2>&1 || true
