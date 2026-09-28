@@ -17,9 +17,11 @@
 #   --expect-refuse-switch <ключ>
 #                     собранное приложение обязано ОТКАЗАТЬСЯ стартовать с
 #                     `--<ключ>` (гард FORBIDDEN_SWITCHES в electron-main.js):
-#                     выход с кодом 1 и строкой гарда, без единого окна. Без
-#                     --expect выполняется только эта проверка — отдельным
-#                     шагом CI, чтобы провал был виден по имени шага.
+#                     выход с кодом 1 и строкой гарда, без единого окна.
+#                     Повторяется: каждый ключ проверяется одной и той же
+#                     функцией expect_refused. Без --expect выполняется только
+#                     эта проверка — отдельным шагом CI, чтобы провал был виден
+#                     по имени шага.
 #
 # Окружение: APP_USER — обычный пользователь для запуска (обязателен, root
 # запускать Chromium без --no-sandbox не даёт вовсе); ALIVE_SECONDS — сколько
@@ -27,15 +29,15 @@
 set -u
 
 EXPECT=""
-REFUSE_SWITCH=""
+REFUSE_SWITCHES=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --expect) EXPECT="$2"; shift 2 ;;
-        --expect-refuse-switch) REFUSE_SWITCH="$2"; shift 2 ;;
+        --expect-refuse-switch) REFUSE_SWITCHES="$REFUSE_SWITCHES $2"; shift 2 ;;
         *) echo "неизвестный аргумент: $1"; exit 2 ;;
     esac
 done
-if [ -z "$REFUSE_SWITCH" ] || [ -n "$EXPECT" ]; then
+if [ -z "$REFUSE_SWITCHES" ] || [ -n "$EXPECT" ]; then
     case "$EXPECT" in userns|suid) ;; *) echo "нужен --expect userns|suid и/или --expect-refuse-switch <ключ>"; exit 2 ;; esac
 fi
 : "${APP_USER:?нужен APP_USER — обычный пользователь для запуска}"
@@ -64,7 +66,7 @@ app_pids() {
 # Отказ от ключа. Ожидается РОВНО код 1 и строка гарда: 124 — timeout, то есть
 # ключ принят и приложение работало без защиты; 0 — вышло «успешно»; иной код
 # — упало, а не отказалось. Код 1 без строки гарда — тоже падение.
-refuse_switch_check() {
+expect_refused() {
     local sw="$1" udd out log
     echo "== запуск от $APP_USER с --$sw: собранное приложение обязано отказаться =="
     udd=$(runuser -u "$APP_USER" -- mktemp -d /tmp/tw-refuse.XXXXXX)
@@ -96,11 +98,15 @@ refuse_switch_check() {
     for p in $(app_pids); do kill -9 "$p" 2>/dev/null || true; done
 }
 
-if [ -n "$REFUSE_SWITCH" ]; then
-    refuse_switch_check "$REFUSE_SWITCH"
+if [ -n "$REFUSE_SWITCHES" ]; then
+    for sw in $REFUSE_SWITCHES; do
+        expect_refused "$sw"
+    done
     if [ -z "$EXPECT" ]; then
         if [ "$FAILS" -gt 0 ]; then echo "[launch] ПРОВАЛ: $FAILS"; exit 1; fi
-        echo "[launch] OK: --$REFUSE_SWITCH отвергнут собранным приложением"
+        for sw in $REFUSE_SWITCHES; do
+            echo "[launch] OK: --$sw отвергнут собранным приложением"
+        done
         exit 0
     fi
 fi

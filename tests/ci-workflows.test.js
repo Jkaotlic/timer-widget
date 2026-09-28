@@ -117,13 +117,26 @@ test('launch-check умеет требовать ОТКАЗ собранного
 
 const RUNNER = yamlCode(jobBlock(NODEJS, 'deb-launch-runner') || '');
 
-test('deb-launch-runner: --no-sandbox отвергается собранным приложением', () => {
-    assert.ok(RUNNER, 'нет job deb-launch-runner');
-    assert.match(RUNNER, /linux-launch-check\.sh --expect-refuse-switch no-sandbox/, 'нет шага отказа от --no-sandbox');
-    const launch = RUNNER.indexOf('--expect ${{ matrix.path }}');
-    const refuse = RUNNER.indexOf('--expect-refuse-switch no-sandbox');
-    assert.ok(launch > -1 && launch < refuse, 'отказ проверяется до успешного запуска — «код 1» мог бы значить «не стартует вовсе»');
+test('launch-check: отказ — ОДНА функция expect_refused, её зовут для каждого ключа', () => {
+    // Проверка отказа от --dev (2.12.1) — та же, что от --no-sandbox: код 1 +
+    // строка гарда. Две копии тела расходились бы на первой правке.
+    assert.match(launchCode, /^expect_refused\(\) \{/m, 'нет функции expect_refused');
+    assert.doesNotMatch(launchCode, /refuse_switch_check/, 'старое имя функции осталось');
+    assert.match(launchCode, /expect_refused "\$sw"/, 'функция не вызывается для переданных ключей');
 });
+
+// Ключи, от которых собранный deb обязан отказаться на живой системе: снятие
+// песочницы и режим разработчика (требование ПСИ 2.12.1).
+for (const sw of ['no-sandbox', 'dev']) {
+    test(`deb-launch-runner: --${sw} отвергается собранным приложением`, () => {
+        assert.ok(RUNNER, 'нет job deb-launch-runner');
+        const re = new RegExp(`linux-launch-check\\.sh --expect-refuse-switch ${sw}(?:\\s|$)`, 'm');
+        assert.match(RUNNER, re, `нет шага отказа от --${sw}`);
+        const launch = RUNNER.indexOf('--expect ${{ matrix.path }}');
+        const refuse = RUNNER.search(re);
+        assert.ok(launch > -1 && launch < refuse, 'отказ проверяется до успешного запуска — «код 1» мог бы значить «не стартует вовсе»');
+    });
+}
 
 test('deb-launch-runner: purge убирает профиль AppArmor и ссылку, но не трогает $HOME', () => {
     const purge = stepBlock(RUNNER, 'Purge');

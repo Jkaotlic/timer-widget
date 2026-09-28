@@ -433,6 +433,9 @@ jobs:
       # запуска: иначе «код 1» мог бы значить «не стартует вообще».
       - name: Refuses --no-sandbox (exit 1, no window)
         run: sudo APP_USER="$(id -un)" bash scripts/linux-launch-check.sh --expect-refuse-switch no-sandbox
+      # Режим разработчика в сборке (2.12.1, требование ПСИ): тот же отказ.
+      - name: Refuses --dev (exit 1, no window)
+        run: sudo APP_USER="$(id -un)" bash scripts/linux-launch-check.sh --expect-refuse-switch dev
       # postrm обязан выгрузить профиль из ядра и убрать файл — иначе после
       # удаления пакета в системе остаётся разрешение userns для пути /opt.
       - name: Remove deb — AppArmor profile goes away
