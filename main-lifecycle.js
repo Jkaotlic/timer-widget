@@ -131,8 +131,24 @@ function startApp(deps) {
         // Deny every renderer permission request (camera/mic/geo/notifications/…).
         // This is a purely offline timer — it never needs any web/device permission.
         // Defense-in-depth on top of sandbox/contextIsolation/CSP/will-navigate.
+        //
+        // R2 (добивка перед повторной сдачей ПСИ, 2026-09-28): вызов ниже под
+        // `typeof … === 'function'` — метод стоит с версии Electron, которая
+        // новее подставок старых тестов (`session.defaultSession` там может
+        // быть `{}`, см. tests/main-lifecycle-hardening.test.js). Гард — не
+        // только «не упасть»: оба вызова стоят в ОДНОМ try, и необработанное
+        // исключение от отсутствующего метода обрывало бы try ПОСЛЕ первого
+        // брошенного — уже существовавший setPermissionRequestHandler просто
+        // не выполнился бы.
         try {
             const session = getSession();
+            // Орфография тянет словарь Hunspell по сети (R2) — офлайновому
+            // таймеру сеть не нужна ни для чего. Дублирует `spellcheck: false`
+            // у каждого окна (main-windows.js) — тот гасит подчёркивание в
+            // самом окне, этот — фоновую загрузку словаря сессией.
+            if (typeof session.defaultSession.setSpellCheckerEnabled === 'function') {
+                session.defaultSession.setSpellCheckerEnabled(false);
+            }
             session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
             session.defaultSession.setPermissionCheckHandler(() => false);
         } catch (err) {

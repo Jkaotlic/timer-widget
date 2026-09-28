@@ -110,7 +110,15 @@ function createWindows(deps) {
                 preload: path.join(__dirname, 'preload.js'),
                 additionalArguments: [windowArgument('control')],
                 sandbox: true,
-                devTools: process.argv.includes('--dev') && !app.isPackaged
+                devTools: process.argv.includes('--dev') && !app.isPackaged,
+                // Chromium подгружает словарь орфографии по сети (Hunspell —
+                // https://o.chromium.org). Приложение офлайновое и не показывает
+                // текстовых полей, где нужна проверка правописания (R2, ПСИ
+                // 2026-09-28): выключено во всех четырёх окнах, тем же ключом,
+                // что и здесь. Продублировано ниже в whenReady
+                // (setSpellCheckerEnabled) — это гасит и подчёркивание, если
+                // проверка где-то всё же включится сама.
+                spellcheck: false
             },
             title: 'Управление Таймером',
             icon: getAppIconPath(),
@@ -190,7 +198,8 @@ function createWindows(deps) {
                 preload: path.join(__dirname, 'preload.js'),
                 additionalArguments: [windowArgument('widget')],
                 sandbox: true,
-                devTools: process.argv.includes('--dev') && !app.isPackaged
+                devTools: process.argv.includes('--dev') && !app.isPackaged,
+                spellcheck: false // см. комментарий у панели (R2)
             },
             hasShadow: false
         });
@@ -264,7 +273,8 @@ function createWindows(deps) {
                 preload: path.join(__dirname, 'preload.js'),
                 additionalArguments: [windowArgument('clock')],
                 sandbox: true,
-                devTools: process.argv.includes('--dev') && !app.isPackaged
+                devTools: process.argv.includes('--dev') && !app.isPackaged,
+                spellcheck: false // см. комментарий у панели (R2)
             },
             hasShadow: false
         });
@@ -356,7 +366,8 @@ function createWindows(deps) {
                 preload: path.join(__dirname, 'preload.js'),
                 additionalArguments: [windowArgument('display')],
                 sandbox: true,
-                devTools: process.argv.includes('--dev') && !app.isPackaged
+                devTools: process.argv.includes('--dev') && !app.isPackaged,
+                spellcheck: false // см. комментарий у панели (R2)
             }
         });
 
