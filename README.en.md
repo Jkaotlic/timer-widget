@@ -7,7 +7,7 @@
 **Transparent timer widget for presentations and desktop**
 
 [![Version](https://img.shields.io/badge/v2.12.0-0a84ff?style=flat-square)](../../releases/latest)
-[![Electron](https://img.shields.io/badge/Electron_43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron_44-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
@@ -323,7 +323,7 @@ timer-widget/
 
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` on all windows
 - Window DevTools only with `--dev` in an unpackaged app; a packaged app started with `--remote-debugging-*` / `--inspect*` exits before the first window
-- Electron fuses: no `RunAsNode`, `NODE_OPTIONS` or `--inspect`; `app.asar` is checked against its build-time hash
+- Electron fuses: no `RunAsNode`, `NODE_OPTIONS` or `--inspect`; `app.asar` is checked against its build-time hash (macOS and Windows; on Linux — root ownership of `/opt` and `dpkg --verify`)
 - Per-window IPC whitelist with direction validation (send / receive): `ipc-senders.js` tables → `preload.js`, plus a sender check in the main process
 - The main process checks the sender of every IPC channel (`ipc-senders.js`) and the shape of relayed payloads (`relay-payload.js`)
 - Navigation only to the app's own four pages (`navigation-guard.js`); `window.open` and `<webview>` are denied
@@ -409,7 +409,7 @@ Bugs and feature requests — in [Issues](../../issues). Full change history —
 
 <div align="center">
 
-**Electron 43.2.0** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
+**Electron 44.4.5** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 

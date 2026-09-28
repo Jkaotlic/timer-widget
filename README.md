@@ -7,7 +7,7 @@
 **Прозрачный таймер-виджет для презентаций и рабочего стола**
 
 [![Version](https://img.shields.io/badge/v2.12.0-0a84ff?style=flat-square)](../../releases/latest)
-[![Electron](https://img.shields.io/badge/Electron_43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron_44-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)
 [![Platform](https://img.shields.io/badge/Windows_|_macOS_|_Linux-333?style=flat-square)]()
@@ -323,7 +323,7 @@ timer-widget/
 
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` на всех окнах
 - DevTools окон — только при `--dev` в несобранном приложении; собранное с `--remote-debugging-*` / `--inspect*` выходит до первого окна
-- Фьюзы Electron: без `RunAsNode`, `NODE_OPTIONS` и `--inspect`, `app.asar` сверяется с хешем
+- Фьюзы Electron: без `RunAsNode`, `NODE_OPTIONS` и `--inspect`, `app.asar` сверяется с хешем (macOS и Windows; на Linux — права root на `/opt` и `dpkg --verify`)
 - IPC whitelist по окнам с валидацией направления (send / receive): таблицы `ipc-senders.js` → `preload.js`, плюс проверка отправителя в главном процессе
 - Главный процесс проверяет отправителя каждого IPC-канала (`ipc-senders.js`) и форму payload ретрансляторов (`relay-payload.js`)
 - Навигация — только на четыре собственные страницы (`navigation-guard.js`), `window.open` и `<webview>` запрещены
@@ -409,7 +409,7 @@ timer-widget/
 
 <div align="center">
 
-**Electron 43.2.0** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
+**Electron 44.4.5** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 
