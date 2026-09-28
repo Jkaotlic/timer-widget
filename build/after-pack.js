@@ -54,8 +54,44 @@ function sanitizeLicenseFile(filePath) {
     return false;
 }
 
+// Разделяемые библиотеки Electron (libffmpeg.so, libvk_swiftshader.so,
+// libvulkan.so.1) приходят с правами 0755. dlopen() бит исполнения не нужен,
+// а lintian считает его ошибкой (E: shared-library-is-executable, CI
+// 28.09.2026). fpm берёт права с диска — поэтому снимаем здесь, до упаковки.
+// Символические ссылки не трогаем: chmod по ним менял бы цель.
+const SHARED_LIB = /\.so(\.\d+)*$/;
+
+function dropExecOnSharedLibs(dir, acc = []) {
+    let entries;
+    try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+        return acc;
+    }
+    for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            dropExecOnSharedLibs(full, acc);
+        } else if (entry.isFile() && SHARED_LIB.test(entry.name)) {
+            const mode = fs.statSync(full).mode & 0o777;
+            if (mode & 0o111) {
+                fs.chmodSync(full, mode & ~0o111);
+                acc.push(full);
+            }
+        }
+    }
+    return acc;
+}
+
+exports.dropExecOnSharedLibs = dropExecOnSharedLibs;
+
 exports.default = async function afterPack(context) {
     const appOutDir = context.appOutDir;
+    if (context.electronPlatformName === 'linux') {
+        const fixed = dropExecOnSharedLibs(appOutDir);
+        console.log(`[after-pack] Linux: снят бит исполнения у ${fixed.length} библиотек: ` +
+            fixed.map((f) => path.relative(appOutDir, f)).join(', '));
+    }
     const files = walk(appOutDir, []);
     let cleaned = 0;
     for (const file of files) {
