@@ -322,7 +322,7 @@ timer-widget/
 <br>
 
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` на всех окнах
-- DevTools окон — только при `--dev` в несобранном приложении; собранное с `--remote-debugging-*` / `--inspect*` выходит до первого окна
+- DevTools окон — только при `--dev` в несобранном приложении; собранное приложение выходит до первого окна на любом ключе, снимающем песочницу/изоляцию или включающем отладку (полный список — SECURITY.md)
 - Фьюзы Electron: без `RunAsNode`, `NODE_OPTIONS` и `--inspect`, `app.asar` сверяется с хешем (macOS и Windows; на Linux — права root на `/opt` и `dpkg --verify`)
 - IPC whitelist по окнам с валидацией направления (send / receive): таблицы `ipc-senders.js` → `preload.js`, плюс проверка отправителя в главном процессе
 - Главный процесс проверяет отправителя каждого IPC-канала (`ipc-senders.js`) и форму payload ретрансляторов (`relay-payload.js`)

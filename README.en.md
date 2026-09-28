@@ -322,7 +322,7 @@ timer-widget/
 <br>
 
 - `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` on all windows
-- Window DevTools only with `--dev` in an unpackaged app; a packaged app started with `--remote-debugging-*` / `--inspect*` exits before the first window
+- Window DevTools only with `--dev` in an unpackaged app; a packaged app exits before the first window on any switch that weakens the sandbox/isolation or enables debugging (full list — SECURITY.md)
 - Electron fuses: no `RunAsNode`, `NODE_OPTIONS` or `--inspect`; `app.asar` is checked against its build-time hash (macOS and Windows; on Linux — root ownership of `/opt` and `dpkg --verify`)
 - Per-window IPC whitelist with direction validation (send / receive): `ipc-senders.js` tables → `preload.js`, plus a sender check in the main process
 - The main process checks the sender of every IPC channel (`ipc-senders.js`) and the shape of relayed payloads (`relay-payload.js`)

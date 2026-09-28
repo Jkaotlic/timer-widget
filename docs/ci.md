@@ -22,6 +22,25 @@
 (так в 2.3.2 потерялся `design-tokens.css`); его парсер проверен на
 **настоящем** `default_app.asar`.
 
+## lintian: 0 error, но не 0 warning
+
+`scripts/lintian-check.sh` валит job только на error (`--fail-on error`);
+warning печатается в лог, но сборку не останавливает. Три тега в
+`build/lintian-overrides` (`dir-or-file-in-opt`, `embedded-library`,
+`unstripped-binary-or-object` на `libvulkan.so.1`) официально подавлены с
+причиной прямо в самом пакете. Ниже — оставшиеся warning-теги, которые
+`--fail-on error` пропускает без override: они не поставлены в overrides
+намеренно (они не мешают сборке и не являются находками аудита 28.09.2026),
+но остаются документированной и осознанной, а не забытой цепочкой:
+
+| Тег | Причина |
+|-----|---------|
+| `maintainer-script-ignores-errors` (×2 — postinst и postrm) | Каждый шаг в этих скриптах явно завершается `\|\| true`: необязательный шаг (например, профиль AppArmor, которого может не быть в системе) не должен ронять установку/удаление всего пакета |
+| `postrm-removes-alternative` | Штатное поведение шаблона electron-builder (`templates/linux/after-remove.tpl`, `update-alternatives --remove`); при обновлении новый `postinst` сам добавляет альтернативу снова — проверено ячейкой CI на живом апгрейде |
+| `package-contains-timestamped-gzip` | Побочный эффект генератора changelog у `fpm` (см. следующую строку) — сам gzip не переизобретается руками ради воспроизводимой сборки одного файла-заглушки |
+| `syntax-error-in-debian-changelog` | `fpm` сам генерирует заглушку `debian/changelog` без записей проекта — реальный changelog ведёт `CHANGELOG.md` |
+| `unknown-field` (`License`, `Vendor` в control-файле) | Поля, которые сам `electron-builder` пишет в control сверх стандартного набора Debian; их удаление — правка вендорного шаблона электрон-билдера, а не пакета |
+
 ## Ворота уязвимостей
 
 Зачем: сборка 2.9.0 не прошла ПСИ по критическим уязвимостям Linux-версии.
