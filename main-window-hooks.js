@@ -21,8 +21,9 @@ const NavigationGuard = require('./navigation-guard');
  * @param {string[]} deps.appPageUrls — адреса четырёх страниц (navigation-guard.js)
  * @param {Function} deps.logBlockedNavigation — журнал отказа навигации
  * @param {Function} deps.updateTrayMenu — трей перестраивает меню по открытию окон
+ * @param {object} deps.CONFIG — constants.js (CRASH_RELOAD_LIMIT, CRASH_RELOAD_WINDOW_MS)
  */
-function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logBlockedNavigation, updateTrayMenu }) {
+function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logBlockedNavigation, updateTrayMenu, CONFIG }) {
     const APP_PAGE_URLS = appPageUrls;
 
     // Block Ctrl+=/- keyboard zoom and Ctrl+Wheel page zoom on all windows
@@ -50,13 +51,30 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
     }
 
     // Render process crash handler
+    //
+    // R5 (2026-09-28-psi-hardening): лимит перезагрузок — СКОЛЬЗЯЩЕЕ окно
+    // CRASH_RELOAD_WINDOW_MS, а не счётчик на жизнь окна (constraints.md,
+    // review focus #4) — окно, упавшее один раз в час, обязано перезагружаться
+    // всегда. Поэтому метки времени перезагрузок держатся МАССИВОМ на самом
+    // окне (`win.__crashReloads`): старые метки, выпавшие из окна, просто
+    // отфильтровываются при каждом новом крахе. При достижении лимита окно
+    // остаётся как есть — не перезагружается и не закрывается, только лог.
     function bindRenderCrashHandler(win, label) {
         if (!win || !win.webContents) { return; }
         win.webContents.on('render-process-gone', (_event, details) => {
             log.error(`Render process gone in ${label}: ${JSON.stringify(details)}`);
-            if (details.reason !== 'clean-exit' && !win.isDestroyed()) {
-                try { win.reload(); } catch (err) { log.error('Reload failed:', err); }
+            if (details.reason === 'clean-exit' || win.isDestroyed()) { return; }
+
+            const now = Date.now();
+            const recent = (win.__crashReloads || []).filter((t) => now - t < CONFIG.CRASH_RELOAD_WINDOW_MS);
+            if (recent.length >= CONFIG.CRASH_RELOAD_LIMIT) {
+                win.__crashReloads = recent;
+                log.error(`${label}: превышен лимит перезагрузок после краха (${CONFIG.CRASH_RELOAD_LIMIT} за ${CONFIG.CRASH_RELOAD_WINDOW_MS} мс) — окно оставлено без перезагрузки`);
+                return;
             }
+            recent.push(now);
+            win.__crashReloads = recent;
+            try { win.reload(); } catch (err) { log.error('Reload failed:', err); }
         });
     }
 

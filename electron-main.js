@@ -270,7 +270,7 @@ const getSession = () => require('electron').session;
 const closing = createWindowClosing({ windows });
 const geometry = createWindowGeometry({ screen, CONFIG, safelySendToWindow });
 const hooks = createWindowHooks({
-    windows, log, safelySendToWindow,
+    windows, log, safelySendToWindow, CONFIG,
     appPageUrls: APP_PAGE_URLS, logBlockedNavigation,
     updateTrayMenu: () => tray.updateTrayMenu()
 });
