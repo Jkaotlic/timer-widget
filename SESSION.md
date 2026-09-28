@@ -73,7 +73,6 @@
 ### Design
 - Mockup: `.superpowers/brainstorm/1913-1775470678/content/design-improvements.html`
 - Spec: `docs/superpowers/specs/2026-04-06-design-improvements-v2.md`
-- Figma: https://www.figma.com/design/ojj21B75qClGUlDgqAUFIU (control panel, Starter limit)
 
 ## Apr 6, 2026 — Overtime Visuals + UI Polish
 
