@@ -20,7 +20,7 @@ v2.11.0) и требования «режим разработчика выкл�
 | Нужны ли права администратора | Нет (кроме установки deb-пакета, как у любого пакета) |
 | Какие данные хранит | Настройки, загруженные пользователем звуки и фон, итог перелимита мероприятия, снимок таймера для восстановления после сбоя, журнал работы |
 | Куда пишет | Каталог данных приложения текущего пользователя; отчёт CSV — только в место, выбранное пользователем в диалоге |
-| Открыт ли режим разработчика | Нет. В собранном приложении нет ни одного входа в него: DevTools окон выключены, а `--dev` и ключи отладки Chromium и Node приводят к выходу до первого окна (раздел «Режим разработчика») |
+| Открыт ли режим разработчика | Нет. В собранном приложении DevTools окон выключены; `--dev`, отладочные ключи Chromium и отладочные переменные окружения Electron приводят к выходу до первого окна; отладка Node отключена фьюзами (раздел «Режим разработчика») |
 
 ## Работа без сети
 
@@ -156,7 +156,12 @@ DevTools окна — не единственный вход. Ключи Chromiu
 `no-zygote`, `renderer-cmd-prefix`, `gpu-launcher`, `utility-cmd-prefix`,
 `browser-subprocess-path`, `js-flags`, `allow-file-access-from-files`,
 `remote-allow-origins`, а также ключи режима разработчика (2.12.1): `dev`,
-`enable-logging`, `v`, `vmodule`, `auto-open-devtools-for-tabs`.
+`enable-logging`, `v`, `vmodule`, `auto-open-devtools-for-tabs`,
+`trace-startup`, `trace-startup-file`. Тем же выходом кончается запуск с
+любой из переменных окружения Electron, включающих отладочный журнал без
+ключа: `ELECTRON_ENABLE_LOGGING` (по документации Electron — то же, что
+`--enable-logging`), `ELECTRON_LOG_FILE`, `ELECTRON_LOG_ASAR_READS`,
+`ELECTRON_ENABLE_STACK_DUMPING` — запрещены самим наличием, даже пустые.
 
 Гард читает `process.argv` — то, с чем реально запущен процесс, — а не
 `app.commandLine.hasSwitch()`: Electron сам дописывает
@@ -200,13 +205,18 @@ Zygote-процесс — механизм Chromium для форка песоч
 | Ключ приложения `--dev` | Выход с кодом 1. Второй замок: каждое чтение `--dev` в главном процессе (подробный лог, монитор памяти, DevTools) требует ещё и `!app.isPackaged` | `electron-main.js`; `tests/electron-main-load.test.js`, `tests/main-modules.test.js` |
 | Удалённая отладка (`--remote-debugging-port`, `--remote-debugging-pipe`, `--remote-allow-origins`, `--inspect`, `--inspect-brk`) | Выход с кодом 1 | раздел выше |
 | Отладка через Node (`ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS`, `--inspect`) | Отключена фьюзами в самом бинаре — ключом или переменной не включается | раздел «Фьюзы Electron» |
-| Отладочный журнал Chromium (`--enable-logging`, `--v`, `--vmodule`), `--auto-open-devtools-for-tabs` | Выход с кодом 1 | раздел выше |
+| Отладочный журнал и трассировка Chromium (`--enable-logging`, `--v`, `--vmodule`, `--trace-startup`, `--trace-startup-file`), `--auto-open-devtools-for-tabs` | Выход с кодом 1 | раздел выше |
+| Те же журналы без ключа — переменные окружения Electron (`ELECTRON_ENABLE_LOGGING`, `ELECTRON_LOG_FILE`, `ELECTRON_LOG_ASAR_READS`, `ELECTRON_ENABLE_STACK_DUMPING`) | Выход с кодом 1 | раздел выше |
 | Тестовый режим и режим съёмки (`NODE_TEST_CONTEXT`, `--screenshot`) | Игнорируются | раздел выше |
 
-На установленном deb это проверяет CI: шаги «Refuses --no-sandbox» и
-«Refuses --dev» запускают `/usr/bin/timer-widget` от обычного пользователя и
-требуют код 1 и строку гарда без единого окна (`scripts/linux-launch-check.sh`,
-функция `expect_refused`).
+Строка гарда в выводе: «ключ «--X» запрещён в собранном приложении — выход»
+или «переменная окружения X запрещена в собранном приложении — выход».
+
+На установленном deb это проверяет CI: шаги «Refuses --no-sandbox»,
+«Refuses --dev» и «Refuses ELECTRON_ENABLE_LOGGING» запускают
+`/usr/bin/timer-widget` от обычного пользователя и требуют код 1 и строку
+гарда без единого окна (`scripts/linux-launch-check.sh`, функция
+`expect_refused`).
 
 ### Фьюзы Electron
 

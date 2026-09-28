@@ -436,6 +436,9 @@ jobs:
       # Режим разработчика в сборке (2.12.1, требование ПСИ): тот же отказ.
       - name: Refuses --dev (exit 1, no window)
         run: sudo APP_USER="$(id -un)" bash scripts/linux-launch-check.sh --expect-refuse-switch dev
+      # Тот же отладочный журнал без ключа — переменной окружения Electron.
+      - name: Refuses ELECTRON_ENABLE_LOGGING (exit 1, no window)
+        run: sudo APP_USER="$(id -un)" bash scripts/linux-launch-check.sh --expect-refuse-env ELECTRON_ENABLE_LOGGING
       # postrm обязан выгрузить профиль из ядра и убрать файл — иначе после
       # удаления пакета в системе остаётся разрешение userns для пути /opt.
       - name: Remove deb — AppArmor profile goes away

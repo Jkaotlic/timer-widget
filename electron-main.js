@@ -83,13 +83,25 @@ const FORBIDDEN_SWITCHES = [
     'single-process', 'in-process-gpu', 'no-zygote',
     'renderer-cmd-prefix', 'gpu-launcher', 'utility-cmd-prefix', 'browser-subprocess-path', 'js-flags',
     'allow-file-access-from-files', 'remote-allow-origins',
-    'dev', 'enable-logging', 'v', 'vmodule', 'auto-open-devtools-for-tabs'
+    'dev', 'enable-logging', 'v', 'vmodule', 'auto-open-devtools-for-tabs',
+    'trace-startup', 'trace-startup-file'
+];
+
+// Те же входы в режим разработчика БЕЗ ключа — переменными окружения
+// Electron (ревью 2.12.1): ELECTRON_ENABLE_LOGGING по документации Electron —
+// «то же, что --enable-logging», ELECTRON_LOG_FILE — куда писать этот журнал,
+// ELECTRON_LOG_ASAR_READS и ELECTRON_ENABLE_STACK_DUMPING — отладочные журнал
+// чтений asar и дамп стека. Фьюзы их не закрывают (фьюзы — про RunAsNode,
+// NODE_OPTIONS и inspect). Запрещены самим НАЛИЧИЕМ, даже пустые: гард не
+// гадает, какое значение Electron сочтёт включением.
+const FORBIDDEN_ENV = [
+    'ELECTRON_ENABLE_LOGGING', 'ELECTRON_LOG_FILE', 'ELECTRON_LOG_ASAR_READS', 'ELECTRON_ENABLE_STACK_DUMPING'
 ];
 
 // Смотрим на process.argv, а НЕ на app.commandLine.hasSwitch() (fix-round-2,
 // 28.09.2026): деб-запуск в CI (прогон 36398413388, все шесть ячеек «deb
 // install + launch») поймал собранный пакет, падающий на КАЖДОМ старте со
-// строкой «ключ «--allow-file-access-from-files» ослабляет изоляцию…» — хотя
+// строкой про ключ «--allow-file-access-from-files» — хотя
 // НИКТО такой ключ не передавал. Причина: сборка держит фьюз
 // GrantFileProtocolExtraPrivileges (package.json → electronFuses, нужен
 // localStorage на file:// при переносе настроек), и Electron САМ дописывает
@@ -136,8 +148,16 @@ function findForbiddenArgv(argv, names, platform = process.platform) {
 const __forbiddenSwitchFound = app.isPackaged
     ? findForbiddenArgv(process.argv, FORBIDDEN_SWITCHES)
     : undefined;
-if (__forbiddenSwitchFound) {
-    console.error(`[TimerWidget] ключ «--${__forbiddenSwitchFound}» ослабляет изоляцию собранного приложения — выход`);
+const __forbiddenEnvFound = app.isPackaged
+    ? FORBIDDEN_ENV.find((name) => process.env[name] !== undefined)
+    : undefined;
+// Формулировка нейтральна: в списке и ключи, снимающие изоляцию, и ключи
+// режима разработчика — «ослабляет изоляцию» про `--dev` было бы неправдой в
+// строке, которую читают проверяющие. scripts/linux-launch-check.sh ищет её.
+if (__forbiddenSwitchFound || __forbiddenEnvFound) {
+    console.error(__forbiddenSwitchFound
+        ? `[TimerWidget] ключ «--${__forbiddenSwitchFound}» запрещён в собранном приложении — выход`
+        : `[TimerWidget] переменная окружения ${__forbiddenEnvFound} запрещена в собранном приложении — выход`);
     app.exit(1);
     process.exit(1);
 }

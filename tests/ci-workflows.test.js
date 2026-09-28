@@ -103,16 +103,30 @@ test('launch-check умеет требовать ОТКАЗ собранного
     assert.match(launchCode, /--expect-refuse-switch\)/, 'нет разбора --expect-refuse-switch');
     // Ограничение по времени обязательно: без него «принял ключ и работает»
     // выглядело бы как зависший шаг, а не как провал проверки.
-    assert.match(launchCode, /timeout[^\n]*\b20\b[^\n]*"\/usr\/bin\/\$EXE" "--\$/, 'запуск с ключом не ограничен timeout 20');
+    assert.match(launchCode, /timeout[^\n]*\b20\b[^\n]*"\/usr\/bin\/\$EXE"/, 'запуск с ключом не ограничен timeout 20');
     assert.match(launchCode, /runuser -u "\$APP_USER"[^\n]*\\\n\s*timeout /, 'отказ проверяется не от обычного пользователя');
     // Ожидается ровно 1: 124 — timeout (ключ принят, приложение работало),
     // 0 — вышло «успешно», иное — упало. Все три — провал.
     assert.match(launchCode, /"\$RC" = 1/, 'код отказа не сверяется с 1');
     assert.match(launchCode, /\b124[|)]/, 'код 124 (timeout) не разобран отдельно');
     // Код 1 бывает и у падения: отказ подтверждается строкой гарда.
-    assert.match(launchCode, /ослабляет изоляцию/, 'код 1 не сверен с сообщением гарда electron-main.js');
+    // Формулировка нейтральна (2.12.1): в списке и ключи режима разработчика,
+    // а «ослабляет изоляцию» про --dev — неправда в строке для проверяющих.
+    assert.match(launchCode, /запрещен[аы]? в собранном приложении/, 'код 1 не сверен с сообщением гарда electron-main.js');
+    assert.doesNotMatch(launchCode, /ослабляет изоляцию/, 'launch-check ищет старую формулировку гарда');
     const guard = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
-    assert.match(guard, /ослабляет изоляцию собранного приложения — выход/, 'сообщение гарда изменилось — launch-check ищет старое');
+    assert.match(guard, /ключ «--\$\{__forbiddenSwitchFound\}» запрещён в собранном приложении — выход/, 'сообщение гарда о ключе изменилось — launch-check ищет старое');
+    assert.match(guard, /переменная окружения \$\{__forbiddenEnvFound\} запрещена в собранном приложении — выход/, 'сообщение гарда о переменной изменилось — launch-check ищет старое');
+});
+
+test('launch-check: пустое значение отказа отвергается, а не превращается в «проверять нечего»', () => {
+    // ` --expect-refuse-switch ""` раньше давал непустую строку из пробела:
+    // цикл не выполнялся ни разу, скрипт выходил с 0, ничего не проверив.
+    assert.match(launchCode, /--expect-refuse-switch\)\s*\[ -n "\$\{2:-\}" \]/, 'пустой ключ не отвергается');
+    assert.match(launchCode, /--expect-refuse-env\)\s*\[ -n "\$\{2:-\}" \]/, 'пустая переменная не отвергается');
+    // Массив, а не строка через пробел: значение с `*` не раскрывается глобом.
+    assert.match(launchCode, /REFUSE\+=\("switch:\$2"\)/, 'ключи копятся не в массив');
+    assert.match(launchCode, /for item in "\$\{REFUSE\[@\]\}"/, 'обход без кавычек — глоб раскроется');
 });
 
 const RUNNER = yamlCode(jobBlock(NODEJS, 'deb-launch-runner') || '');
@@ -122,7 +136,15 @@ test('launch-check: отказ — ОДНА функция expect_refused, её 
     // строка гарда. Две копии тела расходились бы на первой правке.
     assert.match(launchCode, /^expect_refused\(\) \{/m, 'нет функции expect_refused');
     assert.doesNotMatch(launchCode, /refuse_switch_check/, 'старое имя функции осталось');
-    assert.match(launchCode, /expect_refused "\$sw"/, 'функция не вызывается для переданных ключей');
+    assert.match(launchCode, /expect_refused "\$item"/, 'функция не вызывается для переданных ключей');
+});
+
+test('deb-launch-runner: ELECTRON_ENABLE_LOGGING в окружении — отказ собранного приложения', () => {
+    // Тот же журнал, что --enable-logging, без единого ключа (ревью 2.12.1).
+    const re = /linux-launch-check\.sh --expect-refuse-env ELECTRON_ENABLE_LOGGING(?:\s|$)/m;
+    assert.match(RUNNER, re, 'нет шага отказа от ELECTRON_ENABLE_LOGGING');
+    const launch = RUNNER.indexOf('--expect ${{ matrix.path }}');
+    assert.ok(launch > -1 && launch < RUNNER.search(re), 'отказ проверяется до успешного запуска');
 });
 
 // Ключи, от которых собранный deb обязан отказаться на живой системе: снятие

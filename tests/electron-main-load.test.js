@@ -1049,7 +1049,7 @@ test('SEC-05: electron-log не вешает свой preload в окна', () =
 // `platform` подменяет process.platform (дескриптор configurable — Node это
 // разрешает) — гард fix-round-3 читает её как параметр по умолчанию
 // (`platform = process.platform`), вычисляемый заново при каждом вызове.
-function loadPackagedGuard(customizeStubs, { argv, platform } = {}) {
+function loadPackagedGuard(customizeStubs, { argv, platform, env } = {}) {
     const stubs = createStubs();
     stubs.electron.app.isPackaged = true;
     const exits = [];
@@ -1062,6 +1062,8 @@ function loadPackagedGuard(customizeStubs, { argv, platform } = {}) {
     if (argv) { process.argv = argv; }
     const platformDesc = platform ? Object.getOwnPropertyDescriptor(process, 'platform') : null;
     if (platform) { Object.defineProperty(process, 'platform', { value: platform, configurable: true }); }
+    const savedEnv = {};
+    for (const [k, v] of Object.entries(env || {})) { savedEnv[k] = process.env[k]; process.env[k] = v; }
     let threw = null;
     try {
         loadMain(stubs);
@@ -1071,6 +1073,9 @@ function loadPackagedGuard(customizeStubs, { argv, platform } = {}) {
         process.exit = realExit;
         if (argv) { process.argv = savedArgv; }
         if (platformDesc) { Object.defineProperty(process, 'platform', platformDesc); }
+        for (const [k, v] of Object.entries(savedEnv)) {
+            if (v === undefined) { delete process.env[k]; } else { process.env[k] = v; }
+        }
     }
     if (threw && threw !== EXIT) { throw threw; }
     return { stubs, exits };
@@ -1103,8 +1108,76 @@ const FORBIDDEN_SWITCHES_SPEC = [
     'allow-file-access-from-files', 'remote-allow-origins',
     // Режим разработчика (2.12.1, требование ПСИ «выключен везде, жёстко»):
     // свой ключ приложения и отладочные ключи Chromium.
-    'dev', 'enable-logging', 'v', 'vmodule', 'auto-open-devtools-for-tabs'
+    'dev', 'enable-logging', 'v', 'vmodule', 'auto-open-devtools-for-tabs',
+    'trace-startup', 'trace-startup-file'
 ];
+
+// Переменные окружения Electron, включающие отладочный журнал/дампы без
+// единого ключа (ревью 2.12.1): ELECTRON_ENABLE_LOGGING — «то же, что
+// --enable-logging» по документации Electron.
+const FORBIDDEN_ENV_SPEC = [
+    'ELECTRON_ENABLE_LOGGING', 'ELECTRON_LOG_FILE', 'ELECTRON_LOG_ASAR_READS', 'ELECTRON_ENABLE_STACK_DUMPING'
+];
+
+for (const name of FORBIDDEN_ENV_SPEC) {
+    test(`2.12.1 режим разработчика: собранное приложение с ${name} в окружении выходит до первого окна`, () => {
+        const errors = [];
+        const realError = console.error;
+        console.error = (...a) => { errors.push(a.join(' ')); };
+        let res;
+        try {
+            res = loadPackagedGuard(null, { env: { [name]: '1' } });
+        } finally {
+            console.error = realError;
+        }
+        assert.deepEqual(res.exits[0], ['app.exit', 1], 'выход обязан быть с кодом 1');
+        assert.equal(res.stubs.created.length, 0, 'окно создано до выхода');
+        assert.ok(errors.some((e) => e.includes(`переменная окружения ${name} запрещена в собранном приложении — выход`)),
+            `нет строки гарда про ${name}: ${errors.join(' | ')}`);
+    });
+}
+
+test('2.12.1: НЕсобранное приложение с ELECTRON_ENABLE_LOGGING стартует', () => {
+    const stubs = createStubs();
+    let exited = false;
+    stubs.electron.app.exit = () => { exited = true; };
+    const saved = process.env.ELECTRON_ENABLE_LOGGING;
+    process.env.ELECTRON_ENABLE_LOGGING = '1';
+    try {
+        loadMain(stubs);
+    } finally {
+        if (saved === undefined) { delete process.env.ELECTRON_ENABLE_LOGGING; } else { process.env.ELECTRON_ENABLE_LOGGING = saved; }
+    }
+    assert.equal(exited, false);
+});
+
+test('2.12.1: переменная окружения запрещена самим НАЛИЧИЕМ, даже пустая', () => {
+    // Electron решает по наличию переменной, а не по её значению — гард не
+    // гадает, какое значение «включает»: fail closed.
+    const realError = console.error;
+    console.error = () => {};
+    let exits;
+    try {
+        ({ exits } = loadPackagedGuard(null, { env: { ELECTRON_ENABLE_LOGGING: '' } }));
+    } finally {
+        console.error = realError;
+    }
+    assert.deepEqual(exits[0], ['app.exit', 1]);
+});
+
+test('2.12.1: сообщение гарда ключей нейтрально — «запрещён», а не «ослабляет изоляцию»', () => {
+    // --dev и отладочные ключи изоляцию не ослабляют; строка видна проверяющим.
+    const errors = [];
+    const realError = console.error;
+    console.error = (...a) => { errors.push(a.join(' ')); };
+    try {
+        loadPackagedWith(['--dev']);
+    } finally {
+        console.error = realError;
+    }
+    assert.ok(errors.some((e) => e.includes('ключ «--dev» запрещён в собранном приложении — выход')), errors.join(' | '));
+    assert.ok(!errors.some((e) => e.includes('ослабляет изоляцию')), 'старая формулировка осталась');
+});
 
 for (const sw of FORBIDDEN_SWITCHES_SPEC) {
     test(`SEC-04/R1: собранное приложение с --${sw} выходит до первого окна`, () => {

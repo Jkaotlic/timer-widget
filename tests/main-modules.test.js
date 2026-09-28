@@ -161,9 +161,12 @@ test('SEC-04: гард ключей отладки стоит раньше лю�
     assert.ok(guard > 0, 'гард ключей отладки исчез из точки входа');
     assert.ok(firstLocal > 0, 'зонд не нашёл ни одного локального require');
     assert.ok(guard < firstLocal, 'модуль главного процесса загружается ДО гарда ключей отладки');
-    // И гард выходит сразу: process.exit после app.exit.
-    const tail = entry.slice(guard, guard + 400);
-    assert.match(tail, /app\.exit\(1\);\s*process\.exit\(1\);/, 'гард не выходит немедленно');
+    // И гард выходит сразу — до первого локального модуля: process.exit
+    // после app.exit. Переменные окружения режима разработчика (2.12.1)
+    // проверяются там же.
+    const head = entry.slice(guard, firstLocal);
+    assert.match(head, /app\.exit\(1\);\s*process\.exit\(1\);/, 'гард не выходит до загрузки модулей');
+    assert.match(head, /FORBIDDEN_ENV\.find\(/, 'переменные окружения режима разработчика не проверяются до модулей');
 });
 
 /**

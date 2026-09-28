@@ -23,22 +23,32 @@
 #                     эта проверка — отдельным шагом CI, чтобы провал был виден
 #                     по имени шага.
 #
+#   --expect-refuse-env <ПЕРЕМЕННАЯ>
+#                     то же для переменной окружения (гард FORBIDDEN_ENV):
+#                     приложение запускается с <ПЕРЕМЕННАЯ>=1 без ключей.
+#
 # Окружение: APP_USER — обычный пользователь для запуска (обязателен, root
 # запускать Chromium без --no-sandbox не даёт вовсе); ALIVE_SECONDS — сколько
 # приложение обязано прожить после готовности (по умолчанию 15).
 set -u
 
 EXPECT=""
-REFUSE_SWITCHES=""
+# Массив «вид:имя», а не строка через пробел: пустое значение не
+# превращается в «проверять нечего» (цикл по пробелу не выполнялся ни разу,
+# и скрипт выходил с 0), а `*` в значении не раскрывается глобом.
+REFUSE=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --expect) EXPECT="$2"; shift 2 ;;
-        --expect-refuse-switch) REFUSE_SWITCHES="$REFUSE_SWITCHES $2"; shift 2 ;;
+        --expect-refuse-switch) [ -n "${2:-}" ] || { echo "--expect-refuse-switch без ключа"; exit 2; }
+            REFUSE+=("switch:$2"); shift 2 ;;
+        --expect-refuse-env) [ -n "${2:-}" ] || { echo "--expect-refuse-env без переменной"; exit 2; }
+            REFUSE+=("env:$2"); shift 2 ;;
         *) echo "неизвестный аргумент: $1"; exit 2 ;;
     esac
 done
-if [ -z "$REFUSE_SWITCHES" ] || [ -n "$EXPECT" ]; then
-    case "$EXPECT" in userns|suid) ;; *) echo "нужен --expect userns|suid и/или --expect-refuse-switch <ключ>"; exit 2 ;; esac
+if [ "${#REFUSE[@]}" -eq 0 ] || [ -n "$EXPECT" ]; then
+    case "$EXPECT" in userns|suid) ;; *) echo "нужен --expect userns|suid и/или --expect-refuse-switch/--expect-refuse-env"; exit 2 ;; esac
 fi
 : "${APP_USER:?нужен APP_USER — обычный пользователь для запуска}"
 ALIVE_SECONDS="${ALIVE_SECONDS:-15}"
@@ -66,46 +76,58 @@ app_pids() {
 # Отказ от ключа. Ожидается РОВНО код 1 и строка гарда: 124 — timeout, то есть
 # ключ принят и приложение работало без защиты; 0 — вышло «успешно»; иной код
 # — упало, а не отказалось. Код 1 без строки гарда — тоже падение.
+#
+# Аргумент — «switch:<ключ>» (запуск с `--<ключ>`) или «env:<ПЕРЕМЕННАЯ>»
+# (запуск без ключей, с <ПЕРЕМЕННАЯ>=1). Строка гарда — та, что печатает
+# electron-main.js: «ключ «--X» запрещён…» / «переменная окружения X запрещена…».
 expect_refused() {
-    local sw="$1" udd out log
-    echo "== запуск от $APP_USER с --$sw: собранное приложение обязано отказаться =="
+    local kind="${1%%:*}" name="${1#*:}" label want udd out log
+    local -a argsw=() envset=()
+    if [ "$kind" = env ]; then
+        label="$name"; envset=("$name=1")
+        want="переменная окружения $name запрещена в собранном приложении"
+    else
+        label="--$name"; argsw=("--$name")
+        want="ключ «--$name» запрещён в собранном приложении"
+    fi
+    echo "== запуск от $APP_USER с $label: собранное приложение обязано отказаться =="
     udd=$(runuser -u "$APP_USER" -- mktemp -d /tmp/tw-refuse.XXXXXX)
     out=$(mktemp /tmp/tw-refuse-out.XXXXXX)
     chmod 666 "$out"
     log="$udd/logs/main.log"
-    runuser -u "$APP_USER" -- env -u ELECTRON_RUN_AS_NODE HOME="$APP_HOME" \
-        timeout --kill-after=5 20 $DBUS xvfb-run -a -s '-screen 0 1920x1080x24' "/usr/bin/$EXE" "--$sw" "--user-data-dir=$udd" >"$out" 2>&1
+    runuser -u "$APP_USER" -- env -u ELECTRON_RUN_AS_NODE HOME="$APP_HOME" "${envset[@]}" \
+        timeout --kill-after=5 20 $DBUS xvfb-run -a -s '-screen 0 1920x1080x24' "/usr/bin/$EXE" "${argsw[@]}" "--user-data-dir=$udd" >"$out" 2>&1
     RC=$?
     echo "  код выхода: $RC"
     echo "  вывод приложения:"; sed 's/^/  | /' "$out"
     case "$RC" in
         1) ;;
-        124|137) fail "--$sw: за 20 с приложение не завершилось (код $RC) — ключ принят, гард не сработал" ;;
-        0) fail "--$sw: приложение вышло с кодом 0 — ожидался отказ с кодом 1" ;;
-        *) fail "--$sw: код $RC — приложение упало, а не отказалось (ожидался 1)" ;;
+        124|137) fail "$label: за 20 с приложение не завершилось (код $RC) — принято, гард не сработал" ;;
+        0) fail "$label: приложение вышло с кодом 0 — ожидался отказ с кодом 1" ;;
+        *) fail "$label: код $RC — приложение упало, а не отказалось (ожидался 1)" ;;
     esac
     if [ "$RC" = 1 ]; then
-        if grep -q "ключ «--$sw» ослабляет изоляцию" "$out"; then
-            ok "--$sw отвергнут гардом: $(grep -m1 'ослабляет изоляцию' "$out")"
+        if grep -qF "$want" "$out"; then
+            ok "$label отвергнут гардом: $(grep -m1 -F "$want" "$out")"
         else
-            fail "--$sw: код 1, но строки гарда в выводе нет — это падение, а не отказ"
+            fail "$label: код 1, но строки гарда «$want» в выводе нет — это падение, а не отказ"
         fi
     fi
     if grep -q 'control window ready' "$log" 2>/dev/null; then
-        fail "--$sw: окно панели успело открыться — гард обязан сработать до окон"
+        fail "$label: окно панели успело открыться — гард обязан сработать до окон"
         cat "$log"
     fi
     for p in $(app_pids); do kill -9 "$p" 2>/dev/null || true; done
 }
 
-if [ -n "$REFUSE_SWITCHES" ]; then
-    for sw in $REFUSE_SWITCHES; do
-        expect_refused "$sw"
+if [ "${#REFUSE[@]}" -gt 0 ]; then
+    for item in "${REFUSE[@]}"; do
+        expect_refused "$item"
     done
     if [ -z "$EXPECT" ]; then
         if [ "$FAILS" -gt 0 ]; then echo "[launch] ПРОВАЛ: $FAILS"; exit 1; fi
-        for sw in $REFUSE_SWITCHES; do
-            echo "[launch] OK: --$sw отвергнут собранным приложением"
+        for item in "${REFUSE[@]}"; do
+            echo "[launch] OK: ${item#*:} отвергнут собранным приложением"
         done
         exit 0
     fi
