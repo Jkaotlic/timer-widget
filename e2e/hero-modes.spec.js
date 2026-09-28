@@ -98,10 +98,19 @@ function isRed(rgb) {
     return r > g + 40 && r > b + 40;
 }
 
-/** Только время НАЧАЛА: тесты полос двигают одну отметку, не обе. */
-async function setStart(control, start) {
-    await control.locator('#eventTimeInput').fill(start);
-    await control.locator('#eventTimeInput').blur();
+/**
+ * Начало — на заданную секунду суток, конец — через два часа после него, оба
+ * ОДНИМ вызовом.
+ *
+ * Двигать одно начало нельзя: конец остаётся тем, что поставил прошлый тест
+ * (12:00 из resetEventTimes), и при запуске с 11:00 до 12:00 «начало через
+ * час» оказывалось ПОЗЖЕ конца. Правило eventClockDistances читает это как
+ * мероприятие через полночь, «до начала» — минус сутки без часа, герой
+ * красный: тест падал на всех трёх ОС в зависимости от часа запуска (CI main
+ * 28.09.2026). Конец не дальше 23:59 — переход через полночь меряют не здесь.
+ */
+async function setEventAround(control, startSeconds) {
+    await setEvent(control, clockOf(startSeconds), clockOf(Math.min(86340, startSeconds + 7200)));
 }
 
 /** Секунды с начала суток — по часам САМОГО окна дисплея. */
@@ -557,7 +566,7 @@ test.describe('режимы центрального времени', () => {
             const boundary = (Math.floor(t0 / 60) + 1) * 60;
             const mark = (boundary - t0 < 8) ? boundary + 60 : boundary;
 
-            await setStart(control, clockOf(mark));
+            await setEventAround(control, mark);
             await pickMode(control, 'to-start');
 
             // ДО отметки: число без минуса, краски нет.
@@ -607,7 +616,7 @@ test.describe('режимы центрального времени', () => {
             // проверяющего. Клампа в ноль тут нет: мероприятие идёт, «до начала»
             // — честный минус (eventClockDistances); «минута назад» в 00:00:30
             // даёт 00:00.
-            await setStart(control, clockOf(Math.max(0, t0 - 60)));
+            await setEventAround(control, Math.max(0, t0 - 60));
             await pickMode(control, 'to-start');
 
             await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
@@ -619,9 +628,9 @@ test.describe('режимы центрального времени', () => {
             expect(isRed(red.trackBg),
                 `жёлоб полосы не покраснел в перерасходе: ${red.trackBg}`).toBe(true);
 
-            // Двигаем ТОЛЬКО отметку: режим прежний, кэш перерисовки НЕ
+            // Двигаем ТОЛЬКО отметки: режим прежний, кэш перерисовки НЕ
             // сбрасывается (сброс живёт лишь в ветке смены режима).
-            await setStart(control, clockOf(Math.min(86340, t0 + 3600)));
+            await setEventAround(control, Math.min(86340, t0 + 3600));
 
             await expect.poll(async () => isRed((await readPaint(display)).heroColor), {
                 message: 'отметка ушла в будущее, а герой остался красным (замёрзшая полоса)'
@@ -664,7 +673,7 @@ test.describe('режимы центрального времени', () => {
             // Полоса перерасхода тянула сюда `width: 100% !important` и
             // рисовала залу «мероприятие пройдено на 100 %» для величины, у
             // которой доли не существует.
-            await setStart(control, clockOf(Math.max(0, t0 - 60)));
+            await setEventAround(control, Math.max(0, t0 - 60));
             await pickMode(control, 'to-start');
 
             await expect.poll(async () => (await readPaint(display)).fillDisplay, {
