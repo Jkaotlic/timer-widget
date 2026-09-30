@@ -727,7 +727,7 @@ License: MIT
 Repository: https://github.com/electron/windows-installer
 
 === electron ===
-Version: 44.4.5
+Version: 44.5.1
 License: MIT
 Repository: https://github.com/electron/electron
 Publisher: Electron Community

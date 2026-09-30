@@ -6,7 +6,7 @@
 
 **Прозрачный таймер-виджет для презентаций и рабочего стола**
 
-[![Version](https://img.shields.io/badge/v2.12.1-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.12.2-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_44-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)
@@ -409,7 +409,7 @@ timer-widget/
 
 <div align="center">
 
-**Electron 44.4.5** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
+**Electron 44.5.1** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 
