@@ -164,16 +164,24 @@ function clampScale(value, min, max) {
  * состояться (окно ещё не разложено), и схлопнуть таймер в точку — худший из
  * возможных ответов.
  *
+ * `floorPct` (по умолчанию 100) — ниже какого масштаба потолок не опускается.
+ * Сто — когда место под неувеличенный блок отвела раскладка (подпись сверху,
+ * плашка снизу). Меньше — когда тесноту создают карточки СБОКУ: их ставит
+ * пользователь или раскладка «47-й этаж», а смена стиля делает таймер шире
+ * (см. sideCardBand). Тогда ограничивается и масштаб ≤ 100 %.
+ *
  * @param {{width: number, height: number, centerX: number, centerY: number,
  *          free: {left: number, right: number, top: number, bottom: number},
- *          requested: number}} p
+ *          requested: number, floorPct?: number}} p
  * @returns {number} проценты
  */
 function fitBlockScale(p) {
     const opts = p || {};
     const requested = Number(opts.requested);
     if (!Number.isFinite(requested)) { return 100; }
-    if (requested <= 100) { return requested; }
+    const floorRaw = Number(opts.floorPct);
+    const floorPct = Number.isFinite(floorRaw) ? Math.min(100, Math.max(0, floorRaw)) : 100;
+    if (requested <= floorPct) { return requested; }
 
     const width = Number(opts.width);
     const height = Number(opts.height);
@@ -190,9 +198,55 @@ function fitBlockScale(p) {
 
     const ceiling = Math.min(...sides) * 100;
     if (!Number.isFinite(ceiling)) { return requested; }
-    // Ниже 100 % потолок не опускаем: место под НЕувеличенный блок отводит
-    // раскладка, и спорить с ней здесь не о чем.
-    return Math.max(100, Math.min(requested, Math.floor(ceiling)));
+    // Ниже пола потолок не опускаем: при полу 100 место под НЕувеличенный
+    // блок отводит раскладка, и спорить с ней здесь не о чем.
+    return Math.max(floorPct, Math.min(requested, Math.floor(ceiling)));
+}
+
+// ---------------------------------------------------------------------------
+// sideCardBand({centerX, top, bottom, boxes, gap, free}) → {left, right}
+// ---------------------------------------------------------------------------
+/**
+ * Горизонтальная полоса, которую таймеру оставляют карточки СБОКУ от него.
+ *
+ * Зачем. Карточки дисплея стоят `fixed` и о таймере не знают. Раскладка
+ * «47-й этаж» кладёт деньги по бокам от круга, а «Флип» и «Цифры» шире круга:
+ * замер 30.09.2026 на 1280×720 — таймер 242..1038 при «Перелимите» 97..338.
+ * Уступать здесь обязан таймер: карточку поставили туда, где она нужна.
+ *
+ * Боковая — карточка, чья вертикаль пересекает вертикаль таймера (`top`..
+ * `bottom`) и которая целиком по одну сторону от его центра. Карточка выше
+ * или ниже таймера — дело полосы сверху (topBandReserve), поперёк центра —
+ * сбоку её нет, и сужение по горизонтали ей не поможет.
+ *
+ * @param {{centerX: number, top: number, bottom: number,
+ *          boxes: Array<{left: number, right: number, top: number, bottom: number}>,
+ *          gap?: number, free: {left: number, right: number}}} p
+ * @returns {{left: number, right: number}}
+ */
+function sideCardBand(p) {
+    const opts = p || {};
+    const free = opts.free || {};
+    let left = Number(free.left) || 0;
+    let right = Number(free.right) || 0;
+    const centerX = Number(opts.centerX);
+    const top = Number(opts.top);
+    const bottom = Number(opts.bottom);
+    const gap = Number(opts.gap) || 0;
+    if (![centerX, top, bottom].every(Number.isFinite)) { return { left, right }; }
+
+    for (const box of (Array.isArray(opts.boxes) ? opts.boxes : [])) {
+        if (!box) { continue; }
+        const b = { left: Number(box.left), right: Number(box.right), top: Number(box.top), bottom: Number(box.bottom) };
+        if (![b.left, b.right, b.top, b.bottom].every(Number.isFinite)) { continue; }
+        if (b.bottom <= top || b.top >= bottom) { continue; }
+        if (b.right <= centerX) {
+            left = Math.max(left, b.right + gap);
+        } else if (b.left >= centerX) {
+            right = Math.min(right, b.left - gap);
+        }
+    }
+    return { left, right };
 }
 
 // ---------------------------------------------------------------------------
@@ -925,6 +979,7 @@ const RendererShared = {
     flipCells,
     clampScale,
     fitBlockScale,
+    sideCardBand,
     topBandReserve,
     heroFrameShrink,
     clockToSeconds,

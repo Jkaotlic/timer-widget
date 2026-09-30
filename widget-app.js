@@ -205,6 +205,16 @@
                             '--digits-sign-shift',
                             window.DigitsStyle.measureSignShift(this.digitsFont)
                         );
+                        // Ширина знака — поле рамки в минусе (знак стоит ВНУТРИ).
+                        // Только из ДЕЙСТВИТЕЛЬНОГО замера: у скрытого стиля
+                        // проба нулевая, и от ширины знака остаётся один зазор
+                        // (0.1 вместо ~0.45) — знак лёг бы на цифры.
+                        if (size > 0) {
+                            this.widgetDigitsTime.style.setProperty(
+                                '--digits-sign-em',
+                                String(window.DigitsStyle.signWidthEm(probe))
+                            );
+                        }
                     }
                 }
             }
@@ -883,6 +893,9 @@
                 if (this.timeDisplaySign && this.timeDisplayDigits) {
                     this.timeDisplaySign.textContent = secs < 0 ? '−' : '';
                     this.timeDisplayDigits.textContent = this.formatTime(Math.abs(secs));
+                    // Минус И часы — знак висит слева от центрированных цифр
+                    // и ложился на обводку кольца; кегль на ступень меньше.
+                    this.timeDisplay.classList.toggle('signed-hours', secs < 0 && Math.abs(secs) >= 3600);
                 } else {
                     this.timeDisplay.textContent = formatted;
                 }

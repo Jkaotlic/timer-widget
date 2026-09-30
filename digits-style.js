@@ -135,7 +135,7 @@ const PROBE_FIGURES = '0123456789';
 
 // Знак меньше цифр и отделён отступом — те же значения стоят в CSS всех трёх
 // окон. Держим их здесь, потому что запас под знак считает эта арифметика.
-const SIGN_FONT_RATIO = 0.62;
+const SIGN_FONT_RATIO = 0.8;
 const SIGN_GAP_EM = 0.1;
 
 // Поля рамки вокруг цифр — в долях КЕГЛЯ, потому что рамка обязана расти
@@ -176,10 +176,10 @@ function resolveFont(id) {
  * Во сколько раз замеренный эталон нужно увеличить, чтобы он уложился в
  * доступный прямоугольник.
  *
- * `signWidth` вычитается из доступной ширины: знак минуса вынесен из потока
- * (`position: absolute; right: 100%`) и в ширину блока цифр не входит, но за
- * край окна вылезти может. Существующий код решает это грубее — прибавляет
- * один символ к длине строки.
+ * `signWidth` вычитается из доступной ширины ДВАЖДЫ и ВСЕГДА, а не только в
+ * минусе: в минусе рамка отводит поле под знак слева и такое же справа (знак
+ * внутри рамки, цифры на оси окна, см. signWidthEm), и резерв заранее держит
+ * кегль неизменным при переходе через ноль.
  *
  * Мусор на входе даёт 0, а не Infinity и не NaN: и то и другое, попав в
  * font-size, схлопывает цифры до невидимых.
@@ -199,7 +199,7 @@ function fitScale(options) {
     // заданном фоне рамка вылезала бы за окно ровно на свои поля.
     const frameX = PROBE_FONT_SIZE * 2 * FRAME_PAD_X_EM;
     const frameY = PROBE_FONT_SIZE * 2 * FRAME_PAD_Y_EM;
-    const byWidth = availableWidth / (probeWidth + Math.max(0, signWidth) + frameX);
+    const byWidth = availableWidth / (probeWidth + 2 * Math.max(0, signWidth) + frameX);
     const byHeight = availableHeight / (probeHeight + frameY);
     const scale = Math.min(byWidth, byHeight);
     return Number.isFinite(scale) && scale > 0 ? scale : 0;
@@ -443,6 +443,25 @@ function applyFont(el, fontId) {
     return font;
 }
 
+/**
+ * Ширина знака минуса вместе с зазором — в долях кегля ЦИФР.
+ *
+ * Величина зависит только от шрифта (как и вертикаль знака), поэтому окно
+ * кладёт её переменной `--digits-sign-em` на рамку, и рамка в минусе отводит
+ * под знак ровно столько же, сколько резервирует подгонка (signWidth в
+ * fitScale). Мусор даёт 0: поле без знака лучше поля в NaN.
+ *
+ * @param {{signWidth: number}|null} probe — результат measureDigits
+ * @returns {number}
+ */
+function signWidthEm(probe) {
+    // Проба скрытого стиля даёт ширину цифр 0, а signWidth = один зазор: это
+    // не замер, и ответ «0.1» выглядел бы правдоподобно.
+    if (!probe || !(Number(probe.width) > 0)) { return 0; }
+    const width = Number(probe.signWidth);
+    return Number.isFinite(width) && width > 0 ? width / PROBE_FONT_SIZE : 0;
+}
+
 const DigitsStyle = {
     DIGIT_FONTS,
     DEFAULT_FONT_ID,
@@ -464,6 +483,7 @@ const DigitsStyle = {
     isFontLoaded,
     ensureFont,
     measureDigits,
+    signWidthEm,
     clearProbeCache,
     applyFont
 };

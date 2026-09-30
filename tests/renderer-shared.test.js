@@ -522,6 +522,24 @@ test('fitBlockScale: уменьшение НИКОГДА не ограничив
     assert.equal(fitBlockScale({ ...BOX, free: { left: 99, right: 101, top: 99, bottom: 101 }, requested: 30 }), 30);
 });
 
+// Карточка СБОКУ от таймера (деньги «47-го этажа») — не то же, что подпись
+// сверху: место под неё раскладка не отводила, а смена стиля делает таймер
+// шире. Замер 30.09.2026 на 1280×720: «Флип» 242..1038 при «Перелимите»
+// 97..338. Здесь уступать обязан таймер, и уступать ниже 100 %.
+test('fitBlockScale: с полом floorPct потолок опускается ниже 100 %', () => {
+    // Свободно 20px от центра влево при полублоке 50px → 40 %.
+    const free = { ...FREE, left: 80 };
+    assert.equal(fitBlockScale({ ...BOX, free, requested: 100, floorPct: 30 }), 40);
+    assert.equal(fitBlockScale({ ...BOX, free, requested: 88, floorPct: 30 }), 40);
+});
+
+test('fitBlockScale: floorPct — предел снизу, а не цель', () => {
+    const free = { ...FREE, left: 99 };
+    assert.equal(fitBlockScale({ ...BOX, free, requested: 100, floorPct: 30 }), 30);
+    // Влезает — запрошенное проходит как есть, в том числе меньше 100.
+    assert.equal(fitBlockScale({ ...BOX, free: FREE, requested: 70, floorPct: 30 }), 70);
+});
+
 test('fitBlockScale: мусор возвращает запрошенное, а не 0 и не NaN', () => {
     // Замер мог не состояться (окно не разложено) — тогда лучше показать
     // масштаб как есть, чем схлопнуть таймер в точку.
@@ -1052,4 +1070,55 @@ test('BUG-16: ни одного `overlay || 30` в панели и диспле�
     assert.match(panel, /bgLocalOverlay:\s*window\.RendererShared\.bgOverlayPercent\(/);
     // Самопроверка регулярки: на старом тексте она обязана сработать.
     assert.match('bgLocalOverlay: localBgSettings.overlay || 30,', /[Oo]verlay\s*\|\|\s*\d/);
+});
+
+// ---------------------------------------------------------------------------
+// sideCardBand — полоса, которую таймеру оставляют карточки СБОКУ (30.09.2026)
+// ---------------------------------------------------------------------------
+// Раскладка «47-й этаж» ставит деньги по бокам от круга. «Флип» и «Цифры»
+// шире круга, и после смены стиля таймер ложился на суммы. Карточка считается
+// боковой, если её вертикаль пересекает вертикаль таймера, а сама она целиком
+// по одну сторону от его центра.
+const { sideCardBand } = require('../renderer-shared');
+
+const HERO = { centerX: 640, top: 200, bottom: 520 };
+const WIN = { left: 0, right: 1280 };
+
+test('sideCardBand: без карточек полоса — всё окно', () => {
+    assert.deepEqual(sideCardBand({ ...HERO, boxes: [], gap: 8, free: WIN }), { left: 0, right: 1280 });
+});
+
+test('sideCardBand: карточки слева и справа сужают полосу на свой край плюс зазор', () => {
+    const boxes = [
+        { left: 97, right: 338, top: 309, bottom: 411 },
+        { left: 942, right: 1183, top: 309, bottom: 411 }
+    ];
+    assert.deepEqual(sideCardBand({ ...HERO, boxes, gap: 8, free: WIN }), { left: 346, right: 934 });
+});
+
+test('sideCardBand: карточка выше или ниже таймера полосу НЕ сужает', () => {
+    // Угловые карточки «47-го этажа» — над таймером; их обходит полоса сверху.
+    const boxes = [
+        { left: 79, right: 228, top: 47, bottom: 125 },
+        { left: 1050, right: 1203, top: 560, bottom: 640 }
+    ];
+    assert.deepEqual(sideCardBand({ ...HERO, boxes, gap: 8, free: WIN }), { left: 0, right: 1280 });
+});
+
+test('sideCardBand: карточка поперёк центра полосу не сужает — сбоку её нет', () => {
+    const boxes = [{ left: 600, right: 700, top: 300, bottom: 400 }];
+    assert.deepEqual(sideCardBand({ ...HERO, boxes, gap: 8, free: WIN }), { left: 0, right: 1280 });
+});
+
+test('sideCardBand: из двух карточек с одной стороны держит БЛИЖНЯЯ', () => {
+    const boxes = [
+        { left: 20, right: 120, top: 300, bottom: 400 },
+        { left: 150, right: 300, top: 250, bottom: 350 }
+    ];
+    assert.equal(sideCardBand({ ...HERO, boxes, gap: 8, free: WIN }).left, 308);
+});
+
+test('sideCardBand: мусорные коробки пропускаются, а не роняют расчёт', () => {
+    const boxes = [null, { left: NaN, right: 5, top: 0, bottom: 1 }, { left: 97, right: 338, top: 309, bottom: 411 }];
+    assert.deepEqual(sideCardBand({ ...HERO, boxes, gap: 8, free: WIN }), { left: 346, right: 1280 });
 });

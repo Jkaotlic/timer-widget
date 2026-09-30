@@ -92,11 +92,12 @@ test('fitScale: ограничение по высоте — тоже с пол�
     }), 100 / (50 + FRAME_Y));
 });
 
-test('fitScale: запас под знак минуса сужает доступную ширину', () => {
-    // Знак вынесен из потока и в ширину блока не входит, но за край вылезти может.
+test('fitScale: запас под знак минуса — с ОБЕИХ сторон', () => {
+    // В минусе рамка отводит поле под знак слева и такое же справа: знак стоит
+    // внутри рамки, а цифры остаются на оси окна (правило «цифры по центру»).
     assert.equal(fitScale({
         availableWidth: 400, availableHeight: 5000, probeWidth: 150, probeHeight: 50, signWidth: 50
-    }), 400 / (150 + 50 + FRAME_X));
+    }), 400 / (150 + 2 * 50 + FRAME_X));
 });
 
 test('поля рамки в CSS совпадают с теми, по которым считается подгонка', () => {
@@ -166,34 +167,57 @@ test('signShiftRatio: мусор даёт 0, а не NaN — иначе знак
     }
 });
 
-test('посадка знака минуса в CSS совпадает с той, по которой считается запас', () => {
-    // Знак стоит абсолютом от ПАДДИНГ-бокса рамки, поэтому к зазору
-    // прибавляется её левое поле — его надо вычесть, иначе минус отъезжает от
-    // числа на FRAME_PAD_X_EM (замер 17.08.2026: 0.40 кегля вместо 0.10, знак
-    // целиком снаружи рамки и обрезан краем окна). Деление на SIGN_FONT_RATIO
-    // переводит обе величины из кегля цифр в собственный кегль знака: `em` в
-    // свойствах знака считается от него.
-    const expected = `margin-right: calc((${DigitsStyle.SIGN_GAP_EM}em - ${DigitsStyle.FRAME_PAD_X_EM}em) / ${DigitsStyle.SIGN_FONT_RATIO})`;
-    for (const [file, selector] of [
-        ['electron-widget.html', '.widget-digits-sign'],
-        ['display.css', '.digits-sign']
+test('знак минуса стоит ВНУТРИ рамки — посадка совпадает с запасом подгонки', () => {
+    // До 30.09.2026 знак висел абсолютом от `right: 100%`, то есть СНАРУЖИ
+    // рамки: при выбранном фоне минус торчал за левый край подложки (жалоба
+    // «минус вылезает за рамки»). Теперь в минусе рамка получает левое поле
+    // ровно на знак, а знак встаёт в это поле: от края рамки — её поле
+    // FRAME_PAD_X_EM, дальше знак и зазор SIGN_GAP_EM (они и есть
+    // `--digits-sign-em`, см. signWidthEm). Подгонка резервирует ту же ширину
+    // (signWidth в fitScale), поэтому кегль при переходе через ноль не
+    // меняется. Деление на SIGN_FONT_RATIO — `em` в свойствах знака считается
+    // от его собственного кегля.
+    const signLeft = `left: calc(${DigitsStyle.FRAME_PAD_X_EM}em / ${DigitsStyle.SIGN_FONT_RATIO})`;
+    // Поле — с ОБЕИХ сторон: слева под знак, справа противовес, иначе цифры
+    // съезжают с оси окна на ползнака (e2e/digits-style.spec.js).
+    const framePad = `padding-inline: calc(${DigitsStyle.FRAME_PAD_X_EM}em + var(--digits-sign-em`;
+    for (const [file, frame, sign] of [
+        ['electron-widget.html', '.widget-digits-time', '.widget-digits-sign'],
+        ['display.css', '.digits-time', '.digits-sign']
     ]) {
         const src = readSource(file);
-        const rule = src.match(new RegExp(`^\\s*\\${selector} \\{[^}]*\\}`, 'm'));
-        assert.ok(rule, `${file}: не найдено правило ${selector}`);
-        assert.ok(
-            rule[0].includes(expected),
-            `${file}: посадка знака ${selector} разошлась с подгонкой (${expected})`
-        );
-        // Старая запись возвращает свес: она НЕ вычитает поле рамки.
-        const oldForm = /margin-right:\s*0\.1em/;
-        // Проверка проверки: зелёное «чисто» и зелёное «регулярка не работает»
-        // выглядят одинаково, поэтому регулярка обязана ловить образец.
-        assert.ok(oldForm.test('margin-right: 0.1em;'), 'регулярка старой записи не ловит образец');
-        assert.ok(
-            !oldForm.test(rule[0]),
-            `${file}: в ${selector} вернулся зазор без вычета поля рамки`
-        );
+        const rule = src.match(new RegExp(`^\\s*\\${sign} \\{[^}]*\\}`, 'm'));
+        assert.ok(rule, `${file}: не найдено правило ${sign}`);
+        assert.ok(rule[0].includes(signLeft), `${file}: знак ${sign} не в поле рамки (${signLeft})`);
+        // Старая посадка — снаружи рамки.
+        const outside = /right:\s*100%/;
+        assert.ok(outside.test('right: 100%;'), 'регулярка старой посадки не ловит образец');
+        // Комментарий правила вправе рассказывать про старую посадку —
+        // отсутствие проверяется по коду (codeOnly), а не по сырому тексту.
+        assert.ok(outside.test(codeOnly('a { right: 100%; }')), 'codeOnly срезал живое свойство');
+        assert.ok(!outside.test(codeOnly(rule[0])), `${file}: знак ${sign} снова снаружи рамки`);
+
+        const negative = src.match(new RegExp(
+            `^\\s*\\${frame}:has\\(> \\${sign}:not\\(:empty\\)\\) \\{[^}]*\\}`, 'm'));
+        assert.ok(negative, `${file}: у рамки нет правила «в минусе» (${frame}:has(> ${sign}:not(:empty)))`);
+        assert.ok(negative[0].includes(framePad), `${file}: рамка в минусе не отводит поле под знак`);
+    }
+});
+
+test('signWidthEm: ширина знака с зазором в долях кегля цифр', () => {
+    assert.equal(DigitsStyle.signWidthEm({ width: 280, signWidth: 45 }), 45 / DigitsStyle.PROBE_FONT_SIZE);
+    // Проба скрытого стиля: цифры нулевой ширины, а signWidth — один зазор.
+    // Это не замер; окно, записав 0.1, положило бы знак на цифры.
+    for (const bad of [null, {}, { width: 280, signWidth: NaN }, { width: 280, signWidth: -3 },
+        { width: 0, height: 0, signWidth: 10 }]) {
+        assert.equal(DigitsStyle.signWidthEm(bad), 0);
+    }
+});
+
+test('ширину знака кладут в рамку ОБА окна — иначе поле под знак нулевое', () => {
+    for (const file of ['widget-app.js', 'display-script.js']) {
+        const src = readSource(file);
+        assert.match(src, /setProperty\(\s*'--digits-sign-em'/, `${file}: не ставит --digits-sign-em`);
     }
 });
 

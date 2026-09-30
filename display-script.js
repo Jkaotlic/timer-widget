@@ -205,9 +205,10 @@ class DisplayTimer {
         // свой собственный и давно (`displayTimerScale`, Ctrl+колесо). Попади
         // он в тот реестр — у масштаба таймера стало бы два владельца.
         //
-        // `kind: 'timer'` читают ровно три места: колесо (масштабировать
-        // ТАЙМЕР, а не элемент), крестик (у колонки его нет) и раскладка
-        // (вернуть колонку в поток). Всё остальное — перетаскивание,
+        // `kind: 'timer'` читают колесо (масштабировать ТАЙМЕР, а не
+        // элемент), крестик (у колонки его нет), раскладка (вернуть колонку в
+        // поток) и уступка карточкам сбоку (fitSideCards: таймер не уступает
+        // сам себе). Всё остальное — перетаскивание,
         // сохранение места, пересчёт по доле окна — работает с ним как с любым
         // другим подвижным элементом, потому что спрашивает про класс
         // `custom-position`, а не про вид элемента.
@@ -592,7 +593,14 @@ class DisplayTimer {
         }
 
         this.timerScale = layout.timerScale;
-        const effective = this.applyTimerScale();
+        // Карточки ещё стоят на местах ПРЕЖНЕЙ раскладки — уступать им нечего.
+        this._ignoreSideCards = true;
+        let effective;
+        try {
+            effective = this.applyTimerScale();
+        } finally {
+            this._ignoreSideCards = false;
+        }
         this.updateDigitsScale();
         if (Number.isFinite(effective)) {
             this.timerScale = effective;
@@ -686,7 +694,9 @@ class DisplayTimer {
         this.saveElementScales();
         // Пересчёт честный, а не формальный ноль: раскладка перечисляет не все
         // семь элементов, и оставшийся на месте по умолчанию всё ещё на пути.
-        this.updateTopBand();
+        // applyTimerScale начинается с updateTopBand и заодно сверяет таймер с
+        // карточками, которые раскладка только что поставила сбоку.
+        this.applyTimerScale();
         return true;
     }
 
@@ -706,6 +716,9 @@ class DisplayTimer {
             // режиме размер меняет пользователь, и позиция в пикселях означала
             // бы разъезжающуюся композицию.
             this.reflowElements();
+            // Уступка карточкам сбоку — по НОВЫМ местам и новому кеглю «Цифр»:
+            // первый вызов выше мерил карточки ещё по прежнему окну.
+            this.applyTimerScale();
         };
         const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
             ? window.TimeUtils.debounce(recalc, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
@@ -1018,7 +1031,14 @@ class DisplayTimer {
         // блоку: у стилей разные габариты, и общий потолок был бы либо
         // бессмысленно тесным для одних, либо бесполезным для других.
         const effective = this.fitTimerScale(requested);
-        const scale = effective / 100;
+        // Уступка карточкам СБОКУ — видимая, но НЕ записываемая: возвращается
+        // `effective`, а не она. Иначе таймер, сжатый на «Флипе» рядом с
+        // деньгами «47-го этажа», так и остался бы сжатым после возврата на
+        // «Круг»: вызывающие пишут возвращённое значение в настройку.
+        const shown = this.fitSideCards(effective);
+        this._timerSideLimited = shown < effective;
+        this._timerShownPct = shown;
+        const scale = shown / 100;
         const blocks = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits];
         for (const block of blocks) {
             if (!block) { continue; }
@@ -1092,18 +1112,19 @@ class DisplayTimer {
      * при этом писало «Таймер уже во всю высоту», показывая цифры в треть
      * экрана. Это и была вторая половина жалобы «не могу менять ширину».
      *
-     * Ширина берётся с ДВУСТОРОННИМ запасом под знак минуса: он висит слева
-     * абсолютом, в offsetWidth не входит, а блок растёт от своего центра —
-     * значит запас обязан быть симметричным, иначе на пределе знак уедет за
-     * край окна в перерасходе.
+     * Ширина берётся С ЗАПАСОМ под знак минуса: с 30.09.2026 знак стоит
+     * ВНУТРИ рамки (в минусе рамка отводит под него поле слева и такое же
+     * справа), так что в минусе оба поля уже в offsetWidth, а в плюсе
+     * прибавляются — иначе потолок масштаба прыгал бы при переходе через ноль.
      *
      * @param {HTMLElement} active — блок активного стиля
      * @returns {{width: number, height: number}} пиксели РАСКЛАДКИ
      */
     timerInkBox(active) {
         if (active === this.timerDigits && this.digitsTime) {
+            const signed = !!(this.digitsSign && this.digitsSign.textContent);
             return {
-                width: this.digitsTime.offsetWidth + 2 * (this._digitsSignPx || 0),
+                width: this.digitsTime.offsetWidth + (signed ? 0 : 2 * (this._digitsSignPx || 0)),
                 height: this.digitsTime.offsetHeight
             };
         }
@@ -1154,6 +1175,58 @@ class DisplayTimer {
                 bottom: pill ? pill.top - HERO_GAP : window.innerHeight
             },
             requested
+        });
+    }
+
+    /**
+     * Сколько процентов таймеру оставляют карточки СБОКУ от него.
+     *
+     * Карточки стоят `fixed` и о таймере не знают; смена стиля делает таймер
+     * шире («Флип» и «Цифры» шире «Круга»), и раскладка «47-й этаж», которая
+     * ставит деньги по бокам, после неё ложилась суммами под цифры. Замер
+     * 30.09.2026 на 1280×720: таймер 242..1038 при «Перелимите» 97..338.
+     * Арифметика — `sideCardBand` + `fitBlockScale` с полом ниже 100 %.
+     *
+     * Внутри раскладки не действует: она зовёт масштаб ДО того, как
+     * переставила карточки, и мерила бы таймер по их прежним местам.
+     */
+    fitSideCards(pct) {
+        const shared = window.RendererShared;
+        if (this._ignoreSideCards || !shared || !shared.sideCardBand) { return pct; }
+        const active = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
+            .find((b) => b && b.classList.contains('active'));
+        if (!active) { return pct; }
+
+        return this.withSettledTransforms(() => {
+            const { width, height } = this.timerInkBox(active);
+            const rect = active.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const half = (height * pct) / 200;
+            const boxes = [];
+            for (const row of (this.movableElements || [])) {
+                const el = row.el;
+                if (!el || row.kind === 'timer' || !el.classList.contains('info-block')) { continue; }
+                if (!el.classList.contains('visible')) { continue; }
+                const r = el.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) { boxes.push(r); }
+            }
+            const band = shared.sideCardBand({
+                centerX, top: centerY - half, bottom: centerY + half,
+                boxes, gap: HERO_GAP,
+                free: { left: 0, right: window.innerWidth }
+            });
+            if (band.left <= 0 && band.right >= window.innerWidth) { return pct; }
+            const floorPct = (window.CONFIG && window.CONFIG.MIN_TIMER_SCALE) || 30;
+            return shared.fitBlockScale({
+                width, height, centerX, centerY,
+                // Вертикаль здесь не ограничивает — её держит fitTimerScale.
+                // Числа конечные намеренно: fitBlockScale на бесконечной
+                // стороне считает замер несостоявшимся и отдаёт запрошенное.
+                free: { left: band.left, right: band.right, top: centerY - 1e6, bottom: centerY + 1e6 },
+                requested: pct,
+                floorPct
+            });
         });
     }
 
@@ -1538,6 +1611,19 @@ class DisplayTimer {
             this.totalCostBlock.classList.toggle('visible',
                 unlocked && this.showTotalCost === true);
         }
+
+        // Сумма переросла резерв ширины (`.money-value`) — блок вырос бы только
+        // вправо, от своего `left`. Место сдвинутого элемента — доля его
+        // ЦЕНТРА, поэтому переставляется он по ней же, а таймер сверяется с
+        // новой шириной соседа. Раз в изменение ширины, а не на каждом тике.
+        const widths = [this.overrunCostBlock, this.totalCostBlock]
+            .map((el) => (el && el.classList.contains('visible') ? el.offsetWidth : 0))
+            .join('|');
+        if (this._moneyWidths !== undefined && widths !== this._moneyWidths) {
+            this.reflowSoon();
+            this.applyTimerScale();
+        }
+        this._moneyWidths = widths;
     }
 
     applyDisplaySettings(settings) {
@@ -2380,6 +2466,9 @@ class DisplayTimer {
             // Добавляем класс compact для длинного времени (минус или часы)
             const isCompact = secs < 0 || Math.abs(secs) >= 3600 || formatted.length > 5;
             this.timeDisplay.classList.toggle('compact', isCompact);
+            // Минус И часы вместе: знак висит слева от цифр, и при 0.19
+            // диаметра он ложился на обводку кольца (кадр 30.09.2026, −1:02:03).
+            this.timeDisplay.classList.toggle('signed-hours', secs < 0 && Math.abs(secs) >= 3600);
 
             this.cache.lastFormatted = formatted;
         }
@@ -2843,10 +2932,10 @@ class DisplayTimer {
             signWidth: probe.signWidth
         });
         if (size > 0) { this.digitsTime.style.setProperty('--digits-font-size', size + 'px'); }
-        // Место под знак минуса в ПИКСЕЛЯХ текущего кегля. Знак висит слева
-        // абсолютом и в offsetWidth цифр не входит вовсе, а потолок масштаба
-        // обязан его учитывать: иначе на пределе минус уезжает за край окна
-        // ровно тогда, когда появляется, — в перерасходе. Величина запоминается
+        // Место под знак минуса в ПИКСЕЛЯХ текущего кегля. Поля под знак рамка
+        // отводит только в минусе, а потолок масштаба обязан учитывать их и в
+        // плюсе (см. timerInkBox): иначе он прыгал бы при переходе через ноль,
+        // и на пределе знак уезжал бы за край окна. Величина запоминается
         // здесь, потому что здесь она уже посчитана: probe.signWidth отдан в
         // кегле пробы (см. measureDigits), перевод — линейный.
         this._digitsSignPx = size > 0
@@ -2858,13 +2947,22 @@ class DisplayTimer {
             '--digits-sign-shift',
             window.DigitsStyle.measureSignShift(this.digitsFont)
         );
+        // Ширина знака — поле рамки в минусе (знак стоит ВНУТРИ рамки).
+        // Только из ДЕЙСТВИТЕЛЬНОГО замера: у скрытого стиля проба нулевая, и
+        // от ширины знака остался бы один зазор — знак лёг бы на цифры.
+        if (size > 0) {
+            this.digitsTime.style.setProperty(
+                '--digits-sign-em',
+                String(window.DigitsStyle.signWidthEm(probe))
+            );
+        }
     }
 
     /**
      * Обновить текст стиля «Цифры».
      *
-     * Знак и цифры — РАЗНЫЕ узлы: знак вынесен из потока, иначе центрируется
-     * надпись целиком и цифры уезжают с оси кольца.
+     * Знак и цифры — РАЗНЫЕ узлы: знак стоит в поле рамки, которое она
+     * отводит под него только в минусе (см. .digits-time в display.css).
      */
     updateDigitsDisplay(secs) {
         if (!this.digitsValue) { return; }
@@ -3173,7 +3271,19 @@ class DisplayTimer {
             ? window.RendererShared.clampScale
             : (value, min, max) => Math.max(min, Math.min(max, value));
         const scaleTimer = (delta) => {
-            const cur = this.timerScale || 100;
+            // Упор в карточки сбоку — тоже упор, и тоже с причиной. Запрошенное
+            // при этом не растёт: иначе оно молча уползло бы к 300 %, а таймер
+            // стоял бы на месте.
+            if (delta > 0 && this._timerSideLimited) {
+                this.showScaleNote('Шире некуда — мешают карточки сбоку');
+                return;
+            }
+            // Уменьшение при уступке считается от ВИДИМОГО масштаба: от
+            // запрошенного первые щелчки ничего бы не меняли на экране (100 →
+            // 90 при видимых 60) и читались бы как сломанное колесо.
+            const cur = (delta < 0 && this._timerSideLimited && Number.isFinite(this._timerShownPct))
+                ? this._timerShownPct
+                : (this.timerScale || 100);
             let newPct = clampScale(cur + delta, TIMER_MIN_SCALE, TIMER_MAX_SCALE);
             if (newPct !== cur) {
                 this.timerScale = newPct;
@@ -3221,6 +3331,9 @@ class DisplayTimer {
             }
             this.applyElementScale(id, next);
             this.saveElementScales();
+            // Карточка сбоку выросла или сжалась — таймер уступает ей место
+            // или забирает его обратно.
+            this.applyTimerScale();
         };
 
         // Масштаб ВСЕХ карточек сразу — Shift+колесо и ползунок панели.
@@ -3235,6 +3348,7 @@ class DisplayTimer {
             if (next === cur) { return; }
             for (const row of blocks) { this.applyElementScale(row.id, next); }
             this.saveElementScales();
+            this.applyTimerScale();
             this._safeSetItem(STORAGE_BLOCK_SCALE_KEY, String(next));
             this._lastPushedBlockScale = next;
             if (this.ipcRenderer) {
@@ -3473,8 +3587,10 @@ class DisplayTimer {
                     // Карточка ушла из места по умолчанию (или пришла в
                     // верхнюю часть окна) — полоса, которую держит колонка,
                     // пересчитывается по факту, а не в следующей посылке
-                    // настроек.
-                    this.updateTopBand();
+                    // настроек. Заодно таймер сверяется с карточкой, которую
+                    // поставили сбоку от него (applyTimerScale начинается с
+                    // updateTopBand).
+                    this.applyTimerScale();
                 };
 
                 document.addEventListener('mousemove', onMove);
@@ -3670,6 +3786,11 @@ class DisplayTimer {
                 if (own) { this.elementFractions[key] = own; }
             }
         } catch { /* ok */ }
+        // Масштаб таймера выше применён ДО того, как карточки встали на
+        // восстановленные места и получили свои масштабы: уступка карточкам
+        // сбоку считалась бы по прежним местам. Пресет «47-го этажа» с «Флипом»
+        // иначе возвращал бы таймер поверх денег.
+        this.applyTimerScale();
     }
 
     cleanup() {

@@ -14,6 +14,7 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
 const { waitForDisplay } = require('./window-ready');
+const { resizeDisplay } = require('./display-window');
 
 /** Неразрывный пробел — им разделены разряды суммы (money-meter.js). */
 const NB = '\u00A0';
@@ -476,6 +477,118 @@ test('справка про режим ДОСТУПНА до разблокир�
         expect(text).toMatch(/подвал/i);
     } finally {
         await control.click('#faqClose').catch(() => {});
+        await app.close();
+    }
+});
+
+/**
+ * Замер в окне дисплея: подставить перелимит и в ТОМ ЖЕ вызове измерить.
+ * Главный процесс шлёт состояние каждую секунду и перезаписал бы подставленное
+ * между двумя вызовами.
+ */
+function moneyProbe(secondsOver) {
+    const d = window.displayTimer;
+    d.remainingSeconds = -secondsOver;
+    d.updateDisplay();
+    d.updateMoneyBlocks();
+    const rect = (el) => el.getBoundingClientRect();
+    const active = [...document.querySelectorAll('#timerRing, #timerFlip, #timerAnalog, #timerDigits')]
+        .find((el) => el.classList.contains('active'));
+    // Чернила таймера: у «Цифр» блок — квадратная рама, шире надписи, поэтому
+    // меряются знак и цифры; у остальных блок и есть содержимое.
+    const parts = active.id === 'timerDigits'
+        ? [...active.querySelectorAll('.digits-sign, .digits-value')]
+        : [active];
+    const ink = parts.map(rect).filter((r) => r.width > 0).reduce((a, r) => ({
+        left: Math.min(a.left, r.left), right: Math.max(a.right, r.right),
+        top: Math.min(a.top, r.top), bottom: Math.max(a.bottom, r.bottom)
+    }), { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity });
+    const area = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+        * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const over = rect(document.getElementById('overrunCostBlock'));
+    const total = rect(document.getElementById('totalCostBlock'));
+    return {
+        style: active.id,
+        value: document.getElementById('overrunCostValue').textContent,
+        overCx: (over.left + over.right) / 2,
+        overW: over.width,
+        overlap: Math.round(area(ink, over) + area(ink, total)),
+        // Самопроверка формулы: коробка с самой собой пересекается всей площадью.
+        selfOverlap: Math.round(area(ink, ink)),
+        transform: active.style.transform
+    };
+}
+
+test('47-й этаж: сумма растёт на месте, а таймер в любом стиле уступает деньгам', async () => {
+    // Жалоба 30.09.2026 «режим 47 этажа улетает и плохо масштабируется».
+    // Замер до правки на 1280×720: раскладка считалась под «Круг», и после
+    // смены стиля «Флип» ложился на «Перелимит» (242..1038 при 97..338), а
+    // знак минуса «Цифр» зачёркивал сумму; сама сумма «0 ₽» → «1 250 000 ₽»
+    // растила блок только вправо — центр уезжал на 30px к таймеру.
+    test.setTimeout(200000);
+    const { app, control } = await launchApp();
+    try {
+        await openDisplayTab(control);
+        await unlock(control);
+        await control.fill('#overrunPrice', '250000');
+        await control.fill('#overrunPeriod', '1');
+        await setToggle(control, 'showOverrunCost', true);
+        await setToggle(control, 'showTotalCost', true);
+        const display = await openDisplay(app, control);
+        const got = await resizeDisplay(app, display, { w: 1280, h: 720 });
+        console.log(`   окно ${got.w}×${got.h}`);
+        await control.waitForTimeout(800);
+
+        await control.locator('#displayLayoutGrid .layout-btn[data-layout="floor47"]').click();
+        await display.waitForTimeout(1600);
+
+        const zero = await display.evaluate(moneyProbe, 0);
+        const million = await display.evaluate(moneyProbe, 9);
+        console.log(`   «${zero.value}»: центр ${zero.overCx.toFixed(1)}, ширина ${zero.overW.toFixed(1)}`
+            + ` · «${million.value}»: центр ${million.overCx.toFixed(1)}, ширина ${million.overW.toFixed(1)}`);
+        expect(million.value).toBe(`2${NB}250${NB}000${NB}₽`);
+        expect(Math.abs(million.overCx - zero.overCx), 'сумма выросла — блок уехал').toBeLessThanOrEqual(1);
+        expect(Math.abs(million.overW - zero.overW), 'ширина блока не зарезервирована').toBeLessThanOrEqual(1);
+
+        const requested = million.transform;
+        for (const style of ['flip', 'digits', 'analog', 'circle']) {
+            await control.locator(`#displayTimerStyle [data-val="${style}"]`).click();
+            await display.waitForTimeout(1500);
+            // Резерв ширины — в КАЖДОМ стиле: у «Флипа» у значения свои поля,
+            // и резерв числом в `ch` там не сходился (139 → 151px).
+            const low = await display.evaluate(moneyProbe, 0);
+            const m = await display.evaluate(moneyProbe, 39);
+            console.log(`   ${m.style}: «${low.value}» ${low.overW.toFixed(1)} → «${m.value}» ${m.overW.toFixed(1)},`
+                + ` пересечение ${m.overlap}px², ${m.transform}`);
+            expect(Math.abs(m.overW - low.overW), `${m.style}: сумма растянула блок`).toBeLessThanOrEqual(1);
+            expect(m.selfOverlap, 'формула пересечения ничего не считает').toBeGreaterThan(0);
+            expect(m.overlap, `${m.style}: таймер лёг на деньги`).toBe(0);
+        }
+
+        // Ресайз окна: уступка пересчитывается по НОВЫМ местам карточек, а не
+        // по тем, что были до debounce (замечание проверки 30.09.2026).
+        await control.locator('#displayTimerStyle [data-val="flip"]').click();
+        await display.waitForTimeout(1500);
+        const small = await resizeDisplay(app, display, { w: 1100, h: 700 });
+        await display.waitForTimeout(1500);
+        const resized = await display.evaluate(moneyProbe, 9);
+        console.log(`   после ресайза ${small.w}×${small.h}: пересечение ${resized.overlap}px², ${resized.transform}`);
+        expect(resized.overlap, 'после ресайза таймер лёг на деньги').toBe(0);
+        await control.locator('#displayTimerStyle [data-val="circle"]').click();
+        await display.waitForTimeout(1500);
+        await resizeDisplay(app, display, { w: 1280, h: 720 });
+        await display.waitForTimeout(1500);
+        // Уступка временная: вернувшись на «Круг», таймер снова того размера,
+        // который выбрала раскладка, а не сжатого «Цифрами».
+        const back = await display.evaluate(moneyProbe, 9);
+        expect(back.transform, 'уступка карточкам записалась в масштаб таймера').toBe(requested);
+    } finally {
+        await control.evaluate(() => {
+            window.ipcRenderer.send('close-display');
+            localStorage.removeItem('displayBlockPositions');
+            localStorage.removeItem('displayBlockScales');
+        }).catch(() => {});
+        await relock(control);
         await app.close();
     }
 });
