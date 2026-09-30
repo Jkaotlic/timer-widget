@@ -7847,8 +7847,8 @@
     {
       "type": "library",
       "name": "undici",
-      "version": "7.29.0",
-      "bom-ref": "timer-widget@2.12.1|undici@7.29.0",
+      "version": "7.30.0",
+      "bom-ref": "timer-widget@2.12.1|undici@7.30.0",
       "description": "An HTTP/1.1 client, written from scratch for Node.js",
       "scope": "optional",
       "licenses": [
@@ -7858,7 +7858,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/undici@7.29.0",
+      "purl": "pkg:npm/undici@7.30.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/nodejs/undici.git",
@@ -7876,12 +7876,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/undici/-/undici-7.29.0.tgz",
+          "url": "https://registry.npmjs.org/undici/-/undici-7.30.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "203c5f95e2e699b4ac91f5925004e23759df9f6ac3baf9cc3aa6f909647dda221fa2303451dfae94e000110e7b2cfafdad69acade5327f9970c9aa3eec634d57"
+              "content": "764ad05de1d26a86a69c8b6561b9b31b4c0562b3346700f108883403b68a8d3cb2861f6cbd1cc234513357e566d39ff27a18c2ce30d9df52977c6123612ced0d"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -9254,8 +9254,8 @@
     {
       "type": "library",
       "name": "brace-expansion",
-      "version": "5.0.9",
-      "bom-ref": "timer-widget@2.12.1|brace-expansion@5.0.9",
+      "version": "5.0.12",
+      "bom-ref": "timer-widget@2.12.1|brace-expansion@5.0.12",
       "description": "Brace expansion as known from sh/bash",
       "licenses": [
         {
@@ -9264,7 +9264,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/brace-expansion@5.0.9",
+      "purl": "pkg:npm/brace-expansion@5.0.12",
       "externalReferences": [
         {
           "url": "git+https://github.com/juliangruber/brace-expansion.git",
@@ -9282,12 +9282,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.9.tgz",
+          "url": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "49c43822ebc8105d533253fb66dfaf8c9ffff7394f6f64837315b13376e4f2ceade8619d27b28ed5d09c4e274e3c929e3d6df42c4ff6713ef00b23e1a3dfd6c6"
+              "content": "628bd0debce168b308ac38cd0cc90d4b4d6d79af77aa11211b9c72f1febe47497e770dca8bee6c0a822823de368ae2d94c75a881692d830543854d3d88d12299"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -10404,8 +10404,8 @@
         {
           "type": "library",
           "name": "undici",
-          "version": "6.28.0",
-          "bom-ref": "timer-widget@2.12.1|node-gyp@12.4.0|undici@6.28.0",
+          "version": "6.29.0",
+          "bom-ref": "timer-widget@2.12.1|node-gyp@12.4.0|undici@6.29.0",
           "description": "An HTTP/1.1 client, written from scratch for Node.js",
           "licenses": [
             {
@@ -10414,7 +10414,7 @@
               }
             }
           ],
-          "purl": "pkg:npm/undici@6.28.0",
+          "purl": "pkg:npm/undici@6.29.0",
           "externalReferences": [
             {
               "url": "git+https://github.com/nodejs/undici.git",
@@ -10432,12 +10432,12 @@
               "comment": "as detected from PackageJson property \"bugs.url\""
             },
             {
-              "url": "https://registry.npmjs.org/undici/-/undici-6.28.0.tgz",
+              "url": "https://registry.npmjs.org/undici/-/undici-6.29.0.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "2c863dd7483d4c8d77612f7996b305aecf119bfbbf8ab8077935a8282a2d79e274e02509f767847e3d2b567fbb54a30f06950f894a0129f84dc8b236dc413f28"
+                  "content": "47e44e0c1aa9ea2da93df94676afb120e52497e44d7c6807c288a779c2aefc90ae7f6b8ed3a70e2a80db2363fb0e7e8a72cc1d2b0adccdb53a21827a2bc5fec2"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -20359,7 +20359,7 @@
         "timer-widget@2.12.1|progress@2.0.3",
         "timer-widget@2.12.1|semver@7.8.5",
         "timer-widget@2.12.1|sumchecker@3.0.1",
-        "timer-widget@2.12.1|undici@7.29.0"
+        "timer-widget@2.12.1|undici@7.30.0"
       ]
     },
     {
@@ -20532,7 +20532,7 @@
     {
       "ref": "timer-widget@2.12.1|minimatch@10.2.6",
       "dependsOn": [
-        "timer-widget@2.12.1|brace-expansion@5.0.9"
+        "timer-widget@2.12.1|brace-expansion@5.0.12"
       ]
     },
     {
@@ -20591,7 +20591,7 @@
     {
       "ref": "timer-widget@2.12.1|@electron/asar@3.4.1|minimatch@3.1.5",
       "dependsOn": [
-        "timer-widget@2.12.1|brace-expansion@5.0.9"
+        "timer-widget@2.12.1|brace-expansion@5.0.12"
       ]
     },
     {
@@ -20659,7 +20659,7 @@
     {
       "ref": "timer-widget@2.12.1|@electron/universal@2.0.3|minimatch@9.0.9",
       "dependsOn": [
-        "timer-widget@2.12.1|brace-expansion@5.0.9"
+        "timer-widget@2.12.1|brace-expansion@5.0.12"
       ]
     },
     {
@@ -20952,7 +20952,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.1|undici@7.29.0"
+      "ref": "timer-widget@2.12.1|undici@7.30.0"
     },
     {
       "ref": "timer-widget@2.12.1|undici-types@7.18.2"
@@ -21062,7 +21062,7 @@
       "ref": "timer-widget@2.12.1|is-extglob@2.1.1"
     },
     {
-      "ref": "timer-widget@2.12.1|brace-expansion@5.0.9",
+      "ref": "timer-widget@2.12.1|brace-expansion@5.0.12",
       "dependsOn": [
         "timer-widget@2.12.1|balanced-match@4.0.4"
       ]
@@ -21111,7 +21111,7 @@
     {
       "ref": "timer-widget@2.12.1|glob@7.2.3|minimatch@3.1.5",
       "dependsOn": [
-        "timer-widget@2.12.1|brace-expansion@5.0.9"
+        "timer-widget@2.12.1|brace-expansion@5.0.12"
       ]
     },
     {
@@ -21180,7 +21180,7 @@
         "timer-widget@2.12.1|semver@7.8.5",
         "timer-widget@2.12.1|tar@7.5.22",
         "timer-widget@2.12.1|tinyglobby@0.2.17",
-        "timer-widget@2.12.1|node-gyp@12.4.0|undici@6.28.0",
+        "timer-widget@2.12.1|node-gyp@12.4.0|undici@6.29.0",
         "timer-widget@2.12.1|node-gyp@12.4.0|which@6.0.1"
       ]
     },
@@ -21188,7 +21188,7 @@
       "ref": "timer-widget@2.12.1|node-gyp@12.4.0|env-paths@2.2.1"
     },
     {
-      "ref": "timer-widget@2.12.1|node-gyp@12.4.0|undici@6.28.0"
+      "ref": "timer-widget@2.12.1|node-gyp@12.4.0|undici@6.29.0"
     },
     {
       "ref": "timer-widget@2.12.1|node-gyp@12.4.0|which@6.0.1",
@@ -21215,7 +21215,7 @@
     {
       "ref": "timer-widget@2.12.1|dir-compare@4.2.0|minimatch@3.1.5",
       "dependsOn": [
-        "timer-widget@2.12.1|brace-expansion@5.0.9"
+        "timer-widget@2.12.1|brace-expansion@5.0.12"
       ]
     },
     {
@@ -21643,7 +21643,7 @@
     {
       "ref": "timer-widget@2.12.1|filelist@1.0.6|minimatch@5.1.9",
       "dependsOn": [
-        "timer-widget@2.12.1|brace-expansion@5.0.9"
+        "timer-widget@2.12.1|brace-expansion@5.0.12"
       ]
     },
     {

@@ -426,7 +426,7 @@ License: MIT
 Repository: https://github.com/thenativeweb/boolean
 
 === brace-expansion ===
-Version: 5.0.9
+Version: 5.0.12
 License: MIT
 Repository: https://github.com/juliangruber/brace-expansion
 
@@ -1988,12 +1988,12 @@ License: MIT
 Repository: https://github.com/nodejs/undici
 
 === undici ===
-Version: 6.28.0
+Version: 6.29.0
 License: MIT
 Repository: https://github.com/nodejs/undici
 
 === undici ===
-Version: 7.29.0
+Version: 7.30.0
 License: MIT
 Repository: https://github.com/nodejs/undici
 
