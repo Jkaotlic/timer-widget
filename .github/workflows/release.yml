@@ -202,7 +202,7 @@ jobs:
       # каталогизаторами образа, полнота проверяется (см. deb-scan в nodejs.yml).
       - name: Download Syft
         id: syft
-        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
 
       - name: SBOM of the shipped deb
         run: ${{ steps.syft.outputs.cmd }} dir:scan-root --override-default-catalogers image -o cyclonedx-json=deb-sbom.cdx.json -o table
