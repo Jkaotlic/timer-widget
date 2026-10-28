@@ -313,9 +313,11 @@ class DisplayTimer {
             }
             positions[row.id] = record;
         }
-        if (Object.keys(positions).length > 0) {
-            this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
-        }
+        // Пустой набор — тоже состояние («ничего не сдвинуто»), и его
+        // записывают: раскладка «Минимум», вернувшая в поток единственный
+        // сдвинутый таймер, иначе оставляла в хранилище его старое место, и
+        // при следующем открытии окна таймер уезжал туда снова.
+        this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
     }
 
     /**
