@@ -216,28 +216,39 @@ const LocalBackgroundMixin = {
 
     loadLocalBackground() {
             const savedBg = localStorage.getItem('localBgImage');
-            const savedSettings = window.safeJSONParse(localStorage.getItem('localBgSettings'), {});
-            
             if (savedBg) {
                 this.showLocalBgPreview(savedBg);
-                
-                // Применяем настройки
-                if (savedSettings.fit) {
-                    document.querySelectorAll('.bg-fit-btn').forEach(b => {
-                        b.classList.toggle('active', b.dataset.fit === savedSettings.fit);
-                    });
-                }
-                if (savedSettings.overlay !== undefined) {
-                    document.getElementById('bgOverlaySlider').value = savedSettings.overlay;
-                    document.getElementById('bgOverlayValue').textContent = savedSettings.overlay + '%';
-                }
             }
+            // Вписывание и затемнение раскладываются ВСЕГДА, а не только при
+            // картинке: их читает и пресет (applyProfile), и удаление фона, и
+            // дисплей получает их из профиля независимо от того, что показывает
+            // панель. Раньше без картинки контролы оставались прежними.
+            this.renderLocalBgSettings();
+    },
+
+    /** Кнопки вписывания и ползунок затемнения — из localBgSettings или умолчания. */
+    renderLocalBgSettings() {
+            const saved = window.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
+            // Умолчания — те же, что у сборки payload дисплея (panel-display.js):
+            // иначе панель и окно снова показали бы разное.
+            const fit = saved.fit || 'cover';
+            const overlay = window.RendererShared.bgOverlayPercent(saved.overlay);
+            document.querySelectorAll('.bg-fit-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.fit === fit);
+            });
+            const slider = document.getElementById('bgOverlaySlider');
+            const label = document.getElementById('bgOverlayValue');
+            if (slider) { slider.value = overlay; }
+            if (label) { label.textContent = overlay + '%'; }
     },
 
     deleteLocalBackground() {
             localStorage.removeItem('localBgImage');
             localStorage.removeItem('localBgSettings');
             this.hideLocalBgPreview();
+            // Настройки удалены — контролы обязаны это показать, иначе после
+            // новой загрузки дисплей получит умолчания, а ползунок — прежнее.
+            this.renderLocalBgSettings();
             
             // Если был выбран режим local, переключаемся на solid
             if (this.currentBgMode === 'local') {
@@ -261,6 +272,10 @@ const LocalBackgroundMixin = {
             }));
     }
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { LocalBackgroundMixin };
+}
 
 if (typeof window !== 'undefined') {
     window.LocalBackgroundMixin = LocalBackgroundMixin;

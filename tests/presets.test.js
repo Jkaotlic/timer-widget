@@ -219,6 +219,7 @@ test('применение идёт ТЕМ ЖЕ путём, что и запус
     const controller = {
         loadSettings: () => calls.push('loadSettings'),
         loadClockSettings: () => calls.push('loadClockSettings'),
+        loadLocalBackground: () => calls.push('loadLocalBackground'),
         pushDisplaySettings: () => calls.push('pushDisplaySettings'),
         pushClockSettings: () => calls.push('pushClockSettings'),
         renderWindowRows: () => calls.push('renderWindowRows')
@@ -226,7 +227,7 @@ test('применение идёт ТЕМ ЖЕ путём, что и запус
     const ipc = { send: (channel) => calls.push(channel) };
     PanelPresets.applyProfile(controller, ipc);
     assert.deepEqual(calls, [
-        'loadSettings', 'loadClockSettings',
+        'loadSettings', 'loadClockSettings', 'loadLocalBackground',
         'pushDisplaySettings', 'pushClockSettings',
         'renderWindowRows', 'display-restore-state'
     ]);

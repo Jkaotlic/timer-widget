@@ -202,6 +202,9 @@ function applyProfile(controller, ipc) {
     // тумблер делений оставались прежними, окно часов пресета не получало, а
     // первая же правка часов собирала СТАРЫЕ контролы поверх пресета.
     if (typeof controller.loadClockSettings === 'function') { controller.loadClockSettings(); }
+    // Вписывание и затемнение локального фона — ключ профиля localBgSettings;
+    // контролы панели раскладывает только loadLocalBackground.
+    if (typeof controller.loadLocalBackground === 'function') { controller.loadLocalBackground(); }
     if (typeof controller.pushDisplaySettings === 'function') { controller.pushDisplaySettings(); }
     if (typeof controller.pushClockSettings === 'function') { controller.pushClockSettings(); }
     if (typeof controller.renderWindowRows === 'function') { controller.renderWindowRows(); }
