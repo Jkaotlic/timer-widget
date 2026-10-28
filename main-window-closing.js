@@ -80,26 +80,36 @@ function createWindowClosing({ windows }) {
         // Уже запланировано: последний запрос побеждает — пока окно закрывалось,
         // человек мог выбрать другой монитор.
         if (pendingOpens.has(key)) {
-            pendingOpens.set(key, create);
+            pendingOpens.get(key).create = create;
             return true;
         }
         if (!closing) { return false; }
 
-        pendingOpens.set(key, create);
+        // Запись — это и токен запроса (MAIN-03). Страховка и `closed`
+        // исполняют только СВОЮ запись: прежде run проверял лишь «есть ли что-то
+        // под ключом», и неснятая страховка прошлого запроса через 3 с
+        // открывала окно за СЛЕДУЮЩИЙ — раньше, чем уходило его окно.
+        const entry = { create, timer: null };
+        pendingOpens.set(key, entry);
         const run = () => {
-            // Пусто — значит пришла команда «закрыть»: человек передумал.
-            if (!pendingOpens.has(key)) { return; }
-            const make = pendingOpens.get(key);
+            // Не своя запись (или пусто — пришла команда «закрыть»: человек
+            // передумал) — не наше дело.
+            if (pendingOpens.get(key) !== entry) { return; }
             pendingOpens.delete(key);
-            make();
+            clearTimeout(entry.timer);
+            entry.create();
         };
         closing.once('closed', run);
-        setTimeout(run, WINDOW_REOPEN_TIMEOUT_MS);
+        entry.timer = setTimeout(run, WINDOW_REOPEN_TIMEOUT_MS);
         return true;
     }
 
     /** Отменить отложенное открытие: «закрыть» отменяет «открыть». */
-    function cancelQueuedOpen(key) { pendingOpens.delete(key); }
+    function cancelQueuedOpen(key) {
+        const entry = pendingOpens.get(key);
+        if (entry) { clearTimeout(entry.timer); }
+        pendingOpens.delete(key);
+    }
 
     /**
      * Закрыть окно дисплея БЕЗОПАСНО: сперва выйти из полноэкранного режима.
