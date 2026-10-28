@@ -218,12 +218,52 @@ test('применение идёт ТЕМ ЖЕ путём, что и запус
     const calls = [];
     const controller = {
         loadSettings: () => calls.push('loadSettings'),
+        loadClockSettings: () => calls.push('loadClockSettings'),
         pushDisplaySettings: () => calls.push('pushDisplaySettings'),
+        pushClockSettings: () => calls.push('pushClockSettings'),
         renderWindowRows: () => calls.push('renderWindowRows')
     };
     const ipc = { send: (channel) => calls.push(channel) };
     PanelPresets.applyProfile(controller, ipc);
-    assert.deepEqual(calls, ['loadSettings', 'pushDisplaySettings', 'renderWindowRows', 'display-restore-state']);
+    assert.deepEqual(calls, [
+        'loadSettings', 'loadClockSettings',
+        'pushDisplaySettings', 'pushClockSettings',
+        'renderWindowRows', 'display-restore-state'
+    ]);
+});
+
+test('PANEL-001: пресет раскладывает и рассылает настройки ЧАСОВ, а не только дисплея', () => {
+    // Сценарий аудита 27.10.2026: пресет с clockWidgetSettings (секунды выкл.,
+    // 12ч) и clockShowTicks. Применение звало только loadSettings +
+    // pushDisplaySettings: чекбоксы часов оставались прежними, окно часов не
+    // менялось, а следующая правка часов собирала СТАРЫЕ контролы и
+    // перезаписывала пресет. Запуск панели зовёт loadClockSettings и
+    // pushClockSettings — пресет обязан идти тем же путём.
+    const calls = [];
+    const controller = {
+        loadSettings: () => calls.push('loadSettings'),
+        loadClockSettings: () => calls.push('loadClockSettings'),
+        pushClockSettings: () => calls.push('pushClockSettings')
+    };
+    PanelPresets.applyProfile(controller, null);
+    assert.ok(calls.includes('loadClockSettings'), 'контролы часов не перечитаны из профиля');
+    assert.ok(calls.includes('pushClockSettings'), 'окно часов не получило настройки пресета');
+    assert.ok(
+        calls.indexOf('loadClockSettings') < calls.indexOf('pushClockSettings'),
+        'рассылать до раскладки — значит разослать СТАРЫЕ контролы поверх пресета'
+    );
+
+    // Деления (clockShowTicks) — отдельный ключ, и читался он только в
+    // initElements. Перечитывать их обязана та же раскладка часов.
+    const control = codeOnly(read('control-app.js'));
+    const at = control.indexOf('loadClockSettings() {');
+    assert.notEqual(at, -1, 'нет метода loadClockSettings');
+    const body = control.slice(at, control.indexOf('\n            }', at));
+    assert.match(
+        body,
+        /clockShowTicksEl[\s\S]{0,120}getItem\('clockShowTicks'\)/,
+        'loadClockSettings не перечитывает деления: после пресета тумблер врёт'
+    );
 });
 
 test('панель подключает модули и ставит ячейки в разметку', () => {

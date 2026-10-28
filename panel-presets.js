@@ -184,8 +184,10 @@ function presetHotkeyHandler({ apply, save, slots = 4 }) {
  * Перечитать профиль и разослать его окнам.
  *
  * Ровно тот же путь, которым панель поднимается при запуске: `loadSettings()`
- * раскладывает ключи по контролам и рассылает стиль, цвета и настройки часов,
- * `pushDisplaySettings()` — набор полноэкранного окна, а `display-restore-state`
+ * раскладывает ключи по контролам и рассылает стиль и цвета,
+ * `loadClockSettings()` + `pushClockSettings()` — настройки часов (их
+ * loadSettings НЕ трогает), `pushDisplaySettings()` — набор полноэкранного
+ * окна, а `display-restore-state`
  * просит его перечитать МЕСТА карточек: они лежат в профиле, а не в payload.
  *
  * Функция здесь, а не методом контроллера, по той же причине, что и остальные
@@ -195,7 +197,13 @@ function presetHotkeyHandler({ apply, save, slots = 4 }) {
 function applyProfile(controller, ipc) {
     if (!controller) { return false; }
     controller.loadSettings();
+    // Часы раскладываются ОТДЕЛЬНО от loadSettings — так же, как при запуске
+    // (конструктор зовёт loadClockSettings следом). Без этого контролы часов и
+    // тумблер делений оставались прежними, окно часов пресета не получало, а
+    // первая же правка часов собирала СТАРЫЕ контролы поверх пресета.
+    if (typeof controller.loadClockSettings === 'function') { controller.loadClockSettings(); }
     if (typeof controller.pushDisplaySettings === 'function') { controller.pushDisplaySettings(); }
+    if (typeof controller.pushClockSettings === 'function') { controller.pushClockSettings(); }
     if (typeof controller.renderWindowRows === 'function') { controller.renderWindowRows(); }
     if (ipc && typeof ipc.send === 'function') { ipc.send('display-restore-state'); }
     return true;

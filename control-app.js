@@ -1142,6 +1142,12 @@
                     this,
                     safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
                 );
+                // Деления — свой ключ вне clockWidgetSettings. Перечитываются
+                // здесь же: эту раскладку зовёт и применение пресета, и без
+                // строки тумблер после пресета показывал прежнее значение.
+                if (this.clockShowTicksEl) {
+                    this.clockShowTicksEl.checked = localStorage.getItem('clockShowTicks') === 'true';
+                }
                 this.updateClockAnalogNumbersVisibility();
             }
 
