@@ -76,8 +76,20 @@ class ColorPicker {
 
     setColor(hex) {
         if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) { return; }
+        // Свой же цвет, вернувшийся из панели (onChange → updateColors →
+        // renderSurfaceControls → setColor), координат не меняет: у серого и
+        // чёрного hex оттенка не хранит, и пересчёт ставил h = 0 — ручка
+        // оттенка прыгала на красный после каждого движения.
+        if (hex.toLowerCase() === ColorPicker.hsvToHex(this.h, this.s, this.v).toLowerCase()) {
+            this.updatePreview();
+            return;
+        }
         const [h, s, v] = ColorPicker.hexToHsv(hex);
-        this.h = h; this.s = s; this.v = v;
+        // Чужой серый (s = 0) или чёрный (v = 0) оттенка не задаёт — текущий
+        // остаётся; у чёрного не задаёт и насыщенности.
+        if (s > 0 && v > 0) { this.h = h; }
+        if (v > 0) { this.s = s; }
+        this.v = v;
         if (this.panel.classList.contains('open')) {
             this.drawSV();
             this.drawHue();
@@ -220,6 +232,10 @@ function addPickerToggle(gridId, pickerId, pickerConfig) {
         toggle.setAttribute('aria-expanded', String(open));
     });
     return picker;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { ColorPicker, addPickerToggle };
 }
 
 if (typeof window !== 'undefined') {
