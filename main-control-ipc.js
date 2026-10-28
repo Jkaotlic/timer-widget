@@ -130,12 +130,49 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // «держать ЦЕНТР при изменении размера» относится к Ctrl+колесу в виджете и
     // часах, где содержимое растёт вокруг себя и курсор ни к чему не привязан;
     // здесь источник — клик по конкретной кнопке вверху окна.
+    //
+    // Состояние свёртки живёт ЗДЕСЬ, а рендерер (mini-bar.js) после
+    // перезагрузки страницы стартует развёрнутым. Поэтому перезагрузка
+    // (крах → bindRenderCrashHandler → reload) разворачивает окно и в main
+    // (MAIN-09): иначе полная панель рисовалась в окне высотой 52 поверх всех
+    // окон, а повторная свёртка перезаписывала границы «до» границами полосы.
+    // Границы помнятся ВМЕСТЕ с окном: панель, пересозданная из трея, —
+    // другое окно, и чужие границы ей не годятся.
     let controlBoundsBeforeCollapse = null;
+    let collapsedWindow = null;
+    const reloadBound = new WeakSet();
+
+    function expandControlWindow(win) {
+        // Разворот: пол возвращается ДО восстановления границ, иначе окно можно
+        // оставить панелью высотой 52 — это обрезанная раскладка, которую чинила
+        // задача про минимальную высоту.
+        win.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+        win.setAlwaysOnTop(false);
+        const prev = collapsedWindow === win ? controlBoundsBeforeCollapse : null;
+        controlBoundsBeforeCollapse = null;
+        collapsedWindow = null;
+        if (prev) {
+            win.setBounds(prev);
+        } else {
+            const [curW] = win.getSize();
+            win.setSize(curW, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+        }
+    }
+
+    function bindReloadExpand(win) {
+        if (reloadBound.has(win) || !win.webContents || typeof win.webContents.on !== 'function') { return; }
+        reloadBound.add(win);
+        win.webContents.on('did-start-loading', () => {
+            if (collapsedWindow !== win || win.isDestroyed()) { return; }
+            expandControlWindow(win);
+        });
+    }
 
     ipcMain.on('control-collapse', (_event, payload) => {
         if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !payload || typeof payload !== 'object') { return; }
+        const win = windows.controlWindow;
         const collapsed = payload.collapsed === true;
-        const [curW] = windows.controlWindow.getSize();
+        const [curW] = win.getSize();
 
         if (collapsed) {
             // Высота приходит из рендерера (её знает CSS), но доверять ей нельзя:
@@ -144,32 +181,27 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             const raw = Number.isFinite(payload.height) ? payload.height : 52;
             const barHeight = Math.max(36, Math.min(120, Math.round(raw)));
 
-            controlBoundsBeforeCollapse = windows.controlWindow.getBounds();
-            const { x, y } = controlBoundsBeforeCollapse;
-            windows.controlWindow.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, 1);
+            // Уже свёрнуто этим окном — границы «до» не перезаписываются
+            // границами полосы.
+            if (collapsedWindow !== win || !controlBoundsBeforeCollapse) {
+                controlBoundsBeforeCollapse = win.getBounds();
+                collapsedWindow = win;
+            }
+            bindReloadExpand(win);
+            const { x, y } = win.getBounds();
+            win.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, 1);
             // Ширину задаёт СОДЕРЖИМОЕ полосы: в ней время, четыре ячейки вида,
             // замок и управление отсчётом, и на 400px этот набор не помещается.
             // Пол, а не размер: окно шире пола сворачивается со своей шириной, а
             // разворот всё равно вернёт прежние границы целиком.
             const barWidth = Math.max(curW, CONFIG.CONTROL_BAR_MIN_WIDTH);
-            windows.controlWindow.setSize(barWidth, barHeight);
-            windows.controlWindow.setPosition(x, y);   // держим ВЕРХНИЙ край
-            windows.controlWindow.setAlwaysOnTop(true);
+            win.setSize(barWidth, barHeight);
+            win.setPosition(x, y);   // держим ВЕРХНИЙ край
+            win.setAlwaysOnTop(true);
             return;
         }
 
-        // Разворот: пол возвращается ДО восстановления границ, иначе окно можно
-        // оставить панелью высотой 52 — это обрезанная раскладка, которую чинила
-        // задача про минимальную высоту.
-        windows.controlWindow.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
-        windows.controlWindow.setAlwaysOnTop(false);
-        const prev = controlBoundsBeforeCollapse;
-        if (prev) {
-            windows.controlWindow.setBounds(prev);
-            controlBoundsBeforeCollapse = null;
-        } else {
-            windows.controlWindow.setSize(curW, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
-        }
+        expandControlWindow(win);
     });
 
     // Управление окном панели управления

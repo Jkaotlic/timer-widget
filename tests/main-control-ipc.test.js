@@ -21,6 +21,17 @@ function makeWindow({ x, y, width, height }) {
         _min: [CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT],
         _max: [CONFIG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER, CONFIG.CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER],
         _onTop: false,
+        // События webContents ХРАНЯТСЯ: перезагрузка страницы — это событие,
+        // и без него «main узнал о reload» непроверяемо.
+        webContents: (() => {
+            const ev = new Map();
+            const on = (e, fn) => { if (!ev.has(e)) { ev.set(e, []); } ev.get(e).push(fn); };
+            return {
+                on, once: on,
+                emit: (e, ...a) => { for (const fn of (ev.get(e) || []).slice()) { fn(...a); } },
+                listenerCount: (e) => (ev.get(e) || []).length
+            };
+        })(),
         isDestroyed: () => false,
         getSize() { return this._size.slice(); },
         setSize(w, h) { this._size = [w, h]; },
@@ -131,4 +142,51 @@ test('MAIN-01: размер не изменился — окно не трога
     const { handlers } = setup(win, [PRIMARY, BELOW]);
     handlers.get('resize-control-window')(null, { width: 400, height: 700 });
     assert.equal(calls, 0);
+});
+
+test('MAIN-09: перезагрузка страницы свёрнутой панели разворачивает окно в main', () => {
+    // Рендерер после reload (крах → bindRenderCrashHandler) стартует
+    // развёрнутым, а main держал окно полосой: пол снят, поверх всех окон.
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    assert.equal(win.getBounds().height, 52);
+    assert.equal(win._onTop, true);
+
+    win.webContents.emit('did-start-loading');
+
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 700 }, 'прежние границы вернулись');
+    assert.equal(win._onTop, false, 'поверх всех окон снято');
+    assert.deepEqual(win.getMinimumSize(), [CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT], 'пол вернулся');
+});
+
+test('MAIN-09: повторное «свернуть» не перезаписывает границы до свёртки границами полосы', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 700 });
+});
+
+test('MAIN-09: свёртка нового окна панели берёт ЕГО границы, а не оставшиеся от старого', () => {
+    const first = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers, windows } = setup(first, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    // Панель закрыли полосой и создали заново (трей).
+    const second = makeWindow({ x: 500, y: 300, width: 420, height: 720 });
+    windows.controlWindow = second;
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(second.getBounds(), { x: 500, y: 300, width: 420, height: 720 });
+});
+
+test('MAIN-09: обработчик перезагрузки вешается на окно один раз, а не на каждую свёртку', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    for (let i = 0; i < 5; i++) {
+        handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+        handlers.get('control-collapse')(null, { collapsed: false });
+    }
+    assert.ok(win.webContents.listenerCount('did-start-loading') <= 1);
 });

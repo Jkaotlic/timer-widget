@@ -85,7 +85,12 @@ test('свёртывание в полосу снимает пол минима�
     // который чинила задача про минимальную высоту.
     // Тело вырезается балансировкой скобок, а не поиском `\n});`: обработчик
     // живёт внутри функции регистрации модуля, и отступ у него другой.
-    const handler = [codeOnly(ipcHandlerBody(source, 'control-collapse'))];
+    // Разворот вынесен в expandControlWindow: его зовут и канал, и
+    // перезагрузка свёрнутой страницы (MAIN-09) — проверяются оба тела.
+    // Поведение — в tests/main-control-ipc.test.js.
+    const handler = [codeOnly(ipcHandlerBody(source, 'control-collapse'))
+        + codeOnly(functionBody(source, 'expandControlWindow'))];
+    assert.match(handler[0], /expandControlWindow\(/, 'канал не зовёт разворот');
 
     assert.match(
         handler[0],
