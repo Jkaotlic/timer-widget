@@ -16,6 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const engine = require('../timer-engine');
 const { createTimerController } = require('../timer-controller');
+const { MAX_SECONDS } = engine;
 
 // Build a controller wired to a fake clock + spies. Returns the controller plus
 // the spy buffers and clock controls.
@@ -123,15 +124,27 @@ test('setConfig: merges booleans/numbers and reports change', () => {
     assert.equal(h.controller.getConfig().overrunIntervalMinutes, 1);
 });
 
-test('setConfig: Infinity / NaN guards fall back to safe defaults', () => {
+test('MAIN-05: setConfig принимает только конечное ЧИСЛО — остальное не меняет конфиг', () => {
+    // Прежде Number(): true давал лимит 1 с (таймер вставал сразу после ухода
+    // в минус), '' и [] — 0 (лимит снят). Правило движка (toWholeSeconds,
+    // BUG-12): true — не «одна секунда», строка — чужая посылка.
     const h = makeHarness();
-    h.controller.setConfig({ overrunLimitSeconds: Infinity, overrunIntervalMinutes: NaN });
-    assert.equal(h.controller.getConfig().overrunLimitSeconds, 0);
-    assert.equal(h.controller.getConfig().overrunIntervalMinutes, 1);
-    // String numbers coerce; non-numeric → default.
-    h.controller.setConfig({ overrunLimitSeconds: '90', overrunIntervalMinutes: 'abc' });
-    assert.equal(h.controller.getConfig().overrunLimitSeconds, 90);
-    assert.equal(h.controller.getConfig().overrunIntervalMinutes, 1);
+    h.controller.setConfig({ overrunLimitSeconds: 120, overrunIntervalMinutes: 5 });
+    for (const junk of [true, false, '', '90', [], {}, Infinity, -Infinity, NaN]) {
+        assert.equal(
+            h.controller.setConfig({ overrunLimitSeconds: junk, overrunIntervalMinutes: junk }), false,
+            `посылка ${JSON.stringify(junk)} не должна менять конфиг`
+        );
+        assert.equal(h.controller.getConfig().overrunLimitSeconds, 120);
+        assert.equal(h.controller.getConfig().overrunIntervalMinutes, 5);
+    }
+});
+
+test('MAIN-05: лимит ограничен сверху MAX_SECONDS', () => {
+    const h = makeHarness();
+    h.controller.setConfig({ overrunLimitSeconds: 1e12, overrunIntervalMinutes: 1e12 });
+    assert.equal(h.controller.getConfig().overrunLimitSeconds, MAX_SECONDS);
+    assert.ok(h.controller.getConfig().overrunIntervalMinutes * 60 <= MAX_SECONDS);
 });
 
 test('setConfig: ignores null / non-object payloads', () => {

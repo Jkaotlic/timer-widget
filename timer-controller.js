@@ -145,17 +145,21 @@ function createTimerController(deps = {}) {
                 configChanged = true;
             }
         }
-        if (overrunLimitSeconds !== null && overrunLimitSeconds !== undefined) {
-            const limitNum = Number(overrunLimitSeconds);
-            const newLimit = Number.isFinite(limitNum) ? Math.max(0, limitNum) : 0;
+        // Только конечное ЧИСЛО (MAIN-05) — то же правило, что у секунд в
+        // движке (toWholeSeconds, BUG-12): Number() делал из `true` лимит 1 с,
+        // а из '' и [] — 0, то есть снятый лимит. Окна шлют числа; иное —
+        // чужая посылка, и конфиг она не меняет. Сверху — потолок таймера.
+        const MAX = engine.MAX_SECONDS;
+        const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+        if (isNum(overrunLimitSeconds)) {
+            const newLimit = Math.min(MAX, Math.max(0, overrunLimitSeconds));
             if (timerConfig.overrunLimitSeconds !== newLimit) {
                 timerConfig = { ...timerConfig, overrunLimitSeconds: newLimit };
                 configChanged = true;
             }
         }
-        if (overrunIntervalMinutes !== null && overrunIntervalMinutes !== undefined) {
-            const intervalNum = Number(overrunIntervalMinutes);
-            const newVal = Number.isFinite(intervalNum) ? Math.max(1, intervalNum) : 1;
+        if (isNum(overrunIntervalMinutes)) {
+            const newVal = Math.min(Math.floor(MAX / 60), Math.max(1, overrunIntervalMinutes));
             if (timerConfig.overrunIntervalMinutes !== newVal) {
                 timerConfig = { ...timerConfig, overrunIntervalMinutes: newVal };
                 configChanged = true;
