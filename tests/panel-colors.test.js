@@ -416,3 +416,16 @@ test('PANEL-002: панель раскладывает цвета ОДНИМ м�
     assert.doesNotMatch(control, /if \(savedClockColors\)/, 'старая односторонняя ветка цветов часов вернулась');
     assert.doesNotMatch(control, /if \(savedDisplayColors\)/, 'старая односторонняя ветка цветов дисплея вернулась');
 });
+
+test('PANEL-011: тема виджета не трогает поля фона ДИСПЛЕЯ', () => {
+    // Сценарий аудита 27.10.2026: дисплею выбран сплошной фон #123456, клик по
+    // теме виджета «Океан» молча писал theme.bg в #bgSolidColor и #bgGrad1 —
+    // поля фона ДРУГОГО окна — и не отправлял их. Следующая любая правка
+    // дисплея (pushDisplaySettings) сохраняла и слала подменённый фон: дисплей
+    // менял цвет «сам», выбор пользователя терялся. У дисплея своя сетка тем.
+    const src = codeOnly(read('theme-grid.js'));
+    assert.doesNotMatch(src, /getElementById\('bgSolidColor'\)/, 'тема виджета пишет сплошной фон дисплея');
+    assert.doesNotMatch(src, /getElementById\('bgGrad1'\)/, 'тема виджета пишет градиент дисплея');
+    assert.match(src, /updateColors\(target, \{ timer: theme\.t1, progress: theme\.t2, bg: theme\.bg \}\)/,
+        'тема перестала красить своё окно');
+});

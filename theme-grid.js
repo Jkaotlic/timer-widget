@@ -82,8 +82,10 @@ const ThemeGridMixin = {
                     // Сборка объекта цветов одна на панель — panel-colors.js.
                     this.updateColors(target, { timer: theme.t1, progress: theme.t2, bg: theme.bg });
                     if (target === 'widget') {
-                        document.getElementById('bgSolidColor').value = theme.bg;
-                        document.getElementById('bgGrad1').value = theme.bg;
+                        // Поля фона ДИСПЛЕЯ (#bgSolidColor, #bgGrad1) здесь больше
+                        // не пишутся: это настройка другого окна со своей сеткой
+                        // тем, и подменённое значение уезжало туда со следующей
+                        // же правкой дисплея (PANEL-011).
                         // Модуль подключается классическим <script>, поэтому
                         // кросс-модульные ссылки идут через window.X: голое имя
                         // резолвится только случайно и ломает линт.
