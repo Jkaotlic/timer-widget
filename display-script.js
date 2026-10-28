@@ -744,6 +744,19 @@ class DisplayTimer {
         }
 
         this._handlers.shortcutsKeydown = (e) => {
+            // Ctrl+1…4 — пресеты ВИДА. Само окно применить их не может: ключи
+            // профиля раскладывает по контролам и рассылает панель, поэтому
+            // отсюда уезжает только НОМЕР ячейки. Голые 1…4 остаются за
+            // пресетами времени — отбирать работающий жест ради нового нельзя.
+            // Стоит ДО выхода по модификаторам: ниже него ветка не исполнялась
+            // никогда. Shift — запись ячейки на панели, окну её делать нечем.
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
+                e.preventDefault();
+                if (this.ipcRenderer) {
+                    this.ipcRenderer.send('preset-apply', { slot: Number(e.code.replace('Digit', '')) });
+                }
+                return;
+            }
             if (e.ctrlKey || e.altKey || e.metaKey) { return; }
             switch (e.code) {
                 case 'Space':
@@ -797,18 +810,6 @@ class DisplayTimer {
                         this.ipcRenderer.send('sound-toggle');
                     }
                     break;
-            }
-
-            // Ctrl+1…4 — пресеты ВИДА. Само окно применить их не может: ключи
-            // профиля раскладывает по контролам и рассылает панель, поэтому
-            // отсюда уезжает только НОМЕР ячейки. Голые 1…4 остаются за
-            // пресетами времени — отбирать работающий жест ради нового нельзя.
-            if ((e.ctrlKey || e.metaKey) && /^Digit[1-4]$/.test(e.code)) {
-                e.preventDefault();
-                if (this.ipcRenderer) {
-                    this.ipcRenderer.send('preset-apply', { slot: Number(e.code.replace('Digit', '')) });
-                }
-                return;
             }
 
             // Пресеты. Комментарий «1-8 (5,10,15,20,25,30,45,60 минут)» остался
