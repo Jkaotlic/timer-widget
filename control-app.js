@@ -43,6 +43,8 @@
                 this.soundEnabled = true; // overwritten by initTabs()
                 // Ручной ввод — состояние панели, а не поле сбоку.
                 this.inputMode = false;
+                // Метка «холодный старт нажат здесь» (start → _onTimerState).
+                this._localStartAt = 0;
                 this.lastUpdateCounter = -1;
                 this.wasFinished = false;
                 this.currentBgMode = 'theme';
@@ -1165,9 +1167,12 @@
 
                     // Звук старта при запуске из другого окна (только холодный старт, не возобновление из паузы)
                     if (!wasRunningBefore && !wasPausedBefore && state.isRunning) {
-                        if (this._localStartTriggered) {
-                            this._localStartTriggered = false;
-                        } else if (this.soundStartEl.checked) {
+                        // Метка живёт ограниченное время: отклонённая главным
+                        // процессом команда не должна глушить чужой старт навсегда.
+                        const startedHere = this._localStartAt > 0
+                            && (Date.now() - this._localStartAt) < window.CONFIG.LOCAL_START_SOUND_WINDOW_MS;
+                        this._localStartAt = 0;
+                        if (!startedHere && this.soundStartEl.checked) {
                             this.playSound('start');
                         }
                     }
@@ -1335,7 +1340,12 @@
                     setTimeout(() => this.controlTimeEl.style.animation = '', 300);
                     return;
                 }
-                this._localStartTriggered = true;
+                // Метка «старт нажат ЗДЕСЬ» — только для холодного старта: его
+                // звук играет эта строка ниже, и _onTimerState не должен сыграть
+                // его второй раз. На «Продолжить» из паузы метка залипала —
+                // её снимает лишь ветка холодного старта, — и следующий старт
+                // из виджета или часов проходил без звука.
+                if (!this.isPaused && !this.isRunning) { this._localStartAt = Date.now(); }
                 this.sendCommand('start');
                 // Не проигрываем звук старта при возобновлении из паузы (this.isPaused ещё отражает прежнее состояние)
                 if (!this.isPaused && this.soundStartEl.checked) {this.playSound('start');}

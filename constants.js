@@ -120,6 +120,10 @@ const CONFIG = {
     // (main-window-hooks.js: bindRenderCrashHandler).
     CRASH_RELOAD_LIMIT: 3,
     CRASH_RELOAD_WINDOW_MS: 60000,
+    // Сколько живёт метка «старт нажат в панели» (control-app.js: start →
+    // _onTimerState): дольше IPC-круга с запасом, но конечна — отклонённая
+    // команда не должна глушить звук чужого старта навсегда.
+    LOCAL_START_SOUND_WINDOW_MS: 3000,
     // Порог дельты одного шага перетаскивания (main-geometry.js: moveWindowBy).
     // Испорченный или подменённый payload IPC-канала `*-move` мог унести окно
     // на координату вне int32 — setBounds на таком значении либо бросает,

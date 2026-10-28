@@ -435,7 +435,7 @@
 
 ### Start sound from remote windows
 
-- **Start sound from remote windows**: Control panel detects `!wasRunning → isRunning` transition in `timer-state` handler and plays start sound. `_localStartTriggered` flag prevents double-play when start button clicked locally.
+- **Start sound from remote windows**: Control panel detects `!wasRunning → isRunning` transition in `timer-state` handler and plays start sound. `_localStartAt` mark prevents double-play when start button clicked locally. The mark is set ONLY for a cold start (`!isPaused && !isRunning`) and expires after `CONFIG.LOCAL_START_SOUND_WINDOW_MS`: until 27.10.2026 (PANEL-006) it was a boolean set on every start, «Продолжить» from pause left it set, and the next cold start from the widget or clock played no sound.
 
 ---
 
