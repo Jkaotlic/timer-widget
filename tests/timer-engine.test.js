@@ -102,6 +102,24 @@ test('tick: overrun reaching -overrunLimitSeconds stops timer (isRunning=false)'
     assert.equal(next.finished, true);
 });
 
+test('MAIN-04: лимит, сниженный ниже текущего минуса, останавливает на ТЕКУЩЕМ значении, а не отматывает назад', () => {
+    // Идёт перелимит −100 с, лимит опустили до 60: прежде следующий тик
+    // зажимал −101 до −60 — минус на экране уменьшался на 40 с, и столько же
+    // терял накопитель перелимита (он берёт live из remainingSeconds).
+    const state = makeState({ remainingSeconds: -100, isRunning: true });
+    const { state: next, finished } = tick(state, { allowNegative: true, overrunLimitSeconds: 60 });
+    assert.equal(finished, true);
+    assert.equal(next.remainingSeconds, -100, 'остановка на текущем минусе');
+    assert.ok(next.remainingSeconds <= state.remainingSeconds, 'тик не двигает отсчёт назад');
+});
+
+test('MAIN-04: длинный шаг через лимит по-прежнему упирается в сам лимит', () => {
+    const state = makeState({ remainingSeconds: -250, isRunning: true });
+    const { state: next, finished } = tick(state, { allowNegative: true, overrunLimitSeconds: 300 }, 100);
+    assert.equal(finished, true);
+    assert.equal(next.remainingSeconds, -300);
+});
+
 test('tick: overrunLimitSeconds=0 means no limit (timer keeps going)', () => {
     const state = makeState({ remainingSeconds: -3599 });
     const { state: next, finished } = tick(state, {

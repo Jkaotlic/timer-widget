@@ -90,8 +90,13 @@ function tick(state, config = {}, stepSeconds = 1) {
     }
 
     // Hard stop at overrun limit (caller should clear interval)
+    //
+    // Зажим НЕ поднимает значение выше прежнего (MAIN-04): лимит, сниженный
+    // посреди перелимита ниже текущего минуса (−100 при новом лимите 60),
+    // останавливает таймер на ТЕКУЩЕМ значении. Прежний зажим до −60 отматывал
+    // минус назад на 40 с — на экране и в накопителе перелимита.
     if (allowNegative && overrunLimit > 0 && nextRemaining <= -overrunLimit) {
-        nextRemaining = -overrunLimit;
+        nextRemaining = Math.min(prevRemaining, -overrunLimit);
         shouldFinish = true;
     }
 
