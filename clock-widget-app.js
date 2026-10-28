@@ -596,7 +596,7 @@
                 const absOffset = Math.abs(offset);
                 const hours = Math.floor(absOffset / 60);
                 const mins = absOffset % 60;
-                return `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace('_', ' ')}`;
+                return `UTC${sign}${hours}${mins > 0 ? ':' + String(mins).padStart(2, '0') : ''} • ${tz.split('/').pop().replace(/_/g, ' ')}`;
             }
 
             updateDateTimezoneVisibility() {
