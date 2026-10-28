@@ -56,6 +56,21 @@ const PanelResetMixin = {
 
         window.SettingsSchema.resetOwnedSettings(target, document);
 
+        // Сброс ставит el.checked и событий НЕ порождает, поэтому всё, что
+        // панель держит полем или выводит из контрола побочным эффектом,
+        // подтягивается здесь — до записи и посылки ниже.
+        //  - синхронизация стиля часов живёт и полем this.syncClockStyle: без
+        //    этой строки чекбокс снят, а часам уходил стиль ВИДЖЕТА;
+        //  - замок 47-го этажа прячет секцию, секретные раскладки и ряды
+        //    подписей только в renderFloor47: без вызова дисплей получал
+        //    floor47Unlocked:false, а панель продолжала их показывать.
+        if (target === 'clock' && this.syncClockStyleEl) {
+            this.syncClockStyle = !!this.syncClockStyleEl.checked;
+        }
+        if (target === 'display' && typeof this.renderFloor47 === 'function') {
+            this.renderFloor47();
+        }
+
         // Настройки часов описаны своей таблицей; пустой объект означает «взять
         // всё из значений по умолчанию».
         if (target === 'clock') {
