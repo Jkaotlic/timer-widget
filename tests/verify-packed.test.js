@@ -459,6 +459,33 @@ test('ворота читают ВЕСЬ главный процесс из па
     assert.equal(checkHardening(readPackedMainSource(() => null, packed)).length, 1);
 });
 
+test('PACK-01: модуль главного процесса, который в пакете есть, но не читается, — провал, а не пропуск', () => {
+    // readPackedMainSource делал `continue` на любом null, кроме точки входа:
+    // модуль, вынесенный в app.asar.unpacked (asarUnpack) или нечитаемый
+    // иначе, молча выпадал из ворот — окно без гарда в нём проходило бы.
+    const packed = ['electron-main.js', 'main-windows.js'];
+    const read = (f) => (f === 'electron-main.js' ? "require('./main-windows');" : null);
+    const src = readPackedMainSource(read, packed);
+    assert.equal(src, null, 'нечитаемый модуль main-*.js обязан сорвать чтение главного процесса');
+    assert.equal(checkHardening(src).length, 1);
+});
+
+test('PACK-01: файл, вынесенный в app.asar.unpacked, читается оттуда', () => {
+    const header = {
+        files: {
+            'main-windows.js': { size: 20, unpacked: true },
+            'electron-main.js': { size: 0, offset: '0' }
+        }
+    };
+    withTempAsar(header, (asarPath) => {
+        fs.mkdirSync(`${asarPath}.unpacked`);
+        fs.writeFileSync(path.join(`${asarPath}.unpacked`, 'main-windows.js'), 'new BrowserWindow({})');
+        assert.equal(readAsarFile(asarPath, header, 'main-windows.js'), 'new BrowserWindow({})');
+        // Записи unpacked без файла рядом — null, а не мусор из области данных.
+        assert.equal(readAsarFile(asarPath, { files: { 'x.js': { size: 3, unpacked: true } } }, 'x.js'), null);
+    });
+});
+
 // --- Мост по окнам на артефакте ---------------------------------------------
 
 test('checkBridge: настоящие preload.js и главный процесс проходят, порча — нет', () => {

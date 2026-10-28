@@ -94,7 +94,19 @@ function readAsarFile(asarPath, header, relPath) {
         node = node.files && node.files[part];
         if (!node) { return null; }
     }
-    if (node.files || node.offset === undefined) { return null; }
+    if (node.files) { return null; }
+    // Файл, вынесенный из архива (asarUnpack): данных в asar у него нет, он
+    // лежит рядом, в app.asar.unpacked/ по тому же пути. Прежде такой файл
+    // читался как null — и для модулей главного процесса это значило «молча
+    // выпал из ворот» (PACK-01).
+    if (node.unpacked) {
+        try {
+            return fs.readFileSync(path.join(`${asarPath}.unpacked`, ...parts), 'utf8');
+        } catch {
+            return null;
+        }
+    }
+    if (node.offset === undefined) { return null; }
 
     const fd = fs.openSync(asarPath, 'r');
     try {
@@ -125,7 +137,8 @@ function mainProcessPaths(packedPaths) {
 
 /**
  * Исходник главного процесса из пакета одной строкой, или null, если в пакете
- * нет точки входа (тогда ворота обязаны упасть, а не «проверить пустоту»).
+ * нет точки входа или какой-то его файл не читается (тогда ворота обязаны
+ * упасть, а не «проверить пустоту»).
  * Модуль, требуемый точкой входа, но не упакованный, ловит checkPacked ниже.
  *
  * @param {(p: string) => string|null} read — содержимое файла из архива
@@ -135,10 +148,12 @@ function readPackedMainSource(read, packedPaths) {
     const parts = [];
     for (const file of mainProcessPaths(packedPaths)) {
         const src = read(file);
-        if (src === null) {
-            if (file === MAIN_ENTRY) { return null; }
-            continue;
-        }
+        // Нечитаемый файл главного процесса — провал целиком, и для модуля
+        // тоже (PACK-01): `continue` здесь молча выкидывал модуль из ворот, и
+        // окно без гарда в нём проходило. Список берётся из САМОГО пакета,
+        // так что «в пакете есть, а прочесть нельзя» — это сломанное чтение,
+        // а не отсутствующий модуль.
+        if (src === null) { return null; }
         parts.push(`\n/* ${file} */\n${src}`);
     }
     return parts.join('\n');
@@ -151,7 +166,7 @@ function readPackedMainSource(read, packedPaths) {
 function checkHardening(source) {
     const problems = [];
     if (source === null) {
-        return ['electron-main.js не найден внутри app.asar'];
+        return ['главный процесс не читается из app.asar: нет electron-main.js или модуль main-*.js не читается'];
     }
     // Комментарии снимаем: пояснение «nodeIntegration: true здесь запрещён»
     // уронило бы сборку на тексте, объясняющем запрет. Та же уборка, что в
