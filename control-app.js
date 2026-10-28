@@ -817,17 +817,13 @@
 
 
             loadSettings() {
-                // Загрузка цветов
-                // Старый общий ключ: то, что в нём есть, ДОПОЛНЯЕТ стартовые
-                // цвета, а не пересобирает их. Прежняя версия строила объект из
-                // трёх полей с фиолетовыми запасными значениями — и тем самым
-                // теряла бы всё, чего в ключе нет (фон окна, прозрачность).
-                const savedColors = localStorage.getItem('timerColors');
-                if (savedColors) {
-                    this.currentColors = window.mergeColors(
-                        this.currentColors, safeJSONParse(savedColors, {})
-                    );
-                }
+                // Цвета трёх окон — одним методом (panel-colors.js). Отсутствие
+                // ключа там — СБРОС: пресет без цветов обязан вернуть окна к
+                // умолчанию, а не оставить прежние. Раньше здесь были три ветки
+                // `if (saved…)` в конце метода, и при отсутствии ключа панель
+                // не делала ничего. Цвета разложены ДО миграции стиля ниже: она
+                // проверяет, задан ли у окна свой фон.
+                this.loadWindowColors();
 
                 // Загрузка расширенных настроек
                 // Профиль прежней версии: общий тумблер блоков переводится в
@@ -950,23 +946,6 @@
                 setTimeout(() => {
                     ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                 }, 600);
-
-                // Загружаем per-window цвета
-                const savedWidgetColors = safeJSONParse(localStorage.getItem('widgetColors'), null);
-                const savedClockColors = safeJSONParse(localStorage.getItem('clockColors'), null);
-                const savedDisplayColors = safeJSONParse(localStorage.getItem('displayColors'), null);
-                if (savedWidgetColors) {
-                    this.currentColors = savedWidgetColors;
-                    ipcRenderer.send('widget-colors-update', savedWidgetColors);
-                }
-                if (savedClockColors) {
-                    this.clockColors = savedClockColors;
-                    ipcRenderer.send('clock-colors-update', savedClockColors);
-                }
-                if (savedDisplayColors) {
-                    this.displayColors = savedDisplayColors;
-                    ipcRenderer.send('display-colors-update', savedDisplayColors);
-                }
 
                 // Цвета загружены — показать, какая тема им соответствует и в
                 // каком состоянии фон окна (до сборки ряда вызов холостой).

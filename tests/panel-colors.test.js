@@ -336,3 +336,83 @@ test('сброс окна обнуляет ВСЕ поля цвета, а не �
         assert.ok(COLOR_FIELDS.includes(field), `поле ${field} выпало из списка полей цвета`);
     }
 });
+
+/* ──────────── PANEL-002: отсутствие ключа цветов — это СБРОС, а не «не трогать» ──────────── */
+
+// Панель читает глобальный localStorage (так его видит и сторож реестра
+// ключей); в Node он подменяется на время вызова.
+function withStorage(initial, fn) {
+    const prev = globalThis.localStorage;
+    globalThis.localStorage = memStorage(initial);
+    try { return fn(); } finally { globalThis.localStorage = prev; }
+}
+
+function memStorage(initial = {}) {
+    const data = { ...initial };
+    return {
+        getItem: (k) => (k in data ? data[k] : null),
+        setItem: (k, v) => { data[k] = String(v); },
+        removeItem: (k) => { delete data[k]; },
+        data
+    };
+}
+
+const FRESH = { timer: '#0a84ff', progress: '#0a84ff' };
+
+test('PANEL-002: профиль без цветов окон возвращает окна к умолчанию и шлёт им сброс', () => {
+    // Сценарий аудита 27.10.2026: ячейка пресета записана при цветах по
+    // умолчанию (widgetColors/clockColors/displayColors = null, применение
+    // делает removeItem), а на экране цветная тема. loadSettings делал
+    // `if (savedWidgetColors)` и при отсутствии ключа НИЧЕГО не делал: панель и
+    // окна оставались в старых цветах, а первая же правка цвета писала их
+    // обратно. Правило снимка: отсутствие ключа = «убери».
+    const tc = fakeController({ timer: '#39ff14', progress: '#39ff14', surface: '#ff00ff' });
+    tc.clockColors = { timer: '#ff0000' };
+    tc.displayColors = { timer: '#00ff00' };
+    const sent = [];
+    withStorage({}, () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload]), FRESH));
+
+    assert.equal(tc.currentColors.timer, FRESH.timer, 'цвет виджета не вернулся к стартовому');
+    assert.ok(!('surface' in tc.currentColors), 'фон виджета пережил пресет без цветов');
+    assert.equal(tc.clockColors, null, 'цвета часов пережили пресет без цветов');
+    assert.equal(tc.displayColors, null, 'цвета дисплея пережили пресет без цветов');
+    // Окнам уходит ПУСТОЙ объект: владелец умолчания — CSS, а не панель.
+    assert.deepEqual(sent, [
+        ['widget-colors-update', {}],
+        ['clock-colors-update', {}],
+        ['display-colors-update', {}]
+    ]);
+});
+
+test('PANEL-002: сохранённые цвета окон раскладываются и рассылаются как раньше', () => {
+    const tc = fakeController({ timer: '#111111' });
+    const sent = [];
+    withStorage({
+        widgetColors: JSON.stringify({ timer: '#222222' }),
+        clockColors: JSON.stringify({ timer: '#333333' }),
+        displayColors: JSON.stringify({ timer: '#444444' })
+    }, () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload]), FRESH));
+    assert.deepEqual(tc.currentColors, { timer: '#222222' });
+    assert.deepEqual(tc.clockColors, { timer: '#333333' });
+    assert.deepEqual(tc.displayColors, { timer: '#444444' });
+    assert.deepEqual(sent.map((s) => s[0]), ['widget-colors-update', 'clock-colors-update', 'display-colors-update']);
+});
+
+test('PANEL-002: старый общий ключ timerColors по-прежнему дополняет стартовые цвета виджета', () => {
+    const tc = fakeController({ timer: '#39ff14' });
+    const sent = [];
+    withStorage({ timerColors: JSON.stringify({ timer: '#abcdef' }) },
+        () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload]), FRESH));
+    assert.equal(tc.currentColors.timer, '#abcdef');
+    assert.equal(tc.currentColors.progress, FRESH.progress, 'стартовое поле потеряно');
+    assert.deepEqual(sent[0], ['widget-colors-update', { timer: '#abcdef' }],
+        'виджет обязан получить цвета старого ключа, а не сброс');
+});
+
+test('PANEL-002: панель раскладывает цвета ОДНИМ методом, условной ветки «если ключ есть» больше нет', () => {
+    const control = codeOnly(read('control-app.js'));
+    assert.match(control, /this\.loadWindowColors\(\)/, 'loadSettings не зовёт раскладку цветов');
+    assert.doesNotMatch(control, /if \(savedWidgetColors\)/, 'старая односторонняя ветка цветов виджета вернулась');
+    assert.doesNotMatch(control, /if \(savedClockColors\)/, 'старая односторонняя ветка цветов часов вернулась');
+    assert.doesNotMatch(control, /if \(savedDisplayColors\)/, 'старая односторонняя ветка цветов дисплея вернулась');
+});

@@ -85,7 +85,50 @@ function el(tag, props, children) {
     return node;
 }
 
+/** Объект цветов из строки хранилища или null: битое значение не роняет панель. */
+function parseColors(raw) {
+    if (typeof raw !== 'string' || raw === '') { return null; }
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch { return null; }
+}
+
 const PanelColorsMixin = {
+    /**
+     * Разложить цвета трёх окон из профиля и разослать их окнам.
+     *
+     * ОТСУТСТВИЕ ключа — такое же значение, как его присутствие: пресет,
+     * записанный при цветах по умолчанию, применяется как removeItem, и
+     * «нет ключа — ничего не делаем» оставляло на экране и в панели прежние
+     * цвета (а первая же правка писала их обратно). Поэтому:
+     *  - виджет без своего ключа возвращается к СТАРТОВЫМ цветам панели
+     *    (`fresh`, дополненным старым общим ключом timerColors);
+     *  - часы и дисплей — к null, как на чистом профиле;
+     *  - окнам уходит то, что они показали бы на чистом профиле: пустой объект
+     *    (владелец умолчания — CSS) или цвета старого ключа.
+     *
+     * @param {(channel: string, payload: object) => void} [send]
+     * @param {{timer: string, progress: string}} [fresh] стартовые цвета
+     */
+    loadWindowColors(send, fresh) {
+        const post = send || ((channel, payload) => window.ipcRenderer.send(channel, payload));
+        const defaults = fresh || window.CONFIG.DEFAULT_TIMER_COLORS;
+        const legacy = parseColors(localStorage.getItem('timerColors'));
+        const widget = parseColors(localStorage.getItem('widgetColors'));
+
+        this.currentColors = widget || mergeColors(
+            { timer: defaults.timer, progress: defaults.progress, bg: '#0f0c29' },
+            legacy || {}
+        );
+        this.clockColors = parseColors(localStorage.getItem('clockColors'));
+        this.displayColors = parseColors(localStorage.getItem('displayColors'));
+
+        post('widget-colors-update', widget || legacy || {});
+        post('clock-colors-update', this.clockColors || {});
+        post('display-colors-update', this.displayColors || {});
+    },
+
     /**
      * ЕДИНСТВЕННОЕ место, где меняется объект цветов окна.
      * @param {'widget'|'clock'|'display'} target
