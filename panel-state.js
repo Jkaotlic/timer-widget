@@ -371,6 +371,15 @@ const PanelStateMixin = {
             this.remainingSeconds, this.totalSeconds)) === 'overtime';
         const live = this.isRunning || this.isPaused;
 
+        // Отсчёт пришёл, пока открыт ручной ввод (старт из виджета, клавиша
+        // другого окна): вводить во время отсчёта нечего — setInputMode и
+        // включить его не даёт. Без этой ветки панель показывала поля и
+        // «Поставить» при бегущем таймере, а Enter слал отклоняемый set.
+        if (this.inputMode && live) {
+            this.inputMode = false;
+            for (const f of this._timeFields || []) { f.el.blur(); }
+        }
+
         const mode = this.inputMode ? 'input'
             : isOvertime ? 'overtime'
                 : live ? 'running' : 'idle';
