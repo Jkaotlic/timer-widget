@@ -18,6 +18,7 @@ const os = require('node:os');
 const Module = require('node:module');
 const { pathToFileURL } = require('node:url');
 const { SENDERS } = require('../ipc-senders');
+const { WINDOW_REOPEN_TIMEOUT_MS } = require('../main-window-closing');
 
 const repoRoot = path.join(__dirname, '..');
 
@@ -600,6 +601,37 @@ for (const c of REOPEN_CASES) {
             + '0 — команду «открыть» проглотило закрытие; 2 — у отложенного открытия нет владельца'
         );
         assert.notEqual(alive[0], first, 'живым обязано быть НОВОЕ окно');
+    });
+
+    test(`${c.who}: опоздавший closed старого окна не осиротит новое (MAIN-02)`, (t) => {
+        // Окно закрывается дольше страховки (подвис рендерер): через
+        // WINDOW_REOPEN_TIMEOUT_MS создаётся новое, а `closed` старого приходит
+        // ПОСЛЕ. Без проверки идентичности он обнулял ссылку на НОВОЕ окно:
+        // оно живо, но W/C и трей считают его закрытым, и следующее «открыть»
+        // создаёт дубль.
+        const stubs = createStubs();
+        loadMain(stubs);
+        t.mock.timers.enable({ apis: ['setTimeout'] });
+
+        stubs.ipcHandlers.get(c.open)(null);
+        const first = windowsOf(stubs, c.file)[0];
+        // Зависшее закрытие: окно разрушено, а `closed` не приходит.
+        first.close = function () { this._destroyed = true; };
+
+        stubs.ipcHandlers.get(c.close)(null);
+        stubs.ipcHandlers.get(c.open)(null);
+        t.mock.timers.tick(WINDOW_REOPEN_TIMEOUT_MS);
+        const second = windowsOf(stubs, c.file).find((w) => w !== first && !w.isDestroyed());
+        assert.ok(second, 'страховка по времени обязана открыть новое окно');
+
+        first.emit('closed');
+        stubs.ipcHandlers.get(c.open)(null);
+
+        const alive = windowsOf(stubs, c.file).filter((w) => !w.isDestroyed());
+        assert.equal(
+            alive.length, 1,
+            `после опоздавшего closed живых окон ${alive.length}: новое осиротело, «открыть» создало дубль`
+        );
     });
 
     test(`${c.who}: «закрыть» отменяет запланированное открытие`, async () => {

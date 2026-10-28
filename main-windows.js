@@ -240,7 +240,13 @@ function createWindows(deps) {
 
         bindGeometryReports(windows.widgetWindow);
 
+        // Проверка идентичности — как у дисплея (MAIN-02): окно, закрывавшееся
+        // дольше страховки отложенного открытия, присылает `closed` уже ПОСЛЕ
+        // создания нового. Без проверки оно обнуляло бы ссылку на новое окно:
+        // живое, но для W/C и трея закрытое, а следующее «открыть» — дубль.
+        const thisWidget = windows.widgetWindow;
         windows.widgetWindow.on('closed', () => {
+            if (windows.widgetWindow !== thisWidget) { return; }
             windows.widgetWindow = null;
             // Уведомляем окно управления что виджет закрыт
             broadcastWindowState('widget-window-state', { isOpen: false });
@@ -315,7 +321,13 @@ function createWindows(deps) {
 
         bindGeometryReports(windows.clockWidgetWindow);
 
+        // Проверка идентичности — как у дисплея (MAIN-02): окно, закрывавшееся
+        // дольше страховки отложенного открытия, присылает `closed` уже ПОСЛЕ
+        // создания нового. Без проверки оно обнуляло бы ссылку на новое окно:
+        // живое, но для W/C и трея закрытое, а следующее «открыть» — дубль.
+        const thisClock = windows.clockWidgetWindow;
         windows.clockWidgetWindow.on('closed', () => {
+            if (windows.clockWidgetWindow !== thisClock) { return; }
             windows.clockWidgetWindow = null;
             // Уведомляем окно управления что виджет часов закрыт
             broadcastWindowState('clock-window-state', { isOpen: false });
