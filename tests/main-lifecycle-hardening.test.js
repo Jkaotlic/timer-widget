@@ -34,7 +34,7 @@ function makeDeps(session) {
             requestSingleInstanceLock: () => true
         },
         BrowserWindow: { getAllWindows: () => [] },
-        Menu: { setApplicationMenu: () => {} },
+        Menu: { setApplicationMenu: () => {}, buildFromTemplate: (template) => ({ template }) },
         powerMonitor: {},
         nativeImage: {},
         log: { info: () => {}, warn: (...a) => warnings.push(a), error: () => {} },

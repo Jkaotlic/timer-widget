@@ -10,7 +10,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startApp } = require('../main-lifecycle');
 
-function makeDeps() {
+function makeDeps({ platform = 'darwin' } = {}) {
     const appHandlers = new Map();
     const windows = { controlWindow: null, widgetWindow: null, displayWindow: null, clockWidgetWindow: null };
     const all = [];
@@ -66,7 +66,8 @@ function makeDeps() {
         tray: { createTray: () => {} },
         inTestMode: false,
         screenshotMode: false,
-        startupT0: Date.now()
+        startupT0: Date.now(),
+        platform
     };
     return { deps, appHandlers, windows, menus, createdCount: () => created };
 }
@@ -102,4 +103,46 @@ test('MAIN-06: activate без панели создаёт её', async () => {
     h.appHandlers.get('activate')();
     assert.equal(h.createdCount(), 2);
     assert.ok(h.windows.controlWindow);
+});
+
+// Роли, за которыми в Electron стоят инструменты разработчика или перезагрузка.
+const DEV_ROLES = ['toggleDevTools', 'viewMenu', 'reload', 'forceReload'];
+
+function flatRoles(template) {
+    const out = [];
+    for (const item of template || []) {
+        if (item.role) { out.push(item.role); }
+        if (Array.isArray(item.submenu)) { out.push(...flatRoles(item.submenu)); }
+    }
+    return out;
+}
+
+test('MAIN-10: на macOS меню приложения — appMenu и editMenu (Cmd+C/V/Q), без инструментов разработчика', async () => {
+    // С меню null у macOS нет ни Cmd+C/V/X/A/Z в полях панели, ни Cmd+Q/H:
+    // эти клавиши в Electron идут через роли меню приложения.
+    const h = makeDeps({ platform: 'darwin' });
+    startApp(h.deps);
+    await until(() => h.menus.length > 0);
+
+    const menu = h.menus[h.menus.length - 1];
+    assert.ok(menu && Array.isArray(menu.template), 'на macOS меню задано шаблоном, а не null');
+    const roles = flatRoles(menu.template);
+    assert.deepEqual(roles.sort(), ['appMenu', 'editMenu']);
+    for (const r of DEV_ROLES) {
+        assert.ok(!roles.includes(r), `в меню роль ${r} — путь к инструментам разработчика`);
+    }
+});
+
+test('MAIN-10: на Windows и Linux меню приложения по-прежнему нет', async () => {
+    for (const platform of ['win32', 'linux']) {
+        const h = makeDeps({ platform });
+        startApp(h.deps);
+        await until(() => h.menus.length > 0);
+        assert.equal(h.menus[h.menus.length - 1], null, platform);
+    }
+});
+
+test('MAIN-10: проверка себя — зонд видит роль инструментов разработчика', () => {
+    assert.deepEqual(flatRoles([{ role: 'appMenu' }, { label: 'V', submenu: [{ role: 'toggleDevTools' }] }]),
+        ['appMenu', 'toggleDevTools']);
 });

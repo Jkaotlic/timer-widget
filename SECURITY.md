@@ -201,7 +201,7 @@ Zygote-процесс — механизм Chromium для форка песоч
 
 | Вход | В собранном приложении | Где закреплено |
 |---|---|---|
-| Инструменты разработчика окон (DevTools, F12, Ctrl+Shift+I) | Выключены у всех окон (`devTools` только при `--dev` И `!app.isPackaged`), меню приложения нет, горячих клавиш DevTools нет | `main-windows.js`, `main-lifecycle.js` (`Menu.setApplicationMenu(null)`); `tests/release-gates.test.js`, `scripts/verify-packed.js` |
+| Инструменты разработчика окон (DevTools, F12, Ctrl+Shift+I) | Выключены у всех окон (`devTools` только при `--dev` И `!app.isPackaged`), меню приложения нет (на macOS — только роли `appMenu` и `editMenu` ради Cmd+C/V/Q: без DevTools и перезагрузки), горячих клавиш DevTools нет | `main-windows.js`, `main-lifecycle.js` (`Menu.setApplicationMenu`); `tests/release-gates.test.js`, `tests/main-lifecycle.test.js`, `scripts/verify-packed.js` |
 | Ключ приложения `--dev` | Выход с кодом 1. Второй замок: каждое чтение `--dev` в главном процессе (подробный лог, монитор памяти, DevTools) требует ещё и `!app.isPackaged` | `electron-main.js`; `tests/electron-main-load.test.js`, `tests/main-modules.test.js` |
 | Удалённая отладка (`--remote-debugging-port`, `--remote-debugging-pipe`, `--remote-allow-origins`, `--inspect`, `--inspect-brk`) | Выход с кодом 1 | раздел выше |
 | Отладка через Node (`ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS`, `--inspect`) | Отключена фьюзами в самом бинаре — ключом или переменной не включается | раздел «Фьюзы Electron» |

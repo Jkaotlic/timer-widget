@@ -37,6 +37,7 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  * @param {boolean} deps.inTestMode
  * @param {boolean} deps.screenshotMode
  * @param {number} deps.startupT0 — метка начала процесса (perf)
+ * @param {string} [deps.platform] — process.platform (подменяется в тестах)
  */
 function startApp(deps) {
     const {
@@ -47,6 +48,7 @@ function startApp(deps) {
     const __inTestMode = deps.inTestMode;
     const __screenshotMode = deps.screenshotMode;
     const __startupT0 = deps.startupT0;
+    const platform = deps.platform || process.platform;
     const { createControlWindow, createWidgetWindow, createClockWidgetWindow, createDisplayWindow } = creators;
 
     /**
@@ -124,8 +126,15 @@ function startApp(deps) {
         // Схема app:// — раньше любого окна: окна и страница миграции грузятся с неё.
         registerProtocol();
 
-        // Remove default Electron menu (File, Edit, View, Help)
-        Menu.setApplicationMenu(null);
+        // Меню Electron по умолчанию (File, Edit, View с DevTools, Help) снято.
+        // На macOS меню null отнимает и системные клавиши: Cmd+C/V/X/A/Z в
+        // полях панели и Cmd+Q/H идут через роли меню приложения (MAIN-10).
+        // Поэтому там — ровно appMenu и editMenu: в них нет ни DevTools, ни
+        // перезагрузки (это роли viewMenu), и выход по Cmd+Q — тот же
+        // app.quit(), что пункт трея «Выход».
+        Menu.setApplicationMenu(platform === 'darwin'
+            ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+            : null);
 
         // Сон машины — см. bindPowerMonitor в main-timer.js.
         timer.bindPowerMonitor(powerMonitor, log);
@@ -252,7 +261,7 @@ function startApp(deps) {
 
     app.on('window-all-closed', () => {
         timer.clearTimerInterval(); // Очищаем интервал таймера при закрытии
-        if (process.platform !== 'darwin') {
+        if (platform !== 'darwin') {
             app.quit();
         }
     });
