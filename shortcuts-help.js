@@ -108,6 +108,73 @@ function showKeyboardShortcuts() {
     setTimeout(() => closeBtn.focus(), 0);
 }
 
+/*
+ * Ворота глобальных клавиш панели: КОГДА клавиша принадлежит не таймеру, а
+ * слою под ней. Здесь, а не в обработчике control-app.js, потому что это
+ * правило о клавишах, которые этот файл и перечисляет, и потому что его можно
+ * проверить в Node (tests/panel-hotkeys.test.js).
+ */
+// Поля, в которых буквы и пробел — ввод. SELECT здесь же: пробел его
+// открывает, буква листает по первой букве.
+const HOTKEY_TEXT_ENTRY = 'input, textarea, select';
+// Что активируется ПРОБЕЛОМ само. Буквы такие элементы не потребляют.
+const HOTKEY_SPACE_CONTROLS = 'button, summary, a[href], [role="button"], [role="radio"], '
+    + '[role="checkbox"], [role="switch"], [role="tab"], [role="option"], .font-select';
+// Открытый слой поверх панели: модалки (класс show) и справка F1.
+const HOTKEY_OPEN_LAYERS = '[role="dialog"][aria-modal="true"].show, #keyboard-shortcuts-overlay';
+
+/**
+ * @param {KeyboardEvent} event
+ * @param {Document} doc
+ * @param {Element|null} pointerControl контрол, по которому последним кликнули
+ *        мышью и который с тех пор держит фокус (см. trackPointerControl)
+ * @returns {boolean} true — глобальной клавише здесь делать нечего
+ */
+function globalHotkeyBlocked(event, doc, pointerControl) {
+    // Автоповтор удержанной клавиши — не новая команда: Space слал start/pause
+    // на каждом повторе, пока состояние ехало по IPC.
+    if (event.repeat) { return true; }
+    const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
+    if (target && (target.isContentEditable || target.closest(HOTKEY_TEXT_ENTRY))) { return true; }
+    // За открытым диалогом таймер не трогают. F1 — переключатель самой
+    // справки, он обязан её и закрывать.
+    if (event.code !== 'F1' && doc && doc.querySelector(HOTKEY_OPEN_LAYERS)) { return true; }
+    if (event.code === 'Space' && target) {
+        const control = target.closest(HOTKEY_SPACE_CONTROLS);
+        // Кнопка, до которой дошли С КЛАВИАТУРЫ, нажимается пробелом сама.
+        // Кнопка, по которой только что кликнули мышью, — нет: «кликнул пресет,
+        // нажал пробел — пошёл отсчёт» работало всегда.
+        if (control && control !== pointerControl) { return true; }
+    }
+    return false;
+}
+
+/**
+ * Помнит контрол, по которому кликнули мышью, пока фокус на нём. Любой другой
+ * переход фокуса (Tab, программный focus модалки) это забывает.
+ *
+ * @param {Document} doc
+ * @returns {() => Element|null}
+ */
+function trackPointerControl(doc) {
+    let last = null;
+    doc.addEventListener('pointerdown', (e) => {
+        last = e.target && typeof e.target.closest === 'function'
+            ? e.target.closest(HOTKEY_SPACE_CONTROLS)
+            : null;
+    }, true);
+    doc.addEventListener('focusin', (e) => {
+        if (last && e.target !== last) { last = null; }
+    }, true);
+    return () => last;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { globalHotkeyBlocked, trackPointerControl, HOTKEY_OPEN_LAYERS };
+}
+
 if (typeof window !== 'undefined') {
     window.showKeyboardShortcuts = showKeyboardShortcuts;
+    window.globalHotkeyBlocked = globalHotkeyBlocked;
+    window.trackPointerControl = trackPointerControl;
 }

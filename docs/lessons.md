@@ -419,6 +419,7 @@
 ### Global keyboard shortcuts
 
 - **Global keyboard shortcuts**: Space (start/pause), R (reset), 1-8 (presets 5-60 min), W/C/D (toggle windows) work from ALL windows (widget, clock, display, control). Guarded with `if (e.ctrlKey || e.altKey) return` to avoid conflicts with scale/drag.
+- **В панели клавиша спрашивает ворота `globalHotkeyBlocked` (shortcuts-help.js) ПЕРВОЙ** (27.10.2026, PANEL-005): автоповтор — не команда; INPUT/TEXTAREA/SELECT/contenteditable клавиш не отдают; открытая модалка (`[role=dialog][aria-modal].show`) или справка F1 глушат всё, кроме F1; пробел на кнопке, до которой дошли С КЛАВИАТУРЫ, — за кнопкой (замер: `preventDefault` на keydown давал click 0 раз), а на кнопке, по которой только что кликнули МЫШЬЮ, — за таймером («клик по пресету, пробел — пошёл отсчёт»). Признак «мышью» — `trackPointerControl`: pointerdown помечает контрол, любой другой переход фокуса метку снимает. `e2e/panel-hotkeys.spec.js`.
 
 ---
 

@@ -1771,11 +1771,13 @@
         });
 
         // FIX BUG-027: Keyboard shortcuts
+        // Контрол, по которому последним кликнули мышью: пробел на нём остаётся
+        // за таймером (см. globalHotkeyBlocked в shortcuts-help.js).
+        const _pointerControl = window.trackPointerControl(document);
         const _onGlobalShortcutsKeydown = (event) => {
-            // Ignore if user is typing in an input field
-            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-                return;
-            }
+            // Ворота: автоповтор, поля ввода и SELECT, пробел на кнопке, до
+            // которой дошли с клавиатуры, открытая модалка или справка F1.
+            if (window.globalHotkeyBlocked(event, document, _pointerControl())) { return; }
 
             // Модификаторы отсекаем ЦЕЛИКОМ и в одном месте — ровно так, как это
             // делают виджет, часы и полноэкранный режим (`if (e.ctrlKey ||
