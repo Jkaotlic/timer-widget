@@ -20,7 +20,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { globalHotkeyBlocked } = require('../shortcuts-help.js');
+const { globalHotkeyBlocked, trackPointerControl } = require('../shortcuts-help.js');
 const { codeOnly } = require('./helpers/source-scan');
 const { readSource } = require('./helpers/window-source');
 
@@ -82,7 +82,6 @@ test('пробел на кнопке в фокусе С КЛАВИАТУРЫ —
         node({ tag: 'button' }),
         node({ role: 'radio' }),
         node({ role: 'switch' }),
-        node({ cls: ['font-select'] }),
         // Цель — потомок кнопки (иконка): решает сама кнопка.
         node({ tag: 'span', parent: node({ tag: 'button' }) })
     ];
@@ -119,4 +118,62 @@ test('обработчик панели спрашивает ворота ПЕР
     assert.match(head, /window\.globalHotkeyBlocked\(event, document, /, 'ворота не вызваны в начале обработчика');
     assert.doesNotMatch(src, /event\.target\.tagName === 'INPUT' \|\| event\.target\.tagName === 'TEXTAREA'/,
         'старая неполная проверка вернулась');
+});
+
+/*
+ * Регрессия первой версии ворот (проверка итога 28.10.2026).
+ *
+ *  1. Монитор выбрали в #displaySelect МЫШЬЮ — фокус остаётся на списке, и
+ *     D / W / C / Space молчали, пока фокус не уйдёт. Раньше работали. Список,
+ *     выбранный мышью, — то же, что кнопка, по которой кликнули мышью: клавиши
+ *     принадлежат таймеру. Список, до которого дошли Tab'ом, — по-прежнему
+ *     вводу (листание по первой букве).
+ *  2. `.font-select` пробел НЕ обрабатывает (font-select.js слушает только
+ *     стрелки), поэтому в списке «нажимается пробелом сам» ему не место: Space
+ *     на нём ничего не делал вовсе.
+ */
+test('список, выбранный мышью, отдаёт клавиши таймеру; выбранный с клавиатуры — нет', () => {
+    const select = node({ tag: 'select' });
+    for (const code of ['KeyD', 'KeyW', 'KeyC', 'Space']) {
+        assert.equal(globalHotkeyBlocked(key(code, select), docWith(false), select), false,
+            `${code} после выбора мышью молчит`);
+        assert.equal(globalHotkeyBlocked(key(code, select), docWith(false), null), true,
+            `${code} в списке с клавиатуры ушёл таймеру — листание по букве сломано`);
+    }
+});
+
+test('пробел на .font-select — таймеру: компонент пробел не обрабатывает', () => {
+    const fs = node({ cls: ['font-select'] });
+    assert.equal(globalHotkeyBlocked(key('Space', fs), docWith(false), null), false,
+        'пробел на списке шрифтов не делает ничего');
+});
+
+test('клик мышью по SELECT запоминается так же, как по кнопке', () => {
+    const handlers = {};
+    const doc = { addEventListener: (type, fn) => { handlers[type] = fn; } };
+    const current = trackPointerControl(doc);
+    const select = node({ tag: 'select' });
+    handlers.pointerdown({ target: select });
+    handlers.focusin({ target: select });
+    assert.equal(current(), select, 'клик по списку забыт — после выбора монитора клавиши молчат');
+});
+
+test('кнопка, открывшая модалку мышью, после её закрытия снова отдаёт пробел таймеру', () => {
+    // «Сбросить всё» мышью → Esc → Space: фокус вернулся на открыватель
+    // (modal-manager возвращает фокус), а метка «кликнули мышью» стёрлась на
+    // уходе фокуса В модалку — пробел снова открывал её вместо старта.
+    const handlers = {};
+    const doc = { addEventListener: (type, fn) => { handlers[type] = fn; } };
+    const current = trackPointerControl(doc);
+    const opener = node({ tag: 'button' });
+    const insideModal = node({ tag: 'button', parent: node({ role: 'dialog' }) });
+    handlers.pointerdown({ target: opener });
+    handlers.focusin({ target: opener });
+    handlers.focusin({ target: insideModal });
+    handlers.focusin({ target: opener });
+    assert.equal(current(), opener, 'метка мыши потерялась в модалке');
+
+    const other = node({ tag: 'button' });
+    handlers.focusin({ target: other });
+    assert.equal(current(), null, 'Tab на другую кнопку обязан метку стереть');
 });

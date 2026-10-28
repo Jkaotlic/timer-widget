@@ -122,8 +122,14 @@ function showKeyboardShortcuts() {
 // открывает, буква листает по первой букве.
 const HOTKEY_TEXT_ENTRY = 'input, textarea, select';
 // Что активируется ПРОБЕЛОМ само. Буквы такие элементы не потребляют.
+// `.font-select` здесь НЕТ: он слушает только стрелки (font-select.js), и пробел
+// на нём, отнятый у таймера, не делал бы ничего.
 const HOTKEY_SPACE_CONTROLS = 'button, summary, a[href], [role="button"], [role="radio"], '
-    + '[role="checkbox"], [role="switch"], [role="tab"], [role="option"], .font-select';
+    + '[role="checkbox"], [role="switch"], [role="tab"], [role="option"]';
+// По чему клик МЫШЬЮ возвращает клавиши таймеру: кнопки и списки. Монитор
+// выбирают в #displaySelect мышью, фокус остаётся на списке — и D / W / C /
+// Space молчали, пока фокус не уйдёт (проверка итога 28.10.2026).
+const HOTKEY_POINTER_CONTROLS = HOTKEY_SPACE_CONTROLS + ', select';
 // Открытый слой поверх панели: модалки (класс show) и справка F1.
 const HOTKEY_OPEN_LAYERS = '[role="dialog"][aria-modal="true"].show, #keyboard-shortcuts-overlay';
 
@@ -139,7 +145,10 @@ function globalHotkeyBlocked(event, doc, pointerControl) {
     // на каждом повторе, пока состояние ехало по IPC.
     if (event.repeat) { return true; }
     const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
-    if (target && (target.isContentEditable || target.closest(HOTKEY_TEXT_ENTRY))) { return true; }
+    const entry = target && (target.isContentEditable ? target : target.closest(HOTKEY_TEXT_ENTRY));
+    // Список, выбранный мышью, — не ввод: листать его по букве собирается
+    // только тот, кто пришёл в него с клавиатуры.
+    if (entry && !(entry.tagName === 'SELECT' && entry === pointerControl)) { return true; }
     // За открытым диалогом таймер не трогают. F1 — переключатель самой
     // справки, он обязан её и закрывать.
     if (event.code !== 'F1' && doc && doc.querySelector(HOTKEY_OPEN_LAYERS)) { return true; }
@@ -164,11 +173,16 @@ function trackPointerControl(doc) {
     let last = null;
     doc.addEventListener('pointerdown', (e) => {
         last = e.target && typeof e.target.closest === 'function'
-            ? e.target.closest(HOTKEY_SPACE_CONTROLS)
+            ? e.target.closest(HOTKEY_POINTER_CONTROLS)
             : null;
     }, true);
     doc.addEventListener('focusin', (e) => {
-        if (last && e.target !== last) { last = null; }
+        // Уход фокуса В открытый слой — не новый выбор: modal-manager вернёт
+        // фокус на открыватель, и «кликнул мышью» обязано это пережить.
+        // Иначе «Сбросить всё» мышью → Esc → Space снова открывал модалку.
+        const inLayer = e.target && typeof e.target.closest === 'function'
+            && e.target.closest('[role="dialog"], #keyboard-shortcuts-overlay');
+        if (last && e.target !== last && !inLayer) { last = null; }
     }, true);
     return () => last;
 }
