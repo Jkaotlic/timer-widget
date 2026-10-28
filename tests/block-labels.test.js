@@ -206,3 +206,85 @@ test('санитайзер подписи ОДИН, и обе подписи з�
         'зонд не отличает одну копию от двух — тогда его зелёный ничего не значит'
     );
 });
+
+// ---------------------------------------------------------------------------
+// PANEL-003: пересборка рядов при смене замка 47-го этажа не стирает подписи
+// ---------------------------------------------------------------------------
+// Сценарий аудита 27.10.2026: пользователь вписал свои названия плашек, потом
+// включил тумблер floor47Unlocked (или трижды кликнул по подвалу).
+// renderFloor47 → bindBlockLabelRows делал mount.textContent = '' и строил
+// НОВЫЕ ПУСТЫЕ поля, следом pushDisplaySettings собирал '' и записывал его в
+// профиль: дисплей молча возвращался к стандартным подписям.
+function fakeDom() {
+    const byId = new Map();
+    const make = (tag) => {
+        const node = {
+            tagName: tag.toUpperCase(), children: [], value: '', attrs: {},
+            setAttribute(k, v) { this.attrs[k] = v; },
+            addEventListener() {},
+            appendChild(child) {
+                this.children.push(child);
+                const walk = (n) => { if (n.id) { byId.set(n.id, n); } n.children.forEach(walk); };
+                walk(child);
+                return child;
+            }
+        };
+        Object.defineProperty(node, 'textContent', {
+            get() { return ''; },
+            set(_v) {
+                const drop = (n) => { if (n.id && byId.get(n.id) === n) { byId.delete(n.id); } n.children.forEach(drop); };
+                this.children.forEach(drop);
+                this.children = [];
+            }
+        });
+        return node;
+    };
+    const mount = make('div');
+    mount.id = 'blockLabelRows';
+    byId.set(mount.id, mount);
+    return { createElement: make, getElementById: (id) => byId.get(id) || null };
+}
+
+function withPanelGlobals(storage, fn) {
+    const saved = { window: globalThis.window, document: globalThis.document, localStorage: globalThis.localStorage };
+    globalThis.window = { DisplayLayouts: Layouts };
+    globalThis.document = fakeDom();
+    globalThis.localStorage = {
+        getItem: (k) => (k in storage ? storage[k] : null),
+        setItem: (k, v) => { storage[k] = String(v); }
+    };
+    try { return fn(globalThis.document); } finally { Object.assign(globalThis, saved); }
+}
+
+test('PANEL-003: пересборка рядов подписей сохраняет введённое и подтягивает сохранённое', () => {
+    const { PanelDisplayMixin } = require('../panel-display');
+    const secret = Layouts.LABELLED_ELEMENTS.find((el) => el.secret);
+    const plain = Layouts.LABELLED_ELEMENTS.filter((el) => !el.secret);
+    assert.ok(secret && plain.length >= 2, 'в реестре нет секретной или обычных подписей');
+
+    const storage = {
+        displayExtSettings: JSON.stringify({ [secret.labelKey]: 'Итого за вечер' })
+    };
+    withPanelGlobals(storage, (doc) => {
+        const unlocked = { checked: false };
+        const panel = Object.assign({ floor47UnlockedEl: unlocked }, PanelDisplayMixin);
+        panel.bindBlockLabelRows();
+        // Пользователь вписал свою подпись, но в профиль она ещё не ушла.
+        doc.getElementById(plain[0].labelKey).value = 'Сейчас в зале';
+        assert.equal(doc.getElementById(secret.labelKey), null, 'секретный ряд виден до разблокировки');
+
+        unlocked.checked = true;
+        panel.bindBlockLabelRows();
+        assert.equal(doc.getElementById(plain[0].labelKey).value, 'Сейчас в зале',
+            'пересборка стёрла введённую подпись');
+        assert.equal(doc.getElementById(plain[1].labelKey).value, '',
+            'пустая подпись обязана остаться пустой');
+        assert.equal(doc.getElementById(secret.labelKey).value, 'Итого за вечер',
+            'секретный ряд появился пустым и затрёт сохранённую подпись');
+
+        unlocked.checked = false;
+        panel.bindBlockLabelRows();
+        assert.equal(doc.getElementById(plain[0].labelKey).value, 'Сейчас в зале',
+            'обратная пересборка стёрла подпись');
+    });
+});

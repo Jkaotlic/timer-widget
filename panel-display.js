@@ -53,6 +53,15 @@ const Layouts = (typeof window !== 'undefined' && window.DisplayLayouts)
     ? window.DisplayLayouts
     : require('./display-layouts');
 
+/** Объект из строки хранилища; битое или пустое значение — пустой объект. */
+function safeParseObject(raw) {
+    if (typeof raw !== 'string' || raw === '') { return {}; }
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch { return {}; }
+}
+
 /**
  * Значения полей с кастомными подписями блоков.
  *
@@ -841,6 +850,19 @@ const PanelDisplayMixin = {
         const mount = document.getElementById('blockLabelRows');
         const Layouts = window.DisplayLayouts;
         if (!mount || !Layouts) { return; }
+        // Пересборка (смена замка 47-го этажа) НЕ имеет права стирать подписи:
+        // следом за ней pushDisplaySettings собирает поля и пишет их в профиль,
+        // и новые пустые поля молча возвращали дисплею стандартные слова.
+        // Значение берётся из прежнего поля, а у ряда, которого не было
+        // (секретный — до разблокировки), — из сохранённого профиля.
+        const stored = safeParseObject(localStorage.getItem('displayExtSettings'));
+        const keep = {};
+        for (const el of Layouts.LABELLED_ELEMENTS) {
+            const prev = document.getElementById(el.labelKey);
+            keep[el.labelKey] = prev
+                ? String(prev.value || '')
+                : (typeof stored[el.labelKey] === 'string' ? stored[el.labelKey] : '');
+        }
         mount.textContent = '';
         for (const el of Layouts.LABELLED_ELEMENTS) {
             // Ряд секретного элемента строится только при разблокировке: иначе
@@ -860,6 +882,7 @@ const PanelDisplayMixin = {
             input.className = 'srow-input';
             input.maxLength = Layouts.MAX_CAPTION;
             input.placeholder = el.caption;
+            input.value = keep[el.labelKey];
             input.setAttribute('aria-label', `Своё название плашки «${el.caption}»`);
             input.addEventListener('input', () => this.pushDisplaySettings());
 
