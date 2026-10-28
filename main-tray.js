@@ -74,10 +74,13 @@ function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flag
         _trayLastWidgetOpen = widgetOpen;
         _trayLastClockOpen = clockOpen;
 
-        const remaining = formatTimeShort(timerState.remainingSeconds || 0);
+        // Строки с остатком в меню НЕТ намеренно (MAIN-08): меню перестраивается
+        // только при смене isRunning / открытия окон (F-022), и метка показывала
+        // время последней перестройки — через минуты после старта прежнее.
+        // Перестраивать меню на каждом тике — ровно то, от чего ушёл F-022, а
+        // события «меню открывается» у контекстного меню трея нет. Остаток —
+        // в подсказке, она обновляется на тиках (updateTrayTime).
         const menu = Menu.buildFromTemplate([
-            { label: `⏱  ${remaining}`, enabled: false },
-            { type: 'separator' },
             { label: running ? 'Пауза' : 'Старт', click: () => {
                 if (running) { handleTimerPause(); }
                 else { handleTimerStart(); }
