@@ -61,15 +61,55 @@ function decideCompact(io) {
 }
 
 /**
+ * Предохранитель от петли ступеней.
+ *
+ * Жалоба 27.10.2026, видео с Windows 11 (Сбербук): в каждом кадре видны ДВЕ
+ * ступени сразу — крупные и мелкие цифры, два ряда настроек. Ступень менялась
+ * чаще кадра, пока пробел не запускал таймер (старт прячет пресеты, и
+ * содержимое уходит от границы). На macOS петля не воспроизводится ни на одном
+ * размере окна при масштабе 1 / 1.25 / 1.5: звено, которое её замыкает, живёт
+ * в Windows (дробный масштаб, метрики шрифта, полоса прокрутки).
+ *
+ * Гистерезис «разжимайся только с запасом» тут не построить: растянутая панель
+ * в помещающемся состоянии меряет `scrollHeight` РОВНО в окно, и запаса по
+ * замеру не видно. Поэтому ловится сама петля: больше `limit` смен ступени за
+ * `windowMs` пользователь не делает — это раскачка.
+ *
+ * @param {{now: () => number, limit?: number, windowMs?: number}} o
+ * @returns {{record: (level: number) => boolean}} true — петля поймана
+ */
+function createFlipBreaker({ now, limit = 4, windowMs = 1000 }) {
+    let stamps = [];
+    return {
+        record() {
+            const t = now();
+            stamps = stamps.filter((s) => t - s < windowMs);
+            stamps.push(t);
+            return stamps.length > limit;
+        }
+    };
+}
+
+// Насколько должно измениться окно, чтобы предохранитель отпустил: дробный
+// масштаб Windows сам качает размер на пиксель, и это не новое окно.
+const UNLOCK_DELTA_PX = 4;
+
+/**
  * Повесить автоматический компактный режим на панель.
  *
  * @param {object} deps
  * @param {Document} deps.doc
  * @param {string} [deps.selector]  что меряем
  * @param {string} [deps.className] класс на <body>
- * @returns {{update: () => boolean, stop: () => void}|null}
+ * @param {() => number} [deps.now]  часы предохранителя (в тестах — поддельные)
+ * @param {() => {w: number, h: number}} [deps.getViewport]  размер окна
+ * @returns {{update: () => boolean, stop: () => void, locked: () => boolean}|null}
  */
-function bindCompactMode({ doc, selector = '.control-panel', classNames = ['compact-panel', 'compact-panel-2'] }) {
+function bindCompactMode({
+    doc, selector = '.control-panel', classNames = ['compact-panel', 'compact-panel-2'],
+    now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+    getViewport = () => (typeof window !== 'undefined' ? { w: window.innerWidth, h: window.innerHeight } : { w: 0, h: 0 })
+}) {
     const panel = doc && doc.querySelector ? doc.querySelector(selector) : null;
     if (!panel) { return null; }
     const body = doc.body;
@@ -95,15 +135,44 @@ function bindCompactMode({ doc, selector = '.control-panel', classNames = ['comp
         void panel.offsetHeight;
     };
 
-    const update = () => {
-        // Каждую ступень проверяем ЗАМЕРОМ в ней самой, начиная с нулевой:
-        // так решение не зависит от того, с какой стороны мы в неё пришли, и
-        // повтор ничего не меняет.
+    const currentLevel = () => classNames.filter((c) => body.classList.contains(c)).length;
+
+    const breaker = createFlipBreaker({ now });
+    let lockedAt = null; // размер окна, на котором петля поймана
+
+    // Каждую ступень проверяем ЗАМЕРОМ в ней самой, начиная с нулевой: так
+    // решение не зависит от того, с какой стороны мы в неё пришли.
+    const measureLevel = () => {
         for (let n = 0; n <= classNames.length; n++) {
             setLevel(n);
-            if (fits(panel.scrollHeight, panel.clientHeight)) { return n > 0; }
+            if (fits(panel.scrollHeight, panel.clientHeight)) { return n; }
         }
-        return true;
+        return classNames.length;
+    };
+
+    const update = () => {
+        const prev = currentLevel();
+        if (lockedAt) {
+            const vp = getViewport();
+            const moved = Math.abs(vp.w - lockedAt.w) >= UNLOCK_DELTA_PX
+                || Math.abs(vp.h - lockedAt.h) >= UNLOCK_DELTA_PX;
+            // Замороженная ступень не пробуется заново: сам перебор ступеней и
+            // есть то, что раскачивает панель.
+            if (!moved) { return prev > 0; }
+            lockedAt = null;
+        }
+        const next = measureLevel();
+        if (next !== prev && breaker.record(next)) {
+            // Петля: встаём на самую сжатую из двух. На ней содержимое
+            // помещается в обоих состояниях, а лишний воздух лучше обрезанного.
+            const safe = Math.max(next, prev);
+            setLevel(safe);
+            lockedAt = { ...getViewport() };
+            console.warn(`[panel-compact] петля ступеней ${prev}↔${next}, ступень ${safe} заморожена до смены размера окна`
+                + ` (окно ${lockedAt.w}×${lockedAt.h}, содержимое ${panel.scrollHeight} при ${panel.clientHeight})`);
+            return safe > 0;
+        }
+        return next > 0;
     };
 
     let scheduled = false;
@@ -139,6 +208,7 @@ function bindCompactMode({ doc, selector = '.control-panel', classNames = ['comp
 
     return {
         update,
+        locked: () => lockedAt !== null,
         stop() {
             if (observer) { observer.disconnect(); }
             if (typeof window !== 'undefined') { window.removeEventListener('resize', onResize); }
@@ -146,7 +216,7 @@ function bindCompactMode({ doc, selector = '.control-panel', classNames = ['comp
     };
 }
 
-const PanelCompact = { fits, decideCompact, bindCompactMode };
+const PanelCompact = { fits, decideCompact, createFlipBreaker, bindCompactMode };
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PanelCompact;

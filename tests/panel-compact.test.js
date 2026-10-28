@@ -105,3 +105,93 @@ test('CSS компактного режима висит на КЛАССЕ, а �
     assert.doesNotMatch(css, /body\.compact-panel[^{]*\.preset-hint[^{]*\{[^}]*display:\s*none/,
         'компактный режим снова прячет подсказку под ячейками');
 });
+
+/**
+ * Петля ступеней на Windows (жалоба 27.10.2026, видео со Сбербука, Windows 11).
+ *
+ * В каждом кадре видео два состояния панели сразу: крупные и мелкие цифры, два
+ * ряда «Считать ниже нуля». Ступень менялась чаще кадра и замирала после
+ * пробела (старт прячет пресеты — содержимое уходит от границы). На macOS петля
+ * не воспроизводится ни на одном размере окна при масштабе 1 / 1.25 / 1.5, то
+ * есть звено, которое её замыкает, живёт в Windows. Поэтому защита не от
+ * конкретной причины, а от самой петли: поддельная панель ниже устроена
+ * злонамеренно — ступень 0 у неё «влезает» ровно тогда, когда до этого стояла
+ * ступень 1, и наоборот.
+ */
+const { bindCompactMode, createFlipBreaker } = require(path.join(ROOT, 'panel-compact.js'));
+
+function flappingDoc({ viewport }) {
+    const classes = new Set();
+    let committed = 0; // ступень, стоявшая ДО текущего прохода
+    const level = () => (classes.has('compact-panel-2') ? 2 : classes.has('compact-panel') ? 1 : 0);
+    const panel = {
+        children: [],
+        get offsetHeight() { return 660; },
+        get clientHeight() { return 660; },
+        get scrollHeight() {
+            const n = level();
+            if (n === 0) { return committed === 1 ? 660 : 700; }
+            return 660;
+        }
+    };
+    const doc = {
+        querySelector: () => panel,
+        body: { classList: {
+            toggle: (c, on) => { if (on) { classes.add(c); } else { classes.delete(c); } },
+            contains: (c) => classes.has(c)
+        } }
+    };
+    return {
+        doc,
+        level,
+        commit() { committed = level(); },
+        viewport
+    };
+}
+
+test('предохранитель: пять смен ступени за секунду — петля, одна смена в секунду — нет', () => {
+    let t = 0;
+    const b = createFlipBreaker({ now: () => t, limit: 4, windowMs: 1000 });
+    for (let i = 0; i < 4; i++) { t += 16; assert.equal(b.record(i % 2), false, `сработал на смене ${i + 1}`); }
+    t += 16;
+    assert.equal(b.record(1), true, 'пятая смена за 80 мс — это петля');
+
+    let s = 0;
+    const slow = createFlipBreaker({ now: () => s, limit: 4, windowMs: 1000 });
+    for (let i = 0; i < 20; i++) { s += 1100; assert.equal(slow.record(i % 2), false, 'редкие смены — это пользователь, а не петля'); }
+});
+
+test('петля ступеней гаснет: после срабатывания ступень больше не меняется', () => {
+    let t = 0;
+    const viewport = { w: 400, h: 660 };
+    const f = flappingDoc({ viewport });
+    const ctl = bindCompactMode({ doc: f.doc, now: () => t, getViewport: () => viewport });
+    f.commit();
+    const seen = [];
+    for (let i = 0; i < 40; i++) {
+        t += 16;
+        ctl.update();
+        f.commit();
+        seen.push(f.level());
+    }
+    const tail = seen.slice(-20);
+    assert.equal(new Set(tail).size, 1, `ступень всё ещё скачет: ${seen.join('')}`);
+    assert.ok(tail[0] >= 1, 'замирать надо на сжатой ступени: на несжатой содержимое не влезает');
+});
+
+test('после срабатывания новое окно снова решает замером; дрожь в пиксель — нет', () => {
+    let t = 0;
+    const viewport = { w: 400, h: 660 };
+    const f = flappingDoc({ viewport });
+    const ctl = bindCompactMode({ doc: f.doc, now: () => t, getViewport: () => viewport });
+    for (let i = 0; i < 20; i++) { t += 16; ctl.update(); f.commit(); }
+    assert.equal(ctl.locked(), true);
+
+    viewport.h = 661; // округление дробного масштаба, а не новый размер
+    t += 16; ctl.update();
+    assert.equal(ctl.locked(), true, 'пиксель округления снял предохранитель');
+
+    viewport.h = 800;
+    t += 2000; ctl.update();
+    assert.equal(ctl.locked(), false, 'пользователь поменял размер окна, а ступень заморожена навсегда');
+});
