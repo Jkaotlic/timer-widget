@@ -40,7 +40,14 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // при каждом setSize (HiDPI) и сбивает ручную высоту, которую выставил юзер.
     ipcMain.on('resize-control-window', (event, size) => {
         if (!windows.controlWindow || !size || typeof size !== 'object') { return; }
-        const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+        // Монитор — тот, на котором СТОИТ окно, а не главный, и в глобальных
+        // координатах (workArea.x/y). По главному монитору окно на втором,
+        // стоящем ниже, на каждом ресайзе «вылезало» за низ и переезжало на
+        // главный; а workArea.y (меню macOS, панель задач сверху) не учитывался
+        // вовсе (MAIN-01).
+        const area = screen.getDisplayMatching(windows.controlWindow.getBounds()).workArea;
+        const screenWidth = area.width;
+        const screenHeight = area.height;
         const [curW, curH] = windows.controlWindow.getSize();
         const w = Number.isFinite(size.width) ? size.width : curW;
         const h = Number.isFinite(size.height) ? size.height : curH;
@@ -68,8 +75,9 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         const [x, y] = windows.controlWindow.getPosition();
         windows.controlWindow.setSize(targetWidth, targetHeight);
 
-        if (y + targetHeight > screenHeight) {
-            windows.controlWindow.setPosition(x, Math.max(0, screenHeight - targetHeight - 20));
+        const bottom = area.y + area.height;
+        if (y + targetHeight > bottom) {
+            windows.controlWindow.setPosition(x, Math.max(area.y, bottom - targetHeight - 20));
         }
     });
 

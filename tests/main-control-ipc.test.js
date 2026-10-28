@@ -1,0 +1,134 @@
+'use strict';
+
+/**
+ * main-control-ipc.js на поддельных окне и экране: обработчики размера панели
+ * и режима «полоса» вызываются по-настоящему, проверяются ГРАНИЦЫ окна.
+ *
+ * Модуль получает electron параметрами, поэтому подставка тут — ровно то, что
+ * он трогает: окно (размер, позиция, пол и потолок) и screen (мониторы).
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+const CONFIG = require('../constants');
+const { registerControlIpc } = require('../main-control-ipc');
+
+function makeWindow({ x, y, width, height }) {
+    return {
+        _pos: [x, y],
+        _size: [width, height],
+        _min: [CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT],
+        _max: [CONFIG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER, CONFIG.CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER],
+        _onTop: false,
+        isDestroyed: () => false,
+        getSize() { return this._size.slice(); },
+        setSize(w, h) { this._size = [w, h]; },
+        getPosition() { return this._pos.slice(); },
+        setPosition(px, py) { this._pos = [px, py]; },
+        getBounds() { return { x: this._pos[0], y: this._pos[1], width: this._size[0], height: this._size[1] }; },
+        setBounds(b) { this._pos = [b.x, b.y]; this._size = [b.width, b.height]; },
+        getMaximumSize() { return this._max.slice(); },
+        setMaximumSize(w, h) { this._max = [w, h]; },
+        getMinimumSize() { return this._min.slice(); },
+        setMinimumSize(w, h) { this._min = [w, h]; },
+        setAlwaysOnTop(flag) { this._onTop = flag; }
+    };
+}
+
+// Главный монитор 1920×1080 (полоска меню 25px сверху, workArea 1920×1015)
+// и второй ПОД ним: глобальный y второго начинается с 1080.
+const PRIMARY = {
+    bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+    workArea: { x: 0, y: 25, width: 1920, height: 1015 },
+    workAreaSize: { width: 1920, height: 1015 }
+};
+const BELOW = {
+    bounds: { x: 0, y: 1080, width: 2560, height: 1440 },
+    workArea: { x: 0, y: 1080, width: 2560, height: 1400 },
+    workAreaSize: { width: 2560, height: 1400 }
+};
+
+function makeScreen(displays) {
+    const contains = (d, r) => {
+        const cx = r.x + r.width / 2;
+        const cy = r.y + r.height / 2;
+        return cx >= d.bounds.x && cx < d.bounds.x + d.bounds.width
+            && cy >= d.bounds.y && cy < d.bounds.y + d.bounds.height;
+    };
+    return {
+        getPrimaryDisplay: () => displays[0],
+        getAllDisplays: () => displays,
+        getDisplayMatching: (r) => displays.find((d) => contains(d, r)) || displays[0]
+    };
+}
+
+function setup(win, displays) {
+    const handlers = new Map();
+    const windows = { controlWindow: win };
+    const noop = () => {};
+    registerControlIpc({
+        ipcMain: { on: (ch, fn) => handlers.set(ch, fn) },
+        windows,
+        screen: makeScreen(displays),
+        CONFIG,
+        shell: { openExternal: () => Promise.resolve() },
+        app: { quit: noop },
+        log: { warn: noop, error: noop, info: noop },
+        getSession: () => ({}),
+        clearTimerInterval: noop
+    });
+    return { handlers, windows };
+}
+
+test('MAIN-01: ресайз панели на мониторе ПОД главным не переносит её на главный', () => {
+    const win = makeWindow({ x: 100, y: 1200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY, BELOW]);
+    // Открытие ящика: панель шлёт только ширину.
+    handlers.get('resize-control-window')(null, { width: 736 });
+
+    const b = win.getBounds();
+    assert.equal(b.width, 736);
+    assert.deepEqual([b.x, b.y], [100, 1200], 'окно влезает в свой монитор — позиция не трогается');
+});
+
+test('MAIN-01: вылезающее за низ своего монитора окно поднимается в ЕГО рабочей области', () => {
+    const win = makeWindow({ x: 100, y: 2000, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY, BELOW]);
+    handlers.get('resize-control-window')(null, { height: 1000 });
+
+    const b = win.getBounds();
+    assert.equal(b.height, 1000);
+    const bottom = BELOW.workArea.y + BELOW.workArea.height;
+    assert.ok(b.y >= BELOW.workArea.y, `верх ${b.y} внутри монитора, а не на главном`);
+    assert.ok(b.y + b.height <= bottom, `низ ${b.y + b.height} не ниже рабочей области ${bottom}`);
+});
+
+test('MAIN-01: подъём учитывает workArea.y (панель задач Windows сверху)', () => {
+    // Панель задач 60px СВЕРХУ: рабочая область начинается с y = 60.
+    const TOP_TASKBAR = {
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        workArea: { x: 0, y: 60, width: 1920, height: 1020 },
+        workAreaSize: { width: 1920, height: 1020 }
+    };
+    const win = makeWindow({ x: 100, y: 300, width: 400, height: 700 });
+    const { handlers } = setup(win, [TOP_TASKBAR]);
+    // Высота почти во всю рабочую область: прежний подъём считал от y = 0
+    // и ставил верх окна ПОД панель задач.
+    handlers.get('resize-control-window')(null, { height: 1100 });
+
+    const b = win.getBounds();
+    const wa = TOP_TASKBAR.workArea;
+    assert.ok(b.y >= wa.y, `верх ${b.y} не под панелью задач (${wa.y})`);
+    assert.ok(b.y + b.height <= wa.y + wa.height);
+});
+
+test('MAIN-01: размер не изменился — окно не трогается вовсе (без дрейфа)', () => {
+    const win = makeWindow({ x: 100, y: 2000, width: 400, height: 700 });
+    let calls = 0;
+    win.setSize = () => { calls++; };
+    win.setPosition = () => { calls++; };
+    const { handlers } = setup(win, [PRIMARY, BELOW]);
+    handlers.get('resize-control-window')(null, { width: 400, height: 700 });
+    assert.equal(calls, 0);
+});

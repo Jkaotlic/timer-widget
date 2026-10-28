@@ -72,6 +72,7 @@
 | `after-pack.test.js` | Хук `build/after-pack.js` на Linux снимает бит исполнения с `*.so`/`*.so.N` (lintian `shared-library-is-executable`), бинарники, `chrome-sandbox` и ссылки не трогает; на других платформах не трогает ничего |
 | `ci-workflows.test.js` | Шаги CI, которые не должны исчезнуть молча: lintian по собранному deb одним скриптом `scripts/lintian-check.sh` в CI и релизе; отказ собранного приложения от `--no-sandbox` (код 1 + строка гарда, 124 — провал); purge без следов пакета и с целыми настройками; ячейка обновления с опубликованного 2.11.0; каждая сторонняя `uses:` — полный SHA + `# vX.Y.Z` |
 | `electron-main-source.test.js` | IPC payload hardening, DevTools gating, icon path |
+| `main-control-ipc.test.js` | Каналы панели на поддельных окне и экране: ресайз — по монитору, где стоит окно (`workArea` с x/y), режим «полоса» |
 | `main-modules.test.js` | Модули `main-*.js`: нет сирот, electron только в точке входа (регулярка + загрузка с ловушкой), `rawIpcMain` не покидает точку входа, гард SEC-04 раньше первого `require` — [docs/main-process.md](main-process.md) |
 | `visual-source.test.js` | Layout/centering invariants, release-doc freshness |
 | `audit-2026-07-fixes.test.js` | Regressions from the July 2026 audit (sound, Esc, scales, geometry) |

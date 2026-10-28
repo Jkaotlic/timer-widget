@@ -204,7 +204,14 @@ function createStubs() {
                     workAreaSize: { width: 1920, height: 1040 } }
             ],
             getAllDisplays() { return this._displays; },
-            getPrimaryDisplay() { return this._displays[0]; }
+            getPrimaryDisplay() { return this._displays[0]; },
+            // Монитор, на котором стоит прямоугольник (по центру), иначе главный.
+            getDisplayMatching(r) {
+                const cx = r.x + r.width / 2;
+                const cy = r.y + r.height / 2;
+                return this._displays.find(({ bounds: b }) => cx >= b.x && cx < b.x + b.width
+                    && cy >= b.y && cy < b.y + b.height) || this._displays[0];
+            }
         },
         Menu: { setApplicationMenu: noop, buildFromTemplate: () => ({}) },
         shell: { openExternal: () => Promise.resolve() },
