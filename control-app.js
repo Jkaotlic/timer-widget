@@ -868,12 +868,10 @@
 
                 // Лимит перерасхода: в хранилище секунды, в поле «MM:SS».
                 document.getElementById('overrunRow').style.display = applied.allowNegative ? 'flex' : 'none';
-                if (Number.isFinite(Number(ext.overrunLimitSeconds)) && Number(ext.overrunLimitSeconds) > 0) {
-                    const secs = Number(ext.overrunLimitSeconds);
-                    const mm = String(Math.floor(secs / 60)).padStart(2, '0');
-                    const ss = String(secs % 60).padStart(2, '0');
-                    document.getElementById('overrunLimit').value = `${mm}:${ss}`;
-                }
+                // Ноль и отсутствие ключа — «без лимита», то есть пустое поле:
+                // иначе пресет без лимита оставлял прежний, и pushOverrunLimit
+                // ниже слал его в main.
+                document.getElementById('overrunLimit').value = window.SettingsSchema.overrunLimitFieldValue(ext.overrunLimitSeconds);
                 this.refreshOverrunLimitHint();
 
                 // Чекбокс — авторитет: подтягиваем к нему внутренний флаг, иначе

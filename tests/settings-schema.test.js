@@ -484,3 +484,27 @@ test('resetKeys и resetOwnedSettings — одна механика сброса
     const resets = source.match(/el\.checked = !!descriptor\.def/g) || [];
     assert.equal(resets.length, 1, 'механика сброса контрола скопирована ещё раз');
 });
+
+// ---------------------------------------------------------------------------
+// PANEL-009 (аудит 27.10.2026): поле лимита перерасхода — свой формат, и
+// ОТСУТСТВИЕ значения тоже значение. Стоял лимит 05:00, применяется пресет с
+// overrunLimitSeconds = 0 (или без ключа): ветка `> 0` пропускалась, поле
+// оставалось «05:00», и loadSettings → pushOverrunLimit слал в main СТАРЫЙ
+// лимит. Пресет «без лимита» применить было нельзя.
+// ---------------------------------------------------------------------------
+test('PANEL-009: лимит перерасхода раскладывается в поле, а ноль и отсутствие очищают его', () => {
+    const Schema = require('../settings-schema.js');
+    assert.equal(Schema.overrunLimitFieldValue(300), '05:00');
+    assert.equal(Schema.overrunLimitFieldValue(65), '01:05');
+    assert.equal(Schema.overrunLimitFieldValue(0), '', 'ноль обязан очистить поле');
+    assert.equal(Schema.overrunLimitFieldValue(undefined), '', 'отсутствие обязано очистить поле');
+    assert.equal(Schema.overrunLimitFieldValue('мусор'), '');
+    assert.equal(Schema.overrunLimitFieldValue(-5), '');
+
+    const { codeOnly } = require('./helpers/source-scan');
+    const src = codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'control-app.js'), 'utf8'));
+    assert.match(src, /getElementById\('overrunLimit'\)\.value = window\.SettingsSchema\.overrunLimitFieldValue\(ext\.overrunLimitSeconds\)/,
+        'loadSettings не раскладывает лимит через общий формат');
+    assert.doesNotMatch(src, /Number\(ext\.overrunLimitSeconds\)\) && Number\(ext\.overrunLimitSeconds\) > 0/,
+        'старая ветка «только если > 0» вернулась');
+});

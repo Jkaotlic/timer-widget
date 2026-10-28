@@ -405,8 +405,27 @@ function resetKeys(keys, doc) {
     return resetMatching((descriptor) => wanted.has(descriptor.key), doc);
 }
 
+/**
+ * Значение поля лимита перерасхода из сохранённых секунд: «MM:SS» или ''.
+ *
+ * Ноль, отсутствие и мусор — «без лимита», то есть ПУСТОЕ поле. Раньше панель
+ * писала поле только при `> 0`, и пресет без лимита оставлял в нём прежний.
+ *
+ * @param {*} seconds
+ * @returns {string}
+ */
+function overrunLimitFieldValue(seconds) {
+    const secs = Number(seconds);
+    if (!Number.isFinite(secs) || secs <= 0) { return ''; }
+    const whole = Math.floor(secs);
+    const mm = String(Math.floor(whole / 60)).padStart(2, '0');
+    const ss = String(whole % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+}
+
 const SettingsSchema = {
     SETTINGS_DESCRIPTORS,
+    overrunLimitFieldValue,
     DISPLAY_BLOCK_KEYS,
     DISPLAY_LABEL_KEYS,
     MANUAL_KEYS,
