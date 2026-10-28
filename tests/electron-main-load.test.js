@@ -528,6 +528,45 @@ test('«закрыть» и сразу «открыть»: окно диспле
     assert.notEqual(alive[0], first, 'живым обязано быть НОВОЕ окно, а не то, что закрывали');
 });
 
+test('MAIN-11: мусорный displayIndex не запоминается и не пересоздаёт открытый дисплей', async () => {
+    // relay.lastDisplayIndex — память ретранслятора: прежде туда писалось
+    // что угодно (объект, строка в мегабайты), а сравнение === со
+    // значением окна на следующем open-display пересоздавало дисплей.
+    const stubs = createStubs();
+    loadMain(stubs);
+    stubs.ipcHandlers.get('open-display')(null, { displayIndex: 0 });
+    const first = displayWindows(stubs)[0];
+    assert.equal(first._displayIndex, 0);
+
+    for (const junk of [{ a: 1 }, 'x'.repeat(100000), [0], -1, 7, 1.5, NaN, true, null]) {
+        stubs.ipcHandlers.get('open-display')(null, { displayIndex: junk });
+    }
+    // Без аргумента (клавиша D в виджете) — последний ПРИНЯТЫЙ монитор.
+    stubs.ipcHandlers.get('open-display')(null);
+    // Пересоздание дисплея асинхронно: выход из полноэкранного, 120 мс, closed.
+    await new Promise((r) => setTimeout(r, 400));
+
+    assert.equal(first.isDestroyed(), false, 'мусорный displayIndex пересоздал открытый дисплей');
+    assert.deepEqual(displayWindows(stubs), [first]);
+});
+
+test('MAIN-11: законные displayIndex панели проходят — "auto", число и строка из <select>', async () => {
+    const stubs = createStubs();
+    stubs.electron.screen._displays.push({
+        bounds: { x: 1920, y: 0, width: 1280, height: 1024 },
+        workArea: { x: 1920, y: 0, width: 1280, height: 1000 },
+        workAreaSize: { width: 1280, height: 1000 }
+    });
+    loadMain(stubs);
+    let n = 0;
+    for (const idx of ['auto', 1, '0']) {
+        stubs.ipcHandlers.get('open-display')(null, { displayIndex: idx });
+        n++;
+        await until(() => displayWindows(stubs).length === n);
+    }
+    assert.deepEqual(displayWindows(stubs).map((w) => w._displayIndex), ['auto', 1, '0']);
+});
+
 test('два «открыть» во время закрытия дают одно окно, а «закрыть» отменяет отложенное', async () => {
     const stubs = createStubs();
     loadMain(stubs);

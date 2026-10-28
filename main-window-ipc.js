@@ -114,6 +114,18 @@ function registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, clo
         event.sender.send('displays-list', displays);
     });
 
+    // 'auto', целое 0…N−1 или та же цифра строкой — значение <select> панели
+    // (control-app.js шлёт displaySelectEl.value). Форма значения сохраняется:
+    // окно сравнивает её с _displayIndex. Иное — null.
+    function validDisplayIndex(value) {
+        if (value === 'auto') { return value; }
+        const count = screen.getAllDisplays().length;
+        let idx = null;
+        if (typeof value === 'number' && Number.isInteger(value)) { idx = value; }
+        else if (typeof value === 'string' && /^\d{1,3}$/.test(value)) { idx = Number(value); }
+        return idx !== null && idx >= 0 && idx < count ? value : null;
+    }
+
     ipcMain.on('open-display', (event, options) => {
         // Payload здесь НЕОБЯЗАТЕЛЕН: виджет и часы по клавише D шлют канал без
         // аргументов, и это значит «взять последний выбранный монитор». Поэтому
@@ -121,8 +133,13 @@ function registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, clo
         // ранний выход убил бы клавишу D. Значение по умолчанию `= {}` спасало
         // только от undefined: явный null доходил до чтения поля и ронял обработчик.
         const opts = isPayloadObject(options) ? options : {};
-        // Use provided displayIndex, or fall back to last used
-        const displayIndex = opts.displayIndex !== undefined ? opts.displayIndex : relay.lastDisplayIndex;
+        // Присланный монитор — только законный (MAIN-11), иначе последний
+        // принятый. Прежде в relay.lastDisplayIndex писалось что угодно —
+        // объект, строка в мегабайты, — мимо правила ретрансляторов (плоские
+        // примитивы, потолок размера), и сравнение === ниже пересоздавало
+        // открытый дисплей на мусор.
+        const asked = validDisplayIndex(opts.displayIndex);
+        const displayIndex = asked !== null ? asked : relay.lastDisplayIndex;
         relay.lastDisplayIndex = displayIndex;
 
         // Открытие уже запланировано на закрытие текущего окна — владелец у него
