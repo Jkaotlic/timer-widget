@@ -1005,9 +1005,16 @@
                 // Показываем/скрываем часы в зависимости от общего времени
                 const showHours = cells.hasHours;
 
-                // Добавляем/удаляем класс для адаптивных размеров
+                // Добавляем/удаляем класс для адаптивных размеров. Масштаб флипа
+                // (база 420 с часами / 320 без) читает этот класс, поэтому при
+                // его СМЕНЕ пересчитываем здесь, ПОСЛЕ записи: гейт «Цифр» в
+                // updateDisplay() срабатывает раньше и по своему условию.
                 if (this.widgetFlip) {
+                    const hadHoursClass = this.widgetFlip.classList.contains('has-hours');
                     this.widgetFlip.classList.toggle('has-hours', showHours);
+                    if (hadHoursClass !== showHours) {
+                        this.updateScaling();
+                    }
                 }
 
                 if (this.wFlipHoursGroup && this.wFlipHoursSep) {
