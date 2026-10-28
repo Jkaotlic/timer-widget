@@ -74,6 +74,7 @@
 | `electron-main-source.test.js` | IPC payload hardening, DevTools gating, icon path |
 | `main-control-ipc.test.js` | Каналы панели на поддельных окне и экране: ресайз — по монитору, где стоит окно (`workArea` с x/y), режим «полоса» |
 | `main-window-closing.test.js` | Отложенное открытие на поддельном времени: страховка исполняет только СВОЙ запрос, «закрыть» снимает и её |
+| `main-lifecycle.test.js` | `startApp()` на подставках: клик по Dock (`activate`) возвращает спрятанную в трей панель |
 | `main-modules.test.js` | Модули `main-*.js`: нет сирот, electron только в точке входа (регулярка + загрузка с ловушкой), `rawIpcMain` не покидает точку входа, гард SEC-04 раньше первого `require` — [docs/main-process.md](main-process.md) |
 | `visual-source.test.js` | Layout/centering invariants, release-doc freshness |
 | `audit-2026-07-fixes.test.js` | Regressions from the July 2026 audit (sound, Esc, scales, geometry) |

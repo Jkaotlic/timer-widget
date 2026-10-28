@@ -416,7 +416,7 @@ const prepareStorage = () => migrateStorage({
 
 // --- Жизненный цикл: единственный экземпляр, старт, выход ------------------
 startApp({
-    app, BrowserWindow, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
+    app, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
     registerProtocol, prepareStorage,
     windows, flags, timer, recoverySnapshot, events, creators, tray,
     inTestMode: __inTestMode, screenshotMode: __screenshotMode, startupT0: __startupT0

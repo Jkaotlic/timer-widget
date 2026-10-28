@@ -8,7 +8,7 @@
  * этот модуль решает, КОГДА что звать. Порядок старта несущий и записан в
  * комментариях ниже — накопитель читается до окон, восстановление до панели.
  *
- * Модуль не требует electron: app, BrowserWindow, Menu, powerMonitor и
+ * Модуль не требует electron: app, Menu, powerMonitor и
  * nativeImage передаёт точка входа.
  */
 
@@ -18,7 +18,6 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
 /**
  * @param {object} deps
  * @param {object} deps.app
- * @param {Function} deps.BrowserWindow
  * @param {object} deps.Menu
  * @param {object} deps.powerMonitor
  * @param {object} deps.nativeImage
@@ -41,7 +40,7 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  */
 function startApp(deps) {
     const {
-        app, BrowserWindow, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
+        app, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
         registerProtocol, prepareStorage,
         windows, flags, timer, recoverySnapshot, events, creators, tray
     } = deps;
@@ -97,22 +96,25 @@ function startApp(deps) {
     // Single-instance lock: a tray utility with autostart is easy to launch twice.
     // A duplicate instance would spawn a second tray + timer and race the shared
     // recovery file. Take the primary lock and focus the existing window instead.
+    // Показать панель: второй экземпляр и клик по Dock — один путь.
+    function revealControlWindow() {
+        // Пока идёт перенос настроек, панели ещё нет — и создавать её
+        // рано: окно на пустом app:// записало бы умолчания раньше, чем
+        // туда придут настройки пользователя. Старт создаст её сам.
+        if (__preparingStorage) { return; }
+        if (!windows.controlWindow) { createControlWindow(); return; }
+        if (windows.controlWindow.isMinimized()) { windows.controlWindow.restore(); }
+        if (!windows.controlWindow.isVisible()) { windows.controlWindow.show(); }
+        windows.controlWindow.focus();
+    }
+
     const __singleInstance = __inTestMode || __screenshotMode
         || typeof app.requestSingleInstanceLock !== 'function'
         || app.requestSingleInstanceLock();
     if (!__singleInstance) {
         app.quit();
     } else {
-        app.on('second-instance', () => {
-            // Пока идёт перенос настроек, панели ещё нет — и создавать её
-            // рано: окно на пустом app:// записало бы умолчания раньше, чем
-            // туда придут настройки пользователя. Старт создаст её сам.
-            if (__preparingStorage) { return; }
-            if (!windows.controlWindow) { createControlWindow(); return; }
-            if (windows.controlWindow.isMinimized()) { windows.controlWindow.restore(); }
-            if (!windows.controlWindow.isVisible()) { windows.controlWindow.show(); }
-            windows.controlWindow.focus();
-        });
+        app.on('second-instance', revealControlWindow);
     }
 
     app.whenReady().then(async () => {
@@ -242,11 +244,10 @@ function startApp(deps) {
 
         log.info(`[perf] app ready in ${Date.now() - __startupT0}ms`);
 
-        app.on('activate', () => {
-            if (BrowserWindow.getAllWindows().length === 0) {
-                createControlWindow();
-            }
-        });
+        // Клик по иконке в Dock (macOS). Панель, закрытая крестиком при трее,
+        // СПРЯТАНА (hide), а не закрыта, и в getAllWindows() остаётся — проверка
+        // «окон ноль» не давала Dock'у её вернуть, только трей (MAIN-06).
+        app.on('activate', revealControlWindow);
     });
 
     app.on('window-all-closed', () => {
