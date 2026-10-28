@@ -39,7 +39,7 @@ function showKeyboardShortcuts() {
     // Centralized teardown: remove overlay AND its document keydown listener
     const closeOverlay = () => {
         overlay.remove();
-        document.removeEventListener('keydown', _onOverlayKey);
+        document.removeEventListener('keydown', _onOverlayKey, true);
     };
     // Отдаём закрытие наружу, чтобы повторный вызов showKeyboardShortcuts()
     // (второй F1) снял и узел, и слушатель, а не только узел.
@@ -98,12 +98,16 @@ function showKeyboardShortcuts() {
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) { closeOverlay(); }
     });
+    // На ПОГРУЖЕНИИ и без всплытия: справка — ближний слой, и Esc,
+    // закрывший её, не должен заодно закрыть ящик настроек под ней.
     const _onOverlayKey = (e) => {
         if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
             closeOverlay();
         }
     };
-    document.addEventListener('keydown', _onOverlayKey);
+    document.addEventListener('keydown', _onOverlayKey, true);
     document.body.appendChild(overlay);
     setTimeout(() => closeBtn.focus(), 0);
 }

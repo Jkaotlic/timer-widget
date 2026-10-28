@@ -22,6 +22,17 @@ function _getFocusable(modal) {
 }
 function _modalTrapHandler(modal) {
     return (e) => {
+        // Esc — отмена БЛИЖНЕГО слоя: закрыть эту модалку и не отдавать
+        // нажатие дальше. Обработчик ящика настроек висит на document, и без
+        // stopPropagation один Esc закрывал бы и модалку, и ящик под ней.
+        // Здесь, а не списком модалок в панели: модалки мероприятия строит
+        // panel-display.js, и список их не знал.
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModal(modal);
+            return;
+        }
         if (e.key !== 'Tab') { return; }
         const focusable = _getFocusable(modal);
         if (focusable.length === 0) { e.preventDefault(); return; }
@@ -55,6 +66,10 @@ function closeModal(modal) {
     if (prev && typeof prev.focus === 'function') {
         try { prev.focus(); } catch { /* ignore */ }
     }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { openModal, closeModal };
 }
 
 if (typeof window !== 'undefined') {
