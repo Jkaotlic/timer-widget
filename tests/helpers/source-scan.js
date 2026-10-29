@@ -20,52 +20,136 @@
  * Копия исходника той же длины, где содержимое строк, шаблонов и комментариев
  * заменено пробелами. Индексы совпадают с исходником один в один.
  *
+ * Два режима для проверок ОТСУТСТВИЯ (tests/main-no-dom.test.js), по умолчанию
+ * выключены — балансировка скобок у остальных тестов не меняется:
+ *   - `keepSubstitutions: true` оставляет КОДОМ подстановки `${…}` внутри
+ *     шаблонов (вложенные строки и шаблоны в них маскируются по тем же
+ *     правилам): без этого `\`${window.X}\`` выглядит строкой;
+ *   - `regexLiterals: true` гасит литералы регулярок: кавычка внутри
+ *     `/"([^"]*)"/` иначе открывает «строку» до конца файла, и всё, что ниже,
+ *     для проверки невидимо (так было с app-scheme.js и security.js).
+ *     Эвристика: `/` — начало регулярки, если перед ней (без пробелов) нет
+ *     значения — оператор, скобка, запятая, начало текста или слово
+ *     `return`/`typeof`/`case`/….
+ *
  * @param {string} src
+ * @param {{keepSubstitutions?: boolean, regexLiterals?: boolean}} [options]
  * @returns {string}
  */
-function maskNonCode(src) {
+function maskNonCode(src, { keepSubstitutions = false, regexLiterals = false } = {}) {
     const out = src.split('');
-    let i = 0;
     const blank = (from, to) => {
         for (let k = from; k < to && k < out.length; k++) {
             if (out[k] !== '\n') { out[k] = ' '; }
         }
     };
 
-    while (i < src.length) {
-        const ch = src[i];
-        const next = src[i + 1];
+    // Код от `i`. С `untilBrace` — до `}`, закрывающей подстановку (глубина 0);
+    // возвращает индекс сразу за ней (или конец текста).
+    function code(i, untilBrace) {
+        let depth = 0;
+        while (i < src.length) {
+            const ch = src[i];
+            const next = src[i + 1];
 
-        if (ch === '/' && next === '/') {
-            const end = src.indexOf('\n', i);
-            const stop = end === -1 ? src.length : end;
-            blank(i, stop);
-            i = stop;
-            continue;
-        }
-        if (ch === '/' && next === '*') {
-            const end = src.indexOf('*/', i + 2);
-            const stop = end === -1 ? src.length : end + 2;
-            blank(i, stop);
-            i = stop;
-            continue;
-        }
-        if (ch === '"' || ch === "'" || ch === '`') {
-            const quote = ch;
-            let k = i + 1;
-            while (k < src.length) {
-                if (src[k] === '\\') { k += 2; continue; }
-                if (src[k] === quote) { k++; break; }
-                k++;
+            if (ch === '/' && next === '/') {
+                const end = src.indexOf('\n', i);
+                const stop = end === -1 ? src.length : end;
+                blank(i, stop);
+                i = stop;
+                continue;
             }
-            // Содержимое гасим, сами кавычки оставляем — они не скобки и на
-            // балансировку не влияют, зато граница остаётся видимой при отладке.
-            blank(i + 1, k - 1);
-            i = k;
-            continue;
+            if (ch === '/' && next === '*') {
+                const end = src.indexOf('*/', i + 2);
+                const stop = end === -1 ? src.length : end + 2;
+                blank(i, stop);
+                i = stop;
+                continue;
+            }
+            if (ch === '/' && regexLiterals && regexMayStart(i)) {
+                i = regex(i);
+                continue;
+            }
+            if (ch === '`' && keepSubstitutions) {
+                i = template(i);
+                continue;
+            }
+            if (ch === '"' || ch === "'" || ch === '`') {
+                const quote = ch;
+                let k = i + 1;
+                while (k < src.length) {
+                    if (src[k] === '\\') { k += 2; continue; }
+                    if (src[k] === quote) { k++; break; }
+                    k++;
+                }
+                // Содержимое гасим, сами кавычки оставляем — они не скобки и на
+                // балансировку не влияют, зато граница остаётся видимой при отладке.
+                blank(i + 1, k - 1);
+                i = k;
+                continue;
+            }
+            if (untilBrace) {
+                if (ch === '{') { depth++; }
+                else if (ch === '}') {
+                    if (depth === 0) { return i + 1; }
+                    depth--;
+                }
+            }
+            i++;
         }
-        i++;
+        return i;
     }
+
+    // Перед `/` на `i` — не значение (иначе это деление).
+    function regexMayStart(i) {
+        let k = i - 1;
+        while (k >= 0 && /\s/.test(out[k])) { k--; }
+        if (k < 0) { return true; }
+        if ('(,=:[!&|?{};+-*%<>~^'.includes(out[k])) { return true; }
+        let w = k;
+        while (w >= 0 && /[A-Za-z_$]/.test(out[w])) { w--; }
+        return ['return', 'typeof', 'case', 'in', 'of', 'void', 'delete', 'new', 'throw', 'else', 'do']
+            .includes(out.slice(w + 1, k + 1).join(''));
+    }
+
+    // Регулярка с `/` на `i`: тело гасится (класс `[...]` может содержать `/`).
+    function regex(i) {
+        let k = i + 1;
+        let inClass = false;
+        while (k < src.length && src[k] !== '\n') {
+            if (src[k] === '\\') { k += 2; continue; }
+            if (src[k] === '[') { inClass = true; }
+            else if (src[k] === ']') { inClass = false; }
+            else if (src[k] === '/' && !inClass) { break; }
+            k++;
+        }
+        blank(i + 1, k);
+        return k + 1;
+    }
+
+    // Шаблон с открывающей `\`` на `i`: текст гасится, `${…}` — код.
+    // Возвращает индекс за закрывающей `\``.
+    function template(i) {
+        let k = i + 1;
+        let from = k;
+        while (k < src.length) {
+            if (src[k] === '\\') { k += 2; continue; }
+            if (src[k] === '`') { blank(from, k); return k + 1; }
+            if (src[k] === '$' && src[k + 1] === '{') {
+                blank(from, k + 2);
+                const close = code(k + 2, true);
+                blank(close - 1, close);
+                k = close;
+                from = k;
+                continue;
+            }
+            k++;
+        }
+        blank(from, k);
+        return k;
+    }
+
+    code(0, false);
     return out.join('');
 }
 
