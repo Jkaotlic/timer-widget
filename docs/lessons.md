@@ -3923,3 +3923,45 @@ origin, `localStorage` бросает «Access is denied for this document», и
 **Правило.** Страница приложения — адрес `app://timer-widget/`, не файл. Новое
 окно — `loadURL(pageUrl(…))`; новый файл, который окно подключает, отдаётся
 схемой сам (список собирается из разметки), но обязан быть в `build.files`.
+
+<a id="types-ratchet-checkjs"></a>
+
+### Типы: храповик tsc --checkJs
+
+`npm run typecheck` гоняет `tsc` (6.0.3, `checkJs`, `strict: false`) по двум
+проектам — `tsconfig.main.json` и `tsconfig.renderer.json` — и сравнивает число
+ошибок ПО ФАЙЛАМ с `typecheck-baseline.json`. На старте было 994 ошибки;
+разом запретить нельзя, а `// @ts-check` проверяет только размеченное — новый
+файл без метки не проверялся бы вовсе. Рост в файле или новый файл с ошибками —
+красный; уменьшение — тоже красный, пока не выполнено `npm run typecheck --
+--write` (иначе откат вверх до старой базы прошёл бы молча). `--write` только
+опускает базу.
+
+**Почему `strict: false`.** Долг на `strict` — тысячи ошибок про `null`, и база
+из них была бы шумом. Цена: `undefined |` в типах стирается (нет
+`strictNullChecks`), поэтому `types/main-window.d.ts` не заставит охранять
+`window` в главном процессе. Охрана — `tests/main-no-dom.test.js`.
+
+**Почему TS 6, а не 7.** 7.x — нативный, 20 платформенных бинарников в
+lockfile; ворота `security`/`deb-scan` пришлось бы ослаблять. 6.0.3 — чистый JS,
+версия закреплена точно.
+
+**Почему скрытый lockfile ломал SBOM.** `electron/install.js` пишет файлы так,
+что `node_modules/.package-lock.json` оказывается СТАРШЕ каталога; `npm ls`
+перестаёт ему верить и обходит диск, теряя `integrity` и флаг `dev` в SBOM.
+`scripts/sbom-fresh-lockfile.js` идёт первым в `npm run sbom` и обновляет файл.
+
+**Оговорка про `moduleDetection`.** При `module: nodenext` tsc считает КАЖДЫЙ
+файл модулем (`moduleDetection: force`), поэтому «второй `const X` на верхнем
+уровне», роняющий общий скрипт окна, tsc НЕ ловит — это прежняя ловушка
+«без сборщика объявление верхнего уровня общее», её держат свои тесты.
+
+**Слушатель, сохранённый в поле, обязан иметь тип `IpcListener<C>`.** Иначе
+параметры стрелки получают `any` и опечатка в `payload.field` проходит. Типы
+payload — `types/ipc-payloads.d.ts`; новый `window.X` — строка в
+`types/globals.d.ts`.
+
+**Находки.** `showAnalogNumbers` читают виджет, часы и дисплей, но в
+`display-settings-update` он не шлётся; `allowNegative` в `timer-state`
+шлётся, но не читается — тип показал обе половины одного класса «поле без
+пары».

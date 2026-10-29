@@ -26,6 +26,8 @@
 
 | File | Covers |
 |------|--------|
+| `typecheck-ratchet.test.js` | Храповик `npm run typecheck`: арифметика базы на поддельном выводе tsc; НАСТОЯЩИЙ tsc видит опечатку; пустой include, падение и сигнал tsc — фатально; опечатка в payload ключевых каналов — ошибка |
+| `main-no-dom.test.js` | В `electron-main.js` и `main-*.js` нет `window`/`document` (под `strict:false` tsc этого не поймает); проверяет сам себя на образце |
 | `time-utils.test.js` | `formatTime`, `formatTimeShort`, `parseManualTime` (строгий формат) |
 | `security.test.js` | `isValidDataURL`, `validateImageSource`, `safeJSONParse`, `isSafeColor`, `escapeHTML` |
 | `security-extended.test.js` | `safeSetBackgroundImage` |

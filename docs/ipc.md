@@ -9,6 +9,8 @@
 (`SENDERS` — кто шлёт, `RECEIVERS` — кто слушает), у него обязаны быть оба конца
 (`tests/ipc-liveness.test.js`), а разрешение — это не функция.
 
+Типы payload ключевых каналов (`timer-state`, `widget-style-update`, `display-settings-update`, `*-colors-update`) — в `types/ipc-payloads.d.ts` (`IpcPayloads`, `IpcArgs<C>`, для слушателей в полях — `IpcListener<C>`). Новый канал с payload — строка там; опечатка в поле ловится `npm run typecheck`.
+
 ## Мост по окнам
 
 С 25.09.2026 мост (`preload.js`) каждого окна открывает ТОЛЬКО каналы этого

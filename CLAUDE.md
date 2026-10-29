@@ -9,7 +9,8 @@ npm start              # Run app (Electron)
 npm run dev            # Run with DevTools auto-open (--dev flag)
 npm test               # Run tests (Node.js built-in test runner)
 npm run lint           # ESLint
-npm run ci             # lint + test
+npm run typecheck      # tsc --checkJs, храповик
+npm run ci             # lint + typecheck + test
 npm run build          # Build for current platform (electron-builder)
 npm run build:mac      # Build macOS (DMG + ZIP)
 npm run build:win      # Build Windows (NSIS + Portable)
@@ -97,7 +98,7 @@ Rules when working here:
 - `presets.js` — четыре ячейки вида: снимок ЗНАЧЕНИЙ ключей профиля (`PRESET_KEYS`). Без картинки фона и геометрии окон — почему, в модуле
 - `ui-theme.js` — the only owner of `data-theme` and of the tone class `on-light-bg` (`applyTone` / `initTone` / `bindThemeSync`). The pure part is unit-tested; the DOM/storage part loads in all four windows from `<head>`
 - `hero-modes.js` — что показывает КРУПНОЕ число дисплея: реестр четырёх режимов, подписи, секунды и тотал. Режим влияет на цвет ТОЛЬКО через тотал
-- `event-report.js` — CSV перелимита, ЧИСТЫЙ модуль. Итог — из накопителя, а не сумма строк: расхождение законно и НАЗЫВАЕТСЯ в отчёте. Доклад кончается возвратом ЗАПУЩЕННОГО таймера в покой или выходом; идущий — строка «идёт»; текст-формула — с апострофом
+- `event-report.js` — CSV перелимита, ЧИСТЫЙ модуль. Итог — из накопителя, а не сумма строк: расхождение НАЗЫВАЕТСЯ в отчёте. Доклад кончается возвратом ЗАПУЩЕННОГО таймера в покой или выходом; идущий — «идёт»; формула — с апострофом
 
 ### Key Patterns
 
@@ -175,6 +176,7 @@ Release: те же ворота до сборки, Electron — последни
 разбор: правило говорит ЧТО делать, разбор — почему все предыдущие попытки
 сделали иначе.
 
+- **Типы: новый `window.X` — строка в `types/globals.d.ts`, канал с payload — в `IpcPayloads`; база типов только убывает** — [разбор](docs/lessons.md#types-ratchet-checkjs)
 - **Окна — на `app://timer-widget/`, file:// чужой; фьюз file:// держит лишь перенос настроек (CRITICAL)** — [разбор](docs/lessons.md#windows-live-on-the-app-scheme)
 - **Диапазон масштаба обязан быть ДОСТИЖИМ: пол окна = его размер при `MIN_SCALE_PCT`, ОДИНАКОВЫЙ по осям (иначе окно не квадрат) (CRITICAL)** — [разбор](docs/lessons.md#a-promised-range-must-be-reachable-at-both-ends)
 - **Счётчик масштаба не обновляют из `outerWidth`, прочитанного В событии `resize`: там окно ещё прежнего размера — владелец величины один, модуль геометрии** — [разбор](docs/lessons.md#a-scale-counter-must-not-be-refreshed-from-a-stale-outerwidth)
@@ -288,9 +290,9 @@ Release: те же ворота до сборки, Electron — последни
 - **Тест на владельца значения проверяет точки ВЫЗОВА по всему файлу, а не тело функции-владельца: тело бывает чистым, пока три звонящих передают сырое значение мимо него** — [разбор](docs/lessons.md#a-single-owners-test-must-cover-its-call-sites-not-its-body)
 - **Режим влияет на цвет только через тотал, но это утверждение о ЧЕТЫРЁХ стилях: полосу считают ДО ворот на тотале, иначе круг не краснеет на минусе** — [разбор](docs/lessons.md#a-mode-touches-colour-only-through-the-total)
 - **Часы и длительность не делят форматтер: у `current` всегда ЧЧ:ММ:СС и шесть створок, выбор — по реестру. Час суток — скрытый параметр теста (CRITICAL)** — [разбор](docs/lessons.md#a-clock-and-a-duration-cannot-share-a-formatter)
-- **Гейт перерисовки ключуется ВСЕМ, что красит — константа при нулевом тотале не просигналит смену в принципе, а дефект ВО ВРЕМЕНИ форма-тест не ловит: нужны реальное окно и ОДНА переменная (CRITICAL)** — [разбор](docs/lessons.md#a-repaint-gate-must-key-on-everything-it-paints)
+- **Гейт перерисовки ключуется ВСЕМ, что красит; дефект ВО ВРЕМЕНИ форма-тест не ловит — нужны реальное окно и ОДНА переменная (CRITICAL)** — [разбор](docs/lessons.md#a-repaint-gate-must-key-on-everything-it-paints)
 - **Полоса прогресса без тотала не рисуется вовсе: признак — сам тотал, а не имя режима; гасит её класс на `<body>`, не второй `!important`** — [разбор](docs/lessons.md#a-progress-strip-with-no-total-must-not-appear)
-- **Закрывающееся окно — НЕ открытое (у ЛЮБОГО из четырёх, не только полноэкранного): «открыть» спрашивает не «есть ли объект», а «будет ли он жив»; отложенное открытие — ОДИН реестр на все окна, метку закрытия ставят и пути мимо IPC, включая трей (CRITICAL)** — [разбор](docs/lessons.md#a-closing-window-is-not-an-open-window)
+- **Закрывающееся окно — НЕ открытое (у ЛЮБОГО из четырёх): «открыть» спрашивает «будет ли он жив»; отложенное открытие — ОДИН реестр на все окна, метку закрытия ставят и пути мимо IPC, включая трей (CRITICAL)** — [разбор](docs/lessons.md#a-closing-window-is-not-an-open-window)
 - **Окно в e2e ждут ОПРОСОМ, а не событием `window`: событие приходит раз и теряется, если окно опередило подписку** — [разбор](docs/lessons.md#an-event-fires-once-a-poll-is-always-right)
 - **Бюджет e2e-теста — ОДНА величина в `playwright.config.js`; свой `test.setTimeout` только ПОДНИМАЕТ его** — [разбор](docs/lessons.md#a-test-budget-is-a-setting-with-one-owner)
 - **Описанное исключение из защиты — та же дыра: `--no-sandbox` у AppImage провалил ПСИ** — [разбор](docs/lessons.md#a-documented-hole-is-still-a-hole)
