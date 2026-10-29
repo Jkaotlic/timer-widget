@@ -1,5 +1,7 @@
 const { test, expect } = require('@playwright/test');
-const { launchApp } = require('./launch');
+const fs = require('node:fs');
+const path = require('node:path');
+const { launchApp, USER_DATA_DIR } = require('./launch');
 const { waitForDisplay } = require('./window-ready');
 
 /**
@@ -120,6 +122,14 @@ test('масштаб дисплея применяется ко всем бло�
 test('масштаб дисплея применяется ко всем блокам стилей (восстановление при загрузке окна)', async () => {
     // Своя, изолированная сессия — см. комментарий в шапке файла про то,
     // почему точка входа 3 не может продолжать сессию первого теста.
+    //
+    // Память ретрансляторов переживает перезапуск (relay-store.js): с файлом
+    // от прошлого теста main дослал бы дисплею lastDisplaySettings, и масштаб
+    // применила бы applyDisplaySettings(), а не restoreBlockPositions() —
+    // проверка снова перестала бы ловить вырезанный вызов. Сторож профиля
+    // удаляет файл на каждом закрытии, но убитое приложение (crash-recovery)
+    // его оставляет, поэтому условие «памяти нет» ставится здесь явно.
+    fs.rmSync(path.join(USER_DATA_DIR, 'relay-state.json'), { force: true });
     const { app, control } = await launchApp({ settleMs: 0 });
     let display = null;
     try {
@@ -151,8 +161,8 @@ test('масштаб дисплея применяется ко всем бло�
 
         // Проверяем СРАЗУ. restoreBlockPositions() — часть синхронного
         // конструктора, отрабатывающего на domcontentloaded. lastDisplaySettings
-        // на main-процессе — переменная в памяти, null в свежем процессе, пока
-        // что-то её не выставит; здесь этого не произошло (реальных пушей от
+        // на main-процессе — null в свежем процессе без relay-state.json (файл
+        // удалён выше), пока что-то её не выставит; здесь этого не произошло (реальных пушей от
         // панели ещё не было), поэтому createDisplayWindow() не шлёт хидрейт
         // вовсе (`if (lastDisplaySettings)` в электрон-main.js). Значит на этом
         // кадре масштаб мог применить ТОЛЬКО restoreBlockPositions() — ровно

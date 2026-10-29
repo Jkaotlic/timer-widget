@@ -13,8 +13,9 @@
  * неполный снимок.
  *
  * Что хранится: цвета трёх окон, стиль виджета, настройки дисплея БЕЗ картинки
- * фона (она до ~13 МБ и живёт в localStorage окна), настройки часов, тема и
- * замок. Индекс монитора дисплея не хранится — это выбор на одно открытие.
+ * фона (она до ~13 МБ и живёт в localStorage окна), настройки часов. Тема и
+ * замок — нет (почему — в комментарии над CLOCK_SETTINGS_KEYS). Индекс монитора дисплея
+ * не хранится — это выбор на одно открытие.
  *
  * Панель остаётся источником правды: её посылки на старте перезаписывают
  * память, как и раньше. Файл только закрывает зазор до них.
@@ -52,8 +53,28 @@ const OBJECT_FIELDS = Object.freeze({
     lastDisplaySettings: 'display-settings-update',
     lastClockSettings: 'clock-widget-settings'
 });
-// Значения темы — те же, что пропускает ui-theme-update (main-relay-ipc.js).
-const UI_THEME_VALUES = new Set(['dark', 'light']);
+// Тема и замок (relay.uiTheme / relay.uiLocked) в файл НЕ идут намеренно.
+// Окна читают их сами из localStorage в <head>, а досланный из файла
+// устаревший замок окно, открытое до посылки панели, записало бы в общий
+// профиль (ui-lock.js, writeLock) — значение файла стало бы настройкой.
+// Снимок main несёт их только после посылки панели в ЭТОЙ сессии.
+
+// Настройки часов НАКАПЛИВАЮТСЯ слиянием (main-relay-ipc.js), и с файлом
+// накопление пережило бы перезапуски: ключ, который панель перестала слать,
+// жил бы вечно. Из файла читаются только известные ключи: таблица
+// clock-settings-schema.js плюс showTicks, который pushClockSettings
+// (panel-clock.js) шлёт сверх таблицы.
+const CLOCK_SETTINGS_KEYS = new Set(
+    require('./clock-settings-schema').CLOCK_SETTINGS.map((row) => row.key).concat(['showTicks'])
+);
+
+function onlyKnownClockKeys(settings) {
+    const out = {};
+    for (const [key, value] of Object.entries(settings)) {
+        if (CLOCK_SETTINGS_KEYS.has(key)) { out[key] = value; }
+    }
+    return out;
+}
 
 function getRelayStatePath(userDataPath) {
     return path.join(userDataPath, RELAY_STATE_FILE);
@@ -67,8 +88,6 @@ function relaySnapshot(relay) {
         if (value === null || value === undefined) { continue; }
         out[field] = field === 'lastDisplaySettings' ? withoutBgImage(value) : value;
     }
-    if (UI_THEME_VALUES.has(relay.uiTheme)) { out.uiTheme = relay.uiTheme; }
-    if (typeof relay.uiLocked === 'boolean') { out.uiLocked = relay.uiLocked; }
     return out;
 }
 
@@ -101,10 +120,10 @@ function parseRelayState(text) {
         if (clean === null) { continue; }
         // Картинки в файле быть не должно; оказавшаяся там — отбрасывается:
         // «ключа нет» у дисплея значит «без изменений», и своя копия окна цела.
-        out[field] = field === 'lastDisplaySettings' ? withoutBgImage(clean) : clean;
+        if (field === 'lastDisplaySettings') { out[field] = withoutBgImage(clean); }
+        else if (field === 'lastClockSettings') { out[field] = onlyKnownClockKeys(clean); }
+        else { out[field] = clean; }
     }
-    if (own('uiTheme') && UI_THEME_VALUES.has(src.uiTheme)) { out.uiTheme = src.uiTheme; }
-    if (own('uiLocked') && typeof src.uiLocked === 'boolean') { out.uiLocked = src.uiLocked; }
     return out;
 }
 
@@ -179,6 +198,9 @@ function createRelayPersister({
     // После «Сбросить всё» память в файл больше не пишется: выход
     // (before-quit) иначе воскресил бы только что удалённое.
     let discarded = !!disabled;
+    // Пока файл не прочитан, память в него не пишется: процесс, не читавший
+    // файл (второй экземпляр, выходящий сразу), стёр бы его пустой памятью.
+    let loaded = false;
 
     function cancel() {
         if (timer !== null) { clearTimer(timer); timer = null; }
@@ -186,7 +208,7 @@ function createRelayPersister({
 
     function flush() {
         cancel();
-        if (discarded) { return; }
+        if (discarded || !loaded) { return; }
         const text = serializeRelayState(relay);
         if (text === lastWritten) { return; }
         try {
@@ -198,7 +220,7 @@ function createRelayPersister({
     }
 
     function schedule() {
-        if (discarded || timer !== null) { return; }
+        if (discarded || !loaded || timer !== null) { return; }
         timer = setTimer(() => { timer = null; flush(); }, delayMs);
         // Таймер не держит процесс: на выходе запись делает flush().
         if (timer && typeof timer.unref === 'function') { timer.unref(); }
@@ -208,6 +230,7 @@ function createRelayPersister({
         if (disabled) { return; }
         loadRelayState(getUserDataPath(), relay, log);
         lastWritten = serializeRelayState(relay);
+        loaded = true;
     }
 
     function discard() {

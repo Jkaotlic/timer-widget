@@ -2059,15 +2059,16 @@ test('перезапуск: окно, открытое ДО первой пос�
     assert.deepEqual(lastSentTo(stubs, widget, 'widget-colors-update'), { timer: '#ff0000', progress: '#00ff00' });
     assert.equal(lastSentTo(stubs, widget, 'widget-style-update').alwaysOnTop, false);
     assert.equal(lastSentTo(stubs, widget, 'display-settings-update').overrunPrice, 1000);
-    assert.deepEqual(lastSentTo(stubs, widget, 'ui-theme-update'), { theme: 'light' });
-    assert.deepEqual(lastSentTo(stubs, widget, 'ui-lock-update'), { locked: true });
+    // Тема и замок из файла НЕ досылаются: окно читает их из localStorage само,
+    // а досланный устаревший замок оно записало бы в общий профиль (writeLock).
+    assert.equal(lastSentTo(stubs, widget, 'ui-theme-update'), null);
+    assert.equal(lastSentTo(stubs, widget, 'ui-lock-update'), null);
 
     stubs.ipcHandlers.get('open-clock-widget')(null);
     const clock = liveWindow(stubs, 'clock');
     clock.webContents.emit('did-finish-load');
     assert.deepEqual(lastSentTo(stubs, clock, 'clock-settings'), { showDate: true });
     assert.deepEqual(lastSentTo(stubs, clock, 'clock-colors-update'), { timer: '#111111' });
-    assert.deepEqual(lastSentTo(stubs, clock, 'ui-lock-update'), { locked: true });
 
     openDisplay(stubs);
     const display = liveWindow(stubs, 'display');
@@ -2076,7 +2077,17 @@ test('перезапуск: окно, открытое ДО первой пос�
     assert.equal(lastSentTo(stubs, display, 'display-settings-update').eventTitle, 'Открытие сезона');
     assert.ok(!('bgLocalImage' in lastSentTo(stubs, display, 'display-settings-update')),
         'картинки в файле нет — и досылка не выдумывает пустую, которая стёрла бы фон окна');
-    assert.deepEqual(lastSentTo(stubs, display, 'ui-theme-update'), { theme: 'light' });
+
+    // После посылки панели в ЭТОЙ сессии тема и замок досылаются снимком.
+    stubs.ipcHandlers.get('ui-theme-update')(null, { theme: 'dark' });
+    stubs.ipcHandlers.get('ui-lock-update')(null, { locked: false });
+    const toDisplay = (channel) => stubs.sent.filter((m) => m.win === display && m.channel === channel).length;
+    const before = [toDisplay('ui-theme-update'), toDisplay('ui-lock-update')];
+    display.webContents.emit('did-finish-load');
+    assert.deepEqual([toDisplay('ui-theme-update'), toDisplay('ui-lock-update')], [before[0] + 1, before[1] + 1],
+        'перезагруженное окно не получило тему и замок снимком');
+    assert.deepEqual(lastSentTo(stubs, display, 'ui-theme-update'), { theme: 'dark' });
+    assert.deepEqual(lastSentTo(stubs, display, 'ui-lock-update'), { locked: false });
 
     // Панель — источник правды: её посылка на старте перезаписывает память.
     stubs.ipcHandlers.get('widget-style-update')(null, { style: 'digits', alwaysOnTop: true });

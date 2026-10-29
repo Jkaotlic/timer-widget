@@ -44,7 +44,7 @@ function filledRelay() {
         eventTitle: 'Открытие сезона', overrunPrice: 1000, overrunPeriod: 3,
         bgLocalImage: 'data:image/png;base64,' + 'A'.repeat(4096)
     };
-    relay.lastClockSettings = { showDate: true, timezone: 'Europe/Moscow' };
+    relay.lastClockSettings = { showDate: true, showTimezone: true };
     relay.uiTheme = 'light';
     relay.uiLocked = true;
     return relay;
@@ -58,7 +58,7 @@ function persister(dir, log, overrides = {}) {
     }, overrides));
 }
 
-test('круговой рейс: что сохранили, то и прочли — все восемь полей', () => {
+test('круговой рейс: что сохранили, то и прочли — шесть полей настроек', () => {
     const dir = tempDir();
     const log = quietLog();
     const saved = filledRelay();
@@ -74,8 +74,6 @@ test('круговой рейс: что сохранили, то и прочли
     assert.deepEqual(restored.lastClockSettings, saved.lastClockSettings);
     assert.equal(restored.lastDisplaySettings.overrunPrice, 1000);
     assert.equal(restored.lastDisplaySettings.eventTitle, 'Открытие сезона');
-    assert.equal(restored.uiTheme, 'light');
-    assert.equal(restored.uiLocked, true);
     assert.deepEqual(log.lines.filter((l) => l.level !== 'info'), [], 'чистый файл — без предупреждений');
 });
 
@@ -186,9 +184,12 @@ test('проверка отсутствия проверяет сама себя
     // Без этой пары зелёный «тема neon отвергнута» значил бы и «правило работает»,
     // и «разбор не принимает ничего».
     const accepted = RelayStore.parseRelayState(JSON.stringify({
-        version: RelayStore.RELAY_STATE_VERSION, relay: { uiTheme: 'dark', uiLocked: false }
+        version: RelayStore.RELAY_STATE_VERSION,
+        relay: { lastWidgetStyle: { alwaysOnTop: false }, lastClockSettings: { showDate: true, showTicks: true } }
     }));
-    assert.deepEqual(accepted, { uiTheme: 'dark', uiLocked: false });
+    assert.deepEqual(accepted, {
+        lastWidgetStyle: { alwaysOnTop: false }, lastClockSettings: { showDate: true, showTicks: true }
+    });
 });
 
 test('склейка: десять изменений подряд — одна запись, после задержки', () => {
@@ -203,8 +204,9 @@ test('склейка: десять изменений подряд — одна 
         clearTimer: (t) => { if (t) { t.cleared = true; } },
         write: (userDataPath, r) => { writes++; RelayStore.writeRelayState(userDataPath, r); }
     });
+    p.loadOnStart();
     for (let i = 0; i < 10; i++) {
-        relay.uiTheme = i % 2 ? 'light' : 'dark';
+        relay.lastWidgetStyle = { style: i % 2 ? 'flip' : 'digits' };
         p.schedule();
     }
     assert.equal(writes, 0, 'на каждое сообщение файл не пишется');
@@ -213,7 +215,7 @@ test('склейка: десять изменений подряд — одна 
     assert.equal(live[0].ms, 500);
     live[0].fn();
     assert.equal(writes, 1);
-    assert.equal(JSON.parse(fs.readFileSync(RelayStore.getRelayStatePath(dir), 'utf8')).relay.uiTheme, 'light');
+    assert.equal(JSON.parse(fs.readFileSync(RelayStore.getRelayStatePath(dir), 'utf8')).relay.lastWidgetStyle.style, 'flip');
 });
 
 test('flush пишет отложенное сразу (выход), второй flush без изменений — не пишет', () => {
@@ -225,7 +227,8 @@ test('flush пишет отложенное сразу (выход), второ�
         setTimer: () => ({}), clearTimer: () => {},
         write: (d, r) => { writes++; RelayStore.writeRelayState(d, r); }
     });
-    relay.uiLocked = true;
+    p.loadOnStart();
+    relay.lastWidgetStyle = { alwaysOnTop: false };
     p.schedule();
     p.flush();
     assert.equal(writes, 1);
@@ -242,10 +245,12 @@ test('discard («Сбросить всё») удаляет файл, и выхо
     const dir = tempDir();
     const relay = filledRelay();
     const p = persister(dir, quietLog(), { relay, setTimer: () => ({}), clearTimer: () => {} });
+    p.loadOnStart();
+    relay.lastWidgetStyle = { alwaysOnTop: false };
     p.schedule();
     p.flush();
     assert.ok(fs.existsSync(RelayStore.getRelayStatePath(dir)));
-    relay.uiTheme = 'dark';
+    relay.lastWidgetStyle = { alwaysOnTop: true };
     p.schedule();
     p.discard();
     assert.ok(!fs.existsSync(RelayStore.getRelayStatePath(dir)), 'файл удалён');
@@ -255,9 +260,12 @@ test('discard («Сбросить всё») удаляет файл, и выхо
 
 test('ошибка записи — в журнал, не исключение (выход не должен падать)', () => {
     const log = quietLog();
+    const relay = createRelayMemory();
     const p = persister('/nonexistent/dir/for/relay', log, {
-        setTimer: () => ({}), clearTimer: () => {}
+        relay, setTimer: () => ({}), clearTimer: () => {}
     });
+    p.loadOnStart();
+    relay.lastWidgetStyle = { alwaysOnTop: false };
     p.schedule();
     assert.doesNotThrow(() => p.flush());
     assert.ok(log.lines.some((l) => l.level === 'warn' && l.text.includes('relay-state')));
@@ -271,6 +279,53 @@ test('loadOnStart заполняет ту память, что передана,
     const relay = createRelayMemory();
     const p = persister(dir, quietLog(), { relay, setTimer: () => ({}), clearTimer: () => {} });
     p.loadOnStart();
-    assert.equal(relay.uiTheme, 'light');
+    assert.equal(relay.lastWidgetStyle.style, 'digits');
     assert.ok(Object.isSealed(relay), 'тот же запечатанный объект main-state');
+});
+
+test('без loadOnStart память в файл НЕ пишется: пустой процесс не стирает чужой файл', () => {
+    // Второй экземпляр выходит, не прочитав файл. Пиши он на выходе — файл
+    // основного стал бы {"version":1,"relay":{}}.
+    const dir = tempDir();
+    RelayStore.writeRelayState(dir, filledRelay());
+    const before = fs.readFileSync(RelayStore.getRelayStatePath(dir), 'utf8');
+    const p = persister(dir, quietLog(), { setTimer: () => ({}), clearTimer: () => {} });
+    p.schedule();
+    p.flush();
+    assert.equal(fs.readFileSync(RelayStore.getRelayStatePath(dir), 'utf8'), before);
+});
+
+test('тема и замок в файл не пишутся и из файла не читаются', () => {
+    // Окно, открытое до посылки панели, записало бы досланный замок в общий
+    // localStorage (ui-lock.js, writeLock). Устаревшее значение файла стало бы
+    // настройкой. Окна читают тему и замок сами, из localStorage в <head>;
+    // снимок main несёт их только после посылки панели в ЭТОЙ сессии.
+    const dir = tempDir();
+    RelayStore.writeRelayState(dir, filledRelay());
+    const text = fs.readFileSync(RelayStore.getRelayStatePath(dir), 'utf8');
+    assert.ok(!text.includes('uiTheme') && !text.includes('uiLocked'), text);
+
+    fs.writeFileSync(RelayStore.getRelayStatePath(dir), JSON.stringify({
+        version: RelayStore.RELAY_STATE_VERSION, relay: { uiTheme: 'light', uiLocked: true, lastWidgetStyle: { a: 1 } }
+    }));
+    const relay = createRelayMemory();
+    RelayStore.loadRelayState(dir, relay, quietLog());
+    assert.equal(relay.uiTheme, null);
+    assert.equal(relay.uiLocked, null);
+    assert.deepEqual(relay.lastWidgetStyle, { a: 1 }, 'остальное из того же файла читается');
+});
+
+test('настройки часов из файла — только известные ключи: брошенный панелью ключ не живёт вечно', () => {
+    // Память часов НАКАПЛИВАЕТСЯ (main-relay-ipc.js, слияние), и с файлом
+    // накопление переживает перезапуски: ключ, который панель перестала
+    // слать, остался бы навсегда. Известные — таблица clock-settings-schema
+    // плюс showTicks, который pushClockSettings шлёт сверх таблицы.
+    const dir = tempDir();
+    fs.writeFileSync(RelayStore.getRelayStatePath(dir), JSON.stringify({
+        version: RelayStore.RELAY_STATE_VERSION,
+        relay: { lastClockSettings: { showDate: true, clockDigitsFont: 'mono', showTicks: true, retiredKey: 1, opacity: 0.5 } }
+    }));
+    const relay = createRelayMemory();
+    RelayStore.loadRelayState(dir, relay, quietLog());
+    assert.deepEqual(relay.lastClockSettings, { showDate: true, clockDigitsFont: 'mono', showTicks: true });
 });

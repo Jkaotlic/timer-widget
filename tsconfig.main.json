@@ -30,6 +30,7 @@
     "money-meter.js",
     "recovery.js",
     "settings-schema.js",
+    "clock-settings-schema.js",
     "timer-controller.js",
     "timer-engine.js",
     "utils.js",

@@ -49,6 +49,7 @@ const ClockSettingsSchema = require('../clock-settings-schema.js');
 const UITheme = require('../ui-theme.js');
 
 const LEDGER = path.join(os.tmpdir(), 'timer-widget-e2e-profile-leaks.json');
+const { RELAY_STATE_FILE } = require('../relay-store.js');
 
 /**
  * Ключи, которые пишет само ПРИЛОЖЕНИЕ, а не тест, — каждый с причиной.
@@ -280,6 +281,13 @@ const baselines = new Map();
  * @param {object} app
  * @param {{keepProfile?: boolean}} [opts] — не возвращать на ЭТОМ закрытии
  */
+/** Удалить память ретрансляторов main из профиля e2e (relay-store.js). */
+function forgetRelayMemory() {
+    // Ленивый require: launch.js сам требует этот модуль.
+    const { USER_DATA_DIR } = require('./launch');
+    fs.rmSync(path.join(USER_DATA_DIR, RELAY_STATE_FILE), { force: true });
+}
+
 async function watch(app, opts = {}) {
     const owner = currentTest();
     if (!owner) { return; }
@@ -331,11 +339,19 @@ async function watch(app, opts = {}) {
             // Сторож не имеет права ронять закрытие: окно могло уже уйти.
             console.warn(`[profile-guard] сверка на закрытии не удалась: ${e && e.message}`);
         }
-        return close();
+        const result = await close();
+        // Память ретрансляторов main (relay-state.json, relay-store.js) —
+        // тоже профиль, и вернуть её через localStorage нельзя: restore()
+        // пишет хранилище мимо IPC, relay.* остаётся таким, каким его оставил
+        // тест, и выход записывает это в файл. Следующий запуск прочёл бы
+        // память чужого теста раньше посылок панели. Поэтому файл удаляется
+        // после закрытия; тест с перезапуском (keepProfile) свой сохраняет.
+        if (!opts.keepProfile) { forgetRelayMemory(); }
+        return result;
     };
 }
 
 module.exports = {
-    diffProfiles, watch, readLedger, resetLedger, snapshot,
+    diffProfiles, watch, readLedger, resetLedger, snapshot, forgetRelayMemory,
     VOLATILE_KEYS, DERIVED, FIELD_DEFAULTS, KEY_DEFAULTS, LEDGER
 };

@@ -22,6 +22,7 @@ declare var window: undefined | {
     MoneyMeter?: typeof import('../money-meter.js');
     EventReport?: typeof import('../event-report.js');
     SettingsSchema?: typeof import('../settings-schema.js');
+    ClockSettingsSchema?: typeof import('../clock-settings-schema.js');
     WindowGeometry?: typeof import('../window-geometry.js');
 };
 

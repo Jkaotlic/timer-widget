@@ -80,8 +80,8 @@ file:// → app:// нового канала не заводит: у его ск
 | `event-finish` | панель | Скрытый режим «47-й этаж»: завершить мероприятие — закрыть текущий перелимит и заморозить итог. Полезной нагрузки нет: величину знает главный процесс |
 | `event-reset` | панель | Скрытый режим «47-й этаж»: новое мероприятие — обнулить накопитель. Полезной нагрузки нет |
 | `event-export` | панель | Скрытый режим «47-й этаж»: выгрузить отчёт о перелимите в CSV. Полезной нагрузки нет: журнал и итог живут в главном процессе, ставка и название мероприятия приходят туда же с `display-settings-update` |
-| `ui-theme-update` | панель | `{ theme: 'dark' \| 'light' }` — sent by the panel only (on toggle AND at panel start); main validates against a whitelist, remembers it (`relay.uiTheme`) and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide); widget/clock/display get it again as a snapshot on load |
-| `ui-lock-update` | панель | `{ locked }` — замок «Закрепить положение»; main помнит (`relay.uiLocked`), рассылает всем окнам (как тему) и досылает виджету, часам и дисплею снимком при загрузке |
+| `ui-theme-update` | панель | `{ theme: 'dark' \| 'light' }` — sent by the panel only (on toggle AND at panel start); main validates against a whitelist, remembers it in-session (`relay.uiTheme`, not persisted) and relays to ALL windows (the one channel that IS broadcast, because the theme is app-wide); widget/clock/display get it again as a snapshot on load once the panel has sent it |
+| `ui-lock-update` | панель | `{ locked }` — замок «Закрепить положение»; main помнит в сессии (`relay.uiLocked`, в файл не пишется), рассылает всем окнам (как тему) и досылает виджету, часам и дисплею снимком при загрузке — после посылки панели |
 | `display-restore-state` | панель | Без payload: пресет вернул в профиль места и масштабы карточек — дисплей перечитывает их |
 | `report-scale` | виджет, часы, дисплей | `{ source, scalePct }` — окно сообщает свой масштаб панели |
 | `display-block-hidden` | дисплей | `{ block }` — блок закрыт крестиком в окне, панель снимает его тумблер |
@@ -143,10 +143,16 @@ file:// → app:// нового канала не заводит: у его ск
 ## Память ретрансляторов переживает перезапуск
 
 Что main помнит из ретрансляторов (`relay.*`, `main-state.js`: цвета трёх
-окон, стиль виджета, настройки дисплея и часов, тема, замок), он пишет в
+окон, стиль виджета, настройки дисплея и часов), он пишет в
 `userData/relay-state.json` (`relay-store.js`, `atomic-write.js`) — склейкой
 500 мс и обязательно на `before-quit`/`will-quit`. Картинка фона дисплея в файл
-НЕ идёт. Читается файл синхронно в `startApp`, раньше `whenReady` и любого окна;
-битый или чужой формат (`version` ≠ 1) — пустая память и строка в журнал.
-Панель остаётся источником правды: её посылки на старте перезаписывают память.
-«Сбросить всё» удаляет файл, стенд съёмки его не читает и не пишет.
+НЕ идёт; настройки часов читаются только по известным ключам
+(`clock-settings-schema.js` + `showTicks`). Тема и замок в файл НЕ идут: окна
+читают их из localStorage сами, а снимок main несёт их только после посылки
+панели в этой сессии (досланный устаревший замок окно записало бы в профиль).
+Читается файл синхронно в `startApp`, раньше `whenReady` и любого окна; до
+чтения ничего не пишется (второй экземпляр файл не трогает). Битый или чужой
+формат (`version` ≠ 1) — пустая память и строка в журнал. Панель остаётся
+источником правды: её посылки на старте перезаписывают память. «Сбросить всё»
+удаляет файл, стенд съёмки его не читает и не пишет, сторож профиля e2e удаляет
+его после каждого закрытия (кроме `keepProfile`).
