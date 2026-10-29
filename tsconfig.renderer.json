@@ -15,6 +15,7 @@
     "*.js"
   ],
   "exclude": [
+    "types/main-window.d.ts",
     "eslint.config.js",
     "playwright.config.js",
     "electron-main.js",

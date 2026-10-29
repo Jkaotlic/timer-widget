@@ -451,7 +451,7 @@ function applyFont(el, fontId) {
  * под знак ровно столько же, сколько резервирует подгонка (signWidth в
  * fitScale). Мусор даёт 0: поле без знака лучше поля в NaN.
  *
- * @param {{signWidth: number}|null} probe — результат measureDigits
+ * @param {{width: number, signWidth: number}|null} probe — результат measureDigits
  * @returns {number}
  */
 function signWidthEm(probe) {

@@ -41,6 +41,7 @@ const CLOCK_SETTINGS = [
  * @returns {Record<string, boolean|string>}
  */
 function collectClockSettings(els) {
+    /** @type {Record<string, boolean|string>} */
     const out = {};
     for (const row of CLOCK_SETTINGS) {
         const el = els[row.el];
@@ -72,9 +73,9 @@ function applyClockSettings(els, stored) {
         // пользователя, подменять его умолчанием нельзя.
         const raw = src[row.key];
         if (row.kind === 'value') {
-            el.value = raw === undefined ? row.def : raw;
+            el.value = raw === undefined ? /** @type {string} */ (row.def) : /** @type {string} */ (raw);
         } else {
-            el.checked = raw === undefined ? row.def : !!raw;
+            el.checked = raw === undefined ? /** @type {boolean} */ (row.def) : !!raw;
         }
     }
 }

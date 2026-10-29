@@ -131,7 +131,8 @@ function createWindowGeometry(cfg) {
 
         /** Восстанавливает размер и позицию прошлой сессии. */
         restore() {
-            const geo = parseJSON(storage.getItem(storageKey), null);
+            const geo = /** @type {{scalePct?: unknown, x?: number, y?: number} | null} */ (
+                parseJSON(storage.getItem(storageKey), null));
             if (!geo || typeof geo !== 'object') { return; }
 
             const pct = Number(geo.scalePct);
@@ -358,9 +359,10 @@ function fitRestoredBounds(target, displays, minVisible, fallbackArea, min) {
  * @param {object} cfg
  * @param {Element} cfg.container — элемент, за который тащат
  * @param {Document} cfg.doc — сюда вешаются mousemove/mouseup: кнопку отпускают и за пределами окна
- * @param {(payload: {deltaX: number, deltaY: number}) => void} cfg.onMove
+ * @param {(payload: {deltaX: number, deltaY: number, first: boolean}) => void} cfg.onMove
  * @param {() => void} cfg.onDrop — вызывается один раз в конце перетаскивания
  * @param {object} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
+ * @param {() => boolean} [cfg.isLocked] предикат замка: true отменяет жест
  * @returns {object} тот же объект handlers
  */
 function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) {

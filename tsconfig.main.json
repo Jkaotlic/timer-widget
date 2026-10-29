@@ -12,6 +12,7 @@
   },
   "include": [
     "types/ipc-payloads.d.ts",
+    "types/main-window.d.ts",
     "electron-main.js",
     "main-*.js",
     "preload.js",
