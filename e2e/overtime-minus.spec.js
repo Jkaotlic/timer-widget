@@ -37,12 +37,26 @@ async function findWindow(app, probe) {
 // Прозрачность меряется ЭФФЕКТИВНАЯ — произведение opacity по цепочке предков
 // (функция живёт внутри evaluate). Анимация может висеть и на самом узле, и на
 // контейнере, а тесту нельзя зависеть от того, где именно.
+//
+// Перерасход ждётся УСЛОВИЕМ, а не паузой. Прежде здесь стояли 3500 мс и
+// никакой проверки: если таймер в эти секунды не ушёл в минус или из него
+// вышел, знак оставался пустым, и замер ниже честно считал геометрию ПУСТОГО
+// span — −0.4115 кегля у Inter, то есть «минус уехал», хотя минуса не было
+// (полный прогон 29.10.2026). Затянувшийся main тот же ответ дать не может:
+// отсчёт сверяется по монотонным часам и после простоя догоняет — замер с
+// искусственным простоем main на 2.6 и 3.2 с был зелёным.
 async function overtime(control) {
     await control.evaluate(() => {
         window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true });
         window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true });
     });
-    await control.waitForTimeout(3500);
+    await expect.poll(
+        () => control.evaluate(() => {
+            const tc = window.timerController;
+            return !!tc && tc.isRunning && tc.remainingSeconds <= -2;
+        }),
+        { message: 'таймер не ушёл в перерасход (идёт, ≤ −2 с)', timeout: 10000 }
+    ).toBe(true);
 }
 
 test('перекидыш: минус мигает в одной фазе с цифрами', async () => {
@@ -110,6 +124,46 @@ test('перекидыш: минус мигает в одной фазе с ци
 // присмотра — и именно они выглядели «почти правильно», то есть незаметно.
 const DIGIT_FONTS = ['inter', 'mono', 'bebas', 'oswald', 'orbitron', 'playfair'];
 
+// Центр ЧЕРНИЛ, а не бокса: бокс знака центрирован всегда, и
+// прямоугольники были ровными ровно в тот момент, когда знак
+// визуально уезжал. Базовая линия инлайнового span — его верх плюс
+// восходящая шрифта; у знака (он абсолютом) добавляется половинный
+// интерлиньяж.
+async function measureSignInk() {
+    // Шрифт, выбранный только что, мог ещё не доехать: canvas мерил бы
+    // запасное начертание.
+    await document.fonts.ready;
+    const value = document.getElementById('widgetDigitsValue');
+    const sign = document.getElementById('widgetDigitsSign');
+    const csV = getComputedStyle(value);
+    const csS = getComputedStyle(sign);
+    const ctx = document.createElement('canvas').getContext('2d');
+    const measure = (cs, text) => {
+        ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        return ctx.measureText(text);
+    };
+    // Эталон — ВЕСЬ набор цифр: у Playfair Display цифры
+    // старостильные, и по одной («8» восходящая, «0» в высоту
+    // строчной) ответ отличается вчетверо.
+    const mV = measure(csV, '0123456789');
+    const mS = measure(csS, '−');
+    const v = value.getBoundingClientRect();
+    const s = sign.getBoundingClientRect();
+    const lh = parseFloat(csS.lineHeight) || parseFloat(csS.fontSize);
+
+    const inkV = v.top + mV.fontBoundingBoxAscent
+        - (mV.actualBoundingBoxAscent - mV.actualBoundingBoxDescent) / 2;
+    const inkS = s.top
+        + (lh - (mS.fontBoundingBoxAscent + mS.fontBoundingBoxDescent)) / 2
+        + mS.fontBoundingBoxAscent
+        - (mS.actualBoundingBoxAscent - mS.actualBoundingBoxDescent) / 2;
+    return {
+        offsetEm: (inkV - inkS) / parseFloat(csV.fontSize),
+        signText: sign.textContent,
+        valueText: value.textContent
+    };
+}
+
 test('«Цифры»: чернила минуса по центру чернил цифр во ВСЕХ шрифтах', async () => {
     const { app, control } = await launchApp();
     try {
@@ -131,38 +185,16 @@ test('«Цифры»: чернила минуса по центру чернил
             );
             await widget.waitForTimeout(600);
 
-            // Центр ЧЕРНИЛ, а не бокса: бокс знака центрирован всегда, и
-            // прямоугольники были ровными ровно в тот момент, когда знак
-            // визуально уезжал. Базовая линия инлайнового span — его верх плюс
-            // восходящая шрифта; у знака (он абсолютом) добавляется половинный
-            // интерлиньяж.
-            const offsetEm = await widget.evaluate(() => {
-                const value = document.getElementById('widgetDigitsValue');
-                const sign = document.getElementById('widgetDigitsSign');
-                const csV = getComputedStyle(value);
-                const csS = getComputedStyle(sign);
-                const ctx = document.createElement('canvas').getContext('2d');
-                const measure = (cs, text) => {
-                    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-                    return ctx.measureText(text);
-                };
-                // Эталон — ВЕСЬ набор цифр: у Playfair Display цифры
-                // старостильные, и по одной («8» восходящая, «0» в высоту
-                // строчной) ответ отличается вчетверо.
-                const mV = measure(csV, '0123456789');
-                const mS = measure(csS, '−');
-                const v = value.getBoundingClientRect();
-                const s = sign.getBoundingClientRect();
-                const lh = parseFloat(csS.lineHeight) || parseFloat(csS.fontSize);
+            // Знак должен БЫТЬ — иначе замер ниже меряет пустой span и
+            // выдаёт правдоподобное «смещение» (см. overtime()).
+            await expect.poll(
+                () => widget.evaluate(() => document.getElementById('widgetDigitsSign').textContent),
+                { message: `${font}: перед замером виджет не в перерасходе — знак пуст`, timeout: 5000 }
+            ).toBe('−');
 
-                const inkV = v.top + mV.fontBoundingBoxAscent
-                    - (mV.actualBoundingBoxAscent - mV.actualBoundingBoxDescent) / 2;
-                const inkS = s.top
-                    + (lh - (mS.fontBoundingBoxAscent + mS.fontBoundingBoxDescent)) / 2
-                    + mS.fontBoundingBoxAscent
-                    - (mS.actualBoundingBoxAscent - mS.actualBoundingBoxDescent) / 2;
-                return (inkV - inkS) / parseFloat(csV.fontSize);
-            });
+            const m = await widget.evaluate(measureSignInk);
+            expect(m.signText, `${font}: перерасход потерян во время замера (табло ${m.valueText})`).toBe('−');
+            const offsetEm = m.offsetEm;
 
             console.log(`${font.padEnd(9)} смещение ${offsetEm.toFixed(4)} кегля`);
             if (Math.abs(offsetEm) > Math.abs(worst.value)) { worst.font = font; worst.value = offsetEm; }
@@ -180,6 +212,19 @@ test('«Цифры»: чернила минуса по центру чернил
             expect(Math.abs(offsetEm), `${font}: минус уехал по вертикали на ${offsetEm.toFixed(3)} кегля`).toBeLessThan(0.03);
         }
         console.log(`худший шрифт: ${worst.font} (${worst.value.toFixed(4)})`);
+
+        // Самопроверка охраны: сброс гасит знак — проверка обязана это
+        // увидеть, а сырой замер показывает, во что потерянный перерасход
+        // превращался без неё (−0.41 у Inter при пороге 0.03).
+        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
+        await expect.poll(
+            () => widget.evaluate(() => document.getElementById('widgetDigitsSign').textContent),
+            { message: 'самопроверка: после сброса знак не погас', timeout: 5000 }
+        ).toBe('');
+        const blind = await widget.evaluate(measureSignInk);
+        console.log(`самопроверка, пустой знак: ${blind.offsetEm.toFixed(4)} кегля`);
+        expect(blind.signText, 'самопроверка: охрана не видит пустой знак').not.toBe('−');
+        expect(Math.abs(blind.offsetEm), 'самопроверка: пустой знак неотличим от ровного — охрана не нужна?').toBeGreaterThan(0.03);
     } finally {
         await app.close();
     }
