@@ -49,7 +49,7 @@
                         position: 'clock-widget-set-position'
                     },
                     send: (channel, payload) => ipcRenderer.send(channel, payload),
-                    parseJSON: safeJSONParse,
+                    parseJSON: window.SecurityUtils.safeJSONParse,
                     storage: localStorage,
                     getOuterWidth: () => window.outerWidth,
                     getScreenPosition: () => ({ x: window.screenX, y: window.screenY }),
@@ -712,7 +712,7 @@
                 // СЛИЯНИЕ, а не перезапись — см. тот же комментарий в
                 // electron-control.html:pushClockSettings(). Оба окна пишут этот
                 // ключ разными наборами полей, и прямая запись теряла чужие.
-                const prev = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
+                const prev = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
                 localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prev, ...settings }));
             }
 

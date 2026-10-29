@@ -50,7 +50,7 @@ const SAVE_SETTLE_MS = 300;
  * @param {Storage} cfg.storage
  * @param {() => number} cfg.getOuterWidth
  * @param {() => {x: number, y: number}} cfg.getScreenPosition
- * @param {(pct: number) => void} [cfg.onScaleSettled] — вызывается, когда
+ * @param {(pct: number) => void} [cfg.onScaleSettled] - вызывается, когда
  *        УСТОЯВШИЙСЯ размер оказался другим: окно узнало свой новый масштаб не
  *        от колеса, а от системы (растянули за край рамки, ползунок панели).
  *        Нужен, чтобы ползунок панели не остался на прежнем числе.
@@ -97,7 +97,7 @@ function createWindowGeometry(cfg) {
 
     /**
      * Записывает размер и позицию.
-     * @param {number} [explicitPct] — без него берётся ФАКТИЧЕСКАЯ ширина окна:
+     * @param {number} [explicitPct] - без него берётся ФАКТИЧЕСКАЯ ширина окна:
      *   она учитывает и растягивание за край рамки, а не только Ctrl+колесо.
      */
     function save(explicitPct) {

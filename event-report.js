@@ -112,8 +112,8 @@ function safeTalks(raw) {
  * @param {number} input.price — ставка, ₽
  * @param {number} input.period — за сколько секунд ставка
  * @param {Date}   input.now — «сейчас», для даты при пустом журнале
- * @param {boolean} [input.onlyOverruns] — печатать только доклады с перелимитом
- * @param {{overrunSeconds: number}|null} [input.current] — идущий доклад, если
+ * @param {boolean} [input.onlyOverruns] - печатать только доклады с перелимитом
+ * @param {{overrunSeconds: number}|null} [input.current] - идущий доклад, если
  *        выгрузка снята посреди него (строка «идёт»)
  * @returns {{csv: string, rows: number, totalSeconds: number, totalCost: number, partial: boolean}}
  */

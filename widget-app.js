@@ -45,7 +45,7 @@
                         position: 'widget-set-position'
                     },
                     send: (channel, payload) => ipcRenderer.send(channel, payload),
-                    parseJSON: safeJSONParse,
+                    parseJSON: window.SecurityUtils.safeJSONParse,
                     storage: localStorage,
                     getOuterWidth: () => window.outerWidth,
                     getScreenPosition: () => ({ x: window.screenX, y: window.screenY }),
@@ -402,7 +402,7 @@
                 // Настройки виджета
                 const settings = localStorage.getItem('widgetSettings');
                 if (settings) {
-                    const s = safeJSONParse(settings, {});
+                    const s = window.SecurityUtils.safeJSONParse(settings, {});
                     if (s && s.opacity) {
                         this.container.style.opacity = s.opacity;
                     }
@@ -464,7 +464,7 @@
                 // как описаны, и виджет расходился с двумя другими окнами.
                 if (!colors) {
                     const saved = localStorage.getItem('timerColors');
-                    colors = saved ? safeJSONParse(saved, null) : null;
+                    colors = saved ? window.SecurityUtils.safeJSONParse(saved, null) : null;
                 }
                 // Пустой объект вместо выхода: у каждого цвета в панели своя
                 // кнопка сброса, и сброс приходит сюда как ОТСУТСТВИЕ поля.
@@ -618,7 +618,7 @@
                     console.info('[widget] настройки не применены: ключа displayExtSettings нет (первый запуск или чистый профиль)');
                     return;
                 }
-                const settings = safeJSONParse(bgSettings, {});
+                const settings = window.SecurityUtils.safeJSONParse(bgSettings, {});
 
                 if (!settings || Object.keys(settings).length === 0) {
                     console.warn(

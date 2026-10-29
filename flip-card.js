@@ -117,7 +117,7 @@ function buildFlipLayers(digit, prev, next) {
  * @param {HTMLElement} card — карточка (.flip-card / .widget-flip-card)
  * @param {string} digitSelector — селектор узла с цифрой внутри карточки
  * @param {string|number} value — новое значение
- * @param {{onTimeout?: (id:number)=>void}} [opts] — колбэк для учёта таймера
+ * @param {{onTimeout?: (id:number)=>void}} [opts] - колбэк для учёта таймера
  * @returns {number|null} id таймера снятия класса или null, если ничего не менялось
  */
 function flipCardTo(card, digitSelector, value, opts = {}) {

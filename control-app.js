@@ -18,7 +18,7 @@
         if (typeof debounce === 'undefined') {
             var debounce = (window.TimeUtils && window.TimeUtils.debounce)
                 ? window.TimeUtils.debounce
-                : (fn, delay = (window.CONFIG && CONFIG.DEBOUNCE_DELAY) || 120) => {
+                : (fn, delay = (window.CONFIG && window.CONFIG.DEBOUNCE_DELAY) || 120) => {
                     let timeoutId;
                     return (...args) => {
                         clearTimeout(timeoutId);
@@ -35,6 +35,13 @@
 
         class TimerController {
             constructor() {
+                // Только для tsc: что приносят примеси (Object.assign ниже); строка лишь читает свойство.
+                /** @type {TimerMixins['pushDisplaySettings']} */ this.pushDisplaySettings;
+                /** @type {TimerMixins['widgetStylePayload']} */ this.widgetStylePayload;
+                /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows;
+                /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows;
+                /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow;
+                /** @type {object|null} */ this.clockColors; // ставит PanelColorsMixin.loadWindowColors
                 this.totalSeconds = 0;
                 this.remainingSeconds = 0;
                 this.isRunning = false;
@@ -169,9 +176,9 @@
                 this.clockDigitsFontEl = document.getElementById('clockDigitsFont');
                 this.displayDigitsFontEl = document.getElementById('displayDigitsFont');
                 // attachFontSelect — в font-select.js, не здесь (лимит строк).
-                attachFontSelect(this.widgetDigitsFontEl);
-                attachFontSelect(this.clockDigitsFontEl);
-                attachFontSelect(this.displayDigitsFontEl);
+                window.attachFontSelect(this.widgetDigitsFontEl);
+                window.attachFontSelect(this.clockDigitsFontEl);
+                window.attachFontSelect(this.displayDigitsFontEl);
                 this.widgetDigitsFontRowEl = document.getElementById('widgetDigitsFontRow');
                 this.clockDigitsFontRowEl = document.getElementById('clockDigitsFontRow');
                 this.displayDigitsFontRowEl = document.getElementById('displayDigitsFontRow');
@@ -250,7 +257,7 @@
 
                 if (!wasOpen) {
                     // Capture current outer width so close can restore exactly.
-                    const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                    const baseDefault = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                     this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || baseDefault;
                     const shell = document.querySelector('.app-shell');
                     // Ширина колонки панели выводится из ФАКТИЧЕСКОЙ ширины окна, а
@@ -379,7 +386,7 @@
                 // left-392 → center-560 → full-380. Снимаем класс ТОЛЬКО после того
                 // как окно физически сузилось — тогда визуальное положение panel
                 // не меняется (в узком окне start == center для 100% ширины).
-                const baseDefault = (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                const baseDefault = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                 const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || baseDefault;
                 // Снимаем пересчёт колонки: пока ящик открыт, он держал её равной
                 // «фактическая ширина минус ящик», но у закрытого ящика колонка не
@@ -672,7 +679,7 @@
                 }
 
                 // Scale value click-to-edit and double-click-to-reset wiring
-                setupScaleValueEdit(
+                window.setupScaleValueEdit(
                     document.getElementById('timerScaleValue'),
                     document.getElementById('timerScale'),
                     DEFAULT_SCALE_PCT,
@@ -682,7 +689,7 @@
                     }
                 );
 
-                setupScaleValueEdit(
+                window.setupScaleValueEdit(
                     document.getElementById('clockScaleValue'),
                     document.getElementById('clockScale'),
                     DEFAULT_SCALE_PCT,
@@ -696,14 +703,14 @@
                 // (TIMER_*_SCALE 30..300, BLOCK_*_SCALE 50..600) и с валидацией в
                 // restoreBlockPositions — иначе ползунок выставляет значение,
                 // которое дисплей потом откажется восстанавливать.
-                setupScaleValueEdit(
+                window.setupScaleValueEdit(
                     document.getElementById('displayTimerScaleValue'),
                     document.getElementById('displayTimerScale'),
                     DEFAULT_SCALE_PCT,
                     () => { this.pushDisplaySettings(); }
                 );
 
-                setupScaleValueEdit(
+                window.setupScaleValueEdit(
                     document.getElementById('timeBlocksScaleValue'),
                     document.getElementById('timeBlocksScale'),
                     window.DisplayLayouts.DEFAULT_BLOCK_SCALE,
@@ -833,7 +840,7 @@
                 // блоки были включены, откроется пустым — новых ключей в таком
                 // профиле нет, а их умолчание «выключено».
                 const ext = window.RendererShared.migrateDisplayBlocks(
-                    safeJSONParse(localStorage.getItem('displayExtSettings'), {})
+                    window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
                 );
 
                 // Значения раскладывает таблица (settings-schema.js): ключ, контрол
@@ -915,7 +922,7 @@
                 // для всех окон приложения). В displayExtSettings масштаба часов
                 // нет вообще, поэтому без этого чтения ползунок при каждом запуске
                 // показывал «100%» независимо от реального размера окна.
-                const clockGeo = safeJSONParse(localStorage.getItem('clockGeometry'), null);
+                const clockGeo = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
                 const clockScaleSliderEl = document.getElementById('clockScale');
                 const clockScaleLabelEl = document.getElementById('clockScaleValue');
                 if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
@@ -989,7 +996,7 @@
 
                 // СЛИЯНИЕ, а не перезапись: ключ мог быть записан прежней версией
                 // приложения, и незнакомые панели поля переживают обновление.
-                const prev = safeJSONParse(localStorage.getItem('displayExtSettings'), {});
+                const prev = window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
                 // Подписи строк — производная от этих же настроек (почему здесь,
                 // а не в пяти обработчиках, — в renderWindowRows).
@@ -1109,7 +1116,7 @@
                 // СЛИЯНИЕ, а не перезапись: ключ пишут двое — эта панель и сам
                 // виджет часов (у него там ещё clockStyle). Прямая перезапись
                 // стирала чужие поля.
-                const prevClock = safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
+                const prevClock = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
                 localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prevClock, ...persisted }));
                 this.refreshPresetMarks();
 
@@ -1119,7 +1126,7 @@
             loadClockSettings() {
                 window.ClockSettingsSchema.applyClockSettings(
                     this,
-                    safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
+                    window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
                 );
                 // Деления — свой ключ вне clockWidgetSettings. Перечитываются
                 // здесь же: эту раскладку зовёт и применение пресета, и без
@@ -1197,7 +1204,7 @@
                         doc: document,
                         storage: localStorage,
                         clamp: window.RendererShared.clampScale,
-                        parseJSON: safeJSONParse
+                        parseJSON: window.SecurityUtils.safeJSONParse
                     });
                     // Подписи строк — отчёт о ДЕЙСТВУЮЩИХ значениях, и масштаб
                     // в них входит (см. renderWindowRows).
@@ -1460,7 +1467,7 @@
                 }
 
                 ipcRenderer.send('resize-control-window', {
-                    width: (window.CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380,
+                    width: (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380,
                     height: neededHeight
                 });
             }
@@ -1492,7 +1499,7 @@
                 // для 'none' это тишина — поясняем это тостом, чтобы кнопка
                 // не выглядела сломанной.
                 if (preset === 'none') {
-                    Toast.show('Для этого события звук отключён', 'warning', 2000);
+                    window.Toast.show('Для этого события звук отключён', 'warning', 2000);
                     return;
                 }
 
@@ -1576,7 +1583,7 @@
             { target: 'clock', grid: 'clockThemesGrid', panel: 'clockColorPickerPanel', ids: ['clockCpSv', 'clockCpHue', 'clockCpHex', 'clockCpPreview'] },
             { target: 'display', grid: 'displayThemesGrid', panel: 'displayColorPickerPanel', ids: ['displayCpSv', 'displayCpHue', 'displayCpHex', 'displayCpPreview'] }
         ].forEach(({ target, grid, panel, ids }) => {
-            addPickerToggle(grid, panel, {
+            window.addPickerToggle(grid, panel, {
                 sv: ids[0], hue: ids[1], hex: ids[2], preview: ids[3],
                 onChange: (hex) => {
                     document.querySelectorAll(`#${grid} .theme-btn`).forEach(b => b.classList.remove('active'));
@@ -1653,16 +1660,16 @@
         const exitModal = document.getElementById('exitModal');
         const exitCancelBtn = document.getElementById('exitCancel');
         document.getElementById('closeAppBtn').addEventListener('click', () => {
-            openModal(exitModal, exitCancelBtn);
+            window.openModal(exitModal, exitCancelBtn);
         });
         exitCancelBtn.addEventListener('click', () => {
-            closeModal(exitModal);
+            window.closeModal(exitModal);
         });
         document.getElementById('exitConfirm').addEventListener('click', () => {
             if (window.ipcRenderer) {window.ipcRenderer.send('quit-app');}
         });
         exitModal.addEventListener('click', (e) => {
-            if (e.target === exitModal) { closeModal(exitModal); }
+            if (e.target === exitModal) { window.closeModal(exitModal); }
         });
 
         // Cleanup при закрытии окна
@@ -1700,18 +1707,18 @@
         });
         // Open FAQ modal
         faqBtn.addEventListener('click', () => {
-            openModal(faqModal, faqClose);
+            window.openModal(faqModal, faqClose);
         });
 
         // Close FAQ modal
         faqClose.addEventListener('click', () => {
-            closeModal(faqModal);
+            window.closeModal(faqModal);
         });
 
         // Close on backdrop click
         faqModal.addEventListener('click', (e) => {
             if (e.target === faqModal) {
-                closeModal(faqModal);
+                window.closeModal(faqModal);
             }
         });
 
@@ -1719,13 +1726,13 @@
         const resetModal = document.getElementById('resetModal');
         const resetCancelBtn = document.getElementById('resetCancel');
         document.getElementById('resetSettingsBtn').addEventListener('click', () => {
-            openModal(resetModal, resetCancelBtn);
+            window.openModal(resetModal, resetCancelBtn);
         });
         resetCancelBtn.addEventListener('click', () => {
-            closeModal(resetModal);
+            window.closeModal(resetModal);
         });
         resetModal.addEventListener('click', (e) => {
-            if (e.target === resetModal) { closeModal(resetModal); }
+            if (e.target === resetModal) { window.closeModal(resetModal); }
         });
         document.getElementById('resetConfirm').addEventListener('click', () => {
             localStorage.clear();
@@ -1735,9 +1742,9 @@
         // Close on Escape key
         const _onEscapeKeydown = (e) => {
             if (e.key === 'Escape') {
-                if (resetModal.classList.contains('show')) { closeModal(resetModal); }
-                if (exitModal.classList.contains('show')) { closeModal(exitModal); }
-                if (faqModal.classList.contains('show')) { closeModal(faqModal); }
+                if (resetModal.classList.contains('show')) { window.closeModal(resetModal); }
+                if (exitModal.classList.contains('show')) { window.closeModal(exitModal); }
+                if (faqModal.classList.contains('show')) { window.closeModal(faqModal); }
             }
         };
         document.addEventListener('keydown', _onEscapeKeydown);
@@ -1913,7 +1920,7 @@
             // F1: Show help/shortcuts
             else if (event.code === 'F1') {
                 event.preventDefault();
-                showKeyboardShortcuts();
+                window.showKeyboardShortcuts();
             }
         };
         document.addEventListener('keydown', _onGlobalShortcutsKeydown);

@@ -133,7 +133,9 @@ function calculateProgress(remainingSeconds, totalSeconds) {
 
 /**
  * Безопасно отправляет IPC сообщение если окно существует
- * @param {BrowserWindow} window - окно Electron
+ * @param {{ isDestroyed(): boolean, webContents?: { isDestroyed(): boolean, send(channel: string, ...args: any[]): void } }} window
+ *   окно Electron (BrowserWindow). Тип описан по форме: модуль общий с
+ *   рендерером, где типов electron нет и быть не должно.
  * @param {string} channel - канал IPC
  * @param {...any} args - аргументы для отправки
  * @returns {boolean} - успех операции

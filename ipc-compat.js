@@ -31,7 +31,7 @@
          * Register event listener
          * @param {string} channel - Channel name
          * @param {Function} callback - Callback function (event, ...args) => void
-         * @returns {Function} - Cleanup function
+         * @returns {() => void} - Cleanup function
          */
         on: function(channel, callback) {
             // Wrap callback to match old ipcRenderer signature (event, ...args)

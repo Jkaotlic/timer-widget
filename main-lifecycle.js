@@ -37,7 +37,7 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  * @param {boolean} deps.inTestMode
  * @param {boolean} deps.screenshotMode
  * @param {number} deps.startupT0 — метка начала процесса (perf)
- * @param {string} [deps.platform] — process.platform (подменяется в тестах)
+ * @param {string} [deps.platform] - process.platform (подменяется в тестах)
  */
 function startApp(deps) {
     const {
