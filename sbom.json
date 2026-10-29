@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:d4ff9d9a-6a46-4fc2-a231-0c1de1f80a37",
+  "serialNumber": "urn:uuid:b97cefbe-e61e-408e-9ab4-1dd1a2097ecb",
   "metadata": {
-    "timestamp": "2026-09-30T14:46:40.097Z",
+    "timestamp": "2026-10-29T04:51:36.405Z",
     "tools": {
       "components": [
         {
@@ -466,8 +466,8 @@
     {
       "type": "library",
       "name": "electron",
-      "version": "44.5.1",
-      "bom-ref": "timer-widget@2.12.2|electron@44.5.1",
+      "version": "44.10.0",
+      "bom-ref": "timer-widget@2.12.2|electron@44.10.0",
       "author": "Electron Community",
       "description": "Build cross platform desktop apps with JavaScript, HTML, and CSS",
       "licenses": [
@@ -477,7 +477,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/electron@44.5.1",
+      "purl": "pkg:npm/electron@44.10.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron/electron.git",
@@ -495,12 +495,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/electron/-/electron-44.5.1.tgz",
+          "url": "https://registry.npmjs.org/electron/-/electron-44.10.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "971ec06281488b2bc4be0be9c963bd90e0bad31b4d3e988f640b61e859a0f4dbadce908030bc295256816361177d9c888147731262cc8fd2af2b456ba24975c9"
+              "content": "b2ce2909fad0295e135a4b9562d581e0799ecac3d9801f7a71260d29866fd5454244fe2f40c18d5b9a28a456efc7a05b7dc7b55ed3f9a66e510ee29e869d2cbd"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -7847,8 +7847,8 @@
     {
       "type": "library",
       "name": "undici",
-      "version": "7.30.0",
-      "bom-ref": "timer-widget@2.12.2|undici@7.30.0",
+      "version": "7.30.1",
+      "bom-ref": "timer-widget@2.12.2|undici@7.30.1",
       "description": "An HTTP/1.1 client, written from scratch for Node.js",
       "scope": "optional",
       "licenses": [
@@ -7858,7 +7858,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/undici@7.30.0",
+      "purl": "pkg:npm/undici@7.30.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/nodejs/undici.git",
@@ -7876,12 +7876,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/undici/-/undici-7.30.0.tgz",
+          "url": "https://registry.npmjs.org/undici/-/undici-7.30.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "764ad05de1d26a86a69c8b6561b9b31b4c0562b3346700f108883403b68a8d3cb2861f6cbd1cc234513357e566d39ff27a18c2ce30d9df52977c6123612ced0d"
+              "content": "d372ab31b8c814359047944d3eb4b0ddb775af5d89a7215097dff2c6351b26daa48e6965a82e65163661eae8deb8908aafc10e42f456f3bd8ecbf6b3fa72d8c6"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -10404,8 +10404,8 @@
         {
           "type": "library",
           "name": "undici",
-          "version": "6.29.0",
-          "bom-ref": "timer-widget@2.12.2|node-gyp@12.4.0|undici@6.29.0",
+          "version": "6.29.1",
+          "bom-ref": "timer-widget@2.12.2|node-gyp@12.4.0|undici@6.29.1",
           "description": "An HTTP/1.1 client, written from scratch for Node.js",
           "licenses": [
             {
@@ -10414,7 +10414,7 @@
               }
             }
           ],
-          "purl": "pkg:npm/undici@6.29.0",
+          "purl": "pkg:npm/undici@6.29.1",
           "externalReferences": [
             {
               "url": "git+https://github.com/nodejs/undici.git",
@@ -10432,12 +10432,12 @@
               "comment": "as detected from PackageJson property \"bugs.url\""
             },
             {
-              "url": "https://registry.npmjs.org/undici/-/undici-6.29.0.tgz",
+              "url": "https://registry.npmjs.org/undici/-/undici-6.29.1.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "47e44e0c1aa9ea2da93df94676afb120e52497e44d7c6807c288a779c2aefc90ae7f6b8ed3a70e2a80db2363fb0e7e8a72cc1d2b0adccdb53a21827a2bc5fec2"
+                  "content": "12f46552dfd0a8012f5dd41e44c6147f0390b1fce90f3b7292b1b6a3018413fac1381a18bfdb85dfd673b0d0e1e254c51e14ebd973998ca91882e783d7666618"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -11132,8 +11132,8 @@
     {
       "type": "library",
       "name": "fast-uri",
-      "version": "3.1.8",
-      "bom-ref": "timer-widget@2.12.2|fast-uri@3.1.8",
+      "version": "3.1.9",
+      "bom-ref": "timer-widget@2.12.2|fast-uri@3.1.9",
       "author": "Vincent Le Goff",
       "description": "Dependency-free RFC 3986 URI toolbox",
       "licenses": [
@@ -11143,7 +11143,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/fast-uri@3.1.8",
+      "purl": "pkg:npm/fast-uri@3.1.9",
       "externalReferences": [
         {
           "url": "git+https://github.com/fastify/fast-uri.git",
@@ -11161,12 +11161,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.8.tgz",
+          "url": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.9.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "19932d6544cd4693952040a85f02cd652e7150613e99535b4c1f21ffb4708764c559c05088fcd3832662d39045f543192a42c9bfc5c14494e553bce0f3e65f32"
+              "content": "852ff45addd86b4e37a0a5ecd2c231acca4a4084d784c2c8ad500a2978b8828cc60bdbfb6115959d7219ce334f4ced3633d05dc4b096a8ad7245780dce257225"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -17565,8 +17565,8 @@
     {
       "type": "library",
       "name": "http-cache-semantics",
-      "version": "4.2.0",
-      "bom-ref": "timer-widget@2.12.2|http-cache-semantics@4.2.0",
+      "version": "4.3.0",
+      "bom-ref": "timer-widget@2.12.2|http-cache-semantics@4.3.0",
       "author": "Kornel Lesiński",
       "description": "Parses Cache-Control and other headers. Helps building correct HTTP caches and proxies",
       "licenses": [
@@ -17576,7 +17576,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/http-cache-semantics@4.2.0",
+      "purl": "pkg:npm/http-cache-semantics@4.3.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/kornelski/http-cache-semantics.git",
@@ -17594,12 +17594,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/http-cache-semantics/-/http-cache-semantics-4.2.0.tgz",
+          "url": "https://registry.npmjs.org/http-cache-semantics/-/http-cache-semantics-4.3.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "753c5cbcf5ea3ef5c1429ab9754afa9843095f8a08105bfa6f0a26dc50f02910ecb888e324600daa106ea009fd73545024874029abf7dc40fae44db2b3ef3b41"
+              "content": "339b792e52694b5507323bf045055d147bcf21219e2c0c4d72b5ae2647868742b1b2a0876753b7357654ffcc7b703d010dc196f246a9c4c293bf096aacd90790"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -20056,7 +20056,7 @@
         "timer-widget@2.12.2|@playwright/test@1.63.0",
         "timer-widget@2.12.2|electron-builder@26.15.3",
         "timer-widget@2.12.2|electron-log@5.4.4",
-        "timer-widget@2.12.2|electron@44.5.1",
+        "timer-widget@2.12.2|electron@44.10.0",
         "timer-widget@2.12.2|eslint-plugin-html@8.2.1",
         "timer-widget@2.12.2|eslint@10.11.0",
         "timer-widget@2.12.2|globals@17.12.0"
@@ -20110,7 +20110,7 @@
       "ref": "timer-widget@2.12.2|electron-log@5.4.4"
     },
     {
-      "ref": "timer-widget@2.12.2|electron@44.5.1",
+      "ref": "timer-widget@2.12.2|electron@44.10.0",
       "dependsOn": [
         "timer-widget@2.12.2|@electron-internal/extract-zip@1.0.5",
         "timer-widget@2.12.2|@electron/get@5.1.0",
@@ -20359,7 +20359,7 @@
         "timer-widget@2.12.2|progress@2.0.3",
         "timer-widget@2.12.2|semver@7.8.5",
         "timer-widget@2.12.2|sumchecker@3.0.1",
-        "timer-widget@2.12.2|undici@7.30.0"
+        "timer-widget@2.12.2|undici@7.30.1"
       ]
     },
     {
@@ -20703,7 +20703,7 @@
       "ref": "timer-widget@2.12.2|ajv@8.20.0",
       "dependsOn": [
         "timer-widget@2.12.2|fast-deep-equal@3.1.3",
-        "timer-widget@2.12.2|fast-uri@3.1.8",
+        "timer-widget@2.12.2|fast-uri@3.1.9",
         "timer-widget@2.12.2|json-schema-traverse@1.0.0",
         "timer-widget@2.12.2|require-from-string@2.0.2"
       ]
@@ -20952,7 +20952,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|undici@7.30.0"
+      "ref": "timer-widget@2.12.2|undici@7.30.1"
     },
     {
       "ref": "timer-widget@2.12.2|undici-types@7.18.2"
@@ -21180,7 +21180,7 @@
         "timer-widget@2.12.2|semver@7.8.5",
         "timer-widget@2.12.2|tar@7.5.22",
         "timer-widget@2.12.2|tinyglobby@0.2.17",
-        "timer-widget@2.12.2|node-gyp@12.4.0|undici@6.29.0",
+        "timer-widget@2.12.2|node-gyp@12.4.0|undici@6.29.1",
         "timer-widget@2.12.2|node-gyp@12.4.0|which@6.0.1"
       ]
     },
@@ -21188,7 +21188,7 @@
       "ref": "timer-widget@2.12.2|node-gyp@12.4.0|env-paths@2.2.1"
     },
     {
-      "ref": "timer-widget@2.12.2|node-gyp@12.4.0|undici@6.29.0"
+      "ref": "timer-widget@2.12.2|node-gyp@12.4.0|undici@6.29.1"
     },
     {
       "ref": "timer-widget@2.12.2|node-gyp@12.4.0|which@6.0.1",
@@ -21261,7 +21261,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|fast-uri@3.1.8"
+      "ref": "timer-widget@2.12.2|fast-uri@3.1.9"
     },
     {
       "ref": "timer-widget@2.12.2|json-schema-traverse@1.0.0"
@@ -21565,7 +21565,7 @@
       "dependsOn": [
         "timer-widget@2.12.2|clone-response@1.0.3",
         "timer-widget@2.12.2|get-stream@5.2.0",
-        "timer-widget@2.12.2|http-cache-semantics@4.2.0",
+        "timer-widget@2.12.2|http-cache-semantics@4.3.0",
         "timer-widget@2.12.2|keyv@4.5.4",
         "timer-widget@2.12.2|lowercase-keys@2.0.0",
         "timer-widget@2.12.2|normalize-url@6.1.0",
@@ -21820,7 +21820,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|http-cache-semantics@4.2.0"
+      "ref": "timer-widget@2.12.2|http-cache-semantics@4.3.0"
     },
     {
       "ref": "timer-widget@2.12.2|keyv@4.5.4",

@@ -409,7 +409,7 @@ timer-widget/
 
 <div align="center">
 
-**Electron 44.5.1** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
+**Electron 44.10.0** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 
