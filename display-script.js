@@ -2015,11 +2015,12 @@ class DisplayTimer {
         // который раньше подставлял захардкоженный #0a84ff и потому
         // расходился с остальными на всех четырёх стилях.
         //
-        // Ключ — СВОЙ, displayColors. До 29.10.2026 здесь читался timerColors,
-        // а это цвета ВИДЖЕТА: дисплей со своими цветами открывался в чужих до
-        // досылки main. timerColors остался только запасным путём для профиля
-        // без своего ключа (renderer-shared.ownColors).
-        const colors = window.RendererShared.ownColors(localStorage, 'displayColors');
+        // Ключ — ТОЛЬКО свой, displayColors, без запасного пути на timerColors.
+        // До 29.10.2026 здесь читался timerColors, а это цвета ВИДЖЕТА: дисплей
+        // открывался в чужих до досылки main. Запасного пути нет намеренно:
+        // панель досылает `displayColors || {}`, и первый кадр обязан совпасть
+        // с осевшим (renderer-shared.storedColors).
+        const colors = window.RendererShared.storedColors(localStorage, 'displayColors');
         if (colors) { this.applyColors(colors); }
 
         // Фон - загружаем один раз и из правильного источника

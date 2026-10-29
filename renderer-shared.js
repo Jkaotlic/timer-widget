@@ -529,21 +529,50 @@ function pickOwnSetting(settings, ownKey, sharedKey) {
 /**
  * Ключ цветов прежних версий. Панель ПИШЕТ его (цвета виджета) только ради
  * отката: у версии до 29.10.2026 виджет и дисплей читают именно его. Читает
- * его единственный запасной путь — ownColors ниже, для профиля старше
- * поканальных цветов. Условие удаления — в реестре constants.js.
+ * его единственный запасной путь — ownColors ниже (виджет и панель), для
+ * профиля старше поканальных цветов. Условие удаления — в реестре constants.js.
  */
 const LEGACY_COLORS_KEY = 'timerColors';
 
 /**
- * Цвета окна на старте — из СВОЕГО ключа (`widgetColors`, `displayColors`, …).
+ * Цвета одного ключа хранилища — БЕЗ запасного пути.
  *
- * До 29.10.2026 дисплей и виджет читали `timerColors`, а это цвета ВИДЖЕТА:
- * дисплей со своими цветами открывался в чужих до досылки главного процесса.
+ * Объект (включая {} — «всё по CSS») либо null: ключа нет, JSON битый,
+ * значение не объект (массив, примитив) — как parseColors панели.
  *
- * Запасной путь на `timerColors` — только если своего значения НЕТ (ключа нет
- * или он не разбирается, как у safeJSONParse). Пустой объект — это СВОЁ
- * значение («всё по CSS»), а не отсутствие: иначе сброшенные цвета дисплея
- * воскресали бы цветами виджета.
+ * Этим читает дисплей: панель досылает ему `displayColors || {}` без
+ * запасного пути (panel-colors.loadWindowColors), main помнит и шлёт при
+ * открытии, значит осевшее состояние дисплея без своего ключа — CSS-умолчание.
+ * Запасной путь на timerColors здесь давал первый кадр в цветах ВИДЖЕТА и
+ * затем скачок к умолчанию на самом частом профиле.
+ *
+ * @param {{getItem(key: string): string|null}|null|undefined} storage
+ * @param {string} key
+ * @returns {object|null}
+ */
+function storedColors(storage, key) {
+    if (!storage || !key) { return null; }
+    const raw = storage.getItem(key);
+    if (!raw || typeof raw !== 'string') { return null; }
+    try {
+        const value = JSON.parse(raw);
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Цвета ВИДЖЕТА на старте: свой ключ, а без него — запасной путь на
+ * `timerColors` (профиль старше поканальных цветов).
+ *
+ * Запасной путь здесь законен, потому что панель досылает виджету ту же
+ * формулу (`widget || legacy`, panel-colors.loadWindowColors зовёт эту же
+ * функцию): первый кадр совпадает с осевшим. У дисплея досылка другая —
+ * он читает storedColors.
+ *
+ * Своё значение — объект, включая {} («всё по CSS»): пустой объект — это не
+ * отсутствие, иначе сброшенные цвета воскресали бы старыми.
  *
  * Хранилище — параметром: функция чистая, тест подсовывает поддельное.
  *
@@ -553,18 +582,7 @@ const LEGACY_COLORS_KEY = 'timerColors';
  */
 function ownColors(storage, ownKey) {
     if (!storage || !ownKey) { return null; }
-    const parse = (raw) => {
-        if (!raw || typeof raw !== 'string') { return null; }
-        try {
-            const value = JSON.parse(raw);
-            return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-        } catch {
-            return null;
-        }
-    };
-    const own = parse(storage.getItem(ownKey));
-    if (own) { return own; }
-    return parse(storage.getItem(LEGACY_COLORS_KEY));
+    return storedColors(storage, ownKey) || storedColors(storage, LEGACY_COLORS_KEY);
 }
 
 /**
@@ -1034,6 +1052,7 @@ const RendererShared = {
     timerColorBand,
     pickOwnSetting,
     ownColors,
+    storedColors,
     LEGACY_COLORS_KEY,
     endsAt,
     relativeLuminance,

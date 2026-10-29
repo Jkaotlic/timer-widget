@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
 const {
-    openDisplay, closeDisplay, waitForWidget, waitForWidgetGone
+    openDisplay, closeDisplay, waitForWidget, waitForWidgetGone, waitForSteady
 } = require('./window-ready');
 
 /**
@@ -101,16 +101,30 @@ test('дисплей: первый кадр — цвета displayColors, а н�
     expect(dropped, 'досылка display-colors-update не перехвачена').toBeGreaterThan(0);
 });
 
-test('дисплей, профиль старше поканальных цветов: только timerColors → он', async () => {
+test('дисплей, профиль старше поканальных цветов: первый кадр = осевший (без запасного пути)', async () => {
+    // Панель досылает дисплею `displayColors || {}` — без timerColors, — и
+    // осевшее состояние такого профиля есть CSS-умолчание. Запасной путь на
+    // timerColors давал вспышку цветов ВИДЖЕТА до досылки на самом частом
+    // профиле (меняли только цвета виджета). Сравниваем с ОСЕВШИМ значением,
+    // а не с литералом: то, к чему окно приходит, задаёт досылка панели.
     await seed({ timerColors: { timer: BLUE } });
     const unblock = await blockChannel('display-colors-update');
+    let display;
+    let first;
     try {
-        const display = await openDisplay(app, control);
-        expect(await display.evaluate(readTimerColor)).toBe(BLUE);
-        await closeDisplay(app, control);
+        display = await openDisplay(app, control);
+        first = await display.evaluate(readTimerColor);
     } finally {
         await unblock().catch(() => {});
     }
+    // Досылка с ЭТИМ профилем: панель раскладывает цвета заново и шлёт их тем
+    // же путём, что на старте; main передаёт их открытому дисплею.
+    await control.evaluate(() => window.timerController.loadWindowColors());
+    const settled = await waitForSteady(display, readTimerColor, { name: '--timer-color дисплея' });
+    console.log(`[first-frame] old profile: first = '${first}', settled = '${settled}'`);
+    expect(first, 'первый кадр дисплея обязан совпасть с осевшим').toBe(settled);
+    expect(first, 'дисплей взял timerColors виджета').not.toBe(BLUE);
+    await closeDisplay(app, control);
 });
 
 test('дисплей: displayColors = {} — свой ключ («всё по CSS»), timerColors не берётся', async () => {

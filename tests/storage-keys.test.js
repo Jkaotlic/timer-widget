@@ -38,9 +38,9 @@ function runtimeFiles() {
 const READ_PATTERNS = [
     /localStorage\.getItem\(\s*['"]([^'"]+)['"]/g,
     /safeGetJSON\(\s*\w+,\s*['"]([^'"]+)['"]/g,
-    // Цвета окна на старте: renderer-shared.ownColors(storage, 'ключ') читает
-    // переданный ключ сам — литерал стоит в окне, getItem рядом нет.
-    /ownColors\(\s*\w+,\s*['"]([^'"]+)['"]/g
+    // Цвета окна на старте: renderer-shared.ownColors / storedColors(storage,
+    // 'ключ') читают переданный ключ сами — литерал стоит в окне, getItem нет.
+    /(?:ownColors|storedColors)\(\s*\w+,\s*['"]([^'"]+)['"]/g
 ];
 const WRITE_PATTERNS = [
     /localStorage\.(?:setItem|removeItem)\(\s*['"]([^'"]+)['"]/g,
@@ -66,6 +66,7 @@ function constBindings(src) {
 // писатель у ключа есть; сузив шаблон до имени `localStorage`, реестр объявил
 // бы такой ключ «объявлен, но не используется».
 const READ_VIA_CONST = /\b[A-Za-z_$][\w$]*\.getItem\(\s*([A-Za-z_$][\w$]*)\s*\)/g;
+const COLORS_VIA_CONST = /\b(?:ownColors|storedColors)\(\s*\w+,\s*([A-Za-z_$][\w$]*)\s*\)/g;
 const WRITE_VIA_CONST = /(?:\b[A-Za-z_$][\w$]*\.(?:setItem|removeItem)|_safeSetItem)\(\s*([A-Za-z_$][\w$]*)\s*[,)]/g;
 
 function collect() {
@@ -87,6 +88,12 @@ function collect() {
 
         const bindings = constBindings(src);
         for (const m of src.matchAll(READ_VIA_CONST)) {
+            const key = bindings.get(m[1]);
+            if (key) { note(reads, key, file); }
+        }
+        // Ключ константой у цветов окна: ownColors зовёт
+        // storedColors(storage, LEGACY_COLORS_KEY) — это чтение timerColors.
+        for (const m of src.matchAll(COLORS_VIA_CONST)) {
             const key = bindings.get(m[1]);
             if (key) { note(reads, key, file); }
         }
@@ -161,7 +168,7 @@ test('реестр заморожен и содержит только стро�
     }
 });
 
-test('timerColors — только для отката: пишет панель, читает лишь запасной путь ownColors', () => {
+test('timerColors — только для отката: пишет панель, читает лишь запасной путь ownColors (виджет)', () => {
     // Статус ключа (constants.js, TIMER_COLORS). До 29.10.2026 его читали
     // дисплей и виджет — и дисплей открывался в цветах виджета. Новый читатель
     // здесь значит, что ключ снова стал чьей-то настройкой.
@@ -175,7 +182,7 @@ test('timerColors — только для отката: пишет панель,
     // иначе пустое «читатели timerColors» значило бы и «чисто», и «шаблон не
     // работает».
     assert.ok((reads.get('displayColors') || new Set()).has('display-script.js'),
-        'сканер не видит чтение displayColors дисплеем через ownColors');
+        'сканер не видит чтение displayColors дисплеем через storedColors');
     assert.ok((reads.get('widgetColors') || new Set()).has('widget-app.js'),
         'сканер не видит чтение widgetColors виджетом через ownColors');
 });

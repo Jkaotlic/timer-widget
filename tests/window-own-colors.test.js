@@ -14,7 +14,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ownColors, LEGACY_COLORS_KEY } = require('../renderer-shared');
+const fs = require('node:fs');
+const path = require('node:path');
+const { ownColors, storedColors, LEGACY_COLORS_KEY } = require('../renderer-shared');
+const { codeOnly } = require('./helpers/source-scan');
 
 function store(entries) {
     const map = new Map(Object.entries(entries));
@@ -67,4 +70,33 @@ test('свой ключ — массив или примитив → не объ
     const s = store({ displayColors: '[1,2]', timerColors: WIDGET });
     assert.deepEqual(ownColors(s, 'displayColors'), { timer: '#ff0000' });
     assert.deepEqual(ownColors(store({ displayColors: '42', timerColors: WIDGET }), 'displayColors'), { timer: '#ff0000' });
+});
+
+// ---------------------------------------------------------------------------
+// Дисплей: ТОЛЬКО свой ключ, без запасного пути.
+//
+// Панель досылает дисплею `displayColors || {}` — без запасного пути на
+// timerColors (panel-colors.loadWindowColors), main помнит это и шлёт при
+// открытии. Значит осевшее состояние дисплея без своего ключа — CSS-умолчание,
+// и первый кадр обязан совпасть с ним. Запасной путь давал вспышку цветов
+// виджета на самом частом профиле (меняли только цвета виджета).
+// ---------------------------------------------------------------------------
+
+test('storedColors: свой ключ → объект; нет / битый / массив → null; timerColors НЕ берётся', () => {
+    assert.deepEqual(storedColors(store({ displayColors: DISPLAY }), 'displayColors'), { timer: '#00ff00' });
+    assert.deepEqual(storedColors(store({ displayColors: '{}' }), 'displayColors'), {});
+    assert.equal(storedColors(store({ timerColors: WIDGET }), 'displayColors'), null);
+    assert.equal(storedColors(store({ displayColors: '{не json', timerColors: WIDGET }), 'displayColors'), null);
+    assert.equal(storedColors(store({ displayColors: '[1]' }), 'displayColors'), null);
+    assert.equal(storedColors(null, 'displayColors'), null);
+});
+
+test('дисплей читает цвета storedColors(displayColors), а не ownColors с запасным путём', () => {
+    const read = (f) => codeOnly(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
+    const OWN = /\bownColors\s*\(/;
+    // Самопроверка регулярки: вызов ownColors в виджете она обязана видеть.
+    assert.match(read('widget-app.js'), OWN, 'регулярка не видит ownColors( в виджете — тест слеп');
+    const display = read('display-script.js');
+    assert.doesNotMatch(display, OWN, 'дисплей снова берёт запасной путь на timerColors');
+    assert.match(display, /storedColors\(\s*localStorage,\s*'displayColors'\s*\)/);
 });
