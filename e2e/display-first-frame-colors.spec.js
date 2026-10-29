@@ -92,9 +92,13 @@ test('дисплей: первый кадр — цвета displayColors, а н�
         expect(color, 'дисплей обязан краситься СВОИМ ключом displayColors').toBe(GREEN);
         await closeDisplay(app, control);
     } finally {
-        dropped = await unblock();
+        // Не маскировать исходный сбой, если приложение уже упало.
+        dropped = await unblock().catch(() => undefined);
     }
     console.log(`[first-frame] перехвачено досылок display-colors-update: ${dropped}`);
+    // Самопроверка: досылка БЫЛА и была перехвачена. Иначе сломанный перехват
+    // оставлял бы тест зелёным, проверяя уже не первый кадр.
+    expect(dropped, 'досылка display-colors-update не перехвачена').toBeGreaterThan(0);
 });
 
 test('дисплей, профиль старше поканальных цветов: только timerColors → он', async () => {
@@ -105,7 +109,7 @@ test('дисплей, профиль старше поканальных цве�
         expect(await display.evaluate(readTimerColor)).toBe(BLUE);
         await closeDisplay(app, control);
     } finally {
-        await unblock();
+        await unblock().catch(() => {});
     }
 });
 
@@ -117,7 +121,7 @@ test('дисплей: displayColors = {} — свой ключ («всё по CS
         expect(await display.evaluate(readTimerColor)).toBe('');
         await closeDisplay(app, control);
     } finally {
-        await unblock();
+        await unblock().catch(() => {});
     }
 });
 
@@ -126,6 +130,7 @@ test('виджет: первый кадр — цвета widgetColors, а не t
     // руками: проверяется, КАКОЙ ключ окно читает.
     await seed({ widgetColors: { timer: RED }, timerColors: { timer: BLUE } });
     const unblock = await blockChannel('widget-colors-update');
+    let dropped;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
         const widget = await waitForWidget(app);
@@ -133,6 +138,8 @@ test('виджет: первый кадр — цвета widgetColors, а не t
         await control.evaluate(() => window.ipcRenderer.send('close-widget'));
         await waitForWidgetGone(app);
     } finally {
-        await unblock();
+        dropped = await unblock().catch(() => undefined);
     }
+    console.log(`[first-frame] перехвачено досылок widget-colors-update: ${dropped}`);
+    expect(dropped, 'досылка widget-colors-update не перехвачена').toBeGreaterThan(0);
 });
