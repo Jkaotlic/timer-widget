@@ -482,7 +482,8 @@ const PanelStateMixin = {
     // исполнения: тумблер щёлкает, на экране не меняется ничего.
     updateStyleDependentRows() {
         const widgetStyle = this.timerStyleEl.value;
-        const clockStyle = this.syncClockStyle ? widgetStyle : this.clockStyleEl.value;
+        // Действующий стиль часов — одна формула, panel-clock.js.
+        const clockStyle = this.effectiveClockStyle();
         const rows = [
             [this.widgetDigitsFontRowEl, widgetStyle],
             [this.clockDigitsFontRowEl, clockStyle],

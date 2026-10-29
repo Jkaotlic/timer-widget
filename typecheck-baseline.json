@@ -124,9 +124,6 @@
     "TS2339: Property 'minWindowWidth' does not exist on type '{}'.": 1,
     "TS2339: Property 'screenMargin' does not exist on type '{}'.": 1
   },
-  "panel-reset.js": {
-    "TS2345: Argument of type '{ initResetButtons(): void; resetWindowSettings(target: any): void; pushResetTarget(target: any): void; }' is not assignable to parameter of type 'Record<string, { checked: boolean; value: string; }>'.": 1
-  },
   "panel-state.js": {
     "TS2339: Property 'dataset' does not exist on type 'Element'.": 2,
     "TS2339: Property 'options' does not exist on type 'HTMLElement'.": 1,

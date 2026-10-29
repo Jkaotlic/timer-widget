@@ -253,6 +253,7 @@ test('ползунок прозрачности не отключается из
 /* ─────────────── ряды настроек, применимых не ко всем стилям ──────────────── */
 
 const PanelStateMixin = require('../panel-state');
+const { PanelClockMixin } = require('../panel-clock');
 
 // Поддельный документ: модулю нужны только getElementById и .style.display.
 function fakeRowsDoc() {
@@ -274,7 +275,7 @@ function fakeRowsHost(widgetStyle, clockStyle, sync) {
         widgetDigitsFontRowEl: { style: {} },
         clockDigitsFontRowEl: { style: {} },
         displayDigitsFontRowEl: { style: {} }
-    }, PanelStateMixin);
+    }, PanelStateMixin, { effectiveClockStyle: PanelClockMixin.effectiveClockStyle });
     return { host, doc };
 }
 

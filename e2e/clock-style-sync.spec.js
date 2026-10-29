@@ -393,7 +393,10 @@ test('под синхронизацией панель пишет часам с�
             document.querySelector('#timerStyle button[data-val="circle"]').click();
             document.querySelector('#clockStyle button[data-val="circle"]').click();
         }).catch(() => {});
-        await control.waitForTimeout(400);
+        // Ждём УСЛОВИЕМ, что возврат дошёл до профиля, а не паузой.
+        await expect.poll(() => readClockStored(control).then((s) => s.clockStyle),
+            { message: 'возврат стиля часов не дошёл до профиля' }).toBe('circle')
+            .catch(() => {});
         await app.close();
     }
 });

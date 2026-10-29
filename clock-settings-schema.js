@@ -36,15 +36,33 @@ const CLOCK_SETTINGS = [
 ];
 
 /**
+ * Контрол строки таблицы, как его видит модуль: галочка — `.checked`, список —
+ * `.value`. Владелец ссылок — любой объект (в окне это контроллер панели с
+ * сотней других полей), поэтому параметр — `object`, а сужение — здесь.
+ * @typedef {{checked?: boolean, value?: string}} ClockControl
+ */
+
+/**
+ * Контрол строки у владельца ссылок или undefined.
+ * @param {object} els
+ * @param {string} name
+ * @returns {ClockControl|undefined}
+ */
+function controlOf(els, name) {
+    const el = els ? /** @type {Record<string, unknown>} */ (els)[name] : undefined;
+    return el && typeof el === 'object' ? /** @type {ClockControl} */ (el) : undefined;
+}
+
+/**
  * Читает состояние контролов в объект настроек.
- * @param {Record<string, {checked: boolean, value: string}>} els — владелец ссылок на элементы
+ * @param {object} els — владелец ссылок на элементы (поля с именами из `el` таблицы)
  * @returns {Record<string, boolean|string>}
  */
 function collectClockSettings(els) {
     /** @type {Record<string, boolean|string>} */
     const out = {};
     for (const row of CLOCK_SETTINGS) {
-        const el = els[row.el];
+        const el = controlOf(els, row.el);
         if (row.kind === 'value') {
             out[row.key] = el ? el.value : row.def;
         } else {
@@ -61,13 +79,13 @@ function collectClockSettings(els) {
  * умолчание из таблицы. Проверка именно на undefined: `false` и `''` —
  * сохранённый выбор пользователя, и подменять его умолчанием нельзя.
  *
- * @param {Record<string, {checked: boolean, value: string}>} els
+ * @param {object} els — владелец ссылок на элементы
  * @param {Record<string, unknown>} stored
  */
 function applyClockSettings(els, stored) {
     const src = (stored && typeof stored === 'object') ? stored : {};
     for (const row of CLOCK_SETTINGS) {
-        const el = els[row.el];
+        const el = controlOf(els, row.el);
         if (!el) { continue; }
         // Проверка именно на undefined: сохранённые `false` и '' — это выбор
         // пользователя, подменять его умолчанием нельзя.

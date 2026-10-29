@@ -53,7 +53,7 @@ const PanelClockMixin = {
         // Ключ, контрол и умолчание описаны ОДНОЙ строкой таблицы в
         // clock-settings-schema.js. Здесь остаётся то, что таблица
         // выразить не может: деления циферблата и запись в хранилище.
-        const persisted = window.ClockSettingsSchema.collectClockSettings(/** @type {any} */ (this));
+        const persisted = window.ClockSettingsSchema.collectClockSettings(this);
 
         // Деления — настройка ОБЩАЯ с виджетом, у неё свои ключи, и
         // восстанавливают её сами окна. Поэтому в хранилище часов она не
@@ -71,7 +71,7 @@ const PanelClockMixin = {
     },
 
     loadClockSettings() {
-        window.ClockSettingsSchema.applyClockSettings(/** @type {any} */ (this), readClockStored());
+        window.ClockSettingsSchema.applyClockSettings(this, readClockStored());
         // Деления — свой ключ вне clockWidgetSettings. Перечитываются
         // здесь же: эту раскладку зовёт и применение пресета, и без
         // строки тумблер после пресета показывал прежнее значение.
