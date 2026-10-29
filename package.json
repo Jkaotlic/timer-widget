@@ -188,6 +188,7 @@
       "main-storage-migration.js",
       "ipc-senders.js",
       "relay-payload.js",
+      "relay-store.js",
       "drop-guard.js",
       "settings-schema.js",
       "clock-settings-schema.js",

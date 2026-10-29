@@ -9,7 +9,8 @@
 | Файл | Отвечает за |
 |------|-------------|
 | `electron-main.js` | Точка входа. Порядок: гард `ELECTRON_RUN_AS_NODE`, гард ключей отладки (SEC-04) — ДО любого локального `require`, журнал, краш-обработчики, ключи Chromium, привилегии схемы `app` и снимок «было ли хранилище» (до первого касания сессии), общее состояние, обвязка IPC (SEC-07), `web-contents-created` (SEC-06), сборка модулей |
-| `main-state.js` | ОДИН владелец изменяемого состояния: реестр окон (`windows.controlWindow` …), память ретрансляторов (`relay.lastDisplaySettings` …), `flags.isQuitting`. Объекты запечатаны |
+| `main-state.js` | ОДИН владелец изменяемого состояния: реестр окон (`windows.controlWindow` …), память ретрансляторов (`relay.lastDisplaySettings` …, `relay.uiTheme`, `relay.uiLocked`), `flags.isQuitting`. Объекты запечатаны |
+| `relay-store.js` | Память ретрансляторов в `userData/relay-state.json` (чистый, без electron): чтение до окон, запись склейкой 500 мс и на выходе, удаление при сбросе. Проверка файла — правилами `relay-payload.js`, картинка фона не пишется |
 | `main-window-closing.js` | Закрывающееся окно ≠ открытое: `markClosing`, `isUsableWindow`, ОДИН реестр отложенных открытий, `closeDisplayWindow` (выход из полноэкранного по событию + страховка) |
 | `main-geometry.js` | `moveWindowBy` / `resizeWindowClamped` / `positionWindowClamped`, отчёт `window-geometry` и по своим событиям окна |
 | `main-window-hooks.js` | Что получает каждое окно: `hardenWindow`, запрет масштаба страницы, журнал рендерера, перезагрузка после падения, снимок состояния окон, `announceWindowOpened` |
@@ -23,7 +24,7 @@
 | `main-relay-ipc.js` | Ретрансляторы: цвета, стиль, настройки дисплея и часов, тема, замок, масштаб, блоки, раскладка, пресет, звук |
 | `main-app-protocol.js` | Ответ схемы `app://timer-widget/` для `protocol.handle`: чтение файла, Response с заголовками. Что отдавать и как — чистый `app-scheme.js` (SEC-12) |
 | `main-storage-migration.js` | Разовый перенос localStorage `file://` → `app://` до первого окна: скрытое окно без моста, метка `storage-migration.json`, повтор при сбое |
-| `main-lifecycle.js` | Единственный экземпляр, старт (схема → накопитель → восстановление → перенос настроек → панель → трей), `before-quit`, `window-all-closed` |
+| `main-lifecycle.js` | Единственный экземпляр, старт (память ретрансляторов — синхронно, до `whenReady` → схема → накопитель → восстановление → перенос настроек → панель → трей), `before-quit`/`will-quit` (запись памяти), `window-all-closed` |
 
 ## Правила
 

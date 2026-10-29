@@ -16,6 +16,7 @@ function makeDeps({ platform = 'darwin' } = {}) {
     const all = [];
     let created = 0;
     const menus = [];
+    const order = [];
     const makeControl = () => {
         const win = {
             _visible: true, _focused: 0, _minimized: false,
@@ -59,8 +60,12 @@ function makeDeps({ platform = 'darwin' } = {}) {
             stopPeriodicSave: () => {}, clearSavedTimerState: () => {}, persistRecoverySnapshot: () => {}
         },
         events: { loadOnStart: () => {}, foldPendingOnStart: () => {}, closeTalkOnQuit: () => {} },
+        relayStore: {
+            loadOnStart: () => { order.push('relay-load'); },
+            flush: () => { order.push('relay-flush'); }
+        },
         creators: {
-            createControlWindow: makeControl,
+            createControlWindow: () => { order.push('control'); return makeControl(); },
             createWidgetWindow: () => {}, createClockWidgetWindow: () => {}, createDisplayWindow: () => {}
         },
         tray: { createTray: () => {} },
@@ -69,7 +74,7 @@ function makeDeps({ platform = 'darwin' } = {}) {
         startupT0: Date.now(),
         platform
     };
-    return { deps, appHandlers, windows, menus, createdCount: () => created };
+    return { deps, appHandlers, windows, menus, order, createdCount: () => created };
 }
 
 async function until(cond) {
@@ -145,4 +150,28 @@ test('MAIN-10: на Windows и Linux меню приложения по-преж
 test('MAIN-10: проверка себя — зонд видит роль инструментов разработчика', () => {
     assert.deepEqual(flatRoles([{ role: 'appMenu' }, { label: 'V', submenu: [{ role: 'toggleDevTools' }] }]),
         ['appMenu', 'toggleDevTools']);
+});
+
+test('память ретрансляторов читается ДО первого окна, а на выходе пишется', async () => {
+    // Окно, открытое до досылки панели (из трея, клавишей), получает снимок из
+    // памяти — значит, память обязана быть заполнена раньше любого окна.
+    const h = makeDeps();
+    startApp(h.deps);
+    await until(() => h.appHandlers.has('activate'));
+    assert.deepEqual(h.order.slice(0, 2), ['relay-load', 'control']);
+    assert.equal(h.order.filter((x) => x === 'relay-load').length, 1);
+
+    h.appHandlers.get('before-quit')({ preventDefault() {} });
+    assert.ok(h.order.includes('relay-flush'), 'before-quit не записал отложенное');
+});
+
+test('второй экземпляр файл памяти не читает и не пишет', async () => {
+    const h = makeDeps();
+    let quit = 0;
+    h.deps.app.requestSingleInstanceLock = () => false;
+    h.deps.app.quit = () => { quit++; };
+    startApp(h.deps);
+    await new Promise((r) => setImmediate(r));
+    assert.equal(quit, 1);
+    assert.ok(!h.order.includes('relay-load'));
 });

@@ -119,6 +119,14 @@ function bindThemeToggle({ doc, ipc, theme, buttonId = 'contrastToggle' }) {
 
     sync(theme.readTheme());
     button.addEventListener('click', () => set(theme.nextTheme(theme.readTheme())));
+
+    // Тема уезжает и при старте панели — как замок выше. Главный процесс помнит
+    // её (relay.uiTheme) и досылает окнам при открытии, а память переживает
+    // перезапуск (relay-store.js): без этой посылки устаревшее значение файла
+    // (откат на старую версию, ручная правка профиля) не поправил бы никто.
+    if (ipc && typeof ipc.send === 'function') {
+        ipc.send('ui-theme-update', { theme: theme.readTheme() });
+    }
     return { set };
 }
 

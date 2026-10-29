@@ -32,6 +32,8 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  * @param {object} deps.timer — main-timer.js
  * @param {object} deps.recoverySnapshot — main-recovery.js
  * @param {object} deps.events — main-event-overrun.js
+ * @param {{loadOnStart: Function, flush: Function}} deps.relayStore — память
+ *        ретрансляторов в файле (relay-store.js)
  * @param {object} deps.creators — main-windows.js
  * @param {object} deps.tray — main-tray.js
  * @param {boolean} deps.inTestMode
@@ -43,7 +45,7 @@ function startApp(deps) {
     const {
         app, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
         registerProtocol, prepareStorage,
-        windows, flags, timer, recoverySnapshot, events, creators, tray
+        windows, flags, timer, recoverySnapshot, events, relayStore, creators, tray
     } = deps;
     const __inTestMode = deps.inTestMode;
     const __screenshotMode = deps.screenshotMode;
@@ -93,7 +95,13 @@ function startApp(deps) {
         // re-create the recovery file after we delete it.
         recoverySnapshot.stopPeriodicSave();
         recoverySnapshot.clearSavedTimerState();
+        // Память ретрансляторов пишется с задержкой-склейкой — отложенное
+        // дописывается здесь, иначе последняя правка перед выходом терялась бы.
+        relayStore.flush();
     });
+
+    // Посылка, пришедшая уже после before-quit (окна закрываются), — тоже в файл.
+    app.on('will-quit', () => { relayStore.flush(); });
 
     // Single-instance lock: a tray utility with autostart is easy to launch twice.
     // A duplicate instance would spawn a second tray + timer and race the shared
@@ -117,6 +125,10 @@ function startApp(deps) {
         app.quit();
     } else {
         app.on('second-instance', revealControlWindow);
+        // Память ретрансляторов — ДО любого окна, синхронно и раньше whenReady:
+        // окно, открытое до первой посылки панели (из трея, клавишей), получает
+        // снимок из неё (relay-store.js). Второй экземпляр файл не трогает.
+        relayStore.loadOnStart();
     }
 
     app.whenReady().then(async () => {

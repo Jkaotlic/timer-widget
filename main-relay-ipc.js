@@ -55,8 +55,10 @@ const UI_THEME_VALUES = new Set(['dark', 'light']);
  * @param {object} deps.log
  * @param {() => void} deps.applyWidgetMinimumSize — main-windows.js
  * @param {(on: boolean) => void} deps.applyWidgetAlwaysOnTop — main-windows.js
+ * @param {() => void} deps.persistRelay — память изменилась: склеенная запись
+ *        в relay-state.json (relay-store.js). Зовётся после КАЖДОЙ записи в relay.
  */
-function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, applyWidgetMinimumSize, applyWidgetAlwaysOnTop }) {
+function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, applyWidgetMinimumSize, applyWidgetAlwaysOnTop, persistRelay }) {
     // Проверенная копия payload канала-ретранслятора или null — «не принимать»
     // (SEC-10). Правило одно на все ретрансляторы и живёт в relay-payload.js:
     // то, что главный процесс запоминает в last* и досылает окнам при открытии,
@@ -74,6 +76,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         const colors = acceptRelay('widget-colors-update', payload);
         if (colors === null) { return; }
         relay.lastWidgetColors = colors;
+        persistRelay();
         safelySendToWindow(windows.widgetWindow, 'widget-colors-update', colors);
         safelySendToWindow(windows.controlWindow, 'widget-colors-update', colors);
     });
@@ -82,6 +85,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         const colors = acceptRelay('clock-colors-update', payload);
         if (colors === null) { return; }
         relay.lastClockColors = colors;
+        persistRelay();
         safelySendToWindow(windows.clockWidgetWindow, 'clock-colors-update', colors);
     });
 
@@ -89,6 +93,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         const colors = acceptRelay('display-colors-update', payload);
         if (colors === null) { return; }
         relay.lastDisplayColors = colors;
+        persistRelay();
         safelySendToWindow(windows.displayWindow, 'display-colors-update', colors);
     });
 
@@ -97,6 +102,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         const settings = acceptRelay('widget-style-update', payload);
         if (settings === null) { return; }
         relay.lastWidgetStyle = settings;
+        persistRelay();
         // Пол размера окна одинаков для всех стилей: полоса была только у LED, а
         // он слит с «Цифрами». Вызов оставлен здесь, потому что окно могло быть
         // создано раньше — пол ставится ровно один раз и в одном месте.
@@ -113,6 +119,8 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         // Сохраняем настройки для синхронизации при открытии новых окон. Картинка
         // фона едет только при смене (BUG-10): без ключа запомненная остаётся.
         relay.lastDisplaySettings = mergeDisplaySettings(relay.lastDisplaySettings, settings);
+        // В файл картинка не идёт (relay-store.js): она живёт в localStorage.
+        persistRelay();
 
         // Открытым окнам — ровно пришедшее: дисплей держит свою копию картинки,
         // и 13 МБ на каждое нажатие клавиши не едут и отсюда. Часам фон не нужен.
@@ -137,7 +145,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         // относятся к тому, что запомнено, а не к одному сообщению.
         const merged = sanitizeRelayPayload('clock-widget-settings',
             Object.assign({}, relay.lastClockSettings, settings));
-        if (merged !== null) { relay.lastClockSettings = merged; }
+        if (merged !== null) { relay.lastClockSettings = merged; persistRelay(); }
         safelySendToWindow(windows.clockWidgetWindow, 'clock-settings', settings);
     });
 
@@ -199,6 +207,10 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         if (!isPayloadObject(payload)) { return; }
         const theme = payload.theme;
         if (typeof theme !== 'string' || !UI_THEME_VALUES.has(theme)) { return; }
+        // Запоминается, как цвета: окно, открытое позже, получает тему снимком
+        // (main-windows.js), а не только потому, что localStorage общий.
+        relay.uiTheme = theme;
+        persistRelay();
         for (const win of [windows.controlWindow, windows.widgetWindow, windows.displayWindow, windows.clockWidgetWindow]) {
             safelySendToWindow(win, 'ui-theme-update', { theme });
         }
@@ -212,6 +224,8 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         if (!isPayloadObject(payload)) { return; }
         const locked = payload.locked;
         if (typeof locked !== 'boolean') { return; }
+        relay.uiLocked = locked;
+        persistRelay();
         for (const win of [windows.controlWindow, windows.widgetWindow, windows.displayWindow, windows.clockWidgetWindow]) {
             safelySendToWindow(win, 'ui-lock-update', { locked });
         }

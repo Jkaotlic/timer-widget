@@ -50,6 +50,7 @@ function makeDeps(session) {
             stopPeriodicSave: () => {}, clearSavedTimerState: () => {}, persistRecoverySnapshot: () => {}
         },
         events: { loadOnStart: () => {}, foldPendingOnStart: () => {}, closeTalkOnQuit: () => {} },
+        relayStore: { loadOnStart: () => {}, flush: () => {} },
         creators: {
             createControlWindow: () => {
                 windows.controlWindow = { webContents: { once: () => {} } };

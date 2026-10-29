@@ -77,6 +77,35 @@ function createWindows(deps) {
             : path.join(__dirname, 'build', 'icon.png');
     }
 
+    /**
+     * Тема и замок — снимком окну при загрузке, как цвета: величины одни на все
+     * окна, и окно, открытое после переключения (или после перезапуска, до
+     * посылок панели), иначе узнавало бы о них только из общего localStorage.
+     * Панели не шлётся: она их владелец, а замок её мост и не слушает.
+     */
+    function sendUiSnapshot(win) {
+        if (relay.uiTheme) {
+            safelySendToWindow(win, 'ui-theme-update', { theme: relay.uiTheme });
+        }
+        if (typeof relay.uiLocked === 'boolean') {
+            safelySendToWindow(win, 'ui-lock-update', { locked: relay.uiLocked });
+        }
+    }
+
+    /**
+     * «Поверх всех окон» при СОЗДАНИИ виджета — из запомненного стиля.
+     *
+     * До 29.10.2026 виджет всегда рождался поверх окон, а выключенная настройка
+     * доезжала лишь с посылкой панели через 600 мс после её старта: виджет,
+     * открытый раньше (из трея, клавишей), висел поверх вопреки ей. Память
+     * теперь переживает перезапуск (relay-store.js), и уровень берётся из неё.
+     * Ничего не запомнено — как прежде, поверх (умолчание настройки — true).
+     */
+    function widgetStartsOnTop() {
+        const style = relay.lastWidgetStyle;
+        return !(style && style.alwaysOnTop === false);
+    }
+
     function createControlWindow() {
         const __ctrlT0 = Date.now();
         // Get screen dimensions for adaptive sizing
@@ -170,6 +199,7 @@ function createWindows(deps) {
     function createWidgetWindow() {
         const __widgetT0 = Date.now();
         const { width } = screen.getPrimaryDisplay().workAreaSize;
+        const onTop = !__screenshotMode && widgetStartsOnTop();
 
         windows.widgetWindow = new BrowserWindow({
             width: CONFIG.WIDGET_DEFAULT_WIDTH,
@@ -183,7 +213,7 @@ function createWindows(deps) {
             frame: false,
             transparent: !__screenshotMode,
             backgroundColor: __screenshotMode ? '#1c1c1e' : undefined,
-            alwaysOnTop: !__screenshotMode,
+            alwaysOnTop: onTop,
             skipTaskbar: true,
             resizable: true,
             // Без этой опции macOS поджимает окно к рабочей области: `y` упирался в
@@ -205,8 +235,12 @@ function createWindows(deps) {
         });
         // Уровень задаётся ПОСЛЕ конструктора: в опциях окна его задать нельзя.
         // В режиме съёмки окна намеренно не всплывают, поэтому и уровень не трогаем.
-        if (!__screenshotMode) {
+        if (onTop) {
             windows.widgetWindow.setAlwaysOnTop(true, WINDOW_LEVEL_ABOVE_MENU_BAR);
+        } else if (!__screenshotMode) {
+            // Выключено в запомненном стиле: явно, а не только опцией конструктора
+            // — тот же вызов, что делает applyWidgetAlwaysOnTop при посылке панели.
+            windows.widgetWindow.setAlwaysOnTop(false);
         }
         windows.widgetWindow.loadURL(pageUrl('electron-widget.html')).catch(err => log.error('loadURL failed:', err));
         hardenWindow(windows.widgetWindow);
@@ -228,6 +262,7 @@ function createWindows(deps) {
                 applyWidgetMinimumSize();
                 safelySendToWindow(win, 'widget-style-update', relay.lastWidgetStyle);
             }
+            sendUiSnapshot(win);
         });
 
         windows.widgetWindow.webContents.once('did-finish-load', () => {
@@ -309,6 +344,7 @@ function createWindows(deps) {
             if (relay.lastClockColors) {
                 safelySendToWindow(win, 'clock-colors-update', relay.lastClockColors);
             }
+            sendUiSnapshot(win);
         });
 
         windows.clockWidgetWindow.webContents.once('did-finish-load', () => {
@@ -407,6 +443,7 @@ function createWindows(deps) {
             if (relay.lastDisplayColors) {
                 safelySendToWindow(win, 'display-colors-update', relay.lastDisplayColors);
             }
+            sendUiSnapshot(win);
         });
 
         windows.displayWindow.once('ready-to-show', () => {

@@ -31,8 +31,13 @@ const RELEASES_URL = 'https://github.com/Jkaotlic/timer-widget/releases';
  * @param {object} deps.log
  * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
  * @param {() => void} deps.clearTimerInterval — main-timer.js
+ * @param {() => void} [deps.settleMigration] - метка переноса настроек после
+ *        сброса (main-storage-migration.js)
+ * @param {() => void} [deps.discardRelayState] - «Сбросить всё» стирает и память
+ *        ретрансляторов в файле (relay-store.js), иначе следующий старт
+ *        досылал бы окнам настройки, которых уже нет
  */
-function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval, settleMigration }) {
+function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval, settleMigration, discardRelayState }) {
     // Изменение размера окна управления
     // size.width / size.height опциональны: если поле не передано (или не Finite),
     // соответствующее измерение не меняется. Это нужно, чтобы drawer open/close
@@ -233,6 +238,13 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             if (settleMigration) { settleMigration(); }
         } catch (err) {
             log.warn('метка переноса после сброса не записана:', err && err.message);
+        }
+        // Память ретрансляторов — тоже профиль: удаляется, и выход её не
+        // перезапишет (relay-store.js, discard).
+        try {
+            if (discardRelayState) { discardRelayState(); }
+        } catch (err) {
+            log.warn('память ретрансляторов после сброса не удалена:', err && err.code);
         }
         app.quit();
     });

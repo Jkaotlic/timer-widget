@@ -61,7 +61,6 @@
     "TS2353: Object literal may only specify known properties, and 'anchor' does not exist in type '({ id: string; toggle: string; kind: string; caption: string; labelKey: string; secret?: undefined; } | { id: string; toggle: string; kind: string; caption?: undefined; labelKey?: undefined; secret?: undefined; } | { ...; }) & { ...; }'.": 1
   },
   "electron-main.js": {
-    "TS2353: Object literal may only specify known properties, and 'settleMigration' does not exist in type '{ ipcMain: any; windows: any; screen: any; CONFIG: any; shell: any; app: any; log: any; getSession: () => any; clearTimerInterval: () => void; }'.": 1,
     "TS2740: Type 'Set<string>' is missing the following properties from type 'string[]': length, pop, push, concat, and 24 more.": 1
   },
   "event-overrun-store.js": {
@@ -80,9 +79,6 @@
   "main-app-protocol.js": {
     "TS2339: Property 'reason' does not exist on type '{ ok: true; relPath: string; mime: string; isHtml: boolean; } | { ok: false; status: number; reason: string; }'.": 1,
     "TS2339: Property 'status' does not exist on type '{ ok: true; relPath: string; mime: string; isHtml: boolean; } | { ok: false; status: number; reason: string; }'.": 2
-  },
-  "main-control-ipc.js": {
-    "TS2339: Property 'settleMigration' does not exist on type '{ ipcMain: any; windows: any; screen: any; CONFIG: any; shell: any; app: any; log: any; getSession: () => any; clearTimerInterval: () => void; }'.": 1
   },
   "main-lifecycle.js": {
     "TS2322: Type '{ dispose: Function; }' is not assignable to type '{ dispose: () => void; }'.": 1

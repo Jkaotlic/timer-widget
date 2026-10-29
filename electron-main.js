@@ -198,6 +198,7 @@ const { registerWindowIpc } = require('./main-window-ipc');
 const { registerControlIpc } = require('./main-control-ipc');
 const { registerRelayIpc } = require('./main-relay-ipc');
 const { startApp } = require('./main-lifecycle');
+const { createRelayPersister } = require('./relay-store');
 
 // Logger setup
 //
@@ -345,6 +346,13 @@ app.on('web-contents-created', (_event, contents) => {
 const getUserDataPath = () => app.getPath('userData');
 const getSession = () => require('electron').session;
 
+// Память ретрансляторов в файле userData/relay-state.json (relay-store.js).
+// Стенд съёмки её не читает и не пишет: кадр не должен зависеть от того, чем
+// кончился прошлый прогон (детерминизм стенда, docs/lessons.md).
+const relayStore = createRelayPersister({
+    getUserDataPath, relay, log, disabled: __screenshotMode
+});
+
 const closing = createWindowClosing({ windows });
 const geometry = createWindowGeometry({ screen, CONFIG, safelySendToWindow });
 const hooks = createWindowHooks({
@@ -384,12 +392,14 @@ timer.registerIpc(ipcMain);
 registerControlIpc({
     ipcMain, windows, screen, CONFIG, shell, app, log, getSession,
     clearTimerInterval: () => timer.clearTimerInterval(),
-    settleMigration: () => markSettledAfterReset(app.getPath('userData'))
+    settleMigration: () => markSettledAfterReset(app.getPath('userData')),
+    discardRelayState: () => relayStore.discard()
 });
 registerRelayIpc({
     ipcMain, windows, relay, safelySendToWindow, log,
     applyWidgetMinimumSize: () => creators.applyWidgetMinimumSize(),
-    applyWidgetAlwaysOnTop: (on) => creators.applyWidgetAlwaysOnTop(on)
+    applyWidgetAlwaysOnTop: (on) => creators.applyWidgetAlwaysOnTop(on),
+    persistRelay: () => relayStore.schedule()
 });
 registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, closing, creators, geometry });
 events.registerIpc(ipcMain);
@@ -418,6 +428,6 @@ const prepareStorage = () => migrateStorage({
 startApp({
     app, Menu, powerMonitor, nativeImage, log, safelySendToWindow, getSession,
     registerProtocol, prepareStorage,
-    windows, flags, timer, recoverySnapshot, events, creators, tray,
+    windows, flags, timer, recoverySnapshot, events, relayStore, creators, tray,
     inTestMode: __inTestMode, screenshotMode: __screenshotMode, startupT0: __startupT0
 });

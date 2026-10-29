@@ -21,6 +21,7 @@
     "navigation-guard.js",
     "ipc-senders.js",
     "relay-payload.js",
+    "relay-store.js",
     "channel-validator.js",
     "constants.js",
     "display-layouts.js",

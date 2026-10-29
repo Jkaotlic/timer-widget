@@ -272,3 +272,28 @@ test('лестница поверхностей и шкала объявлены
         assert.match(light, new RegExp(`${token}\\s*:`), `${token} нет в светлой теме`);
     }
 });
+
+test('панель шлёт тему при СТАРТЕ, как замок: память главного процесса не устаревает', () => {
+    // Главный процесс помнит тему (relay.uiTheme) и досылает её окнам при
+    // открытии, а память переживает перезапуск (relay-store.js). Без посылки на
+    // старте устаревшее значение файла (откат версии, ручная правка) досылалось
+    // бы окнам, и поправить его было бы некому.
+    const PanelTitlebar = require('../panel-titlebar.js');
+    const button = {
+        attrs: {}, classList: { toggle() {} },
+        setAttribute(k, v) { this.attrs[k] = v; },
+        addEventListener() {}
+    };
+    const sent = [];
+    const theme = {
+        readTheme: () => 'light', themeLabel: (t) => t,
+        nextTheme: (t) => (t === 'light' ? 'dark' : 'light'),
+        storeTheme: () => {}, applyTheme: () => {}
+    };
+    PanelTitlebar.bindThemeToggle({
+        doc: { getElementById: () => button },
+        ipc: { send: (channel, payload) => sent.push({ channel, payload }) },
+        theme
+    });
+    assert.deepEqual(sent, [{ channel: 'ui-theme-update', payload: { theme: 'light' } }]);
+});

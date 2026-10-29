@@ -24,8 +24,10 @@ const repoRoot = path.join(__dirname, '..');
 
 // --- Заглушки -------------------------------------------------------------
 
-function createStubs() {
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-main-load-'));
+// `userDataDir` — для «перезапуска»: второй главный процесс на том же профиле
+// (память ретрансляторов в файле, relay-store.js).
+function createStubs({ userDataDir: givenUserDataDir } = {}) {
+    const userDataDir = givenUserDataDir || fs.mkdtempSync(path.join(os.tmpdir(), 'timer-main-load-'));
     // Обработчики, как их зарегистрировал главный процесс, — уже С проверкой
     // отправителя (SEC-07). Звать их нужно событием от настоящего окна.
     const ipcRaw = new Map();
@@ -2006,4 +2008,123 @@ test('SEC-12: окно панели, оказавшееся на file://, для
     stubs.ipcRaw.get('get-displays')(eventFrom(control));
     assert.equal(answers(), 1, 'file:// прошёл проверку отправителя');
     assert.ok(stubs.logged.some((l) => /get-displays: чужая страница/.test(l.text)));
+});
+
+// --- Память ретрансляторов переживает перезапуск (relay-store.js) ---------
+
+/** Первая жизнь приложения: панель разослала настройки, приложение вышло. */
+function firstLifeWithSettings() {
+    const stubs = createStubs();
+    loadMain(stubs);
+    const send = (channel, payload) => stubs.ipcHandlers.get(channel)(null, payload);
+    send('widget-colors-update', { timer: '#ff0000', progress: '#00ff00' });
+    send('clock-colors-update', { timer: '#111111' });
+    send('display-colors-update', { bg: '#222222' });
+    send('widget-style-update', { style: 'digits', alwaysOnTop: false });
+    send('display-settings-update', {
+        eventTitle: 'Открытие сезона', overrunPrice: 1000, overrunPeriod: 3,
+        bgLocalImage: 'data:image/png;base64,' + 'A'.repeat(4096)
+    });
+    send('clock-widget-settings', { showDate: true });
+    send('ui-theme-update', { theme: 'light' });
+    send('ui-lock-update', { locked: true });
+    // Выход: отложенная запись обязана случиться здесь, а не «когда-нибудь».
+    stubs.appHandlers.get('before-quit')({ preventDefault() {} });
+    return stubs.userDataDir;
+}
+
+/** Последнее, что ушло ИМЕННО этому окну по каналу. */
+function lastSentTo(stubs, win, channel) {
+    for (let i = stubs.sent.length - 1; i >= 0; i--) {
+        const m = stubs.sent[i];
+        if (m.win === win && m.channel === channel) { return m.payload; }
+    }
+    return null;
+}
+
+test('перезапуск: окно, открытое ДО первой посылки панели, получает полный снимок из файла', () => {
+    const userDataDir = firstLifeWithSettings();
+
+    // Вторая жизнь — тот же профиль, панель ещё не прислала НИЧЕГО.
+    const stubs = createStubs({ userDataDir });
+    loadMain(stubs);
+    const fromPanel = stubs.sent.length;
+    assert.equal(fromPanel, 0, 'до открытия окон главный процесс ничего не слал');
+
+    const widget = openWidget(stubs);
+    // Уровень окна — при СОЗДАНИИ, из сохранённого стиля, а не через 600 мс.
+    assert.equal(widget._alwaysOnTop && widget._alwaysOnTop.flag, false,
+        `виджет встал поверх окон вопреки сохранённой настройке: ${JSON.stringify(widget._alwaysOnTop)}`);
+    widget.webContents.emit('did-finish-load');
+    assert.deepEqual(lastSentTo(stubs, widget, 'widget-colors-update'), { timer: '#ff0000', progress: '#00ff00' });
+    assert.equal(lastSentTo(stubs, widget, 'widget-style-update').alwaysOnTop, false);
+    assert.equal(lastSentTo(stubs, widget, 'display-settings-update').overrunPrice, 1000);
+    assert.deepEqual(lastSentTo(stubs, widget, 'ui-theme-update'), { theme: 'light' });
+    assert.deepEqual(lastSentTo(stubs, widget, 'ui-lock-update'), { locked: true });
+
+    stubs.ipcHandlers.get('open-clock-widget')(null);
+    const clock = liveWindow(stubs, 'clock');
+    clock.webContents.emit('did-finish-load');
+    assert.deepEqual(lastSentTo(stubs, clock, 'clock-settings'), { showDate: true });
+    assert.deepEqual(lastSentTo(stubs, clock, 'clock-colors-update'), { timer: '#111111' });
+    assert.deepEqual(lastSentTo(stubs, clock, 'ui-lock-update'), { locked: true });
+
+    openDisplay(stubs);
+    const display = liveWindow(stubs, 'display');
+    display.webContents.emit('did-finish-load');
+    assert.deepEqual(lastSentTo(stubs, display, 'display-colors-update'), { bg: '#222222' });
+    assert.equal(lastSentTo(stubs, display, 'display-settings-update').eventTitle, 'Открытие сезона');
+    assert.ok(!('bgLocalImage' in lastSentTo(stubs, display, 'display-settings-update')),
+        'картинки в файле нет — и досылка не выдумывает пустую, которая стёрла бы фон окна');
+    assert.deepEqual(lastSentTo(stubs, display, 'ui-theme-update'), { theme: 'light' });
+
+    // Панель — источник правды: её посылка на старте перезаписывает память.
+    stubs.ipcHandlers.get('widget-style-update')(null, { style: 'digits', alwaysOnTop: true });
+    assert.equal(widget._alwaysOnTop.flag, true);
+});
+
+test('перезапуск: выгрузка CSV сразу после старта берёт сохранённую ставку и название', async () => {
+    const userDataDir = firstLifeWithSettings();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'export-relay-'));
+    const target = path.join(dir, 'отчёт.csv');
+    const stubs = createStubs({ userDataDir });
+    stubs.electron.dialog = { showSaveDialog: async () => ({ canceled: false, filePath: target }) };
+    loadMain(stubs);
+    try {
+        stubs.ipcHandlers.get('event-export')(fakeEvent(stubs));
+        await until(() => stubs.lastSent('event-export-done'));
+        const csv = fs.readFileSync(target, 'utf8');
+        assert.match(csv, /Открытие сезона/, 'название мероприятия потеряно');
+        // Ставка в отчёте видна колонкой стоимости: без ставки её нет вовсе
+        // (event-report.js, withMoney).
+        assert.match(csv, /Стоимость/, 'ставка потеряна');
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('«Сбросить всё» удаляет relay-state.json, и выход его не воскрешает', async () => {
+    const userDataDir = firstLifeWithSettings();
+    const file = path.join(userDataDir, 'relay-state.json');
+    assert.ok(fs.existsSync(file), 'первая жизнь обязана записать файл');
+
+    const stubs = createStubs({ userDataDir });
+    let quitted = false;
+    stubs.electron.app.quit = () => { quitted = true; };
+    loadMain(stubs);
+    stubs.ipcRaw.get('reset-and-relaunch')(eventFrom(openControl(stubs)));
+    await until(() => quitted);
+    assert.ok(!fs.existsSync(file), 'файл памяти пережил сброс');
+    stubs.appHandlers.get('before-quit')({ preventDefault() {} });
+    assert.ok(!fs.existsSync(file), 'before-quit после сброса записал файл заново');
+});
+
+test('чистый профиль: файла нет — окна открываются как раньше, без темы и замка в снимке', () => {
+    const stubs = createStubs();
+    loadMain(stubs);
+    const widget = openWidget(stubs);
+    assert.equal(widget._alwaysOnTop.flag, true, 'по умолчанию виджет поверх окон');
+    widget.webContents.emit('did-finish-load');
+    assert.equal(lastSentTo(stubs, widget, 'ui-theme-update'), null);
+    assert.equal(lastSentTo(stubs, widget, 'ui-lock-update'), null);
 });
