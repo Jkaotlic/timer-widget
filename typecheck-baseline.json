@@ -1,37 +1,192 @@
 {
-  "app-scheme.js": 7,
-  "clock-widget-app.js": 11,
-  "color-picker.js": 8,
-  "control-app.js": 103,
-  "custom-sounds.js": 5,
-  "display-script.js": 7,
-  "electron-main.js": 2,
-  "event-overrun-store.js": 1,
-  "flip-card.js": 2,
-  "local-background.js": 8,
-  "main-app-protocol.js": 3,
-  "main-control-ipc.js": 1,
-  "main-lifecycle.js": 1,
-  "main-storage-migration.js": 1,
-  "main-tray.js": 1,
-  "main-window-hooks.js": 1,
-  "main-window-ipc.js": 2,
-  "main-windows.js": 4,
-  "navigation-guard.js": 2,
-  "panel-colors.js": 4,
-  "panel-display.js": 12,
-  "panel-drawer.js": 6,
-  "panel-reset.js": 1,
-  "panel-state.js": 14,
-  "preload.js": 1,
-  "scale-input.js": 5,
-  "scale-report.js": 3,
-  "shortcuts-help.js": 11,
-  "sound-bank.js": 1,
-  "sound-presets.js": 4,
-  "theme-grid.js": 2,
-  "timer-controller.js": 9,
-  "ui-feedback.js": 2,
-  "ui-theme.js": 2,
-  "widget-app.js": 15
+  "app-scheme.js": {
+    "TS2322: Type '{ ok: boolean; status: any; reason: any; }' is not assignable to type '{ ok: true; relPath: string; mime: string; isHtml: boolean; } | { ok: false; status: number; reason: string; }'.": 7
+  },
+  "clock-widget-app.js": {
+    "TS2322: Type 'number' is not assignable to type 'string'.": 2,
+    "TS2339: Property 'alpha' does not exist on type '{}'.": 1,
+    "TS2339: Property 'color' does not exist on type '{}'.": 1,
+    "TS2339: Property 'showAnalogNumbers' does not exist on type 'DisplaySettingsUpdate'.": 2,
+    "TS2339: Property 'widgetDigitalTime' does not exist on type 'ClockWidget'.": 2,
+    "TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.": 2,
+    "TS2769: No overload matches this call.": 1
+  },
+  "color-picker.js": {
+    "TS2339: Property 'getContext' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'height' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'width' does not exist on type 'HTMLElement'.": 2
+  },
+  "control-app.js": {
+    "TS2339: Property '_applyManualTime' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'bindDisplayBlockControls' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'bindDisplayLayouts' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'bindPanelInputs' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'bindSoundDropZone' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'checked' does not exist on type 'HTMLElement'.": 19,
+    "TS2339: Property 'click' does not exist on type 'Element'.": 1,
+    "TS2339: Property 'dataset' does not exist on type 'Element'.": 6,
+    "TS2339: Property 'disabled' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'displayColors' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'focus' does not exist on type 'Element'.": 3,
+    "TS2339: Property 'handleSoundFileUpload' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'heroMode' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'highlightActiveThemes' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'initThemes' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'loadCustomSounds' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'loadWindowColors' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'offsetWidth' does not exist on type 'Element'.": 1,
+    "TS2339: Property 'playCustomSound' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'renderPanelState' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'renderSurfaceControls' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'setHeroMode' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'setupLocalBackground' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'style' does not exist on type 'Element'.": 11,
+    "TS2339: Property 'tagName' does not exist on type 'EventTarget'.": 1,
+    "TS2339: Property 'updateColors' does not exist on type 'TimerController'.": 1,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 29,
+    "TS2345: Argument of type 'HTMLElement' is not assignable to parameter of type 'HTMLInputElement'.": 4,
+    "TS2345: Argument of type 'boolean' is not assignable to parameter of type 'string'.": 1,
+    "TS2345: Argument of type 'this' is not assignable to parameter of type 'Record<string, { checked: boolean; value: string; }>'.": 2,
+    "TS2551: Property 'onDisplayBlockHidden' does not exist on type 'TimerController'. Did you mean '_onBlockHidden'?": 1,
+    "TS2551: Property 'updateDisplaysList' does not exist on type 'TimerController'. Did you mean 'updateDisplay'?": 1,
+    "TS2551: Property 'value' does not exist on type 'string | HTMLElement'. Did you mean 'valueOf'?": 2,
+    "TS2769: No overload matches this call.": 1
+  },
+  "custom-sounds.js": {
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 4,
+    "TS2345: Argument of type 'EventTarget' is not assignable to parameter of type 'Node'.": 1
+  },
+  "display-script.js": {
+    "TS2322: Type 'number' is not assignable to type 'string'.": 3,
+    "TS2339: Property 'showAnalogNumbers' does not exist on type 'Partial<DisplaySettingsUpdate>'.": 2,
+    "TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.": 1,
+    "TS2353: Object literal may only specify known properties, and 'anchor' does not exist in type '({ id: string; toggle: string; kind: string; caption: string; labelKey: string; secret?: undefined; } | { id: string; toggle: string; kind: string; caption?: undefined; labelKey?: undefined; secret?: undefined; } | { ...; }) & { ...; }'.": 1
+  },
+  "electron-main.js": {
+    "TS2353: Object literal may only specify known properties, and 'settleMigration' does not exist in type '{ ipcMain: any; windows: any; screen: any; CONFIG: any; shell: any; app: any; log: any; getSession: () => any; clearTimerInterval: () => void; }'.": 1,
+    "TS2740: Type 'Set<string>' is missing the following properties from type 'string[]': length, pop, push, concat, and 24 more.": 1
+  },
+  "event-overrun-store.js": {
+    "TS2741: Property 'restoredRemaining' is missing in type '{}' but required in type '{ restoredRemaining: number; }'.": 1
+  },
+  "flip-card.js": {
+    "TS2339: Property 'removeAttribute' does not exist on type 'Node'.": 1,
+    "TS2345: Argument of type 'Element' is not assignable to parameter of type 'HTMLElement'.": 1
+  },
+  "local-background.js": {
+    "TS2339: Property 'dataset' does not exist on type 'Element'.": 2,
+    "TS2339: Property 'src' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 3,
+    "TS2345: Argument of type 'string | ArrayBuffer' is not assignable to parameter of type 'string'.": 1
+  },
+  "main-app-protocol.js": {
+    "TS2339: Property 'reason' does not exist on type '{ ok: true; relPath: string; mime: string; isHtml: boolean; } | { ok: false; status: number; reason: string; }'.": 1,
+    "TS2339: Property 'status' does not exist on type '{ ok: true; relPath: string; mime: string; isHtml: boolean; } | { ok: false; status: number; reason: string; }'.": 2
+  },
+  "main-control-ipc.js": {
+    "TS2339: Property 'settleMigration' does not exist on type '{ ipcMain: any; windows: any; screen: any; CONFIG: any; shell: any; app: any; log: any; getSession: () => any; clearTimerInterval: () => void; }'.": 1
+  },
+  "main-lifecycle.js": {
+    "TS2322: Type '{ dispose: Function; }' is not assignable to type '{ dispose: () => void; }'.": 1
+  },
+  "main-storage-migration.js": {
+    "TS2339: Property 'isDestroyed' does not exist on type 'never'.": 1
+  },
+  "main-tray.js": {
+    "TS2351: This expression is not constructable.": 1
+  },
+  "main-window-hooks.js": {
+    "TS2345: Argument of type 'Function' is not assignable to parameter of type '() => void'.": 1
+  },
+  "main-window-ipc.js": {
+    "TS2339: Property 'fromWebContents' does not exist on type 'Function'.": 2
+  },
+  "main-windows.js": {
+    "TS2351: This expression is not constructable.": 4
+  },
+  "navigation-guard.js": {
+    "TS2554: Expected 0 arguments, but got 2.": 2
+  },
+  "panel-colors.js": {
+    "TS2339: Property 'disabled' does not exist on type 'Element'.": 2,
+    "TS2339: Property 'style' does not exist on type 'Element'.": 1,
+    "TS2339: Property 'value' does not exist on type 'Element'.": 1
+  },
+  "panel-display.js": {
+    "TS2322: Type 'string | string[]' is not assignable to type 'string'.": 1,
+    "TS2339: Property 'checked' does not exist on type 'HTMLElement'.": 4,
+    "TS2339: Property 'dataset' does not exist on type 'Element'.": 2,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 5
+  },
+  "panel-drawer.js": {
+    "TS2339: Property 'availWidth' does not exist on type '{}'.": 1,
+    "TS2339: Property 'drawerWidth' does not exist on type '{}'.": 1,
+    "TS2339: Property 'innerWidth' does not exist on type '{}'.": 1,
+    "TS2339: Property 'maxWindowWidth' does not exist on type '{}'.": 1,
+    "TS2339: Property 'minWindowWidth' does not exist on type '{}'.": 1,
+    "TS2339: Property 'screenMargin' does not exist on type '{}'.": 1
+  },
+  "panel-reset.js": {
+    "TS2345: Argument of type '{ initResetButtons(): void; resetWindowSettings(target: any): void; pushResetTarget(target: any): void; }' is not assignable to parameter of type 'Record<string, { checked: boolean; value: string; }>'.": 1
+  },
+  "panel-state.js": {
+    "TS2339: Property 'dataset' does not exist on type 'Element'.": 2,
+    "TS2339: Property 'options' does not exist on type 'HTMLElement'.": 1,
+    "TS2339: Property 'selectedIndex' does not exist on type 'HTMLElement'.": 1,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 8,
+    "TS2551: Property 'select' does not exist on type 'HTMLElement'. Did you mean 'onselect'?": 1,
+    "TS2551: Property 'selectionStart' does not exist on type 'HTMLElement'. Did you mean 'onselectstart'?": 1
+  },
+  "preload.js": {
+    "TS2345: Argument of type 'Function' is not assignable to parameter of type '(event: IpcRendererEvent, ...args: any[]) => void'.": 1
+  },
+  "scale-input.js": {
+    "TS2322: Type 'number' is not assignable to type 'string'.": 5
+  },
+  "scale-report.js": {
+    "TS2339: Property 'max' does not exist on type 'HTMLElement'.": 1,
+    "TS2339: Property 'min' does not exist on type 'HTMLElement'.": 1,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 1
+  },
+  "shortcuts-help.js": {
+    "TS2339: Property '_closeOverlay' does not exist on type 'HTMLDivElement'.": 1,
+    "TS2339: Property '_closeOverlay' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'closest' does not exist on type 'EventTarget'.": 7,
+    "TS2339: Property 'isContentEditable' does not exist on type 'EventTarget'.": 1
+  },
+  "sound-bank.js": {
+    "TS2322: Type 'string' is not assignable to type 'OscillatorType'.": 1
+  },
+  "sound-presets.js": {
+    "TS2339: Property 'options' does not exist on type 'HTMLElement'.": 2,
+    "TS2339: Property 'value' does not exist on type 'HTMLElement'.": 2
+  },
+  "theme-grid.js": {
+    "TS2339: Property 'dataset' does not exist on type 'Element'.": 2
+  },
+  "timer-controller.js": {
+    "TS2339: Property 'allowNegative' does not exist on type '{}'.": 1,
+    "TS2339: Property 'overrunIntervalMinutes' does not exist on type '{}'.": 1,
+    "TS2339: Property 'overrunLimitSeconds' does not exist on type '{}'.": 1,
+    "TS2339: Property 'presetSeconds' does not exist on type 'object'.": 2,
+    "TS2339: Property 'remainingSeconds' does not exist on type 'object'.": 2,
+    "TS2339: Property 'totalSeconds' does not exist on type 'object'.": 2
+  },
+  "ui-feedback.js": {
+    "TS2339: Property 'disabled' does not exist on type 'HTMLElement'.": 2
+  },
+  "ui-theme.js": {
+    "TS2322: Type 'string' is not assignable to type '\"light\" | \"dark\"'.": 2
+  },
+  "widget-app.js": {
+    "TS2322: Type 'number' is not assignable to type 'string'.": 3,
+    "TS2339: Property 'alpha' does not exist on type '{}'.": 1,
+    "TS2339: Property 'color' does not exist on type '{}'.": 1,
+    "TS2339: Property 'dataset' does not exist on type 'Element'.": 3,
+    "TS2339: Property 'showAnalogNumbers' does not exist on type 'DisplaySettingsUpdate'.": 2,
+    "TS2339: Property 'style' does not exist on type 'Element'.": 1,
+    "TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.": 2,
+    "TS2554: Expected 0 arguments, but got 1.": 2
+  }
 }

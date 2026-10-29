@@ -7,34 +7,46 @@
  * Зачем. Проект — vanilla JS без сборщика, и долг типов на старте — около
  * тысячи ошибок (994 в первой базе). Запретить их разом нельзя, а `// @ts-check` по файлам
  * проверяет только размеченное: новый файл без метки не проверяется вовсе.
- * Поэтому tsc гоняется по ВСЕМ файлам приложения, а число ошибок сравнивается
- * ПО ФАЙЛАМ с закоммиченной базой `typecheck-baseline.json`:
+ * Поэтому tsc гоняется по ВСЕМ файлам приложения, а ошибки сравниваются
+ * ПО ФАЙЛАМ с закоммиченной базой `typecheck-baseline.json`.
  *
- *   - файл превысил базу или его нет в базе, а ошибки есть → код 1, печатаются
- *     ошибки этого файла;
- *   - файл опустился ниже базы → код 1 с просьбой опустить базу
+ * Формат базы — у файла МУЛЬТИМНОЖЕСТВО «код: текст» без строки и столбца:
+ *
+ *   { "control-app.js": { "TS2339: Property 'x' does not exist …": 2, … } }
+ *
+ * Ключи отсортированы, одна запись — одна строка: дифф базы читается глазами.
+ * Число при записи — сколько раз ЭТОТ текст встречается в файле (на разных
+ * строках — разные ошибки). Сравнение по записям, а не по сумме файла:
+ *
+ *   - запись выросла или появилась (в том числе новый файл) → код 1, печатаются
+ *     ТОЛЬКО эти сообщения с их текущими местами `файл(строка,столбец)`. Так
+ *     «починил одну, внёс другую» в файле с ненулевой базой — рост, а не ноль;
+ *   - что-то уменьшилось и ничего не выросло → код 1 с просьбой опустить базу
  *     (`npm run typecheck -- --write`): без этого следующий откат вверх до
  *     старой базы прошёл бы молча;
- *   - `--write` переписывает базу, но ОТКАЗЫВАЕТСЯ поднимать число у файла
+ *   - сдвиг строк без новых ошибок ничего не меняет — строк в базе нет;
+ *   - `--write` переписывает базу, но ОТКАЗЫВАЕТСЯ поднимать хоть одну запись
  *     (поднять можно только рукой — в диффе это видно). Единственное
  *     исключение — самая первая запись, когда файла базы ещё нет.
  *
  * Два проекта (`tsconfig.main.json`, `tsconfig.renderer.json`): общие модули
  * живут в обоих мирах и проверяются в обоих. Ошибка общего модуля, видимая в
- * обоих проектах, считается ОДИН раз — дедупликация по месту и тексту.
- * Сравнение с базой идёт по ЧИСЛУ на файл, поэтому сдвиг строк без новых
- * ошибок ничего не меняет.
+ * обоих проектах, считается ОДИН раз — дедупликация по месту, коду и тексту.
  *
- * Пустой `include` дал бы «0 ошибок» = зелёный. Поэтому перед сравнением
- * каждый конфиг прогоняется с `--listFilesOnly`, и отсутствие в списке хотя бы
- * одного файла проекта — провал, а не чистота.
+ * Покрытие. Пустой `include` дал бы «0 ошибок» = зелёный, но и «не пусто» —
+ * слабая охрана: `types/*.d.ts` и `typeof import('../x.js')` тянут в программу
+ * десятки модулей, и битый include молча выкинул бы control-app.js. Поэтому
+ * каждый конфиг прогоняется с `--listFilesOnly`, и ОБЪЕДИНЕНИЕ программ обязано
+ * содержать каждый `*.js` корня проекта, кроме `eslint.config.js` и
+ * `playwright.config.js`; иначе — код 1 со списком пропавших. Корень проекта —
+ * каталог ПЕРВОГО конфига (для временных конфигов тестов — их каталог).
  *
  * Падение самого tsc — не чистота: сигнал или ненулевой код без единой строки
  * `error TS` — фатально (код 1, вывод tsc печатается, `--write` не советуется:
  * он стёр бы базу, увидев «0 ошибок»).
  *
  * Конфиги по умолчанию — пара выше; env `TYPECHECK_CONFIGS` (через запятую)
- * подставляет свои, `TYPECHECK_BASELINE` — свой файл базы, `TYPECHECK_TSC` —
+ * подставляет свои (все — в одном каталоге), `TYPECHECK_BASELINE` — свой файл базы, `TYPECHECK_TSC` —
  * свой скрипт вместо tsc (так тесты гоняют CLI на временном каталоге и не
  * касаются живой базы).
  */
@@ -109,79 +121,114 @@ function errorKey(e) {
     return `${e.file}|${e.line}|${e.col}|${e.code}|${e.message}`;
 }
 
+/** Запись мультимножества: код и текст, без места. */
+function messageKey(e) {
+    return `${e.code}: ${e.message}`;
+}
+
 /**
- * Число ошибок на файл. Одна и та же ошибка (то же место, код и текст) из
- * вывода двух проектов считается один раз; одинаковый текст на РАЗНЫХ строках —
- * это разные ошибки, и считаются обе.
+ * Мультимножество «код: текст» на файл. Одна и та же ошибка (то же место, код и
+ * текст) из вывода двух проектов считается один раз; одинаковый текст на
+ * РАЗНЫХ строках — это разные ошибки, и считаются обе.
  * @param {Array<{file: string, line?: number, col?: number, code: string, message: string}>} errors
- * @returns {Record<string, number>}
+ * @returns {Record<string, Record<string, number>>}
  */
 function tally(errors) {
     const seen = new Set();
-    /** @type {Record<string, number>} */
-    const counts = {};
+    /** @type {Record<string, Record<string, number>>} */
+    const out = {};
     for (const e of errors) {
         const key = errorKey(e);
         if (seen.has(key)) {
             continue;
         }
         seen.add(key);
-        counts[e.file] = (counts[e.file] || 0) + 1;
+        const bag = out[e.file] || (out[e.file] = {});
+        const m = messageKey(e);
+        bag[m] = (bag[m] || 0) + 1;
     }
-    return counts;
+    return out;
 }
 
 /**
- * @param {Record<string, number>} baseline
- * @param {Record<string, number>} current
- * @returns {{grown: string[], shrunk: string[], fresh: string[]}}
+ * Записи, выросшие (включая новые) и уменьшившиеся. Порядок — по файлу, затем
+ * по записи.
+ * @param {Record<string, Record<string, number>>} baseline
+ * @param {Record<string, Record<string, number>>} current
+ * @returns {{grown: Delta[], shrunk: Delta[]}}
+ * @typedef {{file: string, key: string, was: number, now: number}} Delta
  */
 function compare(baseline, current) {
     const grown = [];
     const shrunk = [];
-    const fresh = [];
     const files = new Set([...Object.keys(baseline), ...Object.keys(current)]);
     for (const file of [...files].sort()) {
-        const was = Object.prototype.hasOwnProperty.call(baseline, file) ? baseline[file] : null;
-        const now = current[file] || 0;
-        if (was === null) {
-            if (now > 0) {
-                fresh.push(file);
+        const was = baseline[file] || {};
+        const now = current[file] || {};
+        const keys = new Set([...Object.keys(was), ...Object.keys(now)]);
+        for (const key of [...keys].sort()) {
+            const a = was[key] || 0;
+            const b = now[key] || 0;
+            if (b > a) {
+                grown.push({ file, key, was: a, now: b });
+            } else if (b < a) {
+                shrunk.push({ file, key, was: a, now: b });
             }
-        } else if (now > was) {
-            grown.push(file);
-        } else if (now < was) {
-            shrunk.push(file);
         }
     }
-    return { grown, shrunk, fresh };
+    return { grown, shrunk };
 }
 
 /**
- * Новая база для `--write`: только вниз. Рост (и новый файл с ошибками) —
- * отказ, база не трогается. Файлы с нулём из базы удаляются.
- * @param {Record<string, number>} baseline
- * @param {Record<string, number>} current
- * @returns {{ok: true, baseline: Record<string, number>} | {ok: false, grown: string[]}}
+ * Новая база для `--write`: только вниз. Рост хоть одной записи — отказ, база
+ * не трогается. Нулевые записи и пустые файлы удаляются.
+ * @param {Record<string, Record<string, number>>} baseline
+ * @param {Record<string, Record<string, number>>} current
+ * @returns {{ok: true, baseline: Record<string, Record<string, number>>} | {ok: false, grown: Delta[]}}
  */
 function nextBaseline(baseline, current) {
-    const { grown, fresh } = compare(baseline, current);
-    const up = [...grown, ...fresh].sort();
-    if (up.length > 0) {
-        return { ok: false, grown: up };
+    const { grown } = compare(baseline, current);
+    if (grown.length > 0) {
+        return { ok: false, grown };
     }
-    return { ok: true, baseline: sortedCounts(current) };
+    return { ok: true, baseline: sortedBags(current) };
 }
 
-function sortedCounts(counts) {
-    /** @type {Record<string, number>} */
+function sortedBags(bags) {
+    /** @type {Record<string, Record<string, number>>} */
     const out = {};
-    for (const file of Object.keys(counts).sort()) {
-        if (counts[file] > 0) {
-            out[file] = counts[file];
+    for (const file of Object.keys(bags).sort()) {
+        /** @type {Record<string, number>} */
+        const bag = {};
+        for (const key of Object.keys(bags[file]).sort()) {
+            if (bags[file][key] > 0) {
+                bag[key] = bags[file][key];
+            }
+        }
+        if (Object.keys(bag).length > 0) {
+            out[file] = bag;
         }
     }
     return out;
+}
+
+// Корневые файлы проекта, которые tsc проверять не обязан: конфиги
+// инструментов, а не код приложения.
+const NOT_APP = ['eslint.config.js', 'playwright.config.js'];
+
+/**
+ * Корневые `*.js` проекта, которых нет ни в одной программе tsc.
+ * @param {string} root каталог проекта
+ * @param {string[]} covered пути от корня (объединение `--listFilesOnly`)
+ * @returns {string[]}
+ */
+function missingFromPrograms(root, covered) {
+    const have = new Set(covered.map(toPosix));
+    return fs.readdirSync(root, { withFileTypes: true })
+        .filter((d) => d.isFile() && d.name.endsWith('.js') && !NOT_APP.includes(d.name))
+        .map((d) => d.name)
+        .filter((f) => !have.has(f))
+        .sort();
 }
 
 // `typescript/bin/tsc` закрыт полем `exports` пакета, поэтому путь собирается
@@ -269,25 +316,47 @@ function readBaseline() {
     if (!fs.existsSync(baselinePath())) {
         return null;
     }
-    return JSON.parse(fs.readFileSync(baselinePath(), 'utf8'));
+    const data = JSON.parse(fs.readFileSync(baselinePath(), 'utf8'));
+    for (const [file, bag] of Object.entries(data)) {
+        const ok = bag && typeof bag === 'object' && !Array.isArray(bag)
+            && Object.values(bag).every((n) => Number.isInteger(n) && n > 0);
+        if (!ok) {
+            throw new Error(`${path.basename(baselinePath())}: у «${file}» не тот формат — ждётся { "TSxxxx: текст": число }`);
+        }
+    }
+    return data;
 }
 
-function writeBaseline(counts) {
-    fs.writeFileSync(baselinePath(), `${JSON.stringify(sortedCounts(counts), null, 2)}\n`);
+function writeBaseline(bags) {
+    fs.writeFileSync(baselinePath(), `${JSON.stringify(sortedBags(bags), null, 2)}\n`);
 }
 
-function total(counts) {
-    return Object.values(counts).reduce((a, b) => a + b, 0);
+function total(bags) {
+    let n = 0;
+    for (const bag of Object.values(bags)) {
+        for (const c of Object.values(bag)) {
+            n += c;
+        }
+    }
+    return n;
 }
 
-function printFileErrors(file, errors) {
+/** Текущие места записи (файл + «код: текст»), без дублей двух проектов. */
+function printLocations(delta, errors) {
     const seen = new Set();
     for (const e of errors) {
-        if (e.file !== file || seen.has(errorKey(e))) {
+        if (e.file !== delta.file || messageKey(e) !== delta.key || seen.has(errorKey(e))) {
             continue;
         }
         seen.add(errorKey(e));
         console.error(`    ${e.file}(${e.line},${e.col}): ${e.code}: ${e.message}`);
+    }
+}
+
+function printGrown(grown, errors) {
+    for (const d of grown) {
+        console.error(`  ${d.file}: ${d.key} — в базе ${d.was}, сейчас ${d.now}:`);
+        printLocations(d, errors);
     }
 }
 
@@ -298,24 +367,45 @@ function main(argv) {
         .map((s) => s.trim())
         .filter(Boolean)
         .map((c) => path.resolve(REPO, c));
+    const projectRoot = path.dirname(configs[0]);
 
-    const all = [];
+    // Сначала списки файлов всех программ: покрытие проверяется ДО прогона.
+    const programs = [];
     for (const cfg of configs) {
         const name = path.relative(REPO, cfg) || cfg;
-        const root = path.dirname(cfg);
         let files;
-        let run;
         try {
             files = listProjectFiles(cfg);
-            if (files.length > 0) {
-                run = runTscFull(cfg);
-            }
         } catch (err) {
             console.error(`[typecheck] ${name}: tsc не отработал: ${err.message}`);
             return 1;
         }
         if (files.length === 0) {
             console.error(`[typecheck] ${name}: tsc не нашёл ни одного файла проекта — пустой include дал бы ложный «0 ошибок».`);
+            return 1;
+        }
+        programs.push({ cfg, name, files });
+    }
+    const covered = programs.flatMap((p) => p.files.map((f) =>
+        toPosix(path.relative(projectRoot, path.resolve(path.dirname(p.cfg), f)))));
+    const missing = missingFromPrograms(projectRoot, covered);
+    if (missing.length > 0) {
+        console.error('[typecheck] эти файлы корня не входят ни в одну программу tsc — их ошибки не считались бы. '
+            + 'Добавь в include (main-процесс: tsconfig.main.json include + exclude tsconfig.renderer.json):');
+        for (const f of missing) {
+            console.error(`  ${f}`);
+        }
+        return 1;
+    }
+
+    const all = [];
+    for (const { cfg, name, files } of programs) {
+        const root = path.dirname(cfg);
+        let run;
+        try {
+            run = runTscFull(cfg);
+        } catch (err) {
+            console.error(`[typecheck] ${name}: tsc не отработал: ${err.message}`);
             return 1;
         }
         const errors = parseTscOutput(run.output, root);
@@ -338,7 +428,13 @@ function main(argv) {
 
     const errors = all.filter((e) => isAppFile(e.file));
     const current = tally(errors);
-    const baseline = readBaseline();
+    let baseline;
+    try {
+        baseline = readBaseline();
+    } catch (err) {
+        console.error(`[typecheck] ${err.message}`);
+        return 1;
+    }
 
     if (write) {
         if (baseline === null) {
@@ -348,11 +444,8 @@ function main(argv) {
         }
         const next = nextBaseline(baseline, current);
         if (!next.ok) {
-            console.error('[typecheck] --write отказывается поднимать базу. Выросли:');
-            for (const file of next.grown) {
-                console.error(`  ${file}: ${baseline[file] || 0} → ${current[file]}`);
-                printFileErrors(file, errors);
-            }
+            console.error('[typecheck] --write отказывается поднимать базу. Новые или участившиеся ошибки:');
+            printGrown(next.grown, errors);
             return 1;
         }
         writeBaseline(next.baseline);
@@ -360,19 +453,17 @@ function main(argv) {
         return 0;
     }
 
-    const base = baseline || {};
-    const { grown, shrunk, fresh } = compare(base, current);
-    for (const file of [...grown, ...fresh]) {
-        console.error(`[typecheck] ${file}: ${base[file] || 0} → ${current[file]} (база ${file in base ? base[file] : 'нет'})`);
-        printFileErrors(file, errors);
+    const { grown, shrunk } = compare(baseline || {}, current);
+    if (grown.length > 0) {
+        console.error(`[typecheck] новые ошибки типов (${grown.reduce((n, d) => n + d.now - d.was, 0)}) — нет в базе или их стало больше:`);
+        printGrown(grown, errors);
+        return 1;
     }
     if (shrunk.length > 0) {
         console.error('[typecheck] ошибок стало меньше базы — опусти базу: npm run typecheck -- --write');
-        for (const file of shrunk) {
-            console.error(`  ${file}: ${base[file]} → ${current[file] || 0}`);
+        for (const d of shrunk) {
+            console.error(`  ${d.file}: ${d.key} — ${d.was} → ${d.now}`);
         }
-    }
-    if (grown.length || shrunk.length || fresh.length) {
         return 1;
     }
     console.log(`[typecheck] OK: ${total(current)} ошибок, совпадает с базой.`);
@@ -383,4 +474,4 @@ if (require.main === module) {
     process.exitCode = main(process.argv.slice(2));
 }
 
-module.exports = { parseTscOutput, tally, compare, nextBaseline, runTsc, listProjectFiles, isAppFile };
+module.exports = { parseTscOutput, tally, compare, nextBaseline, runTsc, listProjectFiles, isAppFile, missingFromPrograms };
