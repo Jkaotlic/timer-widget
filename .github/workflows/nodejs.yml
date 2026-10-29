@@ -27,6 +27,11 @@ jobs:
         run: npm ci
       - name: Run lint
         run: npm run lint
+      # Храповик tsc --checkJs по файлам (scripts/typecheck.js): число ошибок
+      # типов у каждого файла не растёт выше typecheck-baseline.json. Только в
+      # этом job: вывод tsc от ОС не зависит.
+      - name: Run typecheck
+        run: npm run typecheck
       - name: Run tests
         run: npm test
       # Визуальная регрессия: поднимаем окна Electron в виртуальном дисплее и

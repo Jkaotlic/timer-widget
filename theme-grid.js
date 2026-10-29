@@ -140,6 +140,10 @@ const ThemeGridMixin = {
     }
 };
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { ThemeGridMixin };
+}
+
 if (typeof window !== 'undefined') {
     window.ThemeGridMixin = ThemeGridMixin;
 }

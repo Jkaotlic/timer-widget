@@ -45,7 +45,7 @@
                         position: 'widget-set-position'
                     },
                     send: (channel, payload) => ipcRenderer.send(channel, payload),
-                    parseJSON: safeJSONParse,
+                    parseJSON: window.SecurityUtils.safeJSONParse,
                     storage: localStorage,
                     getOuterWidth: () => window.outerWidth,
                     getScreenPosition: () => ({ x: window.screenX, y: window.screenY }),
@@ -402,7 +402,7 @@
                 // Настройки виджета
                 const settings = localStorage.getItem('widgetSettings');
                 if (settings) {
-                    const s = safeJSONParse(settings, {});
+                    const s = window.SecurityUtils.safeJSONParse(settings, {});
                     if (s && s.opacity) {
                         this.container.style.opacity = s.opacity;
                     }
@@ -453,6 +453,7 @@
                 }));
             }
 
+            /** @param {ColorsUpdate|null} [colors] payload канала; null — из хранилища */
             applyColors(colors = null) {
                 // Владельцем дефолта остаётся CSS — ровно так уже работают часы
                 // (electron-clock-widget.html:1168-1173) и полноэкранное окно.
@@ -464,7 +465,7 @@
                 // как описаны, и виджет расходился с двумя другими окнами.
                 if (!colors) {
                     const saved = localStorage.getItem('timerColors');
-                    colors = saved ? safeJSONParse(saved, null) : null;
+                    colors = saved ? window.SecurityUtils.safeJSONParse(saved, null) : null;
                 }
                 // Пустой объект вместо выхода: у каждого цвета в панели своя
                 // кнопка сброса, и сброс приходит сюда как ОТСУТСТВИЕ поля.
@@ -618,7 +619,7 @@
                     console.info('[widget] настройки не применены: ключа displayExtSettings нет (первый запуск или чистый профиль)');
                     return;
                 }
-                const settings = safeJSONParse(bgSettings, {});
+                const settings = window.SecurityUtils.safeJSONParse(bgSettings, {});
 
                 if (!settings || Object.keys(settings).length === 0) {
                     console.warn(
@@ -662,7 +663,7 @@
                 ipcRenderer.send('get-timer-state');
 
                 // Сохраняем ссылки на обработчики для последующей очистки
-                this.timerStateHandler = (event, state) => {
+                /** @type {IpcListener<'timer-state'>} */ this.timerStateHandler = (event, state) => {
                     // FIX: Use monotonic updateCounter instead of timestamp for dedup
                     const updateCounter = state.updateCounter || 0;
                     if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) {return;}
@@ -681,11 +682,11 @@
                     this.updateDisplay();
                 };
 
-                this.colorsUpdateHandler = (event, colors) => {
+                /** @type {IpcListener<'widget-colors-update'>} */ this.colorsUpdateHandler = (event, colors) => {
                     this.applyColors(colors);
                 };
 
-                this.displaySettingsUpdateHandler = (event, settings) => {
+                /** @type {IpcListener<'display-settings-update'>} */ this.displaySettingsUpdateHandler = (event, settings) => {
                     // Виджет всегда прозрачный — фоновые картинки только на полноэкранном дисплее
                     const widgetSettings = { ...settings };
                     if (widgetSettings.bgMode === 'local') {
@@ -706,7 +707,7 @@
                     }
                 };
 
-                this.widgetStyleUpdateHandler = (event, settings) => {
+                /** @type {IpcListener<'widget-style-update'>} */ this.widgetStyleUpdateHandler = (event, settings) => {
                     // Подпись состояния. По умолчанию СКРЫТА: состояние уже несёт
                     // цвет дуги, а на маленьком виджете слово занимает место,
                     // которого нет. Класс на <body>, а не инлайн на элементе:
@@ -731,7 +732,7 @@
                     // масштаб, восстановленный из widgetGeometry или выставленный
                     // Ctrl+колесом прямо на виджете.
                     if (settings.timerScale !== undefined) {
-                        const incoming = parseInt(settings.timerScale, 10);
+                        const incoming = parseInt(String(settings.timerScale), 10);
                         if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
                             if (this._lastPushedTimerScale !== undefined) {
                                 this.resizeToScale(incoming);

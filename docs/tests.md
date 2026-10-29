@@ -26,6 +26,8 @@
 
 | File | Covers |
 |------|--------|
+| `typecheck-ratchet.test.js` | Храповик `npm run typecheck`: база — мультимножество «код: текст» на файл; подмена ошибки при том же числе — рост, печатается только новая; сдвиг строк — ноль; НАСТОЯЩИЙ tsc видит опечатку; корневой `*.js` вне программ, пустой include, падение и сигнал tsc — фатально; опечатка в payload ключевых каналов — ошибка |
+| `main-no-dom.test.js` | В файлах только главного процесса (include `tsconfig.main.json` минус renderer) нет `window`/`document`, включая `${…}` в шаблонах (под `strict:false` tsc этого не поймает); проверяет сам себя на образцах и на конце каждого файла |
 | `time-utils.test.js` | `formatTime`, `formatTimeShort`, `parseManualTime` (строгий формат) |
 | `security.test.js` | `isValidDataURL`, `validateImageSource`, `safeJSONParse`, `isSafeColor`, `escapeHTML` |
 | `security-extended.test.js` | `safeSetBackgroundImage` |

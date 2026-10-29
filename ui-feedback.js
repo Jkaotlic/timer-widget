@@ -106,6 +106,10 @@ const Toast = {
     }
 };
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Toast, LoadingIndicator };
+}
+
 if (typeof window !== 'undefined') {
     window.Toast = Toast;
     window.LoadingIndicator = LoadingIndicator;

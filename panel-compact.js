@@ -100,7 +100,7 @@ const UNLOCK_DELTA_PX = 4;
  * @param {object} deps
  * @param {Document} deps.doc
  * @param {string} [deps.selector]  что меряем
- * @param {string} [deps.className] класс на <body>
+ * @param {string[]} [deps.classNames] классы ступеней сжатия на <body>
  * @param {() => number} [deps.now]  часы предохранителя (в тестах — поддельные)
  * @param {() => {w: number, h: number}} [deps.getViewport]  размер окна
  * @returns {{update: () => boolean, stop: () => void, locked: () => boolean}|null}
@@ -110,7 +110,7 @@ function bindCompactMode({
     now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
     getViewport = () => (typeof window !== 'undefined' ? { w: window.innerWidth, h: window.innerHeight } : { w: 0, h: 0 })
 }) {
-    const panel = doc && doc.querySelector ? doc.querySelector(selector) : null;
+    const panel = /** @type {HTMLElement|null} */ (doc && doc.querySelector ? doc.querySelector(selector) : null);
     if (!panel) { return null; }
     const body = doc.body;
 

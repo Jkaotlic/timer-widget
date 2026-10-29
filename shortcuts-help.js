@@ -188,7 +188,7 @@ function trackPointerControl(doc) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { globalHotkeyBlocked, trackPointerControl, HOTKEY_OPEN_LAYERS };
+    module.exports = { showKeyboardShortcuts, globalHotkeyBlocked, trackPointerControl, HOTKEY_OPEN_LAYERS };
 }
 
 if (typeof window !== 'undefined') {

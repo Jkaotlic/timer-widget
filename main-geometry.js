@@ -18,7 +18,7 @@ const { isPayloadObject } = require('./relay-payload');
  * @param {object} deps
  * @param {object} deps.screen — electron.screen
  * @param {object} deps.CONFIG — constants.js
- * @param {Function} deps.safelySendToWindow — utils.js
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow — utils.js
  */
 function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
     // Shared delta-move for a frameless window. Reads deltaX/deltaY from the payload

@@ -21,7 +21,7 @@ const { isPayloadObject } = require('./relay-payload');
  * @param {object} deps
  * @param {object} deps.windows — реестр окон (main-state.js)
  * @param {object} deps.CONFIG
- * @param {Function} deps.safelySendToWindow
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
  * @param {(state: object) => void} deps.accrueOverrun — учёт перелимита (main-event-overrun.js)
  * @param {() => void} deps.persistRecoverySnapshot — снимок восстановления (main-recovery.js)
  * @param {() => void} deps.updateTrayMenu — трей (main-tray.js)

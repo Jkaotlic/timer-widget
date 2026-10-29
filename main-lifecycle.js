@@ -22,7 +22,7 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  * @param {object} deps.powerMonitor
  * @param {object} deps.nativeImage
  * @param {object} deps.log
- * @param {Function} deps.safelySendToWindow
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
  * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
  * @param {() => void} deps.registerProtocol — обработчик схемы app:// (SEC-12)
  * @param {() => Promise<{dispose: Function}>} deps.prepareStorage — перенос
@@ -37,7 +37,7 @@ const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
  * @param {boolean} deps.inTestMode
  * @param {boolean} deps.screenshotMode
  * @param {number} deps.startupT0 — метка начала процесса (perf)
- * @param {string} [deps.platform] — process.platform (подменяется в тестах)
+ * @param {string} [deps.platform] - process.platform (подменяется в тестах)
  */
 function startApp(deps) {
     const {

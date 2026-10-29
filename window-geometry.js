@@ -50,7 +50,7 @@ const SAVE_SETTLE_MS = 300;
  * @param {Storage} cfg.storage
  * @param {() => number} cfg.getOuterWidth
  * @param {() => {x: number, y: number}} cfg.getScreenPosition
- * @param {(pct: number) => void} [cfg.onScaleSettled] — вызывается, когда
+ * @param {(pct: number) => void} [cfg.onScaleSettled] - вызывается, когда
  *        УСТОЯВШИЙСЯ размер оказался другим: окно узнало свой новый масштаб не
  *        от колеса, а от системы (растянули за край рамки, ползунок панели).
  *        Нужен, чтобы ползунок панели не остался на прежнем числе.
@@ -97,7 +97,7 @@ function createWindowGeometry(cfg) {
 
     /**
      * Записывает размер и позицию.
-     * @param {number} [explicitPct] — без него берётся ФАКТИЧЕСКАЯ ширина окна:
+     * @param {number} [explicitPct] - без него берётся ФАКТИЧЕСКАЯ ширина окна:
      *   она учитывает и растягивание за край рамки, а не только Ctrl+колесо.
      */
     function save(explicitPct) {
@@ -131,7 +131,8 @@ function createWindowGeometry(cfg) {
 
         /** Восстанавливает размер и позицию прошлой сессии. */
         restore() {
-            const geo = parseJSON(storage.getItem(storageKey), null);
+            const geo = /** @type {{scalePct?: unknown, x?: number, y?: number} | null} */ (
+                parseJSON(storage.getItem(storageKey), null));
             if (!geo || typeof geo !== 'object') { return; }
 
             const pct = Number(geo.scalePct);
@@ -358,9 +359,10 @@ function fitRestoredBounds(target, displays, minVisible, fallbackArea, min) {
  * @param {object} cfg
  * @param {Element} cfg.container — элемент, за который тащат
  * @param {Document} cfg.doc — сюда вешаются mousemove/mouseup: кнопку отпускают и за пределами окна
- * @param {(payload: {deltaX: number, deltaY: number}) => void} cfg.onMove
+ * @param {(payload: {deltaX: number, deltaY: number, first: boolean}) => void} cfg.onMove
  * @param {() => void} cfg.onDrop — вызывается один раз в конце перетаскивания
  * @param {object} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
+ * @param {() => boolean} [cfg.isLocked] предикат замка: true отменяет жест
  * @returns {object} тот же объект handlers
  */
 function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) {

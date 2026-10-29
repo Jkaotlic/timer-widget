@@ -176,7 +176,7 @@ function clampScale(value, min, max) {
  * @returns {number} проценты
  */
 function fitBlockScale(p) {
-    const opts = p || {};
+    const opts = /** @type {Partial<NonNullable<typeof p>>} */ (p || {});
     const requested = Number(opts.requested);
     if (!Number.isFinite(requested)) { return 100; }
     const floorRaw = Number(opts.floorPct);
@@ -225,8 +225,8 @@ function fitBlockScale(p) {
  * @returns {{left: number, right: number}}
  */
 function sideCardBand(p) {
-    const opts = p || {};
-    const free = opts.free || {};
+    const opts = /** @type {Partial<NonNullable<typeof p>>} */ (p || {});
+    const free = /** @type {Partial<NonNullable<typeof opts.free>>} */ (opts.free || {});
     let left = Number(free.left) || 0;
     let right = Number(free.right) || 0;
     const centerX = Number(opts.centerX);
@@ -354,7 +354,7 @@ function blockingBottom(column, boxes, gap) {
  * @returns {number} пиксели (0 — ужимать не за чем)
  */
 function heroFrameShrink(p) {
-    const opts = p || {};
+    const opts = /** @type {Partial<NonNullable<typeof p>>} */ (p || {});
     const column = opts.column;
     if (!column) { return 0; }
     const top = Number(column.top);

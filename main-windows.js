@@ -44,7 +44,7 @@ const WINDOW_LEVEL_ABOVE_MENU_BAR = 'status';
  * @param {object} deps.app
  * @param {object} deps.log
  * @param {object} deps.CONFIG
- * @param {Function} deps.safelySendToWindow
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
  * @param {object} deps.windows — реестр окон (main-state.js)
  * @param {object} deps.relay — память ретрансляторов (main-state.js)
  * @param {object} deps.hooks — main-window-hooks.js

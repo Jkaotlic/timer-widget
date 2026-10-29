@@ -388,7 +388,7 @@ function measureSignShift(fontId) {
  *
  * @param {HTMLElement} probeEl — скрытый span, живущий в том же окне
  * @param {string} fontId
- * @param {string} [probeText] — эталонная строка; по умолчанию `PROBE_MINUTES`
+ * @param {string} [probeText] - эталонная строка; по умолчанию `PROBE_MINUTES`
  * @returns {{width: number, height: number, signWidth: number}|null}
  */
 function measureDigits(probeEl, fontId, probeText) {
@@ -451,7 +451,7 @@ function applyFont(el, fontId) {
  * под знак ровно столько же, сколько резервирует подгонка (signWidth в
  * fitScale). Мусор даёт 0: поле без знака лучше поля в NaN.
  *
- * @param {{signWidth: number}|null} probe — результат measureDigits
+ * @param {{width: number, signWidth: number}|null} probe — результат measureDigits
  * @returns {number}
  */
 function signWidthEm(probe) {

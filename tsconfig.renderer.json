@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "target": "es2022",
+    "module": "nodenext",
+    "skipLibCheck": true,
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": []
+  },
+  "include": [
+    "types/*.d.ts",
+    "*.js"
+  ],
+  "exclude": [
+    "types/main-window.d.ts",
+    "eslint.config.js",
+    "playwright.config.js",
+    "electron-main.js",
+    "main-*.js",
+    "preload.js",
+    "app-scheme.js",
+    "atomic-write.js",
+    "navigation-guard.js",
+    "ipc-senders.js",
+    "relay-payload.js",
+    "channel-validator.js",
+    "event-overrun-store.js",
+    "event-report.js",
+    "recovery.js",
+    "timer-controller.js",
+    "timer-engine.js",
+    "visual-diff.js"
+  ]
+}

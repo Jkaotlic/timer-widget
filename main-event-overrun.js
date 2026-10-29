@@ -32,7 +32,7 @@ function isAtRest(state) {
  * @param {object} deps.relay — память ретрансляторов (main-state.js): ставка,
  *        период и название мероприятия лежат в lastDisplaySettings
  * @param {() => object} deps.getTimerState — зеркало состояния таймера
- * @param {Function} deps.safelySendToWindow
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
  * @param {object} deps.log
  * @param {() => string} deps.getUserDataPath — app.getPath('userData')
  * @param {object} deps.dialog — electron.dialog (метод зовётся на объекте:

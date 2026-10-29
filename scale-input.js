@@ -100,6 +100,10 @@ function setupScaleValueEdit(spanEl, sliderEl, defaultVal, onApply) {
     });
 }
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { setupScaleValueEdit };
+}
+
 if (typeof window !== 'undefined') {
     window.setupScaleValueEdit = setupScaleValueEdit;
 }

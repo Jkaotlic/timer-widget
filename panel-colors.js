@@ -57,9 +57,9 @@ const SURFACE_TARGETS = ['widget', 'clock'];
  * Разница видна снаружи: удалённого поля в объекте нет, и окно читает это как
  * «владелец значения по умолчанию — CSS».
  *
- * @param {object|null} current
- * @param {object} patch
- * @returns {object}
+ * @param {ColorsUpdate|null} current
+ * @param {ColorsPatch} patch
+ * @returns {ColorsUpdate} тип — types/ipc-payloads.d.ts
  */
 function mergeColors(current, patch) {
     const next = Object.assign({}, current || {});
@@ -85,7 +85,11 @@ function el(tag, props, children) {
     return node;
 }
 
-/** Объект цветов из строки хранилища или null: битое значение не роняет панель. */
+/**
+ * Объект цветов из строки хранилища или null: битое значение не роняет панель.
+ * @param {string|null} raw
+ * @returns {ColorsUpdate|null}
+ */
 function parseColors(raw) {
     if (typeof raw !== 'string' || raw === '') { return null; }
     try {
@@ -108,7 +112,7 @@ const PanelColorsMixin = {
      *  - окнам уходит то, что они показали бы на чистом профиле: пустой объект
      *    (владелец умолчания — CSS) или цвета старого ключа.
      *
-     * @param {(channel: string, payload: object) => void} [send]
+     * @param {(channel: 'widget-colors-update'|'clock-colors-update'|'display-colors-update', payload: ColorsUpdate) => void} [send]
      * @param {{timer: string, progress: string}} [fresh] стартовые цвета
      */
     loadWindowColors(send, fresh) {
@@ -132,7 +136,7 @@ const PanelColorsMixin = {
     /**
      * ЕДИНСТВЕННОЕ место, где меняется объект цветов окна.
      * @param {'widget'|'clock'|'display'} target
-     * @param {object} patch поля цветов; null означает сброс поля
+     * @param {ColorsPatch} patch поля цветов; null означает сброс поля
      */
     updateColors(target, patch) {
         const spec = COLOR_TARGETS[target];

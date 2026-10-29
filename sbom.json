@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:b97cefbe-e61e-408e-9ab4-1dd1a2097ecb",
+  "serialNumber": "urn:uuid:f32e8202-2b3a-4954-a6bb-da5724639bdb",
   "metadata": {
-    "timestamp": "2026-10-29T04:51:36.405Z",
+    "timestamp": "2026-10-29T05:21:11.180Z",
     "tools": {
       "components": [
         {
@@ -348,6 +348,60 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/@playwright/test"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "node",
+      "group": "@types",
+      "version": "24.13.3",
+      "bom-ref": "timer-widget@2.12.2|@types/node@24.13.3",
+      "description": "TypeScript definitions for node",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40types/node@24.13.3",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/DefinitelyTyped/DefinitelyTyped.git#types/node",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\" and \"repository.directory\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/@types/node/-/node-24.13.3.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "0e1f2f02c577ea2839c1af4e5f8a57bcc73d0f755e89b7f0db08b1d0253060e0cb0fc9e48fd52c2e3012af8f673e0fb678acf184157ebfb2fca57bd3e1eeb7f5"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@types/node"
         }
       ]
     },
@@ -806,6 +860,64 @@
     },
     {
       "type": "library",
+      "name": "typescript",
+      "version": "6.0.3",
+      "bom-ref": "timer-widget@2.12.2|typescript@6.0.3",
+      "author": "Microsoft Corp.",
+      "description": "TypeScript is a language for application scale JavaScript development",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/typescript@6.0.3",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/microsoft/TypeScript.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://www.typescriptlang.org/",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/microsoft/TypeScript/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "cb64efbb14993c3c906a490544f6472859be28a56a222b1d83dfc26709bd7edbca5cb3fc3515a3dfcfce0e335baf8dd2b285ea36e022b047f519d0b1a9671d07"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:constraint:engine:node",
+          "value": ">=14.17"
+        },
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/typescript"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "chalk",
       "version": "4.1.2",
       "bom-ref": "timer-widget@2.12.2|chalk@4.1.2",
@@ -970,6 +1082,59 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/playwright"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "undici-types",
+      "version": "7.18.2",
+      "bom-ref": "timer-widget@2.12.2|undici-types@7.18.2",
+      "description": "A stand-alone types package for Undici",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/undici-types@7.18.2",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/nodejs/undici.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://undici.nodejs.org",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/nodejs/undici/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/undici-types/-/undici-types-7.18.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "02cb82cdf7c61c9c9b49a46b9abe5e1ebf359b0254de48f0e8cfaea6b5af09788d78df52386c10dc99fc8dbf26dd9ea2cd58249e7d51d054c21003f642b2d8ff"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/undici-types"
         }
       ]
     },
@@ -2057,60 +2222,6 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/@electron/get"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "node",
-      "group": "@types",
-      "version": "24.13.3",
-      "bom-ref": "timer-widget@2.12.2|@types/node@24.13.3",
-      "description": "TypeScript definitions for node",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:npm/%40types/node@24.13.3",
-      "externalReferences": [
-        {
-          "url": "git+https://github.com/DefinitelyTyped/DefinitelyTyped.git#types/node",
-          "type": "vcs",
-          "comment": "as detected from PackageJson property \"repository.url\" and \"repository.directory\""
-        },
-        {
-          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node",
-          "type": "website",
-          "comment": "as detected from PackageJson property \"homepage\""
-        },
-        {
-          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/issues",
-          "type": "issue-tracker",
-          "comment": "as detected from PackageJson property \"bugs.url\""
-        },
-        {
-          "url": "https://registry.npmjs.org/@types/node/-/node-24.13.3.tgz",
-          "type": "distribution",
-          "hashes": [
-            {
-              "alg": "SHA-512",
-              "content": "0e1f2f02c577ea2839c1af4e5f8a57bcc73d0f755e89b7f0db08b1d0253060e0cb0fc9e48fd52c2e3012af8f673e0fb678acf184157ebfb2fca57bd3e1eeb7f5"
-            }
-          ],
-          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-        }
-      ],
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        },
-        {
-          "name": "cdx:npm:package:path",
-          "value": "node_modules/@types/node"
         }
       ]
     },
@@ -7899,59 +8010,6 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/undici"
-        }
-      ]
-    },
-    {
-      "type": "library",
-      "name": "undici-types",
-      "version": "7.18.2",
-      "bom-ref": "timer-widget@2.12.2|undici-types@7.18.2",
-      "description": "A stand-alone types package for Undici",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:npm/undici-types@7.18.2",
-      "externalReferences": [
-        {
-          "url": "git+https://github.com/nodejs/undici.git",
-          "type": "vcs",
-          "comment": "as detected from PackageJson property \"repository.url\""
-        },
-        {
-          "url": "https://undici.nodejs.org",
-          "type": "website",
-          "comment": "as detected from PackageJson property \"homepage\""
-        },
-        {
-          "url": "https://github.com/nodejs/undici/issues",
-          "type": "issue-tracker",
-          "comment": "as detected from PackageJson property \"bugs.url\""
-        },
-        {
-          "url": "https://registry.npmjs.org/undici-types/-/undici-types-7.18.2.tgz",
-          "type": "distribution",
-          "hashes": [
-            {
-              "alg": "SHA-512",
-              "content": "02cb82cdf7c61c9c9b49a46b9abe5e1ebf359b0254de48f0e8cfaea6b5af09788d78df52386c10dc99fc8dbf26dd9ea2cd58249e7d51d054c21003f642b2d8ff"
-            }
-          ],
-          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-        }
-      ],
-      "properties": [
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        },
-        {
-          "name": "cdx:npm:package:path",
-          "value": "node_modules/undici-types"
         }
       ]
     },
@@ -20054,12 +20112,14 @@
         "timer-widget@2.12.2|@electron/fuses@1.8.0",
         "timer-widget@2.12.2|@eslint/js@10.0.1",
         "timer-widget@2.12.2|@playwright/test@1.63.0",
+        "timer-widget@2.12.2|@types/node@24.13.3",
         "timer-widget@2.12.2|electron-builder@26.15.3",
         "timer-widget@2.12.2|electron-log@5.4.4",
         "timer-widget@2.12.2|electron@44.10.0",
         "timer-widget@2.12.2|eslint-plugin-html@8.2.1",
         "timer-widget@2.12.2|eslint@10.11.0",
-        "timer-widget@2.12.2|globals@17.12.0"
+        "timer-widget@2.12.2|globals@17.12.0",
+        "timer-widget@2.12.2|typescript@6.0.3"
       ]
     },
     {
@@ -20089,6 +20149,12 @@
       "ref": "timer-widget@2.12.2|@playwright/test@1.63.0",
       "dependsOn": [
         "timer-widget@2.12.2|playwright@1.63.0"
+      ]
+    },
+    {
+      "ref": "timer-widget@2.12.2|@types/node@24.13.3",
+      "dependsOn": [
+        "timer-widget@2.12.2|undici-types@7.18.2"
       ]
     },
     {
@@ -20175,6 +20241,9 @@
       "ref": "timer-widget@2.12.2|globals@17.12.0"
     },
     {
+      "ref": "timer-widget@2.12.2|typescript@6.0.3"
+    },
+    {
       "ref": "timer-widget@2.12.2|chalk@4.1.2",
       "dependsOn": [
         "timer-widget@2.12.2|ansi-styles@4.3.0",
@@ -20189,6 +20258,9 @@
       "dependsOn": [
         "timer-widget@2.12.2|playwright-core@1.63.0"
       ]
+    },
+    {
+      "ref": "timer-widget@2.12.2|undici-types@7.18.2"
     },
     {
       "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3",
@@ -20360,12 +20432,6 @@
         "timer-widget@2.12.2|semver@7.8.5",
         "timer-widget@2.12.2|sumchecker@3.0.1",
         "timer-widget@2.12.2|undici@7.30.1"
-      ]
-    },
-    {
-      "ref": "timer-widget@2.12.2|@types/node@24.13.3",
-      "dependsOn": [
-        "timer-widget@2.12.2|undici-types@7.18.2"
       ]
     },
     {
@@ -20953,9 +21019,6 @@
     },
     {
       "ref": "timer-widget@2.12.2|undici@7.30.1"
-    },
-    {
-      "ref": "timer-widget@2.12.2|undici-types@7.18.2"
     },
     {
       "ref": "timer-widget@2.12.2|domelementtype@2.3.0"

@@ -178,7 +178,8 @@ const PanelDisplayMixin = {
         const styleEl = this.displayTimerStyleEl || this.timerStyleEl;
         const scaleEl = this.displayTimerScaleEl || this.timerScaleEl;
 
-        const settings = Object.assign({
+        /** @type {DisplaySettingsUpdate} (types/ipc-payloads.d.ts) */
+        const base = {
             clockStyle: this.syncClockStyle
                 ? this.timerStyleEl.value
                 : (this.clockStyleEl ? this.clockStyleEl.value : 'circle'),
@@ -217,7 +218,8 @@ const PanelDisplayMixin = {
             overrunPeriod: this.overrunPeriodEl ? this.overrunPeriodEl.value : '3',
             floor47Unlocked: this.isFloor47Unlocked(),
             reportOnlyOverruns: this.reportOnlyOverrunsEl ? this.reportOnlyOverrunsEl.checked : false
-        }, collectDisplayToggles(document), collectBlockLabels(document));
+        };
+        const settings = Object.assign(base, collectDisplayToggles(document), collectBlockLabels(document));
 
         // Картинка — только при смене: см. attachChangedBgImage (BUG-10).
         this._sentBgLocalImage = attachChangedBgImage(

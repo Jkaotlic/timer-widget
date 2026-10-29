@@ -1477,7 +1477,7 @@ class DisplayTimer {
         this.ipcRenderer.send('get-timer-state');
 
         // Сохраняем ссылки на обработчики для cleanup
-        this.ipcHandlers.timerState = (event, state) => {
+        /** @type {IpcListener<'timer-state'>} */ this.ipcHandlers.timerState = (event, state) => {
             // FIX BUG-012: Используем монотонный счетчик вместо timestamp
             // Это предотвращает проблемы при изменении системного времени
             const updateCounter = state.updateCounter || 0;
@@ -1498,11 +1498,11 @@ class DisplayTimer {
             this.updateMoneyBlocks();
         };
 
-        this.ipcHandlers.colorsUpdate = (event, colors) => {
+        /** @type {IpcListener<'display-colors-update'>} */ this.ipcHandlers.colorsUpdate = (event, colors) => {
             this.applyColors(colors);
         };
 
-        this.ipcHandlers.displaySettingsUpdate = (event, settings) => {
+        /** @type {IpcListener<'display-settings-update'>} */ this.ipcHandlers.displaySettingsUpdate = (event, settings) => {
             if (settings.bgMode || settings.bgSolid || settings.bgGrad1) {
                 this.applyBackground(settings);
             }
@@ -1633,6 +1633,7 @@ class DisplayTimer {
         this._moneyWidths = widths;
     }
 
+    /** @param {Partial<DisplaySettingsUpdate>} settings payload канала или displayExtSettings из хранилища */
     applyDisplaySettings(settings) {
         // Стиль таймера — только свой. Общее имя `timerStyle` в этом наборе
         // может означать стиль ВИДЖЕТА (когда набор пришёл из localStorage),
@@ -1886,7 +1887,7 @@ class DisplayTimer {
         // Масштаб блоков времени — та же логика «применяем только при реальном
         // изменении», что и для timerScale выше (см. комментарий там).
         if (settings.timeBlocksScale !== undefined) {
-            const incoming = parseInt(settings.timeBlocksScale, 10);
+            const incoming = parseInt(String(settings.timeBlocksScale), 10);
             if (Number.isFinite(incoming) && incoming !== this._lastPushedBlockScale) {
                 // ПЕРВАЯ посылка после открытия окна не применяется вовсе:
                 // масштабы уже восстановлены из хранилища, и каждый свой. Одно
@@ -2071,6 +2072,7 @@ class DisplayTimer {
         this.applyDisplaySettings(settings);
     }
 
+    /** @param {ColorsUpdate} colors */
     applyColors(colors) {
         const timerColor = colors.timer && this._isSafeColor(colors.timer) ? colors.timer : null;
         const progressColor = colors.progress && this._isSafeColor(colors.progress) ? colors.progress : null;
@@ -2178,6 +2180,7 @@ class DisplayTimer {
         return window.SecurityUtils.isSafeColor(value);
     }
 
+    /** @param {Partial<DisplaySettingsUpdate>} settings */
     applyBackground(settings) {
         const mode = settings.bgMode || 'gradient';
         let bg = '';

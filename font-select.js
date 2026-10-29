@@ -104,6 +104,10 @@ function attachFontSelect(el) {
     apply(el.dataset.value);
 }
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { attachFontSelect };
+}
+
 if (typeof window !== 'undefined') {
     window.attachFontSelect = attachFontSelect;
 }
