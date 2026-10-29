@@ -463,9 +463,10 @@
                 // вместо --tw-fg, а секундная стрелка аналога — сине-зелёной
                 // вместо своей красной. Три стиля из четырёх выглядели не так,
                 // как описаны, и виджет расходился с двумя другими окнами.
+                // Из хранилища — СВОЙ ключ widgetColors; timerColors только
+                // запасной путь для профиля без него (renderer-shared.ownColors).
                 if (!colors) {
-                    const saved = localStorage.getItem('timerColors');
-                    colors = saved ? window.SecurityUtils.safeJSONParse(saved, null) : null;
+                    colors = window.RendererShared.ownColors(localStorage, 'widgetColors');
                 }
                 // Пустой объект вместо выхода: у каждого цвета в панели своя
                 // кнопка сброса, и сброс приходит сюда как ОТСУТСТВИЕ поля.

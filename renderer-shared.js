@@ -527,6 +527,47 @@ function pickOwnSetting(settings, ownKey, sharedKey) {
 }
 
 /**
+ * Ключ цветов прежних версий. Панель ПИШЕТ его (цвета виджета) только ради
+ * отката: у версии до 29.10.2026 виджет и дисплей читают именно его. Читает
+ * его единственный запасной путь — ownColors ниже, для профиля старше
+ * поканальных цветов. Условие удаления — в реестре constants.js.
+ */
+const LEGACY_COLORS_KEY = 'timerColors';
+
+/**
+ * Цвета окна на старте — из СВОЕГО ключа (`widgetColors`, `displayColors`, …).
+ *
+ * До 29.10.2026 дисплей и виджет читали `timerColors`, а это цвета ВИДЖЕТА:
+ * дисплей со своими цветами открывался в чужих до досылки главного процесса.
+ *
+ * Запасной путь на `timerColors` — только если своего значения НЕТ (ключа нет
+ * или он не разбирается, как у safeJSONParse). Пустой объект — это СВОЁ
+ * значение («всё по CSS»), а не отсутствие: иначе сброшенные цвета дисплея
+ * воскресали бы цветами виджета.
+ *
+ * Хранилище — параметром: функция чистая, тест подсовывает поддельное.
+ *
+ * @param {{getItem(key: string): string|null}|null|undefined} storage
+ * @param {string} ownKey — ключ цветов этого окна
+ * @returns {object|null} объект цветов либо null (владелец умолчания — CSS)
+ */
+function ownColors(storage, ownKey) {
+    if (!storage || !ownKey) { return null; }
+    const parse = (raw) => {
+        if (!raw || typeof raw !== 'string') { return null; }
+        try {
+            const value = JSON.parse(raw);
+            return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+        } catch {
+            return null;
+        }
+    };
+    const own = parse(storage.getItem(ownKey));
+    if (own) { return own; }
+    return parse(storage.getItem(LEGACY_COLORS_KEY));
+}
+
+/**
  * Час и минута, когда таймер дойдёт до нуля: «закончится в 14:50».
  *
  * Считается ОТ переданного момента, а не от new Date() внутри, — иначе
@@ -992,6 +1033,8 @@ const RendererShared = {
     timerLifecycleStatus,
     timerColorBand,
     pickOwnSetting,
+    ownColors,
+    LEGACY_COLORS_KEY,
     endsAt,
     relativeLuminance,
     backgroundTone,

@@ -2014,10 +2014,12 @@ class DisplayTimer {
         // CSS. Так же ведут себя часы и — после этого прохода — виджет,
         // который раньше подставлял захардкоженный #0a84ff и потому
         // расходился с остальными на всех четырёх стилях.
-        const saved = localStorage.getItem('timerColors');
-        const colors = saved && window.SecurityUtils
-            ? window.SecurityUtils.safeJSONParse(saved, null)
-            : null;
+        //
+        // Ключ — СВОЙ, displayColors. До 29.10.2026 здесь читался timerColors,
+        // а это цвета ВИДЖЕТА: дисплей со своими цветами открывался в чужих до
+        // досылки main. timerColors остался только запасным путём для профиля
+        // без своего ключа (renderer-shared.ownColors).
+        const colors = window.RendererShared.ownColors(localStorage, 'displayColors');
         if (colors) { this.applyColors(colors); }
 
         // Фон - загружаем один раз и из правильного источника

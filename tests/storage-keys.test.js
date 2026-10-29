@@ -37,7 +37,10 @@ function runtimeFiles() {
 
 const READ_PATTERNS = [
     /localStorage\.getItem\(\s*['"]([^'"]+)['"]/g,
-    /safeGetJSON\(\s*\w+,\s*['"]([^'"]+)['"]/g
+    /safeGetJSON\(\s*\w+,\s*['"]([^'"]+)['"]/g,
+    // Цвета окна на старте: renderer-shared.ownColors(storage, 'ключ') читает
+    // переданный ключ сам — литерал стоит в окне, getItem рядом нет.
+    /ownColors\(\s*\w+,\s*['"]([^'"]+)['"]/g
 ];
 const WRITE_PATTERNS = [
     /localStorage\.(?:setItem|removeItem)\(\s*['"]([^'"]+)['"]/g,
@@ -156,4 +159,23 @@ test('реестр заморожен и содержит только стро�
         assert.equal(typeof value, 'string', `${name}: значение должно быть строкой`);
         assert.match(name, /^[A-Z][A-Z0-9_]*$/, `${name}: имя константы — UPPER_SNAKE_CASE`);
     }
+});
+
+test('timerColors — только для отката: пишет панель, читает лишь запасной путь ownColors', () => {
+    // Статус ключа (constants.js, TIMER_COLORS). До 29.10.2026 его читали
+    // дисплей и виджет — и дисплей открывался в цветах виджета. Новый читатель
+    // здесь значит, что ключ снова стал чьей-то настройкой.
+    const key = CONFIG.STORAGE_KEYS.TIMER_COLORS;
+    assert.equal(key, 'timerColors');
+    assert.deepEqual([...(reads.get(key) || [])].sort(), ['renderer-shared.js'],
+        'timerColors читает только renderer-shared.ownColors (запасной путь)');
+    assert.deepEqual([...(writes.get(key) || [])].sort(), ['control-app.js'],
+        'timerColors пишет только панель (ради отката на прошлую версию)');
+    // Сам-себя: окна обязаны читать свои ключи, и сканер обязан это видеть —
+    // иначе пустое «читатели timerColors» значило бы и «чисто», и «шаблон не
+    // работает».
+    assert.ok((reads.get('displayColors') || new Set()).has('display-script.js'),
+        'сканер не видит чтение displayColors дисплеем через ownColors');
+    assert.ok((reads.get('widgetColors') || new Set()).has('widget-app.js'),
+        'сканер не видит чтение widgetColors виджетом через ownColors');
 });

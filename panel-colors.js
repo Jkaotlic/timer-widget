@@ -85,6 +85,11 @@ function el(tag, props, children) {
     return node;
 }
 
+/** Чистая логика окон: здесь — запасной путь цветов (ownColors). */
+const ColorsShared = (typeof window !== 'undefined' && window.RendererShared)
+    ? window.RendererShared
+    : require('./renderer-shared');
+
 /**
  * Объект цветов из строки хранилища или null: битое значение не роняет панель.
  * @param {string|null} raw
@@ -118,17 +123,20 @@ const PanelColorsMixin = {
     loadWindowColors(send, fresh) {
         const post = send || ((channel, payload) => window.ipcRenderer.send(channel, payload));
         const defaults = fresh || window.CONFIG.DEFAULT_TIMER_COLORS;
-        const legacy = parseColors(localStorage.getItem('timerColors'));
         const widget = parseColors(localStorage.getItem('widgetColors'));
+        // Свой ключ виджета, а без него — старый общий timerColors. Формулу
+        // запасного пути знает ОДНО место (renderer-shared.ownColors): тем же
+        // путём виджет красится сам на старте.
+        const own = ColorsShared.ownColors(localStorage, 'widgetColors');
 
         this.currentColors = widget || mergeColors(
             { timer: defaults.timer, progress: defaults.progress, bg: '#0f0c29' },
-            legacy || {}
+            own || {}
         );
         this.clockColors = parseColors(localStorage.getItem('clockColors'));
         this.displayColors = parseColors(localStorage.getItem('displayColors'));
 
-        post('widget-colors-update', widget || legacy || {});
+        post('widget-colors-update', own || {});
         post('clock-colors-update', this.clockColors || {});
         post('display-colors-update', this.displayColors || {});
     },
