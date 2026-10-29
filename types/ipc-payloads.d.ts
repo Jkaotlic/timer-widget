@@ -37,8 +37,6 @@ interface TimerState {
     updateCounter: number;
     /** Штампует patch(); в начальном состоянии (до первого патча) поля нет. */
     overrunLimitSeconds?: number;
-    /** Штампует patch(); в начальном состоянии (до первого патча) поля нет. */
-    allowNegative?: boolean;
 }
 
 /**

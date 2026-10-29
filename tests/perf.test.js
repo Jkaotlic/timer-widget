@@ -223,7 +223,6 @@ test('benchmark: broadcast simulation — emitTimerState shape build x100k', () 
             ...timerState,
             remainingSeconds: i,
             overrunLimitSeconds: timerConfig.overrunLimitSeconds,
-            allowNegative: timerConfig.allowNegative,
             timestamp: Date.now(),
             updateCounter: counter
         };

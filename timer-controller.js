@@ -131,7 +131,6 @@ function createTimerController(deps = {}) {
             ...timerState,
             ...partial,
             overrunLimitSeconds: timerConfig.overrunLimitSeconds,
-            allowNegative: timerConfig.allowNegative,
             timestamp: now(),
             updateCounter: timerUpdateCounter  // Монотонный счетчик
         };

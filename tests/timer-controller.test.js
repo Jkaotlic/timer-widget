@@ -81,7 +81,11 @@ test('patch: stamps config fields, timestamp, and bumps counter once', () => {
     const out = h.controller.patch({ remainingSeconds: 42 });
     assert.equal(out.remainingSeconds, 42);
     assert.equal(out.overrunLimitSeconds, 120);
-    assert.equal(out.allowNegative, true);
+    // allowNegative в состоянии не живёт: его не читало ни одно окно (панель
+    // берёт чекбокс, main — timerConfig), а поле, которое шлют и не читают, —
+    // невыполненное обещание (найдено проверкой типов 29.10.2026, D2).
+    assert.equal('allowNegative' in out, false);
+    assert.equal(h.controller.getConfig().allowNegative, true);
     assert.equal(out.timestamp, 5000);
     assert.equal(out.updateCounter, 1);
     assert.equal(h.states.length, 1);

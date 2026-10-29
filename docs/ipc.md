@@ -131,7 +131,7 @@ file:// → app:// нового канала не заводит: у его ск
     isPaused: false,          // Timer is paused
     finished: false,          // Timer reached zero (latched until reset)
     overrunLimitSeconds: 0,   // Config stamped on every patch
-    allowNegative: false,     // Config stamped on every patch
+    // allowNegative здесь НЕТ (с 29.10.2026): его не читало ни одно окно
     timestamp: 1790000000000, // Wall clock of the patch — NOT used for ordering
     updateCounter: 42         // Monotonic counter for reliable sync
 }
