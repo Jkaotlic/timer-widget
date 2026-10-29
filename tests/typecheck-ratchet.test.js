@@ -7,6 +7,7 @@
 // зелёная арифметика ничего не стоит, если tsc не видит опечатку.
 
 const test = require('node:test');
+const { after } = test;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -124,10 +125,18 @@ test('nextBaseline: падение пишется, файлы с нулём из
 const TYPO = '/** @param {{a: number}} p */ function f(p) { return p.b; }\n';
 const CLEAN = '/** @param {{a: number}} p */ function f(p) { return p.a; }\n';
 
+const TEMP_DIRS = [];
+after(() => {
+    for (const d of TEMP_DIRS) {
+        fs.rmSync(d, { recursive: true, force: true });
+    }
+});
+
 // Временный проект: конфиг — копия tsconfig.renderer.json, но с одним файлом.
 function makeProject(source, include = ['probe.js']) {
     // realpath: на macOS /var — симлинк на /private/var, и tsc печатает пути от него.
     const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'typecheck-probe-')));
+    TEMP_DIRS.push(dir);
     const cfg = JSON.parse(fs.readFileSync(path.join(REPO, 'tsconfig.renderer.json'), 'utf8'));
     cfg.include = include;
     delete cfg.exclude;
@@ -201,7 +210,19 @@ test('CLI: tsc убит сигналом — фатально, базу не т�
     const tsc = fakeTsc(p.dir, "process.kill(process.pid, 'SIGKILL');");
     const res = runCli(p, ['--write'], { TYPECHECK_TSC: tsc });
     assert.equal(res.status, 1, res.stdout + res.stderr);
+    assert.match(res.stderr, /SIGKILL/);
     assert.equal(fs.readFileSync(p.baseline, 'utf8'), '{"probe.js":3}\n');
+});
+
+test('CLI: tsc убит уже на --listFilesOnly — внятное сообщение и код 1, не стек', () => {
+    const p = makeProject(CLEAN);
+    const file = path.join(p.dir, 'fake-tsc-list.js');
+    fs.writeFileSync(file, "process.kill(process.pid, 'SIGKILL');\n");
+    const res = runCli(p, [], { TYPECHECK_TSC: file });
+    assert.equal(res.status, 1, res.stdout + res.stderr);
+    assert.match(res.stderr, /tsc не отработал/);
+    assert.match(res.stderr, /SIGKILL/);
+    assert.doesNotMatch(res.stderr, /\n\s+at /);
 });
 
 test('CLI --write с временным конфигом пишет только временную базу', () => {
@@ -232,6 +253,7 @@ function mutatedCopy(file, from, to) {
     // место (или ничего) и был бы зелёным по ошибке.
     assert.equal(source.split(from).length - 1, 1, `${file}: фрагмент «${from}» не найден или не один`);
     const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'typecheck-payload-')));
+    TEMP_DIRS.push(dir);
     fs.writeFileSync(path.join(dir, 'reader.js'), source.replace(from, to));
     const cfg = JSON.parse(fs.readFileSync(path.join(REPO, 'tsconfig.renderer.json'), 'utf8'));
     cfg.include = [toPosixPath(path.join(REPO, 'types', '*.d.ts')), 'reader.js'];

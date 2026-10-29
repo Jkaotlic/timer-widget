@@ -8,6 +8,12 @@
 // объявлен как «нет окна ИЛИ объект с ровно теми полями, которые общие модули
 // читают и пишут»; типы полей — из экспорта модуля, как в globals.d.ts.
 // `document` в главном процессе не бывает вовсе.
+//
+// ВАЖНО: `undefined |` при `strict: false` (нет strictNullChecks) СТИРАЕТСЯ,
+// поэтому tsc НЕ потребует `typeof window !== 'undefined'` — неохраняемый
+// `window.X` в главном процессе пройдёт проверку типов. Охрана — тест
+// tests/main-no-dom.test.js: в electron-main.js и main-*.js слов window и
+// document в коде нет.
 
 declare var window: undefined | {
     CONFIG?: typeof import('../constants.js');
@@ -26,6 +32,8 @@ declare var document: undefined;
 interface Element {
     addEventListener(type: string, listener: (event: never) => void): void;
 }
+// `interface Document` СЛИВАЕТСЯ с одноимённым интерфейсом из electron.d.ts
+// (типы Electron объявляют свой Document), а не заменяет его.
 interface Document {
     addEventListener(type: string, listener: (event: never) => void): void;
 }

@@ -302,17 +302,20 @@ function main(argv) {
     const all = [];
     for (const cfg of configs) {
         const name = path.relative(REPO, cfg) || cfg;
-        const files = listProjectFiles(cfg);
-        if (files.length === 0) {
-            console.error(`[typecheck] ${name}: tsc не нашёл ни одного файла проекта — пустой include дал бы ложный «0 ошибок».`);
-            return 1;
-        }
         const root = path.dirname(cfg);
+        let files;
         let run;
         try {
-            run = runTscFull(cfg);
+            files = listProjectFiles(cfg);
+            if (files.length > 0) {
+                run = runTscFull(cfg);
+            }
         } catch (err) {
             console.error(`[typecheck] ${name}: tsc не отработал: ${err.message}`);
+            return 1;
+        }
+        if (files.length === 0) {
+            console.error(`[typecheck] ${name}: tsc не нашёл ни одного файла проекта — пустой include дал бы ложный «0 ошибок».`);
             return 1;
         }
         const errors = parseTscOutput(run.output, root);
