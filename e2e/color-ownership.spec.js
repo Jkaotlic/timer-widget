@@ -159,9 +159,17 @@ async function setDisplayStyle(style) {
 
 // Возвращает вычисленные цвет и тень. null — элемента в разметке нет (стиль
 // его не рисует); это тоже факт, который надо запереть.
-function readPaint(selector) {
+//
+// Цвет полосы меняется ПЕРЕХОДОМ (`transition: color var(--tw-dur-base)`), и
+// пауза после команды — ставка на скорость машины: на раннере macOS 29.10.2026
+// снимок поймал середину перехода (rgb(255, 195, 17) вместо rgb(255, 193, 7)).
+// Ждём УСЛОВИЕ — конец всех CSS-переходов документа (цвет наследуется, так что
+// переход предка красит и этот элемент). Бесконечные анимации не ждём.
+async function readPaint(selector) {
     const el = document.querySelector(selector);
     if (!el) { return null; }
+    const transitions = document.getAnimations().filter((a) => a instanceof CSSTransition);
+    await Promise.all(transitions.map((a) => a.finished.catch(() => {})));
     const cs = getComputedStyle(el);
     return { color: cs.color, textShadow: cs.textShadow };
 }
