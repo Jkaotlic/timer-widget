@@ -302,6 +302,13 @@ function listProjectFiles(configPath) {
         }
         files.push(rel);
     }
+    // Ненулевой код без файлов и без `error TS` — сбой tsc, а не пустой
+    // include (у пустого include есть своя диагностика TS18003). Так же
+    // выглядит и kill в Windows, где сигналов нет.
+    const output = `${res.stdout || ''}${res.stderr || ''}`;
+    if (res.status !== 0 && files.length === 0 && !/error TS\d+/.test(output)) {
+        throw new Error(`код ${res.status} без единой диагностики\n${output}`);
+    }
     return files;
 }
 

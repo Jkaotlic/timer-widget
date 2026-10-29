@@ -235,6 +235,11 @@ test('CLI: tsc упал без диагностики (код 2, ни одной
     assert.equal(fs.existsSync(p.baseline), false);
 });
 
+// В Windows сигналов нет: `process.kill(pid, 'SIGKILL')` там — обычное
+// завершение с кодом 1, и `res.signal` пуст (CI 29.10.2026). Имя сигнала
+// ждём только на POSIX; фатальность и нетронутая база — на всех ОС.
+const KILL_IS_SIGNAL = process.platform !== 'win32';
+
 test('CLI: tsc убит сигналом — фатально, базу не трогает', () => {
     const p = makeProject(CLEAN);
     const stored = '{"probe.js":{"TS2339: x":3}}\n';
@@ -242,7 +247,7 @@ test('CLI: tsc убит сигналом — фатально, базу не т�
     const tsc = fakeTsc(p.dir, "process.kill(process.pid, 'SIGKILL');");
     const res = runCli(p, ['--write'], { TYPECHECK_TSC: tsc });
     assert.equal(res.status, 1, res.stdout + res.stderr);
-    assert.match(res.stderr, /SIGKILL/);
+    if (KILL_IS_SIGNAL) { assert.match(res.stderr, /SIGKILL/); }
     assert.equal(fs.readFileSync(p.baseline, 'utf8'), stored);
 });
 
@@ -254,8 +259,22 @@ test('CLI: tsc убит уже на --listFilesOnly — внятное сооб�
     const res = runCli(p, [], { TYPECHECK_TSC: file });
     assert.equal(res.status, 1, res.stdout + res.stderr);
     assert.match(res.stderr, /tsc не отработал/);
-    assert.match(res.stderr, /SIGKILL/);
+    if (KILL_IS_SIGNAL) { assert.match(res.stderr, /SIGKILL/); }
     assert.doesNotMatch(res.stderr, /\n\s+at /);
+});
+
+// Падение без сигнала (так выглядит и kill в Windows): ненулевой код, ни
+// одного файла и ни одной `error TS` — это не «пустой include», а сбой tsc.
+test('CLI: tsc упал на --listFilesOnly без диагностики — «не отработал», а не «пустой include»', () => {
+    const p = makeProject(CLEAN);
+    fs.mkdirSync(path.join(p.dir, 'bin'), { recursive: true });
+    const tsc = path.join(p.dir, 'bin', 'fake-tsc-list-crash.js');
+    fs.writeFileSync(tsc, "console.error('Segmentation oops'); process.exit(1);\n");
+    const res = runCli(p, [], { TYPECHECK_TSC: tsc });
+    assert.equal(res.status, 1, res.stdout + res.stderr);
+    assert.match(res.stderr, /tsc не отработал/);
+    assert.match(res.stderr, /Segmentation oops/);
+    assert.doesNotMatch(res.stderr, /пустой include/);
 });
 
 test('CLI --write с временным конфигом пишет только временную базу', () => {
