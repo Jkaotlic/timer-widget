@@ -174,4 +174,37 @@ test('второй экземпляр файл памяти не читает и
     await new Promise((r) => setImmediate(r));
     assert.equal(quit, 1);
     assert.ok(!h.order.includes('relay-load'));
+    // app.quit() второго экземпляра проходит через before-quit/will-quit.
+    // Его память пуста — записанная, она стёрла бы файл основного.
+    h.appHandlers.get('before-quit')({ preventDefault() {} });
+    h.appHandlers.get('will-quit')();
+    assert.ok(!h.order.includes('relay-flush'), 'второй экземпляр перезаписал relay-state.json пустой памятью');
+});
+
+test('второй экземпляр не трогает снимок восстановления и накопитель основного', async () => {
+    // Второй запуск (автостарт + ярлык) выходит сразу, но его before-quit —
+    // ТОТ ЖЕ обработчик, что у основного: он стирал last-state.json живого
+    // основного, и сбой того в следующие 10 с терял отсчёт.
+    const h = makeDeps();
+    const touched = [];
+    h.deps.app.requestSingleInstanceLock = () => false;
+    h.deps.app.quit = () => {};
+    h.deps.recoverySnapshot.clearSavedTimerState = () => touched.push('clearSavedTimerState');
+    h.deps.recoverySnapshot.stopPeriodicSave = () => touched.push('stopPeriodicSave');
+    h.deps.events.closeTalkOnQuit = () => touched.push('closeTalkOnQuit');
+    startApp(h.deps);
+    await new Promise((r) => setImmediate(r));
+    h.appHandlers.get('before-quit')({ preventDefault() {} });
+    assert.deepEqual(touched, [], 'второй экземпляр тронул состояние основного');
+    assert.equal(h.deps.flags.isQuitting, true, 'выход при этом остаётся выходом');
+});
+
+test('проверка второго экземпляра проверяет себя: у основного before-quit стирает снимок', async () => {
+    const h = makeDeps();
+    const touched = [];
+    h.deps.recoverySnapshot.clearSavedTimerState = () => touched.push('clearSavedTimerState');
+    startApp(h.deps);
+    await until(() => h.appHandlers.has('activate'));
+    h.appHandlers.get('before-quit')({ preventDefault() {} });
+    assert.deepEqual(touched, ['clearSavedTimerState']);
 });

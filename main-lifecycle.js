@@ -71,7 +71,17 @@ function startApp(deps) {
     // Идёт перенос настроек file:// → app:// (до первого окна).
     let __preparingStorage = false;
 
+    // Единственный экземпляр решается ДО обработчиков выхода: второй экземпляр
+    // выходит сразу (app.quit() ниже), и его before-quit — тот же обработчик,
+    // что у основного. Пустой процесс не вправе трогать общий профиль: он
+    // стирал снимок восстановления ЖИВОГО основного (last-state.json) и
+    // перезаписывал бы память ретрансляторов пустой.
+    const __singleInstance = __inTestMode || __screenshotMode
+        || typeof app.requestSingleInstanceLock !== 'function'
+        || app.requestSingleInstanceLock();
+
     app.on('before-quit', (event) => {
+        if (!__singleInstance) { flags.isQuitting = true; return; }
         const win = windows.displayWindow;
         if (!__leavingFullScreenToQuit && win && !win.isDestroyed() && win.isFullScreen()) {
             __leavingFullScreenToQuit = true;
@@ -101,7 +111,10 @@ function startApp(deps) {
     });
 
     // Посылка, пришедшая уже после before-quit (окна закрываются), — тоже в файл.
-    app.on('will-quit', () => { relayStore.flush(); });
+    app.on('will-quit', () => {
+        if (!__singleInstance) { return; }
+        relayStore.flush();
+    });
 
     // Single-instance lock: a tray utility with autostart is easy to launch twice.
     // A duplicate instance would spawn a second tray + timer and race the shared
@@ -118,9 +131,6 @@ function startApp(deps) {
         windows.controlWindow.focus();
     }
 
-    const __singleInstance = __inTestMode || __screenshotMode
-        || typeof app.requestSingleInstanceLock !== 'function'
-        || app.requestSingleInstanceLock();
     if (!__singleInstance) {
         app.quit();
     } else {
