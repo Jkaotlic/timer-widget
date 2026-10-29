@@ -27,9 +27,9 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 **Main process** (`electron-main.js` + `main-*.js`, map and rules — [docs/main-process.md](docs/main-process.md); electron only in the entry) is the single source of truth for timer state. It manages 4 renderer windows and synchronizes them via IPC:
 
 1. **Control Window** (`electron-control.html`) — main management panel. Settings live in a slide-out drawer. Default 400px wide (`CONFIG.CONTROL_WINDOW_WIDTH`), min 380; the drawer adds ~336px. What is left of it (`TimerController` + bootstrap) is `control-app.js` — see **Control panel modules**.
-2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, flip, analog, digits (LED слит с «Цифрами» 13.08.2026). Glassmorphism design.
-3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, flip, analog, digits. Has a `DisplayTimer` class.
-4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, flip, analog, digits. Glassmorphism design.
+2. **Widget Window** (`electron-widget.html`) — transparent, frameless, always-on-top mini-timer. 4 styles: circle, flip, analog, digits.
+3. **Display Window** (`display.html` + `display-script.js`) — fullscreen timer for presentations. 4 styles: circle, flip, analog, digits.
+4. **Clock Widget** (`electron-clock-widget.html`) — independent clock widget. 4 styles: circle, flip, analog, digits.
 
 ### IPC Communication
 
@@ -41,7 +41,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 ### Control panel modules
 
-`electron-control.html` used to be a 7300-line god-file (CSS + markup + all logic in one inline script). It was the project's main source of duplicated-logic bugs — you cannot see a duplicate in a file that size. It is now split:
+`electron-control.html` was a 7300-line god-file, the main source of duplicated-logic bugs (a duplicate is invisible at that size). Now split:
 
 | File | Owns |
 |------|------|
@@ -64,7 +64,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `panel-titlebar.js` | Кнопки темы и замка: обе величины ОБЩИЕ для четырёх окон; у замка две кнопки при одной привязке |
 | `panel-presets.js` | Ячейки вида: клик применяет, Shift+клик пишет, Ctrl+1…4 то же; применение — ТЕМ ЖЕ путём, что запуск панели |
 | `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) |
-| `panel-clock.js` | Окно часов со стороны панели — **примесь**: ЕДИНСТВЕННЫЙ писатель `clockWidgetSettings` (таблица — `pushClockSettings`, стиль — `sendClockStyle`); окно часов ключ только читает |
+| `panel-clock.js` | Часы со стороны панели — **примесь**: ЕДИНСТВЕННЫЙ писатель `clockWidgetSettings`; окно часов только читает |
 | `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, тумблеры, раскладки, крестик |
 | `display-layouts.js` | Реестр элементов дисплея (id → тумблер → вид → подпись), масштабы, пять раскладок; координаты — доли для ЦЕНТРА |
 | `panel-state.js` | Четыре состояния панели — **примесь**: класс `state-*`, ОДНА сборка payload `widget-style-update`, ввод, мастер-звук |
