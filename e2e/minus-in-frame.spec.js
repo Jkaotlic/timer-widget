@@ -13,6 +13,17 @@
  *
  * Время ставится и меряется в ОДНОМ evaluate: главный процесс шлёт состояние
  * каждую секунду, и между двумя вызовами оно перезаписало бы подставленное.
+ *
+ * Меряется ОСЕВШЕЕ состояние, а не кадр посреди анимации (флак 29.10.2026,
+ * windows-latest, один коммит: −8.04 и +9.49 px). У `.time-text` дисплея
+ * `transition: font-size 200ms`, и смена класса (`compact`/`signed-hours`)
+ * запускает переход ОТ ТЕКУЩЕГО кегля. Синхронный замер видит его начало:
+ * при −3723 после −83 это промежуточный кегль между 0.19 и 0.165 диаметра —
+ * чем медленнее машина между двумя evaluate, тем ближе к 0.19, на котором
+ * знак и лежал на обводке. Локально пауза 120 мс перед замером давала −30.7 px
+ * при осевших +17.6. Поэтому зонд ДОВОДИТ переходы до конца (`finish()`), а
+ * бесконечные анимации (`time-pulse`, scale до 1.02 на перерасходе) проходит
+ * по фазам и берёт ХУДШУЮ: знак на пике пульса — тоже то, что видит зритель.
  */
 
 const { test, expect } = require('@playwright/test');
@@ -32,6 +43,29 @@ function probe(cfg) {
     t.remainingSeconds = cfg.secs;
     t.isRunning = false;
     t.updateDisplay();
+    // Переход — к концу: меряем то, к чему окно придёт, а не его начало.
+    for (const a of document.getAnimations()) {
+        if (a instanceof CSSTransition) { a.finish(); }
+    }
+    // Худшее по фазам бесконечных анимаций, двигающих элемент (или предка).
+    const worst = (el, measure) => {
+        const loops = document.getAnimations().filter((a) => !(a instanceof CSSTransition)
+            && a.effect && a.effect.target && a.effect.target.contains(el));
+        if (!loops.length) { return measure(); }
+        let acc = null;
+        const STEPS = 8;
+        for (let i = 0; i <= STEPS; i++) {
+            for (const a of loops) {
+                const d = Number(a.effect.getComputedTiming().duration) || 0;
+                a.pause();
+                a.currentTime = d * i / STEPS;
+            }
+            const m = measure();
+            acc = acc ? Object.fromEntries(Object.keys(m).map((k) => [k, Math.min(acc[k], m[k])])) : m;
+        }
+        for (const a of loops) { a.play(); }
+        return acc;
+    };
     const q = (sel) => {
         const el = document.querySelector(sel);
         return el ? el.getBoundingClientRect() : null;
@@ -44,10 +78,11 @@ function probe(cfg) {
             sign.style.setProperty('left', 'auto');
             sign.style.setProperty('right', '100%');
         }
-        const plate = q(s.digitsTime);
-        const r = sign.getBoundingClientRect();
-        out.insideLeft = r.left - plate.left;
-        out.insideRight = plate.right - r.right;
+        Object.assign(out, worst(sign, () => {
+            const plate = q(s.digitsTime);
+            const r = sign.getBoundingClientRect();
+            return { insideLeft: r.left - plate.left, insideRight: plate.right - r.right };
+        }));
         if (cfg.breakSign) {
             sign.style.removeProperty('left');
             sign.style.removeProperty('right');
@@ -62,14 +97,28 @@ function probe(cfg) {
         // Глиф шире карточки обрезается её краями.
         out.glyphFits = glyph.scrollWidth <= minus.clientWidth + 0.5;
     } else if (cfg.style === 'circle') {
-        const sign = q(s.circleSign);
+        const signEl = document.querySelector(s.circleSign);
+        const text = cfg.breakSign ? document.querySelector(s.circleText) : null;
+        if (text) {
+            // Старый кегль «−1:02:03» (0.19 диаметра) — тот, на котором знак
+            // лежал на обводке (кадр 30.09.2026). Тоже через переход и тоже
+            // доводится до конца: самопроверка покрывает и само доведение.
+            text.style.setProperty('font-size', 'calc(var(--ring-size) * 0.19)');
+            for (const a of document.getAnimations()) {
+                if (a instanceof CSSTransition) { a.finish(); }
+            }
+        }
         const track = document.querySelector(s.ringTrack);
-        const box = track.getBoundingClientRect();
-        const r = Number(track.getAttribute('r'));
-        const k = box.width / (2 * r);
-        const stroke = parseFloat(getComputedStyle(track).strokeWidth) * k;
-        const innerEdge = box.left + stroke / 2;
-        out.clearance = sign.left - innerEdge;
+        Object.assign(out, worst(signEl, () => {
+            const sign = signEl.getBoundingClientRect();
+            const box = track.getBoundingClientRect();
+            const r = Number(track.getAttribute('r'));
+            const k = box.width / (2 * r);
+            const stroke = parseFloat(getComputedStyle(track).strokeWidth) * k;
+            const innerEdge = box.left + stroke / 2;
+            return { clearance: sign.left - innerEdge };
+        }));
+        if (text) { text.style.removeProperty('font-size'); }
     }
     return out;
 }
@@ -82,7 +131,7 @@ const WIDGET = {
 const DISPLAY = {
     digitsTime: '.digits-time', digitsSign: '.digits-sign',
     flipMinus: '#flipMinus', flipCard: '.flip-card', flipMinusSign: '.flip-minus-sign',
-    circleSign: '.time-minus', ringTrack: '.ring-track'
+    circleSign: '.time-minus', circleText: '.time-text', ringTrack: '.ring-track'
 };
 
 function measureIn(page, targetName, selectors, style, secs, breakSign = false) {
@@ -137,6 +186,12 @@ test('минус стоит внутри рамки во всех стилях �
         const broken = await measureIn(widget, 'timerWidget', WIDGET, 'digits', -83, true);
         console.log(`   самопроверка, старая посадка: ${JSON.stringify(broken)}`);
         expect(broken.insideLeft, 'зонд не видит знак за рамкой').toBeLessThan(0);
+
+        // Самопроверка зонда «внутри кольца»: старый кегль «−1:02:03» обязан
+        // ловиться. Дисплей всё ещё на «Круге» — менялся только стиль виджета.
+        const brokenRing = await measureIn(display, 'displayTimer', DISPLAY, 'circle', -3723, true);
+        console.log(`   самопроверка, кегль 0.19: ${JSON.stringify(brokenRing)}`);
+        expect(brokenRing.clearance, 'зонд не видит знак на обводке').toBeLessThan(0);
     } finally {
         await control.evaluate(() => {
             window.ipcRenderer.send('widget-style-update', { timerStyle: 'circle' });
