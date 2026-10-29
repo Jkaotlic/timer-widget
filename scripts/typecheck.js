@@ -4,8 +4,8 @@
 /**
  * Храповик `tsc --checkJs` по файлам.
  *
- * Зачем. Проект — vanilla JS без сборщика, и долг типов на старте — полторы
- * тысячи ошибок. Запретить их разом нельзя, а `// @ts-check` по файлам
+ * Зачем. Проект — vanilla JS без сборщика, и долг типов на старте — около
+ * тысячи ошибок (994 в первой базе). Запретить их разом нельзя, а `// @ts-check` по файлам
  * проверяет только размеченное: новый файл без метки не проверяется вовсе.
  * Поэтому tsc гоняется по ВСЕМ файлам приложения, а число ошибок сравнивается
  * ПО ФАЙЛАМ с закоммиченной базой `typecheck-baseline.json`:
@@ -29,8 +29,14 @@
  * каждый конфиг прогоняется с `--listFilesOnly`, и отсутствие в списке хотя бы
  * одного файла проекта — провал, а не чистота.
  *
+ * Падение самого tsc — не чистота: сигнал или ненулевой код без единой строки
+ * `error TS` — фатально (код 1, вывод tsc печатается, `--write` не советуется:
+ * он стёр бы базу, увидев «0 ошибок»).
+ *
  * Конфиги по умолчанию — пара выше; env `TYPECHECK_CONFIGS` (через запятую)
- * подставляет свои (так тесты гоняют CLI на временном каталоге).
+ * подставляет свои, `TYPECHECK_BASELINE` — свой файл базы, `TYPECHECK_TSC` —
+ * свой скрипт вместо tsc (так тесты гоняют CLI на временном каталоге и не
+ * касаются живой базы).
  */
 
 const fs = require('node:fs');
@@ -38,7 +44,12 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const REPO = path.join(__dirname, '..');
-const BASELINE = path.join(REPO, 'typecheck-baseline.json');
+
+function baselinePath() {
+    return process.env.TYPECHECK_BASELINE
+        ? path.resolve(process.env.TYPECHECK_BASELINE)
+        : path.join(REPO, 'typecheck-baseline.json');
+}
 const DEFAULT_CONFIGS = ['tsconfig.main.json', 'tsconfig.renderer.json'];
 
 // `файл(строка,столбец): error TS1234: текст`. Путь бывает относительным
@@ -173,9 +184,12 @@ function sortedCounts(counts) {
     return out;
 }
 
-// `typescript/bin/tsc` закрыт полем `exports` пакета (7.x), поэтому путь
-// собирается из `bin` его package.json — тот же файл, что запускает npx.
+// `typescript/bin/tsc` закрыт полем `exports` пакета, поэтому путь собирается
+// из `bin` его package.json — тот же файл, что запускает npx.
 function tscBin() {
+    if (process.env.TYPECHECK_TSC) {
+        return path.resolve(process.env.TYPECHECK_TSC);
+    }
     const pkgPath = require.resolve('typescript/package.json');
     const bin = require(pkgPath).bin;
     return path.join(path.dirname(pkgPath), typeof bin === 'string' ? bin : bin.tsc);
@@ -191,19 +205,30 @@ function spawnTsc(args, cwd) {
     if (res.error) {
         throw res.error;
     }
+    if (res.signal) {
+        throw new Error(`tsc убит сигналом ${res.signal}\n${res.stdout || ''}${res.stderr || ''}`);
+    }
     return res;
 }
 
 /**
- * Прогон tsc по конфигу. Возвращает stdout + stderr вместе. Каталог запуска —
+ * Прогон tsc по конфигу: stdout + stderr вместе и код выхода. Каталог запуска —
  * каталог конфига, поэтому относительные пути вывода — от него.
+ * @param {string} configPath
+ * @returns {{output: string, status: number | null}}
+ */
+function runTscFull(configPath) {
+    const abs = path.resolve(configPath);
+    const res = spawnTsc(['-p', abs, '--pretty', 'false'], path.dirname(abs));
+    return { output: `${res.stdout || ''}${res.stderr || ''}`, status: res.status };
+}
+
+/**
  * @param {string} configPath
  * @returns {string}
  */
 function runTsc(configPath) {
-    const abs = path.resolve(configPath);
-    const res = spawnTsc(['-p', abs, '--pretty', 'false'], path.dirname(abs));
-    return `${res.stdout || ''}${res.stderr || ''}`;
+    return runTscFull(configPath).output;
 }
 
 /**
@@ -241,14 +266,14 @@ function isAppFile(file) {
 }
 
 function readBaseline() {
-    if (!fs.existsSync(BASELINE)) {
+    if (!fs.existsSync(baselinePath())) {
         return null;
     }
-    return JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+    return JSON.parse(fs.readFileSync(baselinePath(), 'utf8'));
 }
 
 function writeBaseline(counts) {
-    fs.writeFileSync(BASELINE, `${JSON.stringify(sortedCounts(counts), null, 2)}\n`);
+    fs.writeFileSync(baselinePath(), `${JSON.stringify(sortedCounts(counts), null, 2)}\n`);
 }
 
 function total(counts) {
@@ -283,7 +308,19 @@ function main(argv) {
             return 1;
         }
         const root = path.dirname(cfg);
-        const errors = parseTscOutput(runTsc(cfg), root);
+        let run;
+        try {
+            run = runTscFull(cfg);
+        } catch (err) {
+            console.error(`[typecheck] ${name}: tsc не отработал: ${err.message}`);
+            return 1;
+        }
+        const errors = parseTscOutput(run.output, root);
+        if (run.status !== 0 && errors.length === 0) {
+            console.error(`[typecheck] ${name}: tsc завершился с кодом ${run.status} без единой диагностики — это падение, а не чистота. Вывод:`);
+            console.error(run.output);
+            return 1;
+        }
         const fatal = errors.filter((e) => e.file === '' || e.file.endsWith('.json'));
         if (fatal.length > 0) {
             console.error(`[typecheck] ${name}: ошибка конфигурации tsc:`);
