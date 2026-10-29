@@ -6,7 +6,7 @@
 | Job | Где | Что |
 |-----|-----|-----|
 | `build` | ubuntu-latest | `npm run ci`, затем `visual:check` под xvfb (блокирует промах кадра) и неблокирующий `coverage`. Визуальному шагу нужен `chmod 4755` + root на `chrome-sandbox` дев-бинаря, иначе Chromium падает с кодом 133 |
-| `build` (шаг typecheck) | ubuntu-latest | `npm run typecheck` — `tsc --checkJs` по двум проектам и сравнение с `typecheck-baseline.json`; рост числа ошибок в файле или `tsc` без диагностики — красный; уменьшение без `--write` тоже красное |
+| `build` (шаг typecheck) | ubuntu-latest | `npm run typecheck` — `tsc --checkJs` по двум проектам и сравнение с `typecheck-baseline.json`; новое сообщение или его рост в файле (сравнение «код: текст» без строки), корневой `*.js` вне программ или `tsc` без диагностики — красный; уменьшение без `--write` тоже красное. Тот же шаг — в каждом job сборки `release.yml` |
 | `unit-cross-platform` | windows + macos | `npm run lint` + `npm test` — класс «ломается только не на Linux» (CRLF) |
 | `e2e` | ubuntu + windows + macos | `npx playwright test` — настоящий рантайм. Linux под `xvfb-run`; `fail-fast: false` |
 | `pack` | ubuntu + windows | `electron-builder --dir` + `scripts/verify-packed.js`: состав `app.asar`, релизные гейты, фьюзы |
