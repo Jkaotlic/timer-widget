@@ -701,10 +701,8 @@
                     // флаг _hasWidgetStyle оставался false, и любая правка во
                     // вкладке «Полноэкранный» перерисовывала виджет.
                     // Ровно эту же ветку уже убрали в часах (electron-clock-widget.html).
-                    // Показ цифр на аналоговом циферблате
-                    if (settings.showAnalogNumbers !== undefined && this.widgetClockNumbers) {
-                        this.widgetClockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
-                    }
+                    // Цифр циферблата здесь нет: поле showAnalogNumbers этого
+                    // канала не шлёт никто (проверка типов 29.10.2026, D1).
                 };
 
                 /** @type {IpcListener<'widget-style-update'>} */ this.widgetStyleUpdateHandler = (event, settings) => {

@@ -1879,11 +1879,6 @@ class DisplayTimer {
             }
         }
 
-        // Показ цифр на аналоговом циферблате
-        if (settings.showAnalogNumbers !== undefined && this.clockNumbers) {
-            this.clockNumbers.classList.toggle('visible', settings.showAnalogNumbers);
-        }
-
         // Масштаб блоков времени — та же логика «применяем только при реальном
         // изменении», что и для timerScale выше (см. комментарий там).
         if (settings.timeBlocksScale !== undefined) {

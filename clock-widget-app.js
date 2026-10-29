@@ -735,11 +735,11 @@
                 };
                 ipcRenderer.on('set-clock-style', this._onSetClockStyle);
                 
-                // Получаем настройки дисплея (showAnalogNumbers)
+                // Настройки дисплея: часам из них нужен только clockStyle. Цифры
+                // циферблата здесь не читаются — их показ идёт по clock-settings
+                // (showNumbers); поле showAnalogNumbers этого канала не шлёт
+                // никто (проверка типов 29.10.2026, D1).
                 /** @type {IpcListener<'display-settings-update'>} */ this._onDisplaySettingsUpdate = (event, settings) => {
-                    if (settings.showAnalogNumbers !== undefined && this.clockAnalogNumbers) {
-                        this.clockAnalogNumbers.classList.toggle('visible', settings.showAnalogNumbers);
-                    }
                     // ТОЛЬКО clockStyle. Раньше рядом стоял fallback
                     // `else if (settings.timerStyle) setClockStyle(settings.timerStyle)`,
                     // но timerStyle в ЭТОМ сообщении — стиль ПОЛНОЭКРАННОГО режима
