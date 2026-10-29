@@ -52,7 +52,10 @@ const WINDOWS = [
         // тот же localStorage. Ровно там, где эта подпорка не работает —
         // гонка старта в режиме съёмки, когда окна успевают прочитать
         // хранилище раньше, чем панель туда пишет, — снапшот и нужен.
-        hydration: ['display-settings-update', 'clock-colors-update', 'clock-settings']
+        // Стиль — `set-clock-style` из relay.lastClockStyle (29.10.2026); до
+        // того он ехал полем `display-settings-update`, и эта посылка часам
+        // больше не досылается (tests/clock-style-channel.test.js).
+        hydration: ['set-clock-style', 'clock-colors-update', 'clock-settings']
     },
     {
         create: 'createDisplayWindow',

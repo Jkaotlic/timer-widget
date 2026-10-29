@@ -1663,7 +1663,9 @@ test('BUG-10: payload без картинки не стирает её; дисп
 
     send({ bgMode: 'local', bgLocalImage: IMG, eventTitle: 'a' });
     assert.ok(sentTo('display').at(-1).payload.bgLocalImage === IMG, 'новая картинка не дошла до дисплея');
-    assert.ok(!('bgLocalImage' in sentTo('clock').at(-1).payload), 'часам картинка не нужна — и не шлётся');
+    // Часам эта посылка не шлётся вовсе: стиль у них едет своим каналом
+    // (set-clock-style, tests/clock-style-channel.test.js), фон им не нужен.
+    assert.equal(sentTo('clock').length, 0, 'часам настройки дисплея не шлются');
 
     // Нажатие клавиши в названии: картинки в payload нет — и дальше её нет.
     send({ bgMode: 'local', eventTitle: 'ab' });
@@ -2026,6 +2028,7 @@ function firstLifeWithSettings() {
         bgLocalImage: 'data:image/png;base64,' + 'A'.repeat(4096)
     });
     send('clock-widget-settings', { showDate: true });
+    send('clock-widget-set-style', 'analog');
     send('ui-theme-update', { theme: 'light' });
     send('ui-lock-update', { locked: true });
     // Выход: отложенная запись обязана случиться здесь, а не «когда-нибудь».
@@ -2069,6 +2072,10 @@ test('перезапуск: окно, открытое ДО первой пос�
     clock.webContents.emit('did-finish-load');
     assert.deepEqual(lastSentTo(stubs, clock, 'clock-settings'), { showDate: true });
     assert.deepEqual(lastSentTo(stubs, clock, 'clock-colors-update'), { timer: '#111111' });
+    // Стиль часов — свой канал и своя память: до первой посылки панели окно
+    // получает его снимком из файла, а посылку дисплея не получает вовсе.
+    assert.equal(lastSentTo(stubs, clock, 'set-clock-style'), 'analog');
+    assert.equal(lastSentTo(stubs, clock, 'display-settings-update'), null);
 
     openDisplay(stubs);
     const display = liveWindow(stubs, 'display');

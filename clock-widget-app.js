@@ -512,9 +512,9 @@
 
             setClockStyle(style) {
                 // Белый список. Значение приходит ДВУМЯ путями, и оба без
-                // проверки: из localStorage при старте и по каналу
-                // `clock-widget-set-style`, который главный процесс просто
-                // ретранслирует. Класс собирается конкатенацией, а
+                // проверки стиля: из localStorage при старте и по каналу
+                // `set-clock-style` (главный процесс проверяет лишь, что это
+                // строка разумной длины). Класс собирается конкатенацией, а
                 // `classList.add` роняет DOMException на строке с пробелом или
                 // на пустой — обработчик обрывается ПОСЛЕ снятия прежних
                 // классов, и body остаётся вообще без `style-*`, то есть
@@ -719,23 +719,11 @@
                 };
                 ipcRenderer.on('set-clock-style', this._onSetClockStyle);
                 
-                // Настройки дисплея: часам из них нужен только clockStyle. Цифры
-                // циферблата здесь не читаются — их показ идёт по clock-settings
-                // (showNumbers); поле showAnalogNumbers этого канала не шлёт
-                // никто (проверка типов 29.10.2026, D1).
-                /** @type {IpcListener<'display-settings-update'>} */ this._onDisplaySettingsUpdate = (event, settings) => {
-                    // ТОЛЬКО clockStyle. Раньше рядом стоял fallback
-                    // `else if (settings.timerStyle) setClockStyle(settings.timerStyle)`,
-                    // но timerStyle в ЭТОМ сообщении — стиль ПОЛНОЭКРАННОГО режима
-                    // (см. pushDisplaySettings в electron-control.html), а не часов.
-                    // Сработав, он молча навязал бы часам чужой стиль в обход и
-                    // собственной настройки часов, и переключателя синхронизации
-                    // syncClockStyle, который по умолчанию выключен.
-                    if (settings.clockStyle) {
-                        this.setClockStyle(settings.clockStyle);
-                    }
-                };
-                ipcRenderer.on('display-settings-update', this._onDisplaySettingsUpdate);
+                // `display-settings-update` часы не слушают с 29.10.2026: из
+                // настроек дисплея им был нужен только стиль, а у стиля один
+                // канал — `set-clock-style` выше (main помнит его и досылает
+                // при открытии). Чужой `timerStyle` той посылки (стиль
+                // ПОЛНОЭКРАННОГО режима) часам не принадлежал и раньше.
                 
                 // Получаем настройки часов от панели управления
                 this._onClockSettings = (event, settings) => {
@@ -814,7 +802,6 @@
                 // как окно закрыли — тот же принцип, что строкой выше.
                 if (this._geometry) { this._geometry.cancelPendingSave(); }
                 if (this._onSetClockStyle) {ipcRenderer.removeListener('set-clock-style', this._onSetClockStyle);}
-                if (this._onDisplaySettingsUpdate) {ipcRenderer.removeListener('display-settings-update', this._onDisplaySettingsUpdate);}
                 if (this._onClockSettings) {ipcRenderer.removeListener('clock-settings', this._onClockSettings);}
                 if (this._onColorsUpdate) {
                     ipcRenderer.removeListener('clock-colors-update', this._onColorsUpdate);

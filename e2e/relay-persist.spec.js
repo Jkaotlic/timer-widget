@@ -24,6 +24,8 @@ const path = require('node:path');
 const { _electron: electron } = require('playwright');
 const { launchApp, waitForControlWindow, cleanEnv, MAIN, USER_DATA_DIR } = require('./launch');
 const profileGuard = require('./profile-guard');
+const { waitForClock, findWindowBy } = require('./window-ready');
+const { installClockStyleProbe, clockSends } = require('./clock-style-probe');
 
 const RELAY_FILE = path.join(USER_DATA_DIR, 'relay-state.json');
 const TITLE = 'Сохранённое мероприятие';
@@ -146,6 +148,73 @@ test('после перезапуска виджет и выгрузка CSV с�
             await fix.app.close();
         }
         // Профиль общий: следующий тест не должен стартовать с памятью этого.
+        fs.rmSync(RELAY_FILE, { force: true });
+    }
+});
+
+/**
+ * Стиль часов переживает перезапуск в памяти main (relay.lastClockStyle).
+ *
+ * Во второй жизни панель «молчит»: зонд снимает обработчик её канала стиля
+ * (e2e/clock-style-probe.js) и считает заглушённые посылки. Значит стиль, с
+ * которым main встречает часы, взят ТОЛЬКО из relay-state.json. Зонд проверяет
+ * сам себя: стартовая посылка панели (через 500 мс после её загрузки) обязана
+ * попасть в заглушку — иначе он встал позже неё, и замер ничего не доказывает.
+ */
+test('после перезапуска часы получают стиль снимком из файла, до посылок панели', async () => {
+    const CLOCK_PROBE = () => !!document.getElementById('clockGradient');
+    const closeClock = async (app, control) => {
+        if (!(await findWindowBy(app, CLOCK_PROBE))) { return; }
+        await control.evaluate(() => window.ipcRenderer.send('close-clock-widget'));
+        await expect.poll(async () => !!(await findWindowBy(app, CLOCK_PROBE))).toBe(false);
+    };
+
+    // --- 1. Первая жизнь: свой стиль часов при закрытых часах ---
+    const first = await launchApp({ keepProfile: true });
+    await closeClock(first.app, first.control);
+    await first.control.evaluate(() => {
+        const sync = document.getElementById('syncClockStyle');
+        if (sync.checked) { sync.checked = false; sync.dispatchEvent(new Event('change')); }
+        document.querySelector('#clockStyle button[data-val="analog"]').click();
+    });
+    await first.app.close();
+
+    let second = null;
+    try {
+        const saved = readRelayFile();
+        expect(saved, `после выхода нет ${RELAY_FILE}`).not.toBeNull();
+        expect(saved.relay.lastClockStyle, 'стиль часов в файле памяти').toBe('analog');
+
+        // --- 2. Вторая жизнь: панель молчит, часы открываются сразу ---
+        const app = await electron.launch({ args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`], env: cleanEnv() });
+        await installClockStyleProbe(app, { blockPanel: true });
+        const control = await waitForControlWindow(app);
+        second = { app, control };
+        await control.waitForLoadState('domcontentloaded');
+        await closeClock(app, control);
+        await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        const clock = await waitForClock(app);
+
+        await expect.poll(() => clockSends(app).then((r) => r.blockedPanelPosts),
+            { message: 'стартовая посылка стиля панели не попала в заглушку: зонд встал поздно' })
+            .toBeGreaterThan(0);
+        await expect.poll(() => clockSends(app).then((r) => r.sends.map((s) => s.channel)),
+            { message: 'main не дослал часам стиль при открытии' }).toContain('set-clock-style');
+        const { sends } = await clockSends(app);
+        console.log('   посылки часам:', JSON.stringify(sends));
+        expect(sends.filter((s) => s.channel === 'set-clock-style').map((s) => s.payload)).toEqual(['analog']);
+        expect(sends.filter((s) => s.channel === 'display-settings-update')).toEqual([]);
+        await expect.poll(() => clock.evaluate(() => document.body.className),
+            { message: 'часы открылись не в сохранённом стиле' }).toContain('style-analog');
+        await closeClock(app, control);
+    } finally {
+        if (second) {
+            await profileGuard.watch(second.app);
+            await second.app.close();
+        } else {
+            const fix = await launchApp();
+            await fix.app.close();
+        }
         fs.rmSync(RELAY_FILE, { force: true });
     }
 });

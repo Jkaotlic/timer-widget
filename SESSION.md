@@ -26,8 +26,10 @@
 3. Пара масштабов дисплея (`displayTimerScale` против
    `displayExtSettings.displayTimerScale`), снять «первая посылка не
    применяется».
-4. Стиль часов идёт двумя каналами (`set-clock-style` и `clockStyle` в
-   `display-settings-update`) — оставить один.
+4. ~~Стиль часов идёт двумя каналами~~ ЗАКРЫТ: один канал
+   `clock-widget-set-style` → `set-clock-style`, main помнит
+   `relay.lastClockStyle` (и в relay-state.json), досылает часам при открытии;
+   `clockStyle` из `display-settings-update` убран, часы эту посылку не слушают.
 
 Удалённая ветка `types/checkjs` слита, но не удалена (удаление веток
 блокирует классификатор — пользователь удаляет сам).

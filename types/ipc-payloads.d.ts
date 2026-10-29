@@ -62,7 +62,6 @@ interface WidgetStyleUpdate {
  * tests/typecheck-ratchet.test.js.
  */
 interface DisplaySettingsUpdate {
-    clockStyle: string;
     bgMode: string;
     bgSolid: string;
     bgGrad1: string;

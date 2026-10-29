@@ -194,7 +194,9 @@ const RECEIVERS = Object.freeze({
     'ui-theme-update': ALL,
     // Замок шлёт панель — сама она его не слушает (bindLockSync не зовёт).
     'ui-lock-update': ['widget', 'clock', 'display'],
-    'display-settings-update': ['widget', 'clock', 'display'],
+    // Часам — нет: из этой посылки им был нужен только стиль, а он едет
+    // своим каналом set-clock-style (29.10.2026).
+    'display-settings-update': ['widget', 'display'],
 
     // Каждое окно знает, открыты ли ДВА других (клавиши W / C / D).
     'widget-window-state': ['control', 'clock', 'display'],

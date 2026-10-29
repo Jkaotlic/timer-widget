@@ -180,8 +180,6 @@ const PanelDisplayMixin = {
 
         /** @type {DisplaySettingsUpdate} (types/ipc-payloads.d.ts) */
         const base = {
-            // Формулу «какой стиль у часов сейчас» знает одно место — panel-clock.js.
-            clockStyle: this.effectiveClockStyle(),
             bgMode: this.currentBgMode,
             bgSolid: document.getElementById('bgSolidColor').value,
             bgGrad1: document.getElementById('bgGrad1').value,

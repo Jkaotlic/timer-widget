@@ -15,6 +15,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readSource } = require('./helpers/window-source');
+const { codeOnly } = require('./helpers/source-scan');
 
 const read = (file) => readSource(file);
 
@@ -358,20 +359,15 @@ test('дисплей: часы текущего времени идут по с�
 // BUG-10 — стиль часов не берётся от полноэкранного режима
 // ---------------------------------------------------------------------------
 
-test('часы: стиль применяется только из clockStyle, не из timerStyle дисплея', () => {
-    const src = read('electron-clock-widget.html');
-    const handler = src.match(/_onDisplaySettingsUpdate = \(event, settings\) => \{(.*?)\n {16}\};/s);
-    assert.ok(handler, 'обработчик display-settings-update в часах не найден');
-
-    assert.match(handler[1], /if \(settings\.clockStyle\) \{\s*this\.setClockStyle\(settings\.clockStyle\);/s);
-
-    // Сравниваем только КОД: комментарий рядом намеренно цитирует удалённую
-    // ветку, чтобы правка не вернулась «по незнанию», и без вырезания
-    // комментариев тест ловил бы сам себя.
-    const code = handler[1].replace(/^[ \t]*\/\/.*$/gm, '');
-    assert.doesNotMatch(
-        code,
-        /settings\.timerStyle/,
-        'timerStyle в этом сообщении — стиль ПОЛНОЭКРАННОГО режима; часам он не принадлежит'
-    );
+test('часы: стиль не берётся от полноэкранного режима — посылку дисплея часы не слушают вовсе', () => {
+    // Раньше обработчик display-settings-update в часах читал clockStyle, а
+    // рядом стоял fallback на settings.timerStyle — стиль ПОЛНОЭКРАННОГО
+    // режима. С 29.10.2026 стиль часов едет только каналом set-clock-style,
+    // и подписки на посылку дисплея в окне часов нет: чужому стилю неоткуда
+    // прийти (tests/clock-style-channel.test.js).
+    const code = codeOnly(read('electron-clock-widget.html'));
+    assert.match(code, /\.on\('set-clock-style'/, 'проверка видит подписки окна');
+    assert.doesNotMatch(code, /\.on\('display-settings-update'/);
+    assert.doesNotMatch(code, /settings\.timerStyle/,
+        'timerStyle посылки дисплея — стиль ПОЛНОЭКРАННОГО режима; часам он не принадлежит');
 });

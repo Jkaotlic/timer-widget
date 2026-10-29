@@ -60,7 +60,7 @@ file:// → app:// нового канала не заводит: у его ск
 | `clock-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — clock only |
 | `display-colors-update` | панель | `{ timer: '#hex', progress: '#hex' }` — display only |
 | `widget-style-update` | панель | `{ timerStyle, timerScale }` — widget style/scale |
-| `display-settings-update` | панель | Display style, background, clock settings. `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local`. `bgLocalImage` есть в payload только при СМЕНЕ картинки (BUG-10): ключа нет — «без изменений», `''` — «картинки нет»; main помнит последнюю и досылает её дисплею при открытии, виджету и часам — никогда |
+| `display-settings-update` | панель | Display style, background, event fields (стиля часов в нём НЕТ с 29.10.2026 — у него свой канал `clock-widget-set-style`; часам эта посылка не шлётся). `bgMode` — четыре значения: `theme` (умолчание чистого профиля: холст по теме окна), `solid`, `gradient`, `local`. `bgLocalImage` есть в payload только при СМЕНЕ картинки (BUG-10): ключа нет — «без изменений», `''` — «картинки нет»; main помнит последнюю и досылает её дисплею при открытии, виджету и часам — никогда |
 | `get-timer-state` | панель, виджет, часы, дисплей | Request current timer state |
 | `get-displays` | панель | Request list of available displays |
 | `open-releases-page` | панель | Без payload: main открывает страницу релизов через `shell.openExternal`, адрес — КОНСТАНТА в main. URL из рендерера означал бы выполнение произвольного адреса руками ОС |
@@ -71,7 +71,7 @@ file:// → app:// нового канала не заводит: у его ск
 | `control-drawer` | панель | `{ open }` — ящик настроек. Отдельный канал: потолок окна двухуровневый (760×740 по содержимому, 1096×1100 с ящиком), и из ширины запроса уровень не выводится |
 | `control-collapse` | панель | `{ collapsed, height }` — свернуть панель в полосу. Отдельный канал: `resize-control-window` зажимает высоту минимумом окна (660). Снимает и возвращает пол `minHeight`, держит ВЕРХНИЙ край, `height` в 36…120 |
 | `widget-resize` / `widget-move` / `widget-set-position` | виджет | Геометрия виджета. `widget-move` несёт `{deltaX, deltaY, first}`: `first` помечает начало жеста, и main держит размер окна до конца перетаскивания |
-| `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | clock-widget-resize: панель, часы; clock-widget-set-style: панель; clock-widget-settings: панель | Clock widget controls |
+| `clock-widget-resize` / `clock-widget-set-style` / `clock-widget-settings` | clock-widget-resize: панель, часы; clock-widget-set-style: панель; clock-widget-settings: панель | Clock widget controls. `clock-widget-set-style` — строка стиля, ЕДИНСТВЕННАЯ дорога стиля к часам: шлёт её одна `sendClockStyle()` (panel-clock.js, формула `effectiveClockStyle()`), main помнит (`relay.lastClockStyle`, пишется в relay-state.json), пересылает как `set-clock-style` и досылает часам снимком при открытии. `clock-widget-settings` стиля не несёт |
 | `clock-widget-move` | часы | `{ deltaX, deltaY }` — move clock widget window |
 | `clock-widget-set-position` | часы | `{ x, y }` — restore saved clock position (clamped to a live display) |
 | `display-move` | дисплей | `{ deltaX, deltaY }` — move display window in windowed mode |
@@ -110,7 +110,7 @@ file:// → app:// нового канала не заводит: у его ск
 | `event-overrun-state` | Дисплею И панели: `{ overrunSeconds, finished, excludedLiveSeconds }` — накопитель перелимита мероприятия. СЕКУНДЫ, а не рубли: ставку знает окно, и поправленная посреди мероприятия она обязана пересчитать накопленное. Дисплей рисует деньги залу, панель отчитывается оператору строкой «Идёт / Завершено»; итог оба собирают ОДНОЙ `MoneyMeter.eventSummary`. Payload собран в одном месте (`eventOverrunPayload()`) — рассылка и гидратация окна расходились полем `excludedLiveSeconds` |
 | `event-export-done` | Результат выгрузки: `{ ok, canceled, path, rows, error }`. Ответ обязателен в любом исходе, кроме отмены — кнопка без ответа читается как сломанная |
 | `displays-list` | Array of available displays |
-| `set-clock-style` / `clock-settings` | Clock widget settings |
+| `set-clock-style` / `clock-settings` | Clock widget settings. `set-clock-style` — строка стиля (белый список — в окне, `setClockStyle`); снимок при открытии из `relay.lastClockStyle` |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
 | `ui-theme-update` | `{ theme }` — applied by `UITheme.bindThemeSync()` in every window |
 | `window-geometry` | `{x, y, width, height}` — НАСТОЯЩИЕ границы окна от главного процесса. Виджет и часы пишут в `localStorage` их, а не свои `outerWidth`/`screenX`: на мониторе с масштабом ≠ 100 % это разные единицы |
@@ -143,7 +143,7 @@ file:// → app:// нового канала не заводит: у его ск
 ## Память ретрансляторов переживает перезапуск
 
 Что main помнит из ретрансляторов (`relay.*`, `main-state.js`: цвета трёх
-окон, стиль виджета, настройки дисплея и часов), он пишет в
+окон, стиль виджета, настройки дисплея, настройки и стиль часов), он пишет в
 `userData/relay-state.json` (`relay-store.js`, `atomic-write.js`) — склейкой
 500 мс и обязательно на `before-quit`/`will-quit`. Картинка фона дисплея в файл
 НЕ идёт; настройки часов читаются только по известным ключам

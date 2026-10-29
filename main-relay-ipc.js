@@ -13,7 +13,7 @@
  */
 
 const IpcSenders = require('./ipc-senders');
-const { sanitizeRelayPayload, mergeDisplaySettings, withoutBgImage, isPayloadObject } = require('./relay-payload');
+const { sanitizeRelayPayload, mergeDisplaySettings, isPayloadObject } = require('./relay-payload');
 
 // Блок дисплея закрыт крестиком прямо в окне. Список — из таблицы настроек: он
 // же используется в панели для проводки и сборки payload. Своя копия здесь
@@ -112,7 +112,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         safelySendToWindow(windows.widgetWindow, 'widget-style-update', settings);
     });
 
-    // Рассылка настроек отображения fullscreen и widget (clockStyle/background)
+    // Настройки полноэкранного окна (и фон виджета — снимком при открытии)
     ipcMain.on('display-settings-update', (event, payload) => {
         const settings = acceptRelay('display-settings-update', payload);
         if (settings === null) { return; }
@@ -122,15 +122,20 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
         // В файл картинка не идёт (relay-store.js): она живёт в localStorage.
         persistRelay();
 
-        // Открытым окнам — ровно пришедшее: дисплей держит свою копию картинки,
-        // и 13 МБ на каждое нажатие клавиши не едут и отсюда. Часам фон не нужен.
+        // Открытому дисплею — ровно пришедшее: он держит свою копию картинки,
+        // и 13 МБ на каждое нажатие клавиши не едут и отсюда. Часам эта посылка
+        // не шлётся: им из неё был нужен только стиль, а он едет своим каналом
+        // (clock-widget-set-style ниже). Виджет получает её снимком при открытии.
         safelySendToWindow(windows.displayWindow, 'display-settings-update', settings);
-        safelySendToWindow(windows.clockWidgetWindow, 'display-settings-update', withoutBgImage(settings));
     });
 
     ipcMain.on('clock-widget-set-style', (event, payload) => {
         const style = acceptRelay('clock-widget-set-style', payload);
         if (style === null) { return; }
+        // Запоминается: стиль у часов едет ТОЛЬКО этим каналом, и окно,
+        // открытое позже (или после перезапуска), получает его снимком.
+        relay.lastClockStyle = style;
+        persistRelay();
         safelySendToWindow(windows.clockWidgetWindow, 'set-clock-style', style);
     });
 

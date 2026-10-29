@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
 const { waitForClock, findWindowBy } = require('./window-ready');
+const { installClockStyleProbe, clockSends } = require('./clock-style-probe');
 
 /**
  * Синхронизация стиля часов со стилем виджета: переключатель ЗЕРКАЛИТ виджет.
@@ -394,6 +395,50 @@ test('под синхронизацией панель пишет часам с�
             document.querySelector('#clockStyle button[data-val="circle"]').click();
         }).catch(() => {});
         // Ждём УСЛОВИЕМ, что возврат дошёл до профиля, а не паузой.
+        await expect.poll(() => readClockStored(control).then((s) => s.clockStyle),
+            { message: 'возврат стиля часов не дошёл до профиля' }).toBe('circle')
+            .catch(() => {});
+        await app.close();
+    }
+});
+
+/**
+ * Стиль часов — ОДИН канал, и main его помнит (29.10.2026).
+ *
+ * До этого окно часов, открытое позже, получало стиль снимком из настроек
+ * ДИСПЛЕЯ (`clockStyle` в `display-settings-update`), а смена стиля часов эту
+ * посылку не пересобирала: в памяти main лежал стиль с момента последней
+ * правки дисплея. Часы открывались в выбранном стиле из профиля — и тут же
+ * перекрашивались устаревшим снимком. Открытие — каналом, а не кнопкой: кнопка
+ * панели через 500 мс досылает стиль сама и закрыла бы дефект.
+ */
+test('часы, открытые после смены стиля при закрытых часах, получают стиль снимком main', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await closeClockIfOpen(app, control);
+        await installClockStyleProbe(app);
+        await setSync(control, false);
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#clockStyle button[data-val="flip"]');
+        await expect.poll(() => readClockStored(control).then((s) => s.clockStyle)).toBe('flip');
+
+        await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        const clock = await waitForClock(app);
+        await expect.poll(() => clockSends(app).then((r) => r.sends.map((s) => s.channel)),
+            { message: 'main не дослал часам стиль при открытии' }).toContain('set-clock-style');
+        const { sends } = await clockSends(app);
+        console.log('   посылки часам:', JSON.stringify(sends));
+        expect(sends.filter((s) => s.channel === 'set-clock-style').map((s) => s.payload)).toEqual(['flip']);
+        expect(sends.filter((s) => s.channel === 'display-settings-update'),
+            'настройки дисплея часам не шлются — второй дороги стиля нет').toEqual([]);
+        await expect.poll(() => clock.evaluate(() => document.body.className),
+            { message: 'часы открылись не в выбранном стиле' }).toContain('style-flip');
+    } finally {
+        await closeClockIfOpen(app, control).catch(() => {});
+        await control.evaluate(() => {
+            document.querySelector('#clockStyle button[data-val="circle"]').click();
+        }).catch(() => {});
         await expect.poll(() => readClockStored(control).then((s) => s.clockStyle),
             { message: 'возврат стиля часов не дошёл до профиля' }).toBe('circle')
             .catch(() => {});

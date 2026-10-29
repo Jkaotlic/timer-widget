@@ -332,10 +332,11 @@ function createWindows(deps) {
             // идущем таймере, иначе считали бы его стоящим до первого тика — а
             // на паузе тика нет вовсе (BUG-01).
             safelySendToWindow(win, 'timer-state', getTimerState());
-            // Настройки дисплея несут стиль часов (clockStyle) и цифры циферблата;
-            // картинку фона часы не рисуют (BUG-10).
-            if (relay.lastDisplaySettings) {
-                safelySendToWindow(win, 'display-settings-update', withoutBgImage(relay.lastDisplaySettings));
+            // Стиль часов — свой канал и своя память (relay.lastClockStyle). До
+            // 29.10.2026 он ехал сюда полем настроек ДИСПЛЕЯ; других полей
+            // оттуда часы не читали, и посылка им больше не шлётся.
+            if (relay.lastClockStyle) {
+                safelySendToWindow(win, 'set-clock-style', relay.lastClockStyle);
             }
             // Свои настройки окна часов — тумблеры даты, пояса, секунд и формата.
             if (relay.lastClockSettings) {

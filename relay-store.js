@@ -13,7 +13,7 @@
  * неполный снимок.
  *
  * Что хранится: цвета трёх окон, стиль виджета, настройки дисплея БЕЗ картинки
- * фона (она до ~13 МБ и живёт в localStorage окна), настройки часов. Тема и
+ * фона (она до ~13 МБ и живёт в localStorage окна), настройки и стиль часов. Тема и
  * замок — нет (почему — в комментарии над CLOCK_SETTINGS_KEYS). Индекс монитора дисплея
  * не хранится — это выбор на одно открытие.
  *
@@ -44,14 +44,17 @@ const MAX_FILE_BYTES = 512 * 1024;
 // Склейка: панель шлёт настройки на каждое нажатие клавиши и шаг ползунка.
 const DEFAULT_DELAY_MS = 500;
 
-// Поле памяти → канал, по правилу которого оно проверяется.
-const OBJECT_FIELDS = Object.freeze({
+// Поле памяти → канал, по правилу которого оно проверяется. Все поля —
+// объекты, кроме стиля часов: он строка, и правило его канала — строка
+// разумной длины (relay-payload.js).
+const RELAY_FIELDS = Object.freeze({
     lastWidgetColors: 'widget-colors-update',
     lastClockColors: 'clock-colors-update',
     lastDisplayColors: 'display-colors-update',
     lastWidgetStyle: 'widget-style-update',
     lastDisplaySettings: 'display-settings-update',
-    lastClockSettings: 'clock-widget-settings'
+    lastClockSettings: 'clock-widget-settings',
+    lastClockStyle: 'clock-widget-set-style'
 });
 // Тема и замок (relay.uiTheme / relay.uiLocked) в файл НЕ идут намеренно.
 // Окна читают их сами из localStorage в <head>, а досланный из файла
@@ -83,7 +86,7 @@ function getRelayStatePath(userDataPath) {
 /** Что из памяти уходит в файл. Пустые поля (null) не пишутся. */
 function relaySnapshot(relay) {
     const out = {};
-    for (const field of Object.keys(OBJECT_FIELDS)) {
+    for (const field of Object.keys(RELAY_FIELDS)) {
         const value = relay[field];
         if (value === null || value === undefined) { continue; }
         out[field] = field === 'lastDisplaySettings' ? withoutBgImage(value) : value;
@@ -114,7 +117,7 @@ function parseRelayState(text) {
     const src = data.relay;
     const own = (key) => Object.prototype.hasOwnProperty.call(src, key);
     const out = {};
-    for (const [field, channel] of Object.entries(OBJECT_FIELDS)) {
+    for (const [field, channel] of Object.entries(RELAY_FIELDS)) {
         if (!own(field)) { continue; }
         const clean = sanitizeRelayPayload(channel, src[field]);
         if (clean === null) { continue; }

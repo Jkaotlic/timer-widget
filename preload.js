@@ -123,7 +123,6 @@ const CHANNELS_BY_ROLE = Object.freeze({
             'timer-state',
             'ui-theme-update',
             'ui-lock-update',
-            'display-settings-update',
             'widget-window-state',
             'display-window-state',
             'clock-colors-update',
