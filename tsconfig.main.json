@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "target": "es2022",
+    "module": "nodenext",
+    "skipLibCheck": true,
+    "lib": ["es2022"],
+    "types": ["node"]
+  },
+  "include": [
+    "electron-main.js",
+    "main-*.js",
+    "preload.js",
+    "app-scheme.js",
+    "atomic-write.js",
+    "navigation-guard.js",
+    "ipc-senders.js",
+    "relay-payload.js",
+    "channel-validator.js",
+    "constants.js",
+    "display-layouts.js",
+    "event-overrun-store.js",
+    "event-report.js",
+    "money-meter.js",
+    "recovery.js",
+    "settings-schema.js",
+    "timer-controller.js",
+    "timer-engine.js",
+    "utils.js",
+    "visual-diff.js",
+    "window-geometry.js"
+  ]
+}

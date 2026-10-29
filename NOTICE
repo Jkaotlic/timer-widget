@@ -1982,6 +1982,12 @@ Repository: https://github.com/sindresorhus/type-fest
 Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
+=== typescript ===
+Version: 6.0.3
+License: Apache-2.0
+Repository: https://github.com/microsoft/TypeScript
+Publisher: Microsoft Corp.
+
 === undici-types ===
 Version: 7.18.2
 License: MIT
