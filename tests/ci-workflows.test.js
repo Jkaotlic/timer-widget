@@ -94,6 +94,30 @@ for (const [file, jobName, buildCmd] of [
     });
 }
 
+// Храповик типов — ворота и CI, и релиза. В CI он стоит в job `build` (вывод
+// tsc от ОС не зависит, unit-cross-platform его не повторяет); в релизе —
+// в каждом job сборки, который гоняет `npm test`: тег без него собирался бы
+// мимо проверки, которая стоит на каждом пуше.
+function assertTypecheckBeforeTests(file, jobName, job) {
+    const tc = job.indexOf('run: npm run typecheck');
+    assert.ok(tc > -1, `${file} ${jobName}: нет шага npm run typecheck`);
+    assert.ok(tc < job.indexOf('run: npm test'), `${file} ${jobName}: typecheck после тестов`);
+}
+
+test('nodejs.yml build: npm run typecheck до тестов', () => {
+    assertTypecheckBeforeTests('nodejs.yml', 'build', yamlCode(jobBlock(NODEJS, 'build') || ''));
+});
+
+test('release.yml: каждый job с npm test гоняет и npm run typecheck', () => {
+    const src = yamlCode(read('release.yml'));
+    const jobs = [...src.matchAll(/^ {2}([A-Za-z0-9_-]+):\s*$/gm)].map((m) => m[1]);
+    const withTests = jobs.filter((j) => /run: npm test\b/.test(jobBlock(src, j)));
+    assert.ok(withTests.length >= 4, `в release.yml job с npm test: ${withTests.join(', ')} — срез сломан?`);
+    for (const j of withTests) {
+        assertTypecheckBeforeTests('release.yml', j, jobBlock(src, j));
+    }
+});
+
 // ── P3: установленный deb на живой системе ──────────────────────────────────
 const LAUNCH_CHECK = fs.readFileSync(path.join(ROOT, 'scripts', 'linux-launch-check.sh'), 'utf8');
 /** Скрипт без строк-комментариев: пояснение не засчитывается как проверка. */

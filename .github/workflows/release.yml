@@ -62,6 +62,10 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      # Храповик tsc --checkJs (scripts/typecheck.js) — те же ворота, что в CI.
+      - name: Run typecheck
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
 
@@ -97,6 +101,10 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      # Храповик tsc --checkJs (scripts/typecheck.js) — те же ворота, что в CI.
+      - name: Run typecheck
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test
@@ -134,6 +142,10 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      # Храповик tsc --checkJs (scripts/typecheck.js) — те же ворота, что в CI.
+      - name: Run typecheck
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
 
@@ -167,6 +179,10 @@ jobs:
 
       - name: Run lint
         run: npm run lint
+
+      # Храповик tsc --checkJs (scripts/typecheck.js) — те же ворота, что в CI.
+      - name: Run typecheck
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test
