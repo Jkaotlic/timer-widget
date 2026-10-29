@@ -133,11 +133,16 @@ function calculateProgress(remainingSeconds, totalSeconds) {
 
 /**
  * Безопасно отправляет IPC сообщение если окно существует
+ *
+ * Канал — параметр типа: литерал канала из карты (types/ipc-payloads.d.ts)
+ * выбирает тип payload, и посылка сверяется с ним; прочие каналы — `any`.
+ *
+ * @template {string} C
  * @param {{ isDestroyed(): boolean, webContents?: { isDestroyed(): boolean, send(channel: string, ...args: any[]): void } }} window
  *   окно Electron (BrowserWindow). Тип описан по форме: модуль общий с
  *   рендерером, где типов electron нет и быть не должно.
- * @param {string} channel - канал IPC
- * @param {...any} args - аргументы для отправки
+ * @param {C} channel - канал IPC
+ * @param {IpcArgs<C>} args - аргументы для отправки
  * @returns {boolean} - успех операции
  */
 function safelySendToWindow(window, channel, ...args) {

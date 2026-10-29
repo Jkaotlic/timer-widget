@@ -11,6 +11,7 @@
     "types": ["node"]
   },
   "include": [
+    "types/ipc-payloads.d.ts",
     "electron-main.js",
     "main-*.js",
     "preload.js",

@@ -17,7 +17,7 @@ const NavigationGuard = require('./navigation-guard');
  * @param {object} deps
  * @param {object} deps.windows — реестр окон (main-state.js)
  * @param {object} deps.log — electron-log
- * @param {Function} deps.safelySendToWindow — utils.js
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow — utils.js
  * @param {string[]} deps.appPageUrls — адреса четырёх страниц (navigation-guard.js)
  * @param {Function} deps.logBlockedNavigation — журнал отказа навигации
  * @param {Function} deps.updateTrayMenu — трей перестраивает меню по открытию окон

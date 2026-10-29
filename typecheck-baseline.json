@@ -1,14 +1,14 @@
 {
   "app-scheme.js": 7,
   "clock-settings-schema.js": 3,
-  "clock-widget-app.js": 10,
+  "clock-widget-app.js": 12,
   "color-picker.js": 8,
   "constants.js": 2,
   "control-app.js": 103,
   "custom-sounds.js": 5,
   "digits-style.js": 1,
   "display-layouts.js": 2,
-  "display-script.js": 5,
+  "display-script.js": 7,
   "electron-main.js": 2,
   "event-overrun-store.js": 1,
   "event-report.js": 9,
@@ -43,6 +43,6 @@
   "ui-feedback.js": 2,
   "ui-theme.js": 2,
   "utils.js": 4,
-  "widget-app.js": 14,
+  "widget-app.js": 16,
   "window-geometry.js": 12
 }

@@ -42,8 +42,15 @@
  * overrunLimitSeconds/allowNegative/timestamp/updateCounter → bump counter →
  * onState. The broadcast payload shape is byte-identical to the previous
  * inline emitTimerState in electron-main.js.
+ *
+ * @param {object} [deps]
+ * @param {any} [deps.engine]
+ * @param {() => number} [deps.now]
+ * @param {() => number} [deps.monotonic]
+ * @param {(state: TimerState, meta: { tick?: boolean }) => void} [deps.onState]
+ *     `state` и есть payload `timer-state` (types/ipc-payloads.d.ts)
+ * @param {(name: string) => void} [deps.onEvent]
  */
-
 function createTimerController(deps = {}) {
     const engine = deps.engine;
     const now = typeof deps.now === 'function' ? deps.now : Date.now;
@@ -58,6 +65,7 @@ function createTimerController(deps = {}) {
     // FIX BUG-012: monotonic counter instead of timestamp for reliable sync.
     let timerUpdateCounter = 0;
 
+    /** @type {TimerState} payload `timer-state` (types/ipc-payloads.d.ts) */
     let timerState = {
         totalSeconds: 0,
         remainingSeconds: 0,

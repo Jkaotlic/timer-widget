@@ -253,6 +253,7 @@
                 }));
             }
 
+            /** @param {ColorsUpdate|null} [colors] payload канала; null — из хранилища */
             applyColors(colors = null) {
                 if (!colors) {
                     const saved = localStorage.getItem('clockColors');
@@ -367,7 +368,7 @@
                 let _timerIsRunning = false;
                 let _displayIsOpen = false;
                 let _widgetIsOpen = false;
-                this._handlers.onTimerState = (_event, state) => {
+                /** @type {IpcListener<'timer-state'>} */ this._handlers.onTimerState = (_event, state) => {
                     _timerIsRunning = !!state.isRunning;
                 };
                 this._handlers.onDisplayWindowState = (_event, state) => {
@@ -735,7 +736,7 @@
                 ipcRenderer.on('set-clock-style', this._onSetClockStyle);
                 
                 // Получаем настройки дисплея (showAnalogNumbers)
-                this._onDisplaySettingsUpdate = (event, settings) => {
+                /** @type {IpcListener<'display-settings-update'>} */ this._onDisplaySettingsUpdate = (event, settings) => {
                     if (settings.showAnalogNumbers !== undefined && this.clockAnalogNumbers) {
                         this.clockAnalogNumbers.classList.toggle('visible', settings.showAnalogNumbers);
                     }
@@ -804,7 +805,7 @@
                 ipcRenderer.on('clock-settings', this._onClockSettings);
 
                 // Per-window color theme
-                this._onColorsUpdate = (_event, colors) => {
+                /** @type {IpcListener<'clock-colors-update'>} */ this._onColorsUpdate = (_event, colors) => {
                     this.applyColors(colors);
                 };
                 ipcRenderer.on('clock-colors-update', this._onColorsUpdate);

@@ -21,7 +21,7 @@
         /**
          * Send message to main process
          * @param {string} channel - Channel name
-         * @param {any} data - Data to send
+         * @param {any} [data] - Data to send (тип по каналу — globals.d.ts)
          */
         send: function(channel, data) {
             window.electronAPI.send(channel, data);

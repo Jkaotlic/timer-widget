@@ -27,12 +27,19 @@ declare var Buffer: {
     byteLength(value: string, encoding?: string): number;
 };
 
-/** Мост preload.js (`contextBridge.exposeInMainWorld('electronAPI', …)`). */
+/**
+ * Мост preload.js (`contextBridge.exposeInMainWorld('electronAPI', …)`).
+ *
+ * send/on/once типизированы картой «канал → payload» (ipc-payloads.d.ts):
+ * для канала из карты payload — его тип, для прочих — `any`, как раньше.
+ * Одна сигнатура с условным типом, а не две перегрузки: при перегрузках
+ * неверный payload канала из карты молча ушёл бы в запасную `(string, any)`.
+ */
 interface ElectronBridge {
-    send(channel: string, data?: any): void;
+    send<C extends string>(channel: C, ...data: C extends IpcChannel ? IpcArgs<C> : [data?: any]): void;
     /** Возвращает функцию отписки. */
-    on(channel: string, callback: (...args: any[]) => void): () => void;
-    once(channel: string, callback: (...args: any[]) => void): void;
+    on<C extends string>(channel: C, callback: (...args: IpcArgs<C>) => void): () => void;
+    once<C extends string>(channel: C, callback: (...args: IpcArgs<C>) => void): void;
     removeListener(channel: string, callback: (...args: any[]) => void): void;
     removeAllListeners(channel: string): void;
 }
@@ -43,10 +50,14 @@ interface ElectronBridge {
  * поэтому тип описан здесь, а не взят из импорта.
  */
 interface IpcRendererShim {
-    send(channel: string, data?: any): void;
-    /** Возвращает функцию отписки. */
-    on(channel: string, callback: (event: { sender: null }, ...args: any[]) => void): () => void;
-    once(channel: string, callback: (event: { sender: null }, ...args: any[]) => void): void;
+    /** Канал из карты (ipc-payloads.d.ts) требует ровно свой payload. */
+    send<C extends string>(channel: C, ...data: C extends IpcChannel ? IpcArgs<C> : [data?: any]): void;
+    /**
+     * Колбэк, написанный прямо в вызове, получает тип payload по имени канала
+     * сам — без аннотации на месте. Возвращает функцию отписки.
+     */
+    on<C extends string>(channel: C, callback: (event: { sender: null }, ...args: IpcArgs<C>) => void): () => void;
+    once<C extends string>(channel: C, callback: (event: { sender: null }, ...args: IpcArgs<C>) => void): void;
     removeListener(channel: string, callback: Function): void;
     removeAllListeners(channel: string): void;
     /** Внутреннее: обёртки слушателей по каналу (для removeListener). */

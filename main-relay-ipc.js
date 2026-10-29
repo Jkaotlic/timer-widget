@@ -51,7 +51,7 @@ const UI_THEME_VALUES = new Set(['dark', 'light']);
  * @param {object} deps.ipcMain — обвязка ipc-senders.guardIpcMain
  * @param {object} deps.windows — реестр окон (main-state.js)
  * @param {object} deps.relay — память ретрансляторов (main-state.js)
- * @param {Function} deps.safelySendToWindow
+ * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
  * @param {object} deps.log
  * @param {() => void} deps.applyWidgetMinimumSize — main-windows.js
  * @param {(on: boolean) => void} deps.applyWidgetAlwaysOnTop — main-windows.js

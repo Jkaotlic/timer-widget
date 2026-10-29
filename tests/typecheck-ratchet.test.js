@@ -212,3 +212,86 @@ test('CLI --write с временным конфигом пишет только
     assert.deepEqual(JSON.parse(fs.readFileSync(p.baseline, 'utf8')), { 'probe.js': 1 });
     assert.equal(fs.readFileSync(LIVE_BASELINE, 'utf8'), before);
 });
+
+// ---- мост типизирован картой «канал → payload» (types/ipc-payloads.d.ts) ----
+//
+// Опечатка в поле payload ключевого канала обязана быть ошибкой tsc и там, где
+// payload ЧИТАЮТ, и там, где его СОБИРАЮТ. Проверяется на настоящем коде: копия
+// файла во временном каталоге, одно поле заменено на опечатку; объявления —
+// настоящие types/*.d.ts репозитория. Пока мост отдаёт payload как `any`, tsc
+// молчит — и тест красный.
+
+/**
+ * @param {string} file файл окна в корне репозитория
+ * @param {string} from точный фрагмент с полем payload
+ * @param {string} to тот же фрагмент с опечаткой
+ */
+function mutatedCopy(file, from, to) {
+    const source = fs.readFileSync(path.join(REPO, file), 'utf8');
+    // Фрагмент обязан найтись ровно один раз: иначе тест проверял бы не то
+    // место (или ничего) и был бы зелёным по ошибке.
+    assert.equal(source.split(from).length - 1, 1, `${file}: фрагмент «${from}» не найден или не один`);
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'typecheck-payload-')));
+    fs.writeFileSync(path.join(dir, 'reader.js'), source.replace(from, to));
+    const cfg = JSON.parse(fs.readFileSync(path.join(REPO, 'tsconfig.renderer.json'), 'utf8'));
+    cfg.include = [toPosixPath(path.join(REPO, 'types', '*.d.ts')), 'reader.js'];
+    delete cfg.exclude;
+    fs.writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify(cfg));
+    return parseTscOutput(runTsc(path.join(dir, 'tsconfig.json')), dir)
+        .filter((e) => e.file === 'reader.js');
+}
+
+function toPosixPath(p) {
+    return p.replace(/\\/g, '/');
+}
+
+test('мост: опечатка в поле timer-state у слушателя БЕЗ аннотации — TS2339 (panel-display.js)', () => {
+    // Слушатель написан прямо в вызове ipc.on(...) — колбэк типизирует
+    // перегрузка моста по имени канала, своей аннотации у него нет.
+    const errors = mutatedCopy('panel-display.js',
+        'this.eventRemainingSeconds = state.remainingSeconds;',
+        'this.eventRemainingSeconds = state.remainingTimeX;');
+    const hit = errors.filter((e) => e.code === 'TS2339' && e.message.includes('remainingTimeX'));
+    assert.equal(hit.length, 1, JSON.stringify(errors, null, 2));
+});
+
+test('мост: опечатка в поле timer-state у сохранённого обработчика — TS2339 (widget-app.js)', () => {
+    // Обработчик сохранён в поле (его потом снимает removeListener), поэтому
+    // тип ему даёт не вызов on(), а IpcListener<'timer-state'> из той же карты.
+    const errors = mutatedCopy('widget-app.js',
+        'this.remainingSeconds = Number(state.remainingSeconds) || 0;',
+        'this.remainingSeconds = Number(state.remainingTimeX) || 0;');
+    const hit = errors.filter((e) => e.code === 'TS2339' && e.message.includes('remainingTimeX'));
+    assert.equal(hit.length, 1, JSON.stringify(errors, null, 2));
+});
+
+test('мост: опечатка в поле при СБОРКЕ display-settings-update — ошибка tsc (panel-display.js)', () => {
+    const errors = mutatedCopy('panel-display.js',
+        "bgSolid: document.getElementById('bgSolidColor').value,",
+        "bgSolidX: document.getElementById('bgSolidColor').value,");
+    // TS2353 — лишнее поле; TS2561 — оно же с подсказкой «Did you mean 'bgSolid'?».
+    const hit = errors.filter((e) => ['TS2353', 'TS2561'].includes(e.code) && e.message.includes('bgSolidX'));
+    assert.equal(hit.length, 1, JSON.stringify(errors, null, 2));
+});
+
+test('мост: тумблеры и подписи блоков в DisplaySettingsUpdate совпадают с реестрами', () => {
+    // В .d.ts ключи перечислены поимённо, а в коде они — реестры. Новый блок в
+    // реестре без строки в типе стал бы TS2339 у читающего окна; строка в типе
+    // без блока — обещанием поля, которого никто не шлёт.
+    const Schema = require('../settings-schema');
+    const Layouts = require('../display-layouts');
+    const dts = fs.readFileSync(path.join(REPO, 'types', 'ipc-payloads.d.ts'), 'utf8');
+    const body = dts.match(/interface DisplaySettingsUpdate \{([\s\S]*?)\n\}/);
+    assert.ok(body, 'interface DisplaySettingsUpdate не найден');
+    const declared = new Set([...body[1].matchAll(/^\s*(\w+)\??:/gm)].map((m) => m[1]));
+    const registry = [
+        ...Schema.DISPLAY_BLOCK_KEYS,
+        ...Schema.DISPLAY_LABEL_KEYS,
+        ...Layouts.LABELLED_ELEMENTS.map((el) => el.labelKey),
+    ];
+    for (const key of registry) {
+        assert.ok(declared.has(key), `${key} есть в реестре, но не в DisplaySettingsUpdate`);
+    }
+    const typed = [...declared].filter((k) => /^(show|label)[A-Z]/.test(k) && !/^labelHero/.test(k));
+    assert.deepEqual(typed.sort(), [...new Set(registry)].sort());
+});

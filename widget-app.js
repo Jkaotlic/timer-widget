@@ -453,6 +453,7 @@
                 }));
             }
 
+            /** @param {ColorsUpdate|null} [colors] payload канала; null — из хранилища */
             applyColors(colors = null) {
                 // Владельцем дефолта остаётся CSS — ровно так уже работают часы
                 // (electron-clock-widget.html:1168-1173) и полноэкранное окно.
@@ -662,7 +663,7 @@
                 ipcRenderer.send('get-timer-state');
 
                 // Сохраняем ссылки на обработчики для последующей очистки
-                this.timerStateHandler = (event, state) => {
+                /** @type {IpcListener<'timer-state'>} */ this.timerStateHandler = (event, state) => {
                     // FIX: Use monotonic updateCounter instead of timestamp for dedup
                     const updateCounter = state.updateCounter || 0;
                     if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) {return;}
@@ -681,11 +682,11 @@
                     this.updateDisplay();
                 };
 
-                this.colorsUpdateHandler = (event, colors) => {
+                /** @type {IpcListener<'widget-colors-update'>} */ this.colorsUpdateHandler = (event, colors) => {
                     this.applyColors(colors);
                 };
 
-                this.displaySettingsUpdateHandler = (event, settings) => {
+                /** @type {IpcListener<'display-settings-update'>} */ this.displaySettingsUpdateHandler = (event, settings) => {
                     // Виджет всегда прозрачный — фоновые картинки только на полноэкранном дисплее
                     const widgetSettings = { ...settings };
                     if (widgetSettings.bgMode === 'local') {
@@ -706,7 +707,7 @@
                     }
                 };
 
-                this.widgetStyleUpdateHandler = (event, settings) => {
+                /** @type {IpcListener<'widget-style-update'>} */ this.widgetStyleUpdateHandler = (event, settings) => {
                     // Подпись состояния. По умолчанию СКРЫТА: состояние уже несёт
                     // цвет дуги, а на маленьком виджете слово занимает место,
                     // которого нет. Класс на <body>, а не инлайн на элементе:
@@ -731,7 +732,7 @@
                     // масштаб, восстановленный из widgetGeometry или выставленный
                     // Ctrl+колесом прямо на виджете.
                     if (settings.timerScale !== undefined) {
-                        const incoming = parseInt(settings.timerScale, 10);
+                        const incoming = parseInt(String(settings.timerScale), 10);
                         if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
                             if (this._lastPushedTimerScale !== undefined) {
                                 this.resizeToScale(incoming);

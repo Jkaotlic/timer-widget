@@ -62,12 +62,14 @@ const PanelStateMixin = {
      * Добавить сюда новое поле значило бы отредактировать шесть мест и забыть
      * одно — ровно та поломка, которую этот проект уже ловил на настройках.
      *
-     * @param {object} [extra] поля, которые вызывающий знает точнее (например
-     *                         новое значение из обработчика change, ещё не
-     *                         записанное в контрол)
+     * @param {Partial<WidgetStyleUpdate>} [extra] поля, которые вызывающий
+     *     знает точнее (например новое значение из обработчика change, ещё не
+     *     записанное в контрол)
+     * @returns {WidgetStyleUpdate} тип — types/ipc-payloads.d.ts
      */
     widgetStylePayload(extra) {
-        return Object.assign({
+        /** @type {WidgetStyleUpdate} */
+        const payload = {
             timerStyle: this.timerStyleEl.value,
             timerScale: parseInt(this.timerScaleEl.value, 10),
             digitsFont: this.widgetDigitsFontEl ? this.widgetDigitsFontEl.value : 'inter',
@@ -76,7 +78,8 @@ const PanelStateMixin = {
             // слово занимает место, которого нет.
             statusLabel: this.widgetStatusLabelEl?.checked ?? false,
             alwaysOnTop: this.widgetAlwaysOnTopEl?.checked ?? true
-        }, extra || {});
+        };
+        return Object.assign(payload, extra || {});
     },
 
     /**

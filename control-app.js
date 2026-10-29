@@ -41,7 +41,7 @@
                 /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows;
                 /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows;
                 /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow;
-                /** @type {object|null} */ this.clockColors; // ставит PanelColorsMixin.loadWindowColors
+                /** @type {ColorsUpdate|null} */ this.clockColors; // ставит PanelColorsMixin.loadWindowColors
                 this.totalSeconds = 0;
                 this.remainingSeconds = 0;
                 this.isRunning = false;
@@ -66,7 +66,7 @@
                 // первой версии. Именно она уходила в widgetColors при первом
                 // же изменении настроек, то есть окна красились цветом, не
                 // принадлежащим палитре приложения.
-                this.currentColors = {
+                /** @type {ColorsUpdate} */ this.currentColors = {
                     timer: window.CONFIG.DEFAULT_TIMER_COLORS.timer,
                     progress: window.CONFIG.DEFAULT_TIMER_COLORS.progress,
                     bg: '#0f0c29'
@@ -1146,7 +1146,7 @@
                 };
                 ipcRenderer.on('displays-list', this._onDisplaysList);
 
-                this._onTimerState = (event, state) => {
+                /** @type {IpcListener<'timer-state'>} */ this._onTimerState = (event, state) => {
                     // FIX: Use monotonic updateCounter instead of timestamp for dedup
                     const updateCounter = state.updateCounter || 0;
                     if (updateCounter > 0 && updateCounter <= this.lastUpdateCounter) {return;}
