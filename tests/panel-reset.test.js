@@ -17,6 +17,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { PanelResetMixin } = require('../panel-reset.js');
+const { PanelClockMixin } = require('../panel-clock.js');
+const SettingsSchema = require('../settings-schema.js');
 
 function runReset(target, init) {
     const prev = { window: global.window, document: global.document, localStorage: global.localStorage };
@@ -28,12 +30,14 @@ function runReset(target, init) {
     global.window = {
         // Сброс схемы снимает ВСЕ чекбоксы окна — без событий, как настоящий.
         SettingsSchema: {
+            SETTINGS_DESCRIPTORS: SettingsSchema.SETTINGS_DESCRIPTORS,
             resetOwnedSettings: (owner) => {
                 trace.push('schema');
                 for (const el of Object.values(controls[owner] || {})) { el.checked = false; }
             }
         },
         ClockSettingsSchema: { applyClockSettings: () => {} },
+        SecurityUtils: { safeJSONParse: (raw, fallback) => (raw ? JSON.parse(raw) : fallback) },
         PanelColorFields: [],
         HeroModes: { DEFAULT_MODE: 'timer' },
         ipcRenderer: { send: (channel, payload) => sent.push([channel, payload]) },
@@ -46,6 +50,7 @@ function runReset(target, init) {
             saveExtSettings: () => trace.push('save'),
             pushDisplaySettings: () => trace.push('push'),
             pushClockSettings: () => trace.push('pushClock'),
+            refreshPresetMarks: () => {},
             widgetStylePayload: () => ({}),
             clockShowTicksEl: null,
             timerStyleEl: { value: 'flip' },
@@ -54,7 +59,8 @@ function runReset(target, init) {
             updateClockAnalogNumbersVisibility: () => {},
             highlightActiveThemes: () => {},
             renderSurfaceControls: () => {}
-        }, init.panel, PanelResetMixin);
+        }, init.panel, PanelResetMixin, { sendClockStyle: PanelClockMixin.sendClockStyle,
+            effectiveClockStyle: PanelClockMixin.effectiveClockStyle });
         panel.resetWindowSettings(target);
         return { panel, trace, sent };
     } finally {

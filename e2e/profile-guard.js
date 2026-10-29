@@ -95,8 +95,8 @@ const schemaDefaults = (rows) => Object.fromEntries(rows.map((r) => [r.key, r.de
 const FIELD_DEFAULTS = Object.freeze({
     displayExtSettings: schemaDefaults(SettingsSchema.SETTINGS_DESCRIPTORS),
     clockWidgetSettings: Object.assign(schemaDefaults(ClockSettingsSchema.CLOCK_SETTINGS), {
-        clockStyle: 'circle', // clock-widget-app.js: круговые — стиль по умолчанию
-        opacity: 1            // clock-widget-app.js: непрозрачность по умолчанию
+        clockStyle: 'circle', // пишет панель (sendClockStyle), умолчание окна часов — круг
+        opacity: 1            // писало окно часов до 29.10.2026; в старых профилях осталось
     })
 });
 const KEY_DEFAULTS = Object.freeze({

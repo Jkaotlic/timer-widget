@@ -41,6 +41,10 @@
                 /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows;
                 /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows;
                 /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow;
+                /** @type {TimerMixins['loadClockSettings']} */ this.loadClockSettings;
+                /** @type {TimerMixins['pushClockSettings']} */ this.pushClockSettings;
+                /** @type {TimerMixins['sendClockStyle']} */ this.sendClockStyle;
+                /** @type {TimerMixins['updateClockAnalogNumbersVisibility']} */ this.updateClockAnalogNumbersVisibility;
                 /** @type {ColorsUpdate|null} */ this.clockColors; // ставит PanelColorsMixin.loadWindowColors
                 this.totalSeconds = 0;
                 this.remainingSeconds = 0;
@@ -541,8 +545,7 @@
                         // Синхронизируем настройки и стиль часов при открытии
                         setTimeout(() => {
                             this.pushClockSettings();
-                            const clockStyle = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
-                            ipcRenderer.send('clock-widget-set-style', clockStyle);
+                            this.sendClockStyle();
                         }, 500);
                     }
                 });
@@ -594,7 +597,7 @@
                     // поэтому петля не замыкается и синхронизация не гаснет.
                     if (this.syncClockStyle) {
                         this.clockStyleEl.value = this.timerStyleEl.value;
-                        ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
+                        this.sendClockStyle();
                     }
                     this.updateClockAnalogNumbersVisibility();
                     this.updateStyleDependentRows();
@@ -628,7 +631,7 @@
                     if (this.syncClockStyle) {
                         // При включении синхронизации - применяем стиль таймера к часам
                         this.clockStyleEl.value = this.timerStyleEl.value;
-                        ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
+                        this.sendClockStyle();
                     }
                     this.updateClockAnalogNumbersVisibility();
                     this.updateStyleDependentRows();
@@ -641,7 +644,7 @@
                         this.syncClockStyle = false;
                         if (this.syncClockStyleEl) { this.syncClockStyleEl.checked = false; }
                     }
-                    ipcRenderer.send('clock-widget-set-style', this.clockStyleEl.value);
+                    this.sendClockStyle();
                     this.updateClockAnalogNumbersVisibility();
                     this.updateStyleDependentRows();
                     this.saveExtSettings();
@@ -940,10 +943,7 @@
                 this.updateStyleDependentRows();
 
                 // Отправляем стиль часам при загрузке
-                const clockStyleToSend = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
-                setTimeout(() => {
-                    ipcRenderer.send('clock-widget-set-style', clockStyleToSend);
-                }, 500);
+                setTimeout(() => this.sendClockStyle(), 500);
 
                 // Отправляем интервал и лимит перерасхода при загрузке
                 this.pushOverrunInterval();
@@ -1028,15 +1028,6 @@
             }
 
 
-            updateClockAnalogNumbersVisibility() {
-                // Определяем текущий стиль часов
-                const clockStyle = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
-                // Показываем опцию цифр только для аналогового стиля
-                if (this.clockAnalogNumbersRowEl) {
-                    this.clockAnalogNumbersRowEl.style.display = clockStyle === 'analog' ? 'flex' : 'none';
-                }
-            }
-
             // Строка выбора шрифта видна только при стиле «Цифры» — у остальных
             // четырёх стилей начертание задаёт сам стиль, выбирать нечего.
             // Три независимых проверки: у каждого окна свой активный стиль.
@@ -1099,42 +1090,6 @@
                         el.dispatchEvent(new Event('change'));
                     });
                 });
-            }
-
-            pushClockSettings() {
-                // Ключ, контрол и умолчание описаны ОДНОЙ строкой таблицы в
-                // clock-settings-schema.js. Здесь остаётся то, что таблица
-                // выразить не может: деления циферблата и запись в хранилище.
-                const persisted = window.ClockSettingsSchema.collectClockSettings(this);
-
-                // Деления — настройка ОБЩАЯ с виджетом, у неё свои ключи, и
-                // восстанавливают её сами окна. Поэтому в хранилище часов она не
-                // идёт (вторая копия настройки рано или поздно разойдётся), а по
-                // IPC идёт: там её ждут прямо сейчас.
-                const settings = { ...persisted, showTicks: this.clockShowTicksEl?.checked ?? false };
-
-                // СЛИЯНИЕ, а не перезапись: ключ пишут двое — эта панель и сам
-                // виджет часов (у него там ещё clockStyle). Прямая перезапись
-                // стирала чужие поля.
-                const prevClock = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
-                localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prevClock, ...persisted }));
-                this.refreshPresetMarks();
-
-                ipcRenderer.send('clock-widget-settings', settings);
-            }
-
-            loadClockSettings() {
-                window.ClockSettingsSchema.applyClockSettings(
-                    this,
-                    window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {})
-                );
-                // Деления — свой ключ вне clockWidgetSettings. Перечитываются
-                // здесь же: эту раскладку зовёт и применение пресета, и без
-                // строки тумблер после пресета показывал прежнее значение.
-                if (this.clockShowTicksEl) {
-                    this.clockShowTicksEl.checked = localStorage.getItem('clockShowTicks') === 'true';
-                }
-                this.updateClockAnalogNumbersVisibility();
             }
 
             setupIPC() {
@@ -1569,6 +1524,7 @@
         // Настройки дисплея: сборка payload, тумблеры блоков, приём «закрыли крестиком».
         Object.assign(TimerController.prototype, window.PanelDisplayMixin);
         Object.assign(TimerController.prototype, window.PanelResetMixin);
+        Object.assign(TimerController.prototype, window.PanelClockMixin);
 
         window.timerController = new TimerController();
         // Ряд «Фон» строится ПОСЛЕ конструктора: ему нужны загруженные цвета.
@@ -1854,9 +1810,7 @@
                         if (window.timerController) {
                             setTimeout(() => {
                                 window.timerController.pushClockSettings();
-                                const tc = window.timerController;
-                                const clockStyle = tc.syncClockStyle ? tc.timerStyleEl.value : tc.clockStyleEl.value;
-                                window.ipcRenderer.send('clock-widget-set-style', clockStyle);
+                                window.timerController.sendClockStyle();
                             }, 500);
                         }
                     }

@@ -35,7 +35,8 @@ const EXTRACTED = [
     'shortcuts-help.js',
     'custom-sounds.js',
     'local-background.js',
-    'clock-settings-schema.js'
+    'clock-settings-schema.js',
+    'panel-clock.js'
 ];
 
 test('окно управления больше не god-файл', () => {

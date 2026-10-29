@@ -686,12 +686,15 @@ test('ограничение 24ч для flip — решение отрисов�
     assert.match(clockHtml, /if \(!this\._uses24h\(\)\)/);
 });
 
-test('оба писателя clockWidgetSettings сливают, а не перезаписывают', () => {
-    // Ключ пишут панель управления (showTicks и др.) и сам виджет часов
-    // (opacity, clockStyle). Прямая перезапись стирала чужие поля.
-    for (const [name, src] of [['control', controlHtml], ['clock', clockHtml]]) {
-        const write = src.match(/localStorage\.setItem\('clockWidgetSettings'[^\n]*/);
-        assert.ok(write, `${name} должен писать clockWidgetSettings`);
-        assert.match(write[0], /\.\.\./, `${name} обязан сливать предыдущее значение`);
+test('панель пишет clockWidgetSettings слиянием, а не перезаписью', () => {
+    // Ключ пишут РАЗНЫЕ функции панели (pushClockSettings — таблица настроек,
+    // sendClockStyle — стиль). Прямая перезапись стирала бы поля соседней.
+    // До 29.10.2026 вторым писателем было само окно часов; что оно больше не
+    // пишет — tests/clock-single-writer.test.js.
+    // Запись живёт в примеси панели panel-clock.js (с 29.10.2026).
+    const writes = codeOnly(readRaw('panel-clock.js')).match(/localStorage\.setItem\('clockWidgetSettings'[^\n]*/g) || [];
+    assert.ok(writes.length >= 2, 'панель должна писать clockWidgetSettings (настройки и стиль)');
+    for (const write of writes) {
+        assert.match(write, /\.\.\.prevClock/, 'запись обязана сливать предыдущее значение');
     }
 });

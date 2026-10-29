@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { launchApp } = require('./launch');
+const { waitForClock, findWindowBy } = require('./window-ready');
 
 /**
  * Синхронизация стиля часов со стилем виджета: переключатель ЗЕРКАЛИТ виджет.
@@ -293,4 +294,106 @@ test('переключатели стилей объявляют выбранн�
     }
 
     await app.close();
+});
+
+/**
+ * У `clockWidgetSettings` один писатель — панель (спека 29.10.2026, п. 3).
+ *
+ * Стиль часов попадал в этот ключ только из САМОГО окна часов: панель слала
+ * стиль по IPC, окно его применяло и записывало. Закрытые часы ничего не
+ * получали и не писали — профиль хранил прежний стиль, и окно, открытое после
+ * перезапуска, читало на старте именно его. Сценарий поэтому — при ЗАКРЫТЫХ
+ * часах: при открытых старая схема случайно работала.
+ *
+ * Проверяется и профиль (то, что часы читают при своём старте, до любой
+ * досылки), и само окно после перезапуска.
+ */
+const CLOCK_PROBE = () => !!document.getElementById('clockGradient');
+
+async function closeClockIfOpen(app, control) {
+    if (!(await findWindowBy(app, CLOCK_PROBE))) { return; }
+    await control.evaluate(() => window.ipcRenderer.send('close-clock-widget'));
+    await expect.poll(async () => !!(await findWindowBy(app, CLOCK_PROBE)), { message: 'часы не закрылись' })
+        .toBe(false);
+}
+
+const readClockStored = (control) => control.evaluate(
+    () => JSON.parse(localStorage.getItem('clockWidgetSettings') || '{}')
+);
+
+test('стиль и шрифт часов, выбранные при закрытых часах, переживают перезапуск', async () => {
+    let app1;
+    try {
+        // Настройка нужна во ВТОРОМ запуске: сторож профиля вернёт её только
+        // на последнем закрытии теста.
+        const first = await launchApp({ keepProfile: true });
+        app1 = first.app;
+        const control = first.control;
+        await closeClockIfOpen(app1, control);
+        await setSync(control, false);
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#clockStyle button[data-val="digits"]');
+        await expect(control.locator('#clockDigitsFontRow')).toBeVisible();
+        await control.click('#clockDigitsFont .font-option[data-val="oswald"]');
+
+        // Окна часов нет — записать мог только панель.
+        expect(await findWindowBy(app1, CLOCK_PROBE), 'часы обязаны быть закрыты').toBeNull();
+        await expect.poll(() => readClockStored(control).then((s) => s.clockStyle),
+            { message: 'панель обязана записать стиль часов в clockWidgetSettings' }).toBe('digits');
+        await expect.poll(() => readClockStored(control).then((s) => s.clockDigitsFont),
+            { message: 'панель обязана записать шрифт часов в clockWidgetSettings' }).toBe('oswald');
+    } finally {
+        if (app1) { await app1.close(); }
+    }
+
+    const { app, control } = await launchApp();
+    try {
+        const stored = await readClockStored(control);
+        console.log('clockWidgetSettings после перезапуска →', JSON.stringify(stored));
+        expect(stored.clockStyle, 'часы на старте читают этот стиль').toBe('digits');
+        expect(stored.clockDigitsFont, 'и этот шрифт').toBe('oswald');
+
+        await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
+        const clock = await waitForClock(app);
+        await expect.poll(() => clock.evaluate(() => document.body.classList.contains('style-digits')),
+            { message: 'часы открылись не в выбранном стиле' }).toBe(true);
+        await expect.poll(() => clock.evaluate(() => document.getElementById('clockDigitsTime').style.fontFamily),
+            { message: 'часы открылись не в выбранном шрифте' }).toContain('Oswald');
+    } finally {
+        await closeClockIfOpen(app, control).catch(() => {});
+        await app.close();
+    }
+});
+
+test('под синхронизацией панель пишет часам стиль виджета и при закрытых часах', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await closeClockIfOpen(app, control);
+        await setSync(control, true);
+        await control.evaluate(() => {
+            document.querySelector('#timerStyle button[data-val="analog"]').click();
+        });
+        await expect.poll(() => readClockStored(control).then((s) => s.clockStyle),
+            { message: 'смена стиля виджета под синхронизацией обязана дойти до clockWidgetSettings' })
+            .toBe('analog');
+
+        // Сняли синхронизацию — часы возвращаются к СВОЕМУ стилю, и профиль тоже.
+        await setSync(control, false);
+        await control.click('.tab-btn[data-tab="clock"]');
+        await control.waitForSelector('#settingsDrawer.open');
+        await control.click('#clockStyle button[data-val="flip"]');
+        await expect.poll(() => readClockStored(control).then((s) => s.clockStyle),
+            { message: 'свой выбор стиля часов обязан дойти до clockWidgetSettings' }).toBe('flip');
+    } finally {
+        await control.evaluate(() => {
+            const el = document.getElementById('syncClockStyle');
+            el.checked = false;
+            el.dispatchEvent(new Event('change'));
+            document.querySelector('#timerStyle button[data-val="circle"]').click();
+            document.querySelector('#clockStyle button[data-val="circle"]').click();
+        }).catch(() => {});
+        await control.waitForTimeout(400);
+        await app.close();
+    }
 });

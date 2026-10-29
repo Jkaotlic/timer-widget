@@ -574,8 +574,8 @@ function measureClockDigits() {
 
 // Стиль часов хранится в ДВУХ местах: `displayExtSettings.clockStyle` (его
 // восстанавливает ПАНЕЛЬ через settings-schema.js на своей загрузке) и
-// `clockWidgetSettings.clockStyle` (его пишет и читает САМО окно часов через
-// свои loadSettings()/saveSettings()). Клик по сегменту в панели пишет ОБА —
+// `clockWidgetSettings.clockStyle` (его пишет панель — sendClockStyle в
+// panel-clock.js, — а окно часов читает на старте). Клик по сегменту пишет ОБА —
 // сбрасывать нужно тоже оба, иначе соседний спек в этом же прогоне унаследует
 // либо чужой выбор в панели, либо чужой выбор в самом окне.
 async function resetClockStyle(page) {

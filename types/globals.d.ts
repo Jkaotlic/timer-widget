@@ -127,6 +127,7 @@ interface Window {
     PanelColorsMixin: typeof import('../panel-colors.js').PanelColorsMixin;
     PanelDisplayMixin: typeof import('../panel-display.js').PanelDisplayMixin;
     PanelResetMixin: typeof import('../panel-reset.js').PanelResetMixin;
+    PanelClockMixin: typeof import('../panel-clock.js').PanelClockMixin;
 
     /**
      * НЕ присваивается ни одним модулем: существует лишь потому, что
@@ -157,7 +158,7 @@ interface Window {
  */
 type TimerMixins = Window['CustomSoundsMixin'] & Window['LocalBackgroundMixin']
     & Window['ThemeGridMixin'] & Window['PanelStateMixin'] & Window['PanelColorsMixin']
-    & Window['PanelDisplayMixin'] & Window['PanelResetMixin'];
+    & Window['PanelDisplayMixin'] & Window['PanelResetMixin'] & Window['PanelClockMixin'];
 
 /** ipc-compat.js кладёт шим в window; окна зовут его голым именем. */
 declare var ipcRenderer: Window['ipcRenderer'];

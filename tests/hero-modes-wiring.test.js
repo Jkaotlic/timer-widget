@@ -549,6 +549,7 @@ function runReset(target, heroModeBefore) {
             saveExtSettings() { trace.push('save:' + this.heroMode); },
             pushDisplaySettings() { trace.push('push:' + this.heroMode); },
             pushClockSettings: () => {},
+            sendClockStyle: () => {},
             syncClockStyle: false,
             widgetStylePayload: () => ({}),
             clockShowTicksEl: null,

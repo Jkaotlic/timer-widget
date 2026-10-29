@@ -92,6 +92,7 @@
 | `e2e-window-sizes.test.js` | Выбор размеров окна для e2e: помещающиеся, вывод из рабочей области, пол; ошибка делает спеку ХОЛОСТОЙ |
 | `window-geometry.test.js` | Drag + geometry on fake storage/DOM: restore, save, scale bounds, quota, modifier guard, drag target |
 | `window-top-edge.test.js` | Три условия верхнего края: `enableLargerThanScreen`, уровень `status`, поджатие по границам экрана |
+| `clock-single-writer.test.js` | У `clockWidgetSettings`/`clockColors` один писатель — панель (`panel-clock.js`, `saveColors`); окно часов не пишет, сканер проверяет себя |
 | `clock-settings-schema.test.js` | Clock settings table: collect/apply roundtrip, defaults, stored `false` vs missing |
 | `window-open-ownership.test.js` | Every create-function announces and hydrates its own window; tray binding in `createControlWindow` |
 | `settings-key-ownership.test.js` | `pickOwnSetting` + wiring: display/widget read their OWN key, ticks have one owner |

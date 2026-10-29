@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
 
 const { pickOwnSetting } = require('../renderer-shared');
 const { codeOnly } = require('./helpers/source-scan');
-const { readSource } = require('./helpers/window-source');
+const { readSource, readRaw } = require('./helpers/window-source');
 
 // Локальное имя оставлено читаемым: во всех проверках ниже речь именно о выборе
 // «своё имя против общего».
@@ -153,11 +153,13 @@ test('у делений циферблата один владелец в хра
     // инициализации, и поле внутри `clockWidgetSettings`, которое панель писала,
     // а не читал никто. Вторая копия настройки — это будущее расхождение.
     // По IPC поле идёт по-прежнему: там его ждёт обработчик clock-widget-settings.
-    const control = codeOnly(read('electron-control.html'));
+    // Запись настроек часов живёт в panel-clock.js (примесь панели) с 29.10.2026.
+    const panelClock = codeOnly(readRaw('panel-clock.js'));
     const clock = codeOnly(read('electron-clock-widget.html'));
 
-    const push = control.slice(control.indexOf('pushClockSettings()'));
-    const body = push.slice(0, push.indexOf('loadClockSettings()'));
+    const at = panelClock.indexOf('pushClockSettings() {');
+    assert.notEqual(at, -1, 'нет метода pushClockSettings в panel-clock.js');
+    const body = panelClock.slice(at, panelClock.indexOf('loadClockSettings() {', at));
 
     // Тумблер переехал во вкладку ЧАСОВ вместе с самой настройкой: у виджета
     // таймера делений больше нет, там кольцо обратного отсчёта.

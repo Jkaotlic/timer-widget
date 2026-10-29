@@ -64,6 +64,7 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 | `panel-titlebar.js` | Кнопки темы и замка: обе величины ОБЩИЕ для четырёх окон; у замка две кнопки при одной привязке |
 | `panel-presets.js` | Ячейки вида: клик применяет, Shift+клик пишет, Ctrl+1…4 то же; применение — ТЕМ ЖЕ путём, что запуск панели |
 | `panel-drawer.js` | Ширина колонки при открытом ящике: предсказание финальной (повторяет обрезку main) |
+| `panel-clock.js` | Окно часов со стороны панели — **примесь**: ЕДИНСТВЕННЫЙ писатель `clockWidgetSettings` (таблица — `pushClockSettings`, стиль — `sendClockStyle`); окно часов ключ только читает |
 | `panel-display.js` | Настройки дисплея — **примесь**: ОДНА сборка payload `display-settings-update`, тумблеры, раскладки, крестик |
 | `display-layouts.js` | Реестр элементов дисплея (id → тумблер → вид → подпись), масштабы, пять раскладок; координаты — доли для ЦЕНТРА |
 | `panel-state.js` | Четыре состояния панели — **примесь**: класс `state-*`, ОДНА сборка payload `widget-style-update`, ввод, мастер-звук |

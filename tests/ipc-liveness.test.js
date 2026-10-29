@@ -54,6 +54,7 @@ const RENDERER_FILES = [
     'panel-state.js',
     'panel-colors.js',
     'panel-display.js',
+    'panel-clock.js',
     'ipc-compat.js'
 ];
 

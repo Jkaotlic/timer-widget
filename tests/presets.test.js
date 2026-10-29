@@ -256,10 +256,11 @@ test('PANEL-001: пресет раскладывает и рассылает н�
 
     // Деления (clockShowTicks) — отдельный ключ, и читался он только в
     // initElements. Перечитывать их обязана та же раскладка часов.
-    const control = codeOnly(read('control-app.js'));
+    // Метод живёт в примеси панели panel-clock.js (с 29.10.2026).
+    const control = codeOnly(read('panel-clock.js'));
     const at = control.indexOf('loadClockSettings() {');
     assert.notEqual(at, -1, 'нет метода loadClockSettings');
-    const body = control.slice(at, control.indexOf('\n            }', at));
+    const body = control.slice(at, control.indexOf('\n    },', at));
     assert.match(
         body,
         /clockShowTicksEl[\s\S]{0,120}getItem\('clockShowTicks'\)/,

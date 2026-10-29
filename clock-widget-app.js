@@ -342,7 +342,8 @@
                     this.timezoneBadge, this.digitsTimezoneBadge, this.flipTimezoneBadge, this.analogTimezoneBadge
                 ].forEach(el => paint(el, 'color', timerColor));
 
-                localStorage.setItem('clockColors', JSON.stringify(colors));
+                // В хранилище окно НЕ пишет: у clockColors один писатель —
+                // панель (saveColors), и пришедший payload она уже записала.
             }
 
             setupEventListeners() {
@@ -519,8 +520,8 @@
                 // классов, и body остаётся вообще без `style-*`, то есть
                 // раскладка выбранного стиля разваливается целиком (замерено).
                 // Виджет и дисплей кладут литералы в ветках switch и такой
-                // дырки не имеют. Мусор нельзя и запоминать: this.clockStyle
-                // уезжает обратно в localStorage при сохранении настроек.
+                // дырки не имеют. Мусор нельзя и показывать: this.clockStyle
+                // решает и 24-часовой формат флипа (_uses24h).
                 // Сохранённый LED переводится в «Цифры» ДО проверки списка:
                 // иначе профиль со слитым стилем откатывался бы к кругу.
                 const wanted = window.RendererShared.migrateTimerStyle(style);
@@ -578,7 +579,8 @@
                     this.updateScaling();
                 }, 50);
 
-                this.saveSettings();
+                // Стиль окно не записывает: в clockWidgetSettings его кладёт
+                // панель (sendClockStyle) — и при закрытых часах тоже.
                 this.updateDisplay();
             }
 
@@ -699,24 +701,6 @@
                 this._geometry.save(scalePct);
             }
 
-            saveSettings() {
-                const settings = {
-                    opacity: parseFloat(this.container.style.opacity) || 1,
-                    showSeconds: this.showSeconds,
-                    format24h: this.format24h,
-                    showDate: this.showDate,
-                    showTimezone: this.showTimezone,
-                    showNumbers: this.showNumbers,
-                    clockStyle: this.clockStyle,
-                    clockDigitsFont: this.digitsFont
-                };
-                // СЛИЯНИЕ, а не перезапись — см. тот же комментарий в
-                // electron-control.html:pushClockSettings(). Оба окна пишут этот
-                // ключ разными наборами полей, и прямая запись теряла чужие.
-                const prev = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
-                localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prev, ...settings }));
-            }
-
             setupIPC() {
                 // Границы окна от ГЛАВНОГО процесса — источник для записи
                 // геометрии. Свои outerWidth/screenX остаются запасным путём,
@@ -798,7 +782,8 @@
                         }
                     }
                     this.updateDateTimezoneVisibility();
-                    this.saveSettings();
+                    // Сохранять нечего: пакет собран из профиля, который панель
+                    // уже записала (pushClockSettings). Окно ключ только читает.
                     this.updateDisplay();
                     if (settings && 'showTicks' in settings) { applyShowTicks(settings.showTicks); }
                 };

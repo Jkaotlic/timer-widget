@@ -129,13 +129,10 @@ const PanelResetMixin = {
         if (target === 'widget') {
             window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
             // У часов может стоять синхронизация со стилем виджета.
-            if (this.syncClockStyle) {
-                window.ipcRenderer.send('clock-widget-set-style', this.timerStyleEl.value);
-            }
+            if (this.syncClockStyle) { this.sendClockStyle(); }
             this.pushClockSettings();
         } else if (target === 'clock') {
-            const style = this.syncClockStyle ? this.timerStyleEl.value : this.clockStyleEl.value;
-            window.ipcRenderer.send('clock-widget-set-style', style);
+            this.sendClockStyle();
             this.pushClockSettings();
         } else if (target === 'display') {
             this.pushDisplaySettings();
