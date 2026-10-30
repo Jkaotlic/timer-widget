@@ -2,7 +2,8 @@ const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const CONFIG = require('../constants.js');
 const {
-    waitForClock, waitForDisplay, waitForWidget, waitForResizeHandled, innerSize, waitForSteady
+    waitForClock, waitForDisplay, waitForWidget, waitForResizeHandled, innerSize, waitForSteady,
+    waitForDisplaySettled, waitForDrawerBeside
 } = require('./window-ready');
 const { leaveFullScreen } = require('./display-window');
 
@@ -266,7 +267,7 @@ test('стиль «Цифры» доходит до полноэкранного
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await windowLoaded(await waitForDisplay(app));
+        await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // Открыть вкладку «Дисплей» — только кликом.
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
@@ -342,7 +343,7 @@ test('масштаб дисплея действует и на стиль «Ци
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await windowLoaded(await waitForDisplay(app));
+        await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
         // (у .tab-btn стоит aria-controls="settingsDrawer").
@@ -410,7 +411,7 @@ test('в перерасходе ЦИФРЫ остаются на оси окна
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await windowLoaded(await waitForDisplay(app));
+        const display = await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
         // (у .tab-btn стоит aria-controls="settingsDrawer").
@@ -966,7 +967,7 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await windowLoaded(await waitForDisplay(app));
+        await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // --- Дисплей ---
         await control.click('.tab-btn[data-tab="display"]');
@@ -986,6 +987,9 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
         // Окно открываем кнопкой и ждём ОПРОСОМ с дедлайном: сразу после
         // click() окна ещё нет (так этот тест и упал первый раз), а событие
         // 'window' приходит один раз и теряется, если окно опередило подписку.
+        // Кнопка — в ГЛАВНОЙ колонке, а ящик открыт: клик дойдёт, только если
+        // ящик встал рядом, а не накладкой (CI macOS 30.10.2026). Факт, а не срок.
+        await waitForDrawerBeside(app, control);
         await control.click('#openWidgetBtn');
         const widget = await waitForWidget(app);
         await widget.waitForLoadState('domcontentloaded');
@@ -1149,7 +1153,7 @@ test('выбор шрифта доходит до СВОЕГО окна клик
 
         // Дисплей открывается по IPC, как и в остальных тестах этого файла.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await windowLoaded(await waitForDisplay(app));
+        await waitForDisplaySettled(app, await waitForDisplay(app));
         const display = await findWindow(app, IS_DISPLAY);
         expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
 
@@ -1188,6 +1192,9 @@ test('выбор шрифта доходит до СВОЕГО окна клик
         expect(afterWidget.display, 'дисплей не должен увидеть шрифт виджета').toBe(baseline.display);
 
         // --- Часы: «Цифры» → Oswald ---
+        // Вкладки — в ГЛАВНОЙ колонке, а ящик открыт: клик дойдёт, только если
+        // ящик встал рядом, а не накладкой (CI macOS 30.10.2026).
+        await waitForDrawerBeside(app, control);
         await control.click('.tab-btn[data-tab="clock"]');
         await control.waitForSelector('#settingsDrawer.open');
         await control.click('#clockStyle button[data-val="digits"]');

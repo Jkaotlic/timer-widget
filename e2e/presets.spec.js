@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, reloadPanel, waitForTransitions } = require('./window-ready');
+const {
+    waitForDisplay, waitForDisplaySettled, waitForDrawerBeside, reloadPanel, waitForTransitions
+} = require('./window-ready');
 
 /**
  * Пресеты вида ПО КЛИКУ: записали один вид, перенастроили, вернули.
@@ -34,12 +36,12 @@ const storedDisplayStyle = (control) => control.evaluate(
 const drawerOpen = (control) => expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
 
 /**
- * Дисплей принял стартовый снимок: главный процесс шлёт его по
- * `did-finish-load` (main-window-hooks.js), то есть ПОСЛЕ события `load`, когда
- * слушатели окна уже стоят. Команда панели, отправленная после этого, придёт
- * следом и не потеряется.
+ * Дисплей ВСТАЛ — не только `load`. Окно создаётся полноэкранным, и на macOS
+ * вход анимирован около секунды; ящик, открытый посреди перехода, просил окно
+ * панели шире, а оно оставалось 400 px — ящик ложился накладкой и перехватывал
+ * клик по ячейке (CI macOS 30.10.2026). Ждём условие конца перехода.
  */
-const displayLoaded = (display) => display.waitForLoadState('load');
+const displayLoaded = (app, display) => waitForDisplaySettled(app, display);
 
 const slotState = (control) => control.evaluate(() => {
     const out = {};
@@ -60,7 +62,7 @@ test('ячейка записывает вид и возвращает его К
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await displayLoaded(display);
+        await displayLoaded(app, display);
 
         // Ячейки ВИДНЫ и пусты — иначе всё дальнейшее проверяло бы невидимое.
         const before = await slotState(control);
@@ -87,6 +89,9 @@ test('ячейка записывает вид и возвращает его К
         expect(configured.currentTimeShown, 'блок не показался — записывать нечего').toBe(true);
 
         // --- клик по ПУСТОЙ ячейке записывает текущий вид ---
+        // Ячейка — в ГЛАВНОЙ колонке: клик дойдёт, только если ящик встал
+        // рядом, а не накладкой (окно выросло). Факт, а не срок.
+        await waitForDrawerBeside(app, control);
         await control.click('#presetSlot1');
         await expect.poll(async () => (await slotState(control))[1].filled, 'ячейка не пометилась записанной').toBe(true);
 
@@ -104,6 +109,7 @@ test('ячейка записывает вид и возвращает его К
         expect(changed.currentTimeShown).toBe(false);
 
         // --- и возвращаем КЛИКОМ по ячейке ---
+        await waitForDrawerBeside(app, control);
         await control.click('#presetSlot1');
         await expect.poll(() => displayStyle(display)).toEqual({ style: 'flip', currentTimeShown: true });
         const restored = await displayStyle(display);
@@ -143,7 +149,7 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
         await reloadPanel(control);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await displayLoaded(display);
+        await displayLoaded(app, display);
 
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
         await drawerOpen(control);

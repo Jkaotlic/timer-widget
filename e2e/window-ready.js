@@ -663,9 +663,64 @@ async function waitForPanelSettled(app, control, opts = {}) {
 }
 
 /**
+ * Ящик настроек встал КОЛОНКОЙ рядом с главной, а не накладкой поверх неё:
+ * окно панели выросло хотя бы до суммы минимумов (панель
+ * `CONFIG.CONTROL_WINDOW_MIN_WIDTH` + ящик `_drawerExtraWidth`, порог
+ * `@media (max-width: 715px)` в control.css), затем панель осела
+ * (`waitForPanelSettled`).
+ *
+ * Ждать нужно ФАКТ, а не срок: ящик просит окно шире (`resize-control-window`),
+ * и система вправе не выдать (диагноз CI 30.10.2026: на macOS ящик, открытый
+ * посреди входа дисплея в полноэкранный режим, оставил окно 400 px, и клик в
+ * главную колонку 30 с перехватывала накладка). Не выросло — падаем сразу с
+ * числами: окно, просьба, экран, состояние дисплея.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control
+ * @param {{timeout?: number}} [opts]
+ */
+async function waitForDrawerBeside(app, control, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const ok = await control.waitForFunction((min) => {
+        const drawer = document.querySelector('.settings-drawer');
+        const extra = window.timerController._drawerExtraWidth;
+        return !!drawer && drawer.classList.contains('open') && window.innerWidth >= min + extra;
+    }, CONFIG.CONTROL_WINDOW_MIN_WIDTH, { timeout }).then(() => true, () => false);
+    if (!ok) {
+        const page = await control.evaluate(() => ({
+            inner: window.innerWidth,
+            asked: window.timerController._baseWidthBeforeDrawer + window.timerController._drawerExtraWidth,
+            availWidth: window.screen.availWidth,
+            open: !!document.querySelector('.settings-drawer.open')
+        }));
+        const main = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed())
+            .map((w) => ({
+                url: w.webContents.getURL().replace(/^.*\//, ''),
+                bounds: w.getBounds(), max: w.getMaximumSize(),
+                fullScreen: w.isFullScreen(), focused: w.isFocused()
+            })));
+        throw new Error(`ящик не встал колонкой за ${timeout} мс: окно панели ${page.inner} px, `
+            + `нужно ≥ ${CONFIG.CONTROL_WINDOW_MIN_WIDTH} + ящик, ящик просил ${page.asked}, `
+            + `экран ${page.availWidth}, ящик открыт ${page.open}; окна: ${JSON.stringify(main)}`);
+    }
+    await waitForPanelSettled(app, control, { timeout });
+}
+
+/**
  * Канал-метка для каждого окна: посылка, которую main шлёт окну и сам, а
  * обработчик окна только запоминает (флаг «открыто ли соседнее окно»). Метка
  * несёт НАСТОЯЩЕЕ состояние соседа, так что для окна это не новость.
+ *
+ * «Настоящее» — в смысле приложения, а не адреса (ревью B3, N1). Main считает
+ * соседа открытым по реестру (`!!windows.clockWidgetWindow`,
+ * main-window-hooks.js, sendWindowStatesTo): слот занят с `new BrowserWindow`
+ * и пуст после `closed`. У только что созданного окна `getURL()` ещё пуст
+ * (замер 31.10.2026: часы сразу после `open-clock-widget` — `url: ""`,
+ * `isLoading: true`), и подсчёт «по адресу» сказал бы «закрыто», затерев
+ * верное `isOpen: true` от `announceWindowOpened`. Поэтому метка не уходит,
+ * пока в приложении есть окно без адреса: когда адреса у всех, «живое окно с
+ * адресом соседа» и «слот реестра занят» совпадают (`closed` = `isDestroyed`).
  */
 const SNAPSHOT_MARK = {
     'display.html': { channel: 'clock-window-state', neighbour: 'electron-clock-widget.html' },
@@ -723,6 +778,9 @@ async function waitForMainSnapshot(app, page, urlPart, name, opts = {}) {
             const live = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
             const own = live.filter((w) => w.webContents.getURL().includes(part));
             if (!own.length || own.some((w) => w.webContents.isLoading())) { return false; }
+            // Окно без адреса — сосед, которого реестр main уже считает
+            // открытым, а адрес ещё нет (см. SNAPSHOT_MARK). Ждём адреса.
+            if (live.some((w) => !w.webContents.getURL())) { return false; }
             const isOpen = live.some((w) => w.webContents.getURL().includes(m.neighbour));
             for (const w of own) { w.webContents.send(m.channel, { isOpen, e2eMarker: mk }); }
             return true;
@@ -730,7 +788,7 @@ async function waitForMainSnapshot(app, page, urlPart, name, opts = {}) {
         if (sent) { break; }
         if (Date.now() > deadline) {
             await received({ timeout: 1 }).catch(() => {});
-            throw new Error(`окно ${name} не закончило загрузку за ${timeout} мс`);
+            throw new Error(`окно ${name} не закончило загрузку за ${timeout} мс (или у соседнего окна так и не появился адрес)`);
         }
         await new Promise((r) => setTimeout(r, POLL_MS));
     }
@@ -754,28 +812,83 @@ function waitForClockSnapshot(app, clock, _control, opts = {}) {
 }
 
 /**
- * Сколько ждать, что заказанный при создании полноэкранный режим включится,
- * прежде чем признать: здесь он не включается. Отсчёт — от вызова, то есть
- * уже после `load` и появления окна.
+ * Заказанный при создании полноэкранный режим дисплея — УСЛОВИЕ состояния, а
+ * не срок (ревью B3, I2). Решает главный процесс по самому новому окну
+ * дисплея (id у webContents растёт с созданием — тот же выбор, что ревью B3,
+ * M4):
+ *
+ *  - `full` — флаг поднят: переход начат или окончен;
+ *  - `windowed` — из полноэкранного его вывели мы сами (`leaveFullScreen`),
+ *    входа больше не будет;
+ *  - `no-transition` — не macOS: вход синхронный, флага нет — его не будет
+ *    (Windows CI: окно в фокусе, флага и события нет никогда);
+ *  - `no-focus` — окно без фокуса: macOS вход не начнёт, ждать нечего (0 мс).
+ *    Опыт 31.10.2026 на локальном mac: `CGSSessionScreenIsLocked = true`,
+ *    ни у одного окна нет фокуса — ни после `win.focus()`, ни после
+ *    `app.focus({ steal: true })`, — и входа нет все 8 с наблюдения даже
+ *    после явного `setFullScreen(true)`. На macOS CI окно дисплея в фокусе и
+ *    полноэкранное (before-close-main.json, 30.10.2026);
+ *  - macOS, окно в фокусе, флага нет — ждём СОБЫТИЕ `enter-full-screen` до
+ *    `timeout`: `entered` или `timeout` (расхождение, печатает вызывающий).
+ *
+ * Слушатель, повешенный после начала перехода, событие не теряет: AppKit уже
+ * поднял флаг, и это ветка `full`.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {number} timeout
+ * @returns {Promise<{state: string, focused?: boolean, bounds?: object}>}
  */
-const FULLSCREEN_GRACE_MS = 1500;
+function settleFullScreenEntry(app, timeout) {
+    return app.evaluate(async ({ BrowserWindow }, ms) => {
+        const win = BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
+        if (!win) { return { state: 'нет окна' }; }
+        const info = () => ({ focused: win.isFocused(), bounds: win.getBounds() });
+        if (win.isFullScreen()) { return { state: 'full' }; }
+        const windowed = globalThis.__e2eWindowedDisplays;
+        if (windowed && windowed.has(win.webContents.id)) { return { state: 'windowed' }; }
+        // Анимированный переход (отдельный Space) — только у macOS. На
+        // Windows и Linux вход синхронный: флага нет к `load` — не будет и
+        // события. Замер CI 30.10.2026 (run 41126739982): windows-latest,
+        // окно в фокусе, флага нет, события нет все 1.5 с у всех 19 открытий —
+        // ожидание «в фокусе без флага» стоило бы там таймаута на КАЖДОЕ.
+        if (process.platform !== 'darwin') { return { state: 'no-transition', ...info() }; }
+        if (!win.isFocused()) { return { state: 'no-focus', ...info() }; }
+        const state = await new Promise((resolve) => {
+            const onEnter = () => { clearTimeout(timer); resolve('entered'); };
+            const timer = setTimeout(() => { win.removeListener('enter-full-screen', onEnter); resolve('timeout'); }, ms);
+            win.once('enter-full-screen', onEnter);
+        });
+        return { state, ...info() };
+    }, timeout);
+}
+
+/** Строка в лог, если полноэкранный режим не включился: где и почему. */
+function reportFullScreenEntry(who, fs, timeout) {
+    if (fs.state === 'full' || fs.state === 'entered' || fs.state === 'windowed') { return; }
+    const why = fs.state === 'no-focus'
+        ? 'окно без фокуса — вход не начнётся, не ждём'
+        : fs.state === 'no-transition'
+            ? `${process.platform}: вход синхронный, флага нет — входа не будет, не ждём`
+        : fs.state === 'timeout'
+            ? `окно в фокусе, но события нет за ${timeout} мс — РАСХОЖДЕНИЕ`
+            : fs.state;
+    console.log(`   [${who}] полноэкранный режим не включился: ${why} `
+        + `(фокус ${fs.focused}; границы ${JSON.stringify(fs.bounds)}) — окно мерится оконным`);
+}
 
 /**
  * Дождаться, что открывшийся дисплей ВСТАЛ: полноэкранный режим включился
- * (или явно не включается), размер окна осел, отложенный пересчёт по
- * последнему `resize` отработал, окно утихло.
+ * (или по состоянию окна включиться не может — `settleFullScreenEntry`),
+ * размер окна осел, отложенный пересчёт по последнему `resize` отработал,
+ * окно утихло.
  *
- * Спеки ждали это паузой 2200–2400 мс. Окно создаётся с `fullscreen: true`,
- * и на macOS вход анимирован около секунды; `setBounds` посреди перехода
- * роняет Electron (разбор a-fullscreen-transition-is-a-condition-not-a-duration).
- *
- * Полноэкранный режим — УСЛОВИЕ (ревью B3, I2):
- *  - флаг уже поднят — переход начат или окончен, дальше решает осевший размер;
- *  - не поднят — ждём СОБЫТИЕ `enter-full-screen` (конец перехода) не дольше
- *    `FULLSCREEN_GRACE_MS`. Не пришло — печатаем расхождение (фокус, границы):
- *    замер 30.10.2026 (macOS, e2e, окно без фокуса) — флаг не поднимается ни
- *    на основном мониторе, ни на Sidecar, и события нет все 5 с наблюдения.
- *    Ждать до общего таймаута значило бы падать на исправном приложении.
+ * Спеки ждали это паузой 2200–2400 мс, затем (B3) льготой 1.5 с на событие —
+ * на машине без фокуса это была та же пауза. Окно создаётся с
+ * `fullscreen: true`, и на macOS вход анимирован около секунды; `setBounds`
+ * посреди перехода роняет Electron
+ * (разбор a-fullscreen-transition-is-a-condition-not-a-duration).
  *
  * Затем — осевший `innerSize` (4×150 мс), кадр и таймер длины debounce,
  * взведённый после таймера приложения (как в `waitForResizeHandled`).
@@ -788,24 +901,7 @@ const FULLSCREEN_GRACE_MS = 1500;
 async function waitForDisplaySettled(app, display, opts = {}) {
     const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
     await display.waitForLoadState('load');
-    const fs = await app.evaluate(async ({ BrowserWindow }, grace) => {
-        // Самое новое окно дисплея: id у webContents растёт с созданием.
-        const win = BrowserWindow.getAllWindows()
-            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
-            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
-        if (!win) { return { state: 'нет окна' }; }
-        if (win.isFullScreen()) { return { state: 'full' }; }
-        const state = await new Promise((resolve) => {
-            const onEnter = () => { clearTimeout(timer); resolve('entered'); };
-            const timer = setTimeout(() => { win.removeListener('enter-full-screen', onEnter); resolve('timeout'); }, grace);
-            win.once('enter-full-screen', onEnter);
-        });
-        return { state, focused: win.isFocused(), bounds: win.getBounds() };
-    }, FULLSCREEN_GRACE_MS);
-    if (fs.state !== 'full' && fs.state !== 'entered') {
-        console.log(`   [waitForDisplaySettled] полноэкранный режим не включился за ${FULLSCREEN_GRACE_MS} мс `
-            + `(${fs.state}; фокус ${fs.focused}; границы ${JSON.stringify(fs.bounds)}) — окно мерится оконным`);
-    }
+    reportFullScreenEntry('waitForDisplaySettled', await settleFullScreenEntry(app, timeout), timeout);
     await waitForSteady(display, innerSize, { samples: 4, timeout, name: 'размер дисплея' });
     // Таймер длины debounce, взведённый ПОСЛЕ таймера приложения, — см.
     // waitForResizeHandled, п. 3.
@@ -824,6 +920,6 @@ module.exports = {
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
     waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSized, waitForPanelSettled,
-    waitForFrameSteady, waitForPanelRemaining,
+    waitForFrameSteady, waitForPanelRemaining, settleFullScreenEntry, reportFullScreenEntry, waitForDrawerBeside, DEFAULT_TIMEOUT,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

@@ -24,14 +24,35 @@
  */
 
 const CONFIG = require('../constants.js');
-const { waitForSteady, innerSize } = require('./window-ready');
+const {
+    waitForSteady, innerSize, settleFullScreenEntry, reportFullScreenEntry, DEFAULT_TIMEOUT
+} = require('./window-ready');
 
-/** Дождаться выхода из полноэкранного режима по СОБЫТИЮ окна. */
+/**
+ * Дождаться выхода из полноэкранного режима по СОБЫТИЮ окна.
+ *
+ * Окно — самое новое окно дисплея (ревью B3, N2: первое по адресу могло быть
+ * закрывающимся прежним). Сначала — заказанный при создании ВХОД
+ * (`settleFullScreenEntry`): фокус, полученный посреди теста (клик,
+ * `bringToFront`), запускает его позже `waitForDisplaySettled`, и `setBounds`
+ * пришёлся бы в переход. Выведенное нами окно помечается в main
+ * (`__e2eWindowedDisplays`), чтобы следующий вызов не ждал входа, которого не
+ * будет.
+ */
 async function leaveFullScreen(app) {
+    const entry = await settleFullScreenEntry(app, DEFAULT_TIMEOUT);
+    // Окно без фокуса здесь — норма (вход не начнётся, выводить нечего);
+    // печатаем только расхождение: фокус есть, а события нет.
+    if (entry.state === 'timeout') { reportFullScreenEntry('leaveFullScreen', entry, DEFAULT_TIMEOUT); }
     await app.evaluate(async ({ BrowserWindow }) => {
         const win = BrowserWindow.getAllWindows()
-            .find((w) => w.webContents.getURL().includes('display.html'));
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         if (!win || !win.isFullScreen()) { return; }
+        // Помечаем только то, что вывели САМИ: окно, не входившее вовсе, ещё
+        // может войти позже (фокус), и следующий вызов обязан это ждать.
+        globalThis.__e2eWindowedDisplays = globalThis.__e2eWindowedDisplays || new Set();
+        globalThis.__e2eWindowedDisplays.add(win.webContents.id);
         await new Promise((resolve) => {
             // Страховка по времени нужна: если система почему-то не пришлёт
             // событие, спека обязана продолжить и упасть на своём утверждении,
@@ -65,8 +86,10 @@ async function resizeDisplay(app, display, size, opts = {}) {
     await leaveFullScreen(app);
 
     const apply = () => app.evaluate(({ BrowserWindow }, s) => {
+        // Самое новое окно дисплея — то же, что вывел из полноэкранного leaveFullScreen.
         const win = BrowserWindow.getAllWindows()
-            .find((w) => w.webContents.getURL().includes('display.html'));
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         win.setBounds({ x: 20, y: 20, width: s.w, height: s.h });
     }, size);
 
