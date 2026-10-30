@@ -90,7 +90,7 @@ const PANEL_CODE = codeOnly(PANEL);
 
 test('панель подключает модуль и подмешивает его в прототип', () => {
     assert.ok(scriptTags(PANEL).some((t) => t.src === 'panel-colors.js'));
-    assert.match(PANEL_CODE, /Object\.assign\(TimerController\.prototype, window\.PanelColorsMixin\)/);
+    assert.match(PANEL_CODE, /Object\.assign\(TimerController\.prototype, PanelColorsMixin\)/);
     assert.match(PANEL_CODE, /initSurfaceControls\(\)/);
 });
 

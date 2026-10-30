@@ -40,6 +40,9 @@ const PERMANENT = Object.freeze([
     'ipcRenderer', 'electronAPI', 'timerController', 'clockWidget', 'displayTimer',
     'timerWidget', 'Toast', 'LoadingIndicator', 'SoundBank', 'CONFIG', 'FlipCard',
     'UILock', 'UITheme', 'openModal', 'closeModal', 'showKeyboardShortcuts',
+    // Экземпляр полосы (control-app.js): его зовут e2e (mini-bar.spec.js) и
+    // стенд съёмки (scripts/screenshot-runner.js, executeJavaScript).
+    'miniBar',
     'setupScaleValueEdit', 'addPickerToggle',
 ]);
 

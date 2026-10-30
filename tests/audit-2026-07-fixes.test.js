@@ -651,7 +651,7 @@ test('панель подтягивает ползунок и не отвеча�
     assert.doesNotMatch(handler[0], /ipcRenderer\.send/);
     // Сама логика — в модуле scale-report.js: она проверяется в Node на
     // поддельных документе и хранилище (tests/scale-range.test.js).
-    assert.match(handler[0], /window\.ScaleReport\.applyScaleReport/);
+    assert.match(handler[0], /(?<![\w.])ScaleReport\.applyScaleReport/);
     // Сохраняется ТОЛЬКО сообщённая величина. Здесь стоял saveExtSettings(),
     // то есть отчёт о размере окна записывал профиль целиком, из контролов
     // панели: открытие окна виджета затирало настройки, положенные в профиль

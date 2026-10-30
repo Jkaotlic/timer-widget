@@ -301,7 +301,7 @@ test('панель подключает модули и ставит ячейк�
     for (let i = 1; i <= Presets.PRESET_SLOTS; i++) {
         assert.match(control, new RegExp(`id="presetSlot${i}"`), `нет ячейки ${i}`);
     }
-    assert.match(codeOnly(control), /window\.PanelPresets\.install\(/, 'ячейки ни к чему не привязаны');
+    assert.match(codeOnly(control), /(?<![\w.])PanelPresets\.install\(/, 'ячейки ни к чему не привязаны');
 });
 
 test('дисплей умеет перечитать места карточек по просьбе', () => {

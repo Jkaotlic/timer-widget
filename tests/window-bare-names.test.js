@@ -229,7 +229,7 @@ test('блок модулей: голое имя и require — ошибка no-
     ]);
     // Классический файл окна под реальным конфигом: no-undef выключен — вот
     // почему голые имена ловит тест выше, а не lint.
-    assert.deepStrictEqual(await lint(real, 'control-app.js', 'Foo;\n'), []);
+    assert.deepStrictEqual(await lint(real, 'widget-app.js', 'Foo;\n'), []);
 });
 
 test('eslint.config.js берёт блок модулей из вычисленного списка, а не из ручного', () => {

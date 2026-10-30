@@ -116,7 +116,7 @@ test('панель ставит замок кнопкой и сообщает о
     const control = codeOnly(read('electron-control.html'));
     assert.match(control, /id="lockToggle"/, 'в титлбаре нет кнопки замка');
     assert.ok(scriptTags(control).some((t) => t.src === 'panel-titlebar.js'), 'панель не подключает panel-lock.js');
-    assert.match(control, /window\.PanelTitlebar\.bindLockToggle\(/, 'кнопка замка ни к чему не привязана');
+    assert.match(control, /(?<![\w.])PanelTitlebar\.bindLockToggle\(/, 'кнопка замка ни к чему не привязана');
 
     const panelLock = codeOnly(read('panel-titlebar.js'));
     assert.match(panelLock, /lock\.writeLock\(value\)/, 'кнопка не сохраняет состояние');

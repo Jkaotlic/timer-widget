@@ -115,7 +115,7 @@ test('обработчик панели спрашивает ворота ПЕР
     const at = src.indexOf('const _onGlobalShortcutsKeydown');
     assert.notEqual(at, -1);
     const head = src.slice(at, at + 400);
-    assert.match(head, /window\.globalHotkeyBlocked\(event, document, /, 'ворота не вызваны в начале обработчика');
+    assert.match(head, /(?<![\w.])globalHotkeyBlocked\(event, document, /, 'ворота не вызваны в начале обработчика');
     assert.doesNotMatch(src, /event\.target\.tagName === 'INPUT' \|\| event\.target\.tagName === 'TEXTAREA'/,
         'старая неполная проверка вернулась');
 });

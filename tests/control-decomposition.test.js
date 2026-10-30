@@ -236,7 +236,7 @@ test('примесь пользовательских звуков примен�
     // а при первом клике по «добавить звук».
     assert.match(
         controlHtml,
-        /Object\.assign\(TimerController\.prototype, window\.CustomSoundsMixin\)/
+        /Object\.assign\(TimerController\.prototype, CustomSoundsMixin\)/
     );
     const mixin = read('custom-sounds.js');
     for (const method of ['showSoundUploadError', 'handleSoundFileUpload',

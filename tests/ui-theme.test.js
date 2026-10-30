@@ -153,7 +153,7 @@ test('кнопка переключения темы в панели: состо
     // природа: величина общая для всех окон, кнопка одна, в титлбаре. В
     // разметке панели осталась кнопка и один вызов проводки.
     assert.ok(scriptTags(html).some((t) => t.src === 'panel-titlebar.js'), 'панель не подключает panel-titlebar.js');
-    assert.match(html, /window\.PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
+    assert.match(html, /(?<![\w.])PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
     const titlebar = readSource('panel-titlebar.js');
     assert.match(titlebar, /theme\.applyTheme\(value\)/, 'тема не применяется локально');
     assert.match(titlebar, /theme\.storeTheme\(value\)/, 'тема не сохраняется');
