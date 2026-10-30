@@ -21,7 +21,7 @@
  * и уже готовый образец — e2e/digits-style.spec.js, `try { … } finally { … }`.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { openDisplay, reopenDisplay } = require('./window-ready');
 

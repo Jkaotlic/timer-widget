@@ -11,7 +11,7 @@
  * Профиль e2e общий: `selectedDisplay` возвращается в `finally`.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 
 test('список мониторов строится и при кавычке в сохранённом выборе', async () => {

@@ -26,7 +26,7 @@
  * по фазам и берёт ХУДШУЮ: знак на пике пульса — тоже то, что видит зритель.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { waitForDisplay, waitForWidget } = require('./window-ready');
 

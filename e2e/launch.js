@@ -23,6 +23,7 @@ const path = require('path');
 const os = require('os');
 const { _electron: electron } = require('playwright');
 const profileGuard = require('./profile-guard');
+const { track } = require('./failure-artifacts');
 
 const MAIN = path.join(__dirname, '..', 'electron-main.js');
 
@@ -66,6 +67,11 @@ async function launchApp(opts = {}) {
     // app.close() — сверка и возврат. `keepProfile` — для первого запуска
     // теста с перезапуском, которому настройка нужна во втором.
     await profileGuard.watch(app, { keepProfile: !!opts.keepProfile });
+    // Следы упавшего теста (e2e/failure-artifacts.js): снимок окон перед
+    // закрытием. ПОСЛЕ сторожа — обёртка, поставленная последней, выполняется
+    // первой, и снимок видит окна такими, какими их оставил тест, а не после
+    // того, как сторож закрыл дисплей и вернул профиль.
+    track(app);
     return { app, control };
 }
 

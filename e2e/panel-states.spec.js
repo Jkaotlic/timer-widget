@@ -11,7 +11,7 @@
  * какое у неё слово, есть ли пресеты и ряд ±, что написано под цифрами.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 
 /** Виден ли элемент — по вычисленному display, а не по наличию в DOM. */

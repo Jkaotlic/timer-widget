@@ -11,7 +11,7 @@
  * запрещён их же CSP (connect-src 'none').
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { openDisplay, waitForWindow } = require('./window-ready');
 

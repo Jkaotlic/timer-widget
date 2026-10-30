@@ -17,11 +17,12 @@
  * раньше, замер ничего не доказывает — тест так и говорит, а не зеленеет.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { _electron: electron } = require('playwright');
+const { track } = require('./failure-artifacts');
 const { launchApp, waitForControlWindow, cleanEnv, MAIN, USER_DATA_DIR } = require('./launch');
 const profileGuard = require('./profile-guard');
 const { waitForClock, findWindowBy } = require('./window-ready');
@@ -39,10 +40,10 @@ function readRelayFile() {
  * досылки панели, а здесь нужен момент до неё.
  */
 async function launchBeforePanelPushes(exportTarget) {
-    const app = await electron.launch({
+    const app = track(await electron.launch({
         args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`],
         env: cleanEnv()
-    });
+    }));
     await app.evaluate(({ ipcMain, app: eapp, dialog }, target) => {
         const probe = { pushes: {}, created: [], exportSawPushes: null };
         globalThis.__relayProbe = probe;
@@ -186,7 +187,7 @@ test('после перезапуска часы получают стиль с�
         expect(saved.relay.lastClockStyle, 'стиль часов в файле памяти').toBe('analog');
 
         // --- 2. Вторая жизнь: панель молчит, часы открываются сразу ---
-        const app = await electron.launch({ args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`], env: cleanEnv() });
+        const app = track(await electron.launch({ args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`], env: cleanEnv() }));
         await installClockStyleProbe(app, { blockPanel: true });
         const control = await waitForControlWindow(app);
         second = { app, control };

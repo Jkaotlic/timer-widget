@@ -60,6 +60,7 @@
 | `ui-pass-2026-08.test.js` | Регрессии UI-прохода 07.08.2026 по исходникам (`codeOnly`) |
 | `e2e-budget.test.js` | `test.setTimeout` в e2e только ПОДНИМАЕТ бюджет из `playwright.config.js` |
 | `e2e-profile-guard.test.js` | Сторож общего e2e-профиля: разница по полям, умолчания из таблиц настроек, доли вместо пикселей в местах карточек, изменчивые ключи с причиной и из реестра, сводная спека последняя; утечку сторож ВИДИТ |
+| `e2e-fixtures.test.js` | Каждая e2e-спека берёт `test` из `./fixtures` (следы упавшего теста), а не из `@playwright/test`; фикстура автоматическая; `track(app)` в `launchApp` стоит ПОСЛЕ сторожа профиля; зонд проверяет сам себя |
 | `sound-hotkey.test.js` | Клавиша `Z` и мастер-звук: у звука ОДИН владелец (`#soundMasterEnabled`), тумблер строки и посылки окон идут через `toggleSoundMaster` |
 | `atomic-write.test.js` | Атомарная запись (tmp + fsync + rename): сорвавшаяся запись оставляет старый файл — накопитель и снимок восстановления (BUG-09) |
 | `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint`, `fitBlockScale`, `topBandReserve`, `heroFrameShrink`, `secondsUntilEventEnd` (полночь, одна формула с героем) |
@@ -147,6 +148,8 @@
 ## e2e (`e2e/`)
 
 e2e specs (`npx playwright test`, `workers: 1`):
+
+Упавший тест оставляет в `test-results/<папка теста>/` снимок и состояние каждого окна: `before-close-<окно>.png|json` (снято на `app.close()`, до сторожа профиля) и/или `live-…` (приложение было живо после теста), плюс `…-main.json` (`BrowserWindow.getAllWindows()`) и `trace.zip` (лента шагов, без DOM). Механизм — `e2e/failure-artifacts.js` + авто-фикстура `e2e/fixtures.js`; спека, запускающая Electron сама, оборачивает его в `track()`.
 
 | File | Covers |
 |------|--------|
