@@ -93,7 +93,7 @@ test('свёртка в первые 100 мс после загрузки не �
     const { app, control } = await launchApp();
     try {
         const startupResize = app.evaluate(({ ipcMain }) => new Promise(
-            (resolve) => ipcMain.once('resize-control-window', () => resolve(Date.now()))
+            (resolve) => ipcMain.once('resize-control-window', (_e, size) => resolve({ at: Date.now(), size }))
         ));
         await reloadPanel(control);
         // Клик раньше авто-размера — иначе тест проверяет не тот порядок.
@@ -101,7 +101,11 @@ test('свёртка в первые 100 мс после загрузки не �
             window.miniBar.collapse();
             return Date.now();
         });
-        const resizedAt = await startupResize;
+        // Полоса держит верхний левый угол окна до свёртки (main-control-ipc.js),
+        // поэтому её x/y — это место до свёртки; мерить раньше значило бы
+        // отдать гонке лишний вызов в главный процесс.
+        const bar = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+        const { at: resizedAt, size: requested } = await startupResize;
         console.log(`   свёртка за ${resizedAt - clickedAt} мс до авто-размера`);
         expect(resizedAt, 'авто-размер пришёл раньше свёртки — гонка не воспроизведена').toBeGreaterThanOrEqual(clickedAt);
 
@@ -110,6 +114,16 @@ test('свёртка в первые 100 мс после загрузки не �
         expect(state.onTop, 'полоса обязана быть поверх окон').toBe(true);
         expect(state.bounds.height, `высота окна ${state.bounds.height}: авто-размер развернул полосу`).toBeLessThanOrEqual(120);
         await control.waitForFunction(() => window.innerHeight <= 120);
+
+        // Запрос не потерян, а отложен: разворот применяет его на месте до
+        // свёртки (верхний край). Запрошенное ≠ выданное — печатаем обе.
+        await control.evaluate(() => window.miniBar.expand());
+        const restored = await windowSettled(app, control, false);
+        console.log(`   запрошено ${JSON.stringify(requested)}, после разворота ${JSON.stringify(restored.bounds)}, полоса ${JSON.stringify(bar)}`);
+        expect(restored.onTop).toBe(false);
+        expect({ x: restored.bounds.x, y: restored.bounds.y }, 'разворот держит место до свёртки')
+            .toEqual({ x: bar.x, y: bar.y });
+        expect(restored.bounds.height).toBeGreaterThanOrEqual(CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
     } finally {
         await app.close();
     }

@@ -200,14 +200,63 @@ test('MINIBAR-RACE: запрос размера по содержимому, п�
     handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
     const bar = win.getBounds();
 
-    handlers.get('resize-control-window')(null, { width: 400, height: 660 });
-    handlers.get('resize-control-window')(null, { width: 736 });
+    handlers.get('resize-control-window')(null, { width: 400, height: 700 });
 
     assert.deepEqual(win.getBounds(), bar, 'полоса осталась полосой');
     assert.equal(win._onTop, true);
+});
 
+test('MINIBAR-RACE: отложенный запрос размера применяется при развороте, место — прежнее', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 660 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('resize-control-window')(null, { width: 400, height: 700 });
     handlers.get('control-collapse')(null, { collapsed: false });
-    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 700 }, 'разворот вернул границы до свёртки');
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 700 },
+        'размер — из запроса по содержимому, а не устаревший до свёртки; место — до свёртки');
+});
+
+test('MINIBAR-RACE: из нескольких отложенных запросов побеждает последний (по каждому полю)', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 660 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('resize-control-window')(null, { width: 420, height: 700 });
+    handlers.get('resize-control-window')(null, { height: 720 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 420, height: 720 });
+});
+
+test('MINIBAR-RACE: без отложенного запроса разворот возвращает границы до свёртки', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 700 });
+});
+
+test('MINIBAR-RACE: перезагрузка свёрнутой панели отложенный запрос стирает', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 660 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('resize-control-window')(null, { height: 700 });
+    win.webContents.emit('did-start-loading');
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 660 }, 'reload — границы до свёртки, запрос старой страницы не применён');
+    // и не всплывает при следующей свёртке-развороте
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 660 });
+});
+
+test('MINIBAR-RACE: отложенный запрос старого окна не достаётся новому окну панели', () => {
+    const first = makeWindow({ x: 100, y: 200, width: 400, height: 660 });
+    const { handlers, windows } = setup(first, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('resize-control-window')(null, { height: 900 });
+    const second = makeWindow({ x: 500, y: 300, width: 420, height: 720 });
+    windows.controlWindow = second;
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(second.getBounds(), { x: 500, y: 300, width: 420, height: 720 });
 });
 
 test('MINIBAR-RACE: после разворота запрос размера снова работает', () => {
