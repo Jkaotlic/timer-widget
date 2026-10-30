@@ -47,6 +47,31 @@ const RECORDED = Object.freeze({
     'window-geometry.js': ['MAX_SCALE_PCT', 'MIN_SCALE_PCT', 'SAVE_SETTLE_MS', 'bindWindowDrag', 'createWindowGeometry', 'fitRestoredBounds', 'fitScaledBounds', 'isWindowDragTarget'],
     'event-report.js': ['BOM', 'DELIMITER', 'EOL', 'buildReportCSV', 'csvCell'],
     'presets.js': ['ACTIVE_SLOT_STORAGE_KEY', 'PRESETS_STORAGE_KEY', 'PRESET_KEYS', 'PRESET_SLOTS', 'activeSlot', 'applyPreset', 'capturePreset', 'hasPreset', 'matchesPreset', 'normalizeSlot', 'readPresets', 'writeActiveSlot', 'writePreset'],
+    // Задача 5 — модули панели (записано с классики на 196ded8). Их требуют
+    // только тесты, но тест, потерявший имя, молча проверял бы `undefined`.
+    // panel-state.js здесь НЕТ намеренно: его module.exports БЫЛ самой
+    // примесью (методы + windowRowSubtitle), а модуль экспортирует
+    // `PanelStateMixin` и `windowRowSubtitle` — как остальные примеси.
+    'font-select.js': ['attachFontSelect'],
+    'ui-feedback.js': ['LoadingIndicator', 'Toast'],
+    'scale-input.js': ['setupScaleValueEdit'],
+    'scale-report.js': ['PROFILE_KEY', 'SCALE_TARGETS', 'applyScaleReport'],
+    'color-picker.js': ['ColorPicker', 'addPickerToggle'],
+    'modal-manager.js': ['closeModal', 'openModal'],
+    'shortcuts-help.js': ['HOTKEY_OPEN_LAYERS', 'globalHotkeyBlocked', 'showKeyboardShortcuts', 'trackPointerControl'],
+    'onboarding.js': ['bindReleasesLink', 'init', 'showFirstRunHint'],
+    'mini-bar.js': ['BAR_HEIGHT', 'init'],
+    'custom-sounds.js': ['CustomSoundsMixin', 'isPlayableSoundData', 'mergeCustomSound', 'sanitizeCustomSounds'],
+    'local-background.js': ['LocalBackgroundMixin'],
+    'theme-grid.js': ['ThemeGridMixin'],
+    'panel-colors.js': ['COLOR_FIELDS', 'COLOR_TARGETS', 'PanelColorsMixin', 'SURFACE_TARGETS', 'mergeColors'],
+    'panel-display.js': ['BLOCK_KEYS', 'DISPLAY_TOGGLE_KEYS', 'LABEL_KEYS', 'PanelDisplayMixin', 'attachChangedBgImage', 'collectBlockLabels', 'collectDisplayToggles', 'fillDisplaySelect'],
+    'panel-drawer.js': ['SCREEN_MARGIN', 'columnFromWindow', 'drawerColumnWidth'],
+    'panel-reset.js': ['PanelResetMixin', 'RESET_TARGETS'],
+    'panel-clock.js': ['PanelClockMixin'],
+    'panel-titlebar.js': ['LOCK_BUTTON_IDS', 'bindLockToggle', 'bindThemeToggle'],
+    'panel-presets.js': ['SLOT_BUTTON_PREFIX', 'SLOT_BUTTON_PREFIXES', 'applyProfile', 'bindPresets', 'install', 'presetHotkeyHandler'],
+    'panel-compact.js': ['bindCompactMode', 'createFlipBreaker', 'decideCompact', 'fits'],
 });
 
 /** `require('./x')` / `require('./x.js')` файла → плоские имена с `.js`. */

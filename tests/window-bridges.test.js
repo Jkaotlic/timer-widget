@@ -59,6 +59,10 @@ const TEMPORARY = Object.freeze({
     SettingsSchema: 'settings-schema.js',
     SoundPresets: 'sound-presets.js',
     Presets: 'presets.js',
+    // Задача 5: модули панели, пока их читает классический control-app.js.
+    ScaleReport: 'scale-report.js',
+    ColorPicker: 'color-picker.js',
+    attachFontSelect: 'font-select.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';

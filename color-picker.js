@@ -234,11 +234,11 @@ function addPickerToggle(gridId, pickerId, pickerConfig) {
     return picker;
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ColorPicker, addPickerToggle };
-}
+export { ColorPicker, addPickerToggle };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: ColorPicker читают panel-colors.js и e2e (status-and-colors)
     window.ColorPicker = ColorPicker;
+    // Крючок e2e; control-app.js — до перевода.
     window.addPickerToggle = addPickerToggle;
 }

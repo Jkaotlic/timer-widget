@@ -106,11 +106,10 @@ const Toast = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Toast, LoadingIndicator };
-}
+export { Toast, LoadingIndicator };
 
 if (typeof window !== 'undefined') {
+    // Крючки e2e (page.evaluate) и читатель local-background.js.
     window.Toast = Toast;
     window.LoadingIndicator = LoadingIndicator;
 }

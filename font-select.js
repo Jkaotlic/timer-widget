@@ -104,10 +104,9 @@ function attachFontSelect(el) {
     apply(el.dataset.value);
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { attachFontSelect };
-}
+export { attachFontSelect };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
     window.attachFontSelect = attachFontSelect;
 }
