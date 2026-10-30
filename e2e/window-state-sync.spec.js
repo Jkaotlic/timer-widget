@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForWidget } = require('./window-ready');
+const { waitForClock, waitForWidget, waitForWindowSettled, reloadPanel, untilReceived } = require('./window-ready');
 
 /**
  * Синхронизация состояния окон с окном, которое загрузилось ПОЗЖЕ остальных.
@@ -29,6 +29,37 @@ async function findWindow(app, kind) {
     return null;
 }
 
+/**
+ * Окно ПОЛУЧИЛО свой снимок состояний окон при загрузке (did-finish-load →
+ * sendWindowStatesTo, main-window-hooks.js) и обработало его.
+ *
+ * Помощник `waitFor*Snapshot` здесь запрещён (tests/e2e-fixtures.test.js):
+ * его метка идёт каналом флага соседа и подменила бы именно тот снимок,
+ * который спека утверждает. Поэтому метка — на ДРУГОМ канале снимка,
+ * `display-window-state`, с НАСТОЯЩИМ значением (дисплей в этой спеке не
+ * открывается — false), а проверяемые флаги (часы, виджет) не трогает
+ * никто, кроме снимка.
+ *
+ * Шаги: main видит, что окно догрузилось (`!isLoading()` — did-stop-loading
+ * идёт после did-finish-load, значит посылки снимка ушли), и в том же
+ * вызове шлёт метку; посылки main → окно идут по одной трубе по порядку,
+ * значит метка обработана после снимка. Раньше — пауза 1500 мс.
+ */
+async function waitForLoadSnapshot(app, page, urlPart) {
+    await page.waitForLoadState('load');
+    const marker = `e2e-${Date.now()}-${Math.random()}`;
+    await untilReceived(page, 'display-window-state', async () => {
+        await expect.poll(() => app.evaluate(({ BrowserWindow }, [part, mk]) => {
+            const live = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+            const own = live.filter((w) => w.webContents.getURL().includes(part));
+            if (!own.length || own.some((w) => w.webContents.isLoading())) { return false; }
+            const isOpen = live.some((w) => w.webContents.getURL().includes('display.html'));
+            for (const w of own) { w.webContents.send('display-window-state', { isOpen, e2eMarker: mk }); }
+            return true;
+        }, [urlPart, marker]), { message: `окно ${urlPart} не догрузилось` }).toBe(true);
+    }, { match: { e2eMarker: marker } });
+}
+
 async function pressCode(win, code) {
     await win.evaluate((c) => {
         document.dispatchEvent(new KeyboardEvent('keydown', { code: c, bubbles: true, cancelable: true }));
@@ -40,30 +71,32 @@ test('окно, открытое вторым, знает про уже откр
 
     // 1. Сначала часы.
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-    await waitForClock(app);
-    await control.waitForTimeout(1500);
+    const clock = await waitForClock(app);
+    // Часы ВСТАЛИ: восстановление геометрии и её отложенная запись позади.
+    await waitForWindowSettled(app, clock, 'electron-clock-widget.html');
     expect(await findWindow(app, 'clock'), 'часы должны открыться').not.toBeNull();
 
     // 2. Потом виджет — он загружается ПОСЛЕ часов.
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-    await waitForWidget(app);
-    await control.waitForTimeout(1500);
+    await waitForLoadSnapshot(app, await waitForWidget(app), 'electron-widget.html');
     const widget = await findWindow(app, 'widget');
     expect(widget, 'виджет должен открыться').not.toBeNull();
 
     // 3. C в виджете обязана ЗАКРЫТЬ часы с первого нажатия.
     await pressCode(widget, 'KeyC');
-    await control.waitForTimeout(1200);
 
-    expect(
-        await findWindow(app, 'clock'),
-        'часы должны закрыться: виджет обязан знать, что они уже открыты'
+    // Опрос, а не пауза 1200 мс: закрытие идёт через main и не мгновенно.
+    // Ложно-зелёным это не станет — без снимка виджет слал бы open, и часы
+    // остались бы открытыми до таймаута.
+    await expect.poll(
+        () => findWindow(app, 'clock'),
+        { message: 'часы должны закрыться: виджет обязан знать, что они уже открыты' }
     ).toBeNull();
 
     // 4. И обратно — повторное нажатие снова их открывает.
     await pressCode(widget, 'KeyC');
-    await control.waitForTimeout(1500);
-    expect(await findWindow(app, 'clock'), 'повторное нажатие снова открывает часы').not.toBeNull();
+    await expect.poll(() => findWindow(app, 'clock'), { message: 'повторное нажатие снова открывает часы' })
+        .not.toBeNull();
 
     await app.close();
 });
@@ -72,19 +105,21 @@ test('панель управления после перезагрузки ре
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-    await waitForWidget(app);
-    await control.waitForTimeout(1500);
+    const widget = await waitForWidget(app);
+    await waitForWindowSettled(app, widget, 'electron-widget.html');
 
     // Перезагрузка рендерера — именно это делает краш-обработчик
     // bindRenderCrashHandler(win.reload()) после падения окна.
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(1500);
+    // Контроллер встал и стартовая рассылка ушла (было: пауза 1500 мс).
+    await reloadPanel(control);
 
-    const widgetBtnActive = await control.evaluate(
-        () => document.getElementById('openWidgetBtn').classList.contains('active')
-    );
-    expect(widgetBtnActive, 'кнопка «Виджет» обязана быть отмечена: виджет открыт').toBe(true);
+    // Снимок окон приходит панели на did-finish-load — опрос самого признака.
+    // Другого источника `widget-window-state: true` после перезагрузки нет
+    // (виджет открыт ДО неё), поэтому опрос не станет ложно-зелёным.
+    await expect.poll(
+        () => control.evaluate(() => document.getElementById('openWidgetBtn').classList.contains('active')),
+        { message: 'кнопка «Виджет» обязана быть отмечена: виджет открыт' }
+    ).toBe(true);
 
     await app.close();
 });

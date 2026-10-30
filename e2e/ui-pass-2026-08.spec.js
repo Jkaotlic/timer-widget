@@ -3,7 +3,11 @@ const { launchApp } = require('./launch');
 // Окна ждут ОПРОСОМ с дедлайном, а не событием 'window': событие приходит
 // ровно раз и теряется, если окно успело открыться между возвратом из
 // click() и подпиской — тест после этого висит до таймаута.
-const { waitForWidget, waitForClock, waitForDisplay } = require('./window-ready');
+const {
+    waitForWidget, waitForClock, waitForDisplay, waitForPanelSettled, armReceived, untilReceived,
+    waitForWindowSettled, waitForWidgetSnapshot, waitForClockSnapshot, waitForDisplaySnapshot,
+    waitForDisplaySettled, waitForQuiet
+} = require('./window-ready');
 
 /**
  * Замеры UI-прохода от 07.08.2026 — то, что картинкой не поймать.
@@ -30,6 +34,9 @@ test('часовая стрелка виджета движется', async () =
     await control.click('#openWidgetBtn');
     const widget = await waitForWidget(app);
     await widget.waitForLoadState('domcontentloaded');
+    // Снимок main обработан: его посылки стиля и состояния не придут поверх
+    // посылок теста.
+    await waitForWidgetSnapshot(app, widget);
 
     // Стиль переключаем ЧЕРЕЗ интерфейс: контейнеры стилей скрыты и
     // показываются классом .active, поэтому ожидание #widgetAnalog без
@@ -41,16 +48,22 @@ test('часовая стрелка виджета движется', async () =
     // Ящик закрываем: он перекрывает панель, а клик по времени — это вход в
     // состояние ввода, которого редизайн 2026-08-12 требует перед вводом.
     await control.click('#drawerClose');
-    await control.waitForTimeout(500);
+    // Ящик закрыт ИТОГОМ (finishClose снял drawer-open), окно вернулось —
+    // было 500 мс.
+    await waitForPanelSettled(app, control);
     await control.click('#controlTime');
-    await control.waitForTimeout(300);
+    // Фокус на минуты ставит кадр (setInputMode → rAF): `fill` часов раньше
+    // него отдал бы «1» минутам (диагноз CI 30.10.2026, panel-states:217).
+    await expect(control.locator('#manualMinutes')).toBeFocused();
     // Полей три: часы отдельно, поэтому минуты ограничены 59, как и секунды.
     await control.fill('#manualHours', '1');
     await control.fill('#manualMinutes', '30');
     await control.fill('#manualSeconds', '0');
+    // Виджет получил состояние с этим временем — было 500 мс после стиля.
+    const state = await armReceived(widget, 'timer-state');
     await control.press('#manualSeconds', 'Enter');
     await widget.waitForSelector('#widgetAnalog.active');
-    await widget.waitForTimeout(500);
+    await state({ match: { remainingSeconds: 5400 } });
 
     const angle = await widget.evaluate(handAngle, 'widgetHandHour');
     expect(angle, 'элемента #widgetHandHour нет в разметке').not.toBeNull();
@@ -67,12 +80,19 @@ test('деления циферблата виджета стоят на одн�
     await control.click('#openWidgetBtn');
     const widget = await waitForWidget(app);
     await widget.waitForLoadState('domcontentloaded');
+    // Снимок main обработан: его посылки стиля и состояния не придут поверх
+    // посылок теста.
+    await waitForWidgetSnapshot(app, widget);
 
     await control.click('.wrow-chevron[data-tab="timer"]');
     await control.waitForSelector('#settingsDrawer.open');
-    await control.click('#timerStyle button:has-text("Аналог")');
+    // Стиль дошёл до виджета, окно встало после смены стиля (раскладка и
+    // масштаб циферблата считаются по размеру окна) — было 400 мс.
+    await untilReceived(widget, 'widget-style-update',
+        () => control.click('#timerStyle button:has-text("Аналог")'), { match: { timerStyle: 'analog' } });
     await widget.waitForSelector('#widgetAnalog.active');
-    await widget.waitForTimeout(400);
+    await waitForWindowSettled(app, widget, 'electron-widget.html');
+    await waitForQuiet(widget);
 
     const m = await widget.evaluate(() => {
         // Деление на 3 часах (rotate(90deg)) и центр циферблата обязаны
@@ -118,7 +138,9 @@ test('в светлой теме часы читаемы: стрелки, циф
     // Дефолт после редизайна 2026-08-12 — СВЕТЛАЯ тема, поэтому переключать
     // ничего не нужно: часы уже в ней. Прежняя версия кликала «тёмная →
     // светлая» и теперь уводила бы ровно из проверяемого состояния.
-    await clock.waitForTimeout(400);
+    // Снимок main (тема, цвета) обработан, переходы цвета доехали — было 400 мс.
+    await waitForClockSnapshot(app, clock);
+    await waitForQuiet(clock);
 
     const seen = await clock.evaluate(() => {
         const cs = (sel) => {
@@ -193,7 +215,9 @@ test('кольцо дисплея стоит в центре окна, чип н
     const display = await waitForDisplay(app);
     await display.waitForLoadState('domcontentloaded');
     await display.waitForSelector('.timer-ring');
-    await display.waitForTimeout(500);
+    // Снимок и вставшее окно (полноэкранный вход, раскладка) — было 500 мс.
+    await waitForDisplaySnapshot(app, display);
+    await waitForDisplaySettled(app, display);
 
     const m = await display.evaluate(() => {
         const r = document.querySelector('.timer-ring').getBoundingClientRect();
