@@ -10,7 +10,6 @@ const CONFIG = {
     // ============================================
     // UI DELAYS & DEBOUNCE
     // ============================================
-    DEBOUNCE_DELAY: 120,                    // Debounce для UI events
     RESIZE_DEBOUNCE: 300,                   // Debounce для resize events
     FLASH_INTERVAL: 250,                    // Интервал мигания при завершении таймера
 

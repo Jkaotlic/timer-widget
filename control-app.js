@@ -13,19 +13,11 @@
  */
         // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
-        // debounce: используем из utils.js (TimeUtils), иначе — встроенный fallback
-        // Нельзя использовать const/let — utils.js уже определяет function debounce в глобальной области
-        if (typeof debounce === 'undefined') {
-            var debounce = (window.TimeUtils && window.TimeUtils.debounce)
-                ? window.TimeUtils.debounce
-                : (fn, delay = (window.CONFIG && window.CONFIG.DEBOUNCE_DELAY) || 120) => {
-                    let timeoutId;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), delay);
-                    };
-                };
-        }
+        // debounce — только window.TimeUtils.debounce (utils.js). Здесь стоял
+        // `if (typeof debounce === 'undefined') { var debounce = … }`: `var`
+        // сливался с `function debounce` из utils.js в одно глобальное имя, и
+        // ветка с запасным вариантом не исполнялась никогда. В модуле тот же
+        // `var` стал бы своим, а обращение — к чужому файлу голым именем.
 
         // Обе величины — из реестра, а не литералами: масштаб «как при открытии»
         // (ползунки говорят процентами, CONFIG.DEFAULT_SCALE хранит долю) и
@@ -738,7 +730,7 @@
                 // Фон дисплея
                 ['bgSolidColor', 'bgGrad1', 'bgGrad2'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) {el.addEventListener('input', debounce(() => this.pushDisplaySettings()));}
+                    if (el) {el.addEventListener('input', window.TimeUtils.debounce(() => this.pushDisplaySettings()));}
                 });
                 // Сброс стиля
                 const resetStyleBtn = document.getElementById('resetStyleBtn');

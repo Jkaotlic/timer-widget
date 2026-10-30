@@ -1,6 +1,14 @@
 const globals = require('globals');
 const js = require('@eslint/js');
 const html = require('eslint-plugin-html');
+const { windowModuleFiles, moduleLintBlock } = require('./scripts/window-modules.js');
+
+// Файлы окон, которые грузятся модулем (`type="module"` + граф import), —
+// ВЫЧИСЛЯЮТСЯ из страниц, а не перечисляются: см. scripts/window-modules.js.
+// Блок для них стоит ПОСЛЕ классических — более поздний блок flat-конфига
+// перекрывает `sourceType` и `no-undef`. Пустой `files` ESLint не принимает,
+// поэтому без модулей блока нет вовсе.
+const WINDOW_MODULES = windowModuleFiles(__dirname);
 
 module.exports = [
   js.configs.recommended,
@@ -75,6 +83,7 @@ module.exports = [
       'no-useless-assignment': 'error',
     },
   },
+  ...(WINDOW_MODULES.length > 0 ? [moduleLintBlock(WINDOW_MODULES)] : []),
   {
     ignores: ['dist/**', 'node_modules/**', '.superpowers/**'],
   },
