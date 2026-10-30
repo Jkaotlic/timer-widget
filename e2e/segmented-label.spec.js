@@ -24,7 +24,19 @@ for (const row of ROWS) {
     test(`подпись стиля (${row.tab}) занимает одну строку`, async () => {
         const { app, control } = await launchApp();
         try {
-            await control.click(`.tab-btn[data-tab="${row.tab}"]`);
+            // 30.10.2026 полный прогон один раз упал здесь: шеврон «не виден»
+            // 30 с, три повтора зелёные, причина не найдена. На отказе печатаем
+            // то, что прячет строку: классы body (collapsed / compact-panel*)
+            // и окно — чтобы следующий раз объяснил себя.
+            await control.click(`.tab-btn[data-tab="${row.tab}"]`, { timeout: 10000 }).catch(async (err) => {
+                const why = await control.evaluate(() => ({
+                    body: document.body.className,
+                    win: [window.innerWidth, window.innerHeight],
+                    focused: document.hasFocus()
+                })).catch(() => null);
+                console.log('шеврон не нажат, состояние панели:', JSON.stringify(why));
+                throw err;
+            });
             await control.waitForTimeout(600);
 
             const m = await control.evaluate(({ seg, rowId }) => {
