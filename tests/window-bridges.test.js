@@ -54,6 +54,11 @@ const TEMPORARY = Object.freeze({
     DisplayLayouts: 'display-layouts.js',
     WindowGeometry: 'window-geometry.js',
     DigitsStyle: 'digits-style.js',
+    RendererShared: 'renderer-shared.js',
+    HeroModes: 'hero-modes.js',
+    SettingsSchema: 'settings-schema.js',
+    SoundPresets: 'sound-presets.js',
+    Presets: 'presets.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';

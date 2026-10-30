@@ -4,9 +4,8 @@
 // windows (electron-widget.html, electron-clock-widget.html, display.html /
 // display-script.js). It contains ONLY pure functions.
 //
-// Dual export, identical to utils.js:
-//   - Node (tests / main process): `module.exports = { ... }`
-//   - Browser (renderer process):  `window.RendererShared = { ... }`
+// ES module: named exports (Node tests take it via require(esm)); the
+// classic files of the windows still read the temporary `window.RendererShared`.
 //
 // IMPORTANT: every function here mirrors the EXACT behavior already present in
 // the renderers — they adopt these as drop-in replacements, no new behavior is
@@ -1033,6 +1032,9 @@ function migrateDisplayBlocks(settings) {
 // ---------------------------------------------------------------------------
 // Exports — dual pattern identical to utils.js
 // ---------------------------------------------------------------------------
+// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
+// не расширяются (иначе объект не совпал бы с `typeof import`).
+/** @type {typeof import('./renderer-shared.js')} */
 const RendererShared = {
     breakdown,
     flipCells,
@@ -1064,12 +1066,17 @@ const RendererShared = {
     migrateTimerStyle
 };
 
-// Node.js (tests / main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = RendererShared;
-}
+export {
+    breakdown, flipCells, clampScale, fitBlockScale, sideCardBand, topBandReserve,
+    heroFrameShrink, clockToSeconds, secondsUntilEventEnd, signedSecondsUntilClock,
+    eventClockDistances, bgOverlayPercent, DEFAULT_BG_OVERLAY, migrateDisplayBlocks,
+    timerLifecycleStatus, timerColorBand, pickOwnSetting, ownColors, storedColors,
+    LEGACY_COLORS_KEY, endsAt, relativeLuminance, backgroundTone, surfaceTone,
+    surfacePaint, surfaceSolid, surfaceAlpha, migrateTimerStyle
+};
 
 // Browser (renderer process)
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.RendererShared = RendererShared;
 }

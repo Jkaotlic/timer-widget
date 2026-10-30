@@ -17,16 +17,8 @@
  * одного тотала. Второго знания о цвете здесь не заводится.
  */
 
-// Имена УНИКАЛЬНЫ на весь документ: сборщика нет, все файлы — classic
-// <script>, и столкновение имени верхнего уровня роняет inline-скрипт окна
-// целиком.
-const HeroShared = (typeof window !== 'undefined' && window.RendererShared)
-    ? window.RendererShared
-    : require('./renderer-shared.js');
-
-const HeroLayouts = (typeof window !== 'undefined' && window.DisplayLayouts)
-    ? window.DisplayLayouts
-    : require('./display-layouts.js');
+import * as HeroShared from './renderer-shared.js';
+import * as HeroLayouts from './display-layouts.js';
 
 /**
  * Реестр режимов.
@@ -177,6 +169,9 @@ function heroProgress(secs, total, overrunLimitSeconds) {
     return Math.min(1, Math.round((s / t) * 1000) / 1000);
 }
 
+// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
+// не расширяются (иначе объект не совпал бы с `typeof import`).
+/** @type {typeof import('./hero-modes.js')} */
 const HeroModes = {
     HERO_MODES,
     HERO_MODE_IDS,
@@ -190,12 +185,13 @@ const HeroModes = {
     heroProgress
 };
 
-// Node.js (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = HeroModes;
-}
+export {
+    HERO_MODES, HERO_MODE_IDS, HERO_LABEL_KEYS, DEFAULT_MODE, modeById, isClockMode,
+    heroCaption, heroSeconds, heroTotal, heroProgress
+};
 
 // Браузер (дисплей, панель)
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.HeroModes = HeroModes;
 }

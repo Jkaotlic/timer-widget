@@ -27,9 +27,8 @@
  * объект настроек и `document`. Поэтому его поведение проверяется юнит-тестами на
  * поддельном DOM (`tests/settings-schema.test.js`), а не только через e2e.
  *
- * Двойной экспорт, как в utils.js / renderer-shared.js:
- *   - Node (тесты):     `module.exports`
- *   - Браузер (рендер): `window.SettingsSchema`
+ * ES-модуль: именованный экспорт (тесты и main — require(esm)); классике
+ * панели — временный мост `window.SettingsSchema`.
  */
 
 // ---------------------------------------------------------------------------
@@ -56,13 +55,7 @@
  * умолчания здесь нет намеренно: две копии одного числа в этом проекте уже
  * расходились.
  */
-// Имя УНИКАЛЬНО на весь документ: сборщика нет, все файлы — classic <script>,
-// и `const Layouts` здесь столкнулся бы с таким же именем в panel-display.js.
-// Столкновение роняет ВЕСЬ inline-скрипт панели («Identifier has already been
-// declared»), то есть окно управления перестаёт работать целиком.
-const SchemaLayouts = (typeof window !== 'undefined' && window.DisplayLayouts)
-    ? window.DisplayLayouts
-    : require('./display-layouts.js');
+import * as SchemaLayouts from './display-layouts.js';
 
 const DISPLAY_BLOCK_KEYS = [
     'showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle',
@@ -423,6 +416,9 @@ function overrunLimitFieldValue(seconds) {
     return `${mm}:${ss}`;
 }
 
+// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
+// не расширяются (иначе объект не совпал бы с `typeof import`).
+/** @type {typeof import('./settings-schema.js')} */
 const SettingsSchema = {
     SETTINGS_DESCRIPTORS,
     overrunLimitFieldValue,
@@ -436,12 +432,14 @@ const SettingsSchema = {
     resetKeys
 };
 
-// Node.js (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SettingsSchema;
-}
+export {
+    SETTINGS_DESCRIPTORS, overrunLimitFieldValue, DISPLAY_BLOCK_KEYS,
+    DISPLAY_LABEL_KEYS, MANUAL_KEYS, settingValue, applyStoredSettings,
+    collectSettings, resetOwnedSettings, resetKeys
+};
 
 // Браузер (окно управления)
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.SettingsSchema = SettingsSchema;
 }

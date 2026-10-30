@@ -17,7 +17,7 @@
          кадра, иначе окно успевает показать чужое состояние. -->
     <script src="ui-lock.js"></script>
     <script src="panel-titlebar.js"></script>
-    <script src="presets.js"></script><script src="panel-presets.js"></script><script src="panel-compact.js"></script>
+    <script src="panel-presets.js"></script><script src="panel-compact.js"></script>
     <script src="theme-init.js"></script>
 </head>
 <body class="control-window state-idle">
@@ -1097,16 +1097,19 @@
     <script type="module" src="color-utils.js"></script>
     <script type="module" src="utils.js"></script>
     <script type="module" src="renderer-storage.js"></script>
-    <script src="renderer-shared.js" defer></script>
+    <script type="module" src="renderer-shared.js"></script>
     <script type="module" src="digits-style.js"></script>
     <script src="font-select.js" defer></script>
     <!-- display-layouts.js РАНЬШЕ settings-schema.js: таблица берёт у реестра умолчание масштаба блоков -->
     <script type="module" src="display-layouts.js"></script>
-    <script src="hero-modes.js" defer></script>
-    <script src="settings-schema.js" defer></script>
+    <script type="module" src="hero-modes.js"></script>
+    <script type="module" src="settings-schema.js"></script>
     <script type="module" src="clock-settings-schema.js"></script>
+    <!-- Из <head> перенесён модулем: его читает только control-app.js (window.Presets
+         при установке ячеек), а panel-presets.js получает реестр аргументом. -->
+    <script type="module" src="presets.js"></script>
     <script type="module" src="sound-bank.js"></script>
-    <script src="sound-presets.js" defer></script>
+    <script type="module" src="sound-presets.js"></script>
     <script src="ui-feedback.js" defer></script>
     <script src="scale-input.js" defer></script>
     <script src="scale-report.js" defer></script>

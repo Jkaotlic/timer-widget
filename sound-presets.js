@@ -172,12 +172,17 @@ function buildSoundSelects(doc) {
     return filled;
 }
 
+// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
+// не расширяются (иначе объект не совпал бы с `typeof import`).
+/** @type {typeof import('./sound-presets.js')} */
 const SoundPresets = { SOUND_PRESETS, SOUND_EVENTS, presetsForEvent, buildSoundSelects, repairSelection };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SoundPresets;
-}
+export {
+    SOUND_PRESETS, SOUND_EVENTS, presetsForEvent, buildSoundSelects,
+    repairSelection
+};
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.SoundPresets = SoundPresets;
 }
