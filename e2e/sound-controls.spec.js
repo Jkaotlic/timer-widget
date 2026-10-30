@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { waitForPanelSettled } = require('./window-ready');
 
 /**
  * Вкладка «Звуки»: один вид контрола на один смысл, и мишень не меньше нормы.
@@ -24,7 +25,8 @@ test('включение звука события — тот же перекл�
     const { app, control } = await launchApp();
     try {
         await control.click('.tab-btn[data-tab="sound"]');
-        await control.waitForTimeout(700);
+        // Ящик открыт, окно получило ширину, колонка пересчитана (было 700 мс).
+        await waitForPanelSettled(app, control);
 
         const m = await control.evaluate((rows) => {
             const HIT_MIN = parseFloat(

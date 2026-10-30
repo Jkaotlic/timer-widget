@@ -418,6 +418,7 @@ test.describe('режимы центрального времени', () => {
             while (Date.now() < deadline) {
                 last = await readAngle();
                 if (last.rendered && Math.abs(last.angle - last.expected) < 6) { break; }
+                // шаг опроса: стрелка отрисована и угол сошёлся
                 await display.waitForTimeout(120);
             }
 

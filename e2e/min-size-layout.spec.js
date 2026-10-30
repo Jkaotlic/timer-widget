@@ -1,6 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const CONFIG = require('../constants.js');
+const { waitForPanelSettled } = require('./window-ready');
 
 const MIN_W = CONFIG.CONTROL_WINDOW_MIN_WIDTH;
 const MIN_H = CONFIG.CONTROL_WINDOW_MIN_HEIGHT;
@@ -35,7 +36,9 @@ test(`при ${MIN_W}×${MIN_H} секция настроек не обреза�
             win.setMinimumSize(size[0], size[1]);
             win.setSize(size[0], size[1]);
         }, [MIN_W, MIN_H]);
-        await control.waitForTimeout(600);
+        // Размер дошёл до страницы, ступени компактного режима отработали,
+        // панель утихла (было 600 мс).
+        await waitForPanelSettled(app, control);
 
         const m = await control.evaluate(() => {
             const section = document.getElementById('advancedSettings');
