@@ -342,6 +342,7 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
                     return { x: Math.round(r.left), y: Math.round(r.top) };
                 };
                 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+                const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
                 const o = (x, y) => ({
                     bubbles: true, cancelable: true, button: 0, altKey: true,
                     screenX: x, screenY: y, clientX: x, clientY: y
@@ -355,14 +356,21 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
                 const px = start.x + 10, py = start.y + 10;
 
                 el.dispatchEvent(new MouseEvent('mousedown', o(px, py)));
+                // пауза законна: утверждается ОТСУТСТВИЕ прыжка на нажатии за
+                // интервал — прыжок мог бы прийти и переходом, а не только
+                // синхронно в обработчике
                 await wait(60);
                 const afterDown = box();
+                // Шаги — по кадрам (порогов по времени у жеста нет), а не сном.
                 for (let i = 1; i <= 6; i++) {
                     document.dispatchEvent(new MouseEvent('mousemove', o(px + (DX * i) / 6, py + (DY * i) / 6)));
-                    await wait(30);
+                    await frame();
                 }
                 document.dispatchEvent(new MouseEvent('mouseup', o(px + DX, py + DY)));
-                await wait(120);
+                // Пройденный путь — по ОСЕВШЕЙ коробке: переходы карточки
+                // доехали (было: сон 120 мс).
+                await frame();
+                await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {})));
                 const afterUp = box();
                 return {
                     jump: { dx: afterDown.x - start.x, dy: afterDown.y - start.y },

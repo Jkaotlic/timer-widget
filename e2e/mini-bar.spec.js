@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const CONFIG = require('../constants.js');
-const { waitForSteady, reloadPanel } = require('./window-ready');
+const { waitForSteady, reloadPanel, showToastSettled } = require('./window-ready');
 
 /** Окно панели глазами главного процесса: границы и уровень. */
 const winState = ({ BrowserWindow }) => {
@@ -398,9 +398,8 @@ test('тост в свёрнутом состоянии виден целико�
         await control.click('#miniBarToggle');
         await windowSettled(app, control, true);
 
-        const m = await control.evaluate(async () => {
-            window.Toast.show('Проверка размещения сообщения в полосе');
-            await new Promise((r) => setTimeout(r, 400));
+        await showToastSettled(control, 'Проверка размещения сообщения в полосе');
+        const m = await control.evaluate(() => {
             const toast = document.querySelector('.toast');
             if (!toast) { return null; }
             const r = toast.getBoundingClientRect();

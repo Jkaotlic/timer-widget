@@ -533,6 +533,28 @@ async function panelRoundTrip(control, opts = {}) {
 }
 
 /**
+ * Показать тост панели и дождаться, что он ВСТАЛ (было: сон 400 мс внутри
+ * evaluate). `Toast.show` (ui-feedback.js) кладёт элемент сразу, а класс
+ * `show` — в кадре; наш кадр взведён позже и идёт после него, а запущенный
+ * классом переход ждётся до конца (`finished`). Возвращает false, если
+ * `Toast` в окне нет.
+ *
+ * @param {import('@playwright/test').Page} control
+ * @param {string} message
+ * @returns {Promise<boolean>}
+ */
+function showToastSettled(control, message) {
+    return control.evaluate(async (text) => {
+        if (!window.Toast || typeof window.Toast.show !== 'function') { return false; }
+        window.Toast.show(text);
+        const toast = [...document.querySelectorAll('.toast')].pop();
+        await new Promise((r) => requestAnimationFrame(() => r()));
+        await Promise.all(toast.getAnimations().map((a) => a.finished.catch(() => {})));
+        return true;
+    }, message);
+}
+
+/**
  * Отсчёт дошёл до `to` (панель показала `remaining ≤ to`), и всё, что main
  * разослал до этой точки (`timer-state`, звуковые события, накопитель
  * перелимита), панель отработала (`panelRoundTrip`).
@@ -1337,7 +1359,7 @@ async function untilMainHandled(app, channel, action, opts = {}) {
 }
 
 module.exports = {
-    relayBarrier, setWindowStyles, newestWindowId, waitForMainWindowGone, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
+    relayBarrier, setWindowStyles, showToastSettled, newestWindowId, waitForMainWindowGone, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,

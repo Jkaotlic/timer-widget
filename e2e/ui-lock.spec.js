@@ -2,7 +2,7 @@ const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
     waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForDisplaySettled, waitForWidgetSnapshot,
-    waitForWindowSettled, untilReceived, armReceived, waitForQuiet
+    waitForWindowSettled, untilReceived, armReceived, waitForQuiet, moveBarrier
 } = require('./window-ready');
 
 /**
@@ -34,22 +34,26 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
 const clickLock = (control, page, locked) => untilReceived(page, 'ui-lock-update',
     () => control.click('#lockToggle'), { match: { locked } });
 
-/** Alt-перетаскивание карточки: тот же жест, что и в display-blocks.spec.js. */
+/**
+ * Alt-перетаскивание карточки: тот же жест, что и в display-blocks.spec.js.
+ * Шаги — по КАДРАМ (порогов по времени у жеста нет, нужны лишь разные
+ * задачи, как у мыши), а не сном 30–60 мс внутри evaluate.
+ */
 const dragBlock = (page, id, dx, dy) => page.evaluate(async ([target, ddx, ddy]) => {
     const el = document.getElementById(target);
     const r = el.getBoundingClientRect();
-    const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+    const frame = () => new Promise((res) => requestAnimationFrame(() => res()));
     const o = (x, y) => ({
         bubbles: true, cancelable: true, button: 0, altKey: true,
         screenX: x, screenY: y, clientX: x, clientY: y
     });
     const px = r.left + 8, py = r.top + 8;
     el.dispatchEvent(new MouseEvent('mousedown', o(px, py)));
-    await wait(60);
+    await frame();
     const steps = [];
     for (let i = 1; i <= 6; i++) {
         document.dispatchEvent(new MouseEvent('mousemove', o(px + (ddx * i) / 6, py + (ddy * i) / 6)));
-        await wait(30);
+        await frame();
         steps.push(Math.round(el.getBoundingClientRect().left));
     }
     document.dispatchEvent(new MouseEvent('mouseup', o(px + ddx, py + ddy)));
@@ -57,8 +61,12 @@ const dragBlock = (page, id, dx, dy) => page.evaluate(async ([target, ddx, ddy])
     // снимается `translateX(-50%)`, а на `transform` висит переход в 400 мс —
     // замер раньше времени показывает не место, а середину анимации (замер:
     // видимый край 1569 → 1583 → 1586 → 1572 → 1561 → 1544 при РОВНО
-    // убывающем style.left 1700 → 1600).
-    await wait(600);
+    // убывающем style.left 1700 → 1600). Было: сон 600 мс (ревью B6, M4);
+    // стало — конец самих переходов карточки, затем кадр. Под замком жест
+    // ничего не меняет синхронно в обработчиках, переходов нет — ждать нечего.
+    await frame();
+    await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {})));
+    await frame();
     const after = el.getBoundingClientRect();
     return { x: Math.round(after.left), y: Math.round(after.top), left: el.style.left, steps };
 }, [id, dx, dy]);
@@ -161,19 +169,24 @@ test('замок держит ОКНО виджета, а панель прод�
             return { x: b.x, y: b.y, width: b.width };
         });
 
-        const drag = (page, dx, dy) => page.evaluate(async ([ddx, ddy]) => {
-            const wait = (ms) => new Promise((res) => setTimeout(res, ms));
-            const o = (x, y) => ({ bubbles: true, cancelable: true, button: 0, buttons: 1, screenX: x, screenY: y, clientX: x, clientY: y });
-            const container = document.querySelector('.widget-container') || document.body;
-            container.dispatchEvent(new MouseEvent('mousedown', o(300, 300)));
-            await wait(40);
-            for (let i = 1; i <= 4; i++) {
-                document.dispatchEvent(new MouseEvent('mousemove', o(300 + (ddx * i) / 4, 300 + (ddy * i) / 4)));
-                await wait(30);
-            }
-            document.dispatchEvent(new MouseEvent('mouseup', o(300 + ddx, 300 + ddy)));
-            await wait(200);
-        }, [dx, dy]);
+        // Шаги жеста — по кадрам; после него барьер main (moveBarrier): все
+        // посылки сдвига, что окно успело отправить, применены. Было: сон
+        // 30–40 мс между шагами и 200 мс после (ревью B6, M4).
+        const drag = async (page, dx, dy) => {
+            await page.evaluate(async ([ddx, ddy]) => {
+                const frame = () => new Promise((res) => requestAnimationFrame(() => res()));
+                const o = (x, y) => ({ bubbles: true, cancelable: true, button: 0, buttons: 1, screenX: x, screenY: y, clientX: x, clientY: y });
+                const container = document.querySelector('.widget-container') || document.body;
+                container.dispatchEvent(new MouseEvent('mousedown', o(300, 300)));
+                await frame();
+                for (let i = 1; i <= 4; i++) {
+                    document.dispatchEvent(new MouseEvent('mousemove', o(300 + (ddx * i) / 4, 300 + (ddy * i) / 4)));
+                    await frame();
+                }
+                document.dispatchEvent(new MouseEvent('mouseup', o(300 + ddx, 300 + ddy)));
+            }, [dx, dy]);
+            await moveBarrier(app, page);
+        };
 
         // Проверка проверки: без замка окно ездит.
         const start = await bounds();
