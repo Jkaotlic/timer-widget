@@ -222,15 +222,40 @@ test('применение идёт ТЕМ ЖЕ путём, что и запус
         loadLocalBackground: () => calls.push('loadLocalBackground'),
         pushDisplaySettings: () => calls.push('pushDisplaySettings'),
         pushClockSettings: () => calls.push('pushClockSettings'),
+        pushWindowStyles: () => calls.push('pushWindowStyles'),
         renderWindowRows: () => calls.push('renderWindowRows')
     };
     const ipc = { send: (channel) => calls.push(channel) };
     PanelPresets.applyProfile(controller, ipc);
     assert.deepEqual(calls, [
         'loadSettings', 'loadClockSettings', 'loadLocalBackground',
-        'pushDisplaySettings', 'pushClockSettings',
+        'pushDisplaySettings', 'pushClockSettings', 'pushWindowStyles',
         'renderWindowRows', 'display-restore-state'
     ]);
+});
+
+test('стиль виджета и часов пресет шлёт СРАЗУ, а не через 500/600 мс', () => {
+    // Посылки стиля жили в loadSettings под setTimeout 500/600 мс: пресет
+    // менял настройки окон мгновенно, а стиль — с опозданием, и часы до
+    // полсекунды показывали новые настройки старым стилем. Задержка нужна
+    // только запуску панели (там она была всегда, порядок старта не трогаем),
+    // поэтому посылки вынесены в pushWindowStyles: запуск зовёт его отложенно,
+    // пресет — синхронно (проверено составом вызовов выше).
+    const control = codeOnly(read('control-app.js'));
+    const at = control.indexOf('loadSettings() {');
+    assert.notEqual(at, -1, 'нет loadSettings');
+    const body = control.slice(at, control.indexOf('\n            saveColors(', at));
+    assert.ok(body.length > 500, 'тело loadSettings найдено (самопроверка)');
+    assert.doesNotMatch(body, /sendClockStyle\(|'widget-style-update'/, 'loadSettings снова шлёт стиль сам');
+    assert.match(control, /setTimeout\(\(\) => this\.pushWindowStyles\(\)/, 'запуск панели не шлёт стиль окнам');
+
+    const state = codeOnly(read('panel-state.js'));
+    const pw = state.indexOf('pushWindowStyles() {');
+    assert.notEqual(pw, -1, 'нет pushWindowStyles в panel-state.js');
+    const pwBody = state.slice(pw, state.indexOf('\n    },', pw));
+    assert.match(pwBody, /this\.sendClockStyle\(\)/);
+    assert.match(pwBody, /'widget-style-update', this\.widgetStylePayload\(\)/);
+    assert.doesNotMatch(pwBody, /setTimeout/, 'внутри метода задержки быть не должно');
 });
 
 test('PANEL-001: пресет раскладывает и рассылает настройки ЧАСОВ, а не только дисплея', () => {

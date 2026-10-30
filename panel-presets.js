@@ -184,10 +184,11 @@ function presetHotkeyHandler({ apply, save, slots = 4 }) {
  * Перечитать профиль и разослать его окнам.
  *
  * Ровно тот же путь, которым панель поднимается при запуске: `loadSettings()`
- * раскладывает ключи по контролам и рассылает стиль и цвета,
+ * раскладывает ключи по контролам и рассылает цвета,
  * `loadClockSettings()` + `pushClockSettings()` — настройки часов (их
  * loadSettings НЕ трогает), `pushDisplaySettings()` — набор полноэкранного
- * окна, а `display-restore-state`
+ * окна, `pushWindowStyles()` — стиль виджета и часов (при запуске — отложенно),
+ * а `display-restore-state`
  * просит его перечитать МЕСТА карточек: они лежат в профиле, а не в payload.
  *
  * Функция здесь, а не методом контроллера, по той же причине, что и остальные
@@ -207,6 +208,9 @@ function applyProfile(controller, ipc) {
     if (typeof controller.loadLocalBackground === 'function') { controller.loadLocalBackground(); }
     if (typeof controller.pushDisplaySettings === 'function') { controller.pushDisplaySettings(); }
     if (typeof controller.pushClockSettings === 'function') { controller.pushClockSettings(); }
+    // Стиль виджета и часов — сразу: при запуске он уходит отложенно, и та же
+    // задержка здесь показывала полсекунды новых настроек старым стилем.
+    if (typeof controller.pushWindowStyles === 'function') { controller.pushWindowStyles(); }
     if (typeof controller.renderWindowRows === 'function') { controller.renderWindowRows(); }
     if (ipc && typeof ipc.send === 'function') { ipc.send('display-restore-state'); }
     return true;

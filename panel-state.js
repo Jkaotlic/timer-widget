@@ -83,6 +83,18 @@ const PanelStateMixin = {
     },
 
     /**
+     * Стиль виджета и часов — окнам, БЕЗ задержки. Запуск панели зовёт его
+     * отложенно (control-app.js, конструктор), пресет — сразу (applyProfile в
+     * panel-presets.js): раньше обе посылки сидели в loadSettings под
+     * setTimeout, и пресет менял настройки окон мгновенно, а стиль — через
+     * полсекунды.
+     */
+    pushWindowStyles() {
+        this.sendClockStyle();
+        window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
+    },
+
+    /**
      * Раскладывает живое состояние окон в подзаголовки их строк.
      *
      * Значения берутся из САМИХ контролов настроек, а не из отдельной копии:

@@ -38,6 +38,7 @@
                 // Только для tsc: что приносят примеси (Object.assign ниже); строка лишь читает свойство.
                 /** @type {TimerMixins['pushDisplaySettings']} */ this.pushDisplaySettings;
                 /** @type {TimerMixins['widgetStylePayload']} */ this.widgetStylePayload;
+                /** @type {TimerMixins['pushWindowStyles']} */ this.pushWindowStyles;
                 /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows;
                 /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows;
                 /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow;
@@ -96,6 +97,9 @@
                     this.pushDisplaySettings();
                     this.pushClockSettings();
                 }, 200);
+                // Стиль окнам — позже настроек, как было всегда (500/600 мс
+                // стояли в loadSettings). Пресет зовёт его без задержки.
+                setTimeout(() => this.pushWindowStyles(), 600);
             }
 
             initElements() {
@@ -942,17 +946,12 @@
                 // восстановленного выше стиля каждого из трёх окон.
                 this.updateStyleDependentRows();
 
-                // Отправляем стиль часам при загрузке
-                setTimeout(() => this.sendClockStyle(), 500);
+                // Стиль виджета и часов шлёт pushWindowStyles (panel-state.js):
+                // запуск — отложенно (конструктор), пресет — сразу.
 
                 // Отправляем интервал и лимит перерасхода при загрузке
                 this.pushOverrunInterval();
                 this.pushOverrunLimit();
-
-                // Отправляем начальный стиль виджета
-                setTimeout(() => {
-                    ipcRenderer.send('widget-style-update', this.widgetStylePayload());
-                }, 600);
 
                 // Цвета загружены — показать, какая тема им соответствует и в
                 // каком состоянии фон окна (до сборки ряда вызов холостой).
