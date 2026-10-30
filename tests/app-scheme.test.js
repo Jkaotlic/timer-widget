@@ -194,3 +194,100 @@ test('collectWebFiles берёт только плоские относител�
         'electron-control.html', 'electron-widget.html', 'storage-migration.html'
     ]);
 });
+
+// --- Белый список идёт по графу import (ES-модули окон) ---
+
+const PAGE_STUBS = (extra) => ({
+    'electron-control.html': '',
+    'electron-widget.html': '',
+    'electron-clock-widget.html': '',
+    'display.html': '',
+    'storage-migration.html': '',
+    ...extra
+});
+const collectFrom = (files) => S.collectWebFiles((rel) => files[rel]);
+
+test('collectWebFiles идёт по import транзитивно: страница → a.js → b.js → c.js', () => {
+    const got = collectFrom(PAGE_STUBS({
+        'display.html': '<script type="module" src="a.js"></script>',
+        'a.js': "import { b } from './b.js';\nexport const a = b;",
+        'b.js': "export * from './c.js';",
+        'c.js': 'export const c = 1;',
+        'lonely.js': 'export const x = 1;'
+    }));
+    for (const f of ['a.js', 'b.js', 'c.js']) { assert.ok(got.has(f), f); }
+    assert.ok(!got.has('lonely.js'), 'не импортированный файл не отдаётся');
+});
+
+test('collectImports: только плоские ./имя.js; ../, /abs, URL, import() и не-js — мимо', () => {
+    const src = [
+        "import a from './a.js';",
+        "import './side.js';",
+        "import { x,",
+        "  y } from \"./multi.js\";",
+        "export { z } from './re.js';",
+        "export * from './star.js';",
+        "export * as ns from './ns.js';",
+        "import up from '../x.js';",
+        "import abs from '/x.js';",
+        "import url from 'https://example.com/x.js';",
+        "import css from './style.css';",
+        "import sub from './sub/d.js';",
+        "const d = import('./dyn.js');",
+        "await import('./dyn2.js');"
+    ].join('\n');
+    assert.deepEqual(S.collectImports(src).sort(),
+        ['a.js', 'multi.js', 'ns.js', 're.js', 'side.js', 'star.js']);
+});
+
+test('collectImports: import в комментарии не считается, строка с // не ломает разбор', () => {
+    const src = [
+        "// import './line.js';",
+        "/* import './block.js';",
+        "   import './block2.js'; */",
+        "const u = 'https://example.com/a'; // import './tail.js'",
+        "import './real.js';"
+    ].join('\n');
+    assert.deepEqual(S.collectImports(src), ['real.js']);
+});
+
+test('collectWebFiles: цикл a ↔ b не зависает', () => {
+    const got = collectFrom(PAGE_STUBS({
+        'display.html': '<script type="module" src="a.js"></script>',
+        'a.js': "import './b.js';",
+        'b.js': "import './a.js';"
+    }));
+    assert.ok(got.has('a.js') && got.has('b.js'));
+});
+
+test('collectWebFiles: импорт не из белых имён и не .js не попадает в список', () => {
+    const got = collectFrom(PAGE_STUBS({
+        'display.html': '<script type="module" src="a.js"></script>',
+        'a.js': "import '../x.js'; import '/y.js'; import 'https://example.com/z.js'; import('./d.js'); import './ok.js';",
+        'ok.js': ''
+    }));
+    for (const f of ['x.js', 'y.js', 'z.js', 'd.js']) { assert.ok(!got.has(f), f); }
+    assert.ok(got.has('ok.js'));
+});
+
+test('collectWebFiles: импортированный файл, которого нет на диске, не роняет сборку списка', () => {
+    const got = S.collectWebFiles((rel) => {
+        if (rel === 'display.html') { return '<script src="a.js"></script>'; }
+        if (rel === 'a.js') { return "import './gone.js';"; }
+        if (rel.endsWith('.html')) { return ''; }
+        throw new Error('ENOENT');
+    });
+    assert.ok(got.has('a.js'));
+});
+
+test('самопроверка: на настоящих страницах граф import не сужает список относительно разметки', () => {
+    const REF = /<(?:script|link)\b[^>]*?\s(?:src|href)\s*=\s*"([^"]*)"/gi;
+    for (const page of [...S.WINDOW_PAGES, S.MIGRATION_PAGE]) {
+        for (const m of readRepo(page).matchAll(REF)) {
+            const ref = m[1];
+            if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(ref) && Object.prototype.hasOwnProperty.call(S.MIME_TYPES, path.extname(ref))) {
+                assert.ok(ALLOWED.has(ref), `${page}: ${ref} пропал из списка`);
+            }
+        }
+    }
+});

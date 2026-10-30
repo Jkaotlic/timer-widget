@@ -17,7 +17,7 @@
  * Что отдаётся (список, а не каталог):
  *   - четыре страницы окон и страница миграции хранилища;
  *   - то, что эти страницы подключают (`<script src>`, `<link href>`) — список
- *     собирается из самой разметки, поэтому новый модуль окна не нужно
+ *     собирается из самой разметки и статических `import` модулей, поэтому новый модуль окна не нужно
  *     вписывать в третье место: хватит подключить его и упаковать;
  *   - плоские файлы каталогов ассетов (`fonts/`, `sounds/`) с их расширениями.
  * Главный процесс, preload.js и package.json ни одна страница не подключает —
@@ -114,13 +114,51 @@ function pageUrl(page) {
 // (CSP их и так не пустит, а список — это то, что схема ОТДАЁТ).
 const REF_RE = /<(?:script|link)\b[^>]*?\s(?:src|href)\s*=\s*"([^"]*)"/gi;
 
+// Строки, шаблоны и комментарии одним проходом: строка проигрывает первой и
+// возвращается как есть, поэтому `//` внутри 'https://…' комментарием не
+// считается. Нужен, чтобы `import` в комментарии не вёл в белый список.
+// Сюда нельзя звать tests/helpers/source-scan.js: это модуль main, тесты в
+// пакет не входят.
+const STRING_OR_COMMENT_RE = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+
+// Статические зависимости модуля: `import x from '…'`, `import '…'`,
+// `export … from '…'`. Динамический `import(` не подходит ни под одну ветку
+// (после `import` обязан идти идентификатор, `{`, `*` или кавычка), и он
+// не поддерживается намеренно: граф должен быть виден без исполнения кода.
+const IMPORT_RE = /(?:^|[;}])\s*import\s*(?:[\w$*{][^'"`;]*?\bfrom\s*|)(['"])([^'"\n]+)\1/gm;
+const EXPORT_FROM_RE = /(?:^|[;}])\s*export\s*(?:\*(?:\s*as\s+[\w$]+)?|\{[^}]*\})\s*from\s*(['"])([^'"\n]+)\1/gm;
+
 /**
- * Разрешённые к выдаче файлы корня: страницы и всё, что они подключают.
+ * Плоские имена `.js`, которые модуль тянет статическим import/export-from.
+ * Берутся только `./имя.js` по тем же SAFE_NAME и MIME_TYPES, что и ссылки
+ * страниц: `../`, `/abs`, URL и подкаталоги в список не идут.
+ * @param {string} src
+ * @returns {string[]}
+ */
+function collectImports(src) {
+    const code = String(src).replace(STRING_OR_COMMENT_RE, (m, str) => (str === undefined ? ' ' : str));
+    const found = new Set();
+    for (const re of [IMPORT_RE, EXPORT_FROM_RE]) {
+        for (const m of code.matchAll(re)) {
+            const spec = m[2];
+            if (!spec.startsWith('./')) { continue; }
+            const name = spec.slice(2);
+            if (SAFE_NAME.test(name) && path.posix.extname(name) === '.js') { found.add(name); }
+        }
+    }
+    return [...found];
+}
+
+/**
+ * Разрешённые к выдаче файлы корня: страницы, всё, что они подключают, и
+ * (для `.js`) всё, что те статически импортируют, транзитивно. Посещённые
+ * запоминаются, поэтому цикл a ↔ b безопасен.
  * @param {(rel: string) => string} readText — текст файла по относительному пути
  * @returns {Set<string>}
  */
 function collectWebFiles(readText) {
     const allowed = new Set();
+    const scripts = [];
     for (const page of [...WINDOW_PAGES, MIGRATION_PAGE]) {
         allowed.add(page);
         const html = readText(page) || '';
@@ -128,7 +166,24 @@ function collectWebFiles(readText) {
             const ref = m[1];
             if (SAFE_NAME.test(ref) && Object.prototype.hasOwnProperty.call(MIME_TYPES, path.posix.extname(ref))) {
                 allowed.add(ref);
+                if (path.posix.extname(ref) === '.js') { scripts.push(ref); }
             }
+        }
+    }
+    const visited = new Set();
+    while (scripts.length > 0) {
+        const file = scripts.pop();
+        if (visited.has(file)) { continue; }
+        visited.add(file);
+        let text = '';
+        try {
+            text = readText(file) || '';
+        } catch {
+            // Файла нет на диске: отдавать нечего, список от этого не страдает.
+        }
+        for (const dep of collectImports(text)) {
+            allowed.add(dep);
+            scripts.push(dep);
         }
     }
     return allowed;
@@ -205,5 +260,5 @@ function responseHeaders(resolved) {
 module.exports = {
     SCHEME, HOST, ORIGIN, PRIVILEGED_SCHEME, WINDOW_PAGES, MIGRATION_PAGE,
     CONTENT_SECURITY_POLICY, RESPONSE_CONTENT_SECURITY_POLICY, MIME_TYPES, ASSET_DIRS,
-    pageUrl, collectWebFiles, resolveAppRequest, responseHeaders
+    pageUrl, collectWebFiles, collectImports, resolveAppRequest, responseHeaders
 };
