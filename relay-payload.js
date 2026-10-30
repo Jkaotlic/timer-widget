@@ -39,9 +39,10 @@ const RELAY_LIMITS = Object.freeze({
 
 const MAX_KEYS = 200;
 const EVENT_TITLE_MAX = 60;
-// Стиль часов едет голой строкой ('circle', 'flip', …). Список стилей знает
-// окно (и переводит старые имена), поэтому здесь — только форма.
-const STYLE_NAME_MAX = 32;
+// Стиль часов едет голой строкой ('circle', 'flip', …) и запоминается в
+// relay-state.json. Поэтому принимается только имя из списка: окно свело бы
+// неизвестное к кругу, но файл досылал бы его при каждом открытии.
+const CLOCK_STYLES = new Set(CONFIG.TIMER_STYLES);
 
 // Эти имена, присвоенные обычному объекту, меняют не поле, а сам объект.
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -73,8 +74,7 @@ function isPrimitive(value) {
  */
 function sanitizeRelayPayload(channel, payload) {
     if (channel === 'clock-widget-set-style') {
-        return typeof payload === 'string' && payload.length > 0 && payload.length <= STYLE_NAME_MAX
-            ? payload : null;
+        return typeof payload === 'string' && CLOCK_STYLES.has(payload) ? payload : null;
     }
     if (!OBJECT_CHANNELS.has(channel)) {
         throw new Error(`relay-payload: для канала «${channel}» нет правила`);

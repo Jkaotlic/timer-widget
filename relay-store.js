@@ -45,8 +45,8 @@ const MAX_FILE_BYTES = 512 * 1024;
 const DEFAULT_DELAY_MS = 500;
 
 // Поле памяти → канал, по правилу которого оно проверяется. Все поля —
-// объекты, кроме стиля часов: он строка, и правило его канала — строка
-// разумной длины (relay-payload.js).
+// объекты, кроме стиля часов: он строка, и правило его канала — имя
+// из CONFIG.TIMER_STYLES (relay-payload.js).
 const RELAY_FIELDS = Object.freeze({
     lastWidgetColors: 'widget-colors-update',
     lastClockColors: 'clock-colors-update',

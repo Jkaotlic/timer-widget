@@ -122,3 +122,20 @@ test('в CONFIG нет ключей, которых не читает НИКТО
     assert.deepEqual(orphans, [],
         `эти ключи объявлены, но их никто не читает — либо дать им владельца, либо удалить:\n  ${orphans.join('\n  ')}`);
 });
+
+test('каждая Object.freeze(CONFIG.X) называет СУЩЕСТВУЮЩЕЕ поле', () => {
+    // Object.freeze(undefined) не падает, поэтому заморозка удалённого поля
+    // молча живёт годами и обещает список, которого нет (TIMER_STYLES,
+    // TIMER_STATES, TIMER_STATUS, BACKGROUND_MODES, Z_INDEX — 30.10.2026).
+    const { codeOnly } = require('./helpers/source-scan');
+    const src = codeOnly(require('fs').readFileSync(require('path').join(__dirname, '..', 'constants.js'), 'utf8'));
+    const named = [...src.matchAll(/Object\.freeze\(CONFIG\.([A-Z_]+)\)/g)].map((m) => m[1]);
+    assert.ok(named.length >= 3, 'регулярка находит заморозки (самопроверка)');
+    const missing = named.filter((k) => CONFIG[k] === undefined);
+    assert.deepEqual(missing, [], 'заморожены поля, которых нет в CONFIG');
+});
+
+test('CONFIG.TIMER_STYLES — четыре стиля окон, заморожен', () => {
+    assert.deepEqual([...CONFIG.TIMER_STYLES], ['circle', 'flip', 'analog', 'digits']);
+    assert.ok(Object.isFrozen(CONFIG.TIMER_STYLES));
+});

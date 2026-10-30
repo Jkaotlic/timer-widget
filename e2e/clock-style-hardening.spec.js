@@ -12,9 +12,11 @@ const { waitForClock } = require('./window-ready');
  * `.active`, и часы остаются пустым прозрачным окном без единого способа
  * починить их из интерфейса.
  *
- * Путь для мусора реальный, и их два: `clock-widget-set-style` главный процесс
- * ретранслирует БЕЗ проверки (`safelySendToWindow` без белого списка), и
- * `clockStyle` читается из localStorage при старте окна.
+ * Путей для мусора было два: `clock-widget-set-style` (главный процесс с
+ * 30.10.2026 пропускает только имена из CONFIG.TIMER_STYLES — мусор до окна не
+ * доезжает, проверяется ниже) и `clockStyle` из localStorage при старте окна —
+ * этот путь проверки не имеет, поэтому сторож окна проверяется прямым вызовом
+ * `setClockStyle`, тем же, что делает чтение профиля.
  *
  * Замечание найдено security-обзором 03.08.2026 и оставалось ниже порога
  * находки; чинится вместе с раскладкой шильдиков.
@@ -67,11 +69,29 @@ test('испорченный стиль часов откатывается на
     console.log('до мусора:', JSON.stringify(before));
     expect(before.active, 'исходный стиль должен примениться').toEqual(['flip']);
 
+    // Слой 1 — main: мусор по каналу до окна не доезжает. Шпион пишет КАЖДЫЙ
+    // доехавший стиль: без него конечный analog был бы и при сломанном фильтре.
+    await clock.evaluate(() => {
+        const orig = window.clockWidget.setClockStyle.bind(window.clockWidget);
+        window.__arrivedStyles = [];
+        window.clockWidget.setClockStyle = (st) => { window.__arrivedStyles.push(st); orig(st); };
+    });
     for (const bad of BAD_STYLES) {
         await control.evaluate((s) => {
             window.ipcRenderer.send('clock-widget-set-style', s);
         }, bad);
-        await control.waitForTimeout(500);
+    }
+    // Валидная посылка ПОСЛЕ мусора — метка того, что мусор уже обработан
+    // (канал упорядочен): ждём её условием, а не паузой.
+    await control.evaluate(() => { window.ipcRenderer.send('clock-widget-set-style', 'analog'); });
+    await expect.poll(() => clock.evaluate(measureStyleState).then((st) => st.active),
+        { message: 'метка analog после мусора' }).toEqual(['analog']);
+    expect(await clock.evaluate(() => window.__arrivedStyles), 'до окна доехала только метка').toEqual(['analog']);
+
+    // Слой 2 — окно: то же значение из профиля (setClockStyle — путь чтения
+    // localStorage) откатывается на круг, а не ломает окно.
+    for (const bad of BAD_STYLES) {
+        await clock.evaluate((s) => { window.clockWidget.setClockStyle(s); }, bad);
 
         const state = await clock.evaluate(measureStyleState);
         console.log(`мусор ${JSON.stringify(bad)} →`, JSON.stringify(state));

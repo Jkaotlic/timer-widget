@@ -349,8 +349,8 @@ test('стиль часов приводится к белому списку п
     // `classList.add('style-' + style)` роняет DOMException на строке с пробелом
     // или на пустой. Обработчик обрывался ПОСЛЕ снятия прежних классов, поэтому
     // body оставался вообще без `style-*`. Значение приходит из localStorage и
-    // из `clock-widget-set-style`, который главный процесс ретранслирует без
-    // проверки. Замерено в e2e/clock-style-hardening.spec.js.
+    // из `clock-widget-set-style` (main с 30.10.2026 пропускает только имена
+    // из списка, но localStorage — нет). Замерено в e2e/clock-style-hardening.spec.js.
     const clockHtml = readCode('electron-clock-widget.html');
     const JS_CODE = clockHtml.replace(/\/\/[^\n]*/g, '');
 
@@ -358,7 +358,9 @@ test('стиль часов приводится к белому списку п
     // перевод сохранённого значения (migrateTimerStyle) — иначе профиль со
     // старым стилем откатывался бы к кругу.
     assert.match(JS_CODE, /migrateTimerStyle\(style\)/);
-    assert.match(JS_CODE, /const safeStyle = \['circle', 'flip', 'analog', 'digits'\]\.includes\(wanted\)/);
+    // Список — один, CONFIG.TIMER_STYLES (его же держит relay-payload в main).
+    assert.match(JS_CODE, /const safeStyle = window\.CONFIG\.TIMER_STYLES\.includes\(wanted\)/);
+    assert.doesNotMatch(JS_CODE, /\['circle', 'flip', 'analog', 'digits'\]\.includes/);
     assert.match(JS_CODE, /classList\.add\('style-' \+ safeStyle\)/);
     // Сырое значение больше не должно доходить ни до класса, ни до поля.
     assert.doesNotMatch(JS_CODE, /classList\.add\('style-' \+ style\)/);

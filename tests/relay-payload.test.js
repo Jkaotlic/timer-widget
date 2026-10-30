@@ -76,10 +76,16 @@ test('слишком много ключей — отказ', () => {
     assert.equal(sanitizeRelayPayload('clock-widget-settings', many), null);
 });
 
-test('стиль часов — короткая строка, иначе отказ', () => {
-    assert.equal(sanitizeRelayPayload('clock-widget-set-style', 'flip'), 'flip');
-    for (const bad of [null, 42, {}, 'x'.repeat(100)]) {
-        assert.equal(sanitizeRelayPayload('clock-widget-set-style', bad), null);
+test('стиль часов — имя из CONFIG.TIMER_STYLES, иначе отказ', () => {
+    for (const style of ['circle', 'flip', 'analog', 'digits']) {
+        assert.equal(sanitizeRelayPayload('clock-widget-set-style', style), style);
+    }
+    // Неизвестное имя main запомнил бы в relay-state.json навсегда: окно
+    // сводит его к кругу, но файл досылал бы его при каждом открытии.
+    // 'digital' (LED, слит 13.08.2026) панель переводит до посылки, а файл
+    // памяти появился позже слияния — старого имени в нём быть не может.
+    for (const bad of [null, 42, {}, 'x'.repeat(100), 'neon', 'digital', '']) {
+        assert.equal(sanitizeRelayPayload('clock-widget-set-style', bad), null, `не принимать ${JSON.stringify(bad).slice(0, 20)}`);
     }
 });
 

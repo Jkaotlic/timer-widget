@@ -270,29 +270,19 @@ const CONFIG = {
     // ============================================
     // TIMER STYLES
     // ============================================
-
-    // ============================================
-    // TIMER STATES
-    // ============================================
-
-    // ============================================
-    // TIMER STATUS
-    // ============================================
-
-    // ============================================
-    // BACKGROUND MODES
-    // ============================================
+    /**
+     * Четыре стиля окон таймера и часов. Список нужен ДВУМ сторонам: окну
+     * часов (неизвестное имя → круг) и главному процессу, который запоминает
+     * стиль в relay-state.json (relay-payload.js) — без списка там жило бы
+     * любое имя. Старое 'digital' переводит migrateTimerStyle, в списке его нет.
+     */
+    TIMER_STYLES: ['circle', 'flip', 'analog', 'digits'],
 
     // ============================================
     // ALLOWED FILE TYPES
     // ============================================
     ALLOWED_AUDIO_TYPES: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'],
-    ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'],
-
-    // ============================================
-    // Z-INDEX LAYERS
-    // ============================================
-
+    ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
 };
 
 // Freeze объект чтобы предотвратить изменения
@@ -300,10 +290,6 @@ Object.freeze(CONFIG);
 Object.freeze(CONFIG.STORAGE_KEYS);
 Object.freeze(CONFIG.DEFAULT_TIMER_COLORS);
 Object.freeze(CONFIG.TIMER_STYLES);
-Object.freeze(CONFIG.TIMER_STATES);
-Object.freeze(CONFIG.TIMER_STATUS);
-Object.freeze(CONFIG.BACKGROUND_MODES);
-Object.freeze(CONFIG.Z_INDEX);
 if (CONFIG.ALLOWED_AUDIO_TYPES) { Object.freeze(CONFIG.ALLOWED_AUDIO_TYPES); }
 if (CONFIG.ALLOWED_IMAGE_TYPES) { Object.freeze(CONFIG.ALLOWED_IMAGE_TYPES); }
 if (CONFIG.PRESET_DURATIONS) { Object.freeze(CONFIG.PRESET_DURATIONS); }

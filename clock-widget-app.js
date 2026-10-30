@@ -511,10 +511,10 @@
             // геометрию, а UI для выбора пресета размера в приложении отсутствует.
 
             setClockStyle(style) {
-                // Белый список. Значение приходит ДВУМЯ путями, и оба без
-                // проверки стиля: из localStorage при старте и по каналу
-                // `set-clock-style` (главный процесс проверяет лишь, что это
-                // строка разумной длины). Класс собирается конкатенацией, а
+                // Белый список. Значение приходит ДВУМЯ путями: из localStorage
+                // при старте (без проверки) и по каналу `set-clock-style`
+                // (главный процесс с 30.10.2026 пропускает только имена из того
+                // же CONFIG.TIMER_STYLES). Класс собирается конкатенацией, а
                 // `classList.add` роняет DOMException на строке с пробелом или
                 // на пустой — обработчик обрывается ПОСЛЕ снятия прежних
                 // классов, и body остаётся вообще без `style-*`, то есть
@@ -525,7 +525,7 @@
                 // Сохранённый LED переводится в «Цифры» ДО проверки списка:
                 // иначе профиль со слитым стилем откатывался бы к кругу.
                 const wanted = window.RendererShared.migrateTimerStyle(style);
-                const safeStyle = ['circle', 'flip', 'analog', 'digits'].includes(wanted) ? wanted : 'circle';
+                const safeStyle = window.CONFIG.TIMER_STYLES.includes(wanted) ? wanted : 'circle';
                 this.clockStyle = safeStyle;
 
                 // Применяем класс стиля к body
