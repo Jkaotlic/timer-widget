@@ -58,6 +58,20 @@ async function launchApp(opts = {}) {
         args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`, ...(opts.args || [])],
         env: cleanEnv(opts.env)
     });
+    // Журнал полноэкранных входов (ревью CI-правки, R1): на macOS флаг
+    // `isFullScreen()` поднимается в НАЧАЛЕ анимированного перехода, и по нему
+    // «вход окончен» не отличить от «вход идёт». Событие `enter-full-screen`
+    // приходит в конце — его копим по id окна с момента СОЗДАНИЯ, чтобы оно
+    // не терялось, если вход кончился раньше вопроса. Читает
+    // settleFullScreenEntry (window-ready.js). Ставится до любого окна
+    // дисплея: дисплей открывает только тест.
+    await app.evaluate(({ app: electronApp }) => {
+        globalThis.__e2eEnteredDisplays = new Set();
+        electronApp.on('browser-window-created', (_e, win) => {
+            const id = win.webContents.id;
+            win.on('enter-full-screen', () => globalThis.__e2eEnteredDisplays.add(id));
+        });
+    });
     const control = await waitForControlWindow(app);
     await control.waitForLoadState('domcontentloaded');
     // Панель досылает стартовые настройки таймерами конструктора (подгонка

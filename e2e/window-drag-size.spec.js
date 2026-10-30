@@ -2,7 +2,7 @@ const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
     waitForDisplay, waitForWidget, waitForClock, waitForSteady, waitForResizeHandled, innerSize,
-    armReceived, waitForDisplaySettled, waitForBoundsSettled
+    armReceived, waitForDisplaySettled, waitForBoundsSettled, mainBoundsOf
 } = require('./window-ready');
 const { leaveFullScreen } = require('./display-window');
 const { SAVE_SETTLE_MS } = require('../window-geometry.js');
@@ -39,17 +39,20 @@ const WINDOWS = [
 /** Границы окна в main, когда они ОСЕЛИ: окно на открытии само доезжает (restore, автоподгонка). */
 const settledBounds = (app, urlPart) => waitForBoundsSettled(app, urlPart);
 
+// Самое новое живое окно по id, а не первое по адресу (ревью CI-правки, R3 —
+// класс ревью B3, N2): закрывающееся прежнее окно стоит в списке первым.
+// Границы — `mainBoundsOf` (тот же выбор), сдвиг извне и setBounds — тем же
+// фильтром и сортировкой: все три берут одно окно.
 function boundsOf(app, urlPart) {
-    return app.evaluate(({ BrowserWindow }, part) => {
-        const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes(part));
-        return win ? win.getBounds() : null;
-    }, urlPart);
+    return mainBoundsOf(app, urlPart);
 }
 
 /** Роль системы: чужая смена размера посреди жеста (аналог WM_DPICHANGED). */
 function resizeFromOutside(app, urlPart, size) {
     return app.evaluate(({ BrowserWindow }, { part, size }) => {
-        const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes(part));
+        const win = BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes(part))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         if (win) { win.setSize(size, size); }
     }, { part: urlPart, size });
 }
@@ -149,7 +152,9 @@ test('дисплей: размер, заданный между жестами, 
     const { app, control } = await launchApp();
     const URL_PART = 'display.html';
     const setBounds = (bounds) => app.evaluate(({ BrowserWindow }, b) => {
-        const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('display.html'));
+        const win = BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         if (win) { win.setBounds(b); }
     }, bounds);
     const drag = (page) => page.evaluate(() => {

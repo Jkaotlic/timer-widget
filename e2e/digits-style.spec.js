@@ -1159,7 +1159,8 @@ test('выбор шрифта доходит до СВОЕГО окна клик
 
         // Стартовая рассылка панели (widget-style-update через 600 мс после её
         // загрузки, control-app.js) к этому месту давно прошла: launchApp ждёт
-        // 900 мс после загрузки панели, а три окна открылись уже после.
+        // её зонд (`__startupPushed`) и ответ на стартовый get-displays
+        // (waitForStartupPush), а три окна открылись уже после.
 
         const fontFamilyOf = (win, elId) => win.evaluate(
             (id) => getComputedStyle(document.getElementById(id)).fontFamily, elId

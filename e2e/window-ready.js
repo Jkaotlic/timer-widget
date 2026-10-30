@@ -858,24 +858,43 @@ function waitForClockSnapshot(app, clock, _control, opts = {}) {
  * Заказанный при создании полноэкранный режим дисплея — УСЛОВИЕ состояния, а
  * не срок (ревью B3, I2). Решает главный процесс по самому новому окну
  * дисплея (id у webContents растёт с созданием — тот же выбор, что ревью B3,
- * M4):
+ * M4). Опора — журнал входов `globalThis.__e2eEnteredDisplays`: `launchApp`
+ * вешает `enter-full-screen` на КАЖДОЕ окно с момента создания
+ * (`browser-window-created`), поэтому событие не теряется, даже если вход
+ * закончился раньше, чем спросили (ревью CI-правки, R1).
  *
- *  - `full` — флаг поднят: переход начат или окончен;
- *  - `windowed` — из полноэкранного его вывели мы сами (`leaveFullScreen`),
- *    входа больше не будет;
- *  - `no-transition` — не macOS: вход синхронный, флага нет — его не будет
- *    (Windows CI: окно в фокусе, флага и события нет никогда);
- *  - `no-focus` — окно без фокуса: macOS вход не начнёт, ждать нечего (0 мс).
- *    Опыт 31.10.2026 на локальном mac: `CGSSessionScreenIsLocked = true`,
- *    ни у одного окна нет фокуса — ни после `win.focus()`, ни после
+ *  - `full` — вход ОКОНЧЕН: флаг поднят и событие в журнале (или флаг поднят
+ *    не на macOS — там перехода нет, см. ниже);
+ *  - `entered` — флаг поднят, а события ещё не было: на macOS
+ *    `isFullScreen()` смотрит на `NSWindowStyleMaskFullScreen`, а маска
+ *    ставится в НАЧАЛЕ анимированного перехода. Ждём событие до `timeout`
+ *    (`timeout` — расхождение, печатает вызывающий). Раньше «флаг поднят»
+ *    считался концом, и ящик, открытый следом, мог попасть в переход;
+ *  - `windowed` — из полноэкранного его вывели мы сами (`leaveFullScreen`)
+ *    или он вошёл и вышел сам (событие в журнале, флага нет): входа больше не
+ *    будет;
+ *  - `no-transition` — не macOS, флага нет: ждать нечего, 0 мс. Довод не в
+ *    том, что «вход синхронный» (ревью CI-правки, R2): на Linux вход идёт
+ *    через оконный менеджер асинхронно, а на Windows флага нет вовсе. Довод —
+ *    эмпирика CI и природа краша:
+ *      · Windows (run 41126739982): у всех 19 открытий окно в фокусе, флага и
+ *        события нет ни за 1.5 с — Electron там фактически оконный, перехода
+ *        не будет, ожидание стоило бы таймаута на КАЖДОЕ открытие;
+ *      · Linux CI: флаг поднят уже к `load` (строк «не включился» ноль);
+ *      · краш `setBounds` посреди перехода (стек `_doSucceededToExitFullScreen`)
+ *        — класс AppKit, только macOS;
+ *  - `no-focus` — macOS, окно без фокуса и флага: вход не начнётся, ждать
+ *    нечего (0 мс). Опыт 31.10.2026 на локальном mac: `CGSSessionScreenIsLocked
+ *    = true`, ни у одного окна нет фокуса — ни после `win.focus()`, ни после
  *    `app.focus({ steal: true })`, — и входа нет все 8 с наблюдения даже
  *    после явного `setFullScreen(true)`. На macOS CI окно дисплея в фокусе и
- *    полноэкранное (before-close-main.json, 30.10.2026);
+ *    полноэкранное (before-close-main.json, 30.10.2026). Поздний вход после
+ *    фокуса ловит `leaveFullScreen` перед каждым `setBounds`;
  *  - macOS, окно в фокусе, флага нет — ждём СОБЫТИЕ `enter-full-screen` до
- *    `timeout`: `entered` или `timeout` (расхождение, печатает вызывающий).
+ *    `timeout`: `entered` или `timeout`.
  *
- * Слушатель, повешенный после начала перехода, событие не теряет: AppKit уже
- * поднял флаг, и это ветка `full`.
+ * Журнала нет (окно открыто не через `launchApp`) — прежнее поведение:
+ * поднятый флаг считается концом.
  *
  * @param {import('@playwright/test').ElectronApplication} app
  * @param {number} timeout
@@ -887,23 +906,25 @@ function settleFullScreenEntry(app, timeout) {
             .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
             .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         if (!win) { return { state: 'нет окна' }; }
+        const id = win.webContents.id;
         const info = () => ({ focused: win.isFocused(), bounds: win.getBounds() });
-        if (win.isFullScreen()) { return { state: 'full' }; }
-        const windowed = globalThis.__e2eWindowedDisplays;
-        if (windowed && windowed.has(win.webContents.id)) { return { state: 'windowed' }; }
-        // Анимированный переход (отдельный Space) — только у macOS. На
-        // Windows и Linux вход синхронный: флага нет к `load` — не будет и
-        // события. Замер CI 30.10.2026 (run 41126739982): windows-latest,
-        // окно в фокусе, флага нет, события нет все 1.5 с у всех 19 открытий —
-        // ожидание «в фокусе без флага» стоило бы там таймаута на КАЖДОЕ.
-        if (process.platform !== 'darwin') { return { state: 'no-transition', ...info() }; }
-        if (!win.isFocused()) { return { state: 'no-focus', ...info() }; }
-        const state = await new Promise((resolve) => {
+        const journal = globalThis.__e2eEnteredDisplays;
+        const entered = !!journal && journal.has(id);
+        const waitEnter = () => new Promise((resolve) => {
             const onEnter = () => { clearTimeout(timer); resolve('entered'); };
             const timer = setTimeout(() => { win.removeListener('enter-full-screen', onEnter); resolve('timeout'); }, ms);
             win.once('enter-full-screen', onEnter);
         });
-        return { state, ...info() };
+        if (win.isFullScreen()) {
+            if (!journal || entered || process.platform !== 'darwin') { return { state: 'full' }; }
+            // Флаг поднят в начале перехода — ждём его конец.
+            return { state: await waitEnter(), ...info() };
+        }
+        const windowed = globalThis.__e2eWindowedDisplays;
+        if ((windowed && windowed.has(id)) || entered) { return { state: 'windowed' }; }
+        if (process.platform !== 'darwin') { return { state: 'no-transition', ...info() }; }
+        if (!win.isFocused()) { return { state: 'no-focus', ...info() }; }
+        return { state: await waitEnter(), ...info() };
     }, timeout);
 }
 
@@ -913,7 +934,7 @@ function reportFullScreenEntry(who, fs, timeout) {
     const why = fs.state === 'no-focus'
         ? 'окно без фокуса — вход не начнётся, не ждём'
         : fs.state === 'no-transition'
-            ? `${process.platform}: вход синхронный, флага нет — входа не будет, не ждём`
+            ? `${process.platform}: флага нет, перехода AppKit нет — входа не будет, не ждём`
         : fs.state === 'timeout'
             ? `окно в фокусе, но события нет за ${timeout} мс — РАСХОЖДЕНИЕ`
             : fs.state;
