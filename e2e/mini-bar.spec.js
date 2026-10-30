@@ -81,6 +81,40 @@ test('окно сжимается в полосу и разворачивает�
     }
 });
 
+/**
+ * Свёртка сразу после загрузки панели: отложенный авто-размер (control-app.js,
+ * `setTimeout(autoResizeWindow, 100)`) приходит в main уже ПОСЛЕ неё и не
+ * должен развернуть окно обратно в 400×660 (замер до починки: окно 400×660
+ * поверх всех окон с классом `collapsed`). Тот же путь — перезагрузка панели
+ * краш-обработчиком. Ждём именно событие авто-размера в main: подписка стоит
+ * ДО перезагрузки, клик — до того, как оно пришло.
+ */
+test('свёртка в первые 100 мс после загрузки не перезаписывается отложенным авто-размером', async () => {
+    const { app, control } = await launchApp();
+    try {
+        const startupResize = app.evaluate(({ ipcMain }) => new Promise(
+            (resolve) => ipcMain.once('resize-control-window', () => resolve(Date.now()))
+        ));
+        await reloadPanel(control);
+        // Клик раньше авто-размера — иначе тест проверяет не тот порядок.
+        const clickedAt = await control.evaluate(() => {
+            window.miniBar.collapse();
+            return Date.now();
+        });
+        const resizedAt = await startupResize;
+        console.log(`   свёртка за ${resizedAt - clickedAt} мс до авто-размера`);
+        expect(resizedAt, 'авто-размер пришёл раньше свёртки — гонка не воспроизведена').toBeGreaterThanOrEqual(clickedAt);
+
+        const state = await waitForSteady(app, winState, { name: 'границы полосы' });
+        console.log(`   после авто-размера: ${JSON.stringify(state)}`);
+        expect(state.onTop, 'полоса обязана быть поверх окон').toBe(true);
+        expect(state.bounds.height, `высота окна ${state.bounds.height}: авто-размер развернул полосу`).toBeLessThanOrEqual(120);
+        await control.waitForFunction(() => window.innerHeight <= 120);
+    } finally {
+        await app.close();
+    }
+});
+
 test('полоса показывает то же время, что и панель, и управляет таймером', async () => {
     const { app, control } = await launchApp();
     try {
@@ -412,11 +446,10 @@ test('в полосе замок и ячейки вида — те же самы
             localStorage.setItem('uiLocked', '0');
         });
         // Панель через 100 мс после загрузки подгоняет высоту окна под
-        // содержимое (autoResizeWindow, control-app.js) и про полосу не знает:
-        // свёртка, успевшая раньше, перезаписывается — окно остаётся 400×660
-        // поверх всех окон с классом collapsed (замер 30.10.2026). Прежняя
-        // пауза 1200 мс это прятала. Ждём именно это событие в главном
-        // процессе; подписка стоит ДО перезагрузки.
+        // содержимое (autoResizeWindow, control-app.js). Свёрнутое окно main
+        // этот запрос больше не применяет (гонку стережёт отдельный тест выше);
+        // здесь ждём авто-размер, чтобы проверять замок и ячейки на осевшей
+        // панели, а не порядок событий. Подписка стоит ДО перезагрузки.
         const startupResize = app.evaluate(({ ipcMain }) => new Promise(
             (resolve) => ipcMain.once('resize-control-window', () => resolve(true))
         ));

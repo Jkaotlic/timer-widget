@@ -38,6 +38,11 @@ const RELEASES_URL = 'https://github.com/Jkaotlic/timer-widget/releases';
  *        досылал бы окнам настройки, которых уже нет
  */
 function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval, settleMigration, discardRelayState }) {
+    // Состояние режима «полоса» (канал control-collapse ниже). Объявлено ДО
+    // обработчика размера: он обязан его спрашивать.
+    let controlBoundsBeforeCollapse = null;
+    let collapsedWindow = null;
+
     // Изменение размера окна управления
     // size.width / size.height опциональны: если поле не передано (или не Finite),
     // соответствующее измерение не меняется. Это нужно, чтобы drawer open/close
@@ -45,6 +50,14 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // при каждом setSize (HiDPI) и сбивает ручную высоту, которую выставил юзер.
     ipcMain.on('resize-control-window', (event, size) => {
         if (!windows.controlWindow || !size || typeof size !== 'object') { return; }
+        // Свёрнутое окно размер по содержимому НЕ получает: его размер — полоса,
+        // а размер панели вернёт разворот (границы «до»). Запрос приходит из
+        // рендерера, который про полосу знать не обязан: отложенный авто-размер
+        // после загрузки (control-app.js, autoResizeWindow через 100 мс) после
+        // свёртки, успевшей раньше, оставлял окно 400×660 поверх всех окон с
+        // разметкой полосы. Правило одно и здесь, у владельца состояния свёртки,
+        // — а не копией в каждом пути рендерера, который шлёт этот канал.
+        if (collapsedWindow === windows.controlWindow) { return; }
         // Монитор — тот, на котором СТОИТ окно, а не главный, и в глобальных
         // координатах (workArea.x/y). По главному монитору окно на втором,
         // стоящем ниже, на каждом ресайзе «вылезало» за низ и переезжало на
@@ -143,8 +156,6 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // окон, а повторная свёртка перезаписывала границы «до» границами полосы.
     // Границы помнятся ВМЕСТЕ с окном: панель, пересозданная из трея, —
     // другое окно, и чужие границы ей не годятся.
-    let controlBoundsBeforeCollapse = null;
-    let collapsedWindow = null;
     const reloadBound = new WeakSet();
 
     function expandControlWindow(win) {
