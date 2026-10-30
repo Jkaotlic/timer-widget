@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { panelRoundTrip } = require('./window-ready');
 
 /**
  * PANEL-005: глобальный пробел панели и кнопки в фокусе — в НАСТОЯЩЕМ Chromium.
@@ -21,14 +22,24 @@ async function stopTimer(control) {
         if (window.timerController.isRunning) { window.timerController.pause(); }
         window.timerController.reset();
     });
-    await control.waitForTimeout(300);
+    // Команды ушли в main, их состояние вернулось панели (круг).
+    await panelRoundTrip(control);
 }
+
+/**
+ * Всё, что панель ОТПРАВИЛА (команды таймера от клика или клавиши), main
+ * обработал, и его ответ (`timer-state`) панель отработала. Обработчики клика
+ * и клавиш панели синхронны: команда, если она есть, ушла до круга. Так
+ * утверждается и ОТСУТСТВИЕ запуска — посылки «start» нет до круга, значит её
+ * нет вовсе (раньше паузы 300 / 500 / 1000 / 1200 мс).
+ */
+const settled = panelRoundTrip;
 
 test('пробел: кнопка с клавиатуры нажимается, кнопка после клика мышью запускает таймер', async () => {
     const { app, control } = await launchApp();
     try {
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await settled(control);
         await control.evaluate(() => {
             window.__presetClicks = 0;
             document.querySelector('.preset[data-minutes="15"]')
@@ -38,7 +49,7 @@ test('пробел: кнопка с клавиатуры нажимается, �
         // Фокус пришёл НЕ мышью (как после Tab): пробел — за кнопкой.
         await control.evaluate(() => document.querySelector('.preset[data-minutes="15"]').focus());
         await control.keyboard.press('Space');
-        await control.waitForTimeout(500);
+        await settled(control);
         let s = await state(control);
         console.log('клавиатурный фокус:', JSON.stringify(s));
         expect(s.clicks, 'пробел не нажал кнопку в фокусе').toBe(1);
@@ -46,10 +57,10 @@ test('пробел: кнопка с клавиатуры нажимается, �
 
         // Клик мышью по пресету и пробел — отсчёт пошёл, как всегда.
         await control.click('.preset[data-minutes="15"]');
-        await control.waitForTimeout(300);
+        await settled(control);
         const before = (await state(control)).clicks;
         await control.keyboard.press('Space');
-        await control.waitForTimeout(1200);
+        await settled(control);
         s = await state(control);
         console.log('после клика мышью:', JSON.stringify(s));
         expect(s.running, 'клик по пресету и пробел больше не запускают отсчёт').toBe(true);
@@ -64,12 +75,17 @@ test('открытая модалка: пробел и R не трогают т�
     const { app, control } = await launchApp();
     try {
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await settled(control);
         await control.evaluate(() => {
             document.body.focus();
             window.openModal(document.getElementById('exitModal'));
         });
-        await control.waitForTimeout(200);
+        // Начальный фокус модалка ставит отложенно (modal-manager.js,
+        // setTimeout 0) — он перебил бы наш фокус на сам диалог ниже.
+        await control.waitForFunction(() => {
+            const m = document.getElementById('exitModal');
+            return m.contains(document.activeElement) && document.activeElement !== m;
+        });
         // Фокус — внутри модалки; уводим его на сам диалог, чтобы пробел не
         // нажал её кнопку (проверяется таймер, а не кнопки модалки).
         await control.evaluate(() => {
@@ -78,7 +94,7 @@ test('открытая модалка: пробел и R не трогают т�
             m.focus();
         });
         await control.keyboard.press('Space');
-        await control.waitForTimeout(1000);
+        await settled(control);
         const s = await state(control);
         expect(s.running, 'пробел запустил таймер за открытой модалкой').toBe(false);
         await control.evaluate(() => {
