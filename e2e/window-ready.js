@@ -514,6 +514,30 @@ async function panelRoundTrip(control, opts = {}) {
 }
 
 /**
+ * Отсчёт дошёл до `to` (панель показала `remaining ≤ to`), и всё, что main
+ * разослал до этой точки (`timer-state`, звуковые события, накопитель
+ * перелимита), панель отработала (`panelRoundTrip`).
+ *
+ * Замена паузы «подождать N секунд, пока таймер идёт»: отрезок меряется
+ * таймером приложения, а не часами машины, и на медленной машине не
+ * становится короче.
+ *
+ * @param {import('@playwright/test').Page} control
+ * @param {number} to — секунды на табло (в минусе — отрицательные)
+ * @param {{timeout?: number}} [opts]
+ */
+async function waitForPanelRemaining(control, to, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await control.waitForFunction((t) => window.timerController
+        && window.timerController.remainingSeconds <= t, to, { timeout })
+        .catch(async (err) => {
+            const now = await control.evaluate(() => window.timerController.remainingSeconds).catch(() => '?');
+            throw new Error(`таймер не дошёл до ${to} за ${timeout} мс (на табло ${now}): ${err.message}`, { cause: err });
+        });
+    await panelRoundTrip(control, { timeout });
+}
+
+/**
  * Окно панели получило размер, который ему дал main, и утихло.
  *
  * Размер панели меняет main — по её же запросу (`resize-control-window` из
@@ -800,6 +824,6 @@ module.exports = {
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
     waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSized, waitForPanelSettled,
-    waitForFrameSteady,
+    waitForFrameSteady, waitForPanelRemaining,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

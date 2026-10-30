@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForWidget, panelRoundTrip } = require('./window-ready');
+const { waitForWidget, panelRoundTrip, waitForPanelRemaining } = require('./window-ready');
 
 /**
  * Звуки во времени: КАЖДОЕ событие звучит и звучит РОВНО ОДИН раз.
@@ -61,18 +61,13 @@ const count = (list, type) => list.filter((t) => t === type).length;
 /**
  * «Ровно один» — утверждение и об ОТСУТСТВИИ второго звука, поэтому здесь
  * ждут не появления звука, а ТОЧКИ отсчёта, до которой прежде досиживала
- * пауза: панель показала `remaining ≤ to`. Второй звук пошёл бы из тех же
- * обработчиков панели (timer-state / timer-minute / timer-reached-zero /
- * timer-overrun-minute — все синхронные, control-app.js), и все посылки main,
- * ушедшие до этой точки, круг панель → main → панель (`panelRoundTrip`)
- * доставляет. Отрезок наблюдения тот же, что давала пауза, но меряется
- * таймером приложения, а не часами машины.
+ * пауза (`waitForPanelRemaining`). Второй звук пошёл бы из тех же обработчиков
+ * панели (timer-state / timer-minute / timer-reached-zero /
+ * timer-overrun-minute — все синхронные, control-app.js), а все посылки main,
+ * ушедшие до этой точки, круг панель → main → панель доставляет. Отрезок
+ * наблюдения тот же, что давала пауза, но меряется таймером приложения.
  */
-async function runUntil(control, to) {
-    await expect.poll(() => control.evaluate(() => window.timerController.remainingSeconds),
-        { message: `таймер должен дойти до ${to}`, timeout: 15000 }).toBeLessThanOrEqual(to);
-    await panelRoundTrip(control);
-}
+const runUntil = (control, to) => waitForPanelRemaining(control, to);
 
 test('предупреждение за минуту звучит ровно один раз', async () => {
     const { app, control } = await launchApp();
