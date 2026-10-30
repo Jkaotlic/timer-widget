@@ -39,6 +39,8 @@ const DISPLAY_PROBE = () => !!document.getElementById('progressRing');
 const WIDGET_PROBE = () => !!document.getElementById('wFlipHoursGroup');
 const CLOCK_PROBE = () => !!document.getElementById('clockGradient');
 
+const CONFIG = require('../constants.js');
+
 const DEFAULT_TIMEOUT = 20000;
 const POLL_MS = 100;
 
@@ -319,11 +321,139 @@ async function waitForResizeHandled(page, before, opts = {}) {
 /** Размер окна глазами страницы — вход для `waitForResizeHandled`. */
 function innerSize() { return { w: window.innerWidth, h: window.innerHeight }; }
 
+/**
+ * Дождаться, что окно УТИХЛО: шрифты доехали, CSS-переходов нет, отложенные
+ * на кадр пересчёты отработали.
+ *
+ * Для замеров коробок после команды, которая уже ДОШЛА до окна (см.
+ * `armReceived`): обработчик сообщения синхронный, но за ним идут хвосты —
+ * `reflowSoon()` на следующем кадре, `transform`/`opacity` переходом 300–400 мс,
+ * перерасчёт по приехавшему woff2. Спеки ждали это паузой 600–1200 мс.
+ *
+ * Круг: шрифты (`document.fonts.ready`) → два кадра (кадровые колбэки
+ * приложения, взведённые до нас, уже отработали) → все идущие CSSTransition
+ * (`finished`). Круг повторяется, пока не выйдет чистым: переход, доехав,
+ * может завести пересчёт, а тот — новый переход. Предел кругов — чтобы
+ * бесконечно перезапускаемый переход упал на утверждении теста, а не повис.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{rounds?: number}} [opts]
+ */
+async function waitForQuiet(page, opts = {}) {
+    await page.evaluate(async (rounds) => {
+        const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+        for (let i = 0; i < rounds; i++) {
+            if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+            await frame();
+            await frame();
+            const running = document.getAnimations().filter((a) => a instanceof CSSTransition);
+            const fontsBusy = document.fonts && document.fonts.status === 'loading';
+            if (!running.length && !fontsBusy) { return; }
+            await Promise.all(running.map((a) => a.finished.catch(() => {})));
+        }
+    }, opts.rounds ?? 6);
+}
+
+/**
+ * Взвести ожидание СЛЕДУЮЩЕГО сообщения канала в окне — ДО действия, которое
+ * его вызовет. Возвращает функцию «дождаться»: сообщение пришло, обработчик
+ * окна отработал, окно утихло (`waitForQuiet`).
+ *
+ * Почему это условие, а не ставка. Слушатель ставится через тот же мост
+ * (`window.ipcRenderer.once`), что и слушатель приложения, на тот же
+ * EventEmitter `ipcRenderer` в preload; приложение подписалось при загрузке,
+ * значит раньше, а слушатели одного события вызываются в порядке подписки.
+ * Наш флаг поднимается строго ПОСЛЕ синхронного обработчика приложения.
+ * Порядок сообщений одного канала main → окно сохраняется, поэтому и все
+ * предыдущие посылки уже отработаны.
+ *
+ * Пример: панель шлёт `display-settings-update`, затем `display-layout`;
+ * взведя `display-layout`, тест дожидается обоих.
+ *
+ * @param {import('@playwright/test').Page} page — окно-ПОЛУЧАТЕЛЬ
+ * @param {string} channel — канал, открытый мостом этого окна на приём
+ * @returns {Promise<(opts?: {timeout?: number}) => Promise<any>>} ожидание; отдаёт payload
+ */
+async function armReceived(page, channel) {
+    const key = `${channel}#${Date.now()}#${Math.random()}`;
+    await page.evaluate(([ch, k]) => {
+        const box = (window.__e2eReceived = window.__e2eReceived || {});
+        box[k] = { seen: false, payload: null };
+        window.ipcRenderer.once(ch, (_e, payload) => {
+            box[k] = { seen: true, payload: payload === undefined ? null : payload };
+        });
+    }, [channel, key]);
+    return async (opts = {}) => {
+        const handle = await page.waitForFunction(
+            (k) => window.__e2eReceived[k].seen && window.__e2eReceived[k],
+            key, { timeout: opts.timeout ?? DEFAULT_TIMEOUT }
+        ).catch((err) => {
+            throw new Error(`окно не получило «${channel}»: ${err.message}`);
+        });
+        const got = await handle.jsonValue();
+        await page.evaluate((k) => { delete window.__e2eReceived[k]; }, key);
+        await waitForQuiet(page);
+        return got.payload;
+    };
+}
+
+/**
+ * Выполнить действие и дождаться, что окно-получатель ПОЛУЧИЛО вызванную им
+ * посылку канала и утихло. Обёртка над `armReceived`: взвести → действие →
+ * дождаться. Действие обязано породить посылку, иначе ожидание упадёт по
+ * таймауту с именем канала.
+ *
+ * @param {import('@playwright/test').Page} page — окно-ПОЛУЧАТЕЛЬ
+ * @param {string} channel
+ * @param {() => Promise<any>} action
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<any>} payload посылки
+ */
+async function untilReceived(page, channel, action, opts = {}) {
+    const received = await armReceived(page, channel);
+    await action();
+    return received(opts);
+}
+
+/**
+ * Дождаться, что открывшийся дисплей ВСТАЛ: документ загружен, размер окна
+ * осел, отложенный пересчёт по последнему `resize` отработал, окно утихло.
+ *
+ * Спеки ждали это паузой 2200–2400 мс. Окно создаётся с `fullscreen: true`;
+ * где вход в полноэкранный режим анимирован, размер доезжает серией `resize`,
+ * а места карточек пересчитываются по `CONFIG.RESIZE_DEBOUNCE` — замер,
+ * сделанный раньше, видит промежуточное окно.
+ *
+ * Признаком служит именно осевший РАЗМЕР, а не `isFullScreen()`: замер
+ * 30.10.2026 (macOS, e2e) — флаг остаётся false все 4.7 с наблюдения и на
+ * основном мониторе (окно сразу 3440×1440 = границы экрана), и на Sidecar
+ * (1314×955 = рабочая область). Ожидание флага висело бы до таймаута на
+ * исправном приложении.
+ *
+ * @param {import('@playwright/test').ElectronApplication} _app — для единообразия вызова
+ * @param {import('@playwright/test').Page} display
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<import('@playwright/test').Page>} то же окно
+ */
+async function waitForDisplaySettled(_app, display, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await display.waitForLoadState('load');
+    await waitForSteady(display, innerSize, { samples: 4, timeout, name: 'размер дисплея' });
+    // Таймер длины debounce, взведённый ПОСЛЕ таймера приложения, — см.
+    // waitForResizeHandled, п. 3.
+    await display.evaluate(async (ms) => {
+        await new Promise((r) => requestAnimationFrame(() => r()));
+        await new Promise((r) => setTimeout(r, ms));
+    }, CONFIG.RESIZE_DEBOUNCE);
+    await waitForQuiet(display);
+    return display;
+}
+
 module.exports = {
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
-    waitForResizeHandled, innerSize,
+    waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

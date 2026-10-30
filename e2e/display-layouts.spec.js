@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForDisplayGone } = require('./window-ready');
+const {
+    waitForDisplay, waitForDisplayGone, waitForDisplaySettled, untilReceived, waitForQuiet, waitForTransitions
+} = require('./window-ready');
+const { resizeDisplay } = require('./display-window');
 const { pickWindowSizes } = require('./window-sizes');
 const DL = require('../display-layouts');
 
@@ -35,8 +38,12 @@ const DL = require('../display-layouts');
  * во время перехода в полноэкранный режим отклоняется, а `.catch(() => false)`
  * это проглатывает. На macOS-руннере 01.09.2026 так и упало: «раскладка
  * переживает переоткрытие окна дисплея», `expect(display).not.toBeNull()`,
- * при 229 зелёных. Страница теперь берётся из результата ожидания. Пауза после
- * него оставлена намеренно: она ждёт не ОКНО, а осадку раскладки.
+ * при 229 зелёных. Страница теперь берётся из результата ожидания.
+ *
+ * 30.10.2026, про осадку. После окна ждали ещё и осадку раскладки — паузами
+ * 600–2400 мс. Теперь условиями из e2e/window-ready.js: `waitForDisplaySettled`
+ * (полноэкранный режим, осевший размер, отработавший debounce) и
+ * `armReceived` — посылка панели ДОШЛА до дисплея и он утих.
  */
 
 const MOVABLE = [
@@ -145,8 +152,28 @@ function overlaps(a, b) {
  */
 async function openDisplayDrawer(control) {
     await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-    await control.waitForTimeout(700);
     await expect(control.locator('#displayLayoutGrid')).toBeVisible();
+    // Ящик выезжает переходом; клик Playwright и так ждёт неподвижности
+    // кнопки, но замеров панели после него нет — достаточно конца перехода.
+    await waitForTransitions(control);
+}
+
+/**
+ * Действие в панели, после которого дисплей обязан ПОЛУЧИТЬ посылку канала
+ * `channel` и утихнуть. Канал по умолчанию — настройки дисплея: их шлёт
+ * каждый тумблер, ползунок и стиль.
+ */
+function untilDisplayGot(display, action, channel = 'display-settings-update') {
+    return untilReceived(display, channel, action);
+}
+
+/** Клик по кнопке раскладки — и дождаться, что дисплей её ПРИМЕНИЛ. */
+function clickLayout(control, display, id) {
+    return untilDisplayGot(
+        display,
+        () => control.locator(`#displayLayoutGrid .layout-btn[data-layout="${id}"]`).click(),
+        'display-layout'
+    );
 }
 
 /**
@@ -154,32 +181,44 @@ async function openDisplayDrawer(control) {
  * досталась бы соседним спекам вместе с позициями и масштабами.
  */
 async function resetDisplayState(control, display) {
+    for (const m of MOVABLE) {
+        const on = m.id === 'heroLabel' || m.id === 'statusPill';
+        await setToggle(control, m.toggle, on);
+    }
+    // Ползунок шлёт настройки последним; дождавшись ЕГО посылки в дисплее,
+    // знаем, что отработали и тумблеры (порядок одного канала сохраняется).
+    // Хранилище дисплея чистится ПОСЛЕ: иначе поздняя посылка, отработав,
+    // могла бы записать места и масштаб обратно.
+    await untilDisplayGot(display, () => control.evaluate(() => {
+        const el = document.getElementById('displayTimerScale');
+        if (!el) { return; }
+        el.value = '100';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    }));
     await display.evaluate(() => {
         localStorage.removeItem('displayBlockPositions');
         localStorage.removeItem('displayBlockScales');
         localStorage.removeItem('displayBlockScale');
         localStorage.setItem('displayTimerScale', '100');
     });
-    for (const m of MOVABLE) {
-        const on = m.id === 'heroLabel' || m.id === 'statusPill';
-        await setToggle(control, m.toggle, on);
-    }
-    await control.evaluate(() => {
-        const el = document.getElementById('displayTimerScale');
-        if (!el) { return; }
-        el.value = '100';
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await control.waitForTimeout(400);
+}
+
+async function openSettledDisplay(control, app) {
+    await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
+    return waitForDisplaySettled(app, await waitForDisplay(app));
+}
+
+/** Включить тумблеры и дождаться, что дисплей получил ПОСЛЕДНИЙ из них. */
+async function setTogglesOnDisplay(control, display, pairs) {
+    const last = pairs[pairs.length - 1];
+    for (const [id, on] of pairs.slice(0, -1)) { await setToggle(control, id, on); }
+    await untilDisplayGot(display, () => setToggle(control, last[0], last[1]));
 }
 
 async function openDisplayWithEverything(control, app) {
-    await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-    const display = await waitForDisplay(app);
-    await control.waitForTimeout(2200);
-    for (const m of MOVABLE) { await setToggle(control, m.toggle, true); }
-    await display.waitForTimeout(800);
+    const display = await openSettledDisplay(control, app);
+    await setTogglesOnDisplay(control, display, MOVABLE.map((m) => [m.toggle, true]));
     return display;
 }
 
@@ -253,10 +292,11 @@ test('Shift+колесо по ГОРИЗОНТАЛЬНОЙ оси увеличи
         const start = await readScales(display);
 
         // Уменьшаем, чтобы было куда расти, и убеждаемся, что вниз работает.
+        // Обработчик колеса синхронный (масштаб — переменная CSS, ставится в
+        // самом обработчике), а читается здесь именно переменная — ждать нечего.
         await display.evaluate(() => document.body.dispatchEvent(new WheelEvent('wheel', {
             deltaY: 0, deltaX: 100, shiftKey: true, bubbles: true, cancelable: true
         })));
-        await display.waitForTimeout(300);
         const down = await readScales(display);
         expect(down.currentTimeBlock, 'горизонтальное колесо вниз не уменьшило')
             .toBeLessThan(start.currentTimeBlock);
@@ -265,16 +305,16 @@ test('Shift+колесо по ГОРИЗОНТАЛЬНОЙ оси увеличи
         await display.evaluate(() => document.body.dispatchEvent(new WheelEvent('wheel', {
             deltaY: 0, deltaX: -100, shiftKey: true, bubbles: true, cancelable: true
         })));
-        await display.waitForTimeout(300);
         const up = await readScales(display);
         expect(up.currentTimeBlock, 'горизонтальное колесо вверх не увеличило — Shift снова умеет только уменьшать')
             .toBeGreaterThan(down.currentTimeBlock);
 
-        // Колесо без движения не должно решать за пользователя.
+        // Колесо без движения не должно решать за пользователя. Отложенного
+        // пути у пустого события нет: обработчик выходит на `!raw` ДО любой
+        // записи и посылки, так что интервал после него ничего бы не добавил.
         await display.evaluate(() => document.body.dispatchEvent(new WheelEvent('wheel', {
             deltaY: 0, deltaX: 0, shiftKey: true, bubbles: true, cancelable: true
         })));
-        await display.waitForTimeout(250);
         const idle = await readScales(display);
         expect(idle.currentTimeBlock, 'пустое событие изменило масштаб').toBe(up.currentTimeBlock);
     } finally {
@@ -293,7 +333,7 @@ test('Shift+колесо двигает ВСЕ карточки сразу', asy
                 deltaY: -100, shiftKey: true, bubbles: true, cancelable: true
             }));
         });
-        await display.waitForTimeout(300);
+        // Синхронный обработчик, читается переменная масштаба — ждать нечего.
         const after = await readScales(display);
 
         for (const m of MOVABLE) {
@@ -314,9 +354,7 @@ test('Shift+колесо двигает ВСЕ карточки сразу', asy
 test('каждая раскладка применяется КЛИКОМ и ничто не наезжает друг на друга', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await openSettledDisplay(control, app);
         await openDisplayDrawer(control);
 
         // Кнопки должны быть на экране и кликабельны — по одной на раскладку.
@@ -324,8 +362,7 @@ test('каждая раскладка применяется КЛИКОМ и н�
         await expect(buttons).toHaveCount(PUBLIC_LAYOUTS.length);
 
         for (const layout of PUBLIC_LAYOUTS) {
-            await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout.id}"]`).click();
-            await display.waitForTimeout(900);
+            await clickLayout(control, display, layout.id);
 
             const boxes = await readBoxes(display, NODES);
             const visible = await display.evaluate((ids) => {
@@ -400,19 +437,16 @@ test('каждая раскладка применяется КЛИКОМ и н�
 test('упор масштаба называет помеху, и без неё потолок выше', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
-        await setToggle(control, 'showStatusPill', true);
-        await setToggle(control, 'showHeroLabel', true);
-        await display.waitForTimeout(600);
+        const display = await openSettledDisplay(control, app);
+        await setTogglesOnDisplay(control, display, [['showStatusPill', true], ['showHeroLabel', true]]);
 
         const crankUp = async () => {
+            // Щелчки — подряд: обработчик синхронный, а потолок он считает по
+            // коробкам подписи и плашки, которые колесо над таймером не трогает.
             for (let i = 0; i < 16; i++) {
                 await display.evaluate(() => document.body.dispatchEvent(new WheelEvent('wheel', {
                     deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true
                 })));
-                await display.waitForTimeout(70);
             }
             return display.evaluate(() => ({
                 scale: parseFloat((document.getElementById('timerRing').style.transform.match(/scale\(([\d.]+)\)/) || [0, 0])[1]),
@@ -426,9 +460,7 @@ test('упор масштаба называет помеху, и без неё 
         expect(withPill.note, 'упор не назвал помеху').toMatch(/плашка|подпись|край/);
 
         // Выключаем названную помеху — потолок обязан подняться.
-        await setToggle(control, 'showStatusPill', false);
-        await setToggle(control, 'showHeroLabel', false);
-        await display.waitForTimeout(700);
+        await setTogglesOnDisplay(control, display, [['showStatusPill', false], ['showHeroLabel', false]]);
         const without = await crankUp();
         expect(
             without.scale,
@@ -436,10 +468,11 @@ test('упор масштаба называет помеху, и без неё 
         ).toBeGreaterThan(withPill.scale + 0.05);
 
         // Профиль e2e общий — возвращаем как было.
-        await setToggle(control, 'showStatusPill', true);
-        await setToggle(control, 'showHeroLabel', true);
+        // Хранилище — ПОСЛЕ того, как дисплей отработал тумблеры: посылка
+        // несёт масштаб с ползунка панели, и поздняя её обработка записала бы
+        // его поверх возвращённых 100.
+        await setTogglesOnDisplay(control, display, [['showStatusPill', true], ['showHeroLabel', true]]);
         await display.evaluate(() => localStorage.setItem('displayTimerScale', '100'));
-        await control.waitForTimeout(400);
     } finally {
         await app.close();
     }
@@ -464,15 +497,18 @@ test('элементы держат композицию при изменени
     try {
         const display = await openDisplayWithEverything(control, app);
         await openDisplayDrawer(control);
-        await control.locator('#displayLayoutGrid .layout-btn[data-layout="conference"]').click();
-        await display.waitForTimeout(900);
+        await clickLayout(control, display, 'conference');
 
-        const setBounds = (b) => app.evaluate(({ BrowserWindow }, bounds) => {
-            const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('display.html'));
-            if (!win) { return; }
-            if (win.isFullScreen()) { win.setFullScreen(false); }
-            win.setBounds(bounds);
-        }, b);
+        // Размер — общим помощником: выход из полноэкранного режима по
+        // СОБЫТИЮ (setBounds посреди перехода роняет Electron на macOS),
+        // размер дошёл и осел, отложенный пересчёт мест отработал. Прежде
+        // здесь были setFullScreen(false) + setBounds подряд и пауза 1200.
+        // Строгости нет, как не было и прежде: утверждение — о ДОЛЯХ того
+        // окна, которое выдала система.
+        const setBounds = async (b) => {
+            await resizeDisplay(app, display, { w: b.width, h: b.height });
+            await waitForQuiet(display);
+        };
 
         const fractions = () => display.evaluate((ids) => {
             const out = {};
@@ -495,13 +531,11 @@ test('элементы держат композицию при изменени
             return out;
         }, NODES);
 
-        await setBounds({ x: 60, y: 60, width: 1400, height: 900 });
-        await display.waitForTimeout(1200);
+        await setBounds({ width: 1400, height: 900 });
         const before = await fractions();
         expect(Object.keys(before).length, 'на экране нет элементов — мерить нечего').toBeGreaterThan(3);
 
-        await setBounds({ x: 60, y: 60, width: 900, height: 640 });
-        await display.waitForTimeout(1200);
+        await setBounds({ width: 900, height: 640 });
         const after = await fractions();
 
         for (const id of Object.keys(before)) {
@@ -532,13 +566,10 @@ test('элементы держат композицию при изменени
 test('раскладка переживает переоткрытие окна дисплея', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        let display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        let display = await openSettledDisplay(control, app);
         await openDisplayDrawer(control);
 
-        await control.locator('#displayLayoutGrid .layout-btn[data-layout="dashboard"]').click();
-        await display.waitForTimeout(900);
+        await clickLayout(control, display, 'dashboard');
         const before = await readBoxes(display, ['currentTimeBlock', 'endTimeBlock']);
 
         // Закрытие ждут УСЛОВИЕМ, а не паузой. Окно дисплея полноэкранное, и
@@ -548,10 +579,7 @@ test('раскладка переживает переоткрытие окна 
         // самом приложении — e2e/window-reopen-race.spec.js.
         await control.evaluate(() => window.ipcRenderer.send('close-display'));
         await waitForDisplayGone(app);
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
-        await display.waitForTimeout(600);
+        display = await openSettledDisplay(control, app);
 
         const after = await readBoxes(display, ['currentTimeBlock', 'endTimeBlock']);
         for (const id of ['currentTimeBlock', 'endTimeBlock']) {
@@ -592,10 +620,7 @@ test('раскладка не зависит от того, какой масш�
     try {
         const display = await openDisplayWithEverything(control, app);
         await openDisplayDrawer(control);
-        const applyLayout = async (id) => {
-            await control.click(`.layout-btn[data-layout="${id}"]`);
-            await display.waitForTimeout(1000);
-        };
+        const applyLayout = (id) => clickLayout(control, display, id);
         // Раскрутить блоки колесом далеко вверх — это и есть «масштабирование»
         // из жалобы. Десять щелчков над каждым блоком.
         const spinUp = async () => {
@@ -608,7 +633,9 @@ test('раскладка не зависит от того, какой масш�
                     }, m.node);
                 }
             }
-            await display.waitForTimeout(600);
+            // Колесо синхронное, но `transform` едет переходом: раскладка
+            // обязана видеть ровно то, что было на экране, — осевшее.
+            await waitForQuiet(display);
         };
 
         // Эталон: раскладка применяется ВТОРОЙ раз подряд, то есть масштабы уже
@@ -700,27 +727,16 @@ test('раскладка на низком окне не кладёт карто
         for (const size of sizes) {
             // Размер ставится по УСЛОВИЮ: выход из полноэкранного режима на
             // macOS анимирован, и setBounds посреди анимации не доезжает.
-            let got = null;
-            for (let attempt = 0; attempt < 6; attempt++) {
-                await app.evaluate(async ({ BrowserWindow }, s) => {
-                    const win = BrowserWindow.getAllWindows()
-                        .find((w) => w.webContents.getURL().includes('display.html'));
-                    if (win.isFullScreen()) {
-                        win.setFullScreen(false);
-                        await new Promise((r) => setTimeout(r, 800));
-                    }
-                    win.setBounds({ x: 20, y: 20, width: s.w, height: s.h });
-                }, size);
-                await display.waitForTimeout(700);
-                got = await display.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
-                if (Math.abs(got.w - size.w) <= 2 && Math.abs(got.h - size.h) <= 2) { break; }
-            }
+            // Общий помощник: выход по событию, повторы setBounds, размер
+            // осел, отложенный пересчёт отработал (прежде — своя копия с
+            // паузами 800 и 700 мс и тем же числом повторов).
+            const got = await resizeDisplay(app, display, size);
+            await waitForQuiet(display);
             expect(`${got.w}×${got.h}`, 'окно не приняло заданный размер — замер относится не к тому кадру')
                 .toBe(`${size.w}×${size.h}`);
 
             for (const layout of PUBLIC_LAYOUTS) {
-                await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout.id}"]`).click();
-                await display.waitForTimeout(1000);
+                await clickLayout(control, display, layout.id);
 
                 const seen = await display.evaluate((ids) => {
                     const out = {};
@@ -791,10 +807,11 @@ test('перещёлкивание стилей не сдвигает разло
     try {
         const display = await openDisplayWithEverything(control, app);
         await openDisplayDrawer(control);
-        await control.evaluate(() => {
+        await untilDisplayGot(display, () => control.evaluate(() => {
             const el = document.getElementById('eventTitleInput');
-            if (el) { el.value = 'Ежегодная конференция'; el.dispatchEvent(new Event('input', { bubbles: true })); }
-        });
+            el.value = 'Ежегодная конференция';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        }));
 
         const fractions = () => display.evaluate((ids) => {
             const MARGIN = 20;
@@ -823,16 +840,14 @@ test('перещёлкивание стилей не сдвигает разло
         }, MOVABLE.filter((m) => m.id !== 'heroLabel' && m.id !== 'statusPill').map((m) => m.node));
 
         for (const layout of ['conference', 'dashboard']) {
-            await control.locator(`#displayLayoutGrid .layout-btn[data-layout="${layout}"]`).click();
-            await display.waitForTimeout(1200);
+            await clickLayout(control, display, layout);
             const base = await fractions();
             expect(Object.keys(base).length, `${layout}: карточек на экране нет`).toBeGreaterThan(2);
 
             let sizeChanged = false;
             let checked = 0;
             for (const style of ['flip', 'analog', 'digits', 'circle']) {
-                await control.click(`#displayTimerStyle button[data-val="${style}"]`);
-                await display.waitForTimeout(900);
+                await untilDisplayGot(display, () => control.click(`#displayTimerStyle button[data-val="${style}"]`));
                 const now = await fractions();
                 for (const id of Object.keys(base)) {
                     const a = base[id];
@@ -868,8 +883,7 @@ test('перещёлкивание стилей не сдвигает разло
         // Возвращаем стиль ЯВНО: соседние спеки (дуга кольца, масштаб
         // таймера) открывают дисплей заново и берут стиль из профиля —
         // оставленный «аналог» показал бы им окно без кольца вовсе.
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await display.waitForTimeout(500);
+        await untilDisplayGot(display, () => control.click('#displayTimerStyle button[data-val="circle"]'));
         await resetDisplayState(control, display);
     } finally {
         await app.close();
