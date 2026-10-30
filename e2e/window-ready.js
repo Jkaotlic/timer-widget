@@ -216,8 +216,11 @@ async function reopenDisplay(app, control, opts = {}) {
  * «2400 мс хватит» — ставка на скорость машины; здесь ждут, пока перестанет
  * меняться, и не дольше.
  *
- * @param {import('@playwright/test').Page} page
- * @param {Function} read — выполняется В ОКНЕ, возвращает сериализуемое значение
+ * Годится и `ElectronApplication`: тогда `read` выполняется в ГЛАВНОМ
+ * процессе и получает модуль electron (границы окна, которые меняет main).
+ *
+ * @param {import('@playwright/test').Page|import('@playwright/test').ElectronApplication} page
+ * @param {Function} read — выполняется В ОКНЕ (или в main), возвращает сериализуемое значение
  * @param {{samples?: number, interval?: number, timeout?: number, name?: string}} [opts]
  * @returns {Promise<any>} осевшее значение
  */

@@ -1,6 +1,42 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const CONFIG = require('../constants.js');
+const { waitForSteady, reloadPanel } = require('./window-ready');
+
+/** Окно панели глазами главного процесса: границы и уровень. */
+const winState = ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    return { bounds: w.getBounds(), onTop: w.isAlwaysOnTop() };
+};
+
+/**
+ * Свёртка (или разворот) дошла до окна — по УСЛОВИЮ, а не паузой.
+ *
+ * Цепочка: класс `collapsed` на body (mini-bar.js, синхронно) → канал
+ * `control-collapse` → обработчик в main-control-ipc.js меняет размер, место и
+ * уровень окна ОДНИМ синхронным вызовом. Признак, что он отработал, — уровень:
+ * поверх окон панель только в полосе. Границы после этого ждём ОСЕВШИМИ —
+ * запрошенный размер не обязан совпасть с выданным, и система вправе
+ * поправить его следом. Последнее — рендерер увидел новое окно: раскладка
+ * полосы и место тоста считаются от `innerHeight`.
+ *
+ * @returns {Promise<{bounds: object, onTop: boolean}>} осевшее состояние окна
+ */
+async function windowSettled(app, control, collapsed) {
+    if (collapsed) {
+        await expect(control.locator('body')).toHaveClass(/\bcollapsed\b/);
+    } else {
+        await expect(control.locator('body')).not.toHaveClass(/\bcollapsed\b/);
+    }
+    await expect.poll(async () => (await app.evaluate(winState)).onTop).toBe(collapsed);
+    const state = await waitForSteady(app, winState, { name: 'границы панели' });
+    // Полоса не выше 120 px (потолок в обработчике), панель — заведомо выше.
+    await control.waitForFunction((c) => (c ? window.innerHeight <= 120 : window.innerHeight > 120), collapsed);
+    return state;
+}
+
+/** Таймер идёт / стоит — ответ главного процесса, отражённый контроллером. */
+const isRunning = (control) => control.evaluate(() => window.timerController.isRunning);
 
 /**
  * Режим полосы: окно действительно сжимается, полоса действительно управляет.
@@ -17,12 +53,7 @@ test('окно сжимается в полосу и разворачивает�
         const before = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
-
-        const collapsed = await app.evaluate(({ BrowserWindow }) => {
-            const w = BrowserWindow.getAllWindows()[0];
-            return { bounds: w.getBounds(), onTop: w.isAlwaysOnTop() };
-        });
+        const collapsed = await windowSettled(app, control, true);
 
         expect(collapsed.bounds.height, `высота окна ${collapsed.bounds.height}`).toBeLessThanOrEqual(60);
         // Ширину задаёт СОДЕРЖИМОЕ полосы: с 20.08.2026 в ней ещё четыре ячейки
@@ -42,12 +73,7 @@ test('окно сжимается в полосу и разворачивает�
         expect(seen.hero).toBe(0);
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(700);
-
-        const restored = await app.evaluate(({ BrowserWindow }) => {
-            const w = BrowserWindow.getAllWindows()[0];
-            return { bounds: w.getBounds(), onTop: w.isAlwaysOnTop() };
-        });
+        const restored = await windowSettled(app, control, false);
         expect(restored.bounds).toEqual(before);
         expect(restored.onTop).toBe(false);
     } finally {
@@ -62,13 +88,15 @@ test('полоса показывает то же время, что и пане
         // полосе одно действие из двух по состоянию таймера, и без пресета
         // «Старт» не переводит панель в отсчёт — «Паузы» не появится вовсе.
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('05:00');
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(600);
+        await windowSettled(app, control, true);
 
         await control.click('#miniBarStart');
-        await control.waitForTimeout(2200);
+        // Отсчёт пошёл, и тик дошёл до полосы: время в ней уже не 05:00.
+        await expect(control.locator('#miniBarTime')).not.toHaveText('05:00');
+        await expect(control.locator('#miniBarDot')).toHaveClass(/ok/);
 
         const running = await control.evaluate(() => ({
             bar: document.getElementById('miniBarTime').textContent.trim(),
@@ -80,14 +108,16 @@ test('полоса показывает то же время, что и пане
         expect(running.dot).toContain('ok');
 
         await control.click('#miniBarPause');
-        await control.waitForTimeout(700);
+        // Состояние «пауза» пришло от главного процесса: после него тиков нет.
+        await expect(control.locator('#statusText')).toHaveText('Пауза');
         const paused = await control.evaluate(() => document.getElementById('miniBarTime').textContent.trim());
+        // пауза законна: утверждается ОТСУТСТВИЕ тика за интервал длиннее секунды отсчёта
         await control.waitForTimeout(1500);
         const stillPaused = await control.evaluate(() => document.getElementById('miniBarTime').textContent.trim());
         expect(stillPaused, 'после паузы время не должно идти').toBe(paused);
 
         await control.click('#miniBarReset');
-        await control.waitForTimeout(700);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
         const afterReset = await control.evaluate(() => ({
             bar: document.getElementById('miniBarTime').textContent.trim(),
             hero: document.getElementById('controlTimeDigits').textContent.trim()
@@ -96,7 +126,7 @@ test('полоса показывает то же время, что и пане
 
         // Профиль e2e общий: возвращаем окно в развёрнутое состояние.
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
     } finally {
         await app.close();
     }
@@ -115,14 +145,14 @@ test('в паузе полоса предлагает продолжить, и �
     const { app, control } = await launchApp();
     try {
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('05:00');
         await control.click('#startBtn');
-        await control.waitForTimeout(1300);
+        await expect(control.locator('body')).toHaveClass(/state-running/);
         await control.click('#pauseBtn');
-        await control.waitForTimeout(500);
+        await expect(control.locator('#statusText')).toHaveText('Пауза');
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         const visible = await control.evaluate(() => {
             const vis = (id) => getComputedStyle(document.getElementById(id)).display !== 'none';
@@ -132,13 +162,13 @@ test('в паузе полоса предлагает продолжить, и �
         expect(visible.pause, 'кнопка «Пауза» в паузе не делает ничего').toBe(false);
 
         await control.click('#miniBarStart');
-        await control.waitForTimeout(1300);
-        expect(await control.evaluate(() => window.timerController.isRunning)).toBe(true);
+        await expect.poll(() => isRunning(control)).toBe(true);
+        await expect(control.locator('#statusText')).not.toHaveText('Пауза');
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
         await control.click('#resetBtn');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     } finally {
         await app.close();
     }
@@ -157,25 +187,23 @@ test('сворачивание выходит из режима ввода, и �
     const { app, control } = await launchApp();
     try {
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('05:00');
         await control.click('#controlTime');
-        await control.waitForTimeout(500);
         await expect(control.locator('body')).toHaveClass(/state-input/);
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
         await expect(control.locator('body')).not.toHaveClass(/state-input/);
 
         await control.keyboard.press('Space');
-        await control.waitForTimeout(1300);
-        expect(await control.evaluate(() => window.timerController.isRunning),
+        await expect.poll(() => isRunning(control),
             'пробел обязан запускать таймер из полосы').toBe(true);
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
         await control.click('#pauseBtn');
         await control.click('#resetBtn');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     } finally {
         await app.close();
     }
@@ -185,19 +213,16 @@ test('клавиша M переключает режим, а ящик настр
     const { app, control } = await launchApp();
     try {
         await control.click('.tab-btn[data-tab="timer"]');
-        await control.waitForTimeout(700);
+        await expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
 
         await control.keyboard.press('m');
-        await control.waitForTimeout(800);
-
-        const collapsed = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+        const collapsed = (await windowSettled(app, control, true)).bounds;
         expect(collapsed.height).toBeLessThanOrEqual(60);
         const drawerOpen = await control.evaluate(() => document.getElementById('settingsDrawer').classList.contains('open'));
         expect(drawerOpen, 'ящик обязан закрыться до сжатия').toBe(false);
 
         await control.keyboard.press('m');
-        await control.waitForTimeout(800);
-        const expanded = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+        const expanded = (await windowSettled(app, control, false)).bounds;
         expect(expanded.height).toBeGreaterThan(400);
     } finally {
         await app.close();
@@ -220,7 +245,7 @@ test('тост в свёрнутом состоянии виден целико�
     const { app, control } = await launchApp();
     try {
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         const m = await control.evaluate(async () => {
             window.Toast.show('Проверка размещения сообщения в полосе');
@@ -243,7 +268,7 @@ test('тост в свёрнутом состоянии виден целико�
         expect(m.right).toBeLessThanOrEqual(m.viewportW);
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(400);
+        await windowSettled(app, control, false);
     } finally {
         await app.close();
     }
@@ -267,7 +292,7 @@ test('в полосе всё помещается: замер кнопок и п
     const { app, control } = await launchApp();
     try {
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         const measure = () => control.evaluate(() => {
             const bar = document.getElementById('miniBar');
@@ -350,7 +375,7 @@ test('в полосе всё помещается: замер кнопок и п
             document.getElementById('miniBarStart').style.display = 'block';
             document.getElementById('miniBarPause').style.display = 'none';
         });
-        await control.waitForTimeout(120);
+        // Паузы нет: getBoundingClientRect в measure() сам досчитывает раскладку.
         const worst = await measure();
         console.log('   [худший случай] по элементам: '
             + worst.kids.map((k) => `${k.id} ${k.w.toFixed(1)}`).join(', '));
@@ -362,7 +387,7 @@ test('в полосе всё помещается: замер кнопок и п
             document.getElementById('miniBarPause').style.display = '';
         });
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
     } finally {
         await app.close();
     }
@@ -386,11 +411,20 @@ test('в полосе замок и ячейки вида — те же самы
             localStorage.removeItem('uiPresets');
             localStorage.setItem('uiLocked', '0');
         });
-        await control.reload();
-        await control.waitForTimeout(1200);
+        // Панель через 100 мс после загрузки подгоняет высоту окна под
+        // содержимое (autoResizeWindow, control-app.js) и про полосу не знает:
+        // свёртка, успевшая раньше, перезаписывается — окно остаётся 400×660
+        // поверх всех окон с классом collapsed (замер 30.10.2026). Прежняя
+        // пауза 1200 мс это прятала. Ждём именно это событие в главном
+        // процессе; подписка стоит ДО перезагрузки.
+        const startupResize = app.evaluate(({ ipcMain }) => new Promise(
+            (resolve) => ipcMain.once('resize-control-window', () => resolve(true))
+        ));
+        await reloadPanel(control);
+        await startupResize;
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         // Кнопки в полосе ВИДНЫ: зелёный тест на скрытой кнопке ничего не значит.
         const seen = await control.evaluate(() => {
@@ -407,7 +441,9 @@ test('в полосе замок и ячейки вида — те же самы
 
         // --- замок ---
         await control.click('#miniBarLock');
-        await control.waitForTimeout(500);
+        // Замок ставится СИНХРОННО в обработчике клика (panel-titlebar.js, set):
+        // запись, класс на <html> и глифы всех кнопок — одним вызовом.
+        await expect(control.locator('html')).toHaveClass(/ui-locked/);
         const locked = await control.evaluate(() => ({
             html: document.documentElement.classList.contains('ui-locked'),
             bar: document.getElementById('miniBarLock').textContent.trim(),
@@ -421,13 +457,14 @@ test('в полосе замок и ячейки вида — те же самы
         expect(locked.titlebar, 'кнопка титлбара осталась с прежним глифом — значит владельцев два').toBe('🔒');
 
         await control.click('#miniBarLock');
-        await control.waitForTimeout(500);
+        await expect(control.locator('#miniBarLock')).toHaveText('🔓');
         expect(await control.evaluate(() => document.documentElement.classList.contains('ui-locked')),
             'второй клик не снял замок').toBe(false);
 
         // --- ячейки вида: пустая ЗАПИСЫВАЕТ, и метку видно в обоих комплектах ---
         await control.click('#miniPresetSlot2');
-        await control.waitForTimeout(800);
+        // Запись и отметки — синхронно в обработчике (panel-presets.js, save).
+        await expect(control.locator('#miniPresetSlot2')).toHaveClass(/\bfilled\b/);
         const marked = await control.evaluate(() => {
             const mini = document.getElementById('miniPresetSlot2');
             const panel = document.getElementById('presetSlot2');
@@ -452,7 +489,7 @@ test('в полосе замок и ячейки вида — те же самы
             if (window.ipcRenderer) { window.ipcRenderer.send('ui-lock-update', { locked: false }); }
         }).catch(() => {});
         await control.click('#miniBarExpand').catch(() => {});
-        await control.waitForTimeout(400);
+        await windowSettled(app, control, false).catch(() => {});
         await app.close();
     }
 });
