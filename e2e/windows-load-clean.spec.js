@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { openDisplay, waitForWidget, waitForClock } = require('./window-ready');
+const {
+    openDisplay, waitForWidget, waitForClock, reloadPanel,
+    waitForWidgetSnapshot, waitForClockSnapshot, waitForDisplaySnapshot
+} = require('./window-ready');
 
 /**
  * Ни одно из четырёх окон не падает при загрузке.
@@ -28,9 +31,12 @@ const { openDisplay, waitForWidget, waitForClock } = require('./window-ready');
 // script». Первое ловит `alive`, второе — наблюдатель консоли.
 const WINDOWS = [
     { name: 'панель', get: async (app, control) => control, alive: 'timerController' },
-    { name: 'виджет', open: 'open-widget', get: (app) => waitForWidget(app), alive: 'timerWidget', drop: true },
-    { name: 'часы', open: 'open-clock-widget', get: (app) => waitForClock(app), alive: 'clockWidget', drop: true },
-    { name: 'дисплей', get: (app, control) => openDisplay(app, control), alive: 'displayTimer', drop: true }
+    { name: 'виджет', open: 'open-widget', get: (app) => waitForWidget(app), alive: 'timerWidget', drop: true,
+      settle: waitForWidgetSnapshot },
+    { name: 'часы', open: 'open-clock-widget', get: (app) => waitForClock(app), alive: 'clockWidget', drop: true,
+      settle: waitForClockSnapshot },
+    { name: 'дисплей', get: (app, control) => openDisplay(app, control), alive: 'displayTimer', drop: true,
+      settle: waitForDisplaySnapshot }
 ];
 
 test('четыре окна загружаются без ошибок в консоли', async () => {
@@ -48,7 +54,12 @@ test('четыре окна загружаются без ошибок в кон
             if (w.open) { await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open); }
             const page = await w.get(app, control);
             if (page !== control) { watch(page, w.name); }
-            await page.waitForTimeout(200);
+            // Загрузка окна ДОШЛА до конца (было 200 мс): `load` — модули
+            // исполнены; снимок main обработан — его обработчики, где тоже
+            // может упасть код окна, отработали. У панели — launchApp уже
+            // дождался её стартовой рассылки.
+            await page.waitForLoadState('load');
+            if (w.settle) { await w.settle(app, page); }
             expect(await page.evaluate((g) => typeof window[g], w.alive), `${w.name}: код страницы окна не исполнился`)
                 .toBe('object');
             // theme-init(-tone).js в <head> ставит тему — свидетель того, что
@@ -62,8 +73,10 @@ test('четыре окна загружаются без ошибок в кон
         }
         // Перезагружаем панель ПОД наблюдением: слушатель повешен уже после
         // первой загрузки, и без этого её собственные ошибки прошли бы мимо.
-        await control.reload();
-        await control.waitForTimeout(1500);
+        // Контроллер встал и стартовая рассылка (таймеры конструктора 100/200/
+        // 600 мс) ушла — было 1500 мс. События консоли приходят по CDP раньше
+        // ответов на вызовы, которые идут после них (evaluate в reloadPanel).
+        await reloadPanel(control);
 
         expect(errors, `ошибки при загрузке окон:\n${errors.join('\n')}`).toEqual([]);
         // Окно, чей скрипт упал, не доводит сборку до конца: контроллера нет.
@@ -99,7 +112,13 @@ test('мост каждого окна открыт по СВОЕЙ роли: с
                 window.electronAPI.on(foreign, () => {});
                 if (foreignSend) { window.electronAPI.send(foreignSend); }
             }, { own, foreign, foreignSend });
-            await page.waitForTimeout(150);
+            // Отказы моста пишутся синхронно, по порядку вызовов (preload.js,
+            // blocked): ждём ПОСЛЕДНИЙ ожидаемый — было 150 мс. Раз он пришёл,
+            // отказ своему каналу (вызван раньше) пришёл бы тоже — утверждение
+            // отсутствия ниже не холостое.
+            const last = foreignSend ? `channel: ${foreignSend} (окно ${role})` : `channel: ${foreign} (окно ${role})`;
+            await expect.poll(() => errors.some((t) => t.startsWith('Blocked attempt') && t.includes(last)),
+                { message: `${role}: отказ моста «${last}» не пришёл в консоль:\n${errors.join('\n')}` }).toBe(true);
             page.off('console', onConsole);
             const blocked = errors.filter((t) => t.startsWith('Blocked attempt'));
             expect(blocked.some((t) => t.includes(`channel: ${foreign} (окно ${role})`)),
@@ -128,8 +147,9 @@ test('зонд самопроверки: падение скрипта в окн
         await control.evaluate(() => {
             setTimeout(() => { throw new Error('зонд: заведомое падение'); }, 0);
         });
-        await control.waitForTimeout(300);
-        expect(errors.length, 'наблюдатель не увидел заведомо падающий скрипт').toBeGreaterThan(0);
+        // Опрос, а не 300 мс: падение приходит событием из таймера окна.
+        await expect.poll(() => errors.length, { message: 'наблюдатель не увидел заведомо падающий скрипт' })
+            .toBeGreaterThan(0);
     } finally {
         await app.close();
     }
@@ -153,7 +173,11 @@ test('CSP не пускает внедрённый инлайновый скри
             st.textContent = ':root { --csp-probe: 1; }';
             document.head.appendChild(st);
         });
-        await control.waitForTimeout(300);
+        // Отказ CSP — событием консоли; ждём его (было 300 мс). Скрипт и стиль
+        // применились бы СИНХРОННО при вставке, так что проверки отсутствия
+        // ниже после вставки уже не холостые.
+        await expect.poll(() => consoleErrors.some((t) => /Content Security Policy/i.test(t)),
+            { message: `отказ CSP не виден в консоли:\n${consoleErrors.join('\n')}` }).toBe(true);
         expect(await control.evaluate(() => typeof window.__cspProbe), 'внедрённый скрипт исполнился — CSP не действует')
             .toBe('undefined');
         expect(await control.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--csp-probe')),

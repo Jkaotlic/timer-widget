@@ -1,6 +1,18 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForDisplaySettled, waitForWidgetSnapshot,
+    waitForWindowSettled, armReceived, waitForPanelRemaining, panelRoundTrip, waitForQuiet
+} = require('./window-ready');
+
+/** Окно показывает время со знаком минуса (или без него) и утихло. */
+async function waitForSign(page, minus) {
+    await page.waitForFunction((want) => {
+        const t = document.querySelector('#timeDisplay, #controlTime');
+        return !!t && /[−-]/.test(t.textContent) === want;
+    }, minus, { timeout: 10000 }).catch(() => console.log(`   окно не показало ${minus ? 'минус' : 'время без минуса'} за 10 с`));
+    await waitForQuiet(page);
+}
 
 /**
  * Центровка времени в перерасходе: по центру стоят ЦИФРЫ.
@@ -137,21 +149,26 @@ test('замер центровки времени в перерасходе', a
         window.ipcRenderer.send('open-widget');
         window.ipcRenderer.send('open-display');
     });
-    await waitForDisplay(app);
-    await waitForWidget(app);
-    await control.waitForTimeout(2500);
+    // Оба окна получили снимок main и ВСТАЛИ — было 2500 мс.
+    await waitForDisplaySettled(app, await waitForDisplaySnapshot(app, await waitForDisplay(app)));
+    await waitForWindowSettled(app, await waitForWidgetSnapshot(app, await waitForWidget(app)), 'electron-widget.html');
 
     const widget = await findWindow(app, 'widget');
     const display = await findWindow(app, 'display');
 
-    // Круглый стиль в обоих окнах — именно про него речь.
+    // Круглый стиль в обоих окнах — именно про него речь. Ждём, что оба
+    // стиля ДОШЛИ до окон (было 800 мс); виджет после стиля ещё и встаёт.
+    const widgetStyle = await armReceived(widget, 'widget-style-update');
+    const displayStyle = await armReceived(display, 'display-settings-update');
     await control.evaluate(() => {
         const seg = document.querySelector('#timerStyle button[data-val="circle"]');
         if (seg) { seg.click(); }
         const dseg = document.querySelector('#displayTimerStyle button[data-val="circle"]');
         if (dseg) { dseg.click(); }
     });
-    await control.waitForTimeout(800);
+    await widgetStyle({ match: { timerStyle: 'circle' } });
+    await displayStyle({ match: { displayTimerStyle: 'circle' } });
+    await waitForWindowSettled(app, widget, 'electron-widget.html');
 
     // Уводим таймер в перерасход: 5 минут, разрешить минус, поставить −47 с.
     await control.evaluate(() => {
@@ -162,7 +179,11 @@ test('замер центровки времени в перерасходе', a
         window.ipcRenderer.send('timer-command', { type: 'adjust', deltaSeconds: -347 });
         window.ipcRenderer.send('timer-command', { type: 'start' });
     });
-    await control.waitForTimeout(1500);
+    // Отсчёт идёт и уже в минусе (было 1500 мс — до −48 с); все три окна
+    // показали минус и утихли. Окна получают состояние своими трубами,
+    // поэтому признак — их собственный текст.
+    await waitForPanelRemaining(control, -48);
+    for (const page of [control, widget, display]) { await waitForSign(page, true); }
 
     const rows = [];
     rows.push(['панель управления', await control.evaluate(measure, TARGETS['панель управления'])]);
@@ -206,11 +227,18 @@ test('замер центровки времени в перерасходе', a
         }
     }
 
-    // Для сравнения — то же в обычном режиме, где знака нет.
+    // Для сравнения — то же в обычном режиме, где знака нет. Сначала СБРОС:
+    // `set` при идущем таймере — no-op (timer-controller.js, setPreset), и
+    // до 31.10.2026 этот раздел печатал тот же перерасход (−01:18) под
+    // заголовком «обычный режим». Вскрылось, когда пауза стала условием
+    // «минуса нет».
     await control.evaluate(() => {
+        window.ipcRenderer.send('timer-command', { type: 'reset' });
         window.ipcRenderer.send('timer-command', { type: 'set', seconds: 300 });
     });
-    await control.waitForTimeout(1200);
+    // Команда обработана и окна показали время без минуса — было 1200 мс.
+    await panelRoundTrip(control);
+    for (const page of [control, widget, display]) { await waitForSign(page, false); }
 
     console.log('\n=== ОБЫЧНЫЙ РЕЖИМ (для сравнения) ===');
     console.log(`панель управления: ${JSON.stringify(await control.evaluate(measure, TARGETS['панель управления']))}`);
@@ -231,7 +259,9 @@ test('замер центровки времени в перерасходе', a
             neg.dispatchEvent(new Event('change', { bubbles: true }));
         }
     });
-    await control.waitForTimeout(500);
+    // Запись хранилища синхронна; всё, что панель послала в main, main
+    // обработал (было 500 мс).
+    await panelRoundTrip(control);
 
     await app.close();
 });
