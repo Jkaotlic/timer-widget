@@ -3964,8 +3964,8 @@ let displayTimer;
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', () => {
         displayTimer = new DisplayTimer();
-        // На window — слушатель темы стоит отдельным <script> в display.html и
-        // в область этого модуля не заглядывает.
+        // Слушатель темы (theme-sync) берёт живую привязку displayTimer через
+        // import. `window.displayTimer` — только крючок e2e.
         window.displayTimer = displayTimer;
 
         // Hint-strip: показываем первые 5 секунд, затем навсегда скрываем

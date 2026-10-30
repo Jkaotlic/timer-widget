@@ -1175,8 +1175,8 @@ export let activeWidgetTimer = null;
             localStorage.setItem('widgetHintShown', 'v2');
         }
 
-        // На window — чтобы до окна дотянулся слушатель темы, который стоит
-        // ОТДЕЛЬНЫМ <script> после ipc-compat.js и в эту область не заглядывает.
+        // Слушатель темы (theme-sync) берёт живую привязку activeWidgetTimer
+        // через import. `window.timerWidget` — только крючок e2e.
         const widgetTimer = new WidgetTimer();
         activeWidgetTimer = widgetTimer;
         window.timerWidget = widgetTimer;

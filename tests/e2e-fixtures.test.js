@@ -72,3 +72,32 @@ test('launchApp регистрирует приложение для снимк�
     // увидеть окна раньше, чем сторож закроет дисплей и вернёт профиль.
     assert.ok(track > watch, 'track(app) стоит раньше profileGuard.watch — снимок увидит окна после сторожа');
 });
+
+/** Прямой запуск Electron без track(): список проблем спеки. */
+function launchProblems(src) {
+    const code = codeOnly(src);
+    const direct = /(?:_electron|\belectron)\s*\.\s*launch\s*\(/.test(code);
+    if (direct && !/\btrack\s*\(/.test(code)) {
+        return ['запускает Electron напрямую, но не оборачивает приложение в track()'];
+    }
+    return [];
+}
+
+test('спека, запускающая Electron напрямую, оборачивает приложение в track()', () => {
+    const offenders = [];
+    for (const file of specs) {
+        const found = launchProblems(fs.readFileSync(path.join(SPEC_DIR, file), 'utf8'));
+        if (found.length) { offenders.push(`${file}: ${found.join('; ')}`); }
+    }
+    assert.deepEqual(offenders, [], `спеки без track():\n  ${offenders.join('\n  ')}`);
+});
+
+test('зонд прямого запуска проверяет сам себя', () => {
+    assert.equal(launchProblems('const app = await electron.launch({ args: [] });').length, 1,
+        'зонд не видит electron.launch без track');
+    assert.equal(launchProblems('const app = await _electron.launch({});').length, 1);
+    assert.deepEqual(launchProblems('const app = track(await electron.launch({}));'), []);
+    assert.deepEqual(launchProblems('const app = await launchApp();'), []);
+    // track() в комментарии — не track().
+    assert.equal(launchProblems('// track(app)\nawait electron.launch({});').length, 1);
+});

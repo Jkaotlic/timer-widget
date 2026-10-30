@@ -47,10 +47,7 @@ const MAIN = expand(readJson('tsconfig.main.json').include);
 const rendererCfg = readJson('tsconfig.renderer.json');
 const rendererExcluded = expand(rendererCfg.exclude || []);
 const RENDERER = new Set([...expand(rendererCfg.include)].filter((f) => !rendererExcluded.has(f)));
-// event-report.js: грузит его только main, но модуль чистый и писан под оба
-// мира — берёт MoneyMeter/TimeUtils из window, если он есть, и сам кладёт себя
-// в window.EventReport. Каждое `window` в нём — под `typeof window`.
-const DUAL_WORLD = ['event-report.js'];
+const DUAL_WORLD = [];
 const MAIN_ONLY = [...MAIN].filter((f) => !RENDERER.has(f) && !DUAL_WORLD.includes(f)).sort();
 
 test('охрана проверяет сама себя: регулярка ловит window.CONFIG и document', () => {

@@ -109,7 +109,7 @@
 | `main-warnings.test.js` | `main-warnings.js` гасит РОВНО `MODULE_TYPELESS_PACKAGE_JSON` во всех формах `emitWarning`; чужие предупреждения проходят; настоящий дочерний Node без шума |
 | `module-exports-shape.test.js` | Общий файл-ESM отдаёт `require()` те же ключи, что раньше `module.exports` (списки записаны ДО перевода; добавить можно, потерять нельзя) |
 | `script-tags.test.js` | Скрипты страниц: `<head>` — классические, `<body>` — только модули (вход + theme-sync) |
-| `window-bare-names.test.js` | Файлы окон обращаются к чужому файлу только через import/`window.X`, голых имён ноль; список модулей для lint (`scripts/window-modules.js`) вычислен из разметки и графа import |
+| `window-bare-names.test.js` | Файлы окон обращаются к чужому файлу только через `import`, голых имён ноль; список модулей для lint (`scripts/window-modules.js`) вычислен из разметки и графа import |
 | `window-bridges.test.js` | Мосты `window.X` = ровно крючки e2e/стенда (PERMANENT/HEAD/PRELOAD) в обе стороны; чтение не-крючка в `e2e/` и `scripts/` валит тест |
 | `main-app-protocol.test.js` | SEC-12: ответ `protocol.handle` настоящими `Response` — тело байт в байт, CSP/nosniff, 403/404/405, HEAD, файл только из каталога приложения, отказ в журнал без пути |
 | `main-storage-migration.test.js` | SEC-12: перенос localStorage `file://` → `app://` на подставке, исполняющей ТОТ ЖЕ код, что уходит в окно: не перезаписывает, метка после сброса на диск, повтор после квоты/таймаута/сбоя, gave-up, свежий профиль по снимку на старте, окно гасится после панели, журнал без ключей |

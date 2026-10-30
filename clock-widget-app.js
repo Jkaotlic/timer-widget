@@ -997,8 +997,8 @@ export let activeClockWidget = null;
             localStorage.setItem('clockHintShown', 'v2');
         }
 
-        // На window — по той же причине, что и в виджете таймера: слушатель
-        // темы стоит отдельным <script> и в эту область не заглядывает.
+        // Слушатель темы (theme-sync) берёт живую привязку activeClockWidget
+        // через import. `window.clockWidget` — только крючок e2e.
         const clockWidget = new ClockWidget();
         activeClockWidget = clockWidget;
         window.clockWidget = clockWidget;

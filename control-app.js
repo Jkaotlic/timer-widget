@@ -55,6 +55,8 @@
 
         /** Ячейки вида (panel-presets.js install); до установки — null. */
         let presetsApi = null;
+        /** Экземпляр панели; создаётся ниже, до этого — null. any: методы примесей типы не видят (как и прежний window.X). @type {any} */
+        let timerController = null;
 
         // debounce — только TimeUtils.debounce (utils.js). Здесь стоял
         // `if (typeof debounce === 'undefined') { var debounce = … }`: `var`
@@ -1560,10 +1562,12 @@
         Object.assign(TimerController.prototype, PanelResetMixin);
         Object.assign(TimerController.prototype, PanelClockMixin);
 
-        window.timerController = new TimerController();
+        timerController = new TimerController();
+        // Крючок e2e (tests/window-bridges.test.js); сам файл читает timerController.
+        window.timerController = timerController;
         // Ряд «Фон» строится ПОСЛЕ конструктора: ему нужны загруженные цвета.
-        window.timerController.initSurfaceControls();
-        window.timerController.initResetButtons();
+        timerController.initSurfaceControls();
+        timerController.initResetButtons();
 
         // Пипетки трёх окон. Объект цветов НЕ пересобирается здесь: раньше
         // каждая писала `{ timer: hex, progress: hex }` целиком и вместе с
@@ -1577,7 +1581,7 @@
                 sv: ids[0], hue: ids[1], hex: ids[2], preview: ids[3],
                 onChange: (hex) => {
                     document.querySelectorAll(`#${grid} .theme-btn`).forEach(b => b.classList.remove('active'));
-                    window.timerController.updateColors(target, { timer: hex, progress: hex });
+                    timerController.updateColors(target, { timer: hex, progress: hex });
                 }
             });
         });
@@ -1604,7 +1608,7 @@
             // стиля, масштаба и монитора из самих контролов настроек. Первая
             // версия писала здесь просто «показан» — то есть теряла ровно ту
             // часть, ради которой строка и заведена.
-            window.timerController?.renderWindowRows?.();
+            timerController?.renderWindowRows?.();
             if (isOpen) {
                 button.title = button.title.replace(/открыть|Компактный|Часы в реальном|На весь экран/i, 'Закрыть');
             } else if (buttonId === 'openWidgetBtn') {
@@ -1617,8 +1621,8 @@
         }
 
         // Слушатели для обновления состояния окон
-        if (window.ipcRenderer && window.timerController) {
-            const tc = window.timerController;
+        if (window.ipcRenderer && timerController) {
+            const tc = timerController;
             tc._handlers.onDisplayWindowState = (event, data) => {
                 isDisplayOpen = data.isOpen;
                 updateWindowButton('openDisplayBtn', isDisplayOpen);
@@ -1664,7 +1668,7 @@
 
         // Cleanup при закрытии окна
         window.addEventListener('beforeunload', () => {
-            window.timerController.cleanup();
+            timerController.cleanup();
         });
 
         // FAQ Modal Logic
@@ -1673,7 +1677,7 @@
         // обновления». Подробности и зависимости — в onboarding.js.
         Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
-        const _tc = () => window.timerController;
+        const _tc = () => timerController;
         window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer,
             // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
             onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } },
@@ -1693,7 +1697,7 @@
         PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
         presetsApi = PanelPresets.install({
             doc: document, storage: localStorage, presets: Presets, ipc: window.ipcRenderer || null,
-            controller: () => window.timerController, notify: (msg) => Toast && Toast.show(msg, 'success', 1600)
+            controller: () => timerController, notify: (msg) => Toast && Toast.show(msg, 'success', 1600)
         });
         // Open FAQ modal
         faqBtn.addEventListener('click', () => {
@@ -1738,8 +1742,8 @@
             }
         };
         document.addEventListener('keydown', _onEscapeKeydown);
-        if (window.timerController) {
-            window.timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
+        if (timerController) {
+            timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
         }
 
         // Аккордеон справки: в секции открыт максимум один ответ.
@@ -1796,11 +1800,11 @@
             // Space: Start/Pause timer
             if (event.code === 'Space') {
                 event.preventDefault();
-                if (window.timerController) {
-                    if (window.timerController.isRunning) {
-                        window.timerController.pause();
+                if (timerController) {
+                    if (timerController.isRunning) {
+                        timerController.pause();
                     } else {
-                        window.timerController.start();
+                        timerController.start();
                     }
                 }
             }
@@ -1808,16 +1812,16 @@
             // R: Reset timer
             else if (event.code === 'KeyR') {
                 event.preventDefault();
-                if (window.timerController) {
-                    window.timerController.reset();
+                if (timerController) {
+                    timerController.reset();
                 }
             }
 
             // S: Stop timer (pause)
             else if (event.code === 'KeyS') {
                 event.preventDefault();
-                if (window.timerController) {
-                    window.timerController.pause();
+                if (timerController) {
+                    timerController.pause();
                 }
             }
 
@@ -1841,10 +1845,10 @@
                         window.ipcRenderer.send('close-clock-widget');
                     } else {
                         window.ipcRenderer.send('open-clock-widget');
-                        if (window.timerController) {
+                        if (timerController) {
                             setTimeout(() => {
-                                window.timerController.pushClockSettings();
-                                window.timerController.sendClockStyle();
+                                timerController.pushClockSettings();
+                                timerController.sendClockStyle();
                             }, 500);
                         }
                     }
@@ -1873,13 +1877,13 @@
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
                 if (presetIndex < presets.length) {
                     event.preventDefault();
-                    if (window.timerController) {
-                        window.timerController.setTime(presets[presetIndex]);
+                    if (timerController) {
+                        timerController.setTime(presets[presetIndex]);
                     }
                 } else if (presetIndex === presets.length) {
                     // Клавиша сразу за последним пресетом — та же «мин».
                     event.preventDefault();
-                    window.timerController?.setInputMode(true);
+                    timerController?.setInputMode(true);
                 }
             }
 
@@ -1895,7 +1899,7 @@
             // же, что у клика по тумблеру строки (panel-state.js).
             else if (event.code === 'KeyZ') {
                 event.preventDefault();
-                window.timerController?.toggleSoundMaster();
+                timerController?.toggleSoundMaster();
             }
 
             // M: свернуть окно в полосу и обратно. Клавиша выбрана по коду из
@@ -1912,6 +1916,6 @@
             }
         };
         document.addEventListener('keydown', _onGlobalShortcutsKeydown);
-        if (window.timerController) {
-            window.timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;
+        if (timerController) {
+            timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;
         }
