@@ -73,12 +73,10 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 Rules when working here:
 
-- **No bundler, native ES modules.** In `<body>` of each page only the entry module (`*-app.js` / `display-script.js`) and its `*-theme-sync.js`; everything else arrives by `import` (flat `./name.js`). `<head>` keeps classic scripts (`theme-init*`, `ui-theme`, `ui-lock`, `drop-guard`). `ipc-compat.js` is a module imported FIRST by every entry/theme-sync.
-- **`window.X` is only an e2e/screenshot hook** (`tests/window-bridges.test.js`: PERMANENT / HEAD / PRELOAD lists; a read of a non-bridge in `e2e/` or `scripts/` fails the test). A dependency between files is `import`, never `window.X`. Screenshot clock freeze seam: `window.__frozenEndsAt` (`panel-state.js`).
-- **Several are prototype mixins**: a module exports `XMixin`, `control-app.js` imports it and does `Object.assign(TimerController.prototype, XMixin)`. A lost `Object.assign` line still fails only at the first click; `tests/control-mixins.test.js` guards imported = assigned = exported. A mixin never imports `control-app.js`.
-- **The `app://` whitelist follows static imports** (`app-scheme.js` `collectImports`) — a new module needs no page tag, but it must go into `package.json` `build.files` or it vanishes from the packaged app; two tests guard this.
-- **Shared files (`constants`, `utils`, …) are ESM with NAMED exports only**; main (CommonJS) and tests take them via `require(esm)`. Window module files are linted as `sourceType: module` with `no-undef` as an error (`scripts/window-modules.js` computes them from the pages).
-- **When you touch a self-contained block still living in `control-app.js`, move it out** instead of editing it in place.
+- **Native ES modules, no bundler**: `<body>` has only the entry module and its `*-theme-sync.js`, the rest is `import`; `<head>` stays classic. Dependency = `import`; `window.X` is only an e2e hook (`tests/window-bridges.test.js`) — [разбор](docs/lessons.md#es-modules-three-traps).
+- **Mixins**: `control-app.js` imports `XMixin` and `Object.assign`s it onto the prototype; a lost line fails only at the first click — `tests/control-mixins.test.js`.
+- **Every new module goes into `package.json` `build.files`**; shared files export NAMED only (main uses `require(esm)`).
+- **A self-contained block still in `control-app.js` that you touch — move it out.**
 - **A setting's key, control and default belong in `settings-schema.js` — in ONE row.** `loadSettings()` keeps only what the table cannot express: the two keys with their own format (`MANUAL_KEYS`) and the side effects. `tests/settings-schema.test.js` fails if a second copy of a default reappears
 
 ### Shared Modules
@@ -184,8 +182,8 @@ Release: те же ворота до сборки, Electron — последни
 - **Диапазон масштаба обязан быть ДОСТИЖИМ: пол окна = его размер при `MIN_SCALE_PCT`, ОДИНАКОВЫЙ по осям (иначе окно не квадрат)** — [разбор](docs/lessons.md#a-promised-range-must-be-reachable-at-both-ends)
 - **Счётчик масштаба не обновляют из `outerWidth`, прочитанного В событии `resize`: там окно ещё прежнего размера — владелец величины один, модуль геометрии** — [разбор](docs/lessons.md#a-scale-counter-must-not-be-refreshed-from-a-stale-outerwidth)
 - **`window-geometry` шлётся и по СВОИМ событиям окна (`resize`/`move`): размер меняют не только через IPC** — [разбор](docs/lessons.md#the-main-process-must-report-geometry-on-its-own-events-too)
-- **Модули сняли общий верхний уровень (второй `const X` в модуле — своя область); общий он остался лишь у классических скриптов `<head>`** — [разбор](docs/lessons.md#without-a-bundler-a-top-level-name-is-shared-by-the-whole-document)
-- **Файл, который только импортируют, пускает белый список `app://` по графу import; `require(esm)` в main шумит `MODULE_TYPELESS_PACKAGE_JSON` (гасит `main-warnings.js`); классическая `function f` была `window.f` сама — модуль её молча теряет** — [разбор](docs/lessons.md#es-modules-three-traps)
+- **Общий верхний уровень — только у скриптов `<head>`: второй `const X` роняет скрипт** — [разбор](docs/lessons.md#without-a-bundler-a-top-level-name-is-shared-by-the-whole-document)
+- **Модуль молча теряет неявное `window.f` классической `function f`** — [разбор](docs/lessons.md#es-modules-three-traps)
 - **Замок запрещает ЖЕСТЫ, а не настройки: спрашивать его обязан КАЖДЫЙ жест — перетаскивание, колесо, крестик** — [разбор](docs/lessons.md#a-lock-forbids-gestures-not-settings)
 - **Пресет вида хранит ЗНАЧЕНИЯ ключей профиля и применяется тем же путём, что запуск панели** — [разбор](docs/lessons.md#a-preset-is-the-profile-not-a-second-description-of-it)
 - **«Применён» — СРАВНЕНИЕ по ПОДМНОЖЕСТВУ полей снимка; отсутствие ключа снимок ЗАПИСЫВАЕТ (`null` = «убери»)** — [разбор](docs/lessons.md#applied-is-a-comparison-not-a-memory)
