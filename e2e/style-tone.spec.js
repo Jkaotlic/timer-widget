@@ -216,11 +216,19 @@ test('блок времени повторяет стиль: у флипа — �
         expect(backToCircle.toLowerCase(), 'шрифт «Цифр» залип на блоке после смены стиля').not.toContain('orbitron');
 
         // Возвращаем и шрифт, и тумблер блока: профиль общий на весь прогон.
-        await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.click('#displayDigitsFont .font-option[data-val="inter"]');
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        // Последняя из четырёх посылок одного канала: дошла она — дошли все.
-        await setEventTime(display, control, false);
+        // Каждый шаг шлёт ПОЛНЫЙ снимок настроек (pushDisplaySettings), так что
+        // ждём посылку, несущую всё возвращённое разом (ревью B4, M2): «первая
+        // посылка после взвода» могла быть посылкой одного из кликов выше.
+        await untilReceived(display, 'display-settings-update', async () => {
+            await control.click('#displayTimerStyle button[data-val="digits"]');
+            await control.click('#displayDigitsFont .font-option[data-val="inter"]');
+            await control.click('#displayTimerStyle button[data-val="circle"]');
+            await control.evaluate(() => {
+                const el = document.getElementById('showEventTime');
+                el.checked = false;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        }, { match: { displayTimerStyle: 'circle', displayDigitsFont: 'inter', showEventTime: false } });
     } finally {
         await app.close();
     }
