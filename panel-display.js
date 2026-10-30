@@ -35,9 +35,7 @@
  * владеет ключами. Здесь только разделение обязанностей: крестик на дисплее
  * закрывает БЛОКИ, подписи выключаются лишь тумблером в панели.
  */
-const Schema = (typeof window !== 'undefined' && window.SettingsSchema)
-    ? window.SettingsSchema
-    : require('./settings-schema');
+import * as Schema from './settings-schema.js';
 const BLOCK_KEYS = Schema.DISPLAY_BLOCK_KEYS;
 const LABEL_KEYS = Schema.DISPLAY_LABEL_KEYS;
 const DISPLAY_TOGGLE_KEYS = BLOCK_KEYS.concat(LABEL_KEYS);
@@ -49,9 +47,7 @@ const DISPLAY_TOGGLE_KEYS = BLOCK_KEYS.concat(LABEL_KEYS);
  * нужно дисплею (подставить стандартную подпись) и тесту (сверить разметку),
  * и три копии слова «Начало» разъехались бы молча.
  */
-const Layouts = (typeof window !== 'undefined' && window.DisplayLayouts)
-    ? window.DisplayLayouts
-    : require('./display-layouts');
+import * as Layouts from './display-layouts.js';
 
 /** Объект из строки хранилища; битое или пустое значение — пустой объект. */
 function safeParseObject(raw) {
@@ -979,17 +975,13 @@ const PanelDisplayMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
+export {
     PanelDisplayMixin, collectDisplayToggles, collectBlockLabels, attachChangedBgImage, fillDisplaySelect,
     BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
 };
-}
 
+// window.PanelDisplay снят: читателя у него не было.
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
     window.PanelDisplayMixin = PanelDisplayMixin;
-    window.PanelDisplay = {
-        collectDisplayToggles, collectBlockLabels,
-        BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
-    };
 }

@@ -111,11 +111,6 @@ interface Window {
     showKeyboardShortcuts: typeof import('../shortcuts-help.js').showKeyboardShortcuts;
     globalHotkeyBlocked: typeof import('../shortcuts-help.js').globalHotkeyBlocked;
     trackPointerControl: typeof import('../shortcuts-help.js').trackPointerControl;
-    mergeColors: typeof import('../panel-colors.js').mergeColors;
-    PanelColorFields: typeof import('../panel-colors.js').COLOR_FIELDS;
-    /** window.PanelDisplay — подмножество экспорта panel-display.js. */
-    PanelDisplay: Pick<typeof import('../panel-display.js'),
-        'collectDisplayToggles' | 'collectBlockLabels' | 'BLOCK_KEYS' | 'LABEL_KEYS' | 'DISPLAY_TOGGLE_KEYS'>;
     DisplayTimerHelpers: typeof import('../display-script.js');
 
     // --- примеси TimerController (Object.assign(TimerController.prototype, …))

@@ -75,6 +75,10 @@ const TEMPORARY = Object.freeze({
     LocalBackgroundMixin: 'local-background.js',
     ThemeGridMixin: 'theme-grid.js',
     PanelStateMixin: 'panel-state.js',
+    PanelColorsMixin: 'panel-colors.js',
+    PanelDisplayMixin: 'panel-display.js',
+    PanelResetMixin: 'panel-reset.js',
+    PanelClockMixin: 'panel-clock.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';

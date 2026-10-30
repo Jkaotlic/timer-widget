@@ -324,8 +324,10 @@ test('сброс окна обнуляет ВСЕ поля цвета, а не �
     // сборщика; тест проверяет, что сброс перечисляет именно его.
     const { COLOR_FIELDS, mergeColors } = require(path.join(ROOT, 'panel-colors.js'));
     const reset = readSource('panel-reset.js');
-    assert.match(codeOnly(reset), /window\.PanelColorFields/,
+    assert.match(codeOnly(reset), /import \{ COLOR_FIELDS \} from '\.\/panel-colors\.js'/,
         'сброс перечисляет поля цвета сам — это вторая копия списка');
+    assert.match(codeOnly(reset), /for \(const field of COLOR_FIELDS\)/,
+        'сброс не перечисляет список сборщика');
 
     // И сама операция: патч из всех полей не оставляет от объекта ничего.
     const patch = {};

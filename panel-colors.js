@@ -86,9 +86,7 @@ function el(tag, props, children) {
 }
 
 /** Чистая логика окон: здесь — запасной путь цветов (ownColors). */
-const ColorsShared = (typeof window !== 'undefined' && window.RendererShared)
-    ? window.RendererShared
-    : require('./renderer-shared');
+import * as ColorsShared from './renderer-shared.js';
 
 /**
  * Объект цветов из строки хранилища или null: битое значение не роняет панель.
@@ -304,12 +302,11 @@ const PanelColorsMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS, COLOR_FIELDS };
-}
+// window.mergeColors и window.PanelColorFields сняты: первого не читал никто,
+// второй читал panel-reset.js — теперь он импортирует COLOR_FIELDS.
+export { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS, COLOR_FIELDS };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
     window.PanelColorsMixin = PanelColorsMixin;
-    window.mergeColors = mergeColors;
-    window.PanelColorFields = COLOR_FIELDS;
 }

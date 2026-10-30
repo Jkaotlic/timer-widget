@@ -20,6 +20,9 @@
  * и отправку в окна — всё это принадлежит контроллеру панели.
  */
 
+// Список полей цвета — у сборщика; своя копия уже теряла `bg` (см. ниже).
+import { COLOR_FIELDS } from './panel-colors.js';
+
 const RESET_TARGETS = {
     widget: { mount: 'widgetResetRow', label: 'виджета', toast: 'Настройки виджета сброшены' },
     clock: { mount: 'clockResetRow', label: 'часов', toast: 'Настройки часов сброшены' },
@@ -110,7 +113,7 @@ const PanelResetMixin = {
         // переживало «Сбросить всё» — то есть кнопка возвращала к заводскому
         // виду не всё, а всё, кроме одного.
         const patch = {};
-        for (const field of window.PanelColorFields) { patch[field] = null; }
+        for (const field of COLOR_FIELDS) { patch[field] = null; }
         this.updateColors(target, patch);
 
         this.saveExtSettings();
@@ -140,10 +143,9 @@ const PanelResetMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PanelResetMixin, RESET_TARGETS };
-}
+export { PanelResetMixin, RESET_TARGETS };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
     window.PanelResetMixin = PanelResetMixin;
 }
