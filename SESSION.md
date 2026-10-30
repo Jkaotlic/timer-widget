@@ -1,3 +1,35 @@
+# Session Notes — Oct 30, 2026
+
+## Слито в main (= 474ec7c, CI 17/17 на коммите слияния)
+
+- Хвосты: стиль часов в main — только CONFIG.TIMER_STYLES (+5 мёртвых
+  Object.freeze сняты), IpcPayloads для каналов стиля часов, пресет шлёт стиль
+  сразу (pushWindowStyles).
+- Шаг 3 дорожной карты — ES-модули в окнах (план/спека — docs/superpowers,
+  локально). Решение: MODULE_TYPELESS_PACKAGE_JSON гасится точечно
+  (main-warnings.js, --disable-warning в npm test) вместо .cjs/.mjs.
+- e2e-A: упавший тест прикладывает PNG+JSON всех окон, trace retain-on-failure.
+
+## Ветка modules/es-modules после слияния (запушена, НЕ слита)
+
+- e2e-B1: паузы → условия в panel-states, digits-style, mini-bar, presets
+  (145 → 4 законных; 190 → 96 с), храповик tests/e2e-pauses.test.js (451).
+- Дефект приложения, найденный при снятии пауз: свёртка в полосу в первые
+  100 мс после загрузки затиралась авто-размером. Исправлен: main не меняет
+  размер свёрнутой панели (375e157), пропущенный запрос откладывается в
+  mini-bar.js и исполняется после разворота (9424482); обычный разворот
+  возвращает точные прежние границы.
+
+## Дальше
+
+- CI ветки → слияние по слову.
+- e2e-B2…: оставшиеся ≈ 450 пауз, пачками по 4 спеки (display-layouts,
+  floor-47, display-blocks, window-surface-color, style-tone, …), бриф —
+  .superpowers/sdd/2026-10-30-es-modules/e2e-B-brief.md.
+- Шаг 4 — CSS @layer + container queries.
+- Удалить удалённые ветки types/checkjs, ci/merge-es-modules (классификатор
+  не даёт агенту).
+
 # Session Notes — Oct 28–30, 2026
 
 ## Сделано и запушено (main = 4c793f4, CI зелёный)
