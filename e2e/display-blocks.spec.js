@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, reopenDisplay } = require('./window-ready');
+const {
+    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, waitForQuiet
+} = require('./window-ready');
 
 /**
  * Блоки дисплея: у каждого свой тумблер, каждый тащится и закрывается крестиком.
@@ -34,6 +36,36 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [id, value]);
 
+/**
+ * Открыть дисплей и дождаться, что он ВСТАЛ: снимок главного процесса
+ * получен, размер осел, отложенный пересчёт отработал (прежде — пауза
+ * 1800–2500 мс).
+ */
+async function openReady(app, control, displayIndex = 'auto') {
+    await control.evaluate((idx) => window.ipcRenderer.send('open-display', { displayIndex: idx }), displayIndex);
+    return settle(app, control, await waitForDisplay(app));
+}
+
+async function settle(app, control, display) {
+    await waitForDisplaySnapshot(app, display, control);
+    return waitForDisplaySettled(app, display);
+}
+
+/**
+ * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку настроек и
+ * утих: тумблер, поле, стиль шлют её синхронно (pushDisplaySettings).
+ */
+function untilDisplayGot(display, action) {
+    return untilReceived(display, 'display-settings-update', action);
+}
+
+/** Поставить тумблеры; ждать посылку ПОСЛЕДНЕГО — порядок одного канала сохраняется. */
+async function setToggles(control, display, pairs) {
+    for (const [id, on] of pairs.slice(0, -1)) { await setToggle(control, id, on); }
+    const [id, on] = pairs[pairs.length - 1];
+    await untilDisplayGot(display, () => setToggle(control, id, on));
+}
+
 const visibleIds = (page) => page.evaluate(() => {
     const out = {};
     for (const el of document.querySelectorAll('.info-block')) {
@@ -45,13 +77,10 @@ const visibleIds = (page) => page.evaluate(() => {
 test('каждый тумблер гасит СВОЙ блок и ничего кроме него', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await openReady(app, control);
 
         // Включаем все пять.
-        for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
-        await display.waitForTimeout(700);
+        await setToggles(control, display, BLOCKS.map((b) => [b.toggle, true]));
         const all = await visibleIds(display);
         for (const b of BLOCKS) {
             expect(all[b.block], `${b.name}: тумблер включён, блока нет`).toBe(true);
@@ -59,16 +88,14 @@ test('каждый тумблер гасит СВОЙ блок и ничего �
 
         // Гасим по одному и проверяем, что гаснет РОВНО он.
         for (const b of BLOCKS) {
-            await setToggle(control, b.toggle, false);
-            await display.waitForTimeout(400);
+            await untilDisplayGot(display, () => setToggle(control, b.toggle, false));
             const state = await visibleIds(display);
             for (const other of BLOCKS) {
                 const expected = other.toggle !== b.toggle;
                 expect(state[other.block], `выключили «${b.name}», а «${other.name}» ${expected ? 'исчез' : 'остался'}`)
                     .toBe(expected);
             }
-            await setToggle(control, b.toggle, true);
-            await display.waitForTimeout(300);
+            await untilDisplayGot(display, () => setToggle(control, b.toggle, true));
         }
     } finally {
         for (const b of BLOCKS) { await setToggle(control, b.toggle, false).catch(() => {}); }
@@ -82,18 +109,15 @@ test('крестик на блоке снимает ИМЕННО его тумб
     // переоткрытия окна — тем более.
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
-
-        for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
-        await display.waitForTimeout(700);
+        const display = await openReady(app, control);
+        await setToggles(control, display, BLOCKS.map((b) => [b.toggle, true]));
 
         const target = BLOCKS[1]; // «Начало»
-        await display.evaluate((id) => {
+        // Крестик: дисплей → панель (снять тумблер) → настройки обратно в
+        // дисплей. Их приход и есть конец круга: тумблер панель сняла ДО посылки.
+        await untilDisplayGot(display, () => display.evaluate((id) => {
             document.getElementById(id).querySelector('.info-close').click();
-        }, target.block);
-        await display.waitForTimeout(900);
+        }, target.block));
 
         const toggles = await control.evaluate((list) => {
             const out = {};
@@ -109,11 +133,10 @@ test('крестик на блоке снимает ИМЕННО его тумб
         }
 
         // И блок не возвращается после следующего пуша настроек.
-        await control.evaluate(() => {
+        await untilDisplayGot(display, () => control.evaluate(() => {
             const el = document.getElementById('showCurrentTime');
             el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        await display.waitForTimeout(700);
+        }));
         const after = await visibleIds(display);
         expect(after[target.block], 'закрытый блок вернулся при следующем пуше настроек').toBe(false);
     } finally {
@@ -125,9 +148,7 @@ test('крестик на блоке снимает ИМЕННО его тумб
 test('подпись над таймером и плашка состояния: выключаются, тащатся и не двигают таймер', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        let display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        let display = await openReady(app, control);
 
         const geometry = () => {
             const box = (sel) => {
@@ -161,16 +182,12 @@ test('подпись над таймером и плашка состояния:
         };
 
         // 1. Выключаются.
-        await setToggle(control, 'showHeroLabel', false);
-        await setToggle(control, 'showStatusPill', false);
-        await display.waitForTimeout(700);
+        await setToggles(control, display, [['showHeroLabel', false], ['showStatusPill', false]]);
         let g = await display.evaluate(geometry);
         expect(g.labelShown, 'подпись не выключилась').toBe(false);
         expect(g.pillShown, 'плашка не выключилась').toBe(false);
 
-        await setToggle(control, 'showHeroLabel', true);
-        await setToggle(control, 'showStatusPill', true);
-        await display.waitForTimeout(700);
+        await setToggles(control, display, [['showHeroLabel', true], ['showStatusPill', true]]);
         const before = await display.evaluate(geometry);
         expect(before.labelShown && before.pillShown, 'подпись и плашка должны вернуться').toBe(true);
 
@@ -197,7 +214,9 @@ test('подпись над таймером и плашка состояния:
             }
             document.dispatchEvent(new MouseEvent('mouseup', opts(r.left + 5 + dx, r.top + 5 + dy)));
         }, ['heroLabel', DX, DY]);
-        await display.waitForTimeout(600);
+        // Отпускание ставит место синхронно (onUp доводит кадр руками); хвосты —
+        // пересчёт полосы сверху и переходы колонки.
+        await waitForQuiet(display);
 
         g = await display.evaluate(geometry);
         console.log(`подпись ${before.label.x},${before.label.y} → ${g.label.x},${g.label.y}`);
@@ -225,8 +244,7 @@ test('подпись над таймером и плашка состояния:
         expect(g.labelText, 'текст подписи потерялся').toBe(before.labelText);
 
         // 5. Позиция переживает переоткрытие окна.
-        display = await reopenDisplay(app, control);
-        await control.waitForTimeout(2500);
+        display = await settle(app, control, await reopenDisplay(app, control));
         const reopened = await display.evaluate(geometry);
         console.log(`после переоткрытия: окно ${g.vw}×${g.vh} → ${reopened.vw}×${reopened.vh}; `
             + `центр ${g.label.cx},${g.label.cy} → ${reopened.label.cx},${reopened.label.cy}; `
@@ -281,15 +299,11 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
     //    ещё до первого движения мыши.
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await openReady(app, control);
 
         await control.evaluate(() => localStorage.removeItem('displayBlockPositions'));
-        for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
-        await setToggle(control, 'showHeroLabel', true);
-        await setToggle(control, 'showStatusPill', true);
-        await display.waitForTimeout(900);
+        await setToggles(control, display, BLOCKS.map((b) => [b.toggle, true])
+            .concat([['showHeroLabel', true], ['showStatusPill', true]]));
 
         const boxes = () => {
             const out = {};
@@ -304,7 +318,9 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
         await display.evaluate(() => {
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', bubbles: true }));
         });
-        await display.waitForTimeout(400);
+        // Сдвиг от Alt — правило CSS по классу подсветки: он виден на ближайшем
+        // кадре, а если ехал бы переходом — к концу перехода. Ждём оба.
+        await waitForQuiet(display);
         const after = await display.evaluate(boxes);
 
         for (const id of Object.keys(before)) {
@@ -368,9 +384,7 @@ test('«До завершения» считает до времени окон�
     const { app, control } = await launchApp();
     let saved = null;
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await openReady(app, control);
 
         // Мероприятие ВОКРУГ «сейчас»: начало 20 минут назад, конец через 40.
         // Часы берутся из окна, а не из числа в тесте: время суток — скрытый
@@ -471,9 +485,7 @@ test('аналог: круг — у циферблата, подписи не в
     const { app, control } = await launchApp();
     try {
         await control.waitForLoadState('domcontentloaded');
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const disp = await waitForDisplay(app);
-        await control.waitForTimeout(1800);
+        const disp = await openReady(app, control, 0);
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
@@ -481,8 +493,9 @@ test('аналог: круг — у циферблата, подписи не в
             const el = document.getElementById('eventTitleInput');
             if (el) { el.value = 'Ежегодная конференция'; el.dispatchEvent(new Event('input', { bubbles: true })); }
         });
-        await control.click('#displayTimerStyle button[data-val="analog"]');
-        await disp.waitForTimeout(1000);
+        // Стиль — последняя посылка; дождавшись её, знаем и про тумблеры с
+        // названием. Подписи меряются по шрифту — waitForQuiet ждёт и его.
+        await untilDisplayGot(disp, () => control.click('#displayTimerStyle button[data-val="analog"]'));
 
         const seen = await disp.evaluate(() => {
             const out = [];
@@ -575,8 +588,7 @@ test('аналог: круг — у циферблата, подписи не в
             ).toBeLessThanOrEqual(c.chord);
         }
 
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await disp.waitForTimeout(400);
+        await untilDisplayGot(disp, () => control.click('#displayTimerStyle button[data-val="circle"]'));
     } finally {
         await app.close();
     }
@@ -596,9 +608,7 @@ test('длинное название мероприятия переносит�
     const { app, control } = await launchApp();
     try {
         await control.waitForLoadState('domcontentloaded');
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(1800);
+        const display = await openReady(app, control, 0);
 
         await control.click('.tab-btn[data-tab="display"]');
         await setToggle(control, 'showEventTitle', true);
@@ -609,8 +619,7 @@ test('длинное название мероприятия переносит�
         }, LONG);
 
         for (const style of ['circle', 'analog', 'flip', 'digits']) {
-            await control.click(`#displayTimerStyle button[data-val="${style}"]`);
-            await display.waitForTimeout(700);
+            await untilDisplayGot(display, () => control.click(`#displayTimerStyle button[data-val="${style}"]`));
             const m = await display.evaluate(() => {
                 const block = document.getElementById('eventTitleBlock');
                 const value = document.getElementById('eventTitleValue');
@@ -656,8 +665,7 @@ test('длинное название мероприятия переносит�
             el.dispatchEvent(new Event('input', { bubbles: true }));
         });
         await setToggle(control, 'showEventTitle', false);
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await display.waitForTimeout(400);
+        await untilDisplayGot(display, () => control.click('#displayTimerStyle button[data-val="circle"]'));
     } finally {
         await app.close();
     }
