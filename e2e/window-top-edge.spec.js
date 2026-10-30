@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForWindow, waitForWindowGone, waitForWindowSettled, resizeOwnWindow, untilReceived,
+    waitForWindow, waitForWindowGone, waitForWindowSettled, resizeOwnWindow, untilReceived, waitForBoundsSettled,
     WIDGET_PROBE, CLOCK_PROBE
 } = require('./window-ready');
 
@@ -68,7 +68,10 @@ const backToBase = (app, win, target) => resizeOwnWindow(app, win,
 
 function metricsOf(app, urlPart) {
     return app.evaluate(({ BrowserWindow, screen }, part) => {
-        const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes(part));
+        // Самое новое живое окно — тот же выбор, что mainBoundsOf (ревью B6, M2).
+        const win = BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes(part))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         if (!win) { return null; }
         const bounds = win.getBounds();
         const display = screen.getDisplayMatching(bounds);
@@ -100,6 +103,10 @@ for (const target of WINDOWS) {
             await untilReceived(win, 'window-geometry',
                 () => win.evaluate(({ ch, deltaY }) => window.electronAPI.send(ch, { deltaX: 0, deltaY }),
                     { ch: target.move, deltaY }));
+            // Посылка доказывает лишь, что main выполнил setBounds; утверждение же
+            // — что система НЕ поправила рамку следом (constrainFrameRect, другой
+            // монитор, X11). Поэтому — осевшие границы (ревью B6, I1).
+            await waitForBoundsSettled(app, target.url);
 
             const after = await metricsOf(app, target.url);
             expect(

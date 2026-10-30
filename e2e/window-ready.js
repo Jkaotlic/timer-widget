@@ -71,9 +71,10 @@ function findDisplay(app) { return findWindowBy(app, DISPLAY_PROBE); }
  *
  * @param {import('@playwright/test').ElectronApplication} app
  * @param {Function} probe — выполняется В ОКНЕ, отвечает true/false
- * @param {{timeout?: number, selector?: string, name?: string}} [opts]
+ * @param {{timeout?: number, selector?: string, name?: string, interval?: number}} [opts]
  *        selector — дополнительное условие внутри окна (например `#timerDigits.active`);
- *        name — как назвать окно в сообщении об ошибке
+ *        name — как назвать окно в сообщении об ошибке;
+ *        interval — шаг опроса, мс (по умолчанию `POLL_MS`)
  * @returns {Promise<import('@playwright/test').Page>}
  */
 async function waitForWindow(app, probe, opts = {}) {
@@ -94,7 +95,7 @@ async function waitForWindow(app, probe, opts = {}) {
         if (Date.now() >= deadline) {
             throw new Error(`${name} не появилось за ${timeout} мс: открытых окон ${seen}, проба не сошлась ни в одном`);
         }
-        await new Promise((r) => setTimeout(r, POLL_MS));
+        await new Promise((r) => setTimeout(r, opts.interval ?? POLL_MS));
     }
 }
 
@@ -965,8 +966,13 @@ async function waitForDisplaySettled(app, display, opts = {}) {
  */
 function mainBoundsOf(app, urlPart) {
     return app.evaluate(({ BrowserWindow }, part) => {
+        // Самое новое окно по id (ревью B6, M2; тот же выбор, что ревью B3,
+        // M4): после переоткрытия прежнее окно может ещё не быть
+        // `isDestroyed()` и стоять в списке первым — его границы сошли бы за
+        // границы нового.
         const win = BrowserWindow.getAllWindows()
-            .find((w) => !w.isDestroyed() && w.webContents.getURL().includes(part));
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes(part))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
         return win ? win.getBounds() : null;
     }, urlPart);
 }
@@ -983,9 +989,14 @@ function mainBoundsOf(app, urlPart) {
  */
 function waitForBoundsSettled(app, urlPart, opts = {}) {
     // waitForSteady зовёт `evaluate(read)`; читатель исполняется в main, а не в
-    // странице, поэтому подставляется объект с готовым `evaluate`.
-    return waitForSteady({ evaluate: () => mainBoundsOf(app, urlPart) }, null,
-        { timeout: opts.timeout ?? DEFAULT_TIMEOUT, name: `границы ${urlPart}` });
+    // странице, поэтому подставляется объект с готовым `evaluate`. Окна нет —
+    // это не «осело» (ревью B6, M2): null подменяется уникальным значением,
+    // которое не повторится ни разу подряд, и ожидание кончится ошибкой с
+    // именем окна, а не тихим null.
+    let miss = 0;
+    return waitForSteady({
+        evaluate: async () => (await mainBoundsOf(app, urlPart)) || { missing: ++miss }
+    }, null, { timeout: opts.timeout ?? DEFAULT_TIMEOUT, name: `границы ${urlPart} (окно есть?)` });
 }
 
 /**
@@ -1029,16 +1040,32 @@ async function waitForWindowSettled(app, page, urlPart, opts = {}) {
  * в пути нет — вызывать только на ВСТАВШЕМ окне (`waitForWindowSettled`),
  * где последняя посылка ушла не меньше чем 300 мс назад.
  *
+ * Затем `waitForWindowSettled`, и его таймер `SAVE_SETTLE_MS` опирается на
+ * ПОРЯДОК таймеров: наш взведён после таймера `saveSettled` окна, только если
+ * `resize` рендерера пришёл ДО нашего взвода. Гарантирует это не порядок
+ * событий, а запас стоящих границ (≥ 3 × 150 мс в `waitForBoundsSettled`) —
+ * ревью B6, M1(а).
+ *
+ * Самопроверка (ревью B6, M1(б)): принятая посылка сверяется с осевшими
+ * границами; расхождение печатается — так виден приём ЧУЖОЙ посылки (или
+ * поправка системы после `setBounds`), а решение остаётся утверждениям спеки.
+ *
  * @param {import('@playwright/test').ElectronApplication} app
  * @param {import('@playwright/test').Page} page
  * @param {{channel: string, urlPart: string, size: number, timeout?: number}} req
  * @returns {Promise<{x: number, y: number, width: number, height: number}>} осевшие границы
  */
 async function resizeOwnWindow(app, page, req) {
-    await untilReceived(page, 'window-geometry',
+    const got = await untilReceived(page, 'window-geometry',
         () => page.evaluate(([ch, s]) => window.electronAPI.send(ch, { width: s, height: s }), [req.channel, req.size]),
         { timeout: req.timeout });
-    return waitForWindowSettled(app, page, req.urlPart, { timeout: req.timeout });
+    const bounds = await waitForWindowSettled(app, page, req.urlPart, { timeout: req.timeout });
+    const keys = ['x', 'y', 'width', 'height'];
+    if (!got || keys.some((k) => got[k] !== bounds[k])) {
+        console.log(`   [resizeOwnWindow] РАСХОЖДЕНИЕ: принятая window-geometry ${JSON.stringify(got)}, `
+            + `осевшие границы ${JSON.stringify(bounds)} (просили ${req.size}) — чужая посылка или поправка системы`);
+    }
+    return bounds;
 }
 
 module.exports = {

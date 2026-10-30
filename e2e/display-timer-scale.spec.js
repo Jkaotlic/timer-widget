@@ -166,9 +166,12 @@ test('масштаб дисплея применяется ко всем бло�
             localStorage.setItem('displayTimerScale', String(pct));
         }, RESTORE_SCALE_PCT);
 
-        const displayPromise = app.waitForEvent('window');
+        // Окно — ОПРОСОМ, а не событием `window` (ревью B6, M5; правило
+        // проекта: событие приходит раз и теряется, если окно опередило
+        // подписку). Шаг опроса 10 мс, а не 100: запас до автопуша панели
+        // (см. выше) тратить на опрос нельзя.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        display = await displayPromise;
+        display = await waitForDisplay(app, { interval: 10 });
         await display.waitForLoadState('domcontentloaded');
 
         // Проверяем СРАЗУ. restoreBlockPositions() — часть синхронного
@@ -305,6 +308,10 @@ test('масштаб дисплея не выпускает таймер за о
         const reported = await display.evaluate(() => Number(localStorage.getItem('displayTimerScale')));
         if (reported < 300) {
             await report({ match: { source: 'display', scalePct: reported } });
+        } else {
+            // Отчёта нет — приёмник всё равно снимается (ревью B6, M6): иначе
+            // проверка, дописанная ниже, жила бы с чужим слушателем в панели.
+            await report({ timeout: 1 }).catch(() => {});
         }
 
         const shown = await control.evaluate(() => Number(document.getElementById('displayTimerScale').value));

@@ -218,7 +218,9 @@ test('замок держит ОКНО виджета, а панель прод�
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }, pct);
             await style({ match: { timerScale: pct } });
-            await geometry().catch((err) => console.log(`   ${pct} %: границы от main не пришли — ${err.message.split('\n')[0]}`));
+            // 5 с, а не 20 (ревью B6, M3): размер виджет не попросит, если ползунок
+            // уже стоял на этом значении, — ждать до общего таймаута незачем.
+            await geometry({ timeout: 5000 }).catch((err) => console.log(`   ${pct} %: границы от main не пришли — ${err.message.split('\n')[0]}`));
             // И окно ВСТАЛО: поздние `resize`/`move` этой смены не примут за
             // посылку следующей.
             await waitForWindowSettled(app, widget, 'electron-widget.html');
