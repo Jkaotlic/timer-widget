@@ -184,6 +184,12 @@ test('дисплей: размер, заданный между жестами, 
         // windowDragMousedown).
         const resizeTo = async (bounds) => {
             const was = await waitForSteady(page, innerSize, { name: 'размер дисплея' });
+            // setBounds идёт сразу за ожиданием, а вход в полноэкранный режим
+            // мог начаться ПОЗЖЕ (окно получило фокус после waitForDisplaySettled,
+            // ревью B5, M4). leaveFullScreen решает по СОСТОЯНИЮ окна: флаг
+            // поднят — выходит по событию; в фокусе без флага и не выведено
+            // нами — ждёт заказанный вход и выходит; без фокуса — ничего.
+            await leaveFullScreen(app);
             await setBounds(bounds);
             await waitForResizeHandled(page, was);
         };

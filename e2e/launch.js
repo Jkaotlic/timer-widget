@@ -87,6 +87,14 @@ async function launchApp(opts = {}) {
  * загруженную машину; не дождались — ошибка с названием условия, а не тест,
  * читающий полузапущенную панель.
  *
+ * И что ДОШЁЛ ответ на стартовый `get-displays` (setupIPC шлёт его при каждой
+ * загрузке страницы): `panelRoundTrip` (window-ready.js) ждёт «следующий
+ * `displays-list`», а ответы неотличимы — стартовый, ещё бывший в пути,
+ * закрыл бы первый круг теста раньше его команд (ревью B5, M1). Признак —
+ * ИТОГ ответа, а не срок: `fillDisplaySelect` (panel-display.js) добавляет в
+ * `#displaySelect` мониторы, в разметке там только «Авто». После этого
+ * других `get-displays` в пути нет, пока их не пошлёт сам тест.
+ *
  * @param {import('@playwright/test').Page} control
  * @param {number} [timeout]
  */
@@ -94,6 +102,10 @@ async function waitForStartupPush(control, timeout = 15000) {
     await control.waitForFunction(() => window.__startupPushed === true, null, { timeout })
         .catch((e) => {
             throw new Error(`стартовая рассылка панели не ушла за ${timeout} мс (зонд __startupPushed): ${e.message}`);
+        });
+    await control.waitForFunction(() => !!document.querySelector('#displaySelect option[value="0"]'), null, { timeout })
+        .catch((e) => {
+            throw new Error(`ответ на стартовый get-displays не дошёл за ${timeout} мс (в #displaySelect нет мониторов): ${e.message}`);
         });
 }
 

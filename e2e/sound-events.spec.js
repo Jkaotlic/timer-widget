@@ -97,6 +97,14 @@ test('звук окончания на нуле звучит один раз —
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
     // Без минуса таймер стоит на нуле: финиш — последнее, что main пришлёт,
     // после него посылок нет вовсе, и круг закрывает всё, что ушло.
+    // Окно наблюдения СУЖЕНО сознательно (было 2.5 с, ревью B5, M3): «после
+    // финиша посылок нет» — утверждение о main (main-timer.js: reconcileTimer
+    // → clearTimerInterval, scheduleTimerTick перевзводится только при
+    // isRunning), и этот тест его НЕ проверяет. Если main продолжит тикать
+    // после финиша, здесь этого не увидят. Стережёт отчасти
+    // tests/timer-controller.test.js (reconcile → true на финише,
+    // msUntilNextSecond → null в покое); сама склейка main-timer.js тестом
+    // не закрыта.
     await expect.poll(() => control.evaluate(() => window.timerController.wasFinished),
         { message: 'таймер должен финишировать', timeout: 15000 }).toBe(true);
     await panelRoundTrip(control);

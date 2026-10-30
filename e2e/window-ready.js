@@ -505,6 +505,12 @@ async function untilReceived(page, channel, action, opts = {}) {
  * своём обработчике, а посылки main → панель идут по одной трубе в порядке
  * отправки. Значит, ответ приходит ПОСЛЕ состояния последней команды.
  *
+ * Ответы `displays-list` неотличимы, поэтому круг верен, только пока в пути
+ * нет ЧУЖОГО `get-displays`. Стартовый (setupIPC, при каждой загрузке
+ * панели) исключён условием: `launchApp` и `reloadPanel` ждут его ИТОГ в
+ * `waitForStartupPush` (ревью B5, M1). Вызов с `awaitStartup: false` этой
+ * гарантии не имеет — первый круг там может закрыть стартовый ответ.
+ *
  * @param {import('@playwright/test').Page} control — окно панели
  * @param {{timeout?: number}} [opts]
  */
@@ -570,7 +576,12 @@ async function waitForPanelSized(app, control, opts = {}) {
             return { w, h };
         });
         page = await control.evaluate(innerSize);
-        if (main && main.w === page.w && main.h === page.h) { break; }
+        // ≤ 1 px, а не равенство (ревью B5, M2): на дробном масштабе Windows
+        // (125/150 %) CSS-размер страницы и DIP-размер окна расходятся на
+        // пиксель округления — точное равенство ждало бы до таймаута на
+        // исправном приложении. Допуск — только в УСЛОВИИ ожидания;
+        // утверждения спек меряют выданное сами.
+        if (main && Math.abs(main.w - page.w) <= 1 && Math.abs(main.h - page.h) <= 1) { break; }
         if (Date.now() > deadline) {
             throw new Error(`размер панели не дошёл до страницы за ${timeout} мс: main ${JSON.stringify(main)}, страница ${JSON.stringify(page)}`);
         }
@@ -620,6 +631,7 @@ function panelLayoutState() {
     const shell = document.querySelector('.app-shell');
     return {
         body: document.body.className,
+        shell: shell ? shell.className : null,
         scroll: panel ? panel.scrollHeight : null,
         client: panel ? panel.clientHeight : null,
         column: shell ? getComputedStyle(shell).getPropertyValue('--control-panel-width').trim() : null
@@ -650,13 +662,42 @@ async function waitForPanelSettled(app, control, opts = {}) {
             ? { inner: window.innerWidth, extra: window.timerController._drawerExtraWidth }
             : null;
     });
+    // Что видно сейчас — для сообщения при таймауте (ревью B5, M5): числа, а
+    // не голое «waitForFunction: Timeout».
+    const actual = () => control.evaluate(() => {
+        const shell = document.querySelector('.app-shell');
+        return {
+            inner: window.innerWidth,
+            column: shell ? getComputedStyle(shell).getPropertyValue('--control-panel-width').trim() : null,
+            shellDrawerOpen: !!shell && shell.classList.contains('drawer-open'),
+            drawerOpen: !!document.querySelector('.settings-drawer.open')
+        };
+    }).catch(() => '?');
     if (drawer) {
         const { columnFromWindow } = require('../panel-drawer.js');
-        await control.waitForFunction((want) => {
+        const want = `${columnFromWindow(drawer.inner, drawer.extra)}px`;
+        await control.waitForFunction((w) => {
             const shell = document.querySelector('.app-shell');
             const col = shell && getComputedStyle(shell).getPropertyValue('--control-panel-width').trim();
-            return col === want;
-        }, `${columnFromWindow(drawer.inner, drawer.extra)}px`, { timeout });
+            return col === w;
+        }, want, { timeout }).catch(async (err) => {
+            throw new Error(`колонка панели при открытом ящике не стала ${want} `
+                + `(columnFromWindow(${drawer.inner}, ${drawer.extra})) за ${timeout} мс: `
+                + `сейчас ${JSON.stringify(await actual())}`, { cause: err });
+        });
+    } else {
+        // Ящик закрыт — ждём ИТОГ finishClose (control-app.js): `.app-shell`
+        // теряет `drawer-open`, колонку и резерв не раньше 260 мс от закрытия,
+        // а если окно не вернулось к прежней ширине — через 700 мс (ревью B5,
+        // I1). Без этого «встала» могло вернуться, пока панель ещё в раскладке
+        // ящика: при reduced-motion переходов нет, и тишина наступает сразу.
+        await control.waitForFunction(() => {
+            const shell = document.querySelector('.app-shell');
+            return !shell || !shell.classList.contains('drawer-open');
+        }, null, { timeout }).catch(async (err) => {
+            throw new Error(`после закрытия ящика .app-shell не снял drawer-open за ${timeout} мс: `
+                + `сейчас ${JSON.stringify(await actual())}`, { cause: err });
+        });
     }
     await waitForFrameSteady(control, panelLayoutState, { timeout, name: 'раскладка панели' });
     await waitForPanelSized(app, control, { timeout });
