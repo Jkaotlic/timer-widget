@@ -131,6 +131,10 @@ test.describe('панель: четыре состояния', () => {
         await control.click('#controlTime');
 
         await expect(control.locator('body')).toHaveClass(/state-input/);
+        // Готовность ввода — фокус на минутах (ставит кадр, см. тест про часы):
+        // следующий тест печатает в поля сразу, и кадр, пришедший посреди его
+        // `fill`, уводил цифры в минуты (--repeat-each=3: «30:00» вместо «07:30»).
+        await expect(control.locator('#manualMinutes')).toBeFocused();
         await expect.poll(() => primaryLabel(control)).toBe('Поставить');
         expect(await shown(control, '.time-entry')).toBe(true);
         expect(await shown(control, '#controlTime')).toBe(false);
@@ -217,6 +221,13 @@ test.describe('панель: четыре состояния', () => {
     test('часы отдельным полем: 1:30:00 набирается без счёта в уме', async () => {
         await control.click('#controlTime');
         await expect(control.locator('body')).toHaveClass(/state-input/);
+        // Класс ставится синхронно, а фокус на минуты — кадром
+        // (setInputMode → requestAnimationFrame, panel-state.js), и обработчик
+        // focus делает select(). `fill` — два шага (фокус+выделение поля, затем
+        // insertText): кадр между ними уводил фокус на минуты, и «1» затирала
+        // минуты — 0:30:00 вместо 1:30:00 (CI ubuntu/windows, 30.10.2026).
+        // Готовность ввода — фокус на минутах, а не класс.
+        await expect(control.locator('#manualMinutes')).toBeFocused();
         await control.fill('#manualHours', '1');
         await control.fill('#manualMinutes', '30');
         await control.fill('#manualSeconds', '0');
@@ -227,6 +238,8 @@ test.describe('панель: четыре состояния', () => {
     test('минуты больше 59 — тоже опечатка: для этого и есть часы', async () => {
         await control.click('#controlTime');
         await expect(control.locator('body')).toHaveClass(/state-input/);
+        // Готовность ввода — фокус, который ставит кадр (см. тест про часы).
+        await expect(control.locator('#manualMinutes')).toBeFocused();
         await control.fill('#manualMinutes', '90');
         await control.press('#manualMinutes', 'Enter');
         // Паузы нет и не нужно: отказ решается СИНХРОННО в обработчике keydown
@@ -241,6 +254,8 @@ test.describe('панель: четыре состояния', () => {
     test('секунды больше 59 — опечатка, а не «ещё минута»', async () => {
         await control.click('#controlTime');
         await expect(control.locator('body')).toHaveClass(/state-input/);
+        // Готовность ввода — фокус, который ставит кадр (см. тест про часы).
+        await expect(control.locator('#manualMinutes')).toBeFocused();
         await control.fill('#manualMinutes', '5');
         await control.fill('#manualSeconds', '75');
         await control.press('#manualSeconds', 'Enter');
