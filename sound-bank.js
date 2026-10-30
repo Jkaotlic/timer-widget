@@ -15,8 +15,8 @@
  * Пользовательские звуки (`custom:<имя>`) остаются в панели — они читают
  * localStorage и играются через <audio>, а не через осцилляторы.
  *
- * Двойной экспорт как у utils.js: window.SoundBank в рендерере, module.exports
- * в Node для тестов.
+ * ES-модуль: именованный экспорт (тесты — require(esm)); window.SoundBank —
+ * крючок e2e и путь классической панели.
  */
 
 // Имена всех встроенных пресетов. Держится рядом с реализацией, чтобы список в
@@ -833,9 +833,9 @@ function playBuiltInPreset(ctx, name) {
 
 const SoundBank = { BUILT_IN_PRESETS, playBuiltInPreset };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SoundBank;
-}
+export { BUILT_IN_PRESETS, playBuiltInPreset };
+
 if (typeof window !== 'undefined') {
+    // крючок e2e (sound-levels.spec.js, status-and-colors.spec.js)
     window.SoundBank = SoundBank;
 }

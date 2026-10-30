@@ -23,18 +23,13 @@
  * только навешивание класса.
  */
 
-// Типы — широкие (string/number), а не литералы: мост window.FlipCard — объект
-// с теми же полями, и tsc сверяет его с типом namespace модуля.
-/** @type {string} */
 const FLIP_CLASS = 'flipping';
 // Две фазы разной длины: створка падает 200 мс с разгоном, затем 240 мс встаёт
 // следующая — с проскоком за упор и возвратом. Разными они стали 14.08.2026:
 // одинаковые 180 + 180 с жёсткой передачей эстафеты читались как рывок.
 // Должно покрывать сумму длительностей в flip-card.css — по этому времени
 // снимаются слои, и если разъедется, движение оборвётся на полукадре.
-/** @type {number} */
 const FLIP_DURATION_MS = 460;
-/** @type {string} */
 const FLIP_LAYERS_CLASS = 'fc-flip';
 
 // Незавершённые таймеры снятия класса. Модуль ведёт их САМ и вычёркивает каждый
@@ -166,6 +161,9 @@ function cancelPending() {
     return count;
 }
 
+// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
+// не расширяются (иначе объект не совпал бы с `typeof import`).
+/** @type {typeof import('./flip-card.js')} */
 const FlipCard = { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS, FLIP_LAYERS_CLASS };
 
 export { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS, FLIP_LAYERS_CLASS };

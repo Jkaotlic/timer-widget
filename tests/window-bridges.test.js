@@ -49,6 +49,11 @@ const TEMPORARY = Object.freeze({
     ColorUtils: 'color-utils.js',
     RendererStorage: 'renderer-storage.js',
     MoneyMeter: 'money-meter.js',
+    TimeUtils: 'utils.js',
+    ClockSettingsSchema: 'clock-settings-schema.js',
+    DisplayLayouts: 'display-layouts.js',
+    WindowGeometry: 'window-geometry.js',
+    DigitsStyle: 'digits-style.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';
