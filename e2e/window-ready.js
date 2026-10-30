@@ -1094,8 +1094,88 @@ async function resizeOwnWindow(app, page, req) {
     return bounds;
 }
 
+/**
+ * Барьер окна виджета или часов: всё, что окно ПОСЛАЛО в main до вызова,
+ * main уже обработал.
+ *
+ * Окно шлёт своим каналом перемещения (`widget-move` / `clock-widget-move`)
+ * нулевой сдвиг с `first: true` и ждёт `window-geometry`: `moveWindowBy`
+ * шлёт её всегда, синхронно после `setBounds` (main-geometry.js), а нулевой
+ * сдвиг с началом жеста не меняет ни места, ни размера. Посылки одного окна
+ * main обрабатывает по порядку, значит, всё посланное раньше барьера уже
+ * применено.
+ *
+ * Для утверждений ОТСУТСТВИЯ («перетаскивание с Ctrl не сдвинуло окно»):
+ * обработчик жеста синхронный (window-geometry.js, bindWindowDrag), и
+ * посылка, если бы она была, ушла раньше барьера. Пауза доказывала бы то же
+ * только на быстрой машине.
+ *
+ * Принимается первая посылка после взвода — вызывать на ВСТАВШЕМ окне. Если
+ * перед барьером всё же ушёл сдвиг (дефект), его `window-geometry` закроет
+ * ожидание раньше, но и тогда сдвиг уже применён — утверждение его увидит.
+ *
+ * @param {import('@playwright/test').Page} page — окно виджета или часов
+ * @param {string} moveChannel — `widget-move` или `clock-widget-move`
+ * @param {{timeout?: number}} [opts]
+ */
+async function moveBarrier(page, moveChannel, opts = {}) {
+    await untilReceived(page, 'window-geometry',
+        () => page.evaluate((ch) => window.electronAPI.send(ch, { deltaX: 0, deltaY: 0, first: true }), moveChannel),
+        { timeout: opts.timeout });
+}
+
+/**
+ * Выполнить действие и дождаться, что ГЛАВНЫЙ процесс обработал `count`
+ * посылок канала: в main ставится свой слушатель на настоящий `ipcMain`
+ * (`app.evaluate` получает модуль electron, а не обвязку ipc-senders.js).
+ * Он подписан позже слушателя приложения, а слушатели одного события
+ * вызываются в порядке подписки — счётчик растёт строго ПОСЛЕ синхронного
+ * обработчика приложения (`setBounds` в `resizeWindowClamped` и т. п.).
+ *
+ * Для действий, у которых ответа окну нет или он неотличим от соседних
+ * (лестница размеров: `window-geometry` от прошлой ступени может прийти
+ * после взвода). Счётчик считает только посылки ПОСЛЕ взвода — чужих нет.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {string} channel
+ * @param {() => Promise<any>} action
+ * @param {{count?: number, timeout?: number}} [opts]
+ */
+async function untilMainHandled(app, channel, action, opts = {}) {
+    const key = `${channel}#${Date.now()}#${Math.random()}`;
+    const count = opts.count || 1;
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await app.evaluate(({ ipcMain }, [ch, k]) => {
+        const box = (globalThis.__e2eHandled = globalThis.__e2eHandled || {});
+        const rec = { n: 0, channel: ch };
+        rec.listener = () => { rec.n++; };
+        ipcMain.on(ch, rec.listener);
+        box[k] = rec;
+    }, [channel, key]);
+    const seen = () => app.evaluate((_e, k) => globalThis.__e2eHandled[k].n, key);
+    try {
+        await action();
+        const deadline = Date.now() + timeout;
+        for (;;) {
+            const n = await seen();
+            if (n >= count) { return; }
+            if (Date.now() > deadline) {
+                throw new Error(`main не обработал «${channel}» ×${count} за ${timeout} мс (обработано ${n})`);
+            }
+            await new Promise((r) => setTimeout(r, 20));
+        }
+    } finally {
+        await app.evaluate(({ ipcMain }, k) => {
+            const rec = globalThis.__e2eHandled && globalThis.__e2eHandled[k];
+            if (!rec) { return; }
+            ipcMain.removeListener(rec.channel, rec.listener);
+            delete globalThis.__e2eHandled[k];
+        }, key).catch(() => {});
+    }
+}
+
 module.exports = {
-    mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow,
+    mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,

@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForWidget, waitForClock } = require('./window-ready');
+const {
+    waitForWidget, waitForClock, waitForWindowSettled, waitForBoundsSettled, mainBoundsOf,
+    untilMainHandled, armReceived
+} = require('./window-ready');
 const CONFIG = require('../constants.js');
 const WindowGeometry = require('../window-geometry.js');
 
@@ -25,11 +28,11 @@ const WindowGeometry = require('../window-geometry.js');
 const MIN = WindowGeometry.MIN_SCALE_PCT;
 
 const WINDOWS = [
-    { name: 'виджет', open: 'open-widget', url: 'electron-widget.html',
+    { name: 'виджет', open: 'open-widget', url: 'electron-widget.html', resize: 'widget-resize',
       base: CONFIG.WIDGET_DEFAULT_WIDTH, wait: waitForWidget, owner: 'timerWidget',
       storageKey: 'widgetGeometry',
       apply: (page, pct) => page.evaluate((p) => window.timerWidget.resizeToScale(p), pct) },
-    { name: 'часы', open: 'open-clock-widget', url: 'electron-clock-widget.html',
+    { name: 'часы', open: 'open-clock-widget', url: 'electron-clock-widget.html', resize: 'clock-widget-resize',
       base: CONFIG.CLOCK_WIDGET_DEFAULT_SIZE, wait: waitForClock, owner: 'clockWidget',
       storageKey: 'clockGeometry',
       apply: (page, pct, base) => page.evaluate(({ p, b }) => window.ipcRenderer.send(
@@ -64,10 +67,7 @@ async function waitForOwnScale(page, owner, expected, timeout = 8000) {
     }
 }
 
-const boundsOf = (app, part) => app.evaluate(({ BrowserWindow }, p) => {
-    const w = BrowserWindow.getAllWindows().find(x => x.webContents.getURL().includes(p));
-    return w ? w.getBounds() : null;
-}, part);
+const boundsOf = (app, part) => mainBoundsOf(app, part);
 
 for (const target of WINDOWS) {
     test(`${target.name}: масштаб ${MIN}…100 % даёт РАЗНЫЕ квадратные размеры`, async () => {
@@ -75,12 +75,18 @@ for (const target of WINDOWS) {
         try {
             await control.evaluate((ch) => window.ipcRenderer.send(ch), target.open);
             const page = await target.wait(app);
-            await page.waitForTimeout(300);
+            // Окно ВСТАЛО: восстановление геометрии и её запись позади — было 300 мс.
+            await waitForWindowSettled(app, page, target.url);
 
             const seen = [];
             for (let pct = MIN; pct <= 100; pct += 10) {
-                await target.apply(page, pct, target.base);
-                await page.waitForTimeout(140);
+                // Main ОБРАБОТАЛ просьбу (`setBounds` в resizeWindowClamped —
+                // синхронно в обработчике), затем выданные границы осели:
+                // система вправе поправить рамку следом. Было 140 мс. Ответ
+                // окну (`window-geometry`) условием быть не может: хвост
+                // прошлой ступени (`resize`/`move`) приходит после взвода.
+                await untilMainHandled(app, target.resize, () => target.apply(page, pct, target.base));
+                await waitForBoundsSettled(app, target.url);
                 const b = await boundsOf(app, target.url);
                 seen.push({ pct, w: b.width, h: b.height });
             }
@@ -123,7 +129,14 @@ test('растянутое за край окно доезжает до полз
         const widget = await waitForWidget(app);
         await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
         const clock = await waitForClock(app);
-        await control.waitForTimeout(600);
+        // Оба окна ВСТАЛИ (было 600 мс): иначе их восстановление геометрии
+        // пришло бы поверх setSize ниже.
+        await waitForWindowSettled(app, widget, 'electron-widget.html');
+        await waitForWindowSettled(app, clock, 'electron-clock-widget.html');
+        // Отчёт об осевшем размере идёт окно → main → панель (`scale-report`):
+        // приёмники (по одному на окно) взводятся ДО setSize.
+        const reportWidget = await armReceived(control, 'scale-report');
+        const reportClock = await armReceived(control, 'scale-report');
 
         const wTarget = CONFIG.WIDGET_DEFAULT_WIDTH * 2;
         const cTarget = CONFIG.CLOCK_WIDGET_DEFAULT_SIZE * 2;
@@ -134,8 +147,16 @@ test('растянутое за край окно доезжает до полз
                 if (u.includes('electron-clock-widget.html')) { w.setSize(sizes[1], sizes[1]); }
             }
         }, [wTarget, cTarget]);
-        // Запись отложена до тишины (SAVE_SETTLE_MS), ждём с запасом.
-        await control.waitForTimeout(WindowGeometry.SAVE_SETTLE_MS + 900);
+        // Запись отложена до тишины (SAVE_SETTLE_MS) — было SAVE_SETTLE_MS + 900.
+        // Ждём её ИТОГ: оба окна встали (наш таймер SAVE_SETTLE_MS взведён после
+        // таймера окна), и панель получила оба отчёта. Не дождались отчёта —
+        // решают утверждения ниже, со своими сообщениями.
+        await waitForWindowSettled(app, widget, 'electron-widget.html');
+        await waitForWindowSettled(app, clock, 'electron-clock-widget.html');
+        for (const [who, report] of [['widget', reportWidget], ['clock', reportClock]]) {
+            await report({ match: { source: who, scalePct: 200 }, timeout: 5000 })
+                .catch((e) => console.log(`   отчёт ${who} не пришёл: ${e.message.split('\n')[0]}`));
+        }
 
         const panel = await control.evaluate(() => ({
             widget: Number(document.getElementById('timerScale').value),
@@ -197,18 +218,22 @@ for (const target of WINDOWS) {
         try {
             await control.evaluate((ch) => window.ipcRenderer.send(ch), target.open);
             const page = await target.wait(app);
-            await page.waitForTimeout(300);
+            // Окно встало — было 300 мс.
+            await waitForWindowSettled(app, page, target.url);
             await target.apply(page, 100, target.base);
             // Условие, а не пауза: см. waitForOwnScale.
             await waitForOwnScale(page, target.owner, 100);
 
             const seen = [];
             for (let i = 0; i < 6; i++) {
-                await page.evaluate(() => document.dispatchEvent(new WheelEvent('wheel',
-                    { deltaY: -120, ctrlKey: true, bubbles: true, cancelable: true })));
-                // Пауза заведомо больше времени успокоения: дефект усиливался
-                // именно на длинных паузах.
-                await page.waitForTimeout(WindowGeometry.SAVE_SETTLE_MS + 150);
+                // Между щелчками успокоение ОБЯЗАНО пройти: дефект усиливался
+                // именно на длинных паузах. Было SAVE_SETTLE_MS + 150 — теперь
+                // условием: main обработал просьбу, границы осели, и таймер
+                // SAVE_SETTLE_MS взведён ПОСЛЕ таймера окна (waitForWindowSettled)
+                // — запись по этому щелчку отработала.
+                await untilMainHandled(app, target.resize, () => page.evaluate(() => document.dispatchEvent(
+                    new WheelEvent('wheel', { deltaY: -120, ctrlKey: true, bubbles: true, cancelable: true }))));
+                await waitForWindowSettled(app, page, target.url);
                 const b = await boundsOf(app, target.url);
                 seen.push(Math.round(b.width / target.base * 100));
             }
