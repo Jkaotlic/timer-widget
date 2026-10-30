@@ -141,8 +141,3 @@ const ThemeGridMixin = {
 };
 
 export { ThemeGridMixin };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    window.ThemeGridMixin = ThemeGridMixin;
-}

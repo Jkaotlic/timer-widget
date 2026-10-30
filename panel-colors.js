@@ -302,11 +302,4 @@ const PanelColorsMixin = {
     }
 };
 
-// window.mergeColors и window.PanelColorFields сняты: первого не читал никто,
-// второй читал panel-reset.js — теперь он импортирует COLOR_FIELDS.
 export { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS, COLOR_FIELDS };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    window.PanelColorsMixin = PanelColorsMixin;
-}

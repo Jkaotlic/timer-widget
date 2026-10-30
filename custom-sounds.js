@@ -375,6 +375,6 @@ const CustomSoundsMixin = {
 export { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };
 
 if (typeof window !== 'undefined') {
-    // мост до задачи 6: читают e2e (status-and-colors) и классический control-app.js
+    // мост до задачи 6: читает e2e (status-and-colors); control-app.js импортирует
     window.CustomSoundsMixin = CustomSoundsMixin;
 }

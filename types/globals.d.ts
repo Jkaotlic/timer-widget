@@ -91,37 +91,20 @@ interface Window {
     Presets: typeof import('../presets.js');
     SoundBank: typeof import('../sound-bank.js');
     SoundPresets: typeof import('../sound-presets.js');
-    ScaleReport: typeof import('../scale-report.js');
 
     // --- модули панели
-    PanelTitlebar: typeof import('../panel-titlebar.js');
-    PanelPresets: typeof import('../panel-presets.js');
-    PanelCompact: typeof import('../panel-compact.js');
-    PanelDrawer: typeof import('../panel-drawer.js');
-    MiniBar: typeof import('../mini-bar.js');
-    Onboarding: typeof import('../onboarding.js');
     Toast: typeof import('../ui-feedback.js').Toast;
     LoadingIndicator: typeof import('../ui-feedback.js').LoadingIndicator;
-    attachFontSelect: typeof import('../font-select.js').attachFontSelect;
     setupScaleValueEdit: typeof import('../scale-input.js').setupScaleValueEdit;
     ColorPicker: typeof import('../color-picker.js').ColorPicker;
     addPickerToggle: typeof import('../color-picker.js').addPickerToggle;
     openModal: typeof import('../modal-manager.js').openModal;
     closeModal: typeof import('../modal-manager.js').closeModal;
     showKeyboardShortcuts: typeof import('../shortcuts-help.js').showKeyboardShortcuts;
-    globalHotkeyBlocked: typeof import('../shortcuts-help.js').globalHotkeyBlocked;
-    trackPointerControl: typeof import('../shortcuts-help.js').trackPointerControl;
     DisplayTimerHelpers: typeof import('../display-script.js');
 
-    // --- примеси TimerController (Object.assign(TimerController.prototype, …))
+    // --- примесь, которую читает e2e (status-and-colors); control-app.js импортирует
     CustomSoundsMixin: typeof import('../custom-sounds.js').CustomSoundsMixin;
-    LocalBackgroundMixin: typeof import('../local-background.js').LocalBackgroundMixin;
-    ThemeGridMixin: typeof import('../theme-grid.js').ThemeGridMixin;
-    PanelStateMixin: typeof import('../panel-state.js').PanelStateMixin;
-    PanelColorsMixin: typeof import('../panel-colors.js').PanelColorsMixin;
-    PanelDisplayMixin: typeof import('../panel-display.js').PanelDisplayMixin;
-    PanelResetMixin: typeof import('../panel-reset.js').PanelResetMixin;
-    PanelClockMixin: typeof import('../panel-clock.js').PanelClockMixin;
 
     // --- экземпляры окон. Классы живут в точках входа (*-app.js,
     // display-script.js), которые ничего не экспортируют, поэтому any.
@@ -130,20 +113,24 @@ interface Window {
     clockWidget: any;
     displayTimer: any;
     miniBar: ReturnType<typeof import('../mini-bar.js').init>;
-    presetsApi: ReturnType<typeof import('../panel-presets.js').install>;
 
     /** Старый Safari/WebKit: префиксный AudioContext. */
     webkitAudioContext: typeof AudioContext;
 }
 
 /**
- * Что примеси приносят TimerController (control-app.js:
- * `Object.assign(TimerController.prototype, window.XMixin)`). Класс объявляет
+ * Что примеси приносят TimerController (control-app.js импортирует их и
+ * делает `Object.assign(TimerController.prototype, XMixin)`). Класс объявляет
  * свои члены через `@type {TimerMixins['имя']}` в конструкторе.
  */
-type TimerMixins = Window['CustomSoundsMixin'] & Window['LocalBackgroundMixin']
-    & Window['ThemeGridMixin'] & Window['PanelStateMixin'] & Window['PanelColorsMixin']
-    & Window['PanelDisplayMixin'] & Window['PanelResetMixin'] & Window['PanelClockMixin'];
+type TimerMixins = typeof import('../custom-sounds.js').CustomSoundsMixin
+    & typeof import('../local-background.js').LocalBackgroundMixin
+    & typeof import('../theme-grid.js').ThemeGridMixin
+    & typeof import('../panel-state.js').PanelStateMixin
+    & typeof import('../panel-colors.js').PanelColorsMixin
+    & typeof import('../panel-display.js').PanelDisplayMixin
+    & typeof import('../panel-reset.js').PanelResetMixin
+    & typeof import('../panel-clock.js').PanelClockMixin;
 
 /** ipc-compat.js кладёт шим в window; окна зовут его голым именем. */
 declare var ipcRenderer: Window['ipcRenderer'];

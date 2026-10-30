@@ -537,8 +537,3 @@ const PanelStateMixin = {
 // самой примесью и дописывал в неё windowRowSubtitle (в окне его у объекта
 // не было, в Node — был; формы расходились).
 export { PanelStateMixin, windowRowSubtitle };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    window.PanelStateMixin = PanelStateMixin;
-}

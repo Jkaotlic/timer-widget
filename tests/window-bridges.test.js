@@ -15,9 +15,12 @@
  *    другой процесс (ПОСТОЯННЫЕ, список из спеки), либо временный мост из
  *    TEMPORARY с комментарием «мост до задачи 6» рядом;
  *  - каждая строка TEMPORARY ещё присваивается: снятый мост обязан уйти из
- *    списка. Поэтому список только убывает. Растёт он лишь в задаче 4 — мост
- *    при переводе не появляется (классический файл присваивал тот же
- *    `window.X`), он впервые становится видимым этому тесту;
+ *    списка. Поэтому список только убывает. Растёт он лишь при переводе
+ *    файла, чей читатель ещё классический (задачи 4–5), — мост при переводе
+ *    не появляется (классический файл присваивал тот же `window.X`), он
+ *    впервые становится видимым этому тесту. За задачу 5 список вырос на
+ *    мосты модулей панели и сжался обратно, когда control-app.js стал
+ *    модулем: на выходе +ColorPicker, +CustomSoundsMixin (их читает e2e);
  *  - в конце (задача 6) TEMPORARY пуст: мосты = крючки e2e.
  *
  * Модули — `windowModuleFiles()` (scripts/window-modules.js): тот же список,
@@ -62,26 +65,11 @@ const TEMPORARY = Object.freeze({
     SettingsSchema: 'settings-schema.js',
     SoundPresets: 'sound-presets.js',
     Presets: 'presets.js',
-    // Задача 5: модули панели, пока их читает классический control-app.js.
-    ScaleReport: 'scale-report.js',
+    // Задача 5: читатели вне control-app.js (теперь он импортирует):
+    // ColorPicker — panel-colors.js и e2e, CustomSoundsMixin — e2e
+    // (status-and-colors). Задача 6 решает: в PERMANENT или переписать читателя.
     ColorPicker: 'color-picker.js',
-    attachFontSelect: 'font-select.js',
-    globalHotkeyBlocked: 'shortcuts-help.js',
-    trackPointerControl: 'shortcuts-help.js',
-    Onboarding: 'onboarding.js',
-    MiniBar: 'mini-bar.js',
-    PanelDrawer: 'panel-drawer.js',
-    PanelTitlebar: 'panel-titlebar.js',
-    PanelPresets: 'panel-presets.js',
-    PanelCompact: 'panel-compact.js',
     CustomSoundsMixin: 'custom-sounds.js',
-    LocalBackgroundMixin: 'local-background.js',
-    ThemeGridMixin: 'theme-grid.js',
-    PanelStateMixin: 'panel-state.js',
-    PanelColorsMixin: 'panel-colors.js',
-    PanelDisplayMixin: 'panel-display.js',
-    PanelResetMixin: 'panel-reset.js',
-    PanelClockMixin: 'panel-clock.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';

@@ -217,10 +217,3 @@ function bindCompactMode({
 }
 
 export { fits, decideCompact, createFlipBreaker, bindCompactMode };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    /** @type {typeof import('./panel-compact.js')} */
-    const PanelCompact = { fits, decideCompact, createFlipBreaker, bindCompactMode };
-    window.PanelCompact = PanelCompact;
-}

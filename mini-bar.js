@@ -142,10 +142,3 @@ function init(deps) {
 }
 
 export { init, BAR_HEIGHT };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    /** @type {typeof import('./mini-bar.js')} */
-    const MiniBar = { init, BAR_HEIGHT };
-    window.MiniBar = MiniBar;
-}

@@ -90,10 +90,3 @@ function columnFromWindow(innerWidth, drawerWidth, minWindowWidth) {
 }
 
 export { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    /** @type {typeof import('./panel-drawer.js')} */
-    const PanelDrawer = { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };
-    window.PanelDrawer = PanelDrawer;
-}

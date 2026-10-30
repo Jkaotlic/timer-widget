@@ -979,9 +979,3 @@ export {
     PanelDisplayMixin, collectDisplayToggles, collectBlockLabels, attachChangedBgImage, fillDisplaySelect,
     BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
 };
-
-// window.PanelDisplay снят: читателя у него не было.
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    window.PanelDisplayMixin = PanelDisplayMixin;
-}

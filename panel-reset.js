@@ -144,8 +144,3 @@ const PanelResetMixin = {
 };
 
 export { PanelResetMixin, RESET_TARGETS };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    window.PanelResetMixin = PanelResetMixin;
-}

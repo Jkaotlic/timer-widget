@@ -190,10 +190,6 @@ function trackPointerControl(doc) {
 export { showKeyboardShortcuts, globalHotkeyBlocked, trackPointerControl, HOTKEY_OPEN_LAYERS };
 
 if (typeof window !== 'undefined') {
-    // Крючок e2e (status-and-colors.spec.js); control-app.js — до перевода.
+    // Крючок e2e (status-and-colors.spec.js).
     window.showKeyboardShortcuts = showKeyboardShortcuts;
-    // мост до задачи 6: читатель — классический control-app.js
-    window.globalHotkeyBlocked = globalHotkeyBlocked;
-    // мост до задачи 6: читатель — классический control-app.js
-    window.trackPointerControl = trackPointerControl;
 }

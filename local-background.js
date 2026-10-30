@@ -274,8 +274,3 @@ const LocalBackgroundMixin = {
 };
 
 export { LocalBackgroundMixin };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читатель — классический control-app.js
-    window.LocalBackgroundMixin = LocalBackgroundMixin;
-}
