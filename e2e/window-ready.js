@@ -886,6 +886,33 @@ async function relayBarrier(app, control, pages, opts = {}) {
     }
 }
 
+/**
+ * Поставить стиль открытым окнам ПРЯМЫМИ посылками панели (как спеки делали
+ * всегда: `widget-style-update`, `clock-widget-set-style`,
+ * `display-settings-update` с одним `timerStyle`) и дождаться, что каждое окно
+ * ПОЛУЧИЛО свой стиль, а виджет и часы под новый стиль ВСТАЛИ (размер окна
+ * зависит от стиля). Спеки ждали это паузой 1200–2000 мс.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control
+ * @param {{widget?: import('@playwright/test').Page, clock?: import('@playwright/test').Page, display?: import('@playwright/test').Page}} pages
+ * @param {string} style
+ */
+async function setWindowStyles(app, control, pages, style) {
+    const waits = [];
+    if (pages.widget) { waits.push([await armReceived(pages.widget, 'widget-style-update'), { timerStyle: style }]); }
+    if (pages.clock) { waits.push([await armReceived(pages.clock, 'set-clock-style'), style]); }
+    if (pages.display) { waits.push([await armReceived(pages.display, 'display-settings-update'), { timerStyle: style }]); }
+    await control.evaluate(([st, w, c, d]) => {
+        if (w) { window.ipcRenderer.send('widget-style-update', { timerStyle: st }); }
+        if (c) { window.ipcRenderer.send('clock-widget-set-style', st); }
+        if (d) { window.ipcRenderer.send('display-settings-update', { timerStyle: st }); }
+    }, [style, !!pages.widget, !!pages.clock, !!pages.display]);
+    for (const [received, match] of waits) { await received({ match }); }
+    if (pages.widget) { await waitForWindowSettled(app, pages.widget, 'electron-widget.html'); }
+    if (pages.clock) { await waitForWindowSettled(app, pages.clock, 'electron-clock-widget.html'); }
+}
+
 /** Дисплей получил снимок main. `_control` — прежняя сигнатура (шаг 2 был через панель). */
 function waitForDisplaySnapshot(app, display, _control, opts = {}) {
     return waitForMainSnapshot(app, display, 'display.html', 'дисплея', opts);
@@ -1222,7 +1249,7 @@ async function untilMainHandled(app, channel, action, opts = {}) {
 }
 
 module.exports = {
-    relayBarrier, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
+    relayBarrier, setWindowStyles, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,

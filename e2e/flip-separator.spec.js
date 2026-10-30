@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForWidgetSnapshot,
+    waitForClockSnapshot, waitForDisplaySettled, setWindowStyles
+} = require('./window-ready');
 
 /**
  * Разделитель флипа — во ВСЕХ ТРЁХ окнах сразу.
@@ -73,14 +76,14 @@ test('минус перерасхода — часть табло, а не от�
             window.ipcRenderer.send('open-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await control.waitForTimeout(2500);
-        await control.evaluate(() => {
-            window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' });
-            window.ipcRenderer.send('display-settings-update', { timerStyle: 'flip' });
-        });
-        await control.waitForTimeout(2000);
+        // Пробы, снимки main, вставший дисплей (было 2500 мс); стиль дошёл,
+        // окна встали (было 2000 мс).
+        const display = await waitForDisplay(app);
+        const widget = await waitForWidget(app);
+        await waitForDisplaySnapshot(app, display);
+        await waitForWidgetSnapshot(app, widget);
+        await waitForDisplaySettled(app, display);
+        await setWindowStyles(app, control, { widget, display }, 'flip');
 
         const CASES = [
             {
@@ -156,16 +159,16 @@ test('разделитель флипа — точки цвета цифр во 
             window.ipcRenderer.send('open-clock-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await waitForClock(app);
-        await control.waitForTimeout(2500);
-        await control.evaluate(() => {
-            window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' });
-            window.ipcRenderer.send('clock-widget-set-style', 'flip');
-            window.ipcRenderer.send('display-settings-update', { timerStyle: 'flip' });
-        });
-        await control.waitForTimeout(2000);
+        // Пробы, снимки main, вставший дисплей (было 2500 мс); стиль дошёл,
+        // окна встали (было 2000 мс).
+        const display = await waitForDisplay(app);
+        const widget = await waitForWidget(app);
+        const clock = await waitForClock(app);
+        await waitForDisplaySnapshot(app, display);
+        await waitForWidgetSnapshot(app, widget);
+        await waitForClockSnapshot(app, clock);
+        await waitForDisplaySettled(app, display);
+        await setWindowStyles(app, control, { widget, clock, display }, 'flip');
 
         for (const w of WINDOWS) {
             let page = null;
