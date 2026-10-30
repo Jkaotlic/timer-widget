@@ -63,6 +63,11 @@ const TEMPORARY = Object.freeze({
     ScaleReport: 'scale-report.js',
     ColorPicker: 'color-picker.js',
     attachFontSelect: 'font-select.js',
+    globalHotkeyBlocked: 'shortcuts-help.js',
+    trackPointerControl: 'shortcuts-help.js',
+    Onboarding: 'onboarding.js',
+    MiniBar: 'mini-bar.js',
+    PanelDrawer: 'panel-drawer.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';

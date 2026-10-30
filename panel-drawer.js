@@ -11,14 +11,10 @@
  * никто не увидит, — ровно то, против чего стоит потолок в
  * tests/control-decomposition.test.js.
  *
- * Двойной экспорт, как у renderer-shared.js:
- *   - Node (тесты):     module.exports
- *   - Браузер (панель): window.PanelDrawer
+ * ES-модуль: тесты берут его `require(esm)`, панель — тегом модуля.
  */
 
-const CFG = (typeof window !== 'undefined' && window.CONFIG)
-    ? window.CONFIG
-    : (typeof require === 'function' ? require('./constants.js') : null);
+import * as CFG from './constants.js';
 
 // Поле до края экрана. Тем же числом режет главный процесс (`screenWidth - 50`),
 // и разойтись им нельзя: предсказание перестанет совпадать с фактом.
@@ -93,12 +89,11 @@ function columnFromWindow(innerWidth, drawerWidth, minWindowWidth) {
     return Math.max(minW, Math.round(inner - num(drawerWidth, 336)));
 }
 
-const PanelDrawer = { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelDrawer;
-}
+export { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
+    /** @type {typeof import('./panel-drawer.js')} */
+    const PanelDrawer = { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };
     window.PanelDrawer = PanelDrawer;
 }

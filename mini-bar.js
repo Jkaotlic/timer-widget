@@ -141,14 +141,11 @@ function init(deps) {
     return api;
 }
 
-const MiniBar = { init, BAR_HEIGHT };
+export { init, BAR_HEIGHT };
 
-// Экспорт для Node.js (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MiniBar;
-}
-
-// Экспорт для браузера (renderer process)
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
+    /** @type {typeof import('./mini-bar.js')} */
+    const MiniBar = { init, BAR_HEIGHT };
     window.MiniBar = MiniBar;
 }
