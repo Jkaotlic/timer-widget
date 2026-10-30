@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, reloadPanel, waitForTransitions } = require('./window-ready');
 
 /**
  * Пресеты вида ПО КЛИКУ: записали один вид, перенастроили, вернули.
@@ -25,6 +25,22 @@ const displayStyle = (page) => page.evaluate(() => {
     };
 });
 
+/** Стиль дисплея в профиле: панель пишет его СИНХРОННО в обработчике клика. */
+const storedDisplayStyle = (control) => control.evaluate(
+    () => JSON.parse(localStorage.getItem('displayExtSettings') || '{}').displayTimerStyle
+);
+
+/** Ящик настроек открыт — кнопки стилей в нём доступны клику. */
+const drawerOpen = (control) => expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
+
+/**
+ * Дисплей принял стартовый снимок: главный процесс шлёт его по
+ * `did-finish-load` (main-window-hooks.js), то есть ПОСЛЕ события `load`, когда
+ * слушатели окна уже стоят. Команда панели, отправленная после этого, придёт
+ * следом и не потеряется.
+ */
+const displayLoaded = (display) => display.waitForLoadState('load');
+
 const slotState = (control) => control.evaluate(() => {
     const out = {};
     for (let i = 1; i <= 4; i++) {
@@ -40,12 +56,11 @@ test('ячейка записывает вид и возвращает его К
         // Профиль e2e общий: начинаем с пустых ячеек, иначе тест мерил бы
         // чужую запись из соседней спеки.
         await control.evaluate(() => localStorage.removeItem('uiPresets'));
-        await control.reload();
-        await control.waitForTimeout(1200);
+        await reloadPanel(control);
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        await displayLoaded(display);
 
         // Ячейки ВИДНЫ и пусты — иначе всё дальнейшее проверяло бы невидимое.
         const before = await slotState(control);
@@ -58,14 +73,14 @@ test('ячейка записывает вид и возвращает его К
 
         // --- настраиваем вид: стиль «Флип» + блок «Текущее время» ---
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
+        await drawerOpen(control);
         await control.click('#displayTimerStyle button[data-val="flip"]');
         await control.evaluate(() => {
             const el = document.getElementById('showCurrentTime');
             el.checked = true;
             el.dispatchEvent(new Event('change', { bubbles: true }));
         });
-        await display.waitForTimeout(900);
+        await expect.poll(() => displayStyle(display)).toEqual({ style: 'flip', currentTimeShown: true });
         const configured = await displayStyle(display);
         console.log(`   настроено: ${JSON.stringify(configured)}`);
         expect(configured.style, 'стиль не применился — записывать нечего').toBe('flip');
@@ -73,8 +88,7 @@ test('ячейка записывает вид и возвращает его К
 
         // --- клик по ПУСТОЙ ячейке записывает текущий вид ---
         await control.click('#presetSlot1');
-        await control.waitForTimeout(700);
-        expect((await slotState(control))[1].filled, 'ячейка не пометилась записанной').toBe(true);
+        await expect.poll(async () => (await slotState(control))[1].filled, 'ячейка не пометилась записанной').toBe(true);
 
         // --- всё перенастраиваем ---
         await control.click('#displayTimerStyle button[data-val="analog"]');
@@ -83,7 +97,7 @@ test('ячейка записывает вид и возвращает его К
             el.checked = false;
             el.dispatchEvent(new Event('change', { bubbles: true }));
         });
-        await display.waitForTimeout(900);
+        await expect.poll(() => displayStyle(display)).toEqual({ style: 'analog', currentTimeShown: false });
         const changed = await displayStyle(display);
         console.log(`   перенастроено: ${JSON.stringify(changed)}`);
         expect(changed.style, 'стиль не сменился — возвращать будет нечего').toBe('analog');
@@ -91,7 +105,7 @@ test('ячейка записывает вид и возвращает его К
 
         // --- и возвращаем КЛИКОМ по ячейке ---
         await control.click('#presetSlot1');
-        await control.waitForTimeout(1500);
+        await expect.poll(() => displayStyle(display)).toEqual({ style: 'flip', currentTimeShown: true });
         const restored = await displayStyle(display);
         console.log(`   после пресета: ${JSON.stringify(restored)}`);
         expect(restored.style, 'пресет не вернул стиль').toBe('flip');
@@ -99,8 +113,10 @@ test('ячейка записывает вид и возвращает его К
 
         // Панель обязана показывать то же, что окно: иначе следующая правка
         // уедет от того, что видно на экране.
-        const panelStyle = await control.evaluate(() => document.getElementById('displayTimerStyle').value);
-        expect(panelStyle, 'панель осталась на прежнем стиле').toBe('flip');
+        await expect.poll(
+            () => control.evaluate(() => document.getElementById('displayTimerStyle').value),
+            'панель осталась на прежнем стиле'
+        ).toBe('flip');
     } finally {
         await control.evaluate(() => {
             localStorage.removeItem('uiPresets');
@@ -124,31 +140,26 @@ test('Ctrl+1 применяет ячейку, Ctrl+Shift+1 записывает'
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.removeItem('uiPresets'));
-        await control.reload();
-        await control.waitForTimeout(1200);
+        await reloadPanel(control);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        await displayLoaded(display);
 
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-        await control.waitForTimeout(600);
+        await drawerOpen(control);
         await control.click('#displayTimerStyle button[data-val="digits"]');
-        await display.waitForTimeout(800);
-        expect((await displayStyle(display)).style).toBe('digits');
+        await expect.poll(async () => (await displayStyle(display)).style).toBe('digits');
 
         // Записываем клавишами.
         await control.keyboard.press('Control+Shift+Digit2');
-        await control.waitForTimeout(600);
-        expect((await slotState(control))[2].filled, 'Ctrl+Shift+2 не записал ячейку').toBe(true);
+        await expect.poll(async () => (await slotState(control))[2].filled, 'Ctrl+Shift+2 не записал ячейку').toBe(true);
 
         await control.click('#displayTimerStyle button[data-val="circle"]');
-        await display.waitForTimeout(800);
-        expect((await displayStyle(display)).style).toBe('circle');
+        await expect.poll(async () => (await displayStyle(display)).style).toBe('circle');
 
         // И возвращаем клавишами.
         await control.keyboard.press('Control+Digit2');
-        await control.waitForTimeout(1500);
-        expect((await displayStyle(display)).style, 'Ctrl+2 не применил ячейку').toBe('digits');
+        await expect.poll(async () => (await displayStyle(display)).style, 'Ctrl+2 не применил ячейку').toBe('digits');
     } finally {
         await control.evaluate(() => localStorage.removeItem('uiPresets')).catch(() => {});
         // Стиль возвращается ЗНАЧЕНИЕМ, а не кликом: кнопка живёт в ящике
@@ -177,8 +188,7 @@ test('ячейка помечается применённой и гаснет, 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.removeItem('uiPresets'));
-        await control.reload();
-        await control.waitForTimeout(1200);
+        await reloadPanel(control);
 
         const marks = () => control.evaluate(() => {
             const out = {};
@@ -206,13 +216,16 @@ test('ячейка помечается применённой и гаснет, 
         expect(empty[1].active).toBe(false);
 
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
+        await drawerOpen(control);
         await control.click('#displayTimerStyle button[data-val="flip"]');
-        await control.waitForTimeout(700);
+        // Снимок ячейки читает ПРОФИЛЬ — ждём, что стиль в него записан.
+        await expect.poll(() => storedDisplayStyle(control)).toBe('flip');
 
         // Запись = этот вид И ЕСТЬ то, что на экране.
         await control.click('#presetSlot1');
-        await control.waitForTimeout(800);
+        await expect(control.locator('#presetSlot1')).toHaveClass(/\bactive\b/);
+        // Заливка и цвет цифры меняются ПЕРЕХОДОМ: снимок — после его конца.
+        await waitForTransitions(control);
         const saved = await marks();
         console.log(`   записан и применён: ${JSON.stringify(saved[1])}`);
         expect(saved[1].filled).toBe(true);
@@ -230,7 +243,8 @@ test('ячейка помечается применённой и гаснет, 
 
         // Одна правка настройки — и на экране уже не пресет.
         await control.click('#displayTimerStyle button[data-val="analog"]');
-        await control.waitForTimeout(900);
+        await expect(control.locator('#presetSlot1')).not.toHaveClass(/\bactive\b/);
+        await waitForTransitions(control);
         const drifted = await marks();
         console.log(`   после правки: ${JSON.stringify(drifted[1])}`);
         expect(drifted[1].active, 'отметка пережила смену стиля — она врёт про экран').toBe(false);
@@ -241,7 +255,8 @@ test('ячейка помечается применённой и гаснет, 
 
         // Вернули кликом — отметка загорелась снова.
         await control.click('#presetSlot1');
-        await control.waitForTimeout(1200);
+        await expect(control.locator('#presetSlot1')).toHaveClass(/\bactive\b/);
+        await waitForTransitions(control);
         const back = await marks();
         console.log(`   после применения: ${JSON.stringify(back[1])}`);
         expect(back[1].active, 'применённый вид не помечен').toBe(true);
@@ -275,13 +290,13 @@ test('три ячейки подряд: применённой остаётся 
             localStorage.removeItem('uiPresets');
             localStorage.removeItem('uiPresetActive');
         });
-        await control.reload();
-        await control.waitForTimeout(1200);
+        await reloadPanel(control);
 
         for (const i of [1, 2, 3]) {
             await control.click(`#presetSlot${i}`);
-            await control.waitForTimeout(600);
+            await expect(control.locator(`#presetSlot${i}`)).toHaveClass(/\bfilled\b/);
         }
+        await waitForTransitions(control);
 
         const row = await control.evaluate(() => {
             const out = { cells: {} };
@@ -303,10 +318,9 @@ test('три ячейки подряд: применённой остаётся 
 
         // Клик по записанной переносит отметку на неё.
         await control.click('#presetSlot1');
-        await control.waitForTimeout(1200);
-        const after = await control.evaluate(() => [1, 2, 3, 4]
-            .filter((i) => document.getElementById(`presetSlot${i}`).classList.contains('active')));
-        expect(after, 'применение не перенесло отметку').toEqual([1]);
+        await expect.poll(() => control.evaluate(() => [1, 2, 3, 4]
+            .filter((i) => document.getElementById(`presetSlot${i}`).classList.contains('active'))),
+        'применение не перенесло отметку').toEqual([1]);
     } finally {
         await control.evaluate(() => {
             localStorage.removeItem('uiPresets');
@@ -334,12 +348,14 @@ test('пресет, записанный прошлой версией, всё �
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.removeItem('uiPresets'));
-        await control.reload();
-        await control.waitForTimeout(1200);
+        await reloadPanel(control);
 
         // Записываем ячейку 2 (Shift+клик) — это и есть «вид на экране».
         await control.click('#presetSlot2', { modifiers: ['Shift'] });
-        await control.waitForTimeout(700);
+        // Следующий шаг правит записанный снимок в хранилище — ждём, что он там.
+        await expect.poll(() => control.evaluate(
+            () => !!(JSON.parse(localStorage.getItem('uiPresets') || '{}')['2'])
+        )).toBe(true);
 
         // Делаем снимок «старым»: убираем из него поле, которого в прошлой
         // версии не существовало. Значение в профиле при этом остаётся.
@@ -356,9 +372,9 @@ test('пресет, записанный прошлой версией, всё �
 
         // Перенастраиваем вид, чтобы отметка заведомо погасла...
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
+        await drawerOpen(control);
         await control.click('#displayTimerStyle button[data-val="analog"]');
-        await control.waitForTimeout(700);
+        await expect.poll(() => storedDisplayStyle(control)).toBe('analog');
         const off = await control.evaluate(() => ({
             active: document.getElementById('presetSlot2').classList.contains('active'),
             caption: document.getElementById('presetCaption').textContent
@@ -367,7 +383,11 @@ test('пресет, записанный прошлой версией, всё �
 
         // ...и применяем ячейку кликом.
         await control.click('#presetSlot2');
-        await control.waitForTimeout(1200);
+        // Отметку решает refresh() СИНХРОННО в обработчике клика, после
+        // перезаписи профиля (panel-presets.js, apply): дефект «гаснет сразу»
+        // жил в том же вызове. Позже её могут сдвинуть лишь события storage
+        // ЧУЖИХ окон, а других окон в этом тесте нет.
+        await expect(control.locator('#presetSlot2')).toHaveClass(/\bactive\b/);
 
         const on = await control.evaluate(() => ({
             active: document.getElementById('presetSlot2').classList.contains('active'),

@@ -241,10 +241,42 @@ async function waitForSteady(page, read, opts = {}) {
     }
 }
 
+/**
+ * Перезагрузить панель и дождаться, что контроллер встал.
+ *
+ * Спеки делали `reload()` → `waitForTimeout(1200)`. `reload()` сам ждёт
+ * события `load`; недоставало одного — конструктора `TimerController`
+ * (control-app.js), после которого ячейки, ящик и тумблеры уже связаны.
+ *
+ * @param {import('@playwright/test').Page} control
+ */
+async function reloadPanel(control) {
+    await control.reload();
+    await control.waitForFunction(() => typeof window.timerController === 'object' && !!window.timerController);
+}
+
+/**
+ * Дождаться конца всех CSS-переходов документа.
+ *
+ * Для утверждений о ВЫЧИСЛЕННОМ цвете: заливка, цвет и рамка меняются
+ * переходом (`--tw-dur-base`), и снимок сразу после смены класса ловит
+ * середину. `document.getAnimations()` сам досчитывает отложенный стиль,
+ * поэтому переход, только что запущенный сменой класса, уже в списке.
+ * Бесконечные анимации не ждём — только `CSSTransition`.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function waitForTransitions(page) {
+    await page.evaluate(async () => {
+        const running = document.getAnimations().filter((a) => a instanceof CSSTransition);
+        await Promise.all(running.map((a) => a.finished.catch(() => {})));
+    });
+}
+
 module.exports = {
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
-    findDisplay, findWindowBy, waitForSteady,
+    findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };
