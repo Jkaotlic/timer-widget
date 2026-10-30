@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, reopenDisplay, waitForSteady } = require('./window-ready');
+const {
+    waitForDisplay, reopenDisplay, waitForSteady, findDisplay, untilReceived, panelRoundTrip
+} = require('./window-ready');
 
 /**
  * Таймер полноэкранного окна ПЕРЕТАСКИВАЕТСЯ (просьба 24.08.2026: «в
@@ -50,9 +52,16 @@ const moved = (page, want) => page.waitForFunction(
     want, { timeout: 15000 }
 ).catch(() => {});
 
-/** Alt+перетаскивание за точку внутри коробки таймера. */
+/**
+ * Alt+перетаскивание за точку внутри коробки таймера.
+ *
+ * Шаги жеста разнесены по КАДРАМ, а не по 40–60 мс сна: обработчики жеста
+ * (display-script.js) порогов по времени не имеют, им нужно лишь, чтобы
+ * события шли разными задачами, как у мыши. После `mouseup` ждать нечего —
+ * результат читает `steady` (коробка осела).
+ */
 const dragTimer = (display, dx, dy, opts = {}) => display.evaluate(async ([dX, dY, alt]) => {
-    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
     const active = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']
         .map((id) => document.getElementById(id))
         .find((el) => el && el.classList.contains('active'));
@@ -72,13 +81,12 @@ const dragTimer = (display, dx, dy, opts = {}) => display.evaluate(async ([dX, d
     const px = Math.round(r.left + r.width / 2);
     const py = Math.round(r.top + r.height / 2);
     active.dispatchEvent(down(px, py));
-    await wait(60);
+    await frame();
     for (let i = 1; i <= 4; i++) {
         document.dispatchEvent(o(px + (dX * i) / 4, py + (dY * i) / 4));
-        await wait(40);
+        await frame();
     }
     document.dispatchEvent(up(px + dX, py + dY));
-    await wait(60);
 }, [dx, dy, opts.alt !== false]);
 
 test('Alt+перетаскивание двигает таймер вместе с подписью и переживает переоткрытие', async () => {
@@ -157,16 +165,27 @@ test('Alt+перетаскивание двигает таймер вместе 
         expect(afterLayout.moved, 'раскладка не вернула таймер в поток').toBe(false);
     } finally {
         // Профиль общий: раскладка включила тумблеры и записала места карточек,
-        // а соседние спеки меряют вид ПО УМОЛЧАНИЮ.
-        await control.evaluate(() => {
+        // а соседние спеки меряют вид ПО УМОЛЧАНИЮ. Тумблеры панель пишет
+        // синхронно; дисплей, если открыт, обязан ПОЛУЧИТЬ их выключенными
+        // (было 500 мс) — иначе его запись мест догнала бы удаление.
+        const cleanup = () => control.evaluate(() => {
             localStorage.removeItem('displayBlockPositions');
             localStorage.removeItem('displayBlockScales');
             for (const key of ['showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle']) {
                 const el = document.getElementById(key);
                 if (el && el.checked) { el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); }
             }
-        }).catch(() => {});
-        await control.waitForTimeout(500);
+        });
+        const open = await findDisplay(app).catch(() => null);
+        if (open) {
+            await untilReceived(open, 'display-settings-update', cleanup, {
+                match: { showCurrentTime: false, showEventTime: false, showEndTime: false, showTimeLeft: false, showEventTitle: false },
+                timeout: 5000
+            }).catch((err) => console.log(`   уборка: дисплей не подтвердил тумблеры — ${err.message.split('\n')[0]}`));
+        } else {
+            await cleanup().catch(() => {});
+            await panelRoundTrip(control).catch(() => {});
+        }
         await app.close();
     }
 });
@@ -189,8 +208,15 @@ test('замок «Закрепить положение» держит и та�
         const after = await steady(display, 'таймер после жеста под замком');
         expect(after.timer, 'замок не остановил перетаскивание таймера').toEqual(before.timer);
     } finally {
-        await control.click('#lockToggle').catch(() => {});
-        await control.waitForTimeout(400);
+        // Замок — общий для окон; панель пишет его синхронно, дисплей
+        // подтверждает посылкой (было 400 мс).
+        const open = await findDisplay(app).catch(() => null);
+        if (open) {
+            await untilReceived(open, 'ui-lock-update', () => control.click('#lockToggle'),
+                { match: { locked: false }, timeout: 5000 }).catch(() => {});
+        } else {
+            await control.click('#lockToggle').catch(() => {});
+        }
         await app.close();
     }
 });

@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { openDisplay, waitForWidget, waitForClock } = require('./window-ready');
+const {
+    openDisplay, waitForWidget, waitForClock, waitForDisplaySettled, relayBarrier, panelRoundTrip, waitForQuiet
+} = require('./window-ready');
 
 /**
  * CSP окон без инлайна (`script-src 'self'; style-src 'self'`) — в ЖИВОМ окне.
@@ -39,7 +41,12 @@ async function snapshotControls(control) {
     }), [STYLE_GROUPS, BLOCKS]);
 }
 
-async function applyControls(control, { styles, blocks }) {
+/**
+ * Выставить стили и тумблеры в панели — и дождаться, что окна их применили
+ * (было 400 мс): `pages` — открытые окна (`relayBarrier`); без окон — круг
+ * панели (main запомнил настройки для снимка будущих окон).
+ */
+async function applyControls(control, { styles, blocks }, app = null, pages = []) {
     await control.evaluate(([groups, blockIds, st, bl]) => {
         groups.forEach((g, i) => {
             const b = document.querySelector(`${g} button[data-val="${st[i]}"]`);
@@ -53,7 +60,7 @@ async function applyControls(control, { styles, blocks }) {
             }
         });
     }, [STYLE_GROUPS, BLOCKS, styles, blocks]);
-    await control.waitForTimeout(400);
+    if (app && pages.length) { await relayBarrier(app, control, pages); } else { await panelRoundTrip(control); }
 }
 
 async function violations(page) {
@@ -100,6 +107,8 @@ test('ни одного нарушения CSP: четыре окна, все с
         watchConsole(clock, 'часы');
         const display = await openDisplay(app, control);
         watchConsole(display, 'дисплей');
+        await waitForDisplaySettled(app, display);
+        const windows = [widget, clock, display];
 
         // Ящик и КАЖДАЯ вкладка: в них рождаются ряды, списки звуков, превью.
         const tabs = await control.$$eval('.tab-btn[data-tab]', (els) => [...new Set(els.map((e) => e.dataset.tab))]);
@@ -108,10 +117,12 @@ test('ни одного нарушения CSP: четыре окна, все с
             // Клик по DOM, а не по координатам: на экране CI открытый ящик
         // ложится поверх кнопок вкладок, а проверке нужна сама вкладка.
         await control.$eval(`.tab-btn[data-tab="${tab}"]`, (el) => el.click());
-            await control.waitForTimeout(250);
+            // Разметка вкладки строится синхронно в клике; переходы ящика и
+            // кадр — waitForQuiet (было 250 мс).
+            await waitForQuiet(control);
         }
         // Все стили во всех трёх окнах — у каждого своя разметка и свои правила.
-        await applyControls(control, { styles: before.styles, blocks: BLOCKS.map(() => true) });
+        await applyControls(control, { styles: before.styles, blocks: BLOCKS.map(() => true) }, app, windows);
         for (const style of ['circle', 'flip', 'analog', 'digits']) {
             for (const group of STYLE_GROUPS) {
                 await control.evaluate(([g, s]) => {
@@ -119,7 +130,8 @@ test('ни одного нарушения CSP: четыре окна, все с
                     if (b) { b.click(); }
                 }, [group, style]);
             }
-            await control.waitForTimeout(400);
+            // Окна применили стиль (было 400 мс).
+            await relayBarrier(app, control, windows);
         }
         // Индикатор загрузки и тост строят разметку шаблоном.
         await control.evaluate(() => {
@@ -128,6 +140,9 @@ test('ни одного нарушения CSP: четыре окна, все с
             window.Toast.show('проверка', 'info', 50);
         });
         await control.click('#drawerClose').catch(() => {});
+        // События `securitypolicyviolation` — задачи, поставленные при
+        // нарушении; кадры и переходы панели после них их не обгоняют.
+        await waitForQuiet(control);
 
         const pages = { панель: control, виджет: widget, часы: clock, дисплей: display };
         const found = [];
@@ -138,7 +153,9 @@ test('ни одного нарушения CSP: четыре окна, все с
         }
         expect([...found, ...consoleCsp], `нарушения CSP:\n${[...found, ...consoleCsp].join('\n')}`).toEqual([]);
     } finally {
-        await applyControls(control, before).catch(() => {});
+        // Окна ещё открыты: профиль возвращается, только когда они применили.
+        const open = app.windows().filter((w) => /display\.html|electron-widget\.html|electron-clock-widget\.html/.test(w.url()));
+        await applyControls(control, before, app, open).catch(() => {});
         await app.close();
     }
 });
@@ -194,7 +211,8 @@ test('деления циферблатов стоят под своими уг�
             expectDial(angles, 30, 12, `дисплей, мини-часы ${i + 1}`);
         }
     } finally {
-        await applyControls(control, before).catch(() => {});
+        const open = app.windows().filter((w) => /display\.html|electron-widget\.html|electron-clock-widget\.html/.test(w.url()));
+        await applyControls(control, before, app, open).catch(() => {});
         await app.close();
     }
 });

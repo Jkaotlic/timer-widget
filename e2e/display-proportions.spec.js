@@ -29,7 +29,7 @@
 
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, waitForQuiet } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
 async function workArea(app) {
@@ -89,9 +89,11 @@ test('карточка занимает одну долю полосы соде�
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2600);
+        // Настройки ушли ДО открытия — окно получает их снимком main; затем
+        // полноэкранный вход и раскладка по размеру (было 2600 + 800 мс).
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
         await display.waitForSelector('#currentTimeBlock');
-        await display.waitForTimeout(800);
 
         const area = await workArea(app);
         const [wide, narrow] = pickPair(area);
@@ -99,8 +101,10 @@ test('карточка занимает одну долю полосы соде�
 
         const seen = [];
         for (const size of [wide, narrow]) {
+            // resizeDisplay ждёт осевший размер и debounce пересчёта; хвосты —
+            // переходы и шрифты (было 900 мс).
             await resizeDisplay(app, display, size);
-            await display.waitForTimeout(900);
+            await waitForQuiet(display);
             // Размер берётся из ОКНА, вместе с замером: тогда доли заведомо
             // относятся к тому кадру, в котором посчитаны.
             const m = await display.evaluate(measure);

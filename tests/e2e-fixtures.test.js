@@ -131,7 +131,7 @@ test('живые приложения при сбое: своё — live, зап
 // соседа. Спека, утверждающая снимок при загрузке, на них дала бы зелёный при
 // снимке, потерявшем поле. Список спек — те, что снимок утверждают.
 const SNAPSHOT_SPECS = ['window-state-sync.spec.js', 'relay-persist.spec.js'];
-const SNAPSHOT_HELPER = /\bwait(?:ForMain|ForDisplay|ForWidget|ForClock)Snapshot\b/;
+const SNAPSHOT_HELPER = /\b(?:wait(?:ForMain|ForDisplay|ForWidget|ForClock)Snapshot|relayBarrier)\b/;
 
 function usesSnapshotHelper(src) { return SNAPSHOT_HELPER.test(codeOnly(src)); }
 
@@ -149,4 +149,6 @@ test('зонд помощника снимка проверяет сам себ�
     assert.equal(usesSnapshotHelper('await waitForDisplaySnapshot(app, d, control);'), true);
     assert.equal(usesSnapshotHelper('// waitForClockSnapshot тут не нужен'), false);
     assert.equal(usesSnapshotHelper('await waitForWidget(app);'), false);
+    // relayBarrier шлёт ту же метку (e2e-B7b).
+    assert.equal(usesSnapshotHelper('await relayBarrier(app, control, [widget]);'), true);
 });

@@ -852,6 +852,40 @@ async function waitForMainSnapshot(app, page, urlPart, name, opts = {}) {
     return page;
 }
 
+/**
+ * Всё, что панель ПОСЛАЛА до вызова, дошло до окон `pages` и отработано.
+ *
+ * Для действий панели, которые расходятся сразу по нескольким окнам (стили
+ * трёх окон одним проходом, сброс профиля в `finally`), где ждать посылку
+ * каждого окна по `match` нельзя: что именно и куда уйдёт, решает панель
+ * (синхронизация стиля часов, повторный клик по выбранному варианту).
+ *
+ * Два звена, оба — порядок одной трубы:
+ * 1. `panelRoundTrip`: main обработал всё посланное панелью; пересылка окну
+ *    идёт синхронно в обработчике main, значит, она уже в трубе main → окно;
+ * 2. метка main окну (`waitForMainSnapshot`): посылки main → окно приходят в
+ *    порядке отправки, метка — после пересылок. Ожидание метки включает
+ *    `waitForQuiet` (переходы, шрифты).
+ *
+ * Не годится для отложенных посылок ПАНЕЛИ (debounce `input` цветов фона):
+ * их на момент вызова ещё нет в трубе. Метка — флаг соседа на канале
+ * `*-window-state` с НАСТОЯЩИМ значением (см. SNAPSHOT_MARK); спеки, которые
+ * утверждают снимок при загрузке, барьер не зовут (tests/e2e-fixtures.test.js).
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control
+ * @param {import('@playwright/test').Page[]} pages — окна виджета, часов, дисплея
+ * @param {{timeout?: number}} [opts]
+ */
+async function relayBarrier(app, control, pages, opts = {}) {
+    await panelRoundTrip(control, opts);
+    for (const page of pages) {
+        const urlPart = Object.keys(SNAPSHOT_MARK).find((u) => page.url().includes(u));
+        if (!urlPart) { throw new Error(`relayBarrier: окно ${page.url()} не виджет, не часы и не дисплей`); }
+        await waitForMainSnapshot(app, page, urlPart, urlPart, opts);
+    }
+}
+
 /** Дисплей получил снимок main. `_control` — прежняя сигнатура (шаг 2 был через панель). */
 function waitForDisplaySnapshot(app, display, _control, opts = {}) {
     return waitForMainSnapshot(app, display, 'display.html', 'дисплея', opts);
@@ -1188,7 +1222,7 @@ async function untilMainHandled(app, channel, action, opts = {}) {
 }
 
 module.exports = {
-    mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
+    relayBarrier, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
