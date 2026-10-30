@@ -13,6 +13,7 @@
 
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { waitForWidgetGone, waitForClockGone, waitForDisplayGone } = require('./window-ready');
 
 /** Виден ли элемент — по вычисленному display, а не по наличию в DOM. */
 async function shown(page, selector) {
@@ -48,7 +49,8 @@ test.describe('панель: четыре состояния', () => {
 
     test('покой: пресеты есть, ряда ± нет, кнопка называется «Старт»', async () => {
         await control.click('.preset[data-minutes="25"]');
-        await control.waitForTimeout(400);
+        // Пресет ставит время через главный процесс: цифры 25:00 — его ответ.
+        await expect(control.locator('#controlTimeDigits')).toHaveText('25:00');
 
         await expect(control.locator('body')).toHaveClass(/state-idle/);
         expect(await primaryLabel(control)).toBe('Старт');
@@ -59,8 +61,7 @@ test.describe('панель: четыре состояния', () => {
         await expect(control.locator('#heroHint')).toHaveText('нажмите на время, чтобы ввести своё');
 
         // Активный пресет подсвечен ровно один, и это тот, по которому кликнули.
-        const active = await control.locator('.preset.active').allTextContents();
-        expect(active).toEqual(['25']);
+        await expect(control.locator('.preset.active')).toHaveText(['25']);
 
         // «Считать ниже нуля» доступна и в покое. Спрятать её в состояние ввода
         // значило бы: заметил, что не укладываешься, — а включить уже негде.
@@ -69,10 +70,9 @@ test.describe('панель: четыре состояния', () => {
 
     test('отсчёт: пресеты уступают место ±, кнопка называется «Пауза»', async () => {
         await control.click('#startBtn');
-        await control.waitForTimeout(1200);
 
         await expect(control.locator('body')).toHaveClass(/state-running/);
-        expect(await primaryLabel(control)).toBe('Пауза');
+        await expect.poll(() => primaryLabel(control)).toBe('Пауза');
         expect(await shown(control, '.presets')).toBe(false);
         expect(await shown(control, '.adjust')).toBe(true);
         expect(await shown(control, '.panel-progress')).toBe(true);
@@ -81,18 +81,16 @@ test.describe('панель: четыре состояния', () => {
         await expect(control.locator('#heroHint')).toHaveText(/^закончится в \d{2}:\d{2}$/);
 
         // Полоса действительно заполняется, а не стоит на нуле.
-        const width = await control.evaluate(
+        // Ширину пишет тик таймера — ждём первый, а не секунду.
+        await expect.poll(() => control.evaluate(
             () => document.getElementById('panelProgressFill').style.width
-        );
-        expect(width).toMatch(/%$/);
+        )).toMatch(/%$/);
     });
 
     test('ряд ± меняет время прямо во время отсчёта', async () => {
         const before = await control.locator('#controlTimeDigits').textContent();
         await control.click('.adjust-btn[data-adjust="300"]');
-        await control.waitForTimeout(600);
-        const after = await control.locator('#controlTimeDigits').textContent();
-        expect(after).not.toBe(before);
+        await expect(control.locator('#controlTimeDigits')).not.toHaveText(before);
     });
 
     /**
@@ -107,10 +105,9 @@ test.describe('панель: четыре состояния', () => {
      */
     test('пауза: кнопка предлагает продолжить, а не паузу ещё раз', async () => {
         await control.click('#pauseBtn');
-        await control.waitForTimeout(500);
 
         await expect(control.locator('#statusText')).toHaveText('Пауза');
-        expect(await primaryLabel(control)).toBe('Продолжить');
+        await expect.poll(() => primaryLabel(control)).toBe('Продолжить');
         expect(await shown(control, '#pauseBtn'), 'в паузе кнопка «Пауза» бессмысленна').toBe(false);
         // Раскладка отсчёта в паузе сохраняется: ряд ± и полоса на месте,
         // пресеты по-прежнему уступили им место.
@@ -120,23 +117,21 @@ test.describe('панель: четыре состояния', () => {
 
         // И главное: кнопка РАБОТАЕТ — таймер снова идёт.
         await control.click('#startBtn');
-        await control.waitForTimeout(1300);
-        expect(await control.evaluate(() => window.timerController.isRunning)).toBe(true);
-        expect(await primaryLabel(control)).toBe('Пауза');
+        await expect.poll(() => control.evaluate(() => window.timerController.isRunning)).toBe(true);
+        await expect.poll(() => primaryLabel(control)).toBe('Пауза');
     });
 
     test('ввод: цифры уступают место полю, кнопка называется «Поставить»', async () => {
         await control.click('#pauseBtn');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#statusText')).toHaveText('Пауза');
         await control.click('#resetBtn');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
 
         // Вход в ввод — КЛИКОМ по времени, как обещает подсказка в покое.
         await control.click('#controlTime');
-        await control.waitForTimeout(400);
 
         await expect(control.locator('body')).toHaveClass(/state-input/);
-        expect(await primaryLabel(control)).toBe('Поставить');
+        await expect.poll(() => primaryLabel(control)).toBe('Поставить');
         expect(await shown(control, '.time-entry')).toBe(true);
         expect(await shown(control, '#controlTime')).toBe(false);
         expect(await shown(control, '.transport-cancel')).toBe(true);
@@ -150,15 +145,13 @@ test.describe('панель: четыре состояния', () => {
         await control.fill('#manualMinutes', '7');
         await control.fill('#manualSeconds', '30');
         await control.press('#manualSeconds', 'Enter');
-        await control.waitForTimeout(600);
 
         await expect(control.locator('body')).toHaveClass(/state-idle/);
         await expect(control.locator('#controlTimeDigits')).toHaveText('07:30');
 
         await control.click('#controlTime');
-        await control.waitForTimeout(300);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.click('#manualCancel');
-        await control.waitForTimeout(300);
         await expect(control.locator('body')).toHaveClass(/state-idle/);
     });
 
@@ -166,9 +159,9 @@ test.describe('панель: четыре состояния', () => {
         // Слепленная строка «5:30» требовала помнить формат и попадать курсором
         // в нужную позицию. Полей два, каждое принимает просто число.
         await control.click('.preset[data-minutes="25"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('25:00');
         await control.click('#controlTime');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
 
         const box = await control.evaluate(() => {
             const hrs = document.getElementById('manualHours');
@@ -197,16 +190,17 @@ test.describe('панель: четыре состояния', () => {
         expect(box.shadow).toContain('inset');
 
         await control.click('#manualCancel');
-        await control.waitForTimeout(300);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     });
 
     test('двоеточие переводит из минут в секунды — «7:30» набирается подряд', async () => {
         await control.click('#controlTime');
-        await control.waitForTimeout(400);
+        // Клавиатура пишет в фокус — значит ждём фокус на минутах.
+        await expect(control.locator('#manualMinutes')).toBeFocused();
         await control.keyboard.type('7');
         await control.keyboard.press(':');
         await control.keyboard.type('30');
-        await control.waitForTimeout(200);
+        await expect(control.locator('#manualSeconds')).toHaveValue('30');
         const where = await control.evaluate(() => ({
             focused: document.activeElement.id,
             min: document.getElementById('manualMinutes').value,
@@ -217,45 +211,45 @@ test.describe('панель: четыре состояния', () => {
         expect(where.sec).toBe('30');
 
         await control.keyboard.press('Enter');
-        await control.waitForTimeout(500);
         await expect(control.locator('#controlTimeDigits')).toHaveText('07:30');
     });
 
     test('часы отдельным полем: 1:30:00 набирается без счёта в уме', async () => {
         await control.click('#controlTime');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.fill('#manualHours', '1');
         await control.fill('#manualMinutes', '30');
         await control.fill('#manualSeconds', '0');
         await control.press('#manualSeconds', 'Enter');
-        await control.waitForTimeout(600);
         await expect(control.locator('#controlTimeDigits')).toHaveText('1:30:00');
     });
 
     test('минуты больше 59 — тоже опечатка: для этого и есть часы', async () => {
         await control.click('#controlTime');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.fill('#manualMinutes', '90');
         await control.press('#manualMinutes', 'Enter');
-        await control.waitForTimeout(400);
+        // Паузы нет и не нужно: отказ решается СИНХРОННО в обработчике keydown
+        // (applyManualTime в panel-state.js) — к возврату из press() панель уже
+        // либо вышла из ввода, либо нет. Интервала, за который она могла бы
+        // выйти позже, не существует.
         await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.click('#manualCancel');
-        await control.waitForTimeout(300);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     });
 
     test('секунды больше 59 — опечатка, а не «ещё минута»', async () => {
         await control.click('#controlTime');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.fill('#manualMinutes', '5');
         await control.fill('#manualSeconds', '75');
         await control.press('#manualSeconds', 'Enter');
-        await control.waitForTimeout(400);
 
         // Молча перенести 75 секунд в минуты значило бы поставить не то время,
         // что набрано. Панель остаётся в вводе и помечает поле.
         await expect(control.locator('body')).toHaveClass(/state-input/);
         await control.click('#manualCancel');
-        await control.waitForTimeout(300);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     });
 });
 
@@ -276,14 +270,12 @@ test.describe('панель: строки окон', () => {
         expect(await control.locator('.tabs-row').count()).toBe(0);
 
         await control.click('.wrow:has(#openWidgetBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
 
         await expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
         await expect(control.locator('#drawerTitle')).toHaveText('Виджет');
 
         // «‹» закрывает ящик — это его единственная роль.
         await control.click('#drawerBack');
-        await control.waitForTimeout(700);
         await expect(control.locator('#settingsDrawer')).not.toHaveClass(/open/);
     });
 
@@ -292,16 +284,15 @@ test.describe('панель: строки окон', () => {
         await expect(sub).toHaveText('маленький таймер поверх окон');
 
         await control.click('#openWidgetBtn');
-        await control.waitForTimeout(1500);
 
         await expect(control.locator('#openWidgetBtn')).toHaveAttribute('aria-checked', 'true');
         // Подпись собирается из ЖИВЫХ значений: «показан», стиль, масштаб.
         await expect(sub).toHaveText(/^показан( · .+)?$/);
 
         await control.click('#openWidgetBtn');
-        await control.waitForTimeout(1200);
         await expect(control.locator('#openWidgetBtn')).toHaveAttribute('aria-checked', 'false');
         await expect(sub).toHaveText('маленький таймер поверх окон');
+        await waitForWidgetGone(app);
     });
 
     /**
@@ -313,21 +304,21 @@ test.describe('панель: строки окон', () => {
      */
     test('подпись строки догоняет смену стиля сразу, без тика таймера', async () => {
         await control.click('#openClockBtn');
-        await control.waitForTimeout(1600);
+        await expect(control.locator('#openClockBtn')).toHaveAttribute('aria-checked', 'true');
         await control.click('.wrow:has(#openClockBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
+        await expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
 
         await control.click('#clockStyle button[data-val="flip"]');
-        await control.waitForTimeout(500);
         await expect(control.locator('#subClock')).toHaveText(/флип/);
 
         // Убираем за собой: профиль e2e общий на весь прогон.
         await control.click('#clockStyle button[data-val="circle"]');
-        await control.waitForTimeout(400);
+        await expect(control.locator('#subClock')).toHaveText(/круг/);
         await control.click('#drawerClose');
-        await control.waitForTimeout(600);
+        await expect(control.locator('#settingsDrawer')).not.toHaveClass(/open/);
         await control.click('#openClockBtn');
-        await control.waitForTimeout(900);
+        await expect(control.locator('#openClockBtn')).toHaveAttribute('aria-checked', 'false');
+        await waitForClockGone(app);
     });
 
     /**
@@ -350,10 +341,9 @@ test.describe('панель: строки окон', () => {
         await expect(control.locator('#openDisplayBtn'))
             .toHaveAttribute('aria-checked', 'true', { timeout: 15000 });
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
+        await expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
 
         await control.click('#displayTimerStyle button[data-val="flip"]');
-        await control.waitForTimeout(600);
         // Стиль — как у соседних строк, теми же словами.
         await expect(control.locator('#subDisplay')).toHaveText(/показан · флип/);
 
@@ -364,7 +354,6 @@ test.describe('панель: строки окон', () => {
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
         });
-        await control.waitForTimeout(700);
         await expect(control.locator('#subDisplay')).toHaveText(/флип · 150%/);
 
         // Убираем за собой: профиль e2e общий на весь прогон.
@@ -375,21 +364,22 @@ test.describe('панель: строки окон', () => {
             el.dispatchEvent(new Event('change', { bubbles: true }));
         });
         await control.click('#displayTimerStyle button[data-val="circle"]');
-        await control.waitForTimeout(500);
+        await expect(control.locator('#subDisplay')).toHaveText(/показан · круг/);
+        await expect(control.locator('#subDisplay')).not.toHaveText(/150%/);
         await control.click('#drawerClose');
-        await control.waitForTimeout(600);
+        await expect(control.locator('#settingsDrawer')).not.toHaveClass(/open/);
         await control.click('#openDisplayBtn');
         // Закрытие тоже по условию: профиль общий, и следующая спека не должна
         // получить чужое открытое окно.
         await expect(control.locator('#openDisplayBtn'))
             .toHaveAttribute('aria-checked', 'false', { timeout: 15000 });
+        await waitForDisplayGone(app);
     });
 
     test('строка «Звуки» ведёт в свой раздел', async () => {
         await control.click('.wrow:has(#soundMasterToggle) .wrow-chevron');
-        await control.waitForTimeout(700);
         await expect(control.locator('#drawerTitle')).toHaveText('Звуки');
         await control.click('#drawerClose');
-        await control.waitForTimeout(700);
+        await expect(control.locator('#settingsDrawer')).not.toHaveClass(/open/);
     });
 });

@@ -139,6 +139,11 @@ function waitForWidgetGone(app, opts = {}) {
     return waitForWindowGone(app, WIDGET_PROBE, Object.assign({ name: 'окно виджета' }, opts));
 }
 
+/** Дождаться закрытия окна часов. */
+function waitForClockGone(app, opts = {}) {
+    return waitForWindowGone(app, CLOCK_PROBE, Object.assign({ name: 'окно часов' }, opts));
+}
+
 /** @returns {Promise<import('@playwright/test').Page>} окно дисплея */
 function waitForDisplay(app, opts = {}) {
     return waitForWindow(app, DISPLAY_PROBE, Object.assign({ name: 'окно дисплея' }, opts));
@@ -239,7 +244,7 @@ async function waitForSteady(page, read, opts = {}) {
 module.exports = {
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
-    waitForWindowGone, waitForDisplayGone, waitForWidgetGone,
+    waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };
