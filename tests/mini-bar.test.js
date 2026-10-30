@@ -236,3 +236,101 @@ test('без действий кнопки транспорта не роняю�
     MiniBar.init({ doc, ipc: fakeIpc() });
     assert.doesNotThrow(() => doc._el('miniBarStart').handlers.click());
 });
+
+// Окно для отложенного перемера: resize-слушатели и innerHeight управляются
+// тестом, кадр исполняется сразу.
+function fakeWin(innerHeight = 52) {
+    const listeners = new Set();
+    return {
+        innerHeight,
+        listeners,
+        addEventListener(type, fn) { if (type === 'resize') { listeners.add(fn); } },
+        removeEventListener(type, fn) { if (type === 'resize') { listeners.delete(fn); } },
+        requestAnimationFrame(fn) { fn(); },
+        resize(h) { this.innerHeight = h; for (const fn of [...listeners]) { fn(); } }
+    };
+}
+
+/**
+ * Подгонка размера по содержимому в полосе не мерит и не шлёт ничего:
+ * раскладка свёрнута, и замер был бы замером полосы (замер 30.10.2026:
+ * просьба 400×100, а при откладывании в main — разворот в пол 660). Просьба
+ * запоминается и выполняется ОДИН раз после разворота, когда окно уже снова
+ * панель. Разворот без пропущенной просьбы окно не трогает: прежние границы
+ * пользователя возвращает main целиком.
+ */
+test('deferWhileCollapsed: развёрнутая панель выполняет сразу', () => {
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win: fakeWin(700) });
+    let runs = 0;
+    assert.equal(bar.deferWhileCollapsed(() => { runs++; }), false);
+    assert.equal(runs, 0, 'не отложено — выполняет вызывающий сам');
+});
+
+test('deferWhileCollapsed: в полосе — откладывается и выполняется после разворота, когда окно выросло', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    let runs = 0;
+    bar.collapse();
+    assert.equal(bar.deferWhileCollapsed(() => { runs++; }), true);
+    win.resize(52);
+    assert.equal(runs, 0, 'в полосе не выполняется');
+    bar.expand();
+    assert.equal(runs, 0, 'до resize окна — рано: main ещё не вернул размер панели');
+    win.resize(100);
+    assert.equal(runs, 0, 'окно высотой полосы — ещё не панель');
+    win.resize(700);
+    assert.equal(runs, 1);
+    win.resize(720);
+    assert.equal(runs, 1, 'один раз');
+    assert.equal(win.listeners.size, 0, 'слушатель снят');
+});
+
+test('deferWhileCollapsed: разворот без пропущенной просьбы перемер не заказывает', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    bar.collapse();
+    bar.expand();
+    assert.equal(win.listeners.size, 0);
+});
+
+test('deferWhileCollapsed: две свёртки-разворота до resize — один слушатель и один перемер', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    let runs = 0;
+    bar.collapse();
+    bar.deferWhileCollapsed(() => { runs++; });
+    bar.expand();
+    bar.collapse();
+    bar.expand();
+    assert.ok(win.listeners.size <= 1, `слушателей ${win.listeners.size}`);
+    win.resize(700);
+    assert.equal(runs, 1);
+});
+
+test('deferWhileCollapsed: последняя просьба побеждает; повторная свёртка до resize её сохраняет', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    const seen = [];
+    bar.collapse();
+    bar.deferWhileCollapsed(() => seen.push('a'));
+    bar.deferWhileCollapsed(() => seen.push('b'));
+    bar.expand();
+    bar.collapse();
+    win.resize(52);
+    assert.deepEqual(seen, [], 'свёрнуто снова — не выполняется');
+    bar.expand();
+    win.resize(700);
+    assert.deepEqual(seen, ['b']);
+});
+
+test('hasPendingFit: видно, что просьба ждёт разворота, и что она выполнена', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    assert.equal(bar.hasPendingFit(), false);
+    bar.collapse();
+    bar.deferWhileCollapsed(() => {});
+    assert.equal(bar.hasPendingFit(), true);
+    bar.expand();
+    win.resize(700);
+    assert.equal(bar.hasPendingFit(), false);
+});

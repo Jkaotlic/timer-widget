@@ -83,11 +83,12 @@ test('окно сжимается в полосу и разворачивает�
 
 /**
  * Свёртка сразу после загрузки панели: отложенный авто-размер (control-app.js,
- * `setTimeout(autoResizeWindow, 100)`) приходит в main уже ПОСЛЕ неё и не
- * должен развернуть окно обратно в 400×660 (замер до починки: окно 400×660
- * поверх всех окон с классом `collapsed`). Тот же путь — перезагрузка панели
- * краш-обработчиком. Ждём именно событие авто-размера в main: подписка стоит
- * ДО перезагрузки, клик — до того, как оно пришло.
+ * `setTimeout(autoResizeWindow, 100)`) срабатывает уже ПОСЛЕ неё и не должен
+ * развернуть окно обратно в 400×660 (замер до починки: окно 400×660 поверх
+ * всех окон с классом `collapsed`). Тот же путь — перезагрузка панели
+ * краш-обработчиком. В полосе авто-размер не мерит и не шлёт ничего, а
+ * просьбу запоминает полоса (mini-bar.js, deferWhileCollapsed) — признак
+ * того, что гонка воспроизведена, — и выполняет её после разворота.
  */
 test('свёртка в первые 100 мс после загрузки не перезаписывается отложенным авто-размером', async () => {
     const { app, control } = await launchApp();
@@ -101,18 +102,23 @@ test('свёртка в первые 100 мс после загрузки не �
             const b = w.getBounds();
             w.setBounds({ x: b.x, y: b.y, width: b.width, height: h });
         }, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
-        const startupResize = app.evaluate(({ ipcMain }) => new Promise(
-            (resolve) => ipcMain.once('resize-control-window', () => resolve(Date.now()))
-        ));
-        await reloadPanel(control);
-        // Клик раньше авто-размера — иначе тест проверяет не тот порядок.
-        const clickedAt = await control.evaluate(() => {
-            window.miniBar.collapse();
-            return Date.now();
+        // Всё, что панель попросит у main за время в полосе. Подписка — ДО
+        // перезагрузки.
+        await app.evaluate(({ ipcMain }) => {
+            global.__barAsks = [];
+            global.__barListener = (_e, size) => global.__barAsks.push(size);
+            ipcMain.on('resize-control-window', global.__barListener);
         });
-        const resizedAt = await startupResize;
-        console.log(`   свёртка за ${resizedAt - clickedAt} мс до авто-размера`);
-        expect(resizedAt, 'авто-размер пришёл раньше свёртки — гонка не воспроизведена').toBeGreaterThanOrEqual(clickedAt);
+        await reloadPanel(control);
+        // Свёртка раньше авто-размера — иначе тест проверяет не тот порядок.
+        await control.evaluate(() => window.miniBar.collapse());
+        await expect.poll(() => control.evaluate(() => window.miniBar.hasPendingFit()),
+            { message: 'авто-размер не попал в полосу — гонка не воспроизведена' }).toBe(true);
+        const barAsks = await app.evaluate(({ ipcMain }) => {
+            ipcMain.removeListener('resize-control-window', global.__barListener);
+            return global.__barAsks;
+        });
+        expect(barAsks, 'свёрнутая панель мерила и слала размер').toEqual([]);
 
         const state = await waitForSteady(app, winState, { name: 'границы полосы' });
         console.log(`   после авто-размера: ${JSON.stringify(state)}`);
@@ -120,9 +126,8 @@ test('свёртка в первые 100 мс после загрузки не �
         expect(state.bounds.height, `высота окна ${state.bounds.height}: авто-размер развернул полосу`).toBeLessThanOrEqual(120);
         await control.waitForFunction(() => window.innerHeight <= 120);
 
-        // Авто-размер, пришедший в полосу, main отбросил: он мерил СВЁРНУТУЮ
-        // раскладку. Поэтому развёрнутая панель обязана перемерить содержимое
-        // сама — иначе остаётся высота «до свёртки», ниже содержимого.
+        // Пропущенный в полосе авто-размер выполняется после разворота —
+        // иначе остаётся высота «до свёртки», ниже содержимого.
         await app.evaluate(({ ipcMain }) => {
             global.__refitAsked = null;
             ipcMain.once('resize-control-window', (_e, size) => { global.__refitAsked = size; });
@@ -161,6 +166,50 @@ test('свёртка в первые 100 мс после загрузки не �
                 .toBeLessThanOrEqual(fit.client + 1);
         }
         expect(expected, 'содержимое не переросло пол — проверка ничего не различает').toBeGreaterThan(limits.minH);
+    } finally {
+        await app.close();
+    }
+});
+
+/**
+ * Обычные свёртка и разворот (без гонки) возвращают ТОЧНО прежние границы,
+ * выставленные пользователем: перемер по содержимому — только если просьба о
+ * размере была пропущена в полосе (mini-bar.js, deferWhileCollapsed). Ревью
+ * 30.10.2026: перемер на КАЖДОМ развороте превращал 700×700 в 400×740.
+ */
+test('обычный разворот возвращает границы пользователя целиком, без перемера', async () => {
+    const { app, control } = await launchApp();
+    try {
+        const requested = { width: 700, height: 700 };
+        const granted = await app.evaluate(({ BrowserWindow }, size) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            const b = w.getBounds();
+            w.setBounds({ x: b.x, y: b.y, width: size.width, height: size.height });
+            return w.getBounds();
+        }, requested);
+        const before = await waitForSteady(app, winState, { name: 'границы пользователя' });
+        console.log(`   запрошено ${JSON.stringify(requested)}, выдано ${JSON.stringify(granted)}, осело ${JSON.stringify(before.bounds)}`);
+
+        await app.evaluate(({ ipcMain }) => {
+            global.__fitAsks = [];
+            global.__fitListener = (_e, size) => global.__fitAsks.push(size);
+            ipcMain.on('resize-control-window', global.__fitListener);
+        });
+        await control.click('#miniBarToggle');
+        await windowSettled(app, control, true);
+        await control.click('#miniBarExpand');
+        const restored = await windowSettled(app, control, false);
+        // Перемер, если бы он был, шёл бы кадром после resize окна: ждём два кадра.
+        await control.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const asks = await app.evaluate(({ ipcMain }) => {
+            ipcMain.removeListener('resize-control-window', global.__fitListener);
+            return global.__fitAsks;
+        });
+        const after = await waitForSteady(app, winState, { name: 'границы после разворота' });
+        console.log(`   после разворота ${JSON.stringify(after.bounds)}, просьб размера ${asks.length}`);
+        expect(asks, 'разворот без пропущенной просьбы перемерил панель').toEqual([]);
+        expect(restored.bounds).toEqual(before.bounds);
+        expect(after.bounds, 'границы пользователя не вернулись целиком').toEqual(before.bounds);
     } finally {
         await app.close();
     }

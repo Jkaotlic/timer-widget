@@ -1437,6 +1437,12 @@
             // выбор монитора встраивался в CSS-селектор без экранирования).
 
             autoResizeWindow() {
+                // В полосе не мерим и не шлём: раскладка свёрнута. Полоса
+                // запомнит просьбу и выполнит её после разворота (mini-bar.js,
+                // deferWhileCollapsed); main отбрасывает такой запрос и сам.
+                if (window.miniBar && window.miniBar.deferWhileCollapsed(() => this.autoResizeWindow())) {
+                    return;
+                }
                 // Skip auto-resize while drawer is open — drawer manages width itself.
                 if (this.settingsDrawerEl && this.settingsDrawerEl.classList.contains('open')) {
                     return;
@@ -1686,24 +1692,9 @@
         Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
         const _tc = () => timerController;
-        // Мерить — когда main УЖЕ вернул окну размер панели: признак — `resize`
-        // окна выше полосы (main ограничивает её 120 px), а не пауза. Свернули
-        // снова раньше — перемер не нужен.
-        const refitAfterExpand = () => {
-            const onResize = () => {
-                if (window.miniBar?.isCollapsed()) { window.removeEventListener('resize', onResize); return; }
-                if (window.innerHeight <= 120) { return; }
-                window.removeEventListener('resize', onResize);
-                requestAnimationFrame(() => { if (!window.miniBar?.isCollapsed()) { _tc()?.autoResizeWindow(); } });
-            };
-            window.addEventListener('resize', onResize);
-        };
-        window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer,
+        window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer, win: window,
             // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
-            // Разворот перемеряет содержимое: запрос размера, пришедший в полосу,
-            // main отбрасывает (main-control-ipc.js) — он мерил бы свёрнутую
-            // раскладку, — и границы «до свёртки» могут быть ниже содержимого.
-            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } else { refitAfterExpand(); } },
+            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } },
             actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
 
         const faqModal = document.getElementById('faqModal');
