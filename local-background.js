@@ -17,6 +17,10 @@
  * сборщика в проекте нет, каждый файл — отдельный classic-script.
  */
 
+import * as SecurityUtils from './security.js';
+import * as RendererShared from './renderer-shared.js';
+
+
 const LocalBackgroundMixin = {
     setupLocalBackground() {
             const preview = document.getElementById('localBgPreview');
@@ -228,11 +232,11 @@ const LocalBackgroundMixin = {
 
     /** Кнопки вписывания и ползунок затемнения — из localBgSettings или умолчания. */
     renderLocalBgSettings() {
-            const saved = window.SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
+            const saved = SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
             // Умолчания — те же, что у сборки payload дисплея (panel-display.js):
             // иначе панель и окно снова показали бы разное.
             const fit = saved.fit || 'cover';
-            const overlay = window.RendererShared.bgOverlayPercent(saved.overlay);
+            const overlay = RendererShared.bgOverlayPercent(saved.overlay);
             document.querySelectorAll('.bg-fit-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.fit === fit);
             });

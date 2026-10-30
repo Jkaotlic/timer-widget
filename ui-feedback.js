@@ -12,6 +12,8 @@
  * LoadingIndicator.show(...) по этим именам, как и раньше.
  */
 
+import { escapeHTML } from './security.js';
+
 // FIX BUG-028: Loading indicator utilities
 const LoadingIndicator = {
     /**
@@ -23,9 +25,7 @@ const LoadingIndicator = {
         const overlay = document.createElement('div');
         overlay.className = 'loading-overlay';
         // Используем escapeHTML для защиты от XSS
-        const safeMessage = window.SecurityUtils && window.SecurityUtils.escapeHTML 
-            ? window.SecurityUtils.escapeHTML(message) 
-            : message.replace(/[&<>"'/]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'})[c]);
+        const safeMessage = escapeHTML(message);
         overlay.innerHTML = `
             <div class="loading-box">
                 <div class="loading-spinner"></div>

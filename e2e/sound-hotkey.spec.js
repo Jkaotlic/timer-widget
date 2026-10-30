@@ -26,7 +26,7 @@ const soundState = (control) => control.evaluate(() => {
         checkbox: !!box.checked,
         rowOn: row.classList.contains('active'),
         rowAria: row.getAttribute('aria-checked'),
-        stored: (window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {}) || {}).soundMasterEnabled
+        stored: JSON.parse(localStorage.getItem('displayExtSettings') || '{}').soundMasterEnabled
     };
 });
 

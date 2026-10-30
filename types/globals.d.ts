@@ -74,37 +74,26 @@ interface Window {
     SecurityUtils: typeof import('../security.js');
     /** utils.js кладёт в окно всё, КРОМЕ safelySendToWindow (она — для main). */
     TimeUtils: Omit<typeof import('../utils.js'), 'safelySendToWindow'>;
-    ColorUtils: typeof import('../color-utils.js');
     RendererShared: typeof import('../renderer-shared.js');
-    RendererStorage: typeof import('../renderer-storage.js');
     DigitsStyle: typeof import('../digits-style.js');
     DisplayLayouts: typeof import('../display-layouts.js');
     HeroModes: typeof import('../hero-modes.js');
     MoneyMeter: typeof import('../money-meter.js');
-    EventReport: typeof import('../event-report.js');
     FlipCard: typeof import('../flip-card.js');
     WindowGeometry: typeof import('../window-geometry.js');
     UILock: typeof import('../ui-lock.js');
     UITheme: typeof import('../ui-theme.js');
-    SettingsSchema: typeof import('../settings-schema.js');
-    ClockSettingsSchema: typeof import('../clock-settings-schema.js');
-    Presets: typeof import('../presets.js');
     SoundBank: typeof import('../sound-bank.js');
-    SoundPresets: typeof import('../sound-presets.js');
 
     // --- модули панели
     Toast: typeof import('../ui-feedback.js').Toast;
     LoadingIndicator: typeof import('../ui-feedback.js').LoadingIndicator;
     setupScaleValueEdit: typeof import('../scale-input.js').setupScaleValueEdit;
-    ColorPicker: typeof import('../color-picker.js').ColorPicker;
     addPickerToggle: typeof import('../color-picker.js').addPickerToggle;
     openModal: typeof import('../modal-manager.js').openModal;
     closeModal: typeof import('../modal-manager.js').closeModal;
     showKeyboardShortcuts: typeof import('../shortcuts-help.js').showKeyboardShortcuts;
     DisplayTimerHelpers: typeof import('../display-script.js');
-
-    // --- примесь, которую читает e2e (status-and-colors); control-app.js импортирует
-    CustomSoundsMixin: typeof import('../custom-sounds.js').CustomSoundsMixin;
 
     // --- экземпляры окон. Классы живут в точках входа (*-app.js,
     // display-script.js), которые ничего не экспортируют, поэтому any.
@@ -116,6 +105,9 @@ interface Window {
 
     /** Старый Safari/WebKit: префиксный AudioContext. */
     webkitAudioContext: typeof AudioContext;
+
+    /** Крючок стенда съёмки (scripts/screenshot-runner.js): подпись «закончится в …». */
+    __frozenEndsAt?: string;
 }
 
 /**

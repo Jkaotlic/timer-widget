@@ -87,6 +87,7 @@ function el(tag, props, children) {
 
 /** Чистая логика окон: здесь — запасной путь цветов (ownColors). */
 import * as ColorsShared from './renderer-shared.js';
+import { ColorPicker } from './color-picker.js';
 
 /**
  * Объект цветов из строки хранилища или null: битое значение не роняет панель.
@@ -237,7 +238,7 @@ const PanelColorsMixin = {
             el('span', { class: 'surface-label', text: 'Цвет цифр' }), resetTimer
         ]));
 
-        const picker = new window.ColorPicker(svId, hueId, hexId, previewId, panelId, (hex) => {
+        const picker = new ColorPicker(svId, hueId, hexId, previewId, panelId, (hex) => {
             this.updateColors(target, { surface: hex });
         });
         this.surfacePickers[target] = picker;

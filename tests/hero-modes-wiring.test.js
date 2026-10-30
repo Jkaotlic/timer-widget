@@ -19,6 +19,7 @@ const SRC = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'display-script.
 const CSS = fs.readFileSync(path.join(__dirname, '..', 'display.css'), 'utf8');
 const HeroModes = require('../hero-modes.js');
 const { PanelResetMixin } = require('../panel-reset.js');
+const SettingsSchema = require('../settings-schema.js');
 
 /**
  * Тело МЕТОДА класса по имени.
@@ -532,12 +533,16 @@ function runReset(target, heroModeBefore) {
     const prevWindow = global.window;
     const prevDocument = global.document;
     const trace = [];
-    global.document = { getElementById: () => null };
+    // Сброс схемы — НАСТОЯЩИЙ (panel-reset.js импортирует settings-schema.js):
+    // он находит контролы по id и пишет им checked/value. Запись в контрол
+    // ВКЛАДКИ — след «schema» в порядке действий (подряд идущие — один след).
+    const owned = new Set(SettingsSchema.SETTINGS_DESCRIPTORS
+        .filter((d) => d.owner === target).map((d) => d.el));
+    const mark = () => { if (trace[trace.length - 1] !== 'schema') { trace.push('schema'); } };
+    const control = () => ({ set checked(_v) { mark(); }, set value(_v) { mark(); }, textContent: '' });
+    global.document = { getElementById: (id) => (owned.has(id) ? control() : null) };
+    // Крючки, которые примесь по-прежнему берёт из window: шим IPC и Toast.
     global.window = {
-        SettingsSchema: { resetOwnedSettings: () => trace.push('schema') },
-        ClockSettingsSchema: { applyClockSettings: () => {} },
-        PanelColorFields: [],
-        HeroModes,
         ipcRenderer: { send: () => {} },
         Toast: null
     };

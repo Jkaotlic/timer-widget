@@ -318,32 +318,8 @@ function activeSlot(storage) {
     return key;
 }
 
-// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
-// не расширяются (иначе объект не совпал бы с `typeof import`).
-/** @type {typeof import('./presets.js')} */
-const Presets = {
-    PRESET_SLOTS,
-    PRESETS_STORAGE_KEY,
-    PRESET_KEYS,
-    normalizeSlot,
-    capturePreset,
-    applyPreset,
-    readPresets,
-    writePreset,
-    hasPreset,
-    matchesPreset,
-    ACTIVE_SLOT_STORAGE_KEY,
-    writeActiveSlot,
-    activeSlot
-};
-
 export {
     PRESET_SLOTS, PRESETS_STORAGE_KEY, PRESET_KEYS, normalizeSlot, capturePreset,
     applyPreset, readPresets, writePreset, hasPreset, matchesPreset,
     ACTIVE_SLOT_STORAGE_KEY, writeActiveSlot, activeSlot
 };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.Presets = Presets;
-}

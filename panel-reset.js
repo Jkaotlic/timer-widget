@@ -21,6 +21,9 @@
  */
 
 // Список полей цвета — у сборщика; своя копия уже теряла `bg` (см. ниже).
+import * as ClockSettingsSchema from './clock-settings-schema.js';
+import * as HeroModes from './hero-modes.js';
+import * as SettingsSchema from './settings-schema.js';
 import { COLOR_FIELDS } from './panel-colors.js';
 
 const RESET_TARGETS = {
@@ -57,7 +60,7 @@ const PanelResetMixin = {
     resetWindowSettings(target) {
         if (!RESET_TARGETS[target]) { return; }
 
-        window.SettingsSchema.resetOwnedSettings(target, document);
+        SettingsSchema.resetOwnedSettings(target, document);
 
         // Сброс ставит el.checked и событий НЕ порождает, поэтому всё, что
         // панель держит полем или выводит из контрола побочным эффектом,
@@ -77,7 +80,7 @@ const PanelResetMixin = {
         // Настройки часов описаны своей таблицей; пустой объект означает «взять
         // всё из значений по умолчанию».
         if (target === 'clock') {
-            window.ClockSettingsSchema.applyClockSettings(this, {});
+            ClockSettingsSchema.applyClockSettings(this, {});
         }
 
         // Режим центрального времени — РУЧНОЙ ключ (settings-schema.js,
@@ -95,7 +98,7 @@ const PanelResetMixin = {
         // У `bgMode` дыра ровно та же, но у него есть СВОЯ кнопка сброса фона;
         // у режима второго пути нет.
         if (target === 'display' && typeof this.setHeroMode === 'function') {
-            this.setHeroMode(window.HeroModes.DEFAULT_MODE);
+            this.setHeroMode(HeroModes.DEFAULT_MODE);
         }
 
         // Деления живут в своём ключе, а не в таблице настроек, и принадлежат

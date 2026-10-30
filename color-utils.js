@@ -91,14 +91,3 @@ export {
     hexToRgb,
     hexToHsv
 };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.ColorUtils = {
-        hsvToRgb,
-        rgbToHex,
-        hsvToHex,
-        hexToRgb,
-        hexToHsv
-    };
-}

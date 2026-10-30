@@ -18,6 +18,14 @@
         // Модули панели. Примеси — именем XMixin: присваиваются прототипу ниже,
         // tests/control-mixins.test.js сверяет файлы-примеси, импорты и
         // присваивания. Примеси сами control-app.js не импортируют.
+        import * as SecurityUtils from './security.js';
+        import * as TimeUtils from './utils.js';
+        import * as DisplayLayouts from './display-layouts.js';
+        import * as RendererShared from './renderer-shared.js';
+        import * as HeroModes from './hero-modes.js';
+        import * as SettingsSchema from './settings-schema.js';
+        import * as SoundPresets from './sound-presets.js';
+        import * as Presets from './presets.js';
         import { CustomSoundsMixin } from './custom-sounds.js';
         import { LocalBackgroundMixin } from './local-background.js';
         import { ThemeGridMixin } from './theme-grid.js';
@@ -43,7 +51,7 @@
         /** Ячейки вида (panel-presets.js install); до установки — null. */
         let presetsApi = null;
 
-        // debounce — только window.TimeUtils.debounce (utils.js). Здесь стоял
+        // debounce — только TimeUtils.debounce (utils.js). Здесь стоял
         // `if (typeof debounce === 'undefined') { var debounce = … }`: `var`
         // сливался с `function debounce` из utils.js в одно глобальное имя, и
         // ветка с запасным вариантом не исполнялась никогда. В модуле тот же
@@ -102,7 +110,7 @@
                 // Списки звуков строятся ДО чтения настроек: applyStoredSettings
                 // ставит select.value, а значение без <option> браузер молча
                 // отбрасывает — выбранный звук превратился бы в «— без звука —».
-                window.SoundPresets.buildSoundSelects(document);
+                SoundPresets.buildSoundSelects(document);
                 this.initElements();
                 this.initTabs();
                 this.initThemes();
@@ -742,7 +750,7 @@
                 setupScaleValueEdit(
                     document.getElementById('timeBlocksScaleValue'),
                     document.getElementById('timeBlocksScale'),
-                    window.DisplayLayouts.DEFAULT_BLOCK_SCALE,
+                    DisplayLayouts.DEFAULT_BLOCK_SCALE,
                     () => { this.pushDisplaySettings(); }
                 );
 
@@ -760,7 +768,7 @@
                 // Фон дисплея
                 ['bgSolidColor', 'bgGrad1', 'bgGrad2'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) {el.addEventListener('input', window.TimeUtils.debounce(() => this.pushDisplaySettings()));}
+                    if (el) {el.addEventListener('input', TimeUtils.debounce(() => this.pushDisplaySettings()));}
                 });
                 // Сброс стиля
                 const resetStyleBtn = document.getElementById('resetStyleBtn');
@@ -777,7 +785,7 @@
                         // Значения берутся из таблицы настроек, а не литералами:
                         // умолчание правят в ней, и третья копия разошлась бы с
                         // ней молча.
-                        window.SettingsSchema.resetKeys(['bgSolid', 'bgGrad1', 'bgGrad2'], document);
+                        SettingsSchema.resetKeys(['bgSolid', 'bgGrad1', 'bgGrad2'], document);
                         // «По умолчанию» — это то, что стоит на чистом профиле,
                         // а там «По теме». Кнопка, возвращающая не то же самое,
                         // что новая установка, — это две разные правды. Клик по
@@ -868,8 +876,8 @@
                 // личные ДО раскладки по контролам, иначе дисплей, у которого
                 // блоки были включены, откроется пустым — новых ключей в таком
                 // профиле нет, а их умолчание «выключено».
-                const ext = window.RendererShared.migrateDisplayBlocks(
-                    window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
+                const ext = RendererShared.migrateDisplayBlocks(
+                    SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
                 );
 
                 // Значения раскладывает таблица (settings-schema.js): ключ, контрол
@@ -877,12 +885,12 @@
                 // для сохранения. Здесь остаётся только то, что таблицей не
                 // выражается: собственный формат двух ключей, побочные эффекты
                 // (видимость строк, отправка в окна) и поля контроллера.
-                const applied = window.SettingsSchema.applyStoredSettings(ext, document);
+                const applied = SettingsSchema.applyStoredSettings(ext, document);
                 // Выбранного звука могло не стать: пресет убрали из набора или
                 // пользователь удалил свой файл. Тогда браузер молча показывает
                 // первый пункт, а в хранилище лежит другое — событие беззвучно,
                 // а настройка утверждает обратное. Чинит sound-presets.js.
-                window.SoundPresets.repairSelection(document, window.SettingsSchema);
+                SoundPresets.repairSelection(document, SettingsSchema);
 
                 // Слитый стиль. Профиль мог хранить `digital` (LED) — стиля с
                 // таким именем больше нет ни в одном окне, и сегментированный
@@ -893,7 +901,7 @@
                 // выглядело так же, как до слияния.
                 for (const [el, target] of [[this.timerStyleEl, 'widget'], [this.clockStyleEl, 'clock'], [this.displayTimerStyleEl, 'display']]) {
                     if (!el || el.value !== 'digital') { continue; }
-                    el.value = window.RendererShared.migrateTimerStyle('digital');
+                    el.value = RendererShared.migrateTimerStyle('digital');
                     if (target !== 'display') {
                         const colors = target === 'widget' ? this.currentColors : this.clockColors;
                         if (!colors || !colors.surface) {
@@ -907,7 +915,7 @@
                 // Ноль и отсутствие ключа — «без лимита», то есть пустое поле:
                 // иначе пресет без лимита оставлял прежний, и pushOverrunLimit
                 // ниже слал его в main.
-                document.getElementById('overrunLimit').value = window.SettingsSchema.overrunLimitFieldValue(ext.overrunLimitSeconds);
+                document.getElementById('overrunLimit').value = SettingsSchema.overrunLimitFieldValue(ext.overrunLimitSeconds);
                 this.refreshOverrunLimitHint();
 
                 // Чекбокс — авторитет: подтягиваем к нему внутренний флаг, иначе
@@ -938,7 +946,7 @@
                 // Режим центрального времени — тоже кнопки, а не поле; setHeroMode
                 // сам ставит и активную кнопку, и видимость поля заголовка, иначе
                 // после перезапуска значение восстановилось бы, а вид панели — нет.
-                this.setHeroMode(ext.heroMode || window.HeroModes.DEFAULT_MODE);
+                this.setHeroMode(ext.heroMode || HeroModes.DEFAULT_MODE);
 
                 // Синхронизация: переключатель часов показывает стиль виджета.
                 // Присваивание лечит и профили прежней версии, где в хранилище
@@ -951,13 +959,13 @@
                 // для всех окон приложения). В displayExtSettings масштаба часов
                 // нет вообще, поэтому без этого чтения ползунок при каждом запуске
                 // показывал «100%» независимо от реального размера окна.
-                const clockGeo = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
+                const clockGeo = SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
                 const clockScaleSliderEl = document.getElementById('clockScale');
                 const clockScaleLabelEl = document.getElementById('clockScaleValue');
                 if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
                     // Присваивание .value НЕ порождает 'input', поэтому обратной
                     // отправки в окно часов не происходит и петля не замыкается.
-                    const pct = window.RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
+                    const pct = RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
                     clockScaleSliderEl.value = pct;
                     if (clockScaleLabelEl) { clockScaleLabelEl.textContent = pct + '%'; }
                 }
@@ -1006,18 +1014,18 @@
                     // Всё, что описано таблицей, собирается из контролов ею же —
                     // включая устаревшие ключи timerStyle/timerScale, которые
                     // продолжают писаться ради отката на предыдущую версию.
-                    ...window.SettingsSchema.collectSettings(document),
+                    ...SettingsSchema.collectSettings(document),
                     // Своего формата: секунды из поля «MM:SS».
                     overrunLimitSeconds: this.readOverrunLimit(),
                     // Не поле ввода, а активная кнопка из трёх.
                     bgMode: this.currentBgMode,
                     // Тоже не поле ввода, а активная кнопка — теперь из четырёх.
-                    heroMode: this.heroMode || window.HeroModes.DEFAULT_MODE
+                    heroMode: this.heroMode || HeroModes.DEFAULT_MODE
                 };
 
                 // СЛИЯНИЕ, а не перезапись: ключ мог быть записан прежней версией
                 // приложения, и незнакомые панели поля переживают обновление.
-                const prev = window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {});
+                const prev = SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
                 // Подписи строк — производная от этих же настроек (почему здесь,
                 // а не в пяти обработчиках, — в renderWindowRows).
@@ -1179,8 +1187,8 @@
                     const applied = ScaleReport.applyScaleReport(data, {
                         doc: document,
                         storage: localStorage,
-                        clamp: window.RendererShared.clampScale,
-                        parseJSON: window.SecurityUtils.safeJSONParse
+                        clamp: RendererShared.clampScale,
+                        parseJSON: SecurityUtils.safeJSONParse
                     });
                     // Подписи строк — отчёт о ДЕЙСТВУЮЩИХ значениях, и масштаб
                     // в них входит (см. renderWindowRows).
@@ -1230,7 +1238,7 @@
                     const secs = Number(saved.remainingSeconds);
                     if (!Number.isFinite(secs)) { return; }
                     Toast.show(
-                        `Время восстановлено после сбоя: ${window.TimeUtils.formatTime(secs)}`,
+                        `Время восстановлено после сбоя: ${TimeUtils.formatTime(secs)}`,
                         'warning',
                         6000
                     );
@@ -1279,7 +1287,7 @@
                 if (!el) { return 0; }
                 const raw = String(el.value || '').trim();
                 if (!raw) { return 0; }
-                const parsed = window.TimeUtils.parseManualTime(raw);
+                const parsed = TimeUtils.parseManualTime(raw);
                 if (parsed === null || !Number.isFinite(parsed) || parsed < 0) { return 0; }
                 return parsed;
             }
@@ -1290,13 +1298,13 @@
                 const hint = document.getElementById('overrunLimitHint');
                 if (!el || !hint) { return; }
                 const raw = String(el.value || '').trim();
-                const parsed = raw ? window.TimeUtils.parseManualTime(raw) : 0;
+                const parsed = raw ? TimeUtils.parseManualTime(raw) : 0;
                 const bad = raw !== '' && parsed === null;
                 el.classList.toggle('input-error', bad);
                 if (bad) { hint.textContent = 'не понял формат'; return; }
                 const secs = this.readOverrunLimit();
                 hint.textContent = secs > 0
-                    ? `стоп на \u2212${window.TimeUtils.formatTimeShort(secs)}`
+                    ? `стоп на \u2212${TimeUtils.formatTimeShort(secs)}`
                     : 'без лимита';
             }
 
@@ -1351,7 +1359,7 @@
                 // Цветовые классы для времени
                 // Полоса срочности — общая для всех окон (RendererShared).
                 this.controlTimeEl.classList.remove('warning', 'danger');
-                const band = window.RendererShared.timerColorBand(this.remainingSeconds, this.totalSeconds);
+                const band = RendererShared.timerColorBand(this.remainingSeconds, this.totalSeconds);
                 const isOvertime = band === 'overtime';
                 if (isOvertime || band === 'danger') {
                     this.controlTimeEl.classList.add('danger');
@@ -1369,7 +1377,7 @@
                     running: 'Активен',
                     idle: 'Готов'
                 };
-                const status = window.RendererShared.timerLifecycleStatus({
+                const status = RendererShared.timerLifecycleStatus({
                     remainingSeconds: this.remainingSeconds,
                     totalSeconds: this.totalSeconds,
                     isRunning: this.isRunning,
@@ -1449,7 +1457,7 @@
             }
 
             formatTime(seconds) {
-                return window.TimeUtils.formatTimeShort(seconds);
+                return TimeUtils.formatTimeShort(seconds);
             }
 
             // FIX BUG-020: Add async/await for async operations
@@ -1679,7 +1687,7 @@
         // Пресеты вида: снимок ключей профиля и тот же путь применения, что при запуске панели.
         PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
         presetsApi = PanelPresets.install({
-            doc: document, storage: localStorage, presets: window.Presets, ipc: window.ipcRenderer || null,
+            doc: document, storage: localStorage, presets: Presets, ipc: window.ipcRenderer || null,
             controller: () => window.timerController, notify: (msg) => Toast && Toast.show(msg, 'success', 1600)
         });
         // Open FAQ modal

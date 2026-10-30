@@ -504,7 +504,7 @@ test('PANEL-009: лимит перерасхода раскладывается 
 
     const { codeOnly } = require('./helpers/source-scan');
     const src = codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'control-app.js'), 'utf8'));
-    assert.match(src, /getElementById\('overrunLimit'\)\.value = window\.SettingsSchema\.overrunLimitFieldValue\(ext\.overrunLimitSeconds\)/,
+    assert.match(src, /getElementById\('overrunLimit'\)\.value = SettingsSchema\.overrunLimitFieldValue\(ext\.overrunLimitSeconds\)/,
         'loadSettings не раскладывает лимит через общий формат');
     assert.doesNotMatch(src, /Number\(ext\.overrunLimitSeconds\)\) && Number\(ext\.overrunLimitSeconds\) > 0/,
         'старая ветка «только если > 0» вернулась');

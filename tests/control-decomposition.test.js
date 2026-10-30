@@ -218,13 +218,14 @@ test('вынесенные модули не тянут за собой внут
     }
 });
 
-test('модули берут общие зависимости через window, а не через голые имена', () => {
-    // В проекте нет сборщика: каждый файл — отдельный classic-script, поэтому
-    // голое имя работает случайно (через глобальную область) и ломает статический
-    // анализ. Конвенция проекта — window.X, как в renderer-shared/display-script.
-    const colorPicker = read('color-picker.js');
-    assert.match(colorPicker, /window\.ColorUtils\./);
-    assert.doesNotMatch(colorPicker, /(?<![\w.])ColorUtils\./);
+test('модули берут общие зависимости import-ом, а не через window или голые имена', () => {
+    // Окна — нативные ES-модули (план 2026-10-30-es-modules): зависимость
+    // библиотеки — import, его проверяет связывание. `window.X` остаётся только
+    // крючкам e2e (tests/window-bridges.test.js) — Toast из их числа.
+    const colorPicker = codeOnly(read('color-picker.js'));
+    assert.match(colorPicker, /^import \* as ColorUtils from '\.\/color-utils\.js';$/m);
+    assert.match(colorPicker, /(?<![\w.])ColorUtils\.hsvToRgb\(/);
+    assert.doesNotMatch(colorPicker, /window\.ColorUtils/);
 
     const customSounds = read('custom-sounds.js');
     assert.match(customSounds, /window\.Toast\./);

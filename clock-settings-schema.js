@@ -98,11 +98,4 @@ function applyClockSettings(els, stored) {
     }
 }
 
-const ClockSettingsSchema = { CLOCK_SETTINGS, collectClockSettings, applyClockSettings };
-
 export { CLOCK_SETTINGS, collectClockSettings, applyClockSettings };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.ClockSettingsSchema = ClockSettingsSchema;
-}

@@ -17,6 +17,10 @@
  * так же, как во всех остальных модулях рендерера: сборщика в проекте нет.
  */
 
+import * as SecurityUtils from './security.js';
+import * as RendererStorage from './renderer-storage.js';
+
+
 /**
  * Список звуков из хранилища — только правильной формы (BUG-21).
  *
@@ -33,7 +37,7 @@ function sanitizeCustomSounds(raw) {
 
 /** Прочитать список звуков из хранилища — один вход на все методы. */
 function readCustomSounds() {
-    return sanitizeCustomSounds(window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), []));
+    return sanitizeCustomSounds(SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), []));
 }
 
 /**
@@ -185,7 +189,7 @@ const CustomSoundsMixin = {
                 // Сохраняем в localStorage; замена одноимённого — не молча.
                 const { updated, replaced } = mergeCustomSound(readCustomSounds(), name, base64);
 
-                const storageResult = window.RendererStorage.safeSetJSON(
+                const storageResult = RendererStorage.safeSetJSON(
                     localStorage,
                     'customSounds',
                     updated,
@@ -333,7 +337,7 @@ const CustomSoundsMixin = {
 
     deleteCustomSound(name) {
             const filtered = readCustomSounds().filter(s => s.name !== name);
-            const storageResult = window.RendererStorage.safeSetJSON(
+            const storageResult = RendererStorage.safeSetJSON(
                 localStorage,
                 'customSounds',
                 filtered,
@@ -373,8 +377,3 @@ const CustomSoundsMixin = {
 };
 
 export { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6: читает e2e (status-and-colors); control-app.js импортирует
-    window.CustomSoundsMixin = CustomSoundsMixin;
-}

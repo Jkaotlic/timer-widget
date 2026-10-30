@@ -1067,7 +1067,7 @@ test('BUG-16: ни одного `overlay || 30` в панели и диспле�
         assert.doesNotMatch(src, /[Oo]verlay\s*\|\|\s*\d/, `${file}: вернулось «|| число» у затемнения`);
     }
     const panel = codeOnly(fs.readFileSync(path.join(__dirname, '..', 'panel-display.js'), 'utf8'));
-    assert.match(panel, /bgLocalOverlay:\s*window\.RendererShared\.bgOverlayPercent\(/);
+    assert.match(panel, /bgLocalOverlay:\s*(?<![\w.])RendererShared\.bgOverlayPercent\(/);
     // Самопроверка регулярки: на старом тексте она обязана сработать.
     assert.match('bgLocalOverlay: localBgSettings.overlay || 30,', /[Oo]verlay\s*\|\|\s*\d/);
 });

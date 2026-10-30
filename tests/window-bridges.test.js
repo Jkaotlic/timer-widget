@@ -52,24 +52,13 @@ const PERMANENT = Object.freeze([
 // Временные мосты: имя → файл. Только убывает (см. шапку).
 const TEMPORARY = Object.freeze({
     SecurityUtils: 'security.js',
-    ColorUtils: 'color-utils.js',
-    RendererStorage: 'renderer-storage.js',
     MoneyMeter: 'money-meter.js',
     TimeUtils: 'utils.js',
-    ClockSettingsSchema: 'clock-settings-schema.js',
     DisplayLayouts: 'display-layouts.js',
     WindowGeometry: 'window-geometry.js',
     DigitsStyle: 'digits-style.js',
     RendererShared: 'renderer-shared.js',
     HeroModes: 'hero-modes.js',
-    SettingsSchema: 'settings-schema.js',
-    SoundPresets: 'sound-presets.js',
-    Presets: 'presets.js',
-    // Задача 5: читатели вне control-app.js (теперь он импортирует):
-    // ColorPicker — panel-colors.js и e2e, CustomSoundsMixin — e2e
-    // (status-and-colors). Задача 6 решает: в PERMANENT или переписать читателя.
-    ColorPicker: 'color-picker.js',
-    CustomSoundsMixin: 'custom-sounds.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';

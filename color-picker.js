@@ -14,6 +14,9 @@
  * без него элемент фокусируется, но не активируется.
  */
 
+import * as ColorUtils from './color-utils.js';
+
+
 // === Color Picker ===
 class ColorPicker {
     constructor(svCanvasId, hueCanvasId, hexInputId, previewId, panelId, onColorChange) {
@@ -189,15 +192,15 @@ class ColorPicker {
     // отдельный <script> без сборщика не имеет импортов, а голое имя ломает
     // статический анализ.
     static hsvToRgb(h, s, v) {
-        return window.ColorUtils.hsvToRgb(h, s, v);
+        return ColorUtils.hsvToRgb(h, s, v);
     }
 
     static hsvToHex(h, s, v) {
-        return window.ColorUtils.hsvToHex(h, s, v);
+        return ColorUtils.hsvToHex(h, s, v);
     }
 
     static hexToHsv(hex) {
-        return window.ColorUtils.hexToHsv(hex);
+        return ColorUtils.hexToHsv(hex);
     }
 }
 
@@ -237,8 +240,6 @@ function addPickerToggle(gridId, pickerId, pickerConfig) {
 export { ColorPicker, addPickerToggle };
 
 if (typeof window !== 'undefined') {
-    // мост до задачи 6: ColorPicker читают panel-colors.js и e2e (status-and-colors)
-    window.ColorPicker = ColorPicker;
     // Крючок e2e; control-app.js импортирует.
     window.addPickerToggle = addPickerToggle;
 }

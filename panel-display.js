@@ -35,6 +35,10 @@
  * владеет ключами. Здесь только разделение обязанностей: крестик на дисплее
  * закрывает БЛОКИ, подписи выключаются лишь тумблером в панели.
  */
+import * as SecurityUtils from './security.js';
+import * as MoneyMeter from './money-meter.js';
+import * as RendererShared from './renderer-shared.js';
+import * as HeroModes from './hero-modes.js';
 import * as Schema from './settings-schema.js';
 const BLOCK_KEYS = Schema.DISPLAY_BLOCK_KEYS;
 const LABEL_KEYS = Schema.DISPLAY_LABEL_KEYS;
@@ -163,7 +167,7 @@ const PanelDisplayMixin = {
     pushDisplaySettings() {
         this.saveExtSettings();
 
-        const parse = window.SecurityUtils.safeJSONParse;
+        const parse = SecurityUtils.safeJSONParse;
         // Хранилище читается только в режиме «Файл»: строка до 13 М символов
         // на каждое нажатие клавиши не нужна и внутри панели.
         const localBgImage = this.currentBgMode === 'local'
@@ -181,7 +185,7 @@ const PanelDisplayMixin = {
             bgGrad1: document.getElementById('bgGrad1').value,
             bgGrad2: document.getElementById('bgGrad2').value,
             bgLocalFit: localBgSettings.fit || 'cover',
-            bgLocalOverlay: window.RendererShared.bgOverlayPercent(localBgSettings.overlay),
+            bgLocalOverlay: RendererShared.bgOverlayPercent(localBgSettings.overlay),
             eventTime: this.eventTimeInputEl.value,
             endTime: this.endTimeInputEl.value,
             eventTitle: this.eventTitleInputEl ? this.eventTitleInputEl.value : '',
@@ -189,7 +193,7 @@ const PanelDisplayMixin = {
             // Подписи уходят все три, а не только текущего режима: дисплей
             // хранит их для всех и переключение режима не должно требовать
             // повторного ввода.
-            heroMode: this.heroMode || window.HeroModes.DEFAULT_MODE,
+            heroMode: this.heroMode || HeroModes.DEFAULT_MODE,
             labelHeroCurrent: this.heroLabelInputs.current ? this.heroLabelInputs.current.value : '',
             labelHeroToStart: this.heroLabelInputs['to-start'] ? this.heroLabelInputs['to-start'].value : '',
             labelHeroToEnd: this.heroLabelInputs['to-end'] ? this.heroLabelInputs['to-end'].value : '',
@@ -246,9 +250,9 @@ const PanelDisplayMixin = {
 
         // Режим центрального времени. Ряд кнопок ведёт себя как bgMode:
         // владелец значения — this.heroMode, кнопки лишь его ВИД.
-        this.heroMode = window.HeroModes.DEFAULT_MODE;
+        this.heroMode = HeroModes.DEFAULT_MODE;
         this.heroLabelInputs = {};
-        for (const mode of window.HeroModes.HERO_MODES) {
+        for (const mode of HeroModes.HERO_MODES) {
             if (!mode.labelKey) { continue; }
             this.heroLabelInputs[mode.id] = document.getElementById(mode.labelKey);
         }
@@ -276,7 +280,7 @@ const PanelDisplayMixin = {
      * ни на что не влияют прямо сейчас, — а надпись обязана обещать правду.
      */
     setHeroMode(id) {
-        const mode = window.HeroModes.modeById(id);
+        const mode = HeroModes.modeById(id);
         this.heroMode = mode.id;
 
         document.querySelectorAll('.hero-mode-btn').forEach((btn) => {
@@ -300,7 +304,7 @@ const PanelDisplayMixin = {
         if (!isTimer) {
             const label = row && row.querySelector('.toggle-label');
             if (label) { label.setAttribute('for', mode.labelKey); }
-            if (hint) { hint.textContent = `Пустое поле вернёт «${window.HeroModes.heroCaption(mode.id)}».`; }
+            if (hint) { hint.textContent = `Пустое поле вернёт «${HeroModes.heroCaption(mode.id)}».`; }
         }
     },
 
@@ -801,8 +805,8 @@ const PanelDisplayMixin = {
      * из-за которого «Завершить» ничего не меняло на экране.
      */
     renderEventStatus() {
-        if (!this.eventStatusEl || !window.MoneyMeter) { return; }
-        const summary = window.MoneyMeter.eventSummary({
+        if (!this.eventStatusEl) { return; }
+        const summary = MoneyMeter.eventSummary({
             overrunSeconds: this.eventOverrunState.overrunSeconds,
             remainingSeconds: this.eventRemainingSeconds,
             excludedLiveSeconds: this.eventOverrunState.excludedLiveSeconds,
@@ -843,8 +847,7 @@ const PanelDisplayMixin = {
 
     bindBlockLabelRows() {
         const mount = document.getElementById('blockLabelRows');
-        const Layouts = window.DisplayLayouts;
-        if (!mount || !Layouts) { return; }
+        if (!mount) { return; }
         // Пересборка (смена замка 47-го этажа) НЕ имеет права стирать подписи:
         // следом за ней pushDisplaySettings собирает поля и пишет их в профиль,
         // и новые пустые поля молча возвращали дисплею стандартные слова.
@@ -895,8 +898,7 @@ const PanelDisplayMixin = {
      */
     bindDisplayLayouts() {
         const grid = document.getElementById('displayLayoutGrid');
-        const Layouts = window.DisplayLayouts;
-        if (!grid || !Layouts) { return; }
+        if (!grid) { return; }
         grid.textContent = '';
         for (const layout of Layouts.LAYOUTS) {
             // Секретная раскладка появляется вместе с разделом «47-го этажа».
@@ -931,8 +933,7 @@ const PanelDisplayMixin = {
      * собственные контролы, а не посылается «поставь такой-то тумблер».
      */
     applyDisplayLayout(layoutId) {
-        const Layouts = window.DisplayLayouts;
-        const layout = Layouts && Layouts.layoutById(layoutId);
+        const layout = Layouts.layoutById(layoutId);
         if (!layout) { return; }
 
         for (const [key, on] of Object.entries(Layouts.layoutToggles(layout))) {

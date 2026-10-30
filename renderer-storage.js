@@ -49,15 +49,4 @@ function safeSetJSON(storage, key, value, options = {}) {
     }
 }
 
-const api = {
-    getByteSize,
-    safeGetJSON,
-    safeSetJSON
-};
-
 export { getByteSize, safeGetJSON, safeSetJSON };
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.RendererStorage = api;
-}

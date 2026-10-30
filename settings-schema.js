@@ -416,30 +416,8 @@ function overrunLimitFieldValue(seconds) {
     return `${mm}:${ss}`;
 }
 
-// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
-// не расширяются (иначе объект не совпал бы с `typeof import`).
-/** @type {typeof import('./settings-schema.js')} */
-const SettingsSchema = {
-    SETTINGS_DESCRIPTORS,
-    overrunLimitFieldValue,
-    DISPLAY_BLOCK_KEYS,
-    DISPLAY_LABEL_KEYS,
-    MANUAL_KEYS,
-    settingValue,
-    applyStoredSettings,
-    collectSettings,
-    resetOwnedSettings,
-    resetKeys
-};
-
 export {
     SETTINGS_DESCRIPTORS, overrunLimitFieldValue, DISPLAY_BLOCK_KEYS,
     DISPLAY_LABEL_KEYS, MANUAL_KEYS, settingValue, applyStoredSettings,
     collectSettings, resetOwnedSettings, resetKeys
 };
-
-// Браузер (окно управления)
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.SettingsSchema = SettingsSchema;
-}

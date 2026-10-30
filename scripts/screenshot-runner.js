@@ -140,8 +140,12 @@ async function freezeAnimations(ctx, log) {
  * Ответ — не выкидывать кадры панели из сверки (это САМОЕ большое окно
  * приложения, и терять его коверидж ради одной строки нельзя) и не прятать
  * подпись (тогда из кадра уходит настоящий элемент), а сделать время
- * ПОСТОЯННЫМ. Заменяется ровно одна чистая функция, и подпись остаётся такой
- * же по форме и длине, какой её видит пользователь.
+ * ПОСТОЯННЫМ. Подменяется ровно одно значение — результат `endsAt` в подписи
+ * панели (крючок `window.__frozenEndsAt`, читает его panel-state.js на том же
+ * пути, что рисует подпись), и подпись остаётся такой же по форме и длине,
+ * какой её видит пользователь. До ES-модулей здесь подменялась сама функция
+ * `window.RendererShared.endsAt`; модуль-потребитель берёт её import-ом, и
+ * такая подмена молча перестала бы действовать.
  *
  * То же правило с другой стороны: кадры, где стенное время показано ЦЕЛИКОМ
  * (виджет часов, блоки дисплея), из сверки исключены — см. isTimeDependent().
@@ -155,8 +159,7 @@ async function freezeWallClock(ctx, log) {
         try {
             await w.webContents.executeJavaScript(`
                 (() => {
-                    const S = window.RendererShared;
-                    if (S && typeof S.endsAt === 'function') { S.endsAt = () => '${FROZEN_ENDS_AT}'; }
+                    window.__frozenEndsAt = '${FROZEN_ENDS_AT}';
                     return true;
                 })();
             `);
@@ -249,7 +252,7 @@ async function waitForRemaining(win, seconds, log, timeoutMs = 3000) {
     while (Date.now() < deadline) {
         try {
             const ok = await win.webContents.executeJavaScript(
-                `typeof widgetTimer !== 'undefined' && Math.floor(widgetTimer.remainingSeconds) === ${Math.floor(seconds)}`,
+                `!!window.timerWidget && Math.floor(window.timerWidget.remainingSeconds) === ${Math.floor(seconds)}`,
                 true
             );
             if (ok) { return true; }
