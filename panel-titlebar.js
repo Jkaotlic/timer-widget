@@ -130,12 +130,11 @@ function bindThemeToggle({ doc, ipc, theme, buttonId = 'contrastToggle' }) {
     return { set };
 }
 
-const PanelTitlebar = { bindLockToggle, bindThemeToggle, LOCK_BUTTON_IDS };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelTitlebar;
-}
+export { bindLockToggle, bindThemeToggle, LOCK_BUTTON_IDS };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
+    /** @type {typeof import('./panel-titlebar.js')} */
+    const PanelTitlebar = { bindLockToggle, bindThemeToggle, LOCK_BUTTON_IDS };
     window.PanelTitlebar = PanelTitlebar;
 }

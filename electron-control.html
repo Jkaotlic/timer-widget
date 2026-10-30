@@ -16,8 +16,6 @@
          величины общие для всех окон и обе обязаны быть применены ДО первого
          кадра, иначе окно успевает показать чужое состояние. -->
     <script src="ui-lock.js"></script>
-    <script src="panel-titlebar.js"></script>
-    <script src="panel-presets.js"></script><script src="panel-compact.js"></script>
     <script src="theme-init.js"></script>
 </head>
 <body class="control-window state-idle">
@@ -1108,6 +1106,11 @@
     <!-- Из <head> перенесён модулем: его читает только control-app.js (window.Presets
          при установке ячеек), а panel-presets.js получает реестр аргументом. -->
     <script type="module" src="presets.js"></script>
+    <!-- Из <head> перенесены модулями: до первого кадра им делать нечего — на
+         верхнем уровне только объявления, проводку зовёт control-app.js. -->
+    <script type="module" src="panel-titlebar.js"></script>
+    <script type="module" src="panel-presets.js"></script>
+    <script type="module" src="panel-compact.js"></script>
     <script type="module" src="sound-bank.js"></script>
     <script type="module" src="sound-presets.js"></script>
     <script type="module" src="ui-feedback.js"></script>

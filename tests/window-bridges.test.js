@@ -68,6 +68,9 @@ const TEMPORARY = Object.freeze({
     Onboarding: 'onboarding.js',
     MiniBar: 'mini-bar.js',
     PanelDrawer: 'panel-drawer.js',
+    PanelTitlebar: 'panel-titlebar.js',
+    PanelPresets: 'panel-presets.js',
+    PanelCompact: 'panel-compact.js',
 });
 
 const BRIDGE_NOTE = 'мост до задачи 6';
