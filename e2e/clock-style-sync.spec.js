@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, findWindowBy } = require('./window-ready');
+const { waitForClock, waitForClockGone, findWindowBy, reloadPanel, waitForQuiet } = require('./window-ready');
 const { installClockStyleProbe, clockSends } = require('./clock-style-probe');
 
 /**
@@ -43,6 +43,15 @@ async function readState(control) {
     });
 }
 
+/*
+ * Пауз после кликов в этой спеке нет, и это не допущение: всё, что она меряет
+ * в ПАНЕЛИ, обработчики пишут синхронно. Клик по сегменту — `apply` + событие
+ * `change` (_attachSegmented), обработчики `change` у #timerStyle, #clockStyle
+ * и #syncClockStyle (control-app.js) меняют контролы и зовут saveExtSettings
+ * без таймеров. Когда `evaluate`/`click` вернулись, состояние уже записано.
+ * Ждать приходится только окна и ящик — их и ждём условием.
+ */
+
 async function setSync(control, on) {
     await control.evaluate((v) => {
         const el = document.getElementById('syncClockStyle');
@@ -60,7 +69,9 @@ test('строка «Стиль часов» видна всегда и под �
     await control.evaluate(() => {
         document.querySelector('.tab-btn[data-tab="clock"]').click();
     });
-    await control.waitForTimeout(800);
+    // Видимость меряется offsetParent — ящик обязан быть открыт и доехать.
+    await control.waitForSelector('#settingsDrawer.open');
+    await waitForQuiet(control);
 
     const base = await readState(control);
     console.log('исходно →', JSON.stringify(base));
@@ -76,7 +87,6 @@ test('строка «Стиль часов» видна всегда и под �
     await control.evaluate(() => {
         document.querySelector('#clockStyle button[data-val="digits"]').click();
     });
-    await control.waitForTimeout(400);
     const off = await readState(control);
     console.log('sync выкл →', JSON.stringify(off));
     expect(off.syncChecked).toBe(false);
@@ -85,7 +95,6 @@ test('строка «Стиль часов» видна всегда и под �
 
     // --- Синхронизация ВКЛючена: выбор остаётся ВИДНЫМ и берёт стиль виджета ---
     await setSync(control, true);
-    await control.waitForTimeout(400);
     const on = await readState(control);
     console.log('sync вкл →', JSON.stringify(on));
     expect(on.syncChecked).toBe(true);
@@ -99,7 +108,6 @@ test('строка «Стиль часов» видна всегда и под �
     await control.evaluate(() => {
         document.querySelector('#timerStyle button[data-val="flip"]').click();
     });
-    await control.waitForTimeout(600);
     const moved = await readState(control);
     console.log('виджет→флип при sync вкл →', JSON.stringify(moved));
     expect(moved.syncChecked, 'смена стиля виджета не выключает синхронизацию').toBe(true);
@@ -108,7 +116,6 @@ test('строка «Стиль часов» видна всегда и под �
 
     // --- Клик по стилю часов означает «хочу свой» и снимает синхронизацию ---
     await control.click('#clockStyle button[data-val="analog"]');
-    await control.waitForTimeout(500);
     const own = await readState(control);
     console.log('клик по стилю часов →', JSON.stringify(own));
     expect(own.syncChecked, 'явный выбор стиля часов снимает синхронизацию').toBe(false);
@@ -120,7 +127,6 @@ test('строка «Стиль часов» видна всегда и под �
         document.querySelector('#timerStyle button[data-val="circle"]').click();
         document.querySelector('#clockStyle button[data-val="circle"]').click();
     });
-    await control.waitForTimeout(400);
     await app.close();
 });
 
@@ -136,16 +142,15 @@ test('включённая синхронизация переживает пе�
         el.checked = true;
         el.dispatchEvent(new Event('change'));
     });
-    await control.waitForTimeout(600);
 
     const saved = await control.evaluate(
         () => JSON.parse(localStorage.getItem('displayExtSettings') || '{}').syncClockStyle
     );
     expect(saved, 'syncClockStyle обязан сохраниться как true').toBe(true);
 
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(1500);
+    // Контроллер новой страницы встал и стартовая рассылка ушла: loadSettings
+    // (а с ней и прежний ложный 'change') — в конструкторе, до этого места.
+    await reloadPanel(control);
 
     const after = await control.evaluate(() => ({
         checked: document.getElementById('syncClockStyle').checked,
@@ -162,7 +167,6 @@ test('включённая синхронизация переживает пе�
         el.checked = false;
         el.dispatchEvent(new Event('change'));
     });
-    await control.waitForTimeout(400);
     await app.close();
 });
 
@@ -175,13 +179,11 @@ test('при синхронизации стиль часов идёт за ст
         el.checked = true;
         el.dispatchEvent(new Event('change'));
     });
-    await control.waitForTimeout(500);
 
     // Клик по варианту «Флип» в переключателе стиля ВИДЖЕТА.
     await control.evaluate(() => {
         document.querySelector('#timerStyle button[data-val="flip"]').click();
     });
-    await control.waitForTimeout(600);
 
     const res = await control.evaluate(() => ({
         widget: document.getElementById('timerStyle').value,
@@ -207,7 +209,6 @@ test('при синхронизации стиль часов идёт за ст
         el.checked = false;
         el.dispatchEvent(new Event('change'));
     });
-    await control.waitForTimeout(400);
     await app.close();
 });
 
@@ -226,26 +227,27 @@ test('при синхронизации подпись строки «Часы»
     const { app, control } = await launchApp();
     try {
         await control.click('#openClockBtn');
-        await control.waitForTimeout(1600);
+        await waitForClock(app);
 
         await control.evaluate(() => {
             const el = document.getElementById('syncClockStyle');
             el.checked = true;
             el.dispatchEvent(new Event('change'));
         });
-        await control.waitForTimeout(500);
 
         await control.evaluate(() => {
             document.querySelector('#timerStyle button[data-val="analog"]').click();
         });
-        await control.waitForTimeout(700);
 
-        const subs = await control.evaluate(() => ({
-            clock: document.getElementById('subClock').textContent,
-            widget: document.getElementById('subWidget').textContent
+        // Подпись — отчёт: обновляется на записи настроек (синхронно), опрос —
+        // на случай перерисовки строк по состоянию окна часов.
+        const subClock = () => control.evaluate(() => document.getElementById('subClock').textContent);
+        await expect.poll(subClock, { message: 'часы показывают стиль виджета — так и надо писать' })
+            .toContain('аналог');
+        console.log('подписи при синхронизации →', JSON.stringify({
+            clock: await subClock(),
+            widget: await control.evaluate(() => document.getElementById('subWidget').textContent)
         }));
-        console.log('подписи при синхронизации →', JSON.stringify(subs));
-        expect(subs.clock, 'часы показывают стиль виджета — так и надо писать').toContain('аналог');
     } finally {
         // Профиль e2e общий на весь прогон: тест, оставивший синхронизацию
         // включённой, прячет строку выбора стиля и роняет чужие спеки —
@@ -258,7 +260,7 @@ test('при синхронизации подпись строки «Часы»
             const clockBtn = document.getElementById('openClockBtn');
             if (clockBtn && clockBtn.classList.contains('active')) { clockBtn.click(); }
         });
-        await control.waitForTimeout(800);
+        await waitForClockGone(app);
         await app.close();
     }
 });

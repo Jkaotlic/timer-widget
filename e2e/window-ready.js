@@ -445,25 +445,57 @@ async function untilReceived(page, channel, action, opts = {}) {
  * @returns {Promise<import('@playwright/test').Page>} то же окно
  */
 async function waitForDisplaySnapshot(app, display, control, opts = {}) {
-    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
     await display.waitForLoadState('load');
-    const deadline = Date.now() + timeout;
-    for (;;) {
-        const loaded = await app.evaluate(({ BrowserWindow }) => {
-            const win = BrowserWindow.getAllWindows()
-                .find((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'));
-            return !!win && !win.webContents.isLoading();
-        });
-        if (loaded) { break; }
-        if (Date.now() > deadline) {
-            throw new Error(`окно дисплея не закончило загрузку за ${timeout} мс`);
-        }
-        await new Promise((r) => setTimeout(r, POLL_MS));
-    }
+    await waitForMainLoaded(app, 'display.html', 'дисплея', opts);
     await untilReceived(display, 'display-settings-update', () => control.evaluate(() => {
         document.getElementById('showCurrentTime').dispatchEvent(new Event('change', { bubbles: true }));
     }), opts);
     return display;
+}
+
+/**
+ * То же для ВИДЖЕТА: снимок главного процесса (`announceWindowOpened` —
+ * состояние, настройки дисплея, цвета, стиль, тема) отработан.
+ *
+ * Шаг 2 — повтор стартовой посылки панели `pushWindowStyles()` (её же панель
+ * шлёт через 600 мс после старта): `widget-style-update` идёт через main
+ * следом за снимком, порядок main → окно сохраняется. Настройки дисплея
+ * виджету этим путём не идут — main шлёт их ему только снимком.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} widget
+ * @param {import('@playwright/test').Page} control — окно панели
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<import('@playwright/test').Page>} то же окно
+ */
+async function waitForWidgetSnapshot(app, widget, control, opts = {}) {
+    await widget.waitForLoadState('load');
+    await waitForMainLoaded(app, 'electron-widget.html', 'виджета', opts);
+    await untilReceived(widget, 'widget-style-update',
+        () => control.evaluate(() => window.timerController.pushWindowStyles()), opts);
+    return widget;
+}
+
+/**
+ * Главный процесс видит окно с адресом `urlPart` загруженным
+ * (`!webContents.isLoading()`): `did-stop-loading` идёт после
+ * `did-finish-load`, значит слушатель снимка уже отработал и посылки ушли.
+ */
+async function waitForMainLoaded(app, urlPart, name, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const deadline = Date.now() + timeout;
+    for (;;) {
+        const loaded = await app.evaluate(({ BrowserWindow }, part) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((w) => !w.isDestroyed() && w.webContents.getURL().includes(part));
+            return !!win && !win.webContents.isLoading();
+        }, urlPart);
+        if (loaded) { return; }
+        if (Date.now() > deadline) {
+            throw new Error(`окно ${name} не закончило загрузку за ${timeout} мс`);
+        }
+        await new Promise((r) => setTimeout(r, POLL_MS));
+    }
 }
 
 /**
@@ -506,5 +538,6 @@ module.exports = {
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
+    waitForWidgetSnapshot,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };
