@@ -19,6 +19,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { scriptTags } = require('./helpers/source-scan');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
@@ -81,7 +82,7 @@ test('каждое из четырёх окон подключает ui-lock.js 
     // показать подсветку перетаскивания, которой быть не должно.
     for (const file of WINDOWS) {
         const html = read(file);
-        assert.match(html, /<script src="ui-lock\.js"><\/script>/, `${file}: нет ui-lock.js`);
+        assert.ok(scriptTags(html).some((t) => t.src === 'ui-lock.js'), `${file}: нет ui-lock.js`);
         assert.match(html, /window\.UILock\.initLock\(\)/, `${file}: замок не применяется в <head>`);
         const head = html.slice(0, html.indexOf('</head>'));
         assert.ok(head.includes('window.UILock.initLock()'), `${file}: initLock вызывается ПОСЛЕ <head>`);
@@ -114,7 +115,7 @@ test('панель ставит замок кнопкой и сообщает о
     // самодостаточный блок выносится, а не дописывается в god-файл.
     const control = codeOnly(read('electron-control.html'));
     assert.match(control, /id="lockToggle"/, 'в титлбаре нет кнопки замка');
-    assert.match(control, /<script src="panel-titlebar\.js"><\/script>/, 'панель не подключает panel-lock.js');
+    assert.ok(scriptTags(control).some((t) => t.src === 'panel-titlebar.js'), 'панель не подключает panel-lock.js');
     assert.match(control, /window\.PanelTitlebar\.bindLockToggle\(/, 'кнопка замка ни к чему не привязана');
 
     const panelLock = codeOnly(read('panel-titlebar.js'));

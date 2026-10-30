@@ -27,6 +27,7 @@
  */
 
 const fs = require('node:fs');
+const { scriptTags } = require('./source-scan');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -51,13 +52,16 @@ function expandWindow(file) {
         const body = readRaw(own);
         const re = own.endsWith('.css')
             ? new RegExp(`<link rel="stylesheet" href="${escapeRe(own)}">`, 'g')
-            : new RegExp(`<script src="${escapeRe(own)}"></script>`, 'g');
+            : new RegExp(`<script\\b[^>]*\\ssrc="${escapeRe(own)}"[^>]*></script>`, 'g');
         const tag = own.endsWith('.css') ? 'style' : 'script';
         let hits = 0;
         // Функция, а не строка замены: в коде бывают `$&` и `$1`.
         html = html.replace(re, () => { hits++; return `<${tag}>\n${body}</${tag}>`; });
-        if (hits !== 1) {
-            throw new Error(`${file}: собственный файл ${own} подключён ${hits} раз(а), ожидался ровно один`);
+        // Число подключений считает разбор тегов, не регулярка замены: так
+        // `defer`/`type="module"` не прячут тег от счёта.
+        const tagged = own.endsWith('.css') ? hits : scriptTags(readRaw(file)).filter((t) => t.src === own).length;
+        if (hits !== 1 || tagged !== 1) {
+            throw new Error(`${file}: собственный файл ${own} подключён ${hits} раз(а) (по разбору тегов ${tagged}), ожидался ровно один`);
         }
     }
     return html;

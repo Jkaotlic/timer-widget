@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
-const { codeOnly, styleToken } = require('./helpers/source-scan');
+const { scriptTags, codeOnly, styleToken } = require('./helpers/source-scan');
 
 const { mergeColors, PanelColorsMixin, SURFACE_TARGETS } = require('../panel-colors');
 const { readSource } = require('./helpers/window-source');
@@ -89,7 +89,7 @@ const PANEL = read('electron-control.html');
 const PANEL_CODE = codeOnly(PANEL);
 
 test('панель подключает модуль и подмешивает его в прототип', () => {
-    assert.match(PANEL, /<script src="panel-colors\.js"><\/script>/);
+    assert.ok(scriptTags(PANEL).some((t) => t.src === 'panel-colors.js'));
     assert.match(PANEL_CODE, /Object\.assign\(TimerController\.prototype, window\.PanelColorsMixin\)/);
     assert.match(PANEL_CODE, /initSurfaceControls\(\)/);
 });

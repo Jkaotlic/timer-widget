@@ -24,7 +24,7 @@ const readRaw = (file) => readSource(file);
 // и раньше должны были идти по коду, а не по пояснениям к нему.
 // Реализация ОДНА на весь набор тестов: копий было три, и они разошлись —
 // две вырезали <!-- -->, третья нет.
-const { codeOnly, functionBody, ipcHandlerBody } = require('./helpers/source-scan');
+const { scriptTags, codeOnly, functionBody, ipcHandlerBody } = require('./helpers/source-scan');
 const { readMainSource } = require('./helpers/main-source');
 const { readSource } = require('./helpers/window-source');
 const read = (file) => codeOnly(readRaw(file));
@@ -491,7 +491,7 @@ test('все три окна берут приоритеты статуса из
         );
     }
     // Панель управления обязана подключать модуль, иначе вызов упадёт.
-    assert.match(controlHtml, /<script src="renderer-shared\.js"><\/script>/);
+    assert.ok(scriptTags(controlHtml).some((t) => t.src === 'renderer-shared.js'));
 });
 
 test('виджет читает finished из состояния таймера', () => {
@@ -657,7 +657,7 @@ test('панель подтягивает ползунок и не отвеча�
     // панели: открытие окна виджета затирало настройки, положенные в профиль
     // мимо неё (поймано 01.09.2026 — падал e2e/digits-style.spec.js).
     assert.doesNotMatch(handler[0], /this\.saveExtSettings\(\)/);
-    assert.match(controlHtml, /<script src="scale-report\.js"><\/script>/);
+    assert.ok(scriptTags(controlHtml).some((t) => t.src === 'scale-report.js'));
     // И слушатель обязан сниматься при закрытии окна.
     assert.match(controlHtml, /removeListener\('scale-report', this\._onScaleReport\)/);
 });

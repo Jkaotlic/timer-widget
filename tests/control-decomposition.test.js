@@ -15,6 +15,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { readSource, readRaw } = require('./helpers/window-source');
+const { scriptTags } = require('./helpers/source-scan');
 
 const read = (file) => readSource(file);
 const controlHtml = read('electron-control.html');
@@ -190,9 +191,8 @@ test('таблицы стилей панели подключены в прав�
 
 test('каждый вынесенный модуль подключён в разметке', () => {
     for (const mod of EXTRACTED) {
-        assert.match(
-            controlHtml,
-            new RegExp(`<script src="${mod.replace('.', '\\.')}"></script>`),
+        assert.ok(
+            scriptTags(controlHtml).some((t) => t.src === mod),
             `${mod} не подключён в electron-control.html`
         );
     }

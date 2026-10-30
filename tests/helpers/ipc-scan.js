@@ -16,7 +16,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { codeOnly, maskNonCode, balancedBlockAt, afterBalanced } = require('./source-scan');
+const { scriptTags, codeOnly, maskNonCode, balancedBlockAt, afterBalanced } = require('./source-scan');
 const { WINDOW_OWN, readSource } = require('./window-source');
 
 const repoRoot = path.join(__dirname, '..', '..');
@@ -36,7 +36,7 @@ const PAGES = Object.freeze({
 function roleFiles(role) {
     const html = readSource(PAGES[role]);
     const own = WINDOW_OWN[PAGES[role]];
-    const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1])
+    const srcs = scriptTags(html).map((t) => t.src)
         .filter((f) => !own.includes(f));
     return [
         { file: PAGES[role], code: codeOnly(html), page: true },

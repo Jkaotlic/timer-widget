@@ -15,6 +15,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { scriptTags } = require('./helpers/source-scan');
 const path = require('node:path');
 
 const Schema = require('../settings-schema.js');
@@ -281,7 +282,7 @@ const pkg = JSON.parse(readSource('package.json'));
 test('модуль подключён в панели и попадает в сборку', () => {
     // Без первого — панель падает при загрузке; без второго модуль исчезает из
     // packaged-релиза (ровно так терялся design-tokens.css, см. CHANGELOG 2.3.2).
-    assert.match(controlHtml, /<script src="settings-schema\.js"><\/script>/);
+    assert.ok(scriptTags(controlHtml).some((t) => t.src === 'settings-schema.js'));
     assert.ok(pkg.build.files.includes('settings-schema.js'), 'settings-schema.js нет в build.files');
 });
 

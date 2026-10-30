@@ -16,11 +16,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { WINDOW_OWN, readSource, readRaw } = require('./helpers/window-source');
+const { scriptTags } = require('./helpers/source-scan');
 
 const ROOT = path.join(__dirname, '..');
 
 const refs = (html) => [
-    ...[...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((m) => m[1]),
+    ...scriptTags(html).map((t) => t.src),
     ...[...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1])
 ];
 
