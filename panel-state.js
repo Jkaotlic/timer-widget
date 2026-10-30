@@ -6,17 +6,22 @@
  * Это ПРОТОТИПНЫЙ ПРИМЕСЬ-модуль, как custom-sounds.js и local-background.js:
  * методы обращаются к this.startBtn / this.remainingSeconds и вызывают друг
  * друга, поэтому свободными функциями их сделать нельзя без переписывания
- * семантики this. Подключение — одна строка в панели:
+ * семантики this. Подключение — import и одна строка в control-app.js:
  *
- *     Object.assign(TimerController.prototype, window.PanelStateMixin);
+ *     Object.assign(TimerController.prototype, PanelStateMixin);
  *
- * Если эта строка потеряется, при загрузке НИЧЕГО не упадёт — упадёт первый
- * же тик таймера. Ровно так в этом проекте уже терялись примеси.
+ * Потерянную строку ловит tests/control-mixins.test.js (каждая
+ * импортированная примесь присвоена): без неё при загрузке НИЧЕГО не упало
+ * бы — упал бы первый же тик таймера. Ровно так в этом проекте уже терялись
+ * примеси.
  *
  * Что модуль знает о вёрстке: класс `state-*` на <body> и горстку id. Всё
  * остальное — видимость блоков, цвета, порядок — решает CSS по этому классу.
  * Модуль отдаёт ЗНАЧЕНИЯ и состояние, а не раскладку.
  */
+
+import * as RendererShared from './renderer-shared.js';
+
 
 
 /**
@@ -349,7 +354,7 @@ const PanelStateMixin = {
             // его, а не набирают с нуля. Поле выделяется по фокусу, поэтому
             // первая же цифра заменяет значение целиком.
             const total = Math.max(0, Math.round(this.remainingSeconds || this.presetSeconds || 0));
-            const parts = window.RendererShared.breakdown(total);
+            const parts = RendererShared.breakdown(total);
             const value = { manualHours: parts.hours, manualMinutes: parts.minutes, manualSeconds: parts.seconds };
             for (const f of fields) {
                 f.el.value = String(value[f.id]).padStart(f.id === 'manualHours' ? 1 : 2, '0');
@@ -382,7 +387,7 @@ const PanelStateMixin = {
         // кнопки транспорта: панель показывалась без «Старта». Дефект живёт
         // ровно одну секунду и потому незаметен в разработке.
 
-        const isOvertime = (band || window.RendererShared.timerColorBand(
+        const isOvertime = (band || RendererShared.timerColorBand(
             this.remainingSeconds, this.totalSeconds)) === 'overtime';
         const live = this.isRunning || this.isPaused;
 
@@ -432,7 +437,7 @@ const PanelStateMixin = {
             running: 'Осталось',
             idle: 'Длительность'
         };
-        const lifecycle = status || window.RendererShared.timerLifecycleStatus({
+        const lifecycle = status || RendererShared.timerLifecycleStatus({
             remainingSeconds: this.remainingSeconds,
             totalSeconds: this.totalSeconds,
             isRunning: this.isRunning,
@@ -445,7 +450,17 @@ const PanelStateMixin = {
         // Подсказка под цифрами. В отсчёте и перерасходе это ВРЕМЯ
         // ОКОНЧАНИЯ — оно отвечает на вопрос, который иначе считают в
         // уме: «во сколько это кончится».
-        const endLabel = window.RendererShared.endsAt(this.remainingSeconds, new Date());
+        //
+        // `window.__frozenEndsAt` — крючок стенда съёмки
+        // (scripts/screenshot-runner.js, freezeWallClock): кадр панели не
+        // должен зависеть от минуты съёмки. До модулей стенд подменял
+        // `window.RendererShared.endsAt`, но import-у подмена не видна
+        // (namespace только для чтения), поэтому значение читается здесь, на
+        // настоящем пути подписи. Приложение его не ставит никогда.
+        const frozenEndsAt = window.__frozenEndsAt;
+        const endLabel = typeof frozenEndsAt === 'string'
+            ? frozenEndsAt
+            : RendererShared.endsAt(this.remainingSeconds, new Date());
         const HINT = {
             idle: 'нажмите на время, чтобы ввести своё',
             running: endLabel ? `закончится в ${endLabel}` : '',
@@ -533,11 +548,7 @@ const PanelStateMixin = {
     }
 };
 
-// Node (тесты) и браузер (панель) — двойной экспорт, как у остальных модулей.
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelStateMixin;
-    module.exports.windowRowSubtitle = windowRowSubtitle;
-}
-if (typeof window !== 'undefined') {
-    window.PanelStateMixin = PanelStateMixin;
-}
+// Примесь — отдельным именем, как у остальных: прежний module.exports БЫЛ
+// самой примесью и дописывал в неё windowRowSubtitle (в окне его у объекта
+// не было, в Node — был; формы расходились).
+export { PanelStateMixin, windowRowSubtitle };

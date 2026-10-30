@@ -116,7 +116,11 @@ const DEFAULT_LABEL_SCALE = 100;
 // кадра. То же число стоит в перетаскивании блоков (display-script.js).
 const EDGE_MARGIN = 20;
 
-function clampScale(value) {
+// Не `clampScale`: под тем же именем renderer-shared.js объявляет функцию
+// ТРЁХ аргументов, а классические скрипты страницы делят верхний уровень —
+// какая из двух окажется под голым именем, решал порядок тегов. Наружу —
+// по-прежнему `DisplayLayouts.clampScale`.
+function clampElementScale(value) {
     const n = parseInt(value, 10);
     if (!Number.isFinite(n)) { return null; }
     return Math.max(MIN_ELEMENT_SCALE, Math.min(MAX_ELEMENT_SCALE, n));
@@ -179,11 +183,11 @@ function defaultScale(id) {
  * пользователю, который просто обновил приложение.
  */
 function normalizeScales(stored, legacyPct) {
-    const legacy = clampScale(legacyPct);
+    const legacy = clampElementScale(legacyPct);
     const src = (stored && typeof stored === 'object') ? stored : {};
     const out = {};
     for (const el of DISPLAY_ELEMENTS) {
-        const own = clampScale(src[el.id]);
+        const own = clampElementScale(src[el.id]);
         if (own !== null) {
             out[el.id] = own;
             continue;
@@ -340,7 +344,7 @@ function layoutScales(layout) {
     const out = {};
     for (const el of DISPLAY_ELEMENTS) {
         const entry = layout && layout.elements ? layout.elements[el.id] : null;
-        const own = entry ? clampScale(entry.scale) : null;
+        const own = entry ? clampElementScale(entry.scale) : null;
         out[el.id] = own === null ? defaultScale(el.id) : own;
     }
     return out;
@@ -412,7 +416,7 @@ function placeElements(layout, viewport, naturalSizes, options = {}) {
         const natH = Number(size.height);
         if (!Number.isFinite(natW) || !Number.isFinite(natH) || natW <= 0 || natH <= 0) { continue; }
 
-        let scale = clampScale(entry.scale);
+        let scale = clampElementScale(entry.scale);
         if (scale === null) { scale = defaultScale(id); }
 
         const place = (pct) => {
@@ -514,37 +518,12 @@ function fractionToPosition(fraction, viewport, size, margin = EDGE_MARGIN) {
     };
 }
 
-const DisplayLayouts = {
-    DISPLAY_ELEMENTS,
-    LABELLED_ELEMENTS,
-    SECRET_ELEMENTS,
-    MAX_CAPTION,
-    blockCaption,
-    sanitizeCaption,
-    ELEMENT_IDS,
-    LAYOUTS,
-    LAYOUT_IDS,
-    MIN_ELEMENT_SCALE,
-    MAX_ELEMENT_SCALE,
-    DEFAULT_BLOCK_SCALE,
-    DEFAULT_LABEL_SCALE,
-    EDGE_MARGIN,
-    TIMER_GAP,
-    clampScale,
-    defaultScale,
-    normalizeScales,
-    layoutById,
-    layoutToggles,
-    layoutScales,
-    placeElements,
-    positionToFraction,
+
+export {
+    DISPLAY_ELEMENTS, LABELLED_ELEMENTS, SECRET_ELEMENTS, MAX_CAPTION, blockCaption,
+    sanitizeCaption, ELEMENT_IDS, LAYOUTS, LAYOUT_IDS, MIN_ELEMENT_SCALE,
+    MAX_ELEMENT_SCALE, DEFAULT_BLOCK_SCALE, DEFAULT_LABEL_SCALE, EDGE_MARGIN,
+    TIMER_GAP, clampElementScale as clampScale, defaultScale, normalizeScales,
+    layoutById, layoutToggles, layoutScales, placeElements, positionToFraction,
     fractionToPosition
 };
-
-if (typeof window !== 'undefined') {
-    window.DisplayLayouts = DisplayLayouts;
-}
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = DisplayLayouts;
-}

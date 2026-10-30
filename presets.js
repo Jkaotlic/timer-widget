@@ -318,26 +318,8 @@ function activeSlot(storage) {
     return key;
 }
 
-const Presets = {
-    PRESET_SLOTS,
-    PRESETS_STORAGE_KEY,
-    PRESET_KEYS,
-    normalizeSlot,
-    capturePreset,
-    applyPreset,
-    readPresets,
-    writePreset,
-    hasPreset,
-    matchesPreset,
-    ACTIVE_SLOT_STORAGE_KEY,
-    writeActiveSlot,
-    activeSlot
+export {
+    PRESET_SLOTS, PRESETS_STORAGE_KEY, PRESET_KEYS, normalizeSlot, capturePreset,
+    applyPreset, readPresets, writePreset, hasPreset, matchesPreset,
+    ACTIVE_SLOT_STORAGE_KEY, writeActiveSlot, activeSlot
 };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Presets;
-}
-
-if (typeof window !== 'undefined') {
-    window.Presets = Presets;
-}

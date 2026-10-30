@@ -73,10 +73,10 @@ Multi-window Electron desktop timer app. Vanilla JavaScript — no UI frameworks
 
 Rules when working here:
 
-- **No bundler.** Every file is a classic `<script>`, so cross-module references go through `window.X`. A bare name resolves only by accident via the global scope and breaks lint.
-- **Several are prototype mixins** (`Object.assign(TimerController.prototype, window.XMixin)`), not free functions: their methods call each other and the controller's `this.beep()`, and DOM handlers close over `this`. If the `Object.assign` line is lost, nothing fails at load; it fails at the first click.
-- **Every new module must go into `package.json` `build.files`** or it silently vanishes from the packaged app; two tests guard this.
-- **When you touch a self-contained block still living in `control-app.js`, move it out** instead of editing it in place.
+- **Native ES modules, no bundler**: `<body>` has only the entry module and its `*-theme-sync.js`, the rest is `import`; `<head>` stays classic. Dependency = `import`; `window.X` is only an e2e hook (`tests/window-bridges.test.js`) — [разбор](docs/lessons.md#es-modules-three-traps).
+- **Mixins**: `control-app.js` imports `XMixin` and `Object.assign`s it onto the prototype; a lost line fails only at the first click — `tests/control-mixins.test.js`.
+- **Every new module goes into `package.json` `build.files`**; shared files export NAMED only (main uses `require(esm)`).
+- **A self-contained block still in `control-app.js` that you touch — move it out.**
 - **A setting's key, control and default belong in `settings-schema.js` — in ONE row.** `loadSettings()` keeps only what the table cannot express: the two keys with their own format (`MANUAL_KEYS`) and the side effects. `tests/settings-schema.test.js` fails if a second copy of a default reappears
 
 ### Shared Modules
@@ -182,7 +182,8 @@ Release: те же ворота до сборки, Electron — последни
 - **Диапазон масштаба обязан быть ДОСТИЖИМ: пол окна = его размер при `MIN_SCALE_PCT`, ОДИНАКОВЫЙ по осям (иначе окно не квадрат)** — [разбор](docs/lessons.md#a-promised-range-must-be-reachable-at-both-ends)
 - **Счётчик масштаба не обновляют из `outerWidth`, прочитанного В событии `resize`: там окно ещё прежнего размера — владелец величины один, модуль геометрии** — [разбор](docs/lessons.md#a-scale-counter-must-not-be-refreshed-from-a-stale-outerwidth)
 - **`window-geometry` шлётся и по СВОИМ событиям окна (`resize`/`move`): размер меняют не только через IPC** — [разбор](docs/lessons.md#the-main-process-must-report-geometry-on-its-own-events-too)
-- **Без сборщика ОБЪЯВЛЕНИЕ верхнего уровня общее: второй `const X` роняет весь inline-скрипт окна** — [разбор](docs/lessons.md#without-a-bundler-a-top-level-name-is-shared-by-the-whole-document)
+- **Общий верхний уровень — только у скриптов `<head>`: второй `const X` роняет скрипт** — [разбор](docs/lessons.md#without-a-bundler-a-top-level-name-is-shared-by-the-whole-document)
+- **Модуль молча теряет неявное `window.f` классической `function f`** — [разбор](docs/lessons.md#es-modules-three-traps)
 - **Замок запрещает ЖЕСТЫ, а не настройки: спрашивать его обязан КАЖДЫЙ жест — перетаскивание, колесо, крестик** — [разбор](docs/lessons.md#a-lock-forbids-gestures-not-settings)
 - **Пресет вида хранит ЗНАЧЕНИЯ ключей профиля и применяется тем же путём, что запуск панели** — [разбор](docs/lessons.md#a-preset-is-the-profile-not-a-second-description-of-it)
 - **«Применён» — СРАВНЕНИЕ по ПОДМНОЖЕСТВУ полей снимка; отсутствие ключа снимок ЗАПИСЫВАЕТ (`null` = «убери»)** — [разбор](docs/lessons.md#applied-is-a-comparison-not-a-memory)

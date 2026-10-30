@@ -14,7 +14,7 @@
  * Профиль e2e общий: `customSounds` возвращается в `finally`.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 
 // Минимальные файлы с правильной сигнатурой: RIFF…WAVE и ID3.

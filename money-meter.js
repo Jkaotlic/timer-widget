@@ -155,7 +155,8 @@ function eventSummary(state) {
     };
 }
 
-const MoneyMeter = {
+
+export {
     overrunSeconds,
     liveOverrun,
     overrunCost,
@@ -165,12 +166,3 @@ const MoneyMeter = {
     formatMoney
 };
 
-// Node.js (тесты, главный процесс)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MoneyMeter;
-}
-
-// Браузер (дисплей, панель)
-if (typeof window !== 'undefined') {
-    window.MoneyMeter = MoneyMeter;
-}

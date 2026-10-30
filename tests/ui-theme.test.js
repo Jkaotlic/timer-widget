@@ -18,6 +18,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
@@ -151,8 +152,8 @@ test('кнопка переключения темы в панели: состо
     // panel-titlebar.js — вместе с кнопкой замка, у которой ровно та же
     // природа: величина общая для всех окон, кнопка одна, в титлбаре. В
     // разметке панели осталась кнопка и один вызов проводки.
-    assert.match(html, /<script src="panel-titlebar\.js"><\/script>/, 'панель не подключает panel-titlebar.js');
-    assert.match(html, /window\.PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
+    assert.ok(pageLoads('electron-control.html', 'panel-titlebar.js'), 'панель не подключает panel-titlebar.js');
+    assert.match(html, /(?<![\w.])PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
     const titlebar = readSource('panel-titlebar.js');
     assert.match(titlebar, /theme\.applyTheme\(value\)/, 'тема не применяется локально');
     assert.match(titlebar, /theme\.storeTheme\(value\)/, 'тема не сохраняется');
@@ -226,7 +227,7 @@ test('в разметке панели не осталось инлайновы�
     // Инлайн-стиль бьёт любую тему: пока цвет висел в style=, тема до него не
     // доставала. Восемь таких атрибутов было, должно остаться ноль.
     const html = read('electron-control.html');
-    const markup = html.slice(0, html.indexOf('<script src="ipc-compat.js"'));
+    const markup = html.slice(0, html.search(/<script\b[^>]*\ssrc="ipc-compat\.js"/));
     const inline = markup.match(/style="[^"]*(?:rgba?\(|#[0-9a-fA-F]{3,6})[^"]*"/g) || [];
     assert.deepEqual(inline, [], `инлайновые цвета вернулись в разметку: ${inline.join(' | ')}`);
 });

@@ -15,6 +15,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('node:path');
 
 const Schema = require('../settings-schema.js');
@@ -281,7 +282,7 @@ const pkg = JSON.parse(readSource('package.json'));
 test('модуль подключён в панели и попадает в сборку', () => {
     // Без первого — панель падает при загрузке; без второго модуль исчезает из
     // packaged-релиза (ровно так терялся design-tokens.css, см. CHANGELOG 2.3.2).
-    assert.match(controlHtml, /<script src="settings-schema\.js"><\/script>/);
+    assert.ok(pageLoads('electron-control.html', 'settings-schema.js'));
     assert.ok(pkg.build.files.includes('settings-schema.js'), 'settings-schema.js нет в build.files');
 });
 
@@ -503,7 +504,7 @@ test('PANEL-009: лимит перерасхода раскладывается 
 
     const { codeOnly } = require('./helpers/source-scan');
     const src = codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'control-app.js'), 'utf8'));
-    assert.match(src, /getElementById\('overrunLimit'\)\.value = window\.SettingsSchema\.overrunLimitFieldValue\(ext\.overrunLimitSeconds\)/,
+    assert.match(src, /getElementById\('overrunLimit'\)\.value = SettingsSchema\.overrunLimitFieldValue\(ext\.overrunLimitSeconds\)/,
         'loadSettings не раскладывает лимит через общий формат');
     assert.doesNotMatch(src, /Number\(ext\.overrunLimitSeconds\)\) && Number\(ext\.overrunLimitSeconds\) > 0/,
         'старая ветка «только если > 0» вернулась');

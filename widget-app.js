@@ -3,16 +3,29 @@
  *
  * Код страницы electron-widget.html, до 25.09.2026 — её inline-<script>.
  * Вынесен целиком ради CSP `script-src 'self'` (без хешей и 'unsafe-inline').
- * Classic script, НЕ модуль и НЕ strict: имена верхнего уровня общие со всеми
- * остальными <script> страницы, как и были.
+ * ES-модуль и вход окна (план 2026-10-30-es-modules): зависимости — import,
+ * верхний уровень свой. Наружу — только крючок e2e `window.timerWidget`
+ * (его же читает widget-theme-sync.js).
  *
  * Отступ в 8 пробелов — от HTML, и оставлен намеренно: source-level тесты
  * режут код по отступу (`\n {16}\};`), и сдвиг отступа молча сдвинул бы их
  * срезы. Тесты читают окно через tests/helpers/window-source.js.
  */
-        // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
 
-        // safeJSONParse доступна глобально из security.js
+// Шим IPC (window.ipcRenderer) — до всего остального: конструктор окна
+// подписывается на каналы сразу.
+import './ipc-compat.js';
+import * as SecurityUtils from './security.js';
+import * as TimeUtils from './utils.js';
+import * as WindowGeometry from './window-geometry.js';
+import * as DigitsStyle from './digits-style.js';
+import * as RendererShared from './renderer-shared.js';
+import * as CONFIG from './constants.js';
+import * as FlipCard from './flip-card.js';
+
+// Живая привязка: слушатель темы (widget-theme-sync.js) читает её import-ом,
+// а не через window. null до DOMContentLoaded.
+export let activeWidgetTimer = null;
 
         // Размер окна при масштабе 100%. Раньше жил внутри setupEventListeners,
         // а восстановление геометрии считало от той же цифры, вписанной
@@ -36,7 +49,7 @@
                 // Размер и позиция окна — общий механизм с часами. Различий
                 // ровно четыре, и все они здесь: ключ хранилища, базовый размер
                 // и пара каналов (см. window-geometry.js).
-                this._geometry = window.WindowGeometry.createWindowGeometry({
+                this._geometry = WindowGeometry.createWindowGeometry({
                     storageKey: 'widgetGeometry',
                     baseSize: WIDGET_BASE_SIZE,
                     channels: {
@@ -44,8 +57,8 @@
                         resize: 'widget-resize',
                         position: 'widget-set-position'
                     },
-                    send: (channel, payload) => ipcRenderer.send(channel, payload),
-                    parseJSON: window.SecurityUtils.safeJSONParse,
+                    send: (channel, payload) => window.ipcRenderer.send(channel, payload),
+                    parseJSON: SecurityUtils.safeJSONParse,
                     storage: localStorage,
                     getOuterWidth: () => window.outerWidth,
                     getScreenPosition: () => ({ x: window.screenX, y: window.screenY }),
@@ -53,7 +66,7 @@
                     // рамки. Тот путь ползунку панели ничего не сообщал, и
                     // панель оставалась на прежнем числе (замер: окно 200 %,
                     // ползунок 100 %). Сообщаем ТЕМ ЖЕ каналом, что и колесо.
-                    onScaleSettled: (pct) => ipcRenderer.send(
+                    onScaleSettled: (pct) => window.ipcRenderer.send(
                         'report-scale', { source: 'widget', scalePct: pct }
                     )
                 });
@@ -121,12 +134,12 @@
                 this.widgetDigitsSign = document.getElementById('widgetDigitsSign');
                 this.widgetDigitsValue = document.getElementById('widgetDigitsValue');
                 this.widgetDigitsProbe = document.getElementById('widgetDigitsProbe');
-                this.digitsFont = window.DigitsStyle.DEFAULT_FONT_ID;
+                this.digitsFont = DigitsStyle.DEFAULT_FONT_ID;
                 this._digitsFontsReady = false;
                 if (document.fonts && document.fonts.ready) {
                     document.fonts.ready.then(() => {
                         this._digitsFontsReady = true;
-                        window.DigitsStyle.clearProbeCache();
+                        DigitsStyle.clearProbeCache();
                         this.updateScaling();
                     });
                 } else {
@@ -182,12 +195,12 @@
                     // measureDigits() принимает ЯВНУЮ эталонную строку, не булев
                     // hasHours — выбор строки остаётся здесь, у потребителя.
                     const probeText = hasDigitsHours
-                        ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
-                    const probe = window.DigitsStyle.measureDigits(
+                        ? DigitsStyle.PROBE_HOURS : DigitsStyle.PROBE_MINUTES;
+                    const probe = DigitsStyle.measureDigits(
                         this.widgetDigitsProbe, this.digitsFont, probeText
                     );
                     if (probe) {
-                        const size = window.DigitsStyle.fitFontSize({
+                        const size = DigitsStyle.fitFontSize({
                             availableWidth: containerWidth * 0.9,
                             availableHeight: containerHeight * 0.9,
                             probeWidth: probe.width,
@@ -203,7 +216,7 @@
                         // шрифтом, а не со временем на табло.
                         this.widgetDigitsTime.style.setProperty(
                             '--digits-sign-shift',
-                            window.DigitsStyle.measureSignShift(this.digitsFont)
+                            DigitsStyle.measureSignShift(this.digitsFont)
                         );
                         // Ширина знака — поле рамки в минусе (знак стоит ВНУТРИ).
                         // Только из ДЕЙСТВИТЕЛЬНОГО замера: у скрытого стиля
@@ -212,7 +225,7 @@
                         if (size > 0) {
                             this.widgetDigitsTime.style.setProperty(
                                 '--digits-sign-em',
-                                String(window.DigitsStyle.signWidthEm(probe))
+                                String(DigitsStyle.signWidthEm(probe))
                             );
                         }
                     }
@@ -232,8 +245,8 @@
              */
             applyDigitsFont(fontId) {
                 this.updateScaling();
-                window.DigitsStyle.ensureFont(fontId).then(() => {
-                    window.DigitsStyle.clearProbeCache();
+                DigitsStyle.ensureFont(fontId).then(() => {
+                    DigitsStyle.clearProbeCache();
                     this.updateScaling();
                 });
             }
@@ -247,7 +260,7 @@
                 // Перетаскивание окна на JS вместо `-webkit-app-region: drag` —
                 // общий механизм с окном часов, см. window-geometry.js (там же
                 // объяснено, почему на Windows иначе нельзя).
-                window.WindowGeometry.bindWindowDrag({
+                WindowGeometry.bindWindowDrag({
                     container: this.container,
                     doc: document,
                     // Замок «Закрепить положение»: окно перестаёт ездить за
@@ -255,7 +268,7 @@
                     // модуля, — window-geometry.js проверяется в Node на
                     // внедрённых DOM и хранилище и о состоянии окна не знает.
                     isLocked: () => !!(window.UILock && window.UILock.isLocked()),
-                    onMove: (delta) => ipcRenderer.send('widget-move', delta),
+                    onMove: (delta) => window.ipcRenderer.send('widget-move', delta),
                     onDrop: () => this.saveGeometry(),
                     handlers: this._handlers
                 });
@@ -269,8 +282,8 @@
                 this._handlers.onClockWindowState = (_event, state) => {
                     _clockIsOpen = !!state.isOpen;
                 };
-                ipcRenderer.on('display-window-state', this._handlers.onDisplayWindowState);
-                ipcRenderer.on('clock-window-state', this._handlers.onClockWindowState);
+                window.ipcRenderer.on('display-window-state', this._handlers.onDisplayWindowState);
+                window.ipcRenderer.on('clock-window-state', this._handlers.onClockWindowState);
 
                 // Keyboard shortcuts (Space, R, Escape, W, D, C)
                 this._handlers.onKeyDown = (e) => {
@@ -279,35 +292,35 @@
                         case 'Space':
                             e.preventDefault();
                             if (widgetTimer.isRunning) {
-                                ipcRenderer.send('timer-control', 'pause');
+                                window.ipcRenderer.send('timer-control', 'pause');
                             } else {
-                                ipcRenderer.send('timer-control', 'start');
+                                window.ipcRenderer.send('timer-control', 'start');
                             }
                             break;
                         case 'KeyR':
                             e.preventDefault();
-                            ipcRenderer.send('timer-control', 'reset');
+                            window.ipcRenderer.send('timer-control', 'reset');
                             break;
                         // Escape окно не гасит: см. разбор у дисплея — жест
                         // «закрыть» принадлежит букве, а не клавише отмены.
                         case 'KeyW':
                             e.preventDefault();
-                            ipcRenderer.send('close-widget');
+                            window.ipcRenderer.send('close-widget');
                             break;
                         case 'KeyD':
                             e.preventDefault();
-                            ipcRenderer.send(_displayIsOpen ? 'close-display' : 'open-display');
+                            window.ipcRenderer.send(_displayIsOpen ? 'close-display' : 'open-display');
                             break;
                         case 'KeyC':
                             e.preventDefault();
-                            ipcRenderer.send(_clockIsOpen ? 'close-clock-widget' : 'open-clock-widget');
+                            window.ipcRenderer.send(_clockIsOpen ? 'close-clock-widget' : 'open-clock-widget');
                             break;
                         // Z: мастер-звук. Значение принадлежит ПАНЕЛИ (она же
                         // и играет), поэтому окно только просит — тем же
                         // приёмом, что и пресеты вида.
                         case 'KeyZ':
                             e.preventDefault();
-                            ipcRenderer.send('sound-toggle');
+                            window.ipcRenderer.send('sound-toggle');
                             break;
                     }
 
@@ -318,19 +331,19 @@
                     // это к нулю, то есть НАЖАТИЕ СБРАСЫВАЛО ТАЙМЕР В 00:00.
                     // Панель этот же дефект у себя уже закрыла; окна остались.
                     if (e.code >= 'Digit1' && e.code <= 'Digit9') {
-                        const presets = window.CONFIG.PRESET_DURATIONS;
+                        const presets = CONFIG.PRESET_DURATIONS;
                         const idx = parseInt(e.code.replace('Digit', '')) - 1;
                         if (idx < presets.length) {
                             e.preventDefault();
-                            ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
+                            window.ipcRenderer.send('timer-command', { type: 'set', seconds: presets[idx] });
                         }
                     }
                 };
                 document.addEventListener('keydown', this._handlers.onKeyDown);
 
                 // Ctrl+Wheel scaling — resize widget by 10% per scroll tick
-                const WIDGET_MIN_SCALE = window.WindowGeometry.MIN_SCALE_PCT;
-                const WIDGET_MAX_SCALE = window.WindowGeometry.MAX_SCALE_PCT;
+                const WIDGET_MIN_SCALE = WindowGeometry.MIN_SCALE_PCT;
+                const WIDGET_MAX_SCALE = WindowGeometry.MAX_SCALE_PCT;
                 // Масштаб НЕ хранится второй копией здесь. Копия жила в этом
                 // обработчике, а обработчик `resize` перезаписывал её из
                 // `window.outerWidth`, прочитанного ПРЯМО в событии, — то есть
@@ -355,7 +368,7 @@
                     // панели (см. ui-lock.js).
                     if (window.UILock && window.UILock.isLocked()) { e.preventDefault(); return; }
                     e.preventDefault();
-                    const step = window.CONFIG.SCALE_STEP;
+                    const step = CONFIG.SCALE_STEP;
                     // Ось берётся та, по которой пришло движение, а событие без
                     // движения не решает за пользователя. `e.deltaY < 0 ? … : …`
                     // относит НОЛЬ к «уменьшить» — на дисплее это сделало
@@ -364,14 +377,14 @@
                     if (!raw) { return; }
                     const delta = raw < 0 ? step : -step;
                     const cur = currentScalePct();
-                    const newPct = window.RendererShared.clampScale(cur + delta, WIDGET_MIN_SCALE, WIDGET_MAX_SCALE);
+                    const newPct = RendererShared.clampScale(cur + delta, WIDGET_MIN_SCALE, WIDGET_MAX_SCALE);
                     if (newPct === cur) { return; }
                     // Масштаб от Ctrl+колеса раньше нигде не сохранялся, поэтому
                     // при следующем открытии виджет откатывался к 250px. Запись
                     // делает resizeToScale — он же выводит высоту из стиля.
                     this.resizeToScale(newPct);
                     // И сообщаем панели управления, чтобы её ползунок не врал.
-                    ipcRenderer.send('report-scale', { source: 'widget', scalePct: newPct });
+                    window.ipcRenderer.send('report-scale', { source: 'widget', scalePct: newPct });
                 };
                 document.addEventListener('wheel', this._handlers.onWheel, { passive: false });
                 this._handlers.onResizeScalePct = () => {
@@ -402,7 +415,7 @@
                 // Настройки виджета
                 const settings = localStorage.getItem('widgetSettings');
                 if (settings) {
-                    const s = window.SecurityUtils.safeJSONParse(settings, {});
+                    const s = SecurityUtils.safeJSONParse(settings, {});
                     if (s && s.opacity) {
                         this.container.style.opacity = s.opacity;
                     }
@@ -446,7 +459,7 @@
              */
             refreshTone() {
                 const s = this._surface || {};
-                window.UITheme.applyTone(window.RendererShared.surfaceTone({
+                window.UITheme.applyTone(RendererShared.surfaceTone({
                     color: s.color,
                     alpha: s.alpha,
                     theme: document.documentElement.getAttribute('data-theme')
@@ -466,7 +479,7 @@
                 // Из хранилища — СВОЙ ключ widgetColors; timerColors только
                 // запасной путь для профиля без него (renderer-shared.ownColors).
                 if (!colors) {
-                    colors = window.RendererShared.ownColors(localStorage, 'widgetColors');
+                    colors = RendererShared.ownColors(localStorage, 'widgetColors');
                 }
                 // Пустой объект вместо выхода: у каждого цвета в панели своя
                 // кнопка сброса, и сброс приходит сюда как ОТСУТСТВИЕ поля.
@@ -479,7 +492,7 @@
                 // `rgba?\([\d,.\s%]+\)` принимала любой набор цифр и запятых —
                 // rgb(999,999,999) и rgba(1,2,3,77) проходили как безопасные,
                 // а значение уходит прямо в style.color.
-                const isSafeColor = window.SecurityUtils.isSafeColor;
+                const isSafeColor = SecurityUtils.isSafeColor;
                 const timerColor = isSafeColor(colors.timer) ? colors.timer : null;
                 const progressColor = isSafeColor(colors.progress) ? colors.progress : null;
                 const root = document.documentElement;
@@ -493,7 +506,7 @@
                 // Подложка — одна пара «цвет + прозрачность» на окно, красит
                 // подложку ТОГО стиля, который сейчас на экране: каждая
                 // подложка в CSS записана как var(--surface-paint, <своё>).
-                setVar('--surface-paint', window.RendererShared.surfacePaint({
+                setVar('--surface-paint', RendererShared.surfacePaint({
                     color: colors.surface,
                     alpha: colors.surfaceAlpha
                 }));
@@ -501,7 +514,7 @@
                 // это пластина, с которой створки берут свой фон, и прозрачной
                 // ей быть нельзя: сквозь падающую створку стало бы видно и
                 // цифру под ней, и рабочий стол.
-                setVar('--surface-solid', window.RendererShared.surfaceSolid({
+                setVar('--surface-solid', RendererShared.surfaceSolid({
                     color: colors.surface
                 }));
                 // Прозрачность работает и БЕЗ выбранного цвета: подложка каждого
@@ -509,7 +522,7 @@
                 // ползунок гасит родной фон стиля, а не только заливку
                 // пользователя. Отдельной переменной — потому что множитель нужен
                 // именно CSS, где живут сами значения по умолчанию.
-                const alphaValue = window.RendererShared.surfaceAlpha(colors.surfaceAlpha);
+                const alphaValue = RendererShared.surfaceAlpha(colors.surfaceAlpha);
                 setVar('--surface-alpha', alphaValue === null ? null : String(alphaValue));
 
                 // Тон окна. Своего фона у виджета нет вовсе — он лежит поверх
@@ -620,7 +633,7 @@
                     console.info('[widget] настройки не применены: ключа displayExtSettings нет (первый запуск или чистый профиль)');
                     return;
                 }
-                const settings = window.SecurityUtils.safeJSONParse(bgSettings, {});
+                const settings = SecurityUtils.safeJSONParse(bgSettings, {});
 
                 if (!settings || Object.keys(settings).length === 0) {
                     console.warn(
@@ -642,7 +655,7 @@
                 // IPC-пакете display-settings-update означает уже стиль
                 // ПОЛНОЭКРАННОГО режима. Спрашиваем своё имя первым,
                 // общее держим запасным — см. RendererShared.pickOwnSetting.
-                const ownStyle = window.RendererShared.pickOwnSetting(settings, 'widgetTimerStyle', 'timerStyle');
+                const ownStyle = RendererShared.pickOwnSetting(settings, 'widgetTimerStyle', 'timerStyle');
                 if (ownStyle) {
                     this.setTimerStyle(ownStyle);
                 }
@@ -652,7 +665,7 @@
                 // локального источника изменений (только панель), поэтому
                 // отдельного ключа в localStorage у него нет.
                 if (settings.widgetDigitsFont !== undefined) {
-                    const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.widgetDigitsFont);
+                    const font = DigitsStyle.applyFont(this.widgetDigitsTime, settings.widgetDigitsFont);
                     if (font.id !== this.digitsFont) {
                         this.digitsFont = font.id;
                         this.applyDigitsFont(font.id);
@@ -661,7 +674,7 @@
             }
 
             setupIPC() {
-                ipcRenderer.send('get-timer-state');
+                window.ipcRenderer.send('get-timer-state');
 
                 // Сохраняем ссылки на обработчики для последующей очистки
                 /** @type {IpcListener<'timer-state'>} */ this.timerStateHandler = (event, state) => {
@@ -719,7 +732,7 @@
                         this.setTimerStyle(settings.timerStyle);
                     }
                     if (settings.digitsFont !== undefined) {
-                        const font = window.DigitsStyle.applyFont(this.widgetDigitsTime, settings.digitsFont);
+                        const font = DigitsStyle.applyFont(this.widgetDigitsTime, settings.digitsFont);
                         if (font.id !== this.digitsFont) {
                             this.digitsFont = font.id;
                             this.applyDigitsFont(font.id);
@@ -747,28 +760,28 @@
                 this._handlers.onWindowGeometry = (event, bounds) => {
                     this._geometry.setWindowBounds(bounds);
                 };
-                ipcRenderer.on('window-geometry', this._handlers.onWindowGeometry);
+                window.ipcRenderer.on('window-geometry', this._handlers.onWindowGeometry);
 
                 // Регистрируем обработчики
-                ipcRenderer.on('timer-state', this.timerStateHandler);
-                ipcRenderer.on('widget-colors-update', this.colorsUpdateHandler);
-                ipcRenderer.on('display-settings-update', this.displaySettingsUpdateHandler);
-                ipcRenderer.on('widget-style-update', this.widgetStyleUpdateHandler);
+                window.ipcRenderer.on('timer-state', this.timerStateHandler);
+                window.ipcRenderer.on('widget-colors-update', this.colorsUpdateHandler);
+                window.ipcRenderer.on('display-settings-update', this.displaySettingsUpdateHandler);
+                window.ipcRenderer.on('widget-style-update', this.widgetStyleUpdateHandler);
             }
 
             cleanup() {
                 // Удаляем IPC listeners
                 if (this.timerStateHandler) {
-                    ipcRenderer.removeListener('timer-state', this.timerStateHandler);
+                    window.ipcRenderer.removeListener('timer-state', this.timerStateHandler);
                 }
                 if (this.colorsUpdateHandler) {
-                    ipcRenderer.removeListener('widget-colors-update', this.colorsUpdateHandler);
+                    window.ipcRenderer.removeListener('widget-colors-update', this.colorsUpdateHandler);
                 }
                 if (this.displaySettingsUpdateHandler) {
-                    ipcRenderer.removeListener('display-settings-update', this.displaySettingsUpdateHandler);
+                    window.ipcRenderer.removeListener('display-settings-update', this.displaySettingsUpdateHandler);
                 }
                 if (this.widgetStyleUpdateHandler) {
-                    ipcRenderer.removeListener('widget-style-update', this.widgetStyleUpdateHandler);
+                    window.ipcRenderer.removeListener('widget-style-update', this.widgetStyleUpdateHandler);
                 }
 
                 // Отложенная запись геометрии не должна сработать после того,
@@ -787,13 +800,13 @@
                     this.container.removeEventListener('mousedown', h.onContainerMouseDown);
                 }
                 if (h.onDisplayWindowState) {
-                    ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState);
+                    window.ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState);
                 }
                 if (h.onClockWindowState) {
-                    ipcRenderer.removeListener('clock-window-state', h.onClockWindowState);
+                    window.ipcRenderer.removeListener('clock-window-state', h.onClockWindowState);
                 }
                 if (h.onWindowGeometry) {
-                    ipcRenderer.removeListener('window-geometry', h.onWindowGeometry);
+                    window.ipcRenderer.removeListener('window-geometry', h.onWindowGeometry);
                 }
                 this._handlers = {};
 
@@ -812,7 +825,7 @@
                     clearTimeout(this._scalingTimer);
                     this._scalingTimer = null;
                 }
-                window.FlipCard.cancelPending();
+                FlipCard.cancelPending();
             }
             
             /**
@@ -836,10 +849,10 @@
                 // зондом на 30 %: окно 120×28 при рамке 70 px, то есть рамка
                 // переставала заполнять полосу.
                 const width = Math.max(
-                    window.CONFIG.WIDGET_MIN_WIDTH,
+                    CONFIG.WIDGET_MIN_WIDTH,
                     Math.round(WIDGET_BASE_SIZE * pct / 100)
                 );
-                ipcRenderer.send('widget-resize', { width, height: this.windowHeightFor(width) });
+                window.ipcRenderer.send('widget-resize', { width, height: this.windowHeightFor(width) });
                 this.saveGeometry(pct);
             }
 
@@ -849,7 +862,7 @@
                 // нельзя — окно растягивают за край рамки, и переключение
                 // «Флип» → «Цифры» схлопывало бы растянутое обратно (поймано
                 // визуальной сверкой: кадры уехали с 320×260 на 320×320).
-                this.timerStyle = window.RendererShared.migrateTimerStyle(style);
+                this.timerStyle = RendererShared.migrateTimerStyle(style);
                 style = this.timerStyle;
                 
                 // Скрываем все стили
@@ -941,7 +954,7 @@
 
                 // Status detection — always runs, not gated by totalSeconds
                 // Полоса срочности — общая для всех окон (RendererShared).
-                const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
+                const status = RendererShared.timerColorBand(secs, this.totalSeconds);
 
                 // Apply status to all elements
                 this.progressBar.dataset.status = status;
@@ -989,7 +1002,7 @@
             // Незавершённые таймеры модуль ведёт сам, гасим их одним
             // FlipCard.cancelPending() в cleanup().
             _flip(card, value) {
-                window.FlipCard.flipCardTo(card, '.widget-flip-digit', value);
+                FlipCard.flipCardTo(card, '.widget-flip-digit', value);
             }
 
             updateFlipDisplay(secs) {
@@ -997,7 +1010,7 @@
                 
                 const isNegative = secs < 0;
                 const absSecs = Math.abs(secs);
-                const cells = window.RendererShared.flipCells(absSecs, this.totalSeconds);
+                const cells = RendererShared.flipCells(absSecs, this.totalSeconds);
 
                 // Показываем/скрываем знак минуса
                 if (this.wFlipMinus) {
@@ -1043,7 +1056,7 @@
                 }
 
                 // Полоса срочности — общая для всех окон (RendererShared).
-                const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
+                const status = RendererShared.timerColorBand(secs, this.totalSeconds);
 
                 // Карточке достаточно data-status: цвет цифры задают правила
                 // `.widget-flip-card[data-status=…] .widget-flip-digit`, и они
@@ -1098,7 +1111,7 @@
 
                 // Обновляем цифровое время
                 if (this.widgetAnalogDigital) {
-                    const { hours, minutes: mins } = window.RendererShared.breakdown(absSecs);
+                    const { hours, minutes: mins } = RendererShared.breakdown(absSecs);
                     const prefix = secs < 0 ? '-' : '';
                     if (hours > 0) {
                         this.widgetAnalogDigital.textContent = `${prefix}${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -1111,7 +1124,7 @@
                 const analogElements = [this.widgetHandHour, this.widgetHandMinute, this.widgetHandSecond, this.widgetClockCenter, this.widgetAnalogDigital];
 
                 // Полоса срочности — общая для всех окон (RendererShared).
-                const status = window.RendererShared.timerColorBand(secs, this.totalSeconds);
+                const status = RendererShared.timerColorBand(secs, this.totalSeconds);
 
                 analogElements.forEach(el => {
                     if (el) { el.dataset.status = status; }
@@ -1137,7 +1150,7 @@
                     running: 'Активен',
                     idle: 'Готов'
                 };
-                const status = window.RendererShared.timerLifecycleStatus({
+                const status = RendererShared.timerLifecycleStatus({
                     remainingSeconds: secs,
                     totalSeconds: this.totalSeconds,
                     isRunning: this.isRunning,
@@ -1150,7 +1163,7 @@
             }
 
             formatTime(seconds) {
-                return window.TimeUtils.formatTimeShort(seconds);
+                return TimeUtils.formatTimeShort(seconds);
             }
         }
 
@@ -1162,9 +1175,10 @@
             localStorage.setItem('widgetHintShown', 'v2');
         }
 
-        // На window — чтобы до окна дотянулся слушатель темы, который стоит
-        // ОТДЕЛЬНЫМ <script> после ipc-compat.js и в эту область не заглядывает.
+        // Слушатель темы (theme-sync) берёт живую привязку activeWidgetTimer
+        // через import. `window.timerWidget` — только крючок e2e.
         const widgetTimer = new WidgetTimer();
+        activeWidgetTimer = widgetTimer;
         window.timerWidget = widgetTimer;
 
         // Cleanup при закрытии окна

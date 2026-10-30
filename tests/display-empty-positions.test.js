@@ -34,8 +34,10 @@ function methodFn(name) {
     assert.ok(m, `метод ${name} не найден`);
     const block = balancedBlockAt(SRC, m.index, name);
     const body = block.slice(block.indexOf('{') + 1, block.lastIndexOf('}'));
-     
-    return new Function(body);
+
+    // DisplayLayouts — import модуля (display-script.js — ES-модуль): в
+    // вынутое тело он приходит замыканием, как в окне.
+    return new Function('DisplayLayouts', `return function () {${body}\n};`)(require('../display-layouts.js'));
 }
 
 function row(id, custom, left = 0, top = 0) {
@@ -66,8 +68,7 @@ const saveElementPositions = methodFn('saveElementPositions');
 test.before(() => {
     global.window = {
         innerWidth: 1000,
-        innerHeight: 800,
-        DisplayLayouts: require('../display-layouts.js')
+        innerHeight: 800
     };
 });
 test.after(() => { delete global.window; });

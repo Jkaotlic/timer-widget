@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { codeOnly, maskNonCode, balancedBlockAt, afterBalanced } = require('./source-scan');
 const { WINDOW_OWN, readSource } = require('./window-source');
+const { pageFiles } = require('./page-graph');
 
 const repoRoot = path.join(__dirname, '..', '..');
 const read = (file) => fs.readFileSync(path.join(repoRoot, file), 'utf8');
@@ -36,7 +37,9 @@ const PAGES = Object.freeze({
 function roleFiles(role) {
     const html = readSource(PAGES[role]);
     const own = WINDOW_OWN[PAGES[role]];
-    const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1])
+    // Файлы страницы — по графу (теги + import), а не по тегам: у окна один
+    // вход-модуль, библиотеки приходят его import-ом (tests/helpers/page-graph.js).
+    const srcs = pageFiles(PAGES[role])
         .filter((f) => !own.includes(f));
     return [
         { file: PAGES[role], code: codeOnly(html), page: true },

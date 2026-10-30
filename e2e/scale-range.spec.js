@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { waitForWidget, waitForClock } = require('./window-ready');
 const CONFIG = require('../constants.js');

@@ -3,12 +3,20 @@
  * Provides backward compatibility wrapper for old ipcRenderer code
  * Maps old ipcRenderer calls to new secure electronAPI
  *
- * USAGE: Include this script BEFORE any code that uses ipcRenderer
- * <script src="ipc-compat.js"></script>
+ * ES-модуль без экспорта (план 2026-10-30-es-modules): его импортирует
+ * каждый вход окна и *-theme-sync.js ПЕРВЫМ импортом — `window.ipcRenderer`
+ * готов до кода окна. Сам шим остаётся глобалом: его зовут окна и e2e
+ * (крючок e2e, tests/window-bridges.test.js PERMANENT).
  */
 
 (function() {
     'use strict';
+
+    // Node: тесты делают require(esm) display-script.js ради чистых помощников,
+    // и граф импорта приводит сюда — окна там нет, шим не нужен.
+    if (typeof window === 'undefined') {
+        return;
+    }
 
     // Check if electronAPI is available (from preload.js)
     if (typeof window.electronAPI === 'undefined') {

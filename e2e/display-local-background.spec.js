@@ -15,7 +15,7 @@
  * Профиль e2e общий: всё, что спека меняет, возвращается в `finally`.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { openDisplay, reopenDisplay } = require('./window-ready');
 

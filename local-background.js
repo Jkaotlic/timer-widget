@@ -13,9 +13,15 @@
  * методы вызывают друг друга и pushDisplaySettings() контроллера, поэтому
  * примесь сохраняет семантику this и делает перенос дословным.
  *
- * Зависимости берутся из window (Toast, LoadingIndicator, CONFIG, safeJSONParse):
+ * Зависимости — import (Toast, LoadingIndicator, CONFIG, safeJSONParse):
  * сборщика в проекте нет, каждый файл — отдельный classic-script.
  */
+
+import * as SecurityUtils from './security.js';
+import * as RendererShared from './renderer-shared.js';
+import { Toast, LoadingIndicator } from './ui-feedback.js';
+import * as CONFIG from './constants.js';
+
 
 const LocalBackgroundMixin = {
     setupLocalBackground() {
@@ -73,13 +79,13 @@ const LocalBackgroundMixin = {
     // FIX BUG-025, BUG-026: Validate file upload with MIME and magic bytes
     async validateImageFile(file) {
             // Проверка размера
-            const MAX_SIZE = (window.CONFIG && window.CONFIG.MAX_IMAGE_FILE_SIZE) || 10 * 1024 * 1024;
+            const MAX_SIZE = CONFIG.MAX_IMAGE_FILE_SIZE;
             if (file.size > MAX_SIZE) {
                 return { valid: false, error: 'Файл слишком большой (максимум 10 МБ)' };
             }
 
             // Проверка MIME type
-            const allowedTypes = (window.CONFIG && window.CONFIG.ALLOWED_IMAGE_TYPES) || ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp'];
+            const allowedTypes = CONFIG.ALLOWED_IMAGE_TYPES;
             if (!file.type || !allowedTypes.includes(file.type)) {
                 return { valid: false, error: 'Неподдерживаемый тип файла. Используйте JPG, PNG, GIF, WebP или BMP' };
             }
@@ -130,15 +136,15 @@ const LocalBackgroundMixin = {
             if (!file) {return;}
 
             // FIX BUG-028: Show loading indicator during file processing
-            const loadingOverlay = window.LoadingIndicator.show('Загрузка изображения...');
+            const loadingOverlay = LoadingIndicator.show('Загрузка изображения...');
 
             try {
                 // FIX BUG-025, BUG-026: Validate file before upload
                 const validation = await this.validateImageFile(file);
                 if (!validation.valid) {
-                    window.Toast.show(validation.error, 'error');
+                    Toast.show(validation.error, 'error');
                     event.target.value = ''; // Сбрасываем input
-                    window.LoadingIndicator.hide(loadingOverlay);
+                    LoadingIndicator.hide(loadingOverlay);
                     return;
                 }
 
@@ -151,11 +157,11 @@ const LocalBackgroundMixin = {
                         localStorage.setItem('localBgImage', base64);
                     } catch (err) {
                         if (err.name === 'QuotaExceededError') {
-                            window.Toast.show('Изображение слишком большое для хранилища', 'error');
+                            Toast.show('Изображение слишком большое для хранилища', 'error');
                         } else {
-                            window.Toast.show('Ошибка сохранения изображения', 'error');
+                            Toast.show('Ошибка сохранения изображения', 'error');
                         }
-                        window.LoadingIndicator.hide(loadingOverlay);
+                        LoadingIndicator.hide(loadingOverlay);
                         return;
                     }
 
@@ -166,20 +172,20 @@ const LocalBackgroundMixin = {
                     this.pushDisplaySettings();
 
                     // Hide loading indicator
-                    window.LoadingIndicator.hide(loadingOverlay);
+                    LoadingIndicator.hide(loadingOverlay);
                 };
 
                 reader.onerror = () => {
-                    window.Toast.show('Ошибка при чтении файла', 'error');
+                    Toast.show('Ошибка при чтении файла', 'error');
                     event.target.value = '';
-                    window.LoadingIndicator.hide(loadingOverlay);
+                    LoadingIndicator.hide(loadingOverlay);
                 };
 
                 reader.readAsDataURL(file);
                 event.target.value = ''; // Сбрасываем input
             } catch {
-                window.Toast.show('Произошла ошибка при обработке файла', 'error');
-                window.LoadingIndicator.hide(loadingOverlay);
+                Toast.show('Произошла ошибка при обработке файла', 'error');
+                LoadingIndicator.hide(loadingOverlay);
                 event.target.value = '';
             }
     },
@@ -228,11 +234,11 @@ const LocalBackgroundMixin = {
 
     /** Кнопки вписывания и ползунок затемнения — из localBgSettings или умолчания. */
     renderLocalBgSettings() {
-            const saved = window.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
+            const saved = SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
             // Умолчания — те же, что у сборки payload дисплея (panel-display.js):
             // иначе панель и окно снова показали бы разное.
             const fit = saved.fit || 'cover';
-            const overlay = window.RendererShared.bgOverlayPercent(saved.overlay);
+            const overlay = RendererShared.bgOverlayPercent(saved.overlay);
             document.querySelectorAll('.bg-fit-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.fit === fit);
             });
@@ -273,10 +279,4 @@ const LocalBackgroundMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { LocalBackgroundMixin };
-}
-
-if (typeof window !== 'undefined') {
-    window.LocalBackgroundMixin = LocalBackgroundMixin;
-}
+export { LocalBackgroundMixin };

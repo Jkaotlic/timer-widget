@@ -11,7 +11,7 @@
  * запирается обратно, тумблеры гасятся, накопитель обнуляется.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { waitForDisplay } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');

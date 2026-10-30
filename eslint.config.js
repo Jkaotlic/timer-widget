@@ -1,6 +1,14 @@
 const globals = require('globals');
 const js = require('@eslint/js');
 const html = require('eslint-plugin-html');
+const { windowModuleFiles, moduleLintBlock } = require('./scripts/window-modules.js');
+
+// Файлы окон, которые грузятся модулем (`type="module"` + граф import), —
+// ВЫЧИСЛЯЮТСЯ из страниц, а не перечисляются: см. scripts/window-modules.js.
+// Блок для них стоит ПОСЛЕ классических — более поздний блок flat-конфига
+// перекрывает `sourceType` и `no-undef`. Пустой `files` ESLint не принимает,
+// поэтому без модулей блока нет вовсе.
+const WINDOW_MODULES = windowModuleFiles(__dirname);
 
 module.exports = [
   js.configs.recommended,
@@ -54,13 +62,11 @@ module.exports = [
     // <script> blocks (moved out for CSP `script-src 'self'`). They keep the
     // exact rules they had as inline HTML above: classic scripts, not
     // CommonJS, sharing window-scope globals with the other scripts of the
-    // page, so no-undef stays off for the same reason.
+    // page, so no-undef stays off for the same reason. Since the ES-module
+    // move (Task 6, 30.10.2026) only the classic <head> theme bootstraps are
+    // left here: the entries and *-theme-sync.js are modules (block below).
     files: [
       'theme-init.js', 'theme-init-tone.js',
-      'control-app.js', 'control-theme-sync.js',
-      'widget-app.js', 'widget-theme-sync.js',
-      'clock-widget-app.js', 'clock-widget-theme-sync.js',
-      'display-theme-sync.js',
     ],
     languageOptions: {
       sourceType: 'script',
@@ -75,6 +81,7 @@ module.exports = [
       'no-useless-assignment': 'error',
     },
   },
+  ...(WINDOW_MODULES.length > 0 ? [moduleLintBlock(WINDOW_MODULES)] : []),
   {
     ignores: ['dist/**', 'node_modules/**', '.superpowers/**'],
   },

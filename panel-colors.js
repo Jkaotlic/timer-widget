@@ -86,9 +86,9 @@ function el(tag, props, children) {
 }
 
 /** Чистая логика окон: здесь — запасной путь цветов (ownColors). */
-const ColorsShared = (typeof window !== 'undefined' && window.RendererShared)
-    ? window.RendererShared
-    : require('./renderer-shared');
+import * as ColorsShared from './renderer-shared.js';
+import { ColorPicker } from './color-picker.js';
+import * as CONFIG from './constants.js';
 
 /**
  * Объект цветов из строки хранилища или null: битое значение не роняет панель.
@@ -122,7 +122,7 @@ const PanelColorsMixin = {
      */
     loadWindowColors(send, fresh) {
         const post = send || ((channel, payload) => window.ipcRenderer.send(channel, payload));
-        const defaults = fresh || window.CONFIG.DEFAULT_TIMER_COLORS;
+        const defaults = fresh || CONFIG.DEFAULT_TIMER_COLORS;
         const widget = parseColors(localStorage.getItem('widgetColors'));
         // Свой ключ виджета, а без него — старый общий timerColors. Формулу
         // запасного пути знает ОДНО место (renderer-shared.ownColors): тем же
@@ -239,7 +239,7 @@ const PanelColorsMixin = {
             el('span', { class: 'surface-label', text: 'Цвет цифр' }), resetTimer
         ]));
 
-        const picker = new window.ColorPicker(svId, hueId, hexId, previewId, panelId, (hex) => {
+        const picker = new ColorPicker(svId, hueId, hexId, previewId, panelId, (hex) => {
             this.updateColors(target, { surface: hex });
         });
         this.surfacePickers[target] = picker;
@@ -304,12 +304,4 @@ const PanelColorsMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS, COLOR_FIELDS };
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelColorsMixin = PanelColorsMixin;
-    window.mergeColors = mergeColors;
-    window.PanelColorFields = COLOR_FIELDS;
-}
+export { mergeColors, PanelColorsMixin, COLOR_TARGETS, SURFACE_TARGETS, COLOR_FIELDS };

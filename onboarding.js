@@ -30,7 +30,7 @@
  * settings-schema.js и window-geometry.js.
  */
 
-(function (root) {
+const api = (function (root) {
     /**
      * Показывает подсказку про F1 ровно один раз за профиль.
      *
@@ -141,12 +141,7 @@
         return { hintShown: shown, releasesBound: bound };
     }
 
-    const api = { showFirstRunHint, bindReleasesLink, init };
-
-    if (typeof module !== 'undefined' && module.exports) {
-        module.exports = api;
-    }
-    if (root) {
-        root.Onboarding = api;
-    }
+    return { showFirstRunHint, bindReleasesLink, init };
 })(typeof window !== 'undefined' ? window : null);
+
+export const { showFirstRunHint, bindReleasesLink, init } = api;

@@ -1,4 +1,22 @@
-// Display Timer - Полноэкранное отображение таймера
+// Display Timer - Полноэкранное отображение таймера.
+// ES-модуль и вход окна (план 2026-10-30-es-modules): зависимости — import.
+// Наружу — крючок e2e `window.displayTimer` (его же читает
+// display-theme-sync.js); чистые помощники внизу — именованный экспорт для
+// тестов (require(esm)).
+
+// Шим IPC (window.ipcRenderer) — до всего остального: DisplayTimer
+// подписывается через него на каналы.
+import './ipc-compat.js';
+import * as SecurityUtils from './security.js';
+import * as MoneyMeter from './money-meter.js';
+import * as TimeUtils from './utils.js';
+import * as DisplayLayouts from './display-layouts.js';
+import * as DigitsStyle from './digits-style.js';
+import * as RendererShared from './renderer-shared.js';
+import * as HeroModes from './hero-modes.js';
+import * as CONFIG from './constants.js';
+import * as FlipCard from './flip-card.js';
+
 
 // Зазор между колонкой героя (подпись «Осталось» + таймер) и всем, что стоит
 // у неё на пути. Владелец ОДИН: его просит и потолок масштаба (fitTimerScale),
@@ -106,7 +124,7 @@ class DisplayTimer {
         this.eventTime = '10:00';
         // Режим центрального времени. Умолчание — таймер: профиль без
         // настройки обязан вести себя ровно как до 08.09.2026.
-        this.heroMode = window.HeroModes.DEFAULT_MODE;
+        this.heroMode = HeroModes.DEFAULT_MODE;
         this.heroLabels = {};
         this.endTime = '12:00';
         this.timerScale = 100;
@@ -186,7 +204,7 @@ class DisplayTimer {
         // (см. display.css): они набраны в em и `transform` им не годится —
         // подпись стоит в потоке, а трансформация в раскладке не участвует.
         const labelVars = { heroLabel: '--hero-label-scale', statusPill: '--status-pill-scale' };
-        const registry = (window.DisplayLayouts && window.DisplayLayouts.DISPLAY_ELEMENTS) || [];
+        const registry = (DisplayLayouts && DisplayLayouts.DISPLAY_ELEMENTS) || [];
         this.movableElements = registry
             .map((row) => Object.assign({}, row, {
                 el: nodes[row.id],
@@ -250,7 +268,7 @@ class DisplayTimer {
     applyElementScale(id, pct) {
         const row = this.movableRow(id);
         if (!row) { return null; }
-        const value = window.DisplayLayouts.clampScale(pct);
+        const value = DisplayLayouts.clampScale(pct);
         if (value === null) { return null; }
         this.elementScales[id] = value;
         if (row.cssVar) {
@@ -270,7 +288,7 @@ class DisplayTimer {
      * запасной: профиль, переживший обновление, обязан открыться таким же.
      */
     restoreElementScales() {
-        const parse = window.SecurityUtils && window.SecurityUtils.safeJSONParse;
+        const parse = SecurityUtils && SecurityUtils.safeJSONParse;
         let stored = null;
         try {
             const raw = localStorage.getItem('displayBlockScales');
@@ -281,7 +299,7 @@ class DisplayTimer {
             const raw = parseInt(localStorage.getItem('displayBlockScale'), 10);
             if (Number.isFinite(raw)) { legacy = raw; }
         } catch { /* ok */ }
-        const scales = window.DisplayLayouts.normalizeScales(stored, legacy);
+        const scales = DisplayLayouts.normalizeScales(stored, legacy);
         for (const [id, pct] of Object.entries(scales)) { this.applyElementScale(id, pct); }
     }
 
@@ -304,7 +322,7 @@ class DisplayTimer {
             };
             const rect = row.el.getBoundingClientRect();
             const fraction = rect.width > 0
-                ? window.DisplayLayouts.positionToFraction(rect, viewport)
+                ? DisplayLayouts.positionToFraction(rect, viewport)
                 : null;
             if (fraction) {
                 record.cx = Math.round(fraction.cx * 10000) / 10000;
@@ -374,7 +392,7 @@ class DisplayTimer {
             if (!fraction) { continue; }
             const rect = row.el.getBoundingClientRect();
             if (!rect.width || !rect.height) { continue; }
-            const pos = window.DisplayLayouts.fractionToPosition(
+            const pos = DisplayLayouts.fractionToPosition(
                 fraction, viewport, { width: rect.width, height: rect.height }
             );
             if (!pos) { continue; }
@@ -524,7 +542,7 @@ class DisplayTimer {
     settleAfterResize(row, fraction, viewport, before) {
         const after = row.el.getBoundingClientRect();
         if (Math.abs(after.width - before.width) < 0.5 && Math.abs(after.height - before.height) < 0.5) { return; }
-        const pos = window.DisplayLayouts.fractionToPosition(
+        const pos = DisplayLayouts.fractionToPosition(
             fraction, viewport, { width: after.width, height: after.height }
         );
         if (pos) { this.placeElementAt(row, pos.left, pos.top); }
@@ -562,7 +580,7 @@ class DisplayTimer {
      * состояния видимости в этом окне уже была источником дефекта.
      */
     applyLayout(layoutId) {
-        const DL = window.DisplayLayouts;
+        const DL = DisplayLayouts;
         const layout = DL && DL.layoutById(layoutId);
         if (!layout || !this.movableElements) { return false; }
 
@@ -722,8 +740,8 @@ class DisplayTimer {
             // первый вызов выше мерил карточки ещё по прежнему окну.
             this.applyTimerScale();
         };
-        const debouncedResize = window.TimeUtils && window.TimeUtils.debounce
-            ? window.TimeUtils.debounce(recalc, window.CONFIG ? window.CONFIG.RESIZE_DEBOUNCE : 300)
+        const debouncedResize = TimeUtils && TimeUtils.debounce
+            ? TimeUtils.debounce(recalc, CONFIG ? CONFIG.RESIZE_DEBOUNCE : 300)
             : recalc;
 
         this._handlers.windowResize = debouncedResize;
@@ -823,7 +841,7 @@ class DisplayTimer {
             // СБРАСЫВАЛИ ТАЙМЕР. Диапазон выводится из реестра, а не пишется
             // числом: второе число разъедется с реестром при первой же правке.
             if (e.code >= 'Digit1' && e.code <= 'Digit9') {
-                const presets = window.CONFIG.PRESET_DURATIONS;
+                const presets = CONFIG.PRESET_DURATIONS;
                 const idx = parseInt(e.code.replace('Digit', '')) - 1;
                 if (idx < presets.length) {
                     e.preventDefault();
@@ -882,7 +900,7 @@ class DisplayTimer {
             return 0;
         }
 
-        const shared = window.RendererShared;
+        const shared = RendererShared;
         const active = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
             .find((b) => b && b.classList.contains('active'));
         if (!shared || !shared.topBandReserve || !active) { return 0; }
@@ -1150,7 +1168,7 @@ class DisplayTimer {
     fitTimerScale(requested) {
         const blocks = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits];
         const active = blocks.find((b) => b && b.classList.contains('active'));
-        if (!active || !window.RendererShared || !window.RendererShared.fitBlockScale) { return requested; }
+        if (!active || !RendererShared || !RendererShared.fitBlockScale) { return requested; }
 
         // Габарит БЕЗ трансформации: offsetWidth/offsetHeight её не видят,
         // а getBoundingClientRect() вернул бы уже увеличенный блок — то есть
@@ -1173,7 +1191,7 @@ class DisplayTimer {
         const pillRect = this.statusPill ? this.statusPill.getBoundingClientRect() : null;
         const pill = pillRect && pillRect.height > 0 ? pillRect : null;
 
-        return window.RendererShared.fitBlockScale({
+        return RendererShared.fitBlockScale({
             width, height, centerX, centerY,
             free: {
                 left: 0,
@@ -1198,7 +1216,7 @@ class DisplayTimer {
      * переставила карточки, и мерила бы таймер по их прежним местам.
      */
     fitSideCards(pct) {
-        const shared = window.RendererShared;
+        const shared = RendererShared;
         if (this._ignoreSideCards || !shared || !shared.sideCardBand) { return pct; }
         const active = [this.timerRing, this.timerFlip, this.timerAnalog, this.timerDigits]
             .find((b) => b && b.classList.contains('active'));
@@ -1224,7 +1242,7 @@ class DisplayTimer {
                 free: { left: 0, right: window.innerWidth }
             });
             if (band.left <= 0 && band.right >= window.innerWidth) { return pct; }
-            const floorPct = (window.CONFIG && window.CONFIG.MIN_TIMER_SCALE) || 30;
+            const floorPct = (CONFIG && CONFIG.MIN_TIMER_SCALE) || 30;
             return shared.fitBlockScale({
                 width, height, centerX, centerY,
                 // Вертикаль здесь не ограничивает — её держит fitTimerScale.
@@ -1302,7 +1320,7 @@ class DisplayTimer {
         this.digitsSign = document.getElementById('digitsSign');
         this.digitsValue = document.getElementById('digitsValue');
         this.digitsProbe = document.getElementById('digitsProbe');
-        this.digitsFont = window.DigitsStyle.DEFAULT_FONT_ID;
+        this.digitsFont = DigitsStyle.DEFAULT_FONT_ID;
         this._digitsFontsReady = false;
 
         // Замер эталона до загрузки woff2 меряет ЗАПАСНОЕ начертание и кэширует
@@ -1310,7 +1328,7 @@ class DisplayTimer {
         if (document.fonts && document.fonts.ready) {
             document.fonts.ready.then(() => {
                 this._digitsFontsReady = true;
-                window.DigitsStyle.clearProbeCache();
+                DigitsStyle.clearProbeCache();
                 this.updateDigitsScale();
                 // Шрифт меняет ширину не только таймера, но и КАРТОЧЕК: в
                 // стиле «Цифры» значение блока набрано тем же шрифтом. А место
@@ -1347,9 +1365,9 @@ class DisplayTimer {
             // одна с героем «До конца» (полночь понимает, начало участвует).
             if (this.timeLeftValueEl) {
                 const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-                const left = window.RendererShared.secondsUntilEventEnd(nowSeconds, this.eventTime, this.endTime);
+                const left = RendererShared.secondsUntilEventEnd(nowSeconds, this.eventTime, this.endTime);
                 // formatTime всегда даёт HH:MM:SS — «02:04:21» с фотографии.
-                this.timeLeftValueEl.textContent = window.TimeUtils.formatTime(left);
+                this.timeLeftValueEl.textContent = TimeUtils.formatTime(left);
                 // Стрелки мини-циферблата этого блока крутит ДЛИТЕЛЬНОСТЬ, а не
                 // момент: час за 12 часов остатка, минута за 60 минут — та же
                 // арифметика, что у большого циферблата стиля «Аналог»
@@ -1369,7 +1387,7 @@ class DisplayTimer {
             // от прихода timer-state. Второго таймера не заводим: этот тик уже
             // самокорректирующийся, и лишний ежесекундный интервал на
             // презентационном экране — просто вторая точка расхождения.
-            if (this.heroMode !== window.HeroModes.DEFAULT_MODE) {
+            if (this.heroMode !== HeroModes.DEFAULT_MODE) {
                 this.updateDisplay();
             }
         };
@@ -1566,7 +1584,7 @@ class DisplayTimer {
      * того и нужен, чтобы видеть накопленное.
      */
     updateMoneyBlocks() {
-        const Money = window.MoneyMeter;
+        const Money = MoneyMeter;
         if (!Money) { return; }
         const price = this.overrunPrice;
         const period = this.overrunPeriod;
@@ -1638,7 +1656,7 @@ class DisplayTimer {
         // Стиль таймера — только свой. Общее имя `timerStyle` в этом наборе
         // может означать стиль ВИДЖЕТА (когда набор пришёл из localStorage),
         // см. RendererShared.pickOwnSetting.
-        const style = window.RendererShared.pickOwnSetting(settings, 'displayTimerStyle', 'timerStyle');
+        const style = RendererShared.pickOwnSetting(settings, 'displayTimerStyle', 'timerStyle');
         if (style) {
             this.setTimerStyle(style);
         }
@@ -1654,7 +1672,7 @@ class DisplayTimer {
         // displayExtSettings, тем же путём, что и displayTimerStyle. Здесь
         // шрифт только ПРИМЕНЯЕТСЯ, ничего никуда не пишет.
         if (settings.displayDigitsFont !== undefined) {
-            const font = window.DigitsStyle.applyFont(this.digitsTime, settings.displayDigitsFont);
+            const font = DigitsStyle.applyFont(this.digitsTime, settings.displayDigitsFont);
             // Тот же шрифт — и блокам времени: в стиле «Цифры» блок обязан
             // повторять сам стиль, а не оставаться набранным интерфейсным sans.
             //
@@ -1673,8 +1691,8 @@ class DisplayTimer {
                 // переключения снимается с ЗАПАСНОГО начертания —
                 // `document.fonts.ready` разрешился на старте и об этом шрифте
                 // ничего не знал (см. isFontLoaded в digits-style.js).
-                window.DigitsStyle.ensureFont(font.id).then(() => {
-                    window.DigitsStyle.clearProbeCache();
+                DigitsStyle.ensureFont(font.id).then(() => {
+                    DigitsStyle.clearProbeCache();
                     this.updateDigitsScale();
                     // Тот же довод, что и у document.fonts.ready: приехавший
                     // woff2 меняет ширину карточек, а место у них — доля
@@ -1694,7 +1712,7 @@ class DisplayTimer {
         // двигал. Раньше эти позиции переставлялись при смене пресета и тогда же
         // стиралось сохранённое расположение; менять положение блока теперь
         // некому, кроме самого пользователя.
-        const migrated = window.RendererShared.migrateDisplayBlocks(settings);
+        const migrated = RendererShared.migrateDisplayBlocks(settings);
         const firstLoad = this._blocksLaidOut !== true;
         this._blocksLaidOut = true;
         const hasCustomPositions = (block) => block && block.classList.contains('custom-position');
@@ -1731,11 +1749,11 @@ class DisplayTimer {
         // каждой посылке настроек (а она приходит на любое движение ползунка
         // цвета) значило бы гонять раскладку впустую.
         let captionChanged = false;
-        for (const row of window.DisplayLayouts.LABELLED_ELEMENTS) {
+        for (const row of DisplayLayouts.LABELLED_ELEMENTS) {
             const movable = this.movableRow(row.id);
             const node = movable && movable.el.querySelector('.info-label');
             if (!node) { continue; }
-            const next = window.DisplayLayouts.blockCaption(row.id, settings[row.labelKey]);
+            const next = DisplayLayouts.blockCaption(row.id, settings[row.labelKey]);
             if (node.textContent === next) { continue; }
             node.textContent = next;
             captionChanged = true;
@@ -1819,7 +1837,7 @@ class DisplayTimer {
         // этого вызова навсегда замораживала бы экран на числе прежнего
         // режима — не только подпись, а и само крупное число.
         if (settings.heroMode !== undefined) {
-            const nextMode = window.HeroModes.modeById(settings.heroMode).id;
+            const nextMode = HeroModes.modeById(settings.heroMode).id;
             if (nextMode !== this.heroMode) {
                 this.heroMode = nextMode;
                 this.cache.lastSeconds = null;
@@ -1831,7 +1849,7 @@ class DisplayTimer {
                 this.updateDisplay();
             }
         }
-        for (const key of window.HeroModes.HERO_LABEL_KEYS) {
+        for (const key of HeroModes.HERO_LABEL_KEYS) {
             if (settings[key] !== undefined) { this.heroLabels[key] = String(settings[key]); }
         }
         this.updateHeroLabel();
@@ -1848,7 +1866,7 @@ class DisplayTimer {
         // Имя `timerScale` в наборе из localStorage — масштаб ВИДЖЕТА; из-за
         // этого _lastPushedTimerScale засевался чужим значением, и первый же
         // пуш панели уходил в ветку «осознанное движение ползунка».
-        const incomingScale = window.RendererShared.pickOwnSetting(settings, 'displayTimerScale', 'timerScale');
+        const incomingScale = RendererShared.pickOwnSetting(settings, 'displayTimerScale', 'timerScale');
         if (incomingScale !== undefined) {
             const incoming = parseInt(incomingScale, 10);
             if (Number.isFinite(incoming) && incoming !== this._lastPushedTimerScale) {
@@ -2020,7 +2038,7 @@ class DisplayTimer {
         // открывался в чужих до досылки main. Запасного пути нет намеренно:
         // панель досылает `displayColors || {}`, и первый кадр обязан совпасть
         // с осевшим (renderer-shared.storedColors).
-        const colors = window.RendererShared.storedColors(localStorage, 'displayColors');
+        const colors = RendererShared.storedColors(localStorage, 'displayColors');
         if (colors) { this.applyColors(colors); }
 
         // Фон - загружаем один раз и из правильного источника
@@ -2039,8 +2057,8 @@ class DisplayTimer {
             console.info('[display] фон не применён: ключа displayExtSettings нет (первый запуск или чистый профиль)');
             return;
         }
-        const settings = window.SecurityUtils
-            ? window.SecurityUtils.safeJSONParse(bgSettings, {})
+        const settings = SecurityUtils
+            ? SecurityUtils.safeJSONParse(bgSettings, {})
             : {};
 
         if (!settings || Object.keys(settings).length === 0) {
@@ -2055,14 +2073,14 @@ class DisplayTimer {
         if (settings.bgMode === 'local') {
             const localBgImage = localStorage.getItem('localBgImage');
             const localBgSettingsStr = localStorage.getItem('localBgSettings') || '{}';
-            const localBgSettings = window.SecurityUtils
-                ? window.SecurityUtils.safeJSONParse(localBgSettingsStr, {})
+            const localBgSettings = SecurityUtils
+                ? SecurityUtils.safeJSONParse(localBgSettingsStr, {})
                 : {};
 
             if (localBgImage) {
                 settings.bgLocalImage = localBgImage;
                 settings.bgLocalFit = localBgSettings.fit || 'cover';
-                settings.bgLocalOverlay = window.RendererShared.bgOverlayPercent(localBgSettings.overlay);
+                settings.bgLocalOverlay = RendererShared.bgOverlayPercent(localBgSettings.overlay);
             }
         }
 
@@ -2175,7 +2193,7 @@ class DisplayTimer {
         // Тот же валидатор, что у остальных окон: своя регулярка принимала
         // любой набор цифр в скобках, а значение попадает и в style.color, и в
         // строку linear-gradient().
-        return window.SecurityUtils.isSafeColor(value);
+        return SecurityUtils.isSafeColor(value);
     }
 
     /** @param {Partial<DisplaySettingsUpdate>} settings */
@@ -2231,7 +2249,7 @@ class DisplayTimer {
         } else if (mode === 'local' && localImage) {
             // Локальный фон с настройками
             const fit = settings.bgLocalFit || 'cover';
-            const overlay = window.RendererShared.bgOverlayPercent(settings.bgLocalOverlay);
+            const overlay = RendererShared.bgOverlayPercent(settings.bgLocalOverlay);
 
             // Создаём или обновляем оверлей
             this.applyLocalBackground(localImage, fit, overlay);
@@ -2255,7 +2273,7 @@ class DisplayTimer {
      * цвете текста принимает владелец фона, и владелец тут один.
      */
     applyBackgroundTone(settings, mode) {
-        const tone = window.RendererShared.backgroundTone({
+        const tone = RendererShared.backgroundTone({
             mode: mode || settings.bgMode,
             solid: settings.bgSolid,
             grad1: settings.bgGrad1,
@@ -2317,8 +2335,8 @@ class DisplayTimer {
         // Безопасная установка фона с валидацией (FIX BUG-004: XSS prevention)
         if (sameImage) {
             // Картинка уже стоит и уже проверена.
-        } else if (window.SecurityUtils) {
-            const success = window.SecurityUtils.safeSetBackgroundImage(document.body, imageData);
+        } else if (SecurityUtils) {
+            const success = SecurityUtils.safeSetBackgroundImage(document.body, imageData);
             if (!success) {
                 console.error('Failed to set background image: invalid or unsafe URL');
                 return;
@@ -2586,7 +2604,7 @@ class DisplayTimer {
         // задним числом тоже нельзя.
         if (this.finished && !this._finishEffectShown && !this.flashInterval) {
             this._finishEffectShown = true;
-            if (this.heroMode === window.HeroModes.DEFAULT_MODE) {
+            if (this.heroMode === HeroModes.DEFAULT_MODE) {
                 this.triggerFinishEffect();
             }
         }
@@ -2598,7 +2616,7 @@ class DisplayTimer {
     calculateProgressValue() {
         const total = this._heroTotal();
         if (total === 0) { return 0; }
-        return window.HeroModes.heroProgress(this._heroSeconds(), total, this.overrunLimitSeconds);
+        return HeroModes.heroProgress(this._heroSeconds(), total, this.overrunLimitSeconds);
     }
 
     // Полоса срочности — общая для всех окон (RendererShared.timerColorBand).
@@ -2627,7 +2645,7 @@ class DisplayTimer {
      */
     _heroSeconds() {
         const now = new Date();
-        return window.HeroModes.heroSeconds({
+        return HeroModes.heroSeconds({
             mode: this.heroMode,
             nowSeconds: now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds(),
             startClock: this.eventTime,
@@ -2638,7 +2656,7 @@ class DisplayTimer {
 
     /** Тотал для полос срочности — тоже из одного места. Ноль = полос нет. */
     _heroTotal() {
-        return window.HeroModes.heroTotal({
+        return HeroModes.heroTotal({
             mode: this.heroMode,
             totalSeconds: this.totalSeconds,
             startClock: this.eventTime,
@@ -2657,12 +2675,12 @@ class DisplayTimer {
      * тот час, когда никто не смотрит на тесты.
      */
     _heroHasHours(secs) {
-        if (window.HeroModes.isClockMode(this.heroMode)) { return true; }
+        if (HeroModes.isClockMode(this.heroMode)) { return true; }
         return Math.abs(secs) >= 3600;
     }
 
     _colorBand(secs) {
-        return window.RendererShared.timerColorBand(secs, this._heroTotal());
+        return RendererShared.timerColorBand(secs, this._heroTotal());
     }
 
     /**
@@ -2678,15 +2696,15 @@ class DisplayTimer {
      * плашка состояния гасится каскадом, а не присвоением стиля.
      */
     updateHeroLabel() {
-        for (const id of window.HeroModes.HERO_MODE_IDS) {
+        for (const id of HeroModes.HERO_MODE_IDS) {
             document.body.classList.remove('hero-mode-' + id);
         }
         document.body.classList.add('hero-mode-' + this.heroMode);
 
-        const mode = window.HeroModes.modeById(this.heroMode);
+        const mode = HeroModes.modeById(this.heroMode);
         if (!mode.labelKey) { return; }  // режим таймера: владелец другой
 
-        const caption = window.HeroModes.heroCaption(mode.id, this.heroLabels[mode.labelKey]);
+        const caption = HeroModes.heroCaption(mode.id, this.heroLabels[mode.labelKey]);
         if (this.heroLabelText && this.heroLabelText.textContent !== caption) {
             this.heroLabelText.textContent = caption;
             // Подпись задаёт ширину колонки героя, по которой считаются места
@@ -2698,8 +2716,8 @@ class DisplayTimer {
 
     // Вспомогательная функция для определения статуса (для кэширования)
     getTimerStatusValue(secs) {
-        if (window.TimeUtils && window.TimeUtils.getTimerStatus) {
-            return window.TimeUtils.getTimerStatus(secs, this.totalSeconds);
+        if (TimeUtils && TimeUtils.getTimerStatus) {
+            return TimeUtils.getTimerStatus(secs, this.totalSeconds);
         }
         if (secs < 0) {return 'overtime';}
         if (secs === 0 && this.totalSeconds > 0) {return 'danger';}
@@ -2717,8 +2735,8 @@ class DisplayTimer {
         // часов осталось «hours > 0 || total >= 3600» — но от того тотала,
         // которому принадлежит показанное число, а не от пресета доклада.
         let cells;
-        if (window.RendererShared) {
-            cells = window.RendererShared.flipCells(secs, this._heroTotal());
+        if (RendererShared) {
+            cells = RendererShared.flipCells(secs, this._heroTotal());
         } else {
             const absSecs = Math.abs(secs);
             const hours = Math.floor(absSecs / 3600);
@@ -2741,7 +2759,7 @@ class DisplayTimer {
         // четыре карточки «30:15» — тот же дефект, что короткий форматтер у
         // остальных стилей, только выраженный числом створок. Признак «это
         // часы» спрашивается у реестра, второй копии здесь нет.
-        if (window.HeroModes.isClockMode(this.heroMode)) {
+        if (HeroModes.isClockMode(this.heroMode)) {
             cells.hasHours = true;
         }
 
@@ -2810,7 +2828,7 @@ class DisplayTimer {
     // рывком. Незавершённые таймеры снятия класса ведёт сам модуль, cleanup()
     // гасит их одним FlipCard.cancelPending().
     updateFlipCard(card, value, key) {
-        const id = window.FlipCard.flipCardTo(card, '.flip-digit', value);
+        const id = FlipCard.flipCardTo(card, '.flip-digit', value);
         if (id !== null) { this.lastFlipValues[key] = value; }
     }
 
@@ -2913,8 +2931,8 @@ class DisplayTimer {
         const hasHours = this._heroHasHours(Math.floor(this._heroSeconds()));
         // measureDigits() принимает ЯВНУЮ эталонную строку, не булев hasHours —
         // выбор строки остаётся здесь, у потребителя.
-        const probeText = hasHours ? window.DigitsStyle.PROBE_HOURS : window.DigitsStyle.PROBE_MINUTES;
-        const probe = window.DigitsStyle.measureDigits(this.digitsProbe, this.digitsFont, probeText);
+        const probeText = hasHours ? DigitsStyle.PROBE_HOURS : DigitsStyle.PROBE_MINUTES;
+        const probe = DigitsStyle.measureDigits(this.digitsProbe, this.digitsFont, probeText);
         if (!probe) { return; }
 
         // Рама берётся из РАСКЛАДКИ, а не из прямоугольника. applyTimerScale()
@@ -2932,7 +2950,7 @@ class DisplayTimer {
         // явной высотой вместо `height: auto` (см. .timer-digits в display.css),
         // но закрыли только раскладочную половину.
         const box = { width: this.timerDigits.offsetWidth, height: this.timerDigits.offsetHeight };
-        const size = window.DigitsStyle.fitFontSize({
+        const size = DigitsStyle.fitFontSize({
             availableWidth: box.width * 0.9,
             availableHeight: box.height * 0.9,
             probeWidth: probe.width,
@@ -2947,13 +2965,13 @@ class DisplayTimer {
         // здесь, потому что здесь она уже посчитана: probe.signWidth отдан в
         // кегле пробы (см. measureDigits), перевод — линейный.
         this._digitsSignPx = size > 0
-            ? probe.signWidth * size / window.DigitsStyle.PROBE_FONT_SIZE
+            ? probe.signWidth * size / DigitsStyle.PROBE_FONT_SIZE
             : 0;
         // Вертикаль знака минуса — своя у каждого шрифта (см. measureSignShift):
         // центрируется бокс, а видно чернила.
         this.digitsTime.style.setProperty(
             '--digits-sign-shift',
-            window.DigitsStyle.measureSignShift(this.digitsFont)
+            DigitsStyle.measureSignShift(this.digitsFont)
         );
         // Ширина знака — поле рамки в минусе (знак стоит ВНУТРИ рамки).
         // Только из ДЕЙСТВИТЕЛЬНОГО замера: у скрытого стиля проба нулевая, и
@@ -2961,7 +2979,7 @@ class DisplayTimer {
         if (size > 0) {
             this.digitsTime.style.setProperty(
                 '--digits-sign-em',
-                String(window.DigitsStyle.signWidthEm(probe))
+                String(DigitsStyle.signWidthEm(probe))
             );
         }
     }
@@ -3137,7 +3155,7 @@ class DisplayTimer {
     }
 
     _lifecycleStatus(secs) {
-        return window.RendererShared.timerLifecycleStatus({
+        return RendererShared.timerLifecycleStatus({
             remainingSeconds: secs,
             totalSeconds: this.totalSeconds,
             isRunning: this.isRunning,
@@ -3158,7 +3176,7 @@ class DisplayTimer {
         // Вне режима таймера подпись принадлежит настройке режима, и отчёт о
         // состоянии её НЕ ТРОГАЕТ. Не «пишет и потом перезаписываем» — тогда
         // владельцев было бы два, и они дрались бы на каждом тике.
-        if (this.heroMode !== window.HeroModes.DEFAULT_MODE) {
+        if (this.heroMode !== HeroModes.DEFAULT_MODE) {
             pill.classList.remove('is-success', 'is-attention');
             return;
         }
@@ -3193,8 +3211,8 @@ class DisplayTimer {
 
     triggerFinishEffect() {
         this.flashCount = 0;
-        const maxFlashes = (window.CONFIG && window.CONFIG.MAX_FLASH_COUNT) || 6;
-        const flashInterval = (window.CONFIG && window.CONFIG.FLASH_INTERVAL) || 250;
+        const maxFlashes = (CONFIG && CONFIG.MAX_FLASH_COUNT) || 6;
+        const flashInterval = (CONFIG && CONFIG.FLASH_INTERVAL) || 250;
 
         this.flashInterval = setInterval(() => {
             document.body.classList.toggle('flash-mode');
@@ -3228,9 +3246,9 @@ class DisplayTimer {
      * здесь не заводится.
      */
     formatTime(seconds) {
-        return window.HeroModes.isClockMode(this.heroMode)
-            ? window.TimeUtils.formatTime(seconds)
-            : window.TimeUtils.formatTimeShort(seconds);
+        return HeroModes.isClockMode(this.heroMode)
+            ? TimeUtils.formatTime(seconds)
+            : TimeUtils.formatTimeShort(seconds);
     }
 
     // ===== Block Controls: Ctrl+Scale, Alt+Drag =====
@@ -3248,10 +3266,10 @@ class DisplayTimer {
         // clampScale(), которым применяется КАЖДОЕ значение. Своя пара
         // литералов означала бы, что колесо считает предел одним числом, а
         // применение поджимает другим, — и жест молча крутился бы вхолостую.
-        const BLOCK_MIN_SCALE = window.DisplayLayouts.MIN_ELEMENT_SCALE;
-        const BLOCK_MAX_SCALE = window.DisplayLayouts.MAX_ELEMENT_SCALE;
-        const TIMER_MIN_SCALE = window.CONFIG.MIN_TIMER_SCALE;
-        const TIMER_MAX_SCALE = window.CONFIG.MAX_TIMER_SCALE;
+        const BLOCK_MIN_SCALE = DisplayLayouts.MIN_ELEMENT_SCALE;
+        const BLOCK_MAX_SCALE = DisplayLayouts.MAX_ELEMENT_SCALE;
+        const TIMER_MIN_SCALE = CONFIG.MIN_TIMER_SCALE;
+        const TIMER_MAX_SCALE = CONFIG.MAX_TIMER_SCALE;
         const STORAGE_BLOCK_SCALE_KEY = 'displayBlockScale';
         const STORAGE_TIMER_SCALE_KEY = 'displayTimerScale';
 
@@ -3275,8 +3293,8 @@ class DisplayTimer {
 
         // --- Ctrl+Wheel = scale (context-sensitive: hover over blocks → block scale, else → timer scale) ---
         // --- Shift+Wheel = block scale (explicit) ---
-        const clampScale = (window.RendererShared && window.RendererShared.clampScale)
-            ? window.RendererShared.clampScale
+        const clampScale = (RendererShared && RendererShared.clampScale)
+            ? RendererShared.clampScale
             : (value, min, max) => Math.max(min, Math.min(max, value));
         const scaleTimer = (delta) => {
             // Упор в карточки сбоку — тоже упор, и тоже с причиной. Запрошенное
@@ -3328,7 +3346,7 @@ class DisplayTimer {
             // Запасное умолчание берётся у реестра (у карточки и у подписи оно
             // РАЗНОЕ), а не пишется числом: копия 100 пережила смену умолчания
             // карточек со 120 на 150 и стала третьим значением.
-            const cur = this.elementScales[id] ?? window.DisplayLayouts.defaultScale(id);
+            const cur = this.elementScales[id] ?? DisplayLayouts.defaultScale(id);
             const next = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
             if (next === cur) {
                 // Тот же принцип, что у таймера: упор объясняется, а не молчит.
@@ -3351,7 +3369,7 @@ class DisplayTimer {
             const blocks = this.movableElements.filter((row) => row.kind === 'block');
             if (!blocks.length) { return; }
             const cur = this.elementScales[blocks[0].id]
-                ?? window.DisplayLayouts.DEFAULT_BLOCK_SCALE;
+                ?? DisplayLayouts.DEFAULT_BLOCK_SCALE;
             const next = clampScale(cur + delta, BLOCK_MIN_SCALE, BLOCK_MAX_SCALE);
             if (next === cur) { return; }
             for (const row of blocks) { this.applyElementScale(row.id, next); }
@@ -3376,7 +3394,7 @@ class DisplayTimer {
                 return;
             }
             e.preventDefault();
-            const step = window.CONFIG.SCALE_STEP;
+            const step = CONFIG.SCALE_STEP;
             // Ось берётся ТА, ПО КОТОРОЙ ПРИШЛО ДВИЖЕНИЕ, а не всегда вертикаль.
             //
             // Shift на macOS перекладывает колесо на горизонтальную ось: в
@@ -3757,7 +3775,7 @@ class DisplayTimer {
                     this.elementFractions[key] = fraction;
                     const rect = block.getBoundingClientRect();
                     const placed = rect.width > 0
-                        ? window.DisplayLayouts.fractionToPosition(
+                        ? DisplayLayouts.fractionToPosition(
                             fraction,
                             { width: window.innerWidth, height: window.innerHeight },
                             { width: rect.width, height: rect.height }
@@ -3789,7 +3807,7 @@ class DisplayTimer {
                 // следующий ресайз уже умел пересчитывать.
                 const restored = block.getBoundingClientRect();
                 const own = restored.width > 0
-                    ? window.DisplayLayouts.positionToFraction(restored, { width: window.innerWidth, height: window.innerHeight })
+                    ? DisplayLayouts.positionToFraction(restored, { width: window.innerWidth, height: window.innerHeight })
                     : null;
                 if (own) { this.elementFractions[key] = own; }
             }
@@ -3826,8 +3844,8 @@ class DisplayTimer {
         this._intervals = [];
 
         // Незавершённые таймеры перекидывания карточек.
-        if (window.FlipCard && window.FlipCard.cancelPending) {
-            window.FlipCard.cancelPending();
+        if (FlipCard && FlipCard.cancelPending) {
+            FlipCard.cancelPending();
         }
 
         // Удаляем IPC listeners если они есть
@@ -3905,7 +3923,6 @@ class DisplayTimer {
 }
 
 // Pure helpers для переиспользования и тестирования
-// Работает в браузере (через window.DisplayTimerHelpers) и в Node (module.exports).
 
 // Валидирует структуру позиций блоков после JSON.parse.
 // Возвращает очищенный объект { [key]: { left, top } } или null.
@@ -3927,30 +3944,28 @@ function validateBlockPositions(positions) {
 function canSafelyStore(value, limitBytes = 1024 * 1024) {
     if (typeof value !== 'string') { return false; }
     try {
+        // Blob есть и в окне, и в Node 18+; запасной путь — тот же счёт байт
+        // UTF-8 без node-only Buffer (модуль окна его не видит).
         const size = typeof Blob !== 'undefined'
             ? new Blob([value]).size
-            : Buffer.byteLength(value, 'utf8');
+            : new TextEncoder().encode(value).length;
         return size <= limitBytes;
     } catch {
         return false;
     }
 }
 
-// Экспорт: в браузер через window, в Node через module.exports.
-if (typeof window !== 'undefined') {
-    window.DisplayTimerHelpers = { validateBlockPositions, canSafelyStore };
-}
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { validateBlockPositions, canSafelyStore };
-}
+// `displayTimer` — живая привязка: display-theme-sync.js читает её import-ом
+// (null до DOMContentLoaded).
+export { validateBlockPositions, canSafelyStore, displayTimer };
 
 // Инициализация
 let displayTimer;
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', () => {
         displayTimer = new DisplayTimer();
-        // На window — слушатель темы стоит отдельным <script> в display.html и
-        // в область этого модуля не заглядывает.
+        // Слушатель темы (theme-sync) берёт живую привязку displayTimer через
+        // import. `window.displayTimer` — только крючок e2e.
         window.displayTimer = displayTimer;
 
         // Hint-strip: показываем первые 5 секунд, затем навсегда скрываем

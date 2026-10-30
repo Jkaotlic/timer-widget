@@ -324,6 +324,40 @@ function styleToken(name, tone = 'dark') {
     return m[1].trim().replace(/\s+/g, ' ');
 }
 
+/**
+ * Теги `<script src>` страницы: порядок, тип, defer и место (head/вне него).
+ *
+ * Зачем. Тесты искали подключение файла литералом `<script src="x.js"></script>`,
+ * то есть проверяли ПИСЬМО тега, а не факт подключения: `defer` или
+ * `type="module"` ломали их все разом. Здесь тег разбирается по атрибутам.
+ * HTML-комментарии не считаются (слово `<script src=` в прозе не тег);
+ * тег без src (инлайн) в результат не входит.
+ *
+ * @param {string} html
+ * @returns {{src: string, type: string|null, defer: boolean, inHead: boolean}[]}
+ */
+function scriptTags(html) {
+    const clean = html.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
+    const headEnd = clean.search(/<\/head\s*>/i);
+    const out = [];
+    for (const m of clean.matchAll(/<script\b([^>]*)>/gi)) {
+        const attrs = m[1];
+        const attr = (name) => {
+            const a = new RegExp(`(?:^|\\s)${name}(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+)))?(?=\\s|/|$)`, 'i').exec(attrs);
+            return a ? (a[1] ?? a[2] ?? a[3] ?? '') : null;
+        };
+        const src = attr('src');
+        if (src === null) { continue; }
+        out.push({
+            src,
+            type: attr('type'),
+            defer: attr('defer') !== null,
+            inHead: headEnd === -1 || m.index < headEnd
+        });
+    }
+    return out;
+}
+
 module.exports = {
-    maskNonCode, balancedBlockAt, afterBalanced, functionBody, constructorBlocks, ipcHandlerBody, codeOnly, styleToken
+    maskNonCode, balancedBlockAt, afterBalanced, functionBody, constructorBlocks, ipcHandlerBody, codeOnly, styleToken, scriptTags
 };

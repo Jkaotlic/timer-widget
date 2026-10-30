@@ -14,6 +14,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const { readSource, readRaw } = require('./helpers/window-source');
 
 const read = (file) => readSource(file);
@@ -190,9 +191,8 @@ test('таблицы стилей панели подключены в прав�
 
 test('каждый вынесенный модуль подключён в разметке', () => {
     for (const mod of EXTRACTED) {
-        assert.match(
-            controlHtml,
-            new RegExp(`<script src="${mod.replace('.', '\\.')}"></script>`),
+        assert.ok(
+            pageLoads('electron-control.html', mod),
             `${mod} не подключён в electron-control.html`
         );
     }
@@ -218,17 +218,20 @@ test('вынесенные модули не тянут за собой внут
     }
 });
 
-test('модули берут общие зависимости через window, а не через голые имена', () => {
-    // В проекте нет сборщика: каждый файл — отдельный classic-script, поэтому
-    // голое имя работает случайно (через глобальную область) и ломает статический
-    // анализ. Конвенция проекта — window.X, как в renderer-shared/display-script.
-    const colorPicker = read('color-picker.js');
-    assert.match(colorPicker, /window\.ColorUtils\./);
-    assert.doesNotMatch(colorPicker, /(?<![\w.])ColorUtils\./);
+test('модули берут общие зависимости import-ом, а не через window или голые имена', () => {
+    // Окна — нативные ES-модули (план 2026-10-30-es-modules): зависимость
+    // библиотеки — import, его проверяет связывание. `window.X` остаётся только
+    // крючкам e2e (tests/window-bridges.test.js) — Toast из их числа.
+    const colorPicker = codeOnly(read('color-picker.js'));
+    assert.match(colorPicker, /^import \* as ColorUtils from '\.\/color-utils\.js';$/m);
+    assert.match(colorPicker, /(?<![\w.])ColorUtils\.hsvToRgb\(/);
+    assert.doesNotMatch(colorPicker, /window\.ColorUtils/);
 
-    const customSounds = read('custom-sounds.js');
-    assert.match(customSounds, /window\.Toast\./);
-    assert.doesNotMatch(customSounds, /(?<![\w.])Toast\./);
+    // Toast — тоже import: крючок window.Toast живёт для e2e, модули его не читают.
+    const customSounds = codeOnly(read('custom-sounds.js'));
+    assert.match(customSounds, /^import \{ Toast \} from '\.\/ui-feedback\.js';$/m);
+    assert.match(customSounds, /(?<![\w.])Toast\.show\(/);
+    assert.doesNotMatch(customSounds, /window\.Toast/);
 });
 
 test('примесь пользовательских звуков применяется к прототипу', () => {
@@ -236,7 +239,7 @@ test('примесь пользовательских звуков примен�
     // а при первом клике по «добавить звук».
     assert.match(
         controlHtml,
-        /Object\.assign\(TimerController\.prototype, window\.CustomSoundsMixin\)/
+        /Object\.assign\(TimerController\.prototype, CustomSoundsMixin\)/
     );
     const mixin = read('custom-sounds.js');
     for (const method of ['showSoundUploadError', 'handleSoundFileUpload',

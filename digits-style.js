@@ -18,9 +18,7 @@
  * пересчитывался бы каждую секунду, то есть цифры бы «дышали». Поэтому меряется
  * эталон «88:88» / «8:88:88» — один раз на пару (шрифт, формат), с кэшем.
  *
- * Двойной экспорт, как в window-geometry.js / renderer-shared.js:
- *   - Node (тесты):     module.exports
- *   - Браузер (окна):   window.DigitsStyle
+ * ES-модуль: именованный экспорт (окна — import, Node и тесты — require(esm)).
  */
 
 // ---------------------------------------------------------------------------
@@ -462,38 +460,12 @@ function signWidthEm(probe) {
     return Number.isFinite(width) && width > 0 ? width / PROBE_FONT_SIZE : 0;
 }
 
-const DigitsStyle = {
-    DIGIT_FONTS,
-    DEFAULT_FONT_ID,
-    PROBE_FONT_SIZE,
-    PROBE_MINUTES,
-    PROBE_HOURS,
-    PROBE_SIGN,
-    PROBE_FIGURES,
-    SIGN_FONT_RATIO,
-    SIGN_GAP_EM,
-    FRAME_PAD_X_EM,
-    FRAME_PAD_Y_EM,
-    resolveFont,
-    fitScale,
-    fitFontSize,
-    inkCenterOffset,
-    signShiftRatio,
-    measureSignShift,
-    isFontLoaded,
-    ensureFont,
-    measureDigits,
-    signWidthEm,
-    clearProbeCache,
-    applyFont
+
+export {
+    DIGIT_FONTS, DEFAULT_FONT_ID, PROBE_FONT_SIZE, PROBE_MINUTES, PROBE_HOURS,
+    PROBE_SIGN, PROBE_FIGURES, SIGN_FONT_RATIO, SIGN_GAP_EM, FRAME_PAD_X_EM,
+    FRAME_PAD_Y_EM, resolveFont, fitScale, fitFontSize, inkCenterOffset,
+    signShiftRatio, measureSignShift, isFontLoaded, ensureFont, measureDigits,
+    signWidthEm, clearProbeCache, applyFont
 };
 
-// Node.js (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = DigitsStyle;
-}
-
-// Браузер (все три окна и панель)
-if (typeof window !== 'undefined') {
-    window.DigitsStyle = DigitsStyle;
-}

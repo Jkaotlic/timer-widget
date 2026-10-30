@@ -98,11 +98,4 @@ function applyClockSettings(els, stored) {
     }
 }
 
-const ClockSettingsSchema = { CLOCK_SETTINGS, collectClockSettings, applyClockSettings };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ClockSettingsSchema;
-}
-if (typeof window !== 'undefined') {
-    window.ClockSettingsSchema = ClockSettingsSchema;
-}
+export { CLOCK_SETTINGS, collectClockSettings, applyClockSettings };

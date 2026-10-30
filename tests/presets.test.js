@@ -14,6 +14,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
@@ -295,12 +296,12 @@ test('PANEL-001: пресет раскладывает и рассылает н�
 
 test('панель подключает модули и ставит ячейки в разметку', () => {
     const control = read('electron-control.html');
-    assert.match(control, /<script src="presets\.js"><\/script>/, 'панель не подключает presets.js');
-    assert.match(control, /<script src="panel-presets\.js"><\/script>/, 'панель не подключает panel-presets.js');
+    assert.ok(pageLoads('electron-control.html', 'presets.js'), 'панель не подключает presets.js');
+    assert.ok(pageLoads('electron-control.html', 'panel-presets.js'), 'панель не подключает panel-presets.js');
     for (let i = 1; i <= Presets.PRESET_SLOTS; i++) {
         assert.match(control, new RegExp(`id="presetSlot${i}"`), `нет ячейки ${i}`);
     }
-    assert.match(codeOnly(control), /window\.PanelPresets\.install\(/, 'ячейки ни к чему не привязаны');
+    assert.match(codeOnly(control), /(?<![\w.])PanelPresets\.install\(/, 'ячейки ни к чему не привязаны');
 });
 
 test('дисплей умеет перечитать места карточек по просьбе', () => {

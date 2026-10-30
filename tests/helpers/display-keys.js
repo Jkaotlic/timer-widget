@@ -3,7 +3,7 @@
 /**
  * Обработчик клавиш дисплея — НАСТОЯЩИЙ, из display-script.js: метод
  * setupKeyboardShortcuts() вынимается из исходника и исполняется на поддельном
- * `this` с поддельными document/window. Возвращает функцию «нажать клавишу» и
+ * `this` с поддельными document/window и CONFIG (в модуле — import). Возвращает функцию «нажать клавишу» и
  * журнал того, что окно отправило в главный процесс.
  */
 
@@ -20,7 +20,8 @@ function setupKeyboardShortcutsFn() {
     const block = balancedBlockAt(SRC, m.index, 'setupKeyboardShortcuts');
     const body = block.slice(block.indexOf('{') + 1, block.lastIndexOf('}'));
      
-    return new Function('document', 'window', body);
+    // CONFIG — import модуля (display-script.js — ES-модуль): здесь параметр.
+    return new Function('document', 'window', 'CONFIG', body);
 }
 
 /**
@@ -33,7 +34,8 @@ function displayKeys(state = {}) {
     const fakeDocument = {
         addEventListener: (type, fn) => { if (type === 'keydown') { handler = fn; } }
     };
-    const fakeWindow = { CONFIG: { PRESET_DURATIONS: [300, 600, 900, 1800] } };
+    const fakeWindow = {};
+    const fakeConfig = { PRESET_DURATIONS: [300, 600, 900, 1800] };
     const self = {
         isRunning: !!state.isRunning,
         ipcHandlers: {},
@@ -43,7 +45,7 @@ function displayKeys(state = {}) {
             send: (channel, payload) => sent.push([channel, payload])
         }
     };
-    setupKeyboardShortcutsFn().call(self, fakeDocument, fakeWindow);
+    setupKeyboardShortcutsFn().call(self, fakeDocument, fakeWindow, fakeConfig);
     if (!handler) { throw new Error('обработчик keydown не повешен'); }
     const press = (init) => {
         const event = {

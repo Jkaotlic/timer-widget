@@ -27,7 +27,7 @@
  * всю высоту» при цифрах в треть экрана.
  */
 
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { waitForDisplay } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');

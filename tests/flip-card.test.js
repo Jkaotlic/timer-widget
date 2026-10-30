@@ -194,7 +194,7 @@ test('все три окна используют общую реализаци�
     // Три копии этой логики уже однажды разъехались — см. аудит 2026-07-29.
     for (const file of ['display-script.js', 'electron-widget.html', 'electron-clock-widget.html']) {
         const src = readSource(file);
-        assert.match(src, /window\.FlipCard\.flipCardTo\(/, `${file} должен звать общий flipCardTo`);
+        assert.match(src, /(?<![\w.])FlipCard\.flipCardTo\(/, `${file} должен звать общий flipCardTo`);
         assert.doesNotMatch(src, /classList\.add\('flipping'\)/, `${file} не должен навешивать класс сам`);
     }
 });

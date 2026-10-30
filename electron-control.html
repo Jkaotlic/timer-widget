@@ -16,8 +16,6 @@
          величины общие для всех окон и обе обязаны быть применены ДО первого
          кадра, иначе окно успевает показать чужое состояние. -->
     <script src="ui-lock.js"></script>
-    <script src="panel-titlebar.js"></script>
-    <script src="presets.js"></script><script src="panel-presets.js"></script><script src="panel-compact.js"></script>
     <script src="theme-init.js"></script>
 </head>
 <body class="control-window state-idle">
@@ -1090,44 +1088,11 @@
         </div>
     </div>
 
-    <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
-    <script src="ipc-compat.js"></script>
-    <script src="constants.js"></script>
-    <script src="security.js"></script>
-    <script src="color-utils.js"></script>
-    <script src="utils.js"></script>
-    <script src="renderer-storage.js"></script>
-    <script src="renderer-shared.js"></script>
-    <script src="digits-style.js"></script>
-    <script src="font-select.js"></script>
-    <!-- display-layouts.js РАНЬШЕ settings-schema.js: таблица берёт у реестра умолчание масштаба блоков -->
-    <script src="display-layouts.js"></script>
-    <script src="hero-modes.js"></script>
-    <script src="settings-schema.js"></script>
-    <script src="clock-settings-schema.js"></script>
-    <script src="sound-bank.js"></script>
-    <script src="sound-presets.js"></script>
-    <script src="ui-feedback.js"></script>
-    <script src="scale-input.js"></script>
-    <script src="scale-report.js"></script>
-    <script src="color-picker.js"></script>
-    <script src="modal-manager.js"></script>
-    <script src="shortcuts-help.js"></script>
-    <script src="onboarding.js"></script>
-    <script src="mini-bar.js"></script>
-    <script src="panel-state.js"></script>
-    <script src="custom-sounds.js"></script>
-    <script src="local-background.js"></script>
-    <script src="theme-grid.js"></script>
-    <script src="panel-colors.js"></script>
-    <script src="money-meter.js"></script>
-    <script src="panel-display.js"></script>
-    <script src="panel-drawer.js"></script>
-    <script src="panel-reset.js"></script>
-    <script src="panel-clock.js"></script>
-
-    <script src="control-app.js"></script>
-    <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script src="control-theme-sync.js"></script>
+    <!-- Вход окна — ОДИН модуль: всё остальное (шим IPC, библиотеки) приходит
+         его import-ом, порядок выводится из графа (план 2026-10-30-es-modules). -->
+    <script type="module" src="control-app.js"></script>
+    <!-- Тема приходит из панели; слушатель — отдельным модулем ПОСЛЕ входа:
+         он зовёт окно через его крючок window.X. -->
+    <script type="module" src="control-theme-sync.js"></script>
 </body>
 </html>

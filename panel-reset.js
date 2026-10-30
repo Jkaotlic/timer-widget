@@ -20,6 +20,13 @@
  * и отправку в окна — всё это принадлежит контроллеру панели.
  */
 
+// Список полей цвета — у сборщика; своя копия уже теряла `bg` (см. ниже).
+import * as ClockSettingsSchema from './clock-settings-schema.js';
+import * as HeroModes from './hero-modes.js';
+import * as SettingsSchema from './settings-schema.js';
+import { COLOR_FIELDS } from './panel-colors.js';
+import { Toast } from './ui-feedback.js';
+
 const RESET_TARGETS = {
     widget: { mount: 'widgetResetRow', label: 'виджета', toast: 'Настройки виджета сброшены' },
     clock: { mount: 'clockResetRow', label: 'часов', toast: 'Настройки часов сброшены' },
@@ -54,7 +61,7 @@ const PanelResetMixin = {
     resetWindowSettings(target) {
         if (!RESET_TARGETS[target]) { return; }
 
-        window.SettingsSchema.resetOwnedSettings(target, document);
+        SettingsSchema.resetOwnedSettings(target, document);
 
         // Сброс ставит el.checked и событий НЕ порождает, поэтому всё, что
         // панель держит полем или выводит из контрола побочным эффектом,
@@ -74,7 +81,7 @@ const PanelResetMixin = {
         // Настройки часов описаны своей таблицей; пустой объект означает «взять
         // всё из значений по умолчанию».
         if (target === 'clock') {
-            window.ClockSettingsSchema.applyClockSettings(this, {});
+            ClockSettingsSchema.applyClockSettings(this, {});
         }
 
         // Режим центрального времени — РУЧНОЙ ключ (settings-schema.js,
@@ -92,7 +99,7 @@ const PanelResetMixin = {
         // У `bgMode` дыра ровно та же, но у него есть СВОЯ кнопка сброса фона;
         // у режима второго пути нет.
         if (target === 'display' && typeof this.setHeroMode === 'function') {
-            this.setHeroMode(window.HeroModes.DEFAULT_MODE);
+            this.setHeroMode(HeroModes.DEFAULT_MODE);
         }
 
         // Деления живут в своём ключе, а не в таблице настроек, и принадлежат
@@ -110,7 +117,7 @@ const PanelResetMixin = {
         // переживало «Сбросить всё» — то есть кнопка возвращала к заводскому
         // виду не всё, а всё, кроме одного.
         const patch = {};
-        for (const field of window.PanelColorFields) { patch[field] = null; }
+        for (const field of COLOR_FIELDS) { patch[field] = null; }
         this.updateColors(target, patch);
 
         this.saveExtSettings();
@@ -120,7 +127,7 @@ const PanelResetMixin = {
         this.updateClockAnalogNumbersVisibility();
         this.highlightActiveThemes();
         this.renderSurfaceControls();
-        window.Toast?.show(RESET_TARGETS[target].toast);
+        Toast.show(RESET_TARGETS[target].toast);
     },
 
     // Отправка в само окно. Каналы у каждого свои — общего «применить всё» в
@@ -140,10 +147,4 @@ const PanelResetMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PanelResetMixin, RESET_TARGETS };
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelResetMixin = PanelResetMixin;
-}
+export { PanelResetMixin, RESET_TARGETS };

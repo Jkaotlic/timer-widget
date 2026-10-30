@@ -188,18 +188,11 @@
         </div>
     </div>
 
-    <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
-    <script src="ipc-compat.js"></script>
-    <script src="constants.js"></script>
-    <script src="security.js"></script>
-    <script src="utils.js"></script>
-    <script src="renderer-shared.js"></script>
-    <script src="flip-card.js"></script>
-    <script src="window-geometry.js"></script>
-    <script src="digits-style.js"></script>
-
-    <script src="widget-app.js"></script>
-    <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script src="widget-theme-sync.js"></script>
+    <!-- Вход окна — ОДИН модуль: всё остальное (шим IPC, библиотеки) приходит
+         его import-ом, порядок выводится из графа (план 2026-10-30-es-modules). -->
+    <script type="module" src="widget-app.js"></script>
+    <!-- Тема приходит из панели; слушатель — отдельным модулем ПОСЛЕ входа:
+         он зовёт окно через его крючок window.X. -->
+    <script type="module" src="widget-theme-sync.js"></script>
 </body>
 </html>

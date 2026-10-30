@@ -54,13 +54,30 @@ test('BUG-21: файл с тем же базовым именем заменяе
 // --- поведение примеси на поддельных window / localStorage -------------------
 
 function withFakeEnv(stored, fn) {
-    const saved = { window: global.window, localStorage: global.localStorage, Audio: global.Audio };
-    const audios = [];
-    const toasts = [];
-    global.window = {
-        safeJSONParse,
-        Toast: { show: (msg, kind) => toasts.push({ msg, kind }) }
+    const saved = {
+        window: global.window, localStorage: global.localStorage, Audio: global.Audio,
+        document: global.document, requestAnimationFrame: global.requestAnimationFrame,
+        setTimeout: global.setTimeout
     };
+    const audios = [];
+    const created = [];
+    global.window = { SecurityUtils: { safeJSONParse } };
+    // Toast — настоящий (import из ui-feedback.js), подмены на window у него
+    // нет: тосты читаются из DOM-узлов, которые он создал на поддельном document.
+    const node = () => {
+        const n = { className: '', textContent: '', classList: { add() {}, remove() {} }, remove() {} };
+        n.appendChild = (child) => child;
+        return n;
+    };
+    global.document = {
+        createElement: () => { const n = node(); created.push(n); return n; },
+        body: node()
+    };
+    global.requestAnimationFrame = () => 0;
+    global.setTimeout = () => 0;
+    const toasts = () => created
+        .filter((n) => n.className.startsWith('toast '))
+        .map((n) => ({ msg: n.textContent, kind: n.className.slice('toast '.length) }));
     global.localStorage = { getItem: () => stored };
     global.Audio = function FakeAudio(src) {
         audios.push(src);
@@ -70,6 +87,9 @@ function withFakeEnv(stored, fn) {
         global.window = saved.window;
         global.localStorage = saved.localStorage;
         global.Audio = saved.Audio;
+        global.document = saved.document;
+        global.requestAnimationFrame = saved.requestAnimationFrame;
+        global.setTimeout = saved.setTimeout;
     });
 }
 
@@ -117,7 +137,6 @@ test('BUG-21: настоящий звук играет', async () => {
 test('BUG-21: файл, который не читается, — сообщение, а не необработанный отказ', async () => {
     await withFakeEnv('[]', async ({ toasts }) => {
         const { c, errors } = controller();
-        global.window.CONFIG = { MAX_SOUND_FILE_SIZE: 1024 * 1024, ALLOWED_AUDIO_TYPES: ['audio/wav'] };
         const file = {
             name: 'a.wav', size: 10, type: 'audio/wav',
             slice: () => ({ arrayBuffer: () => Promise.reject(new Error('NotReadableError')) })
@@ -125,7 +144,22 @@ test('BUG-21: файл, который не читается, — сообщен
         const target = { files: [file], value: 'a.wav' };
         await c.handleSoundFileUpload({ target });
         assert.equal(errors.length, 1, 'пользователю не сказали, что файл не прочитан');
-        assert.ok(toasts.some((t) => t.kind === 'error'));
+        assert.ok(toasts().some((t) => t.kind === 'error'));
         assert.equal(target.value, '', 'поле выбора файла не сброшено');
+    });
+});
+
+test('BUG-25: файл на байт больше настоящего лимита CONFIG — отказ и тост, чтение не начато', async () => {
+    const { MAX_SOUND_FILE_SIZE } = await import('../constants.js');
+    await withFakeEnv('[]', async ({ toasts }) => {
+        const { c, errors } = controller();
+        let sliced = false;
+        const file = { name: 'big.wav', size: MAX_SOUND_FILE_SIZE + 1, type: 'audio/wav', slice: () => { sliced = true; } };
+        const target = { files: [file], value: 'big.wav' };
+        await c.handleSoundFileUpload({ target });
+        assert.equal(errors.length, 1);
+        assert.ok(toasts().some((t) => t.kind === 'error'));
+        assert.equal(sliced, false);
+        assert.equal(target.value, '');
     });
 });

@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { waitForDisplay, waitForDisplayGone } = require('./window-ready');
 const { pickWindowSizes } = require('./window-sizes');

@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('path');
 const { codeOnly, styleToken } = require('./helpers/source-scan');
 
@@ -89,8 +90,8 @@ const PANEL = read('electron-control.html');
 const PANEL_CODE = codeOnly(PANEL);
 
 test('панель подключает модуль и подмешивает его в прототип', () => {
-    assert.match(PANEL, /<script src="panel-colors\.js"><\/script>/);
-    assert.match(PANEL_CODE, /Object\.assign\(TimerController\.prototype, window\.PanelColorsMixin\)/);
+    assert.ok(pageLoads('electron-control.html', 'panel-colors.js'));
+    assert.match(PANEL_CODE, /Object\.assign\(TimerController\.prototype, PanelColorsMixin\)/);
     assert.match(PANEL_CODE, /initSurfaceControls\(\)/);
 });
 
@@ -252,7 +253,7 @@ test('ползунок прозрачности не отключается из
 
 /* ─────────────── ряды настроек, применимых не ко всем стилям ──────────────── */
 
-const PanelStateMixin = require('../panel-state');
+const { PanelStateMixin } = require('../panel-state');
 const { PanelClockMixin } = require('../panel-clock');
 
 // Поддельный документ: модулю нужны только getElementById и .style.display.
@@ -324,8 +325,10 @@ test('сброс окна обнуляет ВСЕ поля цвета, а не �
     // сборщика; тест проверяет, что сброс перечисляет именно его.
     const { COLOR_FIELDS, mergeColors } = require(path.join(ROOT, 'panel-colors.js'));
     const reset = readSource('panel-reset.js');
-    assert.match(codeOnly(reset), /window\.PanelColorFields/,
+    assert.match(codeOnly(reset), /import \{ COLOR_FIELDS \} from '\.\/panel-colors\.js'/,
         'сброс перечисляет поля цвета сам — это вторая копия списка');
+    assert.match(codeOnly(reset), /for \(const field of COLOR_FIELDS\)/,
+        'сброс не перечисляет список сборщика');
 
     // И сама операция: патч из всех полей не оставляет от объекта ничего.
     const patch = {};

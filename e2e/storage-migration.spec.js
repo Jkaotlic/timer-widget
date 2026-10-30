@@ -18,8 +18,9 @@ const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const { spawnSync } = require('child_process');
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { _electron: electron } = require('playwright');
+const { track } = require('./failure-artifacts');
 const { MAIN, cleanEnv, waitForControlWindow } = require('./launch');
 
 const ELECTRON = require('electron');
@@ -74,7 +75,7 @@ function seed(dir, entries) {
 }
 
 async function start(dir) {
-    const app = await electron.launch({ args: [MAIN, `--user-data-dir=${dir}`], env: cleanEnv() });
+    const app = track(await electron.launch({ args: [MAIN, `--user-data-dir=${dir}`], env: cleanEnv() }));
     const control = await waitForControlWindow(app);
     await control.waitForLoadState('domcontentloaded');
     await control.waitForTimeout(900);

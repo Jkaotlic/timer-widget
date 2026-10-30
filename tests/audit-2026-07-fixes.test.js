@@ -25,6 +25,7 @@ const readRaw = (file) => readSource(file);
 // Реализация ОДНА на весь набор тестов: копий было три, и они разошлись —
 // две вырезали <!-- -->, третья нет.
 const { codeOnly, functionBody, ipcHandlerBody } = require('./helpers/source-scan');
+const { pageLoads } = require('./helpers/page-graph');
 const { readMainSource } = require('./helpers/main-source');
 const { readSource } = require('./helpers/window-source');
 const read = (file) => codeOnly(readRaw(file));
@@ -203,15 +204,15 @@ test('ползунки масштаба совпадают по диапазон
     const CONFIG = require('../constants');
     assert.equal(CONFIG.MIN_TIMER_SCALE, 30);
     assert.equal(CONFIG.MAX_TIMER_SCALE, 300);
-    assert.match(displayScript, /const TIMER_MIN_SCALE = window\.CONFIG\.MIN_TIMER_SCALE;/);
-    assert.match(displayScript, /const TIMER_MAX_SCALE = window\.CONFIG\.MAX_TIMER_SCALE;/);
+    assert.match(displayScript, /const TIMER_MIN_SCALE = (?<![\w.])CONFIG\.MIN_TIMER_SCALE;/);
+    assert.match(displayScript, /const TIMER_MAX_SCALE = (?<![\w.])CONFIG\.MAX_TIMER_SCALE;/);
     // Пределы блоков тоже переехали к владельцу — в реестр display-layouts.js,
     // где ими же поджимается КАЖДОЕ применяемое значение.
     const Layouts = require('../display-layouts');
     assert.equal(Layouts.MIN_ELEMENT_SCALE, 50);
     assert.equal(Layouts.MAX_ELEMENT_SCALE, 600);
-    assert.match(displayScript, /const BLOCK_MIN_SCALE = window\.DisplayLayouts\.MIN_ELEMENT_SCALE;/);
-    assert.match(displayScript, /const BLOCK_MAX_SCALE = window\.DisplayLayouts\.MAX_ELEMENT_SCALE;/);
+    assert.match(displayScript, /const BLOCK_MIN_SCALE = (?<![\w.])DisplayLayouts\.MIN_ELEMENT_SCALE;/);
+    assert.match(displayScript, /const BLOCK_MAX_SCALE = (?<![\w.])DisplayLayouts\.MAX_ELEMENT_SCALE;/);
 });
 
 test('масштаб дисплея применяется только при реальном движении ползунка', () => {
@@ -490,8 +491,8 @@ test('все три окна берут приоритеты статуса из
             `${name} должен использовать общий timerLifecycleStatus()`
         );
     }
-    // Панель управления обязана подключать модуль, иначе вызов упадёт.
-    assert.match(controlHtml, /<script src="renderer-shared\.js"><\/script>/);
+    // Панель управления обязана подключать модуль (тегом или import), иначе вызов упадёт.
+    assert.ok(pageLoads('electron-control.html', 'renderer-shared.js'));
 });
 
 test('виджет читает finished из состояния таймера', () => {
@@ -651,13 +652,13 @@ test('панель подтягивает ползунок и не отвеча�
     assert.doesNotMatch(handler[0], /ipcRenderer\.send/);
     // Сама логика — в модуле scale-report.js: она проверяется в Node на
     // поддельных документе и хранилище (tests/scale-range.test.js).
-    assert.match(handler[0], /window\.ScaleReport\.applyScaleReport/);
+    assert.match(handler[0], /(?<![\w.])ScaleReport\.applyScaleReport/);
     // Сохраняется ТОЛЬКО сообщённая величина. Здесь стоял saveExtSettings(),
     // то есть отчёт о размере окна записывал профиль целиком, из контролов
     // панели: открытие окна виджета затирало настройки, положенные в профиль
     // мимо неё (поймано 01.09.2026 — падал e2e/digits-style.spec.js).
     assert.doesNotMatch(handler[0], /this\.saveExtSettings\(\)/);
-    assert.match(controlHtml, /<script src="scale-report\.js"><\/script>/);
+    assert.ok(pageLoads('electron-control.html', 'scale-report.js'));
     // И слушатель обязан сниматься при закрытии окна.
     assert.match(controlHtml, /removeListener\('scale-report', this\._onScaleReport\)/);
 });

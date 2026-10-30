@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const fs = require('node:fs');
 const path = require('node:path');
 const { launchApp, USER_DATA_DIR } = require('./launch');

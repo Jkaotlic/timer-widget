@@ -20,8 +20,13 @@
  * this.refreshPresetMarks().
  */
 
+import * as SecurityUtils from './security.js';
+import * as ClockSettingsSchema from './clock-settings-schema.js';
+import * as SettingsSchema from './settings-schema.js';
+
+
 function readClockStored() {
-    return window.SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
+    return SecurityUtils.safeJSONParse(localStorage.getItem('clockWidgetSettings'), {});
 }
 
 const PanelClockMixin = {
@@ -41,7 +46,7 @@ const PanelClockMixin = {
         // Отсутствие поля часы читают как умолчание (круг) — писать его
         // незачем: запись на старте завела бы ключ в профиле, где его не
         // было, и погасила бы отметку пресета, записанного без него.
-        const def = window.SettingsSchema.SETTINGS_DESCRIPTORS.find((r) => r.key === 'clockStyle')?.def;
+        const def = SettingsSchema.SETTINGS_DESCRIPTORS.find((r) => r.key === 'clockStyle')?.def;
         if ((prevClock.clockStyle ?? def) !== style) {
             localStorage.setItem('clockWidgetSettings', JSON.stringify({ ...prevClock, clockStyle: style }));
             this.refreshPresetMarks();
@@ -53,7 +58,7 @@ const PanelClockMixin = {
         // Ключ, контрол и умолчание описаны ОДНОЙ строкой таблицы в
         // clock-settings-schema.js. Здесь остаётся то, что таблица
         // выразить не может: деления циферблата и запись в хранилище.
-        const persisted = window.ClockSettingsSchema.collectClockSettings(this);
+        const persisted = ClockSettingsSchema.collectClockSettings(this);
 
         // Деления — настройка ОБЩАЯ с виджетом, у неё свои ключи, и
         // восстанавливают её сами окна. Поэтому в хранилище часов она не
@@ -71,7 +76,7 @@ const PanelClockMixin = {
     },
 
     loadClockSettings() {
-        window.ClockSettingsSchema.applyClockSettings(this, readClockStored());
+        ClockSettingsSchema.applyClockSettings(this, readClockStored());
         // Деления — свой ключ вне clockWidgetSettings. Перечитываются
         // здесь же: эту раскладку зовёт и применение пресета, и без
         // строки тумблер после пресета показывал прежнее значение.
@@ -89,10 +94,4 @@ const PanelClockMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PanelClockMixin };
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelClockMixin = PanelClockMixin;
-}
+export { PanelClockMixin };

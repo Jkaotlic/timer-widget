@@ -69,74 +69,21 @@ interface Window {
     electronAPI: ElectronBridge;
     ipcRenderer: IpcRendererShim;
 
-    // --- общие модули (window.X = тот же объект, что module.exports)
+    // --- крючки e2e общих модулей (tests/window-bridges.test.js PERMANENT)
     CONFIG: typeof import('../constants.js');
-    SecurityUtils: typeof import('../security.js');
-    /** utils.js кладёт в окно всё, КРОМЕ safelySendToWindow (она — для main). */
-    TimeUtils: Omit<typeof import('../utils.js'), 'safelySendToWindow'>;
-    ColorUtils: typeof import('../color-utils.js');
-    RendererShared: typeof import('../renderer-shared.js');
-    RendererStorage: typeof import('../renderer-storage.js');
-    DigitsStyle: typeof import('../digits-style.js');
-    DisplayLayouts: typeof import('../display-layouts.js');
-    HeroModes: typeof import('../hero-modes.js');
-    MoneyMeter: typeof import('../money-meter.js');
-    EventReport: typeof import('../event-report.js');
     FlipCard: typeof import('../flip-card.js');
-    WindowGeometry: typeof import('../window-geometry.js');
     UILock: typeof import('../ui-lock.js');
     UITheme: typeof import('../ui-theme.js');
-    SettingsSchema: typeof import('../settings-schema.js');
-    ClockSettingsSchema: typeof import('../clock-settings-schema.js');
-    Presets: typeof import('../presets.js');
     SoundBank: typeof import('../sound-bank.js');
-    SoundPresets: typeof import('../sound-presets.js');
-    ScaleReport: typeof import('../scale-report.js');
 
     // --- модули панели
-    PanelTitlebar: typeof import('../panel-titlebar.js');
-    PanelPresets: typeof import('../panel-presets.js');
-    PanelCompact: typeof import('../panel-compact.js');
-    PanelDrawer: typeof import('../panel-drawer.js');
-    MiniBar: typeof import('../mini-bar.js');
-    Onboarding: typeof import('../onboarding.js');
     Toast: typeof import('../ui-feedback.js').Toast;
     LoadingIndicator: typeof import('../ui-feedback.js').LoadingIndicator;
-    attachFontSelect: typeof import('../font-select.js').attachFontSelect;
     setupScaleValueEdit: typeof import('../scale-input.js').setupScaleValueEdit;
-    ColorPicker: typeof import('../color-picker.js').ColorPicker;
     addPickerToggle: typeof import('../color-picker.js').addPickerToggle;
     openModal: typeof import('../modal-manager.js').openModal;
     closeModal: typeof import('../modal-manager.js').closeModal;
     showKeyboardShortcuts: typeof import('../shortcuts-help.js').showKeyboardShortcuts;
-    globalHotkeyBlocked: typeof import('../shortcuts-help.js').globalHotkeyBlocked;
-    trackPointerControl: typeof import('../shortcuts-help.js').trackPointerControl;
-    mergeColors: typeof import('../panel-colors.js').mergeColors;
-    PanelColorFields: typeof import('../panel-colors.js').COLOR_FIELDS;
-    /** window.PanelDisplay — подмножество экспорта panel-display.js. */
-    PanelDisplay: Pick<typeof import('../panel-display.js'),
-        'collectDisplayToggles' | 'collectBlockLabels' | 'BLOCK_KEYS' | 'LABEL_KEYS' | 'DISPLAY_TOGGLE_KEYS'>;
-    DisplayTimerHelpers: typeof import('../display-script.js');
-
-    // --- примеси TimerController (Object.assign(TimerController.prototype, …))
-    CustomSoundsMixin: typeof import('../custom-sounds.js').CustomSoundsMixin;
-    LocalBackgroundMixin: typeof import('../local-background.js').LocalBackgroundMixin;
-    ThemeGridMixin: typeof import('../theme-grid.js').ThemeGridMixin;
-    /** В Node к экспорту дописан windowRowSubtitle; в окне его у объекта нет. */
-    PanelStateMixin: Omit<typeof import('../panel-state.js'), 'windowRowSubtitle'>;
-    PanelColorsMixin: typeof import('../panel-colors.js').PanelColorsMixin;
-    PanelDisplayMixin: typeof import('../panel-display.js').PanelDisplayMixin;
-    PanelResetMixin: typeof import('../panel-reset.js').PanelResetMixin;
-    PanelClockMixin: typeof import('../panel-clock.js').PanelClockMixin;
-
-    /**
-     * НЕ присваивается ни одним модулем: существует лишь потому, что
-     * `function safeJSONParse` верхнего уровня в classic-скрипте security.js
-     * становится свойством window. Зовут его так custom-sounds.js и
-     * local-background.js (и их тесты подкладывают window.safeJSONParse).
-     * Явный путь — window.SecurityUtils.safeJSONParse.
-     */
-    safeJSONParse: typeof import('../security.js').safeJSONParse;
 
     // --- экземпляры окон. Классы живут в точках входа (*-app.js,
     // display-script.js), которые ничего не экспортируют, поэтому any.
@@ -145,20 +92,25 @@ interface Window {
     clockWidget: any;
     displayTimer: any;
     miniBar: ReturnType<typeof import('../mini-bar.js').init>;
-    presetsApi: ReturnType<typeof import('../panel-presets.js').install>;
 
     /** Старый Safari/WebKit: префиксный AudioContext. */
     webkitAudioContext: typeof AudioContext;
+
+    /** Крючок стенда съёмки (scripts/screenshot-runner.js): подпись «закончится в …». */
+    __frozenEndsAt?: string;
 }
 
 /**
- * Что примеси приносят TimerController (control-app.js:
- * `Object.assign(TimerController.prototype, window.XMixin)`). Класс объявляет
+ * Что примеси приносят TimerController (control-app.js импортирует их и
+ * делает `Object.assign(TimerController.prototype, XMixin)`). Класс объявляет
  * свои члены через `@type {TimerMixins['имя']}` в конструкторе.
  */
-type TimerMixins = Window['CustomSoundsMixin'] & Window['LocalBackgroundMixin']
-    & Window['ThemeGridMixin'] & Window['PanelStateMixin'] & Window['PanelColorsMixin']
-    & Window['PanelDisplayMixin'] & Window['PanelResetMixin'] & Window['PanelClockMixin'];
+type TimerMixins = typeof import('../custom-sounds.js').CustomSoundsMixin
+    & typeof import('../local-background.js').LocalBackgroundMixin
+    & typeof import('../theme-grid.js').ThemeGridMixin
+    & typeof import('../panel-state.js').PanelStateMixin
+    & typeof import('../panel-colors.js').PanelColorsMixin
+    & typeof import('../panel-display.js').PanelDisplayMixin
+    & typeof import('../panel-reset.js').PanelResetMixin
+    & typeof import('../panel-clock.js').PanelClockMixin;
 
-/** ipc-compat.js кладёт шим в window; окна зовут его голым именем. */
-declare var ipcRenderer: Window['ipcRenderer'];

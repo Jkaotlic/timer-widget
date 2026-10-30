@@ -216,12 +216,4 @@ function bindCompactMode({
     };
 }
 
-const PanelCompact = { fits, decideCompact, createFlipBreaker, bindCompactMode };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelCompact;
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelCompact = PanelCompact;
-}
+export { fits, decideCompact, createFlipBreaker, bindCompactMode };

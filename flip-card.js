@@ -161,11 +161,14 @@ function cancelPending() {
     return count;
 }
 
+// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
+// не расширяются (иначе объект не совпал бы с `typeof import`).
+/** @type {typeof import('./flip-card.js')} */
 const FlipCard = { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS, FLIP_LAYERS_CLASS };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = FlipCard;
-}
+export { flipCardTo, cancelPending, FLIP_CLASS, FLIP_DURATION_MS, FLIP_LAYERS_CLASS };
+
 if (typeof window !== 'undefined') {
+    // крючок e2e (flip-animation.spec.js)
     window.FlipCard = FlipCard;
 }

@@ -139,3 +139,23 @@ test('CONFIG.TIMER_STYLES — четыре стиля окон, замороже
     assert.deepEqual([...CONFIG.TIMER_STYLES], ['circle', 'flip', 'analog', 'digits']);
     assert.ok(Object.isFrozen(CONFIG.TIMER_STYLES));
 });
+
+test('именованные экспорты constants.js = ключи CONFIG, ни одного пропущенного', async () => {
+    // Главный процесс берёт файл require(esm) и видит ТОЛЬКО экспорты; окна —
+    // window.CONFIG целиком. Ключ, добавленный в CONFIG и забытый в списке
+    // экспорта, в окне работал бы, а в main был бы undefined. Свежий экземпляр
+    // модуля (`?keys`) — чтобы мост window.CONFIG записался в подложенный window.
+    const { pathToFileURL } = require('node:url');
+    const path = require('node:path');
+    const hadWindow = 'window' in globalThis;
+    globalThis.window = {};
+    try {
+        const ns = await import(pathToFileURL(path.join(__dirname, '..', 'constants.js')).href + '?keys');
+        const own = globalThis.window.CONFIG;
+        assert.ok(own && Object.isFrozen(own), 'мост window.CONFIG не записан или не заморожен');
+        assert.deepEqual(Object.keys(ns).sort(), Object.keys(own).sort());
+        assert.deepEqual(Object.keys(CONFIG).sort(), Object.keys(own).sort());
+    } finally {
+        if (!hadWindow) { delete globalThis.window; }
+    }
+});

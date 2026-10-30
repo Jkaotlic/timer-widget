@@ -60,6 +60,7 @@
 | `ui-pass-2026-08.test.js` | Регрессии UI-прохода 07.08.2026 по исходникам (`codeOnly`) |
 | `e2e-budget.test.js` | `test.setTimeout` в e2e только ПОДНИМАЕТ бюджет из `playwright.config.js` |
 | `e2e-profile-guard.test.js` | Сторож общего e2e-профиля: разница по полям, умолчания из таблиц настроек, доли вместо пикселей в местах карточек, изменчивые ключи с причиной и из реестра, сводная спека последняя; утечку сторож ВИДИТ |
+| `e2e-fixtures.test.js` | Каждая e2e-спека берёт `test` из `./fixtures` (следы упавшего теста), а не из `@playwright/test`; фикстура автоматическая; `track(app)` в `launchApp` стоит ПОСЛЕ сторожа профиля; зонд проверяет сам себя |
 | `sound-hotkey.test.js` | Клавиша `Z` и мастер-звук: у звука ОДИН владелец (`#soundMasterEnabled`), тумблер строки и посылки окон идут через `toggleSoundMaster` |
 | `atomic-write.test.js` | Атомарная запись (tmp + fsync + rename): сорвавшаяся запись оставляет старый файл — накопитель и снимок восстановления (BUG-09) |
 | `renderer-shared.test.js` | `breakdown`, `flipCells`, `clampScale`, `surfacePaint`, `fitBlockScale`, `topBandReserve`, `heroFrameShrink`, `secondsUntilEventEnd` (полночь, одна формула с героем) |
@@ -104,6 +105,12 @@
 | `window-source.test.js` | Помощник `helpers/window-source.js` (окно = разметка + его `*-app.js`/`.css` на местах): список собственных файлов сверен с разметкой в обе стороны, развёртка на своих местах; порядок таблиц виджета и часов (fonts первой, своя последней) |
 | `navigation-guard.test.js` | SEC-06: навигация окна — только на четыре свои страницы схемы `app://timer-widget/` (хеш/query не мешают, `%2e%2e` не обходит; любой `file://`, чужой хост/порт — отказ); `window.open` и `<webview>` — отказ на каждом событии |
 | `app-scheme.test.js` | SEC-12: разбор адреса схемы `app://` — хост, порт, учётка, обход каталога в любой записи (`..`, `%2e%2e`, `%2f`, `%5c`, NUL, двойное кодирование), список из разметки, каталоги ассетов, MIME, заголовки; CSP заголовка = meta каждой страницы = `csp-guard` |
+| `control-mixins.test.js` | Примеси TimerController: файлы с `*Mixin` = импортированные в `control-app.js` = аргументы `Object.assign(TimerController.prototype, …)`; примесь не импортирует `control-app.js` |
+| `main-warnings.test.js` | `main-warnings.js` гасит РОВНО `MODULE_TYPELESS_PACKAGE_JSON` во всех формах `emitWarning`; чужие предупреждения проходят; настоящий дочерний Node без шума |
+| `module-exports-shape.test.js` | Общий файл-ESM отдаёт `require()` те же ключи, что раньше `module.exports` (списки записаны ДО перевода; добавить можно, потерять нельзя) |
+| `script-tags.test.js` | Скрипты страниц: `<head>` — классические, `<body>` — только модули (вход + theme-sync) |
+| `window-bare-names.test.js` | Файлы окон обращаются к чужому файлу только через `import`, голых имён ноль; список модулей для lint (`scripts/window-modules.js`) вычислен из разметки и графа import |
+| `window-bridges.test.js` | Мосты `window.X` = ровно крючки e2e/стенда (PERMANENT/HEAD/PRELOAD) в обе стороны; чтение не-крючка в `e2e/` и `scripts/` валит тест |
 | `main-app-protocol.test.js` | SEC-12: ответ `protocol.handle` настоящими `Response` — тело байт в байт, CSP/nosniff, 403/404/405, HEAD, файл только из каталога приложения, отказ в журнал без пути |
 | `main-storage-migration.test.js` | SEC-12: перенос localStorage `file://` → `app://` на подставке, исполняющей ТОТ ЖЕ код, что уходит в окно: не перезаписывает, метка после сброса на диск, повтор после квоты/таймаута/сбоя, gave-up, свежий профиль по снимку на старте, окно гасится после панели, журнал без ключей |
 | `ipc-senders.test.js` | SEC-07: таблица «канал → окна-отправители» покрывает каждый канал main/preload/validator, необратимое — только панель, каждое окно допущено ко всему, что шлёт сегодня (сканер проверен на себе); отказ субфрейму, чужой странице, чужому webContents |
@@ -141,6 +148,8 @@
 ## e2e (`e2e/`)
 
 e2e specs (`npx playwright test`, `workers: 1`):
+
+Упавший тест оставляет в `test-results/<папка теста>/` снимок и состояние каждого окна: `before-close-<окно>.png|json` (снято на `app.close()`, до сторожа профиля) и/или `live-…` (приложение было живо после теста), плюс `…-main.json` (`BrowserWindow.getAllWindows()`) и `trace.zip` (лента шагов, без DOM). Механизм — `e2e/failure-artifacts.js` + авто-фикстура `e2e/fixtures.js`; спека, запускающая Electron сама, оборачивает его в `track()`.
 
 | File | Covers |
 |------|--------|

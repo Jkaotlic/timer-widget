@@ -100,10 +100,9 @@ function setupScaleValueEdit(spanEl, sliderEl, defaultVal, onApply) {
     });
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { setupScaleValueEdit };
-}
+export { setupScaleValueEdit };
 
 if (typeof window !== 'undefined') {
+    // Крючок e2e (status-and-colors.spec.js); control-app.js — до перевода.
     window.setupScaleValueEdit = setupScaleValueEdit;
 }

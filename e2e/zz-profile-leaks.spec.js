@@ -12,7 +12,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { readLedger, VOLATILE_KEYS } = require('./profile-guard');
 const { launchApp, USER_DATA_DIR } = require('./launch');
 const { RELAY_STATE_FILE } = require('../relay-store.js');

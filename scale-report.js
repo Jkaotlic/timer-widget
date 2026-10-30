@@ -89,12 +89,4 @@ function applyScaleReport(data, deps) {
     return clamped;
 }
 
-const ScaleReport = { SCALE_TARGETS, PROFILE_KEY, applyScaleReport };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ScaleReport;
-}
-
-if (typeof window !== 'undefined') {
-    window.ScaleReport = ScaleReport;
-}
+export { SCALE_TARGETS, PROFILE_KEY, applyScaleReport };

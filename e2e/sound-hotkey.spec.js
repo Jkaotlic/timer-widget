@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const { waitForWidget } = require('./window-ready');
 
@@ -26,7 +26,7 @@ const soundState = (control) => control.evaluate(() => {
         checkbox: !!box.checked,
         rowOn: row.classList.contains('active'),
         rowAria: row.getAttribute('aria-checked'),
-        stored: (window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {}) || {}).soundMasterEnabled
+        stored: JSON.parse(localStorage.getItem('displayExtSettings') || '{}').soundMasterEnabled
     };
 });
 

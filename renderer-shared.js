@@ -4,9 +4,8 @@
 // windows (electron-widget.html, electron-clock-widget.html, display.html /
 // display-script.js). It contains ONLY pure functions.
 //
-// Dual export, identical to utils.js:
-//   - Node (tests / main process): `module.exports = { ... }`
-//   - Browser (renderer process):  `window.RendererShared = { ... }`
+// ES module: named exports (windows import it, Node tests take it via
+// require(esm)).
 //
 // IMPORTANT: every function here mirrors the EXACT behavior already present in
 // the renderers — they adopt these as drop-in replacements, no new behavior is
@@ -20,6 +19,8 @@
 // window-geometry.js. The display keeps its own: no preventDefault, a fullscreen
 // heuristic, no geometry. "Diverges enough" is a claim that has to be re-measured,
 // not inherited.
+
+import * as CONFIG from './constants.js';
 
 // ---------------------------------------------------------------------------
 // breakdown(totalAbsSeconds) → { hours, minutes, seconds, hasHours }
@@ -466,7 +467,7 @@ function timerLifecycleStatus(state) {
  *      панель управления, остальные окна держали 10 и 25 захардкоженными.
  *      Правка конфига разъехала бы окна между собой.
  *
- * Пороги берутся из аргумента, иначе из window.CONFIG, иначе 10 / 25.
+ * Пороги берутся из аргумента, иначе из импортированного CONFIG, иначе 10 / 25.
  *
  * @param {number} remainingSeconds
  * @param {number} totalSeconds
@@ -482,14 +483,13 @@ function timerColorBand(remainingSeconds, totalSeconds, thresholds) {
     const total = Number.isFinite(rawTotal) ? rawTotal : 0;
     if (total <= 0) { return 'normal'; }
 
-    const cfg = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : null;
     const t = thresholds || {};
     const dangerPct = Number.isFinite(Number(t.danger))
         ? Number(t.danger)
-        : (cfg && Number.isFinite(Number(cfg.DANGER_PERCENTAGE)) ? Number(cfg.DANGER_PERCENTAGE) : 10);
+        : Number(CONFIG.DANGER_PERCENTAGE);
     const warningPct = Number.isFinite(Number(t.warning))
         ? Number(t.warning)
-        : (cfg && Number.isFinite(Number(cfg.WARNING_PERCENTAGE)) ? Number(cfg.WARNING_PERCENTAGE) : 25);
+        : Number(CONFIG.WARNING_PERCENTAGE);
 
     const percentLeft = (secs / total) * 100;
     // Ноль ВХОДИТ в danger — это конец отсчёта, а не «предупреждение».
@@ -1030,46 +1030,13 @@ function migrateDisplayBlocks(settings) {
     return out;
 }
 
-// ---------------------------------------------------------------------------
-// Exports — dual pattern identical to utils.js
-// ---------------------------------------------------------------------------
-const RendererShared = {
-    breakdown,
-    flipCells,
-    clampScale,
-    fitBlockScale,
-    sideCardBand,
-    topBandReserve,
-    heroFrameShrink,
-    clockToSeconds,
-    secondsUntilEventEnd,
-    signedSecondsUntilClock,
-    eventClockDistances,
-    bgOverlayPercent,
-    DEFAULT_BG_OVERLAY,
-    migrateDisplayBlocks,
-    timerLifecycleStatus,
-    timerColorBand,
-    pickOwnSetting,
-    ownColors,
-    storedColors,
-    LEGACY_COLORS_KEY,
-    endsAt,
-    relativeLuminance,
-    backgroundTone,
-    surfaceTone,
-    surfacePaint,
-    surfaceSolid,
-    surfaceAlpha,
-    migrateTimerStyle
+
+export {
+    breakdown, flipCells, clampScale, fitBlockScale, sideCardBand, topBandReserve,
+    heroFrameShrink, clockToSeconds, secondsUntilEventEnd, signedSecondsUntilClock,
+    eventClockDistances, bgOverlayPercent, DEFAULT_BG_OVERLAY, migrateDisplayBlocks,
+    timerLifecycleStatus, timerColorBand, pickOwnSetting, ownColors, storedColors,
+    LEGACY_COLORS_KEY, endsAt, relativeLuminance, backgroundTone, surfaceTone,
+    surfacePaint, surfaceSolid, surfaceAlpha, migrateTimerStyle
 };
 
-// Node.js (tests / main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = RendererShared;
-}
-
-// Browser (renderer process)
-if (typeof window !== 'undefined') {
-    window.RendererShared = RendererShared;
-}

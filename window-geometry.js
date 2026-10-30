@@ -435,23 +435,9 @@ function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) 
     return handlers;
 }
 
-const WindowGeometry = {
-    createWindowGeometry,
-    isWindowDragTarget,
-    bindWindowDrag,
-    fitScaledBounds,
-    fitRestoredBounds,
-    MIN_SCALE_PCT,
-    MAX_SCALE_PCT,
-    SAVE_SETTLE_MS
+
+export {
+    createWindowGeometry, isWindowDragTarget, bindWindowDrag, fitScaledBounds,
+    fitRestoredBounds, MIN_SCALE_PCT, MAX_SCALE_PCT, SAVE_SETTLE_MS
 };
 
-// Node (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = WindowGeometry;
-}
-
-// Браузер (рендерер) — без сборщика доступ идёт через window.X
-if (typeof window !== 'undefined') {
-    window.WindowGeometry = WindowGeometry;
-}

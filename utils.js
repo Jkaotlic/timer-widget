@@ -1,11 +1,10 @@
 // Utility functions для Timer Widget
 
-// CONFIG нужен здесь ровно ради одного порога. Сборщика нет, поэтому в Node он
-// приходит через require, а в рендерере — через window.CONFIG: constants.js
-// подключается раньше utils.js во всех четырёх окнах. Фолбэк оставлен, чтобы
-// модуль оставался самодостаточным, если его подключат в одиночку.
-const __CONFIG = (typeof window !== 'undefined' && window.CONFIG)
-    || (typeof require === 'function' ? require('./constants') : null);
+// CONFIG нужен здесь ровно ради одного порога — импортом: и в окне, и в Node
+// (require(esm)) это один и тот же модуль, порядок тегов страницы роли больше
+// не играет (на дисплее constants.js стоял ПОСЛЕ utils.js, и порог брался из
+// литерала ниже — с тем же значением 60).
+import * as __CONFIG from './constants.js';
 
 // Порог «жёлтой» зоны в секундах. Здесь стоял литерал 60, а
 // CONFIG.WARNING_THRESHOLD не читал НИ ОДИН рабочий файл — при этом тест
@@ -182,31 +181,15 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-// Экспорт для Node.js (main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        formatTime,
-        formatTimeShort,
-        parseManualTime,
-        debounce,
-        getTimerStatus,
-        calculateProgress,
-        safelySendToWindow,
-        isValidNumber,
-        clamp
-    };
-}
+export {
+    formatTime,
+    formatTimeShort,
+    parseManualTime,
+    debounce,
+    getTimerStatus,
+    calculateProgress,
+    safelySendToWindow,
+    isValidNumber,
+    clamp
+};
 
-// Экспорт для браузера (renderer process)
-if (typeof window !== 'undefined') {
-    window.TimeUtils = {
-        formatTime,
-        formatTimeShort,
-        parseManualTime,
-        getTimerStatus,
-        calculateProgress,
-        isValidNumber,
-        clamp,
-        debounce
-    };
-}

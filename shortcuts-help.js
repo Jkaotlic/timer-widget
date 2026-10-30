@@ -187,12 +187,9 @@ function trackPointerControl(doc) {
     return () => last;
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { showKeyboardShortcuts, globalHotkeyBlocked, trackPointerControl, HOTKEY_OPEN_LAYERS };
-}
+export { showKeyboardShortcuts, globalHotkeyBlocked, trackPointerControl, HOTKEY_OPEN_LAYERS };
 
 if (typeof window !== 'undefined') {
+    // Крючок e2e (status-and-colors.spec.js).
     window.showKeyboardShortcuts = showKeyboardShortcuts;
-    window.globalHotkeyBlocked = globalHotkeyBlocked;
-    window.trackPointerControl = trackPointerControl;
 }

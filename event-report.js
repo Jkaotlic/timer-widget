@@ -22,13 +22,9 @@
  *    Второй копии прейскуранта здесь нет намеренно.
  */
 
-const MoneyLib = (typeof window !== 'undefined' && window.MoneyMeter)
-    ? window.MoneyMeter
-    : require('./money-meter.js');
+const MoneyLib = require('./money-meter.js');
 
-const TimeLib = (typeof window !== 'undefined' && window.TimeUtils)
-    ? window.TimeUtils
-    : require('./utils.js');
+const TimeLib = require('./utils.js');
 
 /**
  * Разделитель — точка с запятой.
@@ -228,12 +224,5 @@ function buildReportCSV(input) {
 
 const EventReport = { buildReportCSV, csvCell, DELIMITER, EOL, BOM };
 
-// Node.js (тесты, главный процесс)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = EventReport;
-}
-
-// Браузер (панель — на случай предпросмотра)
-if (typeof window !== 'undefined') {
-    window.EventReport = EventReport;
-}
+// Грузит только главный процесс (и тесты).
+module.exports = EventReport;

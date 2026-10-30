@@ -84,24 +84,10 @@ function hexToHsv(hex) {
     return [h, s, max];
 }
 
-// Экспорт для Node.js (main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        hsvToRgb,
-        rgbToHex,
-        hsvToHex,
-        hexToRgb,
-        hexToHsv
-    };
-}
-
-// Экспорт для браузера (renderer process)
-if (typeof window !== 'undefined') {
-    window.ColorUtils = {
-        hsvToRgb,
-        rgbToHex,
-        hsvToHex,
-        hexToRgb,
-        hexToHsv
-    };
-}
+export {
+    hsvToRgb,
+    rgbToHex,
+    hsvToHex,
+    hexToRgb,
+    hexToHsv
+};

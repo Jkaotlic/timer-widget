@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 // Окна ждут ОПРОСОМ с дедлайном, а не событием 'window': событие приходит
 // ровно раз и теряется, если окно успело открыться между возвратом из

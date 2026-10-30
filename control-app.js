@@ -2,36 +2,73 @@
  * control-app.js — TimerController панели управления и её запуск.
  *
  * Код страницы electron-control.html, до 25.09.2026 — её inline-<script>.
- * Вынесен целиком, без правок, ради CSP `script-src 'self'` (без хешей и
- * 'unsafe-inline'). Это classic script, НЕ модуль и НЕ strict: имена верхнего
- * уровня общие со всеми остальными <script> страницы, как и были.
+ * Вынесен целиком ради CSP `script-src 'self'` (без хешей и 'unsafe-inline').
+ * С 30.10.2026 — ES-модуль (план 2026-10-30-es-modules): модули панели и
+ * примеси приходят import-ом, верхний уровень файла свой (и strict — тело
+ * класса strict было и раньше, верхний уровень `this` не трогает).
  * Самодостаточный блок, который трогаете, — выносите в свой модуль (CLAUDE.md).
  *
  * Отступ в 8 пробелов — от HTML, и оставлен намеренно: source-level тесты
  * режут код по отступу (`\n {16}\};`), и сдвиг отступа молча сдвинул бы их
  * срезы. Тесты читают окно через tests/helpers/window-source.js.
  */
-        // ipcRenderer теперь доступен через ipc-compat.js (безопасно)
+        // ipcRenderer — window.ipcRenderer: его ставит классический ipc-compat.js
+        // (до задачи 6), голым именем модуль его не видит.
 
-        // debounce: используем из utils.js (TimeUtils), иначе — встроенный fallback
-        // Нельзя использовать const/let — utils.js уже определяет function debounce в глобальной области
-        if (typeof debounce === 'undefined') {
-            var debounce = (window.TimeUtils && window.TimeUtils.debounce)
-                ? window.TimeUtils.debounce
-                : (fn, delay = (window.CONFIG && window.CONFIG.DEBOUNCE_DELAY) || 120) => {
-                    let timeoutId;
-                    return (...args) => {
-                        clearTimeout(timeoutId);
-                        timeoutId = setTimeout(() => fn(...args), delay);
-                    };
-                };
-        }
+        // Модули панели. Примеси — именем XMixin: присваиваются прототипу ниже,
+        // tests/control-mixins.test.js сверяет файлы-примеси, импорты и
+        // присваивания. Примеси сами control-app.js не импортируют.
+        // Шим IPC (window.ipcRenderer) — первым: конструктор панели
+        // подписывается через него на каналы.
+        import './ipc-compat.js';
+        import * as CONFIG from './constants.js';
+        import * as SoundBank from './sound-bank.js';
+        import * as SecurityUtils from './security.js';
+        import * as TimeUtils from './utils.js';
+        import * as DisplayLayouts from './display-layouts.js';
+        import * as RendererShared from './renderer-shared.js';
+        import * as HeroModes from './hero-modes.js';
+        import * as SettingsSchema from './settings-schema.js';
+        import * as SoundPresets from './sound-presets.js';
+        import * as Presets from './presets.js';
+        import { CustomSoundsMixin } from './custom-sounds.js';
+        import { LocalBackgroundMixin } from './local-background.js';
+        import { ThemeGridMixin } from './theme-grid.js';
+        import { PanelStateMixin } from './panel-state.js';
+        import { PanelColorsMixin } from './panel-colors.js';
+        import { PanelDisplayMixin } from './panel-display.js';
+        import { PanelResetMixin } from './panel-reset.js';
+        import { PanelClockMixin } from './panel-clock.js';
+        import * as PanelTitlebar from './panel-titlebar.js';
+        import * as PanelPresets from './panel-presets.js';
+        import * as PanelCompact from './panel-compact.js';
+        import * as PanelDrawer from './panel-drawer.js';
+        import * as MiniBar from './mini-bar.js';
+        import * as Onboarding from './onboarding.js';
+        import * as ScaleReport from './scale-report.js';
+        import { attachFontSelect } from './font-select.js';
+        import { setupScaleValueEdit } from './scale-input.js';
+        import { addPickerToggle } from './color-picker.js';
+        import { openModal, closeModal } from './modal-manager.js';
+        import { showKeyboardShortcuts, globalHotkeyBlocked, trackPointerControl } from './shortcuts-help.js';
+        import { Toast } from './ui-feedback.js';
+
+        /** Ячейки вида (panel-presets.js install); до установки — null. */
+        let presetsApi = null;
+        /** Экземпляр панели; создаётся ниже, до этого — null. any: методы примесей типы не видят (как и прежний window.X). @type {any} */
+        let timerController = null;
+
+        // debounce — только TimeUtils.debounce (utils.js). Здесь стоял
+        // `if (typeof debounce === 'undefined') { var debounce = … }`: `var`
+        // сливался с `function debounce` из utils.js в одно глобальное имя, и
+        // ветка с запасным вариантом не исполнялась никогда. В модуле тот же
+        // `var` стал бы своим, а обращение — к чужому файлу голым именем.
 
         // Обе величины — из реестра, а не литералами: масштаб «как при открытии»
         // (ползунки говорят процентами, CONFIG.DEFAULT_SCALE хранит долю) и
         // базовый размер окна часов, который панель дважды считала по числу 220.
-        const DEFAULT_SCALE_PCT = Math.round(window.CONFIG.DEFAULT_SCALE * 100);
-        const CLOCK_BASE_PX = window.CONFIG.CLOCK_WIDGET_DEFAULT_SIZE;
+        const DEFAULT_SCALE_PCT = Math.round(CONFIG.DEFAULT_SCALE * 100);
+        const CLOCK_BASE_PX = CONFIG.CLOCK_WIDGET_DEFAULT_SIZE;
 
         class TimerController {
             constructor() {
@@ -72,15 +109,15 @@
                 // же изменении настроек, то есть окна красились цветом, не
                 // принадлежащим палитре приложения.
                 /** @type {ColorsUpdate} */ this.currentColors = {
-                    timer: window.CONFIG.DEFAULT_TIMER_COLORS.timer,
-                    progress: window.CONFIG.DEFAULT_TIMER_COLORS.progress,
+                    timer: CONFIG.DEFAULT_TIMER_COLORS.timer,
+                    progress: CONFIG.DEFAULT_TIMER_COLORS.progress,
                     bg: '#0f0c29'
                 };
 
                 // Списки звуков строятся ДО чтения настроек: applyStoredSettings
                 // ставит select.value, а значение без <option> браузер молча
                 // отбрасывает — выбранный звук превратился бы в «— без звука —».
-                window.SoundPresets.buildSoundSelects(document);
+                SoundPresets.buildSoundSelects(document);
                 this.initElements();
                 this.initTabs();
                 this.initThemes();
@@ -144,7 +181,7 @@
                 this.widgetAlwaysOnTopEl = document.getElementById('widgetAlwaysOnTop');
                 for (const el of [this.widgetStatusLabelEl, this.widgetAlwaysOnTopEl]) {
                     el?.addEventListener('change', () => {
-                        ipcRenderer.send('widget-style-update', this.widgetStylePayload());
+                        window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                         this.saveExtSettings();
                     });
                 }
@@ -184,9 +221,9 @@
                 this.clockDigitsFontEl = document.getElementById('clockDigitsFont');
                 this.displayDigitsFontEl = document.getElementById('displayDigitsFont');
                 // attachFontSelect — в font-select.js, не здесь (лимит строк).
-                window.attachFontSelect(this.widgetDigitsFontEl);
-                window.attachFontSelect(this.clockDigitsFontEl);
-                window.attachFontSelect(this.displayDigitsFontEl);
+                attachFontSelect(this.widgetDigitsFontEl);
+                attachFontSelect(this.clockDigitsFontEl);
+                attachFontSelect(this.displayDigitsFontEl);
                 this.widgetDigitsFontRowEl = document.getElementById('widgetDigitsFontRow');
                 this.clockDigitsFontRowEl = document.getElementById('clockDigitsFontRow');
                 this.displayDigitsFontRowEl = document.getElementById('displayDigitsFontRow');
@@ -265,7 +302,7 @@
 
                 if (!wasOpen) {
                     // Capture current outer width so close can restore exactly.
-                    const baseDefault = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                    const baseDefault = (CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                     this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || baseDefault;
                     const shell = document.querySelector('.app-shell');
                     // Ширина колонки панели выводится из ФАКТИЧЕСКОЙ ширины окна, а
@@ -285,7 +322,7 @@
                     // при открытом ящике.
                     const syncColumn = () => {
                         if (!shell) { return; }
-                        shell.style.setProperty('--control-panel-width', `${window.PanelDrawer.columnFromWindow(
+                        shell.style.setProperty('--control-panel-width', `${PanelDrawer.columnFromWindow(
                             window.innerWidth || baseDefault, this._drawerExtraWidth)}px`);
                     };
                     this._syncDrawerColumn = syncColumn;
@@ -301,7 +338,7 @@
                     // Пин — по ПРЕДСКАЗАННОЙ финальной ширине, а не по текущей:
                     // на узком экране окно вырастает не на всю ширину ящика, и
                     // пин оказывался шире правды (разбор — в panel-drawer.js).
-                    const pinnedColumn = window.PanelDrawer.drawerColumnWidth({
+                    const pinnedColumn = PanelDrawer.drawerColumnWidth({
                         innerWidth: this._baseInnerBeforeDrawer,
                         drawerWidth: this._drawerExtraWidth,
                         availWidth: window.screen && window.screen.availWidth
@@ -318,11 +355,11 @@
                     }
 
                     // Потолок ширины поднимается ПЕРВЫМ, иначе запрос ниже обрежется (см. main).
-                    ipcRenderer.send('control-drawer', { open: true });
+                    window.ipcRenderer.send('control-drawer', { open: true });
                     // Drawer-операция меняет только ширину — высоту main оставит
                     // как есть (иначе ручная высота, выставленная юзером,
                     // перезаписывалась innerHeight с HiDPI-дрейфом).
-                    ipcRenderer.send('resize-control-window', {
+                    window.ipcRenderer.send('resize-control-window', {
                         width: this._baseWidthBeforeDrawer + this._drawerExtraWidth
                     });
                     // Ящик раскрывается СРАЗУ: когда раскрытие лежало в отложенном
@@ -394,7 +431,7 @@
                 // left-392 → center-560 → full-380. Снимаем класс ТОЛЬКО после того
                 // как окно физически сузилось — тогда визуальное положение panel
                 // не меняется (в узком окне start == center для 100% ширины).
-                const baseDefault = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                const baseDefault = (CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                 const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || baseDefault;
                 // Снимаем пересчёт колонки: пока ящик открыт, он держал её равной
                 // «фактическая ширина минус ящик», но у закрытого ящика колонка не
@@ -414,8 +451,8 @@
                 if (shell) {
                     shell.style.setProperty('--drawer-reserve', '0px');
                 }
-                ipcRenderer.send('resize-control-window', { width: restoreWidth });
-                ipcRenderer.send('control-drawer', { open: false }); // потолок вниз ПОСЛЕ сжатия
+                window.ipcRenderer.send('resize-control-window', { width: restoreWidth });
+                window.ipcRenderer.send('control-drawer', { open: false }); // потолок вниз ПОСЛЕ сжатия
                 // Класс снимаем, когда ширина окна вернулась И анимация дорожек
                 // отыграла: в этот момент 1fr уже равен пину, поэтому снятие
                 // визуально ничего не меняет. Сторож по времени — на случай, если
@@ -536,16 +573,16 @@
                 // Окна (переключение открыть/закрыть)
                 document.getElementById('openWidgetBtn').addEventListener('click', () => {
                     if (isWidgetOpen) {
-                        ipcRenderer.send('close-widget');
+                        window.ipcRenderer.send('close-widget');
                     } else {
-                        ipcRenderer.send('open-widget');
+                        window.ipcRenderer.send('open-widget');
                     }
                 });
                 document.getElementById('openClockBtn').addEventListener('click', () => {
                     if (isClockOpen) {
-                        ipcRenderer.send('close-clock-widget');
+                        window.ipcRenderer.send('close-clock-widget');
                     } else {
-                        ipcRenderer.send('open-clock-widget');
+                        window.ipcRenderer.send('open-clock-widget');
                         // Синхронизируем настройки и стиль часов при открытии
                         setTimeout(() => {
                             this.pushClockSettings();
@@ -555,17 +592,17 @@
                 });
                 document.getElementById('openDisplayBtn').addEventListener('click', () => {
                     if (isDisplayOpen) {
-                        ipcRenderer.send('close-display');
+                        window.ipcRenderer.send('close-display');
                     } else {
                         // При открытии дисплея закрываем виджеты таймера и часов
                         if (isWidgetOpen) {
-                            ipcRenderer.send('close-widget');
+                            window.ipcRenderer.send('close-widget');
                         }
                         if (isClockOpen) {
-                            ipcRenderer.send('close-clock-widget');
+                            window.ipcRenderer.send('close-clock-widget');
                         }
                         const displayIndex = this.displaySelectEl.value;
-                        ipcRenderer.send('open-display', { displayIndex });
+                        window.ipcRenderer.send('open-display', { displayIndex });
                     }
                 });
                 
@@ -595,7 +632,7 @@
                 
                 this.timerStyleEl.addEventListener('change', () => {
                     // Send widget-specific style update (only affects widget, not display)
-                    ipcRenderer.send('widget-style-update', this.widgetStylePayload());
+                    window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                     // При синхронизации часы идут за виджетом — И ОКНО, И ПЕРЕКЛЮЧАТЕЛЬ.
                     // Присваивание .value не порождает 'change' (см. _attachSegmented),
                     // поэтому петля не замыкается и синхронизация не гаснет.
@@ -610,7 +647,7 @@
 
                 this.timerScaleEl.addEventListener('input', () => {
                     this.timerScaleValueEl.textContent = this.timerScaleEl.value + '%';
-                    ipcRenderer.send('widget-style-update', this.widgetStylePayload());
+                    window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                     this.saveExtSettings();
                 });
 
@@ -657,7 +694,7 @@
                 // Три независимых списка шрифта — каждый шлёт только своему окну.
                 if (this.widgetDigitsFontEl) {
                     this.widgetDigitsFontEl.addEventListener('change', () => {
-                        ipcRenderer.send('widget-style-update', this.widgetStylePayload());
+                        window.ipcRenderer.send('widget-style-update', this.widgetStylePayload());
                         this.saveExtSettings();
                     });
                 }
@@ -681,28 +718,28 @@
                         const val = parseInt(clockScaleEl.value);
                         clockScaleValueEl.textContent = val + '%';
                         const newSize = Math.round(CLOCK_BASE_PX * val / 100);
-                        ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                        window.ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
                     });
                 }
 
                 // Scale value click-to-edit and double-click-to-reset wiring
-                window.setupScaleValueEdit(
+                setupScaleValueEdit(
                     document.getElementById('timerScaleValue'),
                     document.getElementById('timerScale'),
                     DEFAULT_SCALE_PCT,
                     (val) => {
-                        ipcRenderer.send('widget-style-update', this.widgetStylePayload({ timerScale: val }));
+                        window.ipcRenderer.send('widget-style-update', this.widgetStylePayload({ timerScale: val }));
                         this.saveExtSettings();
                     }
                 );
 
-                window.setupScaleValueEdit(
+                setupScaleValueEdit(
                     document.getElementById('clockScaleValue'),
                     document.getElementById('clockScale'),
                     DEFAULT_SCALE_PCT,
                     (val) => {
                         const newSize = Math.round(CLOCK_BASE_PX * val / 100);
-                        ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
+                        window.ipcRenderer.send('clock-widget-resize', { width: newSize, height: newSize });
                     }
                 );
 
@@ -710,17 +747,17 @@
                 // (TIMER_*_SCALE 30..300, BLOCK_*_SCALE 50..600) и с валидацией в
                 // restoreBlockPositions — иначе ползунок выставляет значение,
                 // которое дисплей потом откажется восстанавливать.
-                window.setupScaleValueEdit(
+                setupScaleValueEdit(
                     document.getElementById('displayTimerScaleValue'),
                     document.getElementById('displayTimerScale'),
                     DEFAULT_SCALE_PCT,
                     () => { this.pushDisplaySettings(); }
                 );
 
-                window.setupScaleValueEdit(
+                setupScaleValueEdit(
                     document.getElementById('timeBlocksScaleValue'),
                     document.getElementById('timeBlocksScale'),
-                    window.DisplayLayouts.DEFAULT_BLOCK_SCALE,
+                    DisplayLayouts.DEFAULT_BLOCK_SCALE,
                     () => { this.pushDisplaySettings(); }
                 );
 
@@ -738,7 +775,7 @@
                 // Фон дисплея
                 ['bgSolidColor', 'bgGrad1', 'bgGrad2'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) {el.addEventListener('input', debounce(() => this.pushDisplaySettings()));}
+                    if (el) {el.addEventListener('input', TimeUtils.debounce(() => this.pushDisplaySettings()));}
                 });
                 // Сброс стиля
                 const resetStyleBtn = document.getElementById('resetStyleBtn');
@@ -755,7 +792,7 @@
                         // Значения берутся из таблицы настроек, а не литералами:
                         // умолчание правят в ней, и третья копия разошлась бы с
                         // ней молча.
-                        window.SettingsSchema.resetKeys(['bgSolid', 'bgGrad1', 'bgGrad2'], document);
+                        SettingsSchema.resetKeys(['bgSolid', 'bgGrad1', 'bgGrad2'], document);
                         // «По умолчанию» — это то, что стоит на чистом профиле,
                         // а там «По теме». Кнопка, возвращающая не то же самое,
                         // что новая установка, — это две разные правды. Клик по
@@ -846,8 +883,8 @@
                 // личные ДО раскладки по контролам, иначе дисплей, у которого
                 // блоки были включены, откроется пустым — новых ключей в таком
                 // профиле нет, а их умолчание «выключено».
-                const ext = window.RendererShared.migrateDisplayBlocks(
-                    window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
+                const ext = RendererShared.migrateDisplayBlocks(
+                    SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {})
                 );
 
                 // Значения раскладывает таблица (settings-schema.js): ключ, контрол
@@ -855,12 +892,12 @@
                 // для сохранения. Здесь остаётся только то, что таблицей не
                 // выражается: собственный формат двух ключей, побочные эффекты
                 // (видимость строк, отправка в окна) и поля контроллера.
-                const applied = window.SettingsSchema.applyStoredSettings(ext, document);
+                const applied = SettingsSchema.applyStoredSettings(ext, document);
                 // Выбранного звука могло не стать: пресет убрали из набора или
                 // пользователь удалил свой файл. Тогда браузер молча показывает
                 // первый пункт, а в хранилище лежит другое — событие беззвучно,
                 // а настройка утверждает обратное. Чинит sound-presets.js.
-                window.SoundPresets.repairSelection(document, window.SettingsSchema);
+                SoundPresets.repairSelection(document, SettingsSchema);
 
                 // Слитый стиль. Профиль мог хранить `digital` (LED) — стиля с
                 // таким именем больше нет ни в одном окне, и сегментированный
@@ -871,7 +908,7 @@
                 // выглядело так же, как до слияния.
                 for (const [el, target] of [[this.timerStyleEl, 'widget'], [this.clockStyleEl, 'clock'], [this.displayTimerStyleEl, 'display']]) {
                     if (!el || el.value !== 'digital') { continue; }
-                    el.value = window.RendererShared.migrateTimerStyle('digital');
+                    el.value = RendererShared.migrateTimerStyle('digital');
                     if (target !== 'display') {
                         const colors = target === 'widget' ? this.currentColors : this.clockColors;
                         if (!colors || !colors.surface) {
@@ -885,7 +922,7 @@
                 // Ноль и отсутствие ключа — «без лимита», то есть пустое поле:
                 // иначе пресет без лимита оставлял прежний, и pushOverrunLimit
                 // ниже слал его в main.
-                document.getElementById('overrunLimit').value = window.SettingsSchema.overrunLimitFieldValue(ext.overrunLimitSeconds);
+                document.getElementById('overrunLimit').value = SettingsSchema.overrunLimitFieldValue(ext.overrunLimitSeconds);
                 this.refreshOverrunLimitHint();
 
                 // Чекбокс — авторитет: подтягиваем к нему внутренний флаг, иначе
@@ -916,7 +953,7 @@
                 // Режим центрального времени — тоже кнопки, а не поле; setHeroMode
                 // сам ставит и активную кнопку, и видимость поля заголовка, иначе
                 // после перезапуска значение восстановилось бы, а вид панели — нет.
-                this.setHeroMode(ext.heroMode || window.HeroModes.DEFAULT_MODE);
+                this.setHeroMode(ext.heroMode || HeroModes.DEFAULT_MODE);
 
                 // Синхронизация: переключатель часов показывает стиль виджета.
                 // Присваивание лечит и профили прежней версии, где в хранилище
@@ -929,13 +966,13 @@
                 // для всех окон приложения). В displayExtSettings масштаба часов
                 // нет вообще, поэтому без этого чтения ползунок при каждом запуске
                 // показывал «100%» независимо от реального размера окна.
-                const clockGeo = window.SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
+                const clockGeo = SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
                 const clockScaleSliderEl = document.getElementById('clockScale');
                 const clockScaleLabelEl = document.getElementById('clockScaleValue');
                 if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
                     // Присваивание .value НЕ порождает 'input', поэтому обратной
                     // отправки в окно часов не происходит и петля не замыкается.
-                    const pct = window.RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
+                    const pct = RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
                     clockScaleSliderEl.value = pct;
                     if (clockScaleLabelEl) { clockScaleLabelEl.textContent = pct + '%'; }
                 }
@@ -962,17 +999,17 @@
             saveColors(target = 'all') {
                 if (target === 'all' || target === 'widget') {
                     localStorage.setItem('widgetColors', JSON.stringify(this.currentColors));
-                    ipcRenderer.send('widget-colors-update', this.currentColors);
+                    window.ipcRenderer.send('widget-colors-update', this.currentColors);
                 }
                 if (target === 'all' || target === 'clock') {
                     const colors = this.clockColors || this.currentColors;
                     localStorage.setItem('clockColors', JSON.stringify(colors));
-                    ipcRenderer.send('clock-colors-update', colors);
+                    window.ipcRenderer.send('clock-colors-update', colors);
                 }
                 if (target === 'all' || target === 'display') {
                     const colors = this.displayColors || this.currentColors;
                     localStorage.setItem('displayColors', JSON.stringify(colors));
-                    ipcRenderer.send('display-colors-update', colors);
+                    window.ipcRenderer.send('display-colors-update', colors);
                 }
                 // Backward compat (localStorage only, no global IPC broadcast)
                 localStorage.setItem('timerColors', JSON.stringify(this.currentColors));
@@ -984,18 +1021,18 @@
                     // Всё, что описано таблицей, собирается из контролов ею же —
                     // включая устаревшие ключи timerStyle/timerScale, которые
                     // продолжают писаться ради отката на предыдущую версию.
-                    ...window.SettingsSchema.collectSettings(document),
+                    ...SettingsSchema.collectSettings(document),
                     // Своего формата: секунды из поля «MM:SS».
                     overrunLimitSeconds: this.readOverrunLimit(),
                     // Не поле ввода, а активная кнопка из трёх.
                     bgMode: this.currentBgMode,
                     // Тоже не поле ввода, а активная кнопка — теперь из четырёх.
-                    heroMode: this.heroMode || window.HeroModes.DEFAULT_MODE
+                    heroMode: this.heroMode || HeroModes.DEFAULT_MODE
                 };
 
                 // СЛИЯНИЕ, а не перезапись: ключ мог быть записан прежней версией
                 // приложения, и незнакомые панели поля переживают обновление.
-                const prev = window.SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {});
+                const prev = SecurityUtils.safeJSONParse(localStorage.getItem('displayExtSettings'), {});
                 localStorage.setItem('displayExtSettings', JSON.stringify({ ...prev, ...settings }));
                 // Подписи строк — производная от этих же настроек (почему здесь,
                 // а не в пяти обработчиках, — в renderWindowRows).
@@ -1009,11 +1046,11 @@
             // профилем, поэтому зовётся из КАЖДОГО места, где панель пишет его
             // ключи. Метод — чтобы таких мест не стало три разных строки.
             refreshPresetMarks() {
-                if (window.presetsApi) { window.presetsApi.refresh(); }
+                if (presetsApi) { presetsApi.refresh(); }
             }
 
             pushOverrunLimit() {
-                ipcRenderer.send('timer-command', {
+                window.ipcRenderer.send('timer-command', {
                     allowNegative: this.allowNegativeEl.checked,
                     overrunLimitSeconds: this.readOverrunLimit()
                 });
@@ -1021,7 +1058,7 @@
 
             pushOverrunInterval() {
                 const interval = parseInt(this.overrunIntervalEl.value) || 1;
-                ipcRenderer.send('timer-command', {
+                window.ipcRenderer.send('timer-command', {
                     overrunIntervalMinutes: interval
                 });
             }
@@ -1092,13 +1129,13 @@
             }
 
             setupIPC() {
-                ipcRenderer.send('get-timer-state');
-                ipcRenderer.send('get-displays');
+                window.ipcRenderer.send('get-timer-state');
+                window.ipcRenderer.send('get-displays');
 
                 this._onDisplaysList = (event, displays) => {
                     this.updateDisplaysList(displays);
                 };
-                ipcRenderer.on('displays-list', this._onDisplaysList);
+                window.ipcRenderer.on('displays-list', this._onDisplaysList);
 
                 /** @type {IpcListener<'timer-state'>} */ this._onTimerState = (event, state) => {
                     // FIX: Use monotonic updateCounter instead of timestamp for dedup
@@ -1129,7 +1166,7 @@
                         // Метка живёт ограниченное время: отклонённая главным
                         // процессом команда не должна глушить чужой старт навсегда.
                         const startedHere = this._localStartAt > 0
-                            && (Date.now() - this._localStartAt) < window.CONFIG.LOCAL_START_SOUND_WINDOW_MS;
+                            && (Date.now() - this._localStartAt) < CONFIG.LOCAL_START_SOUND_WINDOW_MS;
                         this._localStartAt = 0;
                         if (!startedHere && this.soundStartEl.checked) {
                             this.playSound('start');
@@ -1143,7 +1180,7 @@
                         }
                     }
                 };
-                ipcRenderer.on('timer-state', this._onTimerState);
+                window.ipcRenderer.on('timer-state', this._onTimerState);
 
                 // Обратный канал масштаба: окно сообщило, что его отмасштабировали
                 // Ctrl+колесом — подтягиваем соответствующий ползунок. Без этого
@@ -1154,45 +1191,45 @@
                 // отправки в окно не происходит и петля не замыкается. В localStorage
                 // пишем через saveExtSettings() — она не шлёт IPC.
                 this._onScaleReport = (event, data) => {
-                    const applied = window.ScaleReport.applyScaleReport(data, {
+                    const applied = ScaleReport.applyScaleReport(data, {
                         doc: document,
                         storage: localStorage,
-                        clamp: window.RendererShared.clampScale,
-                        parseJSON: window.SecurityUtils.safeJSONParse
+                        clamp: RendererShared.clampScale,
+                        parseJSON: SecurityUtils.safeJSONParse
                     });
                     // Подписи строк — отчёт о ДЕЙСТВУЮЩИХ значениях, и масштаб
                     // в них входит (см. renderWindowRows).
                     if (applied !== null) { this.renderWindowRows(); }
                 };
-                ipcRenderer.on('scale-report', this._onScaleReport);
+                window.ipcRenderer.on('scale-report', this._onScaleReport);
 
                 // Блок дисплея закрыли крестиком прямо в окне. Панель — владелец
                 // настроек, поэтому снимает тумблер у себя и рассылает настройки:
                 // иначе состояние жило бы в двух местах и разошлось бы при первом
                 // же переоткрытии дисплея.
                 this._onBlockHidden = (_event, payload) => this.onDisplayBlockHidden(payload);
-                ipcRenderer.on('block-hidden', this._onBlockHidden);
+                window.ipcRenderer.on('block-hidden', this._onBlockHidden);
 
                 this._onTimerMinute = () => {
                     if (this.soundMinuteEl.checked) {
                         this.playSound('minute');
                     }
                 };
-                ipcRenderer.on('timer-minute', this._onTimerMinute);
+                window.ipcRenderer.on('timer-minute', this._onTimerMinute);
 
                 this._onTimerReachedZero = () => {
                     if (this.soundEndEl.checked) {
                         this.playSound('end');
                     }
                 };
-                ipcRenderer.on('timer-reached-zero', this._onTimerReachedZero);
+                window.ipcRenderer.on('timer-reached-zero', this._onTimerReachedZero);
 
                 this._onTimerOverrun = () => {
                     if (this.soundOverrunEl.checked) {
                         this.playSound('overrun');
                     }
                 };
-                ipcRenderer.on('timer-overrun-minute', this._onTimerOverrun);
+                window.ipcRenderer.on('timer-overrun-minute', this._onTimerOverrun);
 
                 // Восстановление после падения. Главный процесс возвращает время в
                 // состояние таймера сам, а этим каналом СООБЩАЕТ об этом панели —
@@ -1207,30 +1244,30 @@
                     if (!saved || typeof saved !== 'object') { return; }
                     const secs = Number(saved.remainingSeconds);
                     if (!Number.isFinite(secs)) { return; }
-                    window.Toast.show(
-                        `Время восстановлено после сбоя: ${window.TimeUtils.formatTime(secs)}`,
+                    Toast.show(
+                        `Время восстановлено после сбоя: ${TimeUtils.formatTime(secs)}`,
                         'warning',
                         6000
                     );
                 };
-                ipcRenderer.on('timer-recovery-available', this._onRecoveryAvailable);
+                window.ipcRenderer.on('timer-recovery-available', this._onRecoveryAvailable);
             }
 
             cleanup() {
-                if (this._onDisplaysList) {ipcRenderer.removeListener('displays-list', this._onDisplaysList);}
-                if (this._onTimerState) {ipcRenderer.removeListener('timer-state', this._onTimerState);}
-                if (this._onTimerMinute) {ipcRenderer.removeListener('timer-minute', this._onTimerMinute);}
-                if (this._onTimerReachedZero) {ipcRenderer.removeListener('timer-reached-zero', this._onTimerReachedZero);}
-                if (this._onTimerOverrun) {ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);}
-                if (this._onScaleReport) {ipcRenderer.removeListener('scale-report', this._onScaleReport);}
-                if (this._onBlockHidden) {ipcRenderer.removeListener('block-hidden', this._onBlockHidden);}
-                if (this._onRecoveryAvailable) {ipcRenderer.removeListener('timer-recovery-available', this._onRecoveryAvailable);}
+                if (this._onDisplaysList) {window.ipcRenderer.removeListener('displays-list', this._onDisplaysList);}
+                if (this._onTimerState) {window.ipcRenderer.removeListener('timer-state', this._onTimerState);}
+                if (this._onTimerMinute) {window.ipcRenderer.removeListener('timer-minute', this._onTimerMinute);}
+                if (this._onTimerReachedZero) {window.ipcRenderer.removeListener('timer-reached-zero', this._onTimerReachedZero);}
+                if (this._onTimerOverrun) {window.ipcRenderer.removeListener('timer-overrun-minute', this._onTimerOverrun);}
+                if (this._onScaleReport) {window.ipcRenderer.removeListener('scale-report', this._onScaleReport);}
+                if (this._onBlockHidden) {window.ipcRenderer.removeListener('block-hidden', this._onBlockHidden);}
+                if (this._onRecoveryAvailable) {window.ipcRenderer.removeListener('timer-recovery-available', this._onRecoveryAvailable);}
 
                 // Удаляем глобальные DOM и IPC handlers из _handlers
                 const h = this._handlers || {};
-                if (h.onDisplayWindowState) { ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState); }
-                if (h.onWidgetWindowState) { ipcRenderer.removeListener('widget-window-state', h.onWidgetWindowState); }
-                if (h.onClockWindowState) { ipcRenderer.removeListener('clock-window-state', h.onClockWindowState); }
+                if (h.onDisplayWindowState) { window.ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState); }
+                if (h.onWidgetWindowState) { window.ipcRenderer.removeListener('widget-window-state', h.onWidgetWindowState); }
+                if (h.onClockWindowState) { window.ipcRenderer.removeListener('clock-window-state', h.onClockWindowState); }
                 if (h.onEscapeKeydown) { document.removeEventListener('keydown', h.onEscapeKeydown); }
                 if (h.onGlobalShortcutsKeydown) { document.removeEventListener('keydown', h.onGlobalShortcutsKeydown); }
                 this._handlers = {};
@@ -1257,7 +1294,7 @@
                 if (!el) { return 0; }
                 const raw = String(el.value || '').trim();
                 if (!raw) { return 0; }
-                const parsed = window.TimeUtils.parseManualTime(raw);
+                const parsed = TimeUtils.parseManualTime(raw);
                 if (parsed === null || !Number.isFinite(parsed) || parsed < 0) { return 0; }
                 return parsed;
             }
@@ -1268,19 +1305,19 @@
                 const hint = document.getElementById('overrunLimitHint');
                 if (!el || !hint) { return; }
                 const raw = String(el.value || '').trim();
-                const parsed = raw ? window.TimeUtils.parseManualTime(raw) : 0;
+                const parsed = raw ? TimeUtils.parseManualTime(raw) : 0;
                 const bad = raw !== '' && parsed === null;
                 el.classList.toggle('input-error', bad);
                 if (bad) { hint.textContent = 'не понял формат'; return; }
                 const secs = this.readOverrunLimit();
                 hint.textContent = secs > 0
-                    ? `стоп на \u2212${window.TimeUtils.formatTimeShort(secs)}`
+                    ? `стоп на \u2212${TimeUtils.formatTimeShort(secs)}`
                     : 'без лимита';
             }
 
             sendCommand(type, extra = {}) {
                 const cfg = this.getConfig();
-                ipcRenderer.send('timer-command', { type, ...cfg, ...extra });
+                window.ipcRenderer.send('timer-command', { type, ...cfg, ...extra });
             }
 
             setTime(seconds) {
@@ -1329,7 +1366,7 @@
                 // Цветовые классы для времени
                 // Полоса срочности — общая для всех окон (RendererShared).
                 this.controlTimeEl.classList.remove('warning', 'danger');
-                const band = window.RendererShared.timerColorBand(this.remainingSeconds, this.totalSeconds);
+                const band = RendererShared.timerColorBand(this.remainingSeconds, this.totalSeconds);
                 const isOvertime = band === 'overtime';
                 if (isOvertime || band === 'danger') {
                     this.controlTimeEl.classList.add('danger');
@@ -1347,7 +1384,7 @@
                     running: 'Активен',
                     idle: 'Готов'
                 };
-                const status = window.RendererShared.timerLifecycleStatus({
+                const status = RendererShared.timerLifecycleStatus({
                     remainingSeconds: this.remainingSeconds,
                     totalSeconds: this.totalSeconds,
                     isRunning: this.isRunning,
@@ -1420,14 +1457,14 @@
                     activeTab.style.overflow = '';
                 }
 
-                ipcRenderer.send('resize-control-window', {
-                    width: (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380,
+                window.ipcRenderer.send('resize-control-window', {
+                    width: (CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380,
                     height: neededHeight
                 });
             }
 
             formatTime(seconds) {
-                return window.TimeUtils.formatTimeShort(seconds);
+                return TimeUtils.formatTimeShort(seconds);
             }
 
             // FIX BUG-020: Add async/await for async operations
@@ -1453,7 +1490,7 @@
                 // для 'none' это тишина — поясняем это тостом, чтобы кнопка
                 // не выглядела сломанной.
                 if (preset === 'none') {
-                    window.Toast.show('Для этого события звук отключён', 'warning', 2000);
+                    Toast.show('Для этого события звук отключён', 'warning', 2000);
                     return;
                 }
 
@@ -1480,7 +1517,7 @@
                     await ctx.resume();
                 }
 
-                window.SoundBank.playBuiltInPreset(ctx, name);
+                SoundBank.playBuiltInPreset(ctx, name);
             }
 
 
@@ -1515,20 +1552,22 @@
         // прототип: их методы вызывают друг друга и общий this.beep(), а
         // обработчики в списке замыкаются на this. Примесь сохраняет семантику
         // this один в один, поэтому перенос кода был дословным.
-        Object.assign(TimerController.prototype, window.CustomSoundsMixin);
-        Object.assign(TimerController.prototype, window.LocalBackgroundMixin);
-        Object.assign(TimerController.prototype, window.ThemeGridMixin);
-        Object.assign(TimerController.prototype, window.PanelStateMixin);
-        Object.assign(TimerController.prototype, window.PanelColorsMixin);
+        Object.assign(TimerController.prototype, CustomSoundsMixin);
+        Object.assign(TimerController.prototype, LocalBackgroundMixin);
+        Object.assign(TimerController.prototype, ThemeGridMixin);
+        Object.assign(TimerController.prototype, PanelStateMixin);
+        Object.assign(TimerController.prototype, PanelColorsMixin);
         // Настройки дисплея: сборка payload, тумблеры блоков, приём «закрыли крестиком».
-        Object.assign(TimerController.prototype, window.PanelDisplayMixin);
-        Object.assign(TimerController.prototype, window.PanelResetMixin);
-        Object.assign(TimerController.prototype, window.PanelClockMixin);
+        Object.assign(TimerController.prototype, PanelDisplayMixin);
+        Object.assign(TimerController.prototype, PanelResetMixin);
+        Object.assign(TimerController.prototype, PanelClockMixin);
 
-        window.timerController = new TimerController();
+        timerController = new TimerController();
+        // Крючок e2e (tests/window-bridges.test.js); сам файл читает timerController.
+        window.timerController = timerController;
         // Ряд «Фон» строится ПОСЛЕ конструктора: ему нужны загруженные цвета.
-        window.timerController.initSurfaceControls();
-        window.timerController.initResetButtons();
+        timerController.initSurfaceControls();
+        timerController.initResetButtons();
 
         // Пипетки трёх окон. Объект цветов НЕ пересобирается здесь: раньше
         // каждая писала `{ timer: hex, progress: hex }` целиком и вместе с
@@ -1538,11 +1577,11 @@
             { target: 'clock', grid: 'clockThemesGrid', panel: 'clockColorPickerPanel', ids: ['clockCpSv', 'clockCpHue', 'clockCpHex', 'clockCpPreview'] },
             { target: 'display', grid: 'displayThemesGrid', panel: 'displayColorPickerPanel', ids: ['displayCpSv', 'displayCpHue', 'displayCpHex', 'displayCpPreview'] }
         ].forEach(({ target, grid, panel, ids }) => {
-            window.addPickerToggle(grid, panel, {
+            addPickerToggle(grid, panel, {
                 sv: ids[0], hue: ids[1], hex: ids[2], preview: ids[3],
                 onChange: (hex) => {
                     document.querySelectorAll(`#${grid} .theme-btn`).forEach(b => b.classList.remove('active'));
-                    window.timerController.updateColors(target, { timer: hex, progress: hex });
+                    timerController.updateColors(target, { timer: hex, progress: hex });
                 }
             });
         });
@@ -1569,7 +1608,7 @@
             // стиля, масштаба и монитора из самих контролов настроек. Первая
             // версия писала здесь просто «показан» — то есть теряла ровно ту
             // часть, ради которой строка и заведена.
-            window.timerController?.renderWindowRows?.();
+            timerController?.renderWindowRows?.();
             if (isOpen) {
                 button.title = button.title.replace(/открыть|Компактный|Часы в реальном|На весь экран/i, 'Закрыть');
             } else if (buttonId === 'openWidgetBtn') {
@@ -1582,8 +1621,8 @@
         }
 
         // Слушатели для обновления состояния окон
-        if (window.ipcRenderer && window.timerController) {
-            const tc = window.timerController;
+        if (window.ipcRenderer && timerController) {
+            const tc = timerController;
             tc._handlers.onDisplayWindowState = (event, data) => {
                 isDisplayOpen = data.isOpen;
                 updateWindowButton('openDisplayBtn', isDisplayOpen);
@@ -1615,31 +1654,31 @@
         const exitModal = document.getElementById('exitModal');
         const exitCancelBtn = document.getElementById('exitCancel');
         document.getElementById('closeAppBtn').addEventListener('click', () => {
-            window.openModal(exitModal, exitCancelBtn);
+            openModal(exitModal, exitCancelBtn);
         });
         exitCancelBtn.addEventListener('click', () => {
-            window.closeModal(exitModal);
+            closeModal(exitModal);
         });
         document.getElementById('exitConfirm').addEventListener('click', () => {
             if (window.ipcRenderer) {window.ipcRenderer.send('quit-app');}
         });
         exitModal.addEventListener('click', (e) => {
-            if (e.target === exitModal) { window.closeModal(exitModal); }
+            if (e.target === exitModal) { closeModal(exitModal); }
         });
 
         // Cleanup при закрытии окна
         window.addEventListener('beforeunload', () => {
-            window.timerController.cleanup();
+            timerController.cleanup();
         });
 
         // FAQ Modal Logic
         const faqBtn = document.getElementById('faqBtn');
         // Подсказка про F1 при первом запуске + кнопка «Проверить
         // обновления». Подробности и зависимости — в onboarding.js.
-        window.Onboarding.init();
+        Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
-        const _tc = () => window.timerController;
-        window.miniBar = window.MiniBar.init({ doc: document, ipc: window.ipcRenderer,
+        const _tc = () => timerController;
+        window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer,
             // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
             onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } },
             actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
@@ -1651,29 +1690,29 @@
         // Переключатель темы и замок «Закрепить положение» — panel-titlebar.js.
         // Обе величины общие для всех окон: локально применяются сразу,
         // остальным уезжают по IPC.
-        window.PanelTitlebar.bindThemeToggle({ doc: document, ipc: window.ipcRenderer || null, theme: window.UITheme });
-        window.PanelTitlebar.bindLockToggle({ doc: document, ipc: window.ipcRenderer || null, lock: window.UILock });
+        PanelTitlebar.bindThemeToggle({ doc: document, ipc: window.ipcRenderer || null, theme: window.UITheme });
+        PanelTitlebar.bindLockToggle({ doc: document, ipc: window.ipcRenderer || null, lock: window.UILock });
 
         // Пресеты вида: снимок ключей профиля и тот же путь применения, что при запуске панели.
-        window.PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
-        window.presetsApi = window.PanelPresets.install({
-            doc: document, storage: localStorage, presets: window.Presets, ipc: window.ipcRenderer || null,
-            controller: () => window.timerController, notify: (msg) => window.Toast && window.Toast.show(msg, 'success', 1600)
+        PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
+        presetsApi = PanelPresets.install({
+            doc: document, storage: localStorage, presets: Presets, ipc: window.ipcRenderer || null,
+            controller: () => timerController, notify: (msg) => Toast && Toast.show(msg, 'success', 1600)
         });
         // Open FAQ modal
         faqBtn.addEventListener('click', () => {
-            window.openModal(faqModal, faqClose);
+            openModal(faqModal, faqClose);
         });
 
         // Close FAQ modal
         faqClose.addEventListener('click', () => {
-            window.closeModal(faqModal);
+            closeModal(faqModal);
         });
 
         // Close on backdrop click
         faqModal.addEventListener('click', (e) => {
             if (e.target === faqModal) {
-                window.closeModal(faqModal);
+                closeModal(faqModal);
             }
         });
 
@@ -1681,30 +1720,30 @@
         const resetModal = document.getElementById('resetModal');
         const resetCancelBtn = document.getElementById('resetCancel');
         document.getElementById('resetSettingsBtn').addEventListener('click', () => {
-            window.openModal(resetModal, resetCancelBtn);
+            openModal(resetModal, resetCancelBtn);
         });
         resetCancelBtn.addEventListener('click', () => {
-            window.closeModal(resetModal);
+            closeModal(resetModal);
         });
         resetModal.addEventListener('click', (e) => {
-            if (e.target === resetModal) { window.closeModal(resetModal); }
+            if (e.target === resetModal) { closeModal(resetModal); }
         });
         document.getElementById('resetConfirm').addEventListener('click', () => {
             localStorage.clear();
-            ipcRenderer.send('reset-and-relaunch');
+            window.ipcRenderer.send('reset-and-relaunch');
         });
 
         // Close on Escape key
         const _onEscapeKeydown = (e) => {
             if (e.key === 'Escape') {
-                if (resetModal.classList.contains('show')) { window.closeModal(resetModal); }
-                if (exitModal.classList.contains('show')) { window.closeModal(exitModal); }
-                if (faqModal.classList.contains('show')) { window.closeModal(faqModal); }
+                if (resetModal.classList.contains('show')) { closeModal(resetModal); }
+                if (exitModal.classList.contains('show')) { closeModal(exitModal); }
+                if (faqModal.classList.contains('show')) { closeModal(faqModal); }
             }
         };
         document.addEventListener('keydown', _onEscapeKeydown);
-        if (window.timerController) {
-            window.timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
+        if (timerController) {
+            timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
         }
 
         // Аккордеон справки: в секции открыт максимум один ответ.
@@ -1743,11 +1782,11 @@
         // FIX BUG-027: Keyboard shortcuts
         // Контрол, по которому последним кликнули мышью: пробел на нём остаётся
         // за таймером (см. globalHotkeyBlocked в shortcuts-help.js).
-        const _pointerControl = window.trackPointerControl(document);
+        const _pointerControl = trackPointerControl(document);
         const _onGlobalShortcutsKeydown = (event) => {
             // Ворота: автоповтор, поля ввода и SELECT, пробел на кнопке, до
             // которой дошли с клавиатуры, открытая модалка или справка F1.
-            if (window.globalHotkeyBlocked(event, document, _pointerControl())) { return; }
+            if (globalHotkeyBlocked(event, document, _pointerControl())) { return; }
 
             // Модификаторы отсекаем ЦЕЛИКОМ и в одном месте — ровно так, как это
             // делают виджет, часы и полноэкранный режим (`if (e.ctrlKey ||
@@ -1761,11 +1800,11 @@
             // Space: Start/Pause timer
             if (event.code === 'Space') {
                 event.preventDefault();
-                if (window.timerController) {
-                    if (window.timerController.isRunning) {
-                        window.timerController.pause();
+                if (timerController) {
+                    if (timerController.isRunning) {
+                        timerController.pause();
                     } else {
-                        window.timerController.start();
+                        timerController.start();
                     }
                 }
             }
@@ -1773,16 +1812,16 @@
             // R: Reset timer
             else if (event.code === 'KeyR') {
                 event.preventDefault();
-                if (window.timerController) {
-                    window.timerController.reset();
+                if (timerController) {
+                    timerController.reset();
                 }
             }
 
             // S: Stop timer (pause)
             else if (event.code === 'KeyS') {
                 event.preventDefault();
-                if (window.timerController) {
-                    window.timerController.pause();
+                if (timerController) {
+                    timerController.pause();
                 }
             }
 
@@ -1806,10 +1845,10 @@
                         window.ipcRenderer.send('close-clock-widget');
                     } else {
                         window.ipcRenderer.send('open-clock-widget');
-                        if (window.timerController) {
+                        if (timerController) {
                             setTimeout(() => {
-                                window.timerController.pushClockSettings();
-                                window.timerController.sendClockStyle();
+                                timerController.pushClockSettings();
+                                timerController.sendClockStyle();
                             }, 500);
                         }
                     }
@@ -1834,17 +1873,17 @@
             // редизайна длительностей стало четыре, и вторая копия числа «8»
             // здесь означала бы setTime(undefined) на клавишах 5–8.
             else if (event.code >= 'Digit1' && event.code <= 'Digit9') {
-                const presets = window.CONFIG.PRESET_DURATIONS;
+                const presets = CONFIG.PRESET_DURATIONS;
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
                 if (presetIndex < presets.length) {
                     event.preventDefault();
-                    if (window.timerController) {
-                        window.timerController.setTime(presets[presetIndex]);
+                    if (timerController) {
+                        timerController.setTime(presets[presetIndex]);
                     }
                 } else if (presetIndex === presets.length) {
                     // Клавиша сразу за последним пресетом — та же «мин».
                     event.preventDefault();
-                    window.timerController?.setInputMode(true);
+                    timerController?.setInputMode(true);
                 }
             }
 
@@ -1860,7 +1899,7 @@
             // же, что у клика по тумблеру строки (panel-state.js).
             else if (event.code === 'KeyZ') {
                 event.preventDefault();
-                window.timerController?.toggleSoundMaster();
+                timerController?.toggleSoundMaster();
             }
 
             // M: свернуть окно в полосу и обратно. Клавиша выбрана по коду из
@@ -1873,10 +1912,10 @@
             // F1: Show help/shortcuts
             else if (event.code === 'F1') {
                 event.preventDefault();
-                window.showKeyboardShortcuts();
+                showKeyboardShortcuts();
             }
         };
         document.addEventListener('keydown', _onGlobalShortcutsKeydown);
-        if (window.timerController) {
-            window.timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;
+        if (timerController) {
+            timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;
         }

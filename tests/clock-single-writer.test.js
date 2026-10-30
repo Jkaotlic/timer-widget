@@ -75,5 +75,5 @@ test('писатель обоих ключей — панель', () => {
     // Запись настроек и стиля — методы ПРИМЕСИ: без Object.assign их нет у
     // контроллера, и падение пришло бы не при загрузке, а при первом клике.
     assert.match(codeOnly(readRaw('control-app.js')),
-        /Object\.assign\(TimerController\.prototype, window\.PanelClockMixin\)/);
+        /Object\.assign\(TimerController\.prototype, PanelClockMixin\)/);
 });

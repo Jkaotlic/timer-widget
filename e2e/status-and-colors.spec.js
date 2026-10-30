@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 
 /**
@@ -221,33 +221,31 @@ test.describe('лимит перерасхода', () => {
 
 test.describe('декомпозиция панели: модули живы в рантайме', () => {
     test('все вынесенные модули подняли свои экспорты', async () => {
-        // Структурные тесты проверяют, что <script src> на месте. Здесь важнее
-        // другое: что файлы реально загрузились и объявили свои имена. Опечатка
-        // в пути дала бы молчаливый 404 и падение при первом же клике.
+        // Структурные тесты проверяют граф импорта. Здесь важнее другое: что
+        // файлы реально загрузились и подняли свои крючки e2e. ColorPicker и
+        // примесь звуков мостов больше не имеют (их читатели импортируют):
+        // color-picker.js доказывает addPickerToggle из того же файла, примесь
+        // — следующий тест (её методы на контроллере).
         const present = await control.evaluate(() => ({
             toast: typeof window.Toast?.show,
             loading: typeof window.LoadingIndicator?.show,
             scaleEdit: typeof window.setupScaleValueEdit,
-            picker: typeof window.ColorPicker,
             pickerToggle: typeof window.addPickerToggle,
             openModal: typeof window.openModal,
             closeModal: typeof window.closeModal,
             help: typeof window.showKeyboardShortcuts,
-            soundBank: typeof window.SoundBank?.playBuiltInPreset,
-            mixin: typeof window.CustomSoundsMixin
+            soundBank: typeof window.SoundBank?.playBuiltInPreset
         }));
 
         expect(present).toEqual({
             toast: 'function',
             loading: 'function',
             scaleEdit: 'function',
-            picker: 'function',
             pickerToggle: 'function',
             openModal: 'function',
             closeModal: 'function',
             help: 'function',
-            soundBank: 'function',
-            mixin: 'object'
+            soundBank: 'function'
         });
     });
 

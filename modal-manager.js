@@ -68,11 +68,11 @@ function closeModal(modal) {
     }
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { openModal, closeModal };
-}
+export { openModal, closeModal };
 
 if (typeof window !== 'undefined') {
+    // Крючки e2e (panel-hotkeys, status-and-colors); control-app.js и
+    // panel-display.js — до перевода.
     window.openModal = openModal;
     window.closeModal = closeModal;
 }

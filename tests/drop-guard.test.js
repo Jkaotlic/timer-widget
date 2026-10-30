@@ -12,6 +12,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { scriptTags } = require('./helpers/source-scan');
 
 const DropGuard = require('../drop-guard');
 const { readSource } = require('./helpers/window-source');
@@ -64,7 +65,7 @@ test('модуль подключён в виджете, часах и дисп�
     // здесь только мешал бы.
     for (const file of ['electron-widget.html', 'electron-clock-widget.html', 'display.html']) {
         const html = readSource(file);
-        assert.match(html, /<script src="drop-guard\.js"><\/script>/, `${file}: drop-guard.js не подключён`);
+        assert.ok(scriptTags(html).some((t) => t.src === 'drop-guard.js'), `${file}: drop-guard.js не подключён`);
     }
     const control = readSource('electron-control.html');
     assert.doesNotMatch(control, /drop-guard\.js/);

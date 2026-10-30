@@ -11,14 +11,10 @@
  * никто не увидит, — ровно то, против чего стоит потолок в
  * tests/control-decomposition.test.js.
  *
- * Двойной экспорт, как у renderer-shared.js:
- *   - Node (тесты):     module.exports
- *   - Браузер (панель): window.PanelDrawer
+ * ES-модуль: тесты берут его `require(esm)`, панель — тегом модуля.
  */
 
-const CFG = (typeof window !== 'undefined' && window.CONFIG)
-    ? window.CONFIG
-    : (typeof require === 'function' ? require('./constants.js') : null);
+import * as CFG from './constants.js';
 
 // Поле до края экрана. Тем же числом режет главный процесс (`screenWidth - 50`),
 // и разойтись им нельзя: предсказание перестанет совпадать с фактом.
@@ -56,8 +52,8 @@ const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value)
 function drawerColumnWidth(o) {
     const opts = o || {};
     const drawer = num(opts.drawerWidth, 336);
-    const maxW = num(opts.maxWindowWidth, CFG ? CFG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER : 1096);
-    const minW = num(opts.minWindowWidth, CFG ? CFG.CONTROL_WINDOW_MIN_WIDTH : 380);
+    const maxW = num(opts.maxWindowWidth, CFG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER);
+    const minW = num(opts.minWindowWidth, CFG.CONTROL_WINDOW_MIN_WIDTH);
     const margin = num(opts.screenMargin, SCREEN_MARGIN);
 
     // Мусор вместо ширины окна — это не повод вернуть NaN: панель всё равно
@@ -88,17 +84,9 @@ function drawerColumnWidth(o) {
  * @returns {number}
  */
 function columnFromWindow(innerWidth, drawerWidth, minWindowWidth) {
-    const minW = num(minWindowWidth, CFG ? CFG.CONTROL_WINDOW_MIN_WIDTH : 380);
+    const minW = num(minWindowWidth, CFG.CONTROL_WINDOW_MIN_WIDTH);
     const inner = num(innerWidth, minW);
     return Math.max(minW, Math.round(inner - num(drawerWidth, 336)));
 }
 
-const PanelDrawer = { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelDrawer;
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelDrawer = PanelDrawer;
-}
+export { SCREEN_MARGIN, drawerColumnWidth, columnFromWindow };

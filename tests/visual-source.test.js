@@ -359,7 +359,7 @@ test('стиль часов приводится к белому списку п
     // старым стилем откатывался бы к кругу.
     assert.match(JS_CODE, /migrateTimerStyle\(style\)/);
     // Список — один, CONFIG.TIMER_STYLES (его же держит relay-payload в main).
-    assert.match(JS_CODE, /const safeStyle = window\.CONFIG\.TIMER_STYLES\.includes\(wanted\)/);
+    assert.match(JS_CODE, /const safeStyle = (?<![\w.])CONFIG\.TIMER_STYLES\.includes\(wanted\)/);
     assert.doesNotMatch(JS_CODE, /\['circle', 'flip', 'analog', 'digits'\]\.includes/);
     assert.match(JS_CODE, /classList\.add\('style-' \+ safeStyle\)/);
     // Сырое значение больше не должно доходить ни до класса, ни до поля.

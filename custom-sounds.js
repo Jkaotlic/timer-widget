@@ -13,9 +13,15 @@
  * сохраняет семантику this один в один, поэтому перенос кода получается
  * дословным и не меняет поведение — что важно, когда рядом нет типов.
  *
- * Зависимости берутся из window (Toast, RendererStorage, CONFIG, safeJSONParse) —
+ * Зависимости — import (Toast, RendererStorage, CONFIG, safeJSONParse) —
  * так же, как во всех остальных модулях рендерера: сборщика в проекте нет.
  */
+
+import * as SecurityUtils from './security.js';
+import * as RendererStorage from './renderer-storage.js';
+import { Toast } from './ui-feedback.js';
+import * as CONFIG from './constants.js';
+
 
 /**
  * Список звуков из хранилища — только правильной формы (BUG-21).
@@ -33,7 +39,7 @@ function sanitizeCustomSounds(raw) {
 
 /** Прочитать список звуков из хранилища — один вход на все методы. */
 function readCustomSounds() {
-    return sanitizeCustomSounds(window.safeJSONParse(localStorage.getItem('customSounds'), []));
+    return sanitizeCustomSounds(SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), []));
 }
 
 /**
@@ -123,9 +129,9 @@ const CustomSoundsMixin = {
             const sizeKB = (n) => n < 1024 * 1024 ? (n / 1024).toFixed(0) + ' КБ' : (n / 1024 / 1024).toFixed(1) + ' МБ';
 
             // FIX BUG-025: Validation for sound file uploads
-            const MAX_SOUND_SIZE = (window.CONFIG && window.CONFIG.MAX_SOUND_FILE_SIZE) || 5 * 1024 * 1024;
+            const MAX_SOUND_SIZE = CONFIG.MAX_SOUND_FILE_SIZE;
             if (file.size > MAX_SOUND_SIZE) {
-                window.Toast.show('Файл слишком большой (максимум 5 MB)', 'error');
+                Toast.show('Файл слишком большой (максимум 5 MB)', 'error');
                 this.showSoundUploadError(
                     'Файл слишком большой',
                     `${file.name} (${sizeKB(file.size)}) превышает лимит ${sizeKB(MAX_SOUND_SIZE)}`
@@ -133,9 +139,9 @@ const CustomSoundsMixin = {
                 event.target.value = '';
                 return;
             }
-            const allowedAudioTypes = (window.CONFIG && window.CONFIG.ALLOWED_AUDIO_TYPES) || ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp3', 'audio/webm', 'audio/aac', 'audio/flac'];
+            const allowedAudioTypes = CONFIG.ALLOWED_AUDIO_TYPES;
             if (!file.type || !allowedAudioTypes.includes(file.type)) {
-                window.Toast.show('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC', 'warning');
+                Toast.show('Неподдерживаемый тип файла. Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC', 'warning');
                 this.showSoundUploadError(
                     'Неподдерживаемый тип файла',
                     'Допускаются: MP3, WAV, OGG, WebM, AAC, FLAC'
@@ -151,7 +157,7 @@ const CustomSoundsMixin = {
             try {
                 audioBytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
             } catch {
-                window.Toast.show('Ошибка чтения звукового файла', 'error');
+                Toast.show('Ошибка чтения звукового файла', 'error');
                 this.showSoundUploadError('Файл не прочитан', `${file.name} не удалось открыть`);
                 event.target.value = '';
                 return;
@@ -168,7 +174,7 @@ const CustomSoundsMixin = {
                            audioBytes[2] === 0xDF && audioBytes[3] === 0xA3;
             const isAAC = audioBytes[0] === 0xFF && (audioBytes[1] & 0xF0) === 0xF0;
             if (!isMP3 && !isWAV && !isOGG && !isFLAC && !isWebM && !isAAC) {
-                window.Toast.show('Файл не прошёл проверку формата', 'error');
+                Toast.show('Файл не прошёл проверку формата', 'error');
                 this.showSoundUploadError(
                     'Файл не прошёл проверку формата',
                     `${file.name} имеет неподдерживаемую сигнатуру`
@@ -185,7 +191,7 @@ const CustomSoundsMixin = {
                 // Сохраняем в localStorage; замена одноимённого — не молча.
                 const { updated, replaced } = mergeCustomSound(readCustomSounds(), name, base64);
 
-                const storageResult = window.RendererStorage.safeSetJSON(
+                const storageResult = RendererStorage.safeSetJSON(
                     localStorage,
                     'customSounds',
                     updated,
@@ -195,7 +201,7 @@ const CustomSoundsMixin = {
                     const message = storageResult.reason === 'too-large'
                         ? 'Суммарный размер пользовательских звуков слишком большой'
                         : 'Не удалось сохранить звук: хранилище переполнено';
-                    window.Toast.show(message, 'error');
+                    Toast.show(message, 'error');
                     this.showSoundUploadError(
                         'Не удалось сохранить звук',
                         message
@@ -203,12 +209,12 @@ const CustomSoundsMixin = {
                     return;
                 }
                 if (replaced) {
-                    window.Toast.show(`Звук «${name}» заменён новым файлом`, 'warning', 3000);
+                    Toast.show(`Звук «${name}» заменён новым файлом`, 'warning', 3000);
                 }
                 this.loadCustomSounds();
             };
             reader.onerror = () => {
-                window.Toast.show('Ошибка чтения звукового файла', 'error');
+                Toast.show('Ошибка чтения звукового файла', 'error');
                 event.target.value = '';
             };
             reader.readAsDataURL(file);
@@ -333,14 +339,14 @@ const CustomSoundsMixin = {
 
     deleteCustomSound(name) {
             const filtered = readCustomSounds().filter(s => s.name !== name);
-            const storageResult = window.RendererStorage.safeSetJSON(
+            const storageResult = RendererStorage.safeSetJSON(
                 localStorage,
                 'customSounds',
                 filtered,
                 { limitBytes: 4 * 1024 * 1024 }
             );
             if (!storageResult.ok) {
-                window.Toast.show('Не удалось обновить список звуков', 'error');
+                Toast.show('Не удалось обновить список звуков', 'error');
                 return;
             }
 
@@ -367,16 +373,9 @@ const CustomSoundsMixin = {
 
             if (resetCount > 0) {
                 if (typeof this.saveExtSettings === 'function') { this.saveExtSettings(); }
-                window.Toast.show('Звук удалён — событие переведено на «без звука»', 'warning', 2500);
+                Toast.show('Звук удалён — событие переведено на «без звука»', 'warning', 2500);
             }
     }
 };
 
-// Node (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };
-}
-
-if (typeof window !== 'undefined') {
-    window.CustomSoundsMixin = CustomSoundsMixin;
-}
+export { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };

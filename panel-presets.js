@@ -261,12 +261,4 @@ function install({ doc, storage, presets, controller, ipc, notify }) {
     return api;
 }
 
-const PanelPresets = { bindPresets, presetHotkeyHandler, applyProfile, install, SLOT_BUTTON_PREFIX, SLOT_BUTTON_PREFIXES };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelPresets;
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelPresets = PanelPresets;
-}
+export { bindPresets, presetHotkeyHandler, applyProfile, install, SLOT_BUTTON_PREFIX, SLOT_BUTTON_PREFIXES };

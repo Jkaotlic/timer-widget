@@ -130,12 +130,4 @@ function bindThemeToggle({ doc, ipc, theme, buttonId = 'contrastToggle' }) {
     return { set };
 }
 
-const PanelTitlebar = { bindLockToggle, bindThemeToggle, LOCK_BUTTON_IDS };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelTitlebar;
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelTitlebar = PanelTitlebar;
-}
+export { bindLockToggle, bindThemeToggle, LOCK_BUTTON_IDS };

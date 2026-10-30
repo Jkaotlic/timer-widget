@@ -38,7 +38,7 @@ test('PANEL-006: start() метит только холодный старт', (
 test('PANEL-006: метка гаснет по времени и снимается при КАЖДОМ холодном старте', () => {
     const at = SRC.indexOf('this._onTimerState = ');
     const handler = SRC.slice(at, SRC.indexOf('ipcRenderer.on(\'timer-state\'', at));
-    assert.match(handler, /Date\.now\(\) - this\._localStartAt\) < window\.CONFIG\.LOCAL_START_SOUND_WINDOW_MS/,
+    assert.match(handler, /Date\.now\(\) - this\._localStartAt\) < (?<![\w.])CONFIG\.LOCAL_START_SOUND_WINDOW_MS/,
         'метка не ограничена временем: отклонённая команда оставит её навсегда');
     assert.match(handler, /this\._localStartAt = 0/, 'метка не снимается');
     assert.doesNotMatch(handler, /_localStartTriggered/, 'старая метка осталась в обработчике');

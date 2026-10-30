@@ -141,14 +141,4 @@ function init(deps) {
     return api;
 }
 
-const MiniBar = { init, BAR_HEIGHT };
-
-// Экспорт для Node.js (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MiniBar;
-}
-
-// Экспорт для браузера (renderer process)
-if (typeof window !== 'undefined') {
-    window.MiniBar = MiniBar;
-}
+export { init, BAR_HEIGHT };

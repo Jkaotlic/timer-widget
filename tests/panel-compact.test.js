@@ -12,6 +12,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
@@ -87,8 +88,8 @@ test('решение устойчиво: повтор ничего не меня
 
 test('панель подключает модуль и вешает режим', () => {
     const control = codeOnly(read('electron-control.html'));
-    assert.match(control, /<script src="panel-compact\.js"><\/script>/, 'панель не подключает panel-compact.js');
-    assert.match(control, /window\.PanelCompact\.bindCompactMode\(/, 'компактный режим ни к чему не привязан');
+    assert.ok(pageLoads('electron-control.html', 'panel-compact.js'), 'панель не подключает panel-compact.js');
+    assert.match(control, /(?<![\w.])PanelCompact\.bindCompactMode\(/, 'компактный режим ни к чему не привязан');
 });
 
 test('CSS компактного режима висит на КЛАССЕ, а не на медиазапросе высоты', () => {

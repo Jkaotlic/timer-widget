@@ -9,7 +9,7 @@
  * именно затем, чтобы новая логика не оседала внутри HTML по умолчанию — а не
  * только затем, чтобы однажды вынести уже накопившееся. Функция не знает о
  * timerController — только об элементе, который ей передали, и о реестре
- * шрифтов `window.DigitsStyle`, поэтому переиспользуется тремя списками
+ * шрифтов `DigitsStyle`, поэтому переиспользуется тремя списками
  * (виджет/часы/дисплей) без единой строчки, завязанной на контроллер.
  *
  * КРИТИЧНО, тот же инвариант, что у _attachSegmented (тот пока остаётся
@@ -23,10 +23,13 @@
  * на <option> не применяется — превью, ради которого контрол и нужен, просто
  * не работало бы.
  */
+
+import * as DigitsStyle from './digits-style.js';
+
 function attachFontSelect(el) {
     if (!el || !el.classList || !el.classList.contains('font-select')) { return; }
 
-    const fonts = window.DigitsStyle.DIGIT_FONTS;
+    const fonts = DigitsStyle.DIGIT_FONTS;
     // id пункта содержит id КОНТЕЙНЕРА — на панели три независимых списка
     // (виджет/часы/дисплей) в одном document, и голое "option-bebas" столкнулось
     // бы у всех трёх.
@@ -56,7 +59,7 @@ function attachFontSelect(el) {
     }
 
     const apply = (v) => {
-        const font = window.DigitsStyle.resolveFont(v);
+        const font = DigitsStyle.resolveFont(v);
         el.dataset.value = font.id;
         el.querySelectorAll('.font-option').forEach((o) => {
             const on = o.dataset.val === font.id;
@@ -75,7 +78,7 @@ function attachFontSelect(el) {
 
     if (!Object.getOwnPropertyDescriptor(el, 'value')) {
         Object.defineProperty(el, 'value', {
-            get() { return this.dataset.value || window.DigitsStyle.DEFAULT_FONT_ID; },
+            get() { return this.dataset.value || DigitsStyle.DEFAULT_FONT_ID; },
             set(v) { apply(v); },
             configurable: true
         });
@@ -104,10 +107,4 @@ function attachFontSelect(el) {
     apply(el.dataset.value);
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { attachFontSelect };
-}
-
-if (typeof window !== 'undefined') {
-    window.attachFontSelect = attachFontSelect;
-}
+export { attachFontSelect };

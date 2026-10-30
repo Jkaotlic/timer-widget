@@ -35,9 +35,11 @@
  * владеет ключами. Здесь только разделение обязанностей: крестик на дисплее
  * закрывает БЛОКИ, подписи выключаются лишь тумблером в панели.
  */
-const Schema = (typeof window !== 'undefined' && window.SettingsSchema)
-    ? window.SettingsSchema
-    : require('./settings-schema');
+import * as SecurityUtils from './security.js';
+import * as MoneyMeter from './money-meter.js';
+import * as RendererShared from './renderer-shared.js';
+import * as HeroModes from './hero-modes.js';
+import * as Schema from './settings-schema.js';
 const BLOCK_KEYS = Schema.DISPLAY_BLOCK_KEYS;
 const LABEL_KEYS = Schema.DISPLAY_LABEL_KEYS;
 const DISPLAY_TOGGLE_KEYS = BLOCK_KEYS.concat(LABEL_KEYS);
@@ -49,9 +51,9 @@ const DISPLAY_TOGGLE_KEYS = BLOCK_KEYS.concat(LABEL_KEYS);
  * нужно дисплею (подставить стандартную подпись) и тесту (сверить разметку),
  * и три копии слова «Начало» разъехались бы молча.
  */
-const Layouts = (typeof window !== 'undefined' && window.DisplayLayouts)
-    ? window.DisplayLayouts
-    : require('./display-layouts');
+import * as Layouts from './display-layouts.js';
+import { Toast } from './ui-feedback.js';
+import { openModal, closeModal } from './modal-manager.js';
 
 /** Объект из строки хранилища; битое или пустое значение — пустой объект. */
 function safeParseObject(raw) {
@@ -167,7 +169,7 @@ const PanelDisplayMixin = {
     pushDisplaySettings() {
         this.saveExtSettings();
 
-        const parse = window.SecurityUtils.safeJSONParse;
+        const parse = SecurityUtils.safeJSONParse;
         // Хранилище читается только в режиме «Файл»: строка до 13 М символов
         // на каждое нажатие клавиши не нужна и внутри панели.
         const localBgImage = this.currentBgMode === 'local'
@@ -185,7 +187,7 @@ const PanelDisplayMixin = {
             bgGrad1: document.getElementById('bgGrad1').value,
             bgGrad2: document.getElementById('bgGrad2').value,
             bgLocalFit: localBgSettings.fit || 'cover',
-            bgLocalOverlay: window.RendererShared.bgOverlayPercent(localBgSettings.overlay),
+            bgLocalOverlay: RendererShared.bgOverlayPercent(localBgSettings.overlay),
             eventTime: this.eventTimeInputEl.value,
             endTime: this.endTimeInputEl.value,
             eventTitle: this.eventTitleInputEl ? this.eventTitleInputEl.value : '',
@@ -193,7 +195,7 @@ const PanelDisplayMixin = {
             // Подписи уходят все три, а не только текущего режима: дисплей
             // хранит их для всех и переключение режима не должно требовать
             // повторного ввода.
-            heroMode: this.heroMode || window.HeroModes.DEFAULT_MODE,
+            heroMode: this.heroMode || HeroModes.DEFAULT_MODE,
             labelHeroCurrent: this.heroLabelInputs.current ? this.heroLabelInputs.current.value : '',
             labelHeroToStart: this.heroLabelInputs['to-start'] ? this.heroLabelInputs['to-start'].value : '',
             labelHeroToEnd: this.heroLabelInputs['to-end'] ? this.heroLabelInputs['to-end'].value : '',
@@ -250,9 +252,9 @@ const PanelDisplayMixin = {
 
         // Режим центрального времени. Ряд кнопок ведёт себя как bgMode:
         // владелец значения — this.heroMode, кнопки лишь его ВИД.
-        this.heroMode = window.HeroModes.DEFAULT_MODE;
+        this.heroMode = HeroModes.DEFAULT_MODE;
         this.heroLabelInputs = {};
-        for (const mode of window.HeroModes.HERO_MODES) {
+        for (const mode of HeroModes.HERO_MODES) {
             if (!mode.labelKey) { continue; }
             this.heroLabelInputs[mode.id] = document.getElementById(mode.labelKey);
         }
@@ -280,7 +282,7 @@ const PanelDisplayMixin = {
      * ни на что не влияют прямо сейчас, — а надпись обязана обещать правду.
      */
     setHeroMode(id) {
-        const mode = window.HeroModes.modeById(id);
+        const mode = HeroModes.modeById(id);
         this.heroMode = mode.id;
 
         document.querySelectorAll('.hero-mode-btn').forEach((btn) => {
@@ -304,7 +306,7 @@ const PanelDisplayMixin = {
         if (!isTimer) {
             const label = row && row.querySelector('.toggle-label');
             if (label) { label.setAttribute('for', mode.labelKey); }
-            if (hint) { hint.textContent = `Пустое поле вернёт «${window.HeroModes.heroCaption(mode.id)}».`; }
+            if (hint) { hint.textContent = `Пустое поле вернёт «${HeroModes.heroCaption(mode.id)}».`; }
         }
     },
 
@@ -746,12 +748,12 @@ const PanelDisplayMixin = {
             const box = document.getElementById(modalId);
             const cancel = document.getElementById(`${modalId}Cancel`);
             const confirm = document.getElementById(`${modalId}Confirm`);
-            if (btn && box) { btn.addEventListener('click', () => window.openModal(box, cancel)); }
-            if (cancel) { cancel.addEventListener('click', () => window.closeModal(box)); }
+            if (btn && box) { btn.addEventListener('click', () => openModal(box, cancel)); }
+            if (cancel) { cancel.addEventListener('click', () => closeModal(box)); }
             if (confirm) {
                 confirm.addEventListener('click', () => {
                     onConfirm();
-                    window.closeModal(box);
+                    closeModal(box);
                 });
             }
         };
@@ -760,11 +762,11 @@ const PanelDisplayMixin = {
         // главного процесса, а «сработало ли» спрашивают в ту же секунду.
         confirmable('eventFinishBtn', 'eventFinish', () => {
             window.ipcRenderer.send('event-finish');
-            window.Toast.show('Мероприятие завершено — итог заморожен', 'success');
+            Toast.show('Мероприятие завершено — итог заморожен', 'success');
         });
         confirmable('eventResetBtn', 'eventReset', () => {
             window.ipcRenderer.send('event-reset');
-            window.Toast.show('Новое мероприятие — итог обнулён', 'success');
+            Toast.show('Новое мероприятие — итог обнулён', 'success');
         });
 
         // Выгрузка НЕ проходит через confirmable: подтверждения в этом проекте
@@ -785,13 +787,13 @@ const PanelDisplayMixin = {
             if (answer.canceled) { return; }
             if (answer.ok) {
                 const rows = Number(answer.rows) || 0;
-                window.Toast.show(
+                Toast.show(
                     rows > 0 ? `Отчёт сохранён · докладов: ${rows}` : 'Отчёт сохранён',
                     'success'
                 );
                 return;
             }
-            window.Toast.show(`Отчёт не сохранён: ${answer.error || 'неизвестная причина'}`, 'error');
+            Toast.show(`Отчёт не сохранён: ${answer.error || 'неизвестная причина'}`, 'error');
         });
 
         this.renderFloor47();
@@ -805,8 +807,8 @@ const PanelDisplayMixin = {
      * из-за которого «Завершить» ничего не меняло на экране.
      */
     renderEventStatus() {
-        if (!this.eventStatusEl || !window.MoneyMeter) { return; }
-        const summary = window.MoneyMeter.eventSummary({
+        if (!this.eventStatusEl) { return; }
+        const summary = MoneyMeter.eventSummary({
             overrunSeconds: this.eventOverrunState.overrunSeconds,
             remainingSeconds: this.eventRemainingSeconds,
             excludedLiveSeconds: this.eventOverrunState.excludedLiveSeconds,
@@ -847,8 +849,7 @@ const PanelDisplayMixin = {
 
     bindBlockLabelRows() {
         const mount = document.getElementById('blockLabelRows');
-        const Layouts = window.DisplayLayouts;
-        if (!mount || !Layouts) { return; }
+        if (!mount) { return; }
         // Пересборка (смена замка 47-го этажа) НЕ имеет права стирать подписи:
         // следом за ней pushDisplaySettings собирает поля и пишет их в профиль,
         // и новые пустые поля молча возвращали дисплею стандартные слова.
@@ -899,8 +900,7 @@ const PanelDisplayMixin = {
      */
     bindDisplayLayouts() {
         const grid = document.getElementById('displayLayoutGrid');
-        const Layouts = window.DisplayLayouts;
-        if (!grid || !Layouts) { return; }
+        if (!grid) { return; }
         grid.textContent = '';
         for (const layout of Layouts.LAYOUTS) {
             // Секретная раскладка появляется вместе с разделом «47-го этажа».
@@ -935,8 +935,7 @@ const PanelDisplayMixin = {
      * собственные контролы, а не посылается «поставь такой-то тумблер».
      */
     applyDisplayLayout(layoutId) {
-        const Layouts = window.DisplayLayouts;
-        const layout = Layouts && Layouts.layoutById(layoutId);
+        const layout = Layouts.layoutById(layoutId);
         if (!layout) { return; }
 
         for (const [key, on] of Object.entries(Layouts.layoutToggles(layout))) {
@@ -954,9 +953,7 @@ const PanelDisplayMixin = {
         this.pushDisplaySettings();
         window.ipcRenderer.send('display-layout', { layout: layout.id });
 
-        if (window.Toast && window.Toast.show) {
-            window.Toast.show(`Раскладка «${layout.name}»`, 'success');
-        }
+        Toast.show(`Раскладка «${layout.name}»`, 'success');
     },
 
     /**
@@ -979,17 +976,7 @@ const PanelDisplayMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
+export {
     PanelDisplayMixin, collectDisplayToggles, collectBlockLabels, attachChangedBgImage, fillDisplaySelect,
     BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
 };
-}
-
-if (typeof window !== 'undefined') {
-    window.PanelDisplayMixin = PanelDisplayMixin;
-    window.PanelDisplay = {
-        collectDisplayToggles, collectBlockLabels,
-        BLOCK_KEYS, LABEL_KEYS, DISPLAY_TOGGLE_KEYS
-    };
-}

@@ -142,26 +142,12 @@ function escapeHTML(str) {
     return str.replace(/[&<>"'/]/g, char => htmlEscapeMap[char]);
 }
 
-// Экспорт для Node.js (main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        isValidDataURL,
-        validateImageSource,
-        safeSetBackgroundImage,
-        safeJSONParse,
-        isSafeColor,
-        escapeHTML
-    };
-}
+export {
+    isValidDataURL,
+    validateImageSource,
+    safeSetBackgroundImage,
+    safeJSONParse,
+    isSafeColor,
+    escapeHTML
+};
 
-// Экспорт для браузера (renderer process)
-if (typeof window !== 'undefined') {
-    window.SecurityUtils = {
-        isValidDataURL,
-        validateImageSource,
-        safeSetBackgroundImage,
-        safeJSONParse,
-        isSafeColor,
-        escapeHTML
-    };
-}

@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 // Окно ждут по УСЛОВИЮ общими помощниками, а не своей копией с паузами. Здесь
 // жил собственный поиск окна по адресу страницы и голая пауза 700 мс между

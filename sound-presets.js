@@ -172,12 +172,7 @@ function buildSoundSelects(doc) {
     return filled;
 }
 
-const SoundPresets = { SOUND_PRESETS, SOUND_EVENTS, presetsForEvent, buildSoundSelects, repairSelection };
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SoundPresets;
-}
-
-if (typeof window !== 'undefined') {
-    window.SoundPresets = SoundPresets;
-}
+export {
+    SOUND_PRESETS, SOUND_EVENTS, presetsForEvent, buildSoundSelects,
+    repairSelection
+};
