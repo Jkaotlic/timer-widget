@@ -416,6 +416,51 @@ async function untilReceived(page, channel, action, opts = {}) {
 }
 
 /**
+ * Дождаться, что открывшийся дисплей ПОЛУЧИЛ снимок главного процесса —
+ * настройки, накопитель перелимита, состояние таймера (`announceWindowOpened`
+ * в main-windows.js шлёт их на `did-finish-load`).
+ *
+ * `load` в окне этого не доказывает: `did-finish-load` в главном процессе
+ * приходит ПОСЛЕ `load` рендерера, и снимок в этот момент может быть ещё не
+ * отправлен. Спеки ждали паузой 2400 мс. Здесь два шага:
+ *
+ * 1. главный процесс видит `!webContents.isLoading()` — `did-stop-loading`
+ *    идёт после `did-finish-load`, значит слушатель снимка уже отработал и
+ *    посылки ушли;
+ * 2. панель шлёт настройки дисплея ещё раз (тот же `change` тумблера, без
+ *    смены значения — ровно то, что панель шлёт и сама), и дисплей их
+ *    получает. Порядок main → окно сохраняется, поэтому снимок отработан
+ *    раньше.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} display
+ * @param {import('@playwright/test').Page} control — окно панели
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<import('@playwright/test').Page>} то же окно
+ */
+async function waitForDisplaySnapshot(app, display, control, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await display.waitForLoadState('load');
+    const deadline = Date.now() + timeout;
+    for (;;) {
+        const loaded = await app.evaluate(({ BrowserWindow }) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'));
+            return !!win && !win.webContents.isLoading();
+        });
+        if (loaded) { break; }
+        if (Date.now() > deadline) {
+            throw new Error(`окно дисплея не закончило загрузку за ${timeout} мс`);
+        }
+        await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+    await untilReceived(display, 'display-settings-update', () => control.evaluate(() => {
+        document.getElementById('showCurrentTime').dispatchEvent(new Event('change', { bubbles: true }));
+    }), opts);
+    return display;
+}
+
+/**
  * Дождаться, что открывшийся дисплей ВСТАЛ: документ загружен, размер окна
  * осел, отложенный пересчёт по последнему `resize` отработал, окно утихло.
  *
@@ -454,6 +499,6 @@ module.exports = {
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
-    waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled,
+    waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };
