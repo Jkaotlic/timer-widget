@@ -1,8 +1,18 @@
 const { test, expect } = require('./fixtures');
 const fs = require('node:fs');
 const path = require('node:path');
-const { launchApp, USER_DATA_DIR } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { launchApp, USER_DATA_DIR, waitForStartupPush } = require('./launch');
+const {
+    waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, armReceived,
+    panelRoundTrip, waitForQuiet
+} = require('./window-ready');
+
+/** Дисплей получил снимок main и ВСТАЛ (полноэкранный вход, раскладка) — раньше пауза 1500 мс. */
+async function settledDisplay(app) {
+    const display = await waitForDisplay(app);
+    await waitForDisplaySnapshot(app, display);
+    return waitForDisplaySettled(app, display);
+}
 
 /**
  * Характеризация: масштаб полноэкранного таймера применяется ко всем блокам
@@ -82,15 +92,14 @@ test('масштаб дисплея применяется ко всем бло�
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        display = await waitForDisplay(app);
-        await control.waitForTimeout(1500);
+        display = await settledDisplay(app);
 
-        // Точка входа 1: приход настроек от панели.
+        // Точка входа 1: приход настроек от панели. Дисплей её получил и утих —
+        // раньше пауза 500 мс.
         await display.evaluate(() => window.ipcRenderer.send('get-timer-state'));
-        await control.evaluate((pct) => {
+        await untilReceived(display, 'display-settings-update', () => control.evaluate((pct) => {
             window.ipcRenderer.send('display-settings-update', { displayTimerScale: pct });
-        }, PUSH_SCALE_PCT);
-        await display.waitForTimeout(500);
+        }, PUSH_SCALE_PCT), { match: { displayTimerScale: PUSH_SCALE_PCT } });
 
         const afterPush = await display.evaluate(readScales, BLOCK_IDS);
         for (const id of BLOCK_IDS) {
@@ -104,7 +113,10 @@ test('масштаб дисплея применяется ко всем бло�
                 deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true
             }));
         });
-        await display.waitForTimeout(300);
+        // Обработчик колеса синхронный (display-script.js, scaleTimer →
+        // applyTimerScale): масштаб записан до возврата; переходы — в
+        // waitForQuiet (раньше пауза 300 мс).
+        await waitForQuiet(display);
 
         const afterWheel = await display.evaluate(readScales, BLOCK_IDS);
         const wheelValues = new Set(Object.values(afterWheel));
@@ -178,8 +190,17 @@ test('масштаб дисплея применяется ко всем бло�
         // И финальное, устоявшееся состояние — тем же значением, для общей
         // характеризации (панель могла позже прислать свой автопуш, но он
         // несёт то же значение, что уже восстановлено, так что расхождения
-        // здесь не будет).
-        await display.waitForTimeout(500);
+        // здесь не будет). «Устоявшееся» — условием, а не паузой 500 мс:
+        //  1. стартовая рассылка панели ушла (зонд, launch.js);
+        //  2. круг панель → main → панель: main её обработал, а посылки дисплею
+        //     он шлёт синхронно в том же обработчике;
+        //  3. метка main дисплею после снимка (waitForDisplaySnapshot) — по той
+        //     же трубе main → дисплей, значит рассылка панели обработана;
+        //  4. окно встало (полноэкранный вход и пересчёт по размеру).
+        await waitForStartupPush(control);
+        await panelRoundTrip(control);
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
         const settled = await display.evaluate(readScales, BLOCK_IDS);
         for (const id of BLOCK_IDS) {
             expect(settled[id], `${id} должен остаться отмасштабированным после полной загрузки`)
@@ -210,8 +231,7 @@ test('масштаб дисплея не выпускает таймер за о
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        display = await waitForDisplay(app);
-        await control.waitForTimeout(1500);
+        display = await settledDisplay(app);
 
         const measure = () => {
             const active = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']
@@ -244,10 +264,11 @@ test('масштаб дисплея не выпускает таймер за о
         };
 
         for (const style of ['circle', 'analog', 'digits', 'flip']) {
-            await control.evaluate(([s, pct]) => {
+            // Посылка дошла, окно утихло (раскладка по кадру, переходы стиля) —
+            // раньше пауза 700 мс.
+            await untilReceived(display, 'display-settings-update', () => control.evaluate(([s, pct]) => {
                 window.ipcRenderer.send('display-settings-update', { timerStyle: s, displayTimerScale: pct });
-            }, [style, 300]);
-            await display.waitForTimeout(700);
+            }, [style, 300]), { match: { timerStyle: style, displayTimerScale: 300 } });
 
             const m = await display.evaluate(measure);
             console.log(`${style} при запрошенных 300% →`, JSON.stringify(m));
@@ -270,10 +291,21 @@ test('масштаб дисплея не выпускает таймер за о
         // одному стилю. Цикл выше гонял стили подряд напрямую по IPC, минуя
         // ползунок, — там расхождение означает лишь «панель показывает ответ
         // про предыдущий стиль».
-        await control.evaluate(() => {
+        //
+        // Ожидание — сама цепочка отчёта (раньше пауза 800 мс): дисплей получил
+        // посылку и записал применённое; если оно меньше запрошенного, дисплей
+        // шлёт `report-scale` (display-script.js, applyDisplaySettings), и панель
+        // получает его `scale-report` с ЭТИМ числом. Применилось целиком — отчёта
+        // нет и ждать нечего. Приёмник панели взведён ДО посылки: отчёт идёт
+        // дисплей → main → панель, мимо нашего ожидания дисплея.
+        const report = await armReceived(control, 'scale-report');
+        await untilReceived(display, 'display-settings-update', () => control.evaluate(() => {
             window.ipcRenderer.send('display-settings-update', { timerStyle: 'circle', displayTimerScale: 300 });
-        });
-        await display.waitForTimeout(800);
+        }), { match: { timerStyle: 'circle', displayTimerScale: 300 } });
+        const reported = await display.evaluate(() => Number(localStorage.getItem('displayTimerScale')));
+        if (reported < 300) {
+            await report({ match: { source: 'display', scalePct: reported } });
+        }
 
         const shown = await control.evaluate(() => Number(document.getElementById('displayTimerScale').value));
         const applied = await display.evaluate(() => Number(localStorage.getItem('displayTimerScale')));
