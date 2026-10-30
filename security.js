@@ -142,20 +142,20 @@ function escapeHTML(str) {
     return str.replace(/[&<>"'/]/g, char => htmlEscapeMap[char]);
 }
 
-// Экспорт для Node.js (main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        isValidDataURL,
-        validateImageSource,
-        safeSetBackgroundImage,
-        safeJSONParse,
-        isSafeColor,
-        escapeHTML
-    };
-}
+export {
+    isValidDataURL,
+    validateImageSource,
+    safeSetBackgroundImage,
+    safeJSONParse,
+    isSafeColor,
+    escapeHTML
+};
 
-// Экспорт для браузера (renderer process)
+// Классике раньше доставалось и голое window.safeJSONParse (верхний
+// `function` классического скрипта — свойство window); у модуля его нет,
+// путь один — window.SecurityUtils.safeJSONParse.
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.SecurityUtils = {
         isValidDataURL,
         validateImageSource,

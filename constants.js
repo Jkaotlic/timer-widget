@@ -293,12 +293,28 @@ if (CONFIG.ALLOWED_AUDIO_TYPES) { Object.freeze(CONFIG.ALLOWED_AUDIO_TYPES); }
 if (CONFIG.ALLOWED_IMAGE_TYPES) { Object.freeze(CONFIG.ALLOWED_IMAGE_TYPES); }
 if (CONFIG.PRESET_DURATIONS) { Object.freeze(CONFIG.PRESET_DURATIONS); }
 
-// Экспорт для Node.js (main process)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = CONFIG;
-}
+// Экспорт — ИМЕНОВАННЫЙ, по ключу на имя: главный процесс берёт файл
+// `require(esm)` и получает namespace той же формы, что прежний
+// `module.exports = CONFIG` (tests/module-exports-shape.test.js). Ключ CONFIG,
+// не попавший в этот список, main не увидит — равенство списков держит
+// tests/constants.test.js.
+export const {
+    TIMER_TICK_MARGIN_MS, RESIZE_DEBOUNCE, FLASH_INTERVAL, WIDGET_DEFAULT_WIDTH,
+    WIDGET_DEFAULT_HEIGHT, WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT,
+    CLOCK_WIDGET_DEFAULT_SIZE, CLOCK_WIDGET_MIN_SIZE, CONTROL_WINDOW_WIDTH,
+    CONTROL_WINDOW_HEIGHT, CONTROL_WINDOW_MIN_WIDTH, CONTROL_BAR_MIN_WIDTH,
+    CONTROL_WINDOW_MAX_WIDTH, CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER,
+    CONTROL_WINDOW_MIN_HEIGHT, CONTROL_WINDOW_MAX_HEIGHT,
+    CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER, WINDOW_MIN_VISIBLE_PX,
+    CRASH_RELOAD_LIMIT, CRASH_RELOAD_WINDOW_MS, LOCAL_START_SOUND_WINDOW_MS,
+    MAX_MOVE_DELTA, SCALE_STEP, DEFAULT_SCALE, WARNING_THRESHOLD,
+    WARNING_PERCENTAGE, DANGER_PERCENTAGE, PRESET_DURATIONS, MAX_SOUND_FILE_SIZE,
+    MAX_IMAGE_FILE_SIZE, MIN_TIMER_SCALE, MAX_TIMER_SCALE, MAX_FLASH_COUNT,
+    STORAGE_KEYS, DEFAULT_TIMER_COLORS, TIMER_STYLES, ALLOWED_AUDIO_TYPES,
+    ALLOWED_IMAGE_TYPES
+} = CONFIG;
 
-// Экспорт для браузера (renderer process)
+// Крючок e2e и общий объект окон: тот же замороженный CONFIG.
 if (typeof window !== 'undefined') {
     window.CONFIG = CONFIG;
 }

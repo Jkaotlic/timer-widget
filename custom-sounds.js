@@ -33,7 +33,7 @@ function sanitizeCustomSounds(raw) {
 
 /** Прочитать список звуков из хранилища — один вход на все методы. */
 function readCustomSounds() {
-    return sanitizeCustomSounds(window.safeJSONParse(localStorage.getItem('customSounds'), []));
+    return sanitizeCustomSounds(window.SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), []));
 }
 
 /**

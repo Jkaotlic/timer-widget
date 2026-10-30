@@ -52,7 +52,9 @@ function withGlobals(h, fn) {
     const prev = { window: global.window, document: global.document, localStorage: global.localStorage };
     global.window = {
         RendererShared,
-        safeJSONParse: (raw, fb) => { try { return raw ? JSON.parse(raw) : fb; } catch { return fb; } }
+        SecurityUtils: {
+            safeJSONParse: (raw, fb) => { try { return raw ? JSON.parse(raw) : fb; } catch { return fb; } }
+        }
     };
     global.document = h.doc;
     global.localStorage = h.store;

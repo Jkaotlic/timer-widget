@@ -129,15 +129,6 @@ interface Window {
     PanelResetMixin: typeof import('../panel-reset.js').PanelResetMixin;
     PanelClockMixin: typeof import('../panel-clock.js').PanelClockMixin;
 
-    /**
-     * НЕ присваивается ни одним модулем: существует лишь потому, что
-     * `function safeJSONParse` верхнего уровня в classic-скрипте security.js
-     * становится свойством window. Зовут его так custom-sounds.js и
-     * local-background.js (и их тесты подкладывают window.safeJSONParse).
-     * Явный путь — window.SecurityUtils.safeJSONParse.
-     */
-    safeJSONParse: typeof import('../security.js').safeJSONParse;
-
     // --- экземпляры окон. Классы живут в точках входа (*-app.js,
     // display-script.js), которые ничего не экспортируют, поэтому any.
     timerController: any;

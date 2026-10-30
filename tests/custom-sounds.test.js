@@ -58,7 +58,7 @@ function withFakeEnv(stored, fn) {
     const audios = [];
     const toasts = [];
     global.window = {
-        safeJSONParse,
+        SecurityUtils: { safeJSONParse },
         Toast: { show: (msg, kind) => toasts.push({ msg, kind }) }
     };
     global.localStorage = { getItem: () => stored };

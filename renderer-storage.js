@@ -5,8 +5,9 @@ function getByteSize(value) {
     if (typeof Blob !== 'undefined') {
         return new Blob([value]).size;
     }
-    if (typeof Buffer !== 'undefined') {
-        return Buffer.byteLength(value, 'utf8');
+    // Модуль: голого node-глобала lint ему не даёт, спрашиваем globalThis.
+    if (typeof globalThis.Buffer !== 'undefined') {
+        return globalThis.Buffer.byteLength(value, 'utf8');
     }
     return encodeURIComponent(value).replace(/%[0-9A-F]{2}/g, 'x').length;
 }
@@ -54,10 +55,9 @@ const api = {
     safeSetJSON
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = api;
-}
+export { getByteSize, safeGetJSON, safeSetJSON };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.RendererStorage = api;
 }

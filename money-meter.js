@@ -165,12 +165,18 @@ const MoneyMeter = {
     formatMoney
 };
 
-// Node.js (тесты, главный процесс)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MoneyMeter;
-}
+export {
+    overrunSeconds,
+    liveOverrun,
+    overrunCost,
+    totalSeconds,
+    totalCost,
+    eventSummary,
+    formatMoney
+};
 
 // Браузер (дисплей, панель)
 if (typeof window !== 'undefined') {
+    // мост до задачи 6
     window.MoneyMeter = MoneyMeter;
 }

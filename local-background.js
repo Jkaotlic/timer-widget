@@ -228,7 +228,7 @@ const LocalBackgroundMixin = {
 
     /** Кнопки вписывания и ползунок затемнения — из localBgSettings или умолчания. */
     renderLocalBgSettings() {
-            const saved = window.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
+            const saved = window.SecurityUtils.safeJSONParse(localStorage.getItem('localBgSettings'), {}) || {};
             // Умолчания — те же, что у сборки payload дисплея (panel-display.js):
             // иначе панель и окно снова показали бы разное.
             const fit = saved.fit || 'cover';
