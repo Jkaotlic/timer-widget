@@ -38,6 +38,10 @@ async function leaveFullScreen(app) {
             // а не повиснуть до таймаута прогона.
             const done = () => { clearTimeout(timer); resolve(); };
             const timer = setTimeout(done, 8000);
+            // 150 мс после события — выйти из нативного стека выхода
+            // (_doSucceededToExitFullScreen, см. шапку): setBounds из него и
+            // ронял Electron. Меньше не проверено на воспроизведённом краше,
+            // поэтому не трогаем: это не ожидание размера, а уход со стека.
             win.once('leave-full-screen', () => setTimeout(done, 150));
             win.setFullScreen(false);
         });

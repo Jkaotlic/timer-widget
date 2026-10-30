@@ -73,12 +73,19 @@ test('launchApp регистрирует приложение для снимк�
     assert.ok(track > watch, 'track(app) стоит раньше profileGuard.watch — снимок увидит окна после сторожа');
 });
 
-/** Прямой запуск Electron без track(): список проблем спеки. */
+/**
+ * Прямой запуск Electron без track(): список проблем спеки.
+ *
+ * Считается ЧИСЛО: запусков не больше, чем вызовов track(). Прежняя проверка
+ * «есть хоть один track(» пропускала второй запуск в файле, где первый
+ * обёрнут (relay-persist запускает дважды).
+ */
 function launchProblems(src) {
     const code = codeOnly(src);
-    const direct = /(?:_electron|\belectron)\s*\.\s*launch\s*\(/.test(code);
-    if (direct && !/\btrack\s*\(/.test(code)) {
-        return ['запускает Electron напрямую, но не оборачивает приложение в track()'];
+    const launches = (code.match(/(?:_electron|\belectron)\s*\.\s*launch\s*\(/g) || []).length;
+    const tracks = (code.match(/\btrack\s*\(/g) || []).length;
+    if (launches > tracks) {
+        return [`запускает Electron напрямую ${launches} раз(а), а track() — ${tracks}: не каждое приложение обёрнуто`];
     }
     return [];
 }
@@ -100,4 +107,21 @@ test('зонд прямого запуска проверяет сам себя'
     assert.deepEqual(launchProblems('const app = await launchApp();'), []);
     // track() в комментарии — не track().
     assert.equal(launchProblems('// track(app)\nawait electron.launch({});').length, 1);
+    // Два запуска при одном track() — второй без следов.
+    assert.equal(launchProblems('const a = track(await electron.launch({}));\nconst b = await electron.launch({});').length, 1,
+        'второй запуск без track() не виден');
+    assert.deepEqual(launchProblems('const a = track(await electron.launch({}));\nconst b = track(await electron.launch({}));'), []);
+});
+
+test('живые приложения при сбое: своё — live, запущенное раньше — live-earlier, умершее — пропуск', () => {
+    const { livePlan } = require(path.join(SPEC_DIR, 'failure-artifacts.js'));
+    const app = (exitCode = null, signalCode = null) => ({ process: () => ({ exitCode, signalCode }) });
+    const mine = app();
+    const shared = app();
+    const killed = app(null, 'SIGKILL');
+    const plan = livePlan(new Map([[shared, 1], [mine, 2], [killed, 2]]), 2);
+    assert.deepEqual(plan.map((p) => [p.app === mine ? 'mine' : 'shared', p.phase]),
+        [['mine', 'live'], ['shared', 'live-earlier']]);
+    const two = livePlan(new Map([[app(), 3], [app(), 3]]), 3).map((p) => p.phase);
+    assert.deepEqual(two, ['live1', 'live2']);
 });

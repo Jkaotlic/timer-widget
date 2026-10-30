@@ -245,6 +245,9 @@ async function restore(app, baseline) {
         }, [baseline, Object.keys(VOLATILE_KEYS)]);
         // Отложенная запись панели (debounce) могла быть в пути: сверяем ещё
         // раз через паузу и повторяем, пока не устоится.
+        // пауза законна: утверждается ОТСУТСТВИЕ поздней записи за интервал
+        // (debounce utils.js — 120 мс); признака «записей в пути нет» у
+        // панели нет. Идёт только на закрытии теста, оставившего след.
         await new Promise((r) => setTimeout(r, 400));
         after = await snapshot(app);
         if (after && diffProfiles(baseline, after).length === 0) { break; }
