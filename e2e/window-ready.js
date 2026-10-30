@@ -477,6 +477,25 @@ async function waitForWidgetSnapshot(app, widget, control, opts = {}) {
 }
 
 /**
+ * То же для ЧАСОВ: снимок main отработан. Шаг 2 — тот же повтор
+ * `pushWindowStyles()`: его `sendClockStyle()` уходит часам через main
+ * каналом `set-clock-style` следом за снимком.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} clock
+ * @param {import('@playwright/test').Page} control — окно панели
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<import('@playwright/test').Page>} то же окно
+ */
+async function waitForClockSnapshot(app, clock, control, opts = {}) {
+    await clock.waitForLoadState('load');
+    await waitForMainLoaded(app, 'electron-clock-widget.html', 'часов', opts);
+    await untilReceived(clock, 'set-clock-style',
+        () => control.evaluate(() => window.timerController.pushWindowStyles()), opts);
+    return clock;
+}
+
+/**
  * Главный процесс видит окно с адресом `urlPart` загруженным
  * (`!webContents.isLoading()`): `did-stop-loading` идёт после
  * `did-finish-load`, значит слушатель снимка уже отработал и посылки ушли.
@@ -538,6 +557,6 @@ module.exports = {
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
-    waitForWidgetSnapshot,
+    waitForWidgetSnapshot, waitForClockSnapshot,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

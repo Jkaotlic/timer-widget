@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock } = require('./window-ready');
+const {
+    waitForClock, waitForClockSnapshot, waitForWidgetGone, reloadPanel, untilReceived, waitForQuiet
+} = require('./window-ready');
 
 /**
  * Достижимость мышью — тема этого прохода.
@@ -19,15 +21,16 @@ const { waitForClock } = require('./window-ready');
  *   3. «Как у виджета» скрывает выбор стиля часов, как и обещает.
  */
 
-const isClock = () => !!document.getElementById('wFlipSecGroup');
-
-async function findClock(app) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(isClock).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
+/** Вкладка ящика: класс `open` ставится синхронно, ждём, что ящик доехал. */
+async function openTab(control, tab) {
+    await control.click(`.tab-btn[data-tab="${tab}"]`);
+    await control.waitForSelector('#settingsDrawer.open');
+    await waitForQuiet(control);
 }
+
+/** Клик в панели, который шлёт часам `channel`, — до обработки окном часов. */
+const clockClick = (clock, control, selector, channel) =>
+    untilReceived(clock, channel, () => control.click(selector));
 
 // Что видно в окне часов. Проба обязана быть НЕЗАВИСИМОЙ ОТ СТИЛЯ: у часов их
 // четыре, и в каждом время рисуется своей разметкой. Первая версия смотрела
@@ -66,8 +69,8 @@ async function setToggle(control, id, want) {
         return el ? el.checked : null;
     }, id);
     if (current !== want) {
+        // Обработчик change синхронный (запись и посылка) — ждать нечего.
         await control.click(`label[for="${id}"]`);
-        await control.waitForTimeout(400);
     }
 }
 
@@ -75,7 +78,9 @@ test('справка раскрывает ответы по клику и по �
     const { app, control } = await launchApp();
 
     await control.click('#faqBtn');
-    await control.waitForTimeout(400);
+    // Окно справки открылось и доехало (переход модалки).
+    await expect(control.locator('.faq-question').first()).toBeVisible();
+    await waitForQuiet(control);
 
     const first = control.locator('.faq-question').first();
     const answer = control.locator('.faq-answer').first();
@@ -123,14 +128,11 @@ test('вернувшиеся переключатели часов меняют 
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-    await waitForClock(app);
-    await control.waitForTimeout(2000);
-    const clock = await findClock(app);
+    const clock = await waitForClockSnapshot(app, await waitForClock(app), control);
     expect(clock, 'окно часов не найдено').not.toBeNull();
 
     // Открываем вкладку «Часы» — настройки живут в выдвижном ящике.
-    await control.click('.tab-btn[data-tab="clock"]');
-    await control.waitForTimeout(600);
+    await openTab(control, 'clock');
 
     // Все четыре вернувшихся контрола обязаны быть ДОСТИЖИМЫ. Проверяем видимую
     // поверхность — подпись и ползунок тумблера: сам <input type="checkbox"> у
@@ -152,8 +154,7 @@ test('вернувшиеся переключатели часов меняют 
     // Стиль часов тоже переживает перезапуск, а формат AM/PM у флип-часов
     // намеренно не показывается (нет ячейки) — фиксируем круговой стиль, иначе
     // проверять 12-часовой формат было бы нечем.
-    await control.click('#clockStyle button[data-val="circle"]');
-    await control.waitForTimeout(900);
+    await clockClick(clock, control, '#clockStyle button[data-val="circle"]', 'set-clock-style');
 
     // Проверяем ИЗМЕНЕНИЕ, а не абсолютные значения: настройки живут в
     // localStorage и переживают перезапуск приложения, поэтому «по умолчанию
@@ -161,16 +162,14 @@ test('вернувшиеся переключатели часов меняют 
     // теста ровно одно: клик по подписи меняет картинку в окне часов.
     const before = await clock.evaluate(probeClock);
 
-    await control.click('label[for="clockShowSeconds"]');
-    await control.waitForTimeout(900);
+    await clockClick(clock, control, 'label[for="clockShowSeconds"]', 'clock-settings');
     const afterSeconds = await clock.evaluate(probeClock);
     expect(
         afterSeconds.secondsVisible,
         'переключатель секунд не изменил окно часов'
     ).toBe(!before.secondsVisible);
 
-    await control.click('label[for="clockFormat24h"]');
-    await control.waitForTimeout(900);
+    await clockClick(clock, control, 'label[for="clockFormat24h"]', 'clock-settings');
     const afterFormat = await clock.evaluate(probeClock);
     expect(
         afterFormat.hasAmPm,
@@ -178,9 +177,8 @@ test('вернувшиеся переключатели часов меняют 
     ).toBe(!before.hasAmPm);
 
     // Возвращаем обратно — переключатели двусторонние, и состояние восстановимо.
-    await control.click('label[for="clockShowSeconds"]');
-    await control.click('label[for="clockFormat24h"]');
-    await control.waitForTimeout(900);
+    await clockClick(clock, control, 'label[for="clockShowSeconds"]', 'clock-settings');
+    await clockClick(clock, control, 'label[for="clockFormat24h"]', 'clock-settings');
     const restored = await clock.evaluate(probeClock);
     expect(restored.secondsVisible, 'секунды не вернулись в исходное состояние').toBe(before.secondsVisible);
     expect(restored.hasAmPm, 'формат не вернулся в исходное состояние').toBe(before.hasAmPm);
@@ -191,8 +189,7 @@ test('вернувшиеся переключатели часов меняют 
 test('«Как у виджета» переводит выбор стиля часов на виджет и сохраняется', async () => {
     const { app, control } = await launchApp();
 
-    await control.click('.tab-btn[data-tab="clock"]');
-    await control.waitForTimeout(600);
+    await openTab(control, 'clock');
 
     // Синхронизация могла остаться включённой от прошлого прогона.
     await setToggle(control, 'syncClockStyle', false);
@@ -200,8 +197,8 @@ test('«Как у виджета» переводит выбор стиля ча
     const row = control.locator('#clockStyleRow');
     await expect(row, 'строка выбора стиля часов должна быть видна, пока синхронизация выключена').toBeVisible();
 
+    // Обработчик change синхронный: значение и запись готовы по возврату клика.
     await control.click('label[for="syncClockStyle"]');
-    await control.waitForTimeout(500);
     // Строка НЕ прячется: она — единственное место, где виден стиль часов, и
     // при включённой синхронизации показывает действующий, то есть стиль
     // виджета. Прятать её значило убирать ответ на вопрос «почему часы поехали».
@@ -215,9 +212,7 @@ test('«Как у виджета» переводит выбор стиля ча
     // Настройка обязана дожить до перезагрузки: раньше loadSettings() её убивала,
     // потому что присваивание .value самодельному сегментированному контролу
     // порождало change, а обработчик стиля гасил галочку.
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(1500);
+    await reloadPanel(control);
     const saved = await control.evaluate(
         () => JSON.parse(localStorage.getItem('displayExtSettings') || '{}').syncClockStyle
     );
@@ -226,8 +221,7 @@ test('«Как у виджета» переводит выбор стиля ча
     // Возвращаем как было: настройка общая для всех спеков через localStorage.
     // Ящик после перезагрузки закрыт — сначала открываем вкладку, иначе клик по
     // скрытой подписи будет ждать до таймаута.
-    await control.click('.tab-btn[data-tab="clock"]');
-    await control.waitForTimeout(600);
+    await openTab(control, 'clock');
     await setToggle(control, 'syncClockStyle', false);
 
     await app.close();
@@ -262,7 +256,10 @@ test('открытое окно помечено формой, а не толь�
         expect(before.active, 'виджет уже открыт — профиль не вернули в исходное').toBe(false);
 
         await control.click('#openWidgetBtn');
-        await control.waitForTimeout(800);
+        // Отметку ставит панель по отчёту main об открытом окне; ручка едет
+        // переходом — меряем доехавшую.
+        await expect(control.locator('#openWidgetBtn')).toHaveClass(/\bactive\b/);
+        await waitForQuiet(control);
 
         const after = await control.evaluate(probe);
         expect(after.active).toBe(true);
@@ -276,7 +273,7 @@ test('открытое окно помечено формой, а не толь�
         // Профиль e2e общий: тест, меняющий глобальное состояние, обязан его
         // вернуть, иначе следующий спек стартует с открытым виджетом.
         await control.click('#openWidgetBtn');
-        await control.waitForTimeout(500);
+        await waitForWidgetGone(app);
     } finally {
         await app.close();
     }

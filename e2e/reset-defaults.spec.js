@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForDisplay, waitForWidget, reloadPanel, untilReceived, waitForQuiet,
+    waitForDisplaySnapshot, waitForWidgetSnapshot, waitForClockSnapshot
+} = require('./window-ready');
 
 /**
  * «Сбросить всё» возвращает окно к ЗАВОДСКОМУ ВИДУ — сверка с чистым профилем.
@@ -18,16 +21,6 @@ const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready'
  * пришли, поэтому «снять цвет» было нечем.
  */
 
-const IS_WIDGET = () => !!document.getElementById('widgetDigits') && !!document.getElementById('wFlipHoursGroup');
-const IS_CLOCK = () => !!document.getElementById('clockGradient');
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-
-async function findWindow(app, probe) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(probe).catch(() => false)) { return w; }
-    }
-    return null;
-}
 
 // Что именно красится темой: переменная цифр, стопы кольца и цвет самой строки.
 const paint = (page) => page.evaluate(() => {
@@ -46,35 +39,48 @@ const paint = (page) => page.evaluate(() => {
     };
 });
 
+/*
+ * Посылки, по которым видно, что клик ДОШЁЛ до своего окна. Ждётся ПОСЛЕДНЯЯ
+ * посылка этому окну из обработчика: порядок main → окно сохраняется, значит
+ * предыдущие (цвета) уже отработаны.
+ *  - свотч темы (theme-grid.js): цвета окну; виджету следом ещё стиль;
+ *  - «Сбросить всё» (panel-reset.js): цвета, затем pushResetTarget — виджету
+ *    стиль, часам стиль и настройки (`clock-settings`), дисплею настройки.
+ */
 const TABS = {
-    widget: { chevron: '.wrow:has(#openWidgetBtn) .wrow-chevron', grid: '#themesGrid', row: '#widgetResetRow' },
-    clock: { chevron: '.wrow:has(#openClockBtn) .wrow-chevron', grid: '#clockThemesGrid', row: '#clockResetRow' },
-    display: { chevron: '.wrow:has(#openDisplayBtn) .wrow-chevron', grid: '#displayThemesGrid', row: '#displayResetRow' }
+    widget: { chevron: '.wrow:has(#openWidgetBtn) .wrow-chevron', grid: '#themesGrid', row: '#widgetResetRow',
+        themeSent: 'widget-style-update', resetSent: 'widget-style-update' },
+    clock: { chevron: '.wrow:has(#openClockBtn) .wrow-chevron', grid: '#clockThemesGrid', row: '#clockResetRow',
+        themeSent: 'clock-colors-update', resetSent: 'clock-settings' },
+    display: { chevron: '.wrow:has(#openDisplayBtn) .wrow-chevron', grid: '#displayThemesGrid', row: '#displayResetRow',
+        themeSent: 'display-colors-update', resetSent: 'display-settings-update' }
 };
+
+/**
+ * Чистый профиль: стереть хранилище, перезагрузить панель (стартовая рассылка
+ * уходит уже с чистого), открыть окна и дождаться их снимков main.
+ */
+async function cleanProfileWindows(app, control, names) {
+    await control.evaluate(() => localStorage.clear());
+    await reloadPanel(control);
+    await control.evaluate((list) => {
+        if (list.includes('widget')) { window.ipcRenderer.send('open-widget'); }
+        if (list.includes('clock')) { window.ipcRenderer.send('open-clock-widget'); }
+        if (list.includes('display')) { window.ipcRenderer.send('open-display', { displayIndex: 0 }); }
+    }, names);
+    const wins = {};
+    if (names.includes('display')) { wins.display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control); }
+    if (names.includes('widget')) { wins.widget = await waitForWidgetSnapshot(app, await waitForWidget(app), control); }
+    if (names.includes('clock')) { wins.clock = await waitForClockSnapshot(app, await waitForClock(app), control); }
+    return wins;
+}
 
 test('«Сбросить всё» возвращает окно к виду чистого профиля — все три окна', async () => {
     test.setTimeout(180000);
     const { app, control } = await launchApp();
     try {
         // --- ЭТАЛОН: чистый профиль ---
-        await control.evaluate(() => localStorage.clear());
-        await control.reload();
-        await control.waitForTimeout(1500);
-        await control.evaluate(() => {
-            window.ipcRenderer.send('open-widget');
-            window.ipcRenderer.send('open-clock-widget');
-            window.ipcRenderer.send('open-display', { displayIndex: 0 });
-        });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await waitForClock(app);
-        await control.waitForTimeout(3000);
-
-        const wins = {
-            widget: await findWindow(app, IS_WIDGET),
-            clock: await findWindow(app, IS_CLOCK),
-            display: await findWindow(app, IS_DISPLAY)
-        };
+        const wins = await cleanProfileWindows(app, control, ['widget', 'clock', 'display']);
         for (const name of Object.keys(wins)) {
             expect(wins[name], `окно ${name} не найдено — мерить нечего`).not.toBeNull();
         }
@@ -89,12 +95,11 @@ test('«Сбросить всё» возвращает окно к виду чи
 
         // --- НАКРУЧИВАЕМ: тема «Неон» во всех трёх окнах, КЛИКОМ по свотчу ---
         for (const name of ['widget', 'clock', 'display']) {
+            // Шеврон открывает ящик синхронно; click сам ждёт видимый свотч.
             await control.click(TABS[name].chevron);
-            await control.waitForTimeout(700);
-            await control.click(`${TABS[name].grid} .theme-btn:nth-child(2)`);
-            await control.waitForTimeout(700);
+            await untilReceived(wins[name], TABS[name].themeSent,
+                () => control.click(`${TABS[name].grid} .theme-btn:nth-child(2)`));
         }
-        await control.waitForTimeout(1200);
         const messy = await snap();
         console.log(`   накручено: ${JSON.stringify(messy)}`);
         for (const name of ['widget', 'clock', 'display']) {
@@ -105,11 +110,12 @@ test('«Сбросить всё» возвращает окно к виду чи
         // --- СБРОС: КЛИКОМ по кнопке в своей вкладке ---
         for (const name of ['widget', 'clock', 'display']) {
             await control.click(TABS[name].chevron);
-            await control.waitForTimeout(700);
-            await control.click(`${TABS[name].row} .reset-all`);
-            await control.waitForTimeout(900);
+            await untilReceived(wins[name], TABS[name].resetSent,
+                () => control.click(`${TABS[name].row} .reset-all`));
         }
-        await control.waitForTimeout(1500);
+        // Сброс виджета шлёт и часам (стиль под синхронизацией, настройки) —
+        // им это пришло раньше их собственного сброса; осталось утихнуть всем.
+        for (const page of Object.values(wins)) { await waitForQuiet(page); }
         const after = await snap();
         console.log(`   после сброса: ${JSON.stringify(after)}`);
 
@@ -137,18 +143,7 @@ test('«Сбросить всё» возвращает окно к виду чи
 test('«Сбросить фон по умолчанию» возвращает фон и НЕ красит виджет', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => localStorage.clear());
-        await control.reload();
-        await control.waitForTimeout(1500);
-        await control.evaluate(() => {
-            window.ipcRenderer.send('open-widget');
-            window.ipcRenderer.send('open-display', { displayIndex: 0 });
-        });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await control.waitForTimeout(3000);
-        const display = await findWindow(app, IS_DISPLAY);
-        const widget = await findWindow(app, IS_WIDGET);
+        const { display, widget } = await cleanProfileWindows(app, control, ['widget', 'display']);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
         expect(widget, 'окно виджета не найдено').not.toBeNull();
 
@@ -171,21 +166,26 @@ test('«Сбросить фон по умолчанию» возвращает �
 
         // Накручиваем фон: режим «сплошной» + свой цвет.
         await control.click('.wrow:has(#openDisplayBtn) .wrow-chevron');
-        await control.waitForTimeout(700);
-        await control.click('.bg-mode-btn[data-mode="solid"]');
-        await control.waitForTimeout(500);
-        await control.evaluate(() => {
+        await untilReceived(display, 'display-settings-update',
+            () => control.click('.bg-mode-btn[data-mode="solid"]'));
+        // Поле цвета шлёт настройки через debounce — ждём именно эту посылку.
+        await untilReceived(display, 'display-settings-update', () => control.evaluate(() => {
             const el = document.getElementById('bgSolidColor');
             el.value = '#8b0000';
             el.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-        await control.waitForTimeout(1200);
+        }));
         const messyLook = await bgLook();
         expect(messyLook.color, 'фон не сменился — сбрасывать нечего').not.toBe(cleanLook.color);
 
         // --- КЛИК по кнопке сброса фона ---
-        await control.click('#resetStyleBtn');
-        await control.waitForTimeout(1500);
+        // Кнопка зовёт клик «По теме» — тот шлёт настройки дисплею.
+        await untilReceived(display, 'display-settings-update', () => control.click('#resetStyleBtn'));
+        // «Виджет не тронут» — утверждение об ОТСУТСТВИИ посылки. Без паузы:
+        // протёкшая посылка виджету ушла бы из того же обработчика, то есть
+        // раньше, чем эта, по тому же пути панель → main → виджет, где порядок
+        // сохраняется. Дошла эта — дошла бы и протёкшая.
+        await untilReceived(widget, 'widget-style-update',
+            () => control.evaluate(() => window.timerController.pushWindowStyles()));
 
         const afterLook = await bgLook();
         const afterStore = await stored();
