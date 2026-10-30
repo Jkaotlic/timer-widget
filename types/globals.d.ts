@@ -98,6 +98,9 @@ interface Window {
 
     /** Крючок стенда съёмки (scripts/screenshot-runner.js): подпись «закончится в …». */
     __frozenEndsAt?: string;
+
+    /** Зонд e2e (control-app.js → e2e/launch.js): стартовая рассылка панели ушла. */
+    __startupPushed?: boolean;
 }
 
 /**

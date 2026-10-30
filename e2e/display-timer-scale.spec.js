@@ -130,7 +130,7 @@ test('масштаб дисплея применяется ко всем бло�
     // удаляет файл на каждом закрытии, но убитое приложение (crash-recovery)
     // его оставляет, поэтому условие «памяти нет» ставится здесь явно.
     fs.rmSync(path.join(USER_DATA_DIR, 'relay-state.json'), { force: true });
-    const { app, control } = await launchApp({ settleMs: 0 });
+    const { app, control } = await launchApp({ awaitStartup: false });
     let display = null;
     try {
         // Кладём целевой масштаб в общее хранилище ДО открытия окна и без
