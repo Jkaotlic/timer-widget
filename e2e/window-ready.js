@@ -558,6 +558,87 @@ async function waitForPanelSized(app, control, opts = {}) {
 }
 
 /**
+ * Дождаться, что `read` вернул одно и то же `frames` КАДРОВ подряд.
+ *
+ * Для того, что пересчитывается по кадрам, а не по таймеру: ступени
+ * компактного режима панели (panel-compact.js) — ResizeObserver → rAF →
+ * смена класса на `<body>` → снова ResizeObserver. Каскад из нескольких
+ * ступеней длиннее двух кадров `waitForQuiet`, а `waitForSteady` с шагом
+ * 150 мс мерил бы часы, а не кадры. Между замерами — кадр страницы.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {Function} read — выполняется В ОКНЕ, возвращает сериализуемое значение
+ * @param {{frames?: number, timeout?: number, name?: string}} [opts]
+ * @returns {Promise<any>} осевшее значение
+ */
+async function waitForFrameSteady(page, read, opts = {}) {
+    const frames = opts.frames ?? 4;
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const deadline = Date.now() + timeout;
+    let last;
+    let same = 0;
+    for (;;) {
+        const value = await page.evaluate(read);
+        const key = JSON.stringify(value);
+        same = key === last ? same + 1 : 1;
+        last = key;
+        if (same >= frames) { return value; }
+        if (Date.now() > deadline) {
+            throw new Error(`${opts.name || 'величина'} не осела за ${timeout} мс; последнее: ${key}`);
+        }
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+    }
+}
+
+/** Что пересчитывает раскладка панели по кадрам: ступени компакта, коробка, колонка ящика. */
+function panelLayoutState() {
+    const panel = document.querySelector('.control-panel');
+    const shell = document.querySelector('.app-shell');
+    return {
+        body: document.body.className,
+        scroll: panel ? panel.scrollHeight : null,
+        client: panel ? panel.clientHeight : null,
+        column: shell ? getComputedStyle(shell).getPropertyValue('--control-panel-width').trim() : null
+    };
+}
+
+/**
+ * Панель ВСТАЛА после смены размера окна или содержимого: размер дошёл
+ * (`waitForPanelSized`); при открытом ящике колонка пересчитана по
+ * ФАКТИЧЕСКОЙ ширине окна; ступени компактного режима отработали
+ * (`waitForFrameSteady`), окно утихло.
+ *
+ * Колонка — отдельное условие: если окно упёрлось в потолок, resize не
+ * придёт, и колонку пересчитывает сторож по времени (control-app.js,
+ * settleColumn, 400 мс). Ждём его ИТОГ — `columnFromWindow(innerWidth)`, ту же
+ * функцию, что зовёт панель, — а не его срок.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control
+ * @param {{timeout?: number}} [opts]
+ */
+async function waitForPanelSettled(app, control, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await waitForPanelSized(app, control, { timeout });
+    const drawer = await control.evaluate(() => {
+        const el = document.querySelector('.settings-drawer');
+        return el && el.classList.contains('open')
+            ? { inner: window.innerWidth, extra: window.timerController._drawerExtraWidth }
+            : null;
+    });
+    if (drawer) {
+        const { columnFromWindow } = require('../panel-drawer.js');
+        await control.waitForFunction((want) => {
+            const shell = document.querySelector('.app-shell');
+            const col = shell && getComputedStyle(shell).getPropertyValue('--control-panel-width').trim();
+            return col === want;
+        }, `${columnFromWindow(drawer.inner, drawer.extra)}px`, { timeout });
+    }
+    await waitForFrameSteady(control, panelLayoutState, { timeout, name: 'раскладка панели' });
+    await waitForPanelSized(app, control, { timeout });
+}
+
+/**
  * Канал-метка для каждого окна: посылка, которую main шлёт окну и сам, а
  * обработчик окна только запоминает (флаг «открыто ли соседнее окно»). Метка
  * несёт НАСТОЯЩЕЕ состояние соседа, так что для окна это не новость.
@@ -718,6 +799,7 @@ module.exports = {
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
-    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSized,
+    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSized, waitForPanelSettled,
+    waitForFrameSteady,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

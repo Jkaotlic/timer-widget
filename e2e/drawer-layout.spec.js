@@ -1,7 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForPanelSized } = require('./window-ready');
-const { columnFromWindow } = require('../panel-drawer.js');
+const { waitForPanelSettled } = require('./window-ready');
 
 /**
  * Ящик настроек не должен ложиться ПОВЕРХ панели — ни при какой ширине окна.
@@ -41,44 +40,22 @@ function measureColumns() {
     };
 }
 
-/**
- * Панель встала: окно получило размер от main (`waitForPanelSized`), а при
- * открытом ящике колонка пересчитана по ФАКТИЧЕСКОЙ ширине окна. Последнее —
- * отдельное условие: если окно упёрлось в потолок, resize не придёт, и
- * колонку пересчитывает сторож по времени (control-app.js, settleColumn,
- * 400 мс) — ждём его итог, а не его срок.
- */
-async function panelSettled(app, control) {
-    await waitForPanelSized(app, control);
-    const open = await control.evaluate(() =>
-        document.querySelector('.settings-drawer').classList.contains('open'));
-    if (!open) { return; }
-    await expect.poll(() => control.evaluate(() => ({
-        inner: window.innerWidth,
-        extra: window.timerController._drawerExtraWidth,
-        column: getComputedStyle(document.querySelector('.app-shell'))
-            .getPropertyValue('--control-panel-width').trim()
-    })).then(({ inner, extra, column }) => column === `${columnFromWindow(inner, extra)}px`),
-    'колонка панели должна пересчитаться по фактической ширине окна').toBe(true);
-    await waitForPanelSized(app, control);
-}
-
 async function openDrawer(app, control, tab) {
     await control.click(`.tab-btn[data-tab="${tab}"]`);
     await expect(control.locator('#settingsDrawer')).toHaveClass(/\bopen\b/);
-    await panelSettled(app, control);
+    await waitForPanelSettled(app, control);
 }
 
 async function closeDrawer(app, control) {
     await control.click('#drawerClose');
     await expect(control.locator('#settingsDrawer')).not.toHaveClass(/\bopen\b/);
-    await panelSettled(app, control);
+    await waitForPanelSettled(app, control);
 }
 
 /** Запрос панели на размер окна — тот же канал, что у ящика и автоподгонки. */
 async function requestSize(app, control, size) {
     await control.evaluate((s) => window.ipcRenderer.send('resize-control-window', s), size);
-    await panelSettled(app, control);
+    await waitForPanelSettled(app, control);
 }
 
 /**
@@ -360,7 +337,7 @@ test('узкое окно: ящик накрывает панель целико
             // обязана проверить то состояние, в которое он попадёт.
             win.setMinimumSize(320, 400);
             win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
-        }, [w, h]).then(() => panelSettled(app, control));
+        }, [w, h]).then(() => waitForPanelSettled(app, control));
 
         const probe = () => control.evaluate(() => {
             const panelEl = document.querySelector('.control-panel');
