@@ -155,15 +155,6 @@ function eventSummary(state) {
     };
 }
 
-const MoneyMeter = {
-    overrunSeconds,
-    liveOverrun,
-    overrunCost,
-    totalSeconds,
-    totalCost,
-    eventSummary,
-    formatMoney
-};
 
 export {
     overrunSeconds,
@@ -175,8 +166,3 @@ export {
     formatMoney
 };
 
-// Браузер (дисплей, панель)
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.MoneyMeter = MoneyMeter;
-}

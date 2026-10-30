@@ -19,6 +19,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pageLoads } = require('./helpers/page-graph');
 const { scriptTags } = require('./helpers/source-scan');
 const path = require('node:path');
 
@@ -115,7 +116,7 @@ test('панель ставит замок кнопкой и сообщает о
     // самодостаточный блок выносится, а не дописывается в god-файл.
     const control = codeOnly(read('electron-control.html'));
     assert.match(control, /id="lockToggle"/, 'в титлбаре нет кнопки замка');
-    assert.ok(scriptTags(control).some((t) => t.src === 'panel-titlebar.js'), 'панель не подключает panel-lock.js');
+    assert.ok(pageLoads('electron-control.html', 'panel-titlebar.js'), 'панель не подключает panel-lock.js');
     assert.match(control, /(?<![\w.])PanelTitlebar\.bindLockToggle\(/, 'кнопка замка ни к чему не привязана');
 
     const panelLock = codeOnly(read('panel-titlebar.js'));

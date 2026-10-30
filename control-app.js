@@ -18,6 +18,11 @@
         // Модули панели. Примеси — именем XMixin: присваиваются прототипу ниже,
         // tests/control-mixins.test.js сверяет файлы-примеси, импорты и
         // присваивания. Примеси сами control-app.js не импортируют.
+        // Шим IPC (window.ipcRenderer) — первым: конструктор панели
+        // подписывается через него на каналы.
+        import './ipc-compat.js';
+        import * as CONFIG from './constants.js';
+        import * as SoundBank from './sound-bank.js';
         import * as SecurityUtils from './security.js';
         import * as TimeUtils from './utils.js';
         import * as DisplayLayouts from './display-layouts.js';
@@ -60,8 +65,8 @@
         // Обе величины — из реестра, а не литералами: масштаб «как при открытии»
         // (ползунки говорят процентами, CONFIG.DEFAULT_SCALE хранит долю) и
         // базовый размер окна часов, который панель дважды считала по числу 220.
-        const DEFAULT_SCALE_PCT = Math.round(window.CONFIG.DEFAULT_SCALE * 100);
-        const CLOCK_BASE_PX = window.CONFIG.CLOCK_WIDGET_DEFAULT_SIZE;
+        const DEFAULT_SCALE_PCT = Math.round(CONFIG.DEFAULT_SCALE * 100);
+        const CLOCK_BASE_PX = CONFIG.CLOCK_WIDGET_DEFAULT_SIZE;
 
         class TimerController {
             constructor() {
@@ -102,8 +107,8 @@
                 // же изменении настроек, то есть окна красились цветом, не
                 // принадлежащим палитре приложения.
                 /** @type {ColorsUpdate} */ this.currentColors = {
-                    timer: window.CONFIG.DEFAULT_TIMER_COLORS.timer,
-                    progress: window.CONFIG.DEFAULT_TIMER_COLORS.progress,
+                    timer: CONFIG.DEFAULT_TIMER_COLORS.timer,
+                    progress: CONFIG.DEFAULT_TIMER_COLORS.progress,
                     bg: '#0f0c29'
                 };
 
@@ -295,7 +300,7 @@
 
                 if (!wasOpen) {
                     // Capture current outer width so close can restore exactly.
-                    const baseDefault = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                    const baseDefault = (CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                     this._baseWidthBeforeDrawer = window.outerWidth || window.innerWidth || baseDefault;
                     const shell = document.querySelector('.app-shell');
                     // Ширина колонки панели выводится из ФАКТИЧЕСКОЙ ширины окна, а
@@ -424,7 +429,7 @@
                 // left-392 → center-560 → full-380. Снимаем класс ТОЛЬКО после того
                 // как окно физически сузилось — тогда визуальное положение panel
                 // не меняется (в узком окне start == center для 100% ширины).
-                const baseDefault = (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380;
+                const baseDefault = (CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380;
                 const restoreWidth = this._baseWidthBeforeDrawer || (window.outerWidth - this._drawerExtraWidth) || baseDefault;
                 // Снимаем пересчёт колонки: пока ящик открыт, он держал её равной
                 // «фактическая ширина минус ящик», но у закрытого ящика колонка не
@@ -1159,7 +1164,7 @@
                         // Метка живёт ограниченное время: отклонённая главным
                         // процессом команда не должна глушить чужой старт навсегда.
                         const startedHere = this._localStartAt > 0
-                            && (Date.now() - this._localStartAt) < window.CONFIG.LOCAL_START_SOUND_WINDOW_MS;
+                            && (Date.now() - this._localStartAt) < CONFIG.LOCAL_START_SOUND_WINDOW_MS;
                         this._localStartAt = 0;
                         if (!startedHere && this.soundStartEl.checked) {
                             this.playSound('start');
@@ -1451,7 +1456,7 @@
                 }
 
                 window.ipcRenderer.send('resize-control-window', {
-                    width: (window.CONFIG && window.CONFIG.CONTROL_WINDOW_WIDTH) || 380,
+                    width: (CONFIG && CONFIG.CONTROL_WINDOW_WIDTH) || 380,
                     height: neededHeight
                 });
             }
@@ -1510,7 +1515,7 @@
                     await ctx.resume();
                 }
 
-                window.SoundBank.playBuiltInPreset(ctx, name);
+                SoundBank.playBuiltInPreset(ctx, name);
             }
 
 
@@ -1864,7 +1869,7 @@
             // редизайна длительностей стало четыре, и вторая копия числа «8»
             // здесь означала бы setTime(undefined) на клавишах 5–8.
             else if (event.code >= 'Digit1' && event.code <= 'Digit9') {
-                const presets = window.CONFIG.PRESET_DURATIONS;
+                const presets = CONFIG.PRESET_DURATIONS;
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
                 if (presetIndex < presets.length) {
                     event.preventDefault();

@@ -193,17 +193,3 @@ export {
     clamp
 };
 
-// Окно: всё, кроме safelySendToWindow (она — для main).
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.TimeUtils = {
-        formatTime,
-        formatTimeShort,
-        parseManualTime,
-        getTimerStatus,
-        calculateProgress,
-        isValidNumber,
-        clamp,
-        debounce
-    };
-}

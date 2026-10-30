@@ -1088,52 +1088,11 @@
         </div>
     </div>
 
-    <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
-    <script src="ipc-compat.js" defer></script>
-    <script type="module" src="constants.js"></script>
-    <script type="module" src="security.js"></script>
-    <script type="module" src="color-utils.js"></script>
-    <script type="module" src="utils.js"></script>
-    <script type="module" src="renderer-storage.js"></script>
-    <script type="module" src="renderer-shared.js"></script>
-    <script type="module" src="digits-style.js"></script>
-    <script type="module" src="font-select.js"></script>
-    <!-- display-layouts.js РАНЬШЕ settings-schema.js: таблица берёт у реестра умолчание масштаба блоков -->
-    <script type="module" src="display-layouts.js"></script>
-    <script type="module" src="hero-modes.js"></script>
-    <script type="module" src="settings-schema.js"></script>
-    <script type="module" src="clock-settings-schema.js"></script>
-    <!-- Из <head> перенесён модулем: его читает только control-app.js (window.Presets
-         при установке ячеек), а panel-presets.js получает реестр аргументом. -->
-    <script type="module" src="presets.js"></script>
-    <!-- Из <head> перенесены модулями: до первого кадра им делать нечего — на
-         верхнем уровне только объявления, проводку зовёт control-app.js. -->
-    <script type="module" src="panel-titlebar.js"></script>
-    <script type="module" src="panel-presets.js"></script>
-    <script type="module" src="panel-compact.js"></script>
-    <script type="module" src="sound-bank.js"></script>
-    <script type="module" src="sound-presets.js"></script>
-    <script type="module" src="ui-feedback.js"></script>
-    <script type="module" src="scale-input.js"></script>
-    <script type="module" src="scale-report.js"></script>
-    <script type="module" src="color-picker.js"></script>
-    <script type="module" src="modal-manager.js"></script>
-    <script type="module" src="shortcuts-help.js"></script>
-    <script type="module" src="onboarding.js"></script>
-    <script type="module" src="mini-bar.js"></script>
-    <script type="module" src="panel-state.js"></script>
-    <script type="module" src="custom-sounds.js"></script>
-    <script type="module" src="local-background.js"></script>
-    <script type="module" src="theme-grid.js"></script>
-    <script type="module" src="panel-colors.js"></script>
-    <script type="module" src="money-meter.js"></script>
-    <script type="module" src="panel-display.js"></script>
-    <script type="module" src="panel-drawer.js"></script>
-    <script type="module" src="panel-reset.js"></script>
-    <script type="module" src="panel-clock.js"></script>
-
+    <!-- Вход окна — ОДИН модуль: всё остальное (шим IPC, библиотеки) приходит
+         его import-ом, порядок выводится из графа (план 2026-10-30-es-modules). -->
     <script type="module" src="control-app.js"></script>
-    <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script src="control-theme-sync.js" defer></script>
+    <!-- Тема приходит из панели; слушатель — отдельным модулем ПОСЛЕ входа:
+         он зовёт окно через его крючок window.X. -->
+    <script type="module" src="control-theme-sync.js"></script>
 </body>
 </html>

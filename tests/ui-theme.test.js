@@ -18,7 +18,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { scriptTags } = require('./helpers/source-scan');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
@@ -152,7 +152,7 @@ test('кнопка переключения темы в панели: состо
     // panel-titlebar.js — вместе с кнопкой замка, у которой ровно та же
     // природа: величина общая для всех окон, кнопка одна, в титлбаре. В
     // разметке панели осталась кнопка и один вызов проводки.
-    assert.ok(scriptTags(html).some((t) => t.src === 'panel-titlebar.js'), 'панель не подключает panel-titlebar.js');
+    assert.ok(pageLoads('electron-control.html', 'panel-titlebar.js'), 'панель не подключает panel-titlebar.js');
     assert.match(html, /(?<![\w.])PanelTitlebar\.bindThemeToggle\(/, 'кнопка темы ни к чему не привязана');
     const titlebar = readSource('panel-titlebar.js');
     assert.match(titlebar, /theme\.applyTheme\(value\)/, 'тема не применяется локально');

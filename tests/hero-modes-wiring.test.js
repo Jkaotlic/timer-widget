@@ -92,11 +92,11 @@ test('зонд проверяет себя: подделанный исходн�
 
 test('форматтер выбирается ПО РЕЖИМУ, и выбор этот ровно один', () => {
     const body = methodBody(SRC, 'formatTime');
-    assert.ok(body.includes('window.HeroModes.isClockMode(this.heroMode)'),
+    assert.ok(body.includes('HeroModes.isClockMode(this.heroMode)'),
         'formatTime() не спрашивает реестр, часы это или длительность');
-    assert.ok(body.includes('window.TimeUtils.formatTime('),
+    assert.ok(body.includes('TimeUtils.formatTime('),
         'часам не достаётся полный ЧЧ:ММ:СС — в 00:30:15 зал прочитает «30:15» как получасовой отсчёт');
-    assert.ok(body.includes('window.TimeUtils.formatTimeShort('),
+    assert.ok(body.includes('TimeUtils.formatTimeShort('),
         'длительность перестала печататься коротким форматтером');
 
     // Второго решения о написании в файле быть не должно: короткий форматтер
@@ -110,12 +110,12 @@ test('форматтер выбирается ПО РЕЖИМУ, и выбор �
 
 test('зонд форматтера проверяет себя: старая безусловная версия ловится', () => {
     const fakeSrc = '\nclass X {\n    formatTime(seconds) {\n'
-        + '        return window.TimeUtils.formatTimeShort(seconds);\n'
+        + '        return TimeUtils.formatTimeShort(seconds);\n'
         + '    }\n}\n';
     const body = methodBody(fakeSrc, 'formatTime');
-    assert.ok(!body.includes('window.HeroModes.isClockMode(this.heroMode)'),
+    assert.ok(!body.includes('HeroModes.isClockMode(this.heroMode)'),
         'зонд не ловит заведомо плохой исходник — проверка на выбор по режиму не работает');
-    assert.ok(!body.includes('window.TimeUtils.formatTime('),
+    assert.ok(!body.includes('TimeUtils.formatTime('),
         'зонд сломан: в заведомо плохом исходнике «найден» полный форматтер');
 });
 
@@ -133,7 +133,7 @@ test('проба «Цифр» знает про часы: группа часо�
     // Иначе проба резервирует место под «88:88», а печатается «00:30:15» —
     // цифры вылезают за рамку ровно в тот час, когда никто не смотрит.
     const body = methodBody(SRC, '_heroHasHours');
-    assert.ok(body.includes('window.HeroModes.isClockMode(this.heroMode)'),
+    assert.ok(body.includes('HeroModes.isClockMode(this.heroMode)'),
         '_heroHasHours() не спрашивает реестр — у часов формат считается по правилу длительности');
     assert.ok(body.includes('Math.abs(secs) >= 3600'),
         '_heroHasHours() потерял правило для длительности');
@@ -440,11 +440,11 @@ test('подпись героя имеет ОДНОГО владельца, вы
     // В не-таймерных режимах отчёт о состоянии подпись не трогает ВОВСЕ —
     // ранним выходом, а не перезаписью после. Перезапись означала бы двух
     // владельцев, дерущихся за один узел на каждом тике.
-    assert.ok(/this\.heroMode !== window\.HeroModes\.DEFAULT_MODE/.test(chip),
+    assert.ok(/this\.heroMode !== (?<![\w.])HeroModes\.DEFAULT_MODE/.test(chip),
         'updateChipState() пишет подпись во всех режимах — это второй владелец');
 
     const label = methodBody(SRC, 'updateHeroLabel');
-    assert.ok(label.includes('window.HeroModes.heroCaption'),
+    assert.ok(label.includes('HeroModes.heroCaption'),
         'updateHeroLabel() не спрашивает реестр, значит завёл свою копию слова');
 });
 
@@ -454,7 +454,7 @@ test('вспышка завершения не запускается вне р�
     // знаков ПО ВСЕМУ файлу: безобидная перестановка строк её роняла, а второй
     // вызов вспышки где-нибудь ниже по файлу проезжал мимо неё незамеченным.
     const body = methodBody(SRC, 'updateDisplay');
-    const guardAt = body.indexOf('if (this.heroMode === window.HeroModes.DEFAULT_MODE)');
+    const guardAt = body.indexOf('if (this.heroMode === HeroModes.DEFAULT_MODE)');
     assert.notEqual(guardAt, -1,
         'в updateDisplay() нет гарда по режиму вокруг вспышки — она бьёт по экрану, где крупно показано другое');
     const guarded = balancedBlockAt(body, guardAt, 'гард режима вокруг вспышки');
@@ -601,6 +601,6 @@ test('«Сбросить всё» у виджета и часов режима �
 test('BUG-20: calculateProgressValue берёт долю у HeroModes.heroProgress, своей формулы нет', () => {
     const body = SRC.match(/calculateProgressValue\(\)\s*\{[\s\S]*?\n {4}\}/);
     assert.ok(body, 'метод calculateProgressValue не найден');
-    assert.match(body[0], /window\.HeroModes\.heroProgress\(/);
+    assert.match(body[0], /(?<![\w.])HeroModes\.heroProgress\(/);
     assert.doesNotMatch(body[0], /secs \/ total/, 'вторая копия формулы доли вернулась');
 });

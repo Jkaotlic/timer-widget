@@ -69,6 +69,27 @@ function windowModuleFiles(root, pages = WINDOW_PAGES) {
 }
 
 /**
+ * Все .js, которые исполнит страница: её `<script src>` и транзитивное
+ * замыкание статических `import` (`collectImports`, как у белого списка схемы
+ * `app://`). Нужен тестам «файл подключён»: с одним входом на окно
+ * библиотека подключается не тегом, а импортом.
+ * @param {string} root
+ * @param {string} page
+ * @returns {string[]} — без повторов, в порядке обхода
+ */
+function pageFiles(root, page) {
+    const queue = pageScripts(root, [page]).get(page).map((t) => t.src);
+    const seen = new Set();
+    while (queue.length > 0) {
+        const file = queue.shift();
+        if (seen.has(file)) { continue; }
+        seen.add(file);
+        queue.push(...collectImports(fs.readFileSync(path.join(root, file), 'utf8')));
+    }
+    return [...seen];
+}
+
+/**
  * Блок flat-конфига ESLint для модулей окон.
  *
  * Глобалы в flat-конфиге СЛИВАЮТСЯ по блокам, а не заменяются: общий блок
@@ -98,4 +119,4 @@ function moduleLintBlock(files) {
     };
 }
 
-module.exports = { pageScripts, windowModuleFiles, moduleLintBlock };
+module.exports = { pageScripts, pageFiles, windowModuleFiles, moduleLintBlock };

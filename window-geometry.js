@@ -435,27 +435,9 @@ function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) 
     return handlers;
 }
 
-// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
-// не расширяются (иначе объект не совпал бы с `typeof import`).
-/** @type {typeof import('./window-geometry.js')} */
-const WindowGeometry = {
-    createWindowGeometry,
-    isWindowDragTarget,
-    bindWindowDrag,
-    fitScaledBounds,
-    fitRestoredBounds,
-    MIN_SCALE_PCT,
-    MAX_SCALE_PCT,
-    SAVE_SETTLE_MS
-};
 
 export {
     createWindowGeometry, isWindowDragTarget, bindWindowDrag, fitScaledBounds,
     fitRestoredBounds, MIN_SCALE_PCT, MAX_SCALE_PCT, SAVE_SETTLE_MS
 };
 
-// Браузер: классические соседи ещё читают window.WindowGeometry.
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.WindowGeometry = WindowGeometry;
-}

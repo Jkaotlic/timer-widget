@@ -10,7 +10,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { scriptTags } = require('./helpers/source-scan');
+const { pageLoads } = require('./helpers/page-graph');
 const { BUILT_IN_PRESETS, playBuiltInPreset } = require('../sound-bank');
 const { readSource } = require('./helpers/window-source');
 
@@ -158,7 +158,7 @@ test('реестр списков и банк звуков совпадают В
 
 test('панель строит списки звуков модулем, а не разметкой', () => {
     const html = readSource('electron-control.html');
-    assert.ok(scriptTags(html).some((t) => t.src === 'sound-presets.js'), 'панель не подключает реестр звуков');
+    assert.ok(pageLoads('electron-control.html', 'sound-presets.js'), 'панель не подключает реестр звуков');
     assert.match(html, /SoundPresets\.buildSoundSelects\(document\)/, 'списки никто не строит');
     // И разметка больше не ведёт свою копию набора.
     for (const id of ['soundStartPreset', 'soundEndPreset', 'soundMinutePreset', 'soundOverrunPreset']) {

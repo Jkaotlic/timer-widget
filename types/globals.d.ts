@@ -69,18 +69,9 @@ interface Window {
     electronAPI: ElectronBridge;
     ipcRenderer: IpcRendererShim;
 
-    // --- общие модули (window.X = тот же объект, что module.exports)
+    // --- крючки e2e общих модулей (tests/window-bridges.test.js PERMANENT)
     CONFIG: typeof import('../constants.js');
-    SecurityUtils: typeof import('../security.js');
-    /** utils.js кладёт в окно всё, КРОМЕ safelySendToWindow (она — для main). */
-    TimeUtils: Omit<typeof import('../utils.js'), 'safelySendToWindow'>;
-    RendererShared: typeof import('../renderer-shared.js');
-    DigitsStyle: typeof import('../digits-style.js');
-    DisplayLayouts: typeof import('../display-layouts.js');
-    HeroModes: typeof import('../hero-modes.js');
-    MoneyMeter: typeof import('../money-meter.js');
     FlipCard: typeof import('../flip-card.js');
-    WindowGeometry: typeof import('../window-geometry.js');
     UILock: typeof import('../ui-lock.js');
     UITheme: typeof import('../ui-theme.js');
     SoundBank: typeof import('../sound-bank.js');
@@ -93,7 +84,6 @@ interface Window {
     openModal: typeof import('../modal-manager.js').openModal;
     closeModal: typeof import('../modal-manager.js').closeModal;
     showKeyboardShortcuts: typeof import('../shortcuts-help.js').showKeyboardShortcuts;
-    DisplayTimerHelpers: typeof import('../display-script.js');
 
     // --- экземпляры окон. Классы живут в точках входа (*-app.js,
     // display-script.js), которые ничего не экспортируют, поэтому any.
@@ -124,5 +114,3 @@ type TimerMixins = typeof import('../custom-sounds.js').CustomSoundsMixin
     & typeof import('../panel-reset.js').PanelResetMixin
     & typeof import('../panel-clock.js').PanelClockMixin;
 
-/** ipc-compat.js кладёт шим в window; окна зовут его голым именем. */
-declare var ipcRenderer: Window['ipcRenderer'];

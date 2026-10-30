@@ -57,7 +57,7 @@ const WINDOW_HTML = Object.freeze([
 //    оно работает без сети, а данные с диска читает главный процесс;
 //  - base-uri / form-action / frame-src / worker-src 'none' — ни <base>, ни
 //    форм, ни фреймов, ни воркеров в окнах нет; открытое — это лазейка.
-const { CONTENT_SECURITY_POLICY: POLICY } = require('../app-scheme');
+const { CONTENT_SECURITY_POLICY: POLICY, collectImports } = require('../app-scheme');
 
 // Все виды инлайна запрещены: политика не пускает ни один из них.
 const FORBIDDEN = Object.freeze(new Set(['inline-script', 'style-element', 'style-attr', 'handler', 'javascript-url']));
@@ -154,11 +154,21 @@ function findInlineInScript(code) {
 }
 
 // Все скрипты, которые исполняются в окнах: <script src> четырёх страниц.
+// Скрипты окон: теги страниц И всё, что их модули статически импортируют,
+// транзитивно (тот же collectImports, по которому схема app:// отдаёт файлы).
+// Входы окон — модули: без обхода графа страж видел бы один файл на окно.
 function windowScripts() {
     const files = new Set();
+    const queue = [];
     for (const file of WINDOW_HTML) {
         const html = fs.readFileSync(path.join(ROOT, file), 'utf8');
-        for (const m of html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) { files.add(m[1]); }
+        for (const m of html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) { queue.push(m[1]); }
+    }
+    while (queue.length > 0) {
+        const file = queue.shift();
+        if (files.has(file)) { continue; }
+        files.add(file);
+        queue.push(...collectImports(fs.readFileSync(path.join(ROOT, file), 'utf8')));
     }
     return [...files];
 }

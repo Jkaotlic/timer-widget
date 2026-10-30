@@ -14,7 +14,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { scriptTags } = require('./helpers/source-scan');
+const { pageLoads } = require('./helpers/page-graph');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
@@ -296,8 +296,8 @@ test('PANEL-001: пресет раскладывает и рассылает н�
 
 test('панель подключает модули и ставит ячейки в разметку', () => {
     const control = read('electron-control.html');
-    assert.ok(scriptTags(control).some((t) => t.src === 'presets.js'), 'панель не подключает presets.js');
-    assert.ok(scriptTags(control).some((t) => t.src === 'panel-presets.js'), 'панель не подключает panel-presets.js');
+    assert.ok(pageLoads('electron-control.html', 'presets.js'), 'панель не подключает presets.js');
+    assert.ok(pageLoads('electron-control.html', 'panel-presets.js'), 'панель не подключает panel-presets.js');
     for (let i = 1; i <= Presets.PRESET_SLOTS; i++) {
         assert.match(control, new RegExp(`id="presetSlot${i}"`), `нет ячейки ${i}`);
     }

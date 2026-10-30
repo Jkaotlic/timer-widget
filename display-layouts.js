@@ -518,40 +518,6 @@ function fractionToPosition(fraction, viewport, size, margin = EDGE_MARGIN) {
     };
 }
 
-// Тип моста — тип namespace модуля: те же поля, литеральные типы констант
-// не расширяются (иначе объект не совпал бы с `typeof import`).
-/** @type {typeof import('./display-layouts.js')} */
-const DisplayLayouts = {
-    DISPLAY_ELEMENTS,
-    LABELLED_ELEMENTS,
-    SECRET_ELEMENTS,
-    MAX_CAPTION,
-    blockCaption,
-    sanitizeCaption,
-    ELEMENT_IDS,
-    LAYOUTS,
-    LAYOUT_IDS,
-    MIN_ELEMENT_SCALE,
-    MAX_ELEMENT_SCALE,
-    DEFAULT_BLOCK_SCALE,
-    DEFAULT_LABEL_SCALE,
-    EDGE_MARGIN,
-    TIMER_GAP,
-    clampScale: clampElementScale,
-    defaultScale,
-    normalizeScales,
-    layoutById,
-    layoutToggles,
-    layoutScales,
-    placeElements,
-    positionToFraction,
-    fractionToPosition
-};
-
-if (typeof window !== 'undefined') {
-    // мост до задачи 6
-    window.DisplayLayouts = DisplayLayouts;
-}
 
 export {
     DISPLAY_ELEMENTS, LABELLED_ELEMENTS, SECRET_ELEMENTS, MAX_CAPTION, blockCaption,

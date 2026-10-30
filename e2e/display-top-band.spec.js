@@ -69,7 +69,11 @@ async function workArea(app) {
     });
 }
 
-const measure = () => {
+// Зазор передаётся аргументом: функция исполняется В ОКНЕ, и до ES-модулей
+// голое HERO_GAP там молча находило верхний `const` display-script.js — то
+// есть число бралось из приложения, а не из спеки. У модуля верхний уровень
+// свой, и такая опора — ReferenceError.
+const measure = (HERO_GAP) => {
     const block = document.getElementById('currentTimeBlock').getBoundingClientRect();
     const label = document.getElementById('heroLabel').getBoundingClientRect();
     const pillEl = document.querySelector('.status-pill');
@@ -170,7 +174,7 @@ test('карточка сверху не ложится на подпись «О
                 }, style);
                 await display.waitForTimeout(700);
 
-                const m = await display.evaluate(measure);
+                const m = await display.evaluate(measure, HERO_GAP);
                 const where = `${size.w}×${size.h}, ${m.style}`;
                 console.log(`${where} →`, JSON.stringify(m));
 
@@ -224,7 +228,7 @@ test('карточка сверху не ложится на подпись «О
                 + 'проверка «уступка только по нужде» здесь не выполняется');
         } else {
             await resizeDisplay(app, display, roomySize);
-            const roomy = await display.evaluate(measure);
+            const roomy = await display.evaluate(measure, HERO_GAP);
             console.log('просторное окно →', JSON.stringify(roomy));
             expect(`${roomy.vw}×${roomy.vh}`, 'окно другого размера — проверка не о том')
                 .toBe(`${roomySize.w}×${roomySize.h}`);
@@ -241,14 +245,14 @@ test('карточка сверху не ложится на подпись «О
             window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' });
         });
         await display.waitForTimeout(900);
-        const first = await display.evaluate(measure);
+        const first = await display.evaluate(measure, HERO_GAP);
         for (let i = 0; i < 3; i++) {
             await control.evaluate(() => {
                 window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' });
             });
             await display.waitForTimeout(500);
         }
-        const again = await display.evaluate(measure);
+        const again = await display.evaluate(measure, HERO_GAP);
         console.log(`идемпотентность: ${first.shrink}/${first.band} → ${again.shrink}/${again.band}`);
         expect(again.shrink, 'уступка рамы поехала при повторном пересчёте').toBe(first.shrink);
         expect(again.band, 'полоса поехала при повторном пересчёте').toBe(first.band);

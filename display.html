@@ -418,18 +418,11 @@
         <span class="display-progress-fill" id="displayProgressFill"></span>
     </div>
 
-    <script src="ipc-compat.js" defer></script>
-    <script type="module" src="security.js"></script>
-    <script type="module" src="utils.js"></script>
-    <script type="module" src="constants.js"></script>
-    <script type="module" src="renderer-shared.js"></script>
-    <script type="module" src="display-layouts.js"></script>
-    <script type="module" src="hero-modes.js"></script>
-    <script type="module" src="money-meter.js"></script>
-    <script type="module" src="flip-card.js"></script>
-    <script type="module" src="digits-style.js"></script>
-    <script src="display-script.js" defer></script>
-    <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script src="display-theme-sync.js" defer></script>
+    <!-- Вход окна — ОДИН модуль: всё остальное (шим IPC, библиотеки) приходит
+         его import-ом, порядок выводится из графа (план 2026-10-30-es-modules). -->
+    <script type="module" src="display-script.js"></script>
+    <!-- Тема приходит из панели; слушатель — отдельным модулем ПОСЛЕ входа:
+         он зовёт окно через его крючок window.X. -->
+    <script type="module" src="display-theme-sync.js"></script>
 </body>
 </html>

@@ -228,8 +228,9 @@ test('блок модулей: голое имя и require — ошибка no-
         "'require' is not defined.",
     ]);
     // Классический файл окна под реальным конфигом: no-undef выключен — вот
-    // почему голые имена ловит тест выше, а не lint.
-    assert.deepStrictEqual(await lint(real, 'widget-app.js', 'Foo;\n'), []);
+    // почему голые имена ловит тест выше, а не lint. После задачи 6 классика
+    // окон — только скрипты <head> (theme-init*).
+    assert.deepStrictEqual(await lint(real, 'theme-init.js', 'Foo;\n'), []);
 });
 
 test('eslint.config.js берёт блок модулей из вычисленного списка, а не из ручного', () => {
@@ -243,7 +244,13 @@ test('eslint.config.js берёт блок модулей из вычислен�
         assert.deepStrictEqual(blocks[0].files, computed);
         assert.strictEqual(blocks[0].rules['no-undef'], 'error');
         // Блок перекрывает классический блок окон — значит, стоит после него.
-        const classic = real.findIndex((c) => Array.isArray(c.files) && c.files.includes('control-app.js'));
+        const classic = real.findIndex((c) => Array.isArray(c.files) && c.files.includes('theme-init.js'));
+        assert.ok(classic >= 0, 'классический блок окон не найден');
         assert.ok(real.indexOf(blocks[0]) > classic);
+        // Входы окон — модули: классическим блоком они больше не описаны.
+        for (const entry of ['control-app.js', 'widget-app.js', 'clock-widget-app.js', 'display-script.js']) {
+            assert.ok(computed.includes(entry), `${entry} не модуль`);
+            assert.ok(!real[classic].files.includes(entry), `${entry} остался в классическом блоке`);
+        }
     }
 });

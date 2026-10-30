@@ -31,8 +31,10 @@ function methodFn(name, params) {
     assert.ok(m, `метод ${name} не найден`);
     const block = balancedBlockAt(SRC, m.index, name);
     const body = block.slice(block.indexOf('{') + 1, block.lastIndexOf('}'));
-     
-    return new Function(params, body);
+
+    // RendererShared — import модуля (widget-app.js — ES-модуль): в вынутое
+    // тело он приходит замыканием, как в окне.
+    return new Function('RendererShared', `return function (${params}) {${body}\n};`)(require('../renderer-shared.js'));
 }
 
 function fakeClassList(initial = []) {
@@ -72,7 +74,7 @@ function makeWidget(totalSeconds, hadHours) {
 const updateFlipDisplay = methodFn('updateFlipDisplay', 'secs');
 
 test.before(() => {
-    global.window = { RendererShared: require('../renderer-shared.js') };
+    global.window = {};
     global.document = { querySelectorAll: () => [] };
 });
 test.after(() => {

@@ -14,7 +14,9 @@
 // намеренно: первые тестируются в node без окружения браузера.
 
 // Порядок важен: это же порядок перебора кнопкой-переключателем.
+/** @type {Array<'dark'|'light'>} */
 const UI_THEMES = ['dark', 'light'];
+/** @type {'dark'|'light'} */
 const UI_THEME_DEFAULT = 'light';
 // Ключ обязан быть в CONFIG.STORAGE_KEYS.UI_THEME — tests/storage-keys.test.js
 // проверяет реестр в обе стороны и падает на ключе, которого там нет.
@@ -27,7 +29,8 @@ const UI_THEME_STORAGE_KEY = 'uiTheme';
  * @returns {'dark'|'light'}
  */
 function normalizeTheme(value) {
-    return UI_THEMES.indexOf(String(value)) === -1 ? UI_THEME_DEFAULT : String(value);
+    const s = String(value);
+    return UI_THEMES.find((t) => t === s) || UI_THEME_DEFAULT;
 }
 
 /**

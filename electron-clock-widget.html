@@ -212,18 +212,11 @@
         </div>
     </div>
 
-    <!-- IPC Compatibility Layer (maps ipcRenderer to secure electronAPI) -->
-    <script src="ipc-compat.js" defer></script>
-    <script type="module" src="constants.js"></script>
-    <script type="module" src="security.js"></script>
-    <script type="module" src="utils.js"></script>
-    <script type="module" src="renderer-shared.js"></script>
-    <script type="module" src="flip-card.js"></script>
-    <script type="module" src="window-geometry.js"></script>
-    <script type="module" src="digits-style.js"></script>
-
-    <script src="clock-widget-app.js" defer></script>
-    <!-- Тема приходит из панели; слушатель ставится ПОСЛЕ ipc-compat.js. -->
-    <script src="clock-widget-theme-sync.js" defer></script>
+    <!-- Вход окна — ОДИН модуль: всё остальное (шим IPC, библиотеки) приходит
+         его import-ом, порядок выводится из графа (план 2026-10-30-es-modules). -->
+    <script type="module" src="clock-widget-app.js"></script>
+    <!-- Тема приходит из панели; слушатель — отдельным модулем ПОСЛЕ входа:
+         он зовёт окно через его крючок window.X. -->
+    <script type="module" src="clock-widget-theme-sync.js"></script>
 </body>
 </html>
