@@ -1,6 +1,10 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock } = require('./window-ready');
+const {
+    waitForClock, waitForClockSnapshot, waitForWindowSettled, resizeOwnWindow, armReceived, untilReceived
+} = require('./window-ready');
+
+const CLOCK_URL = 'electron-clock-widget.html';
 
 /**
  * Шильдики даты и часового пояса в КРУГОВОМ стиле часов не должны налезать
@@ -24,14 +28,6 @@ const { waitForClock } = require('./window-ready');
 
 const SIZES = [220, 400, 600];
 
-async function findClock(app) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(() => !!document.getElementById('wFlipSecGroup')).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
-
 // Замеряем то, что видит пользователь: реальные прямоугольники на экране.
 function measureBadges() {
     const date = document.getElementById('dateBadge');
@@ -53,13 +49,16 @@ test('дата и часовой пояс в круговых часах не п
     const { app, control } = await launchApp();
 
     await control.evaluate(() => { window.ipcRenderer.send('open-clock-widget'); });
-    await waitForClock(app);
-    await control.waitForTimeout(2000);
+    // Окно найдено пробой (бросает, если не открылось), получило снимок main
+    // и ВСТАЛО — геометрия восстановлена и записана. Раньше пауза 2000 мс.
+    const clock = await waitForClock(app);
+    await waitForClockSnapshot(app, clock);
+    await waitForWindowSettled(app, clock, CLOCK_URL);
 
-    const clock = await findClock(app);
-    expect(clock, 'окно часов должно открыться').not.toBeNull();
-
-    // Круговой стиль + оба шильдика — ЧЕРЕЗ РЕАЛЬНЫЕ КОНТРОЛЫ панели.
+    // Круговой стиль + оба шильдика — ЧЕРЕЗ РЕАЛЬНЫЕ КОНТРОЛЫ панели. Ждём,
+    // что обе посылки дошли до часов и отработаны (было 900 мс).
+    const styleSent = await armReceived(clock, 'set-clock-style');
+    const settingsSent = await armReceived(clock, 'clock-settings');
     await control.evaluate(() => {
         const style = document.getElementById('clockStyle');
         style.value = 'circle';
@@ -70,13 +69,14 @@ test('дата и часовой пояс в круговых часах не п
             el.dispatchEvent(new Event('change'));
         }
     });
-    await control.waitForTimeout(900);
+    await styleSent({ match: 'circle' });
+    await settingsSent({ match: { showDate: true, showTimezone: true } });
 
     for (const size of SIZES) {
-        await control.evaluate((s) => {
-            window.ipcRenderer.send('clock-widget-resize', { width: s, height: s });
-        }, size);
-        await control.waitForTimeout(700);
+        // Размер просит само окно тем же каналом (`clock-widget-resize` открыт
+        // и панели, и часам — обработчик в main один): main применил его и
+        // сообщил границы, окно ВСТАЛО (было 700 мс).
+        await resizeOwnWindow(app, clock, { channel: 'clock-widget-resize', urlPart: CLOCK_URL, size });
 
         const m = await clock.evaluate(measureBadges);
         console.log(`размер ${size}:`, JSON.stringify(m));
@@ -104,9 +104,11 @@ test('дата и часовой пояс в круговых часах не п
             el.checked = false;
             el.dispatchEvent(new Event('change'));
         }
-        window.ipcRenderer.send('clock-widget-set-style', 'circle');
-        window.ipcRenderer.send('clock-widget-resize', { width: 220, height: 220 });
     });
-    await control.waitForTimeout(600);
+    await untilReceived(clock, 'set-clock-style',
+        () => control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'circle')), { match: 'circle' });
+    // Геометрию окно пишет отложенно (`saveSettled`): resizeOwnWindow ждёт и
+    // эту запись — закрыть раньше значило бы оставить профилю прежний размер.
+    await resizeOwnWindow(app, clock, { channel: 'clock-widget-resize', urlPart: CLOCK_URL, size: 220 });
     await app.close();
 });
