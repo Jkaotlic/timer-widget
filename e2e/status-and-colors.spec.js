@@ -16,18 +16,25 @@ const { launchApp } = require('./launch');
 let app;
 let control;
 
-// Прогоняет команду таймера через настоящий IPC и ждёт перерисовки.
+// Шлёт команду таймера через настоящий IPC. Не ждёт: команды идут одним
+// каналом панель → main и исполняются по порядку, а результат приходит
+// броадкастом timer-state. Ждут его УТВЕРЖДЕНИЯ — ретраящимися expect, и
+// первым — по значению, которое бывает ТОЛЬКО после последней команды (время
+// или подпись). Время, классы полос и подпись пишет один вызов updateDisplay()
+// (control-app.js) из одного обработчика timer-state, поэтому, когда
+// уникальное значение доехало, остальные утверждения читают то же состояние —
+// и отсутствие класса тоже.
 async function sendCommand(payload) {
     await control.evaluate((cmd) => {
         window.ipcRenderer.send('timer-command', cmd);
     }, payload);
-    // Состояние возвращается броадкастом timer-state; даём кругу пройти.
-    await control.waitForTimeout(250);
 }
 
 // textContent, а не innerText: innerText отдаёт текст уже после CSS-трансформаций,
 // а заголовок и статус в панели подняты в верхний регистр через text-transform.
 const timeText = () => control.locator('#controlTimeDigits').textContent();
+const timeEl = () => control.locator('#controlTimeDigits');
+const statusEl = () => control.locator('#statusText');
 const statusText = () => control.locator('#statusText').textContent();
 // Подпись состояния живёт в своём span: в #controlHeroLabel рядом с ней
 // стоит точка состояния, и её textContent тянул бы за собой пустую строку.
@@ -41,7 +48,7 @@ const enterInputMode = async () => {
     );
     if (already) { return; }
     await control.click('#controlTime');
-    await control.waitForTimeout(300);
+    await expect(control.locator('body')).toHaveClass(/\bstate-input\b/);
 };
 
 const heroLabel = () => control.locator('#statusText').textContent();
@@ -59,9 +66,16 @@ test.describe('цветовые полосы', () => {
     test('ровно на нуле время красное (danger), а не жёлтое (warning)', async () => {
         // Регрессия: условие danger было `percentLeft <= 10 && percentLeft > 0`,
         // поэтому 0% проваливался в жёлтую полосу и 00:00 показывалось жёлтым.
+        // Ожидание ниже — по «00:00»; если с профиля таймер уже стоит на нуле,
+        // оно прошло бы на прежнем состоянии. Тогда сначала уводим с нуля.
+        if (await timeText() === '00:00') {
+            await sendCommand({ type: 'set', seconds: 600, allowNegative: false });
+            await expect(timeEl()).toHaveText('10:00');
+        }
         await sendCommand({ type: 'set', seconds: 60, allowNegative: false });
         await sendCommand({ type: 'adjust', deltaSeconds: -60, allowNegative: false });
 
+        await expect(timeEl()).toHaveText('00:00');
         expect(await timeText()).toBe('00:00');
         const cls = await timeClasses();
         expect(cls).toContain('danger');
@@ -70,6 +84,7 @@ test.describe('цветовые полосы', () => {
 
     test('много времени — без предупреждающих классов', async () => {
         await sendCommand({ type: 'set', seconds: 600, allowNegative: false });
+        await expect(timeEl()).toHaveText('10:00');
         const cls = await timeClasses();
         expect(cls).not.toContain('danger');
         expect(cls).not.toContain('warning');
@@ -79,6 +94,8 @@ test.describe('цветовые полосы', () => {
         await sendCommand({ type: 'set', seconds: 60, allowNegative: true });
         await sendCommand({ type: 'adjust', deltaSeconds: -120, allowNegative: true });
 
+        // «01:00» бывает и после одной set — уникальна подпись перерасхода.
+        await expect(statusEl()).toHaveText('Перерасход');
         expect(await timeText()).toBe('01:00');
         expect(await timeClasses()).toContain('danger');
         // Заголовок «Осталось» над отрицательным временем читался неверно.
@@ -89,6 +106,7 @@ test.describe('цветовые полосы', () => {
         // Тот самый баг: инлайновый красный не снимался, и время оставалось
         // красным даже когда до конца снова далеко.
         await sendCommand({ type: 'set', seconds: 600, allowNegative: false });
+        await expect(timeEl()).toHaveText('10:00');
         const cls = await timeClasses();
         expect(cls).not.toContain('danger');
         expect(cls).not.toContain('warning');
@@ -106,6 +124,8 @@ test.describe('приоритеты статуса', () => {
         await sendCommand({ type: 'adjust', deltaSeconds: -120, allowNegative: true });
         await sendCommand({ type: 'pause', allowNegative: true });
 
+        // Прежнее состояние — «Длительность»: «Пауза» бывает только после pause.
+        await expect(statusEl()).toHaveText('Пауза');
         expect(await statusText()).toBe('Пауза');
     });
 
@@ -114,13 +134,17 @@ test.describe('приоритеты статуса', () => {
         await sendCommand({ type: 'start', allowNegative: true });
         await sendCommand({ type: 'adjust', deltaSeconds: -120, allowNegative: true });
 
+        // Прежнее состояние — «Пауза», промежуточные — «Длительность» и «Идёт».
+        await expect(statusEl()).toHaveText('Перерасход');
         expect(await statusText()).toBe('Перерасход');
         await sendCommand({ type: 'pause', allowNegative: true });
+        await expect(statusEl()).toHaveText('Пауза');
     });
 
     test('досчёт до нуля показывается как «Завершено»', async () => {
         await sendCommand({ type: 'set', seconds: 60, allowNegative: false });
         await sendCommand({ type: 'adjust', deltaSeconds: -60, allowNegative: false });
+        await expect(statusEl()).toHaveText('Завершено');
         expect(await statusText()).toBe('Завершено');
     });
 });
@@ -132,7 +156,9 @@ test.describe('подсветка быстрого выбора', () => {
 
     test('клик по пресету подсвечивает именно его', async () => {
         await control.locator('.preset[data-minutes="15"]').click();
-        await control.waitForTimeout(250);
+        // Подсветку ставит обработчик timer-state (syncPresetHighlight) тем же
+        // вызовом, что и время.
+        await expect(timeEl()).toHaveText('15:00');
         expect(await activePresets()).toEqual(['15']);
     });
 
@@ -144,8 +170,8 @@ test.describe('подсветка быстрого выбора', () => {
         await control.locator('#manualMinutes').fill('7');
         await control.locator('#manualSeconds').fill('30');
         await control.locator('#manualSeconds').press('Enter');
-        await control.waitForTimeout(400);
 
+        await expect(timeEl()).toHaveText('07:30');
         expect(await timeText()).toBe('07:30');
         expect(await activePresets()).toEqual([]);
     });
@@ -153,14 +179,14 @@ test.describe('подсветка быстрого выбора', () => {
     test('корректировка ± не сбивает подсветку пресета', async () => {
         // Пресет остаётся прежним (сброс вернёт к нему), меняется только total.
         await control.locator('.preset[data-minutes="45"]').click();
-        await control.waitForTimeout(250);
+        await expect(timeEl()).toHaveText('45:00');
         // Редизайн 2026-08-12 показывает ряд ± только там, где он нужен, — в
         // отсчёте и при вводе. В покое кнопки нет на экране, и прежняя версия
         // теста кликала по display:none, а не проверяла своё условие.
         await enterInputMode();
         await control.locator('.adjust-btn[data-adjust="300"]').click();
-        await control.waitForTimeout(300);
 
+        await expect(timeEl()).toHaveText('50:00');
         expect(await timeText()).toBe('50:00');
         expect(await activePresets()).toEqual(['45']);
     });
@@ -169,11 +195,9 @@ test.describe('подсветка быстрого выбора', () => {
 test.describe('Escape не пробивает слои', () => {
     test('Escape при открытой панели настроек только закрывает её', async () => {
         await control.locator('.tab-btn[data-tab="timer"]').click();
-        await control.waitForTimeout(500);
         await expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
 
         await control.keyboard.press('Escape');
-        await control.waitForTimeout(600);
 
         await expect(control.locator('#settingsDrawer')).not.toHaveClass(/open/);
         // Приложение живо: панель по-прежнему отвечает.
@@ -197,24 +221,22 @@ test.describe('лимит перерасхода', () => {
         const row = control.locator('#overrunRow');
 
         await expect(row).toBeHidden();
+        // Обработчик change синхронный; toBeVisible/toBeHidden ретраят.
         await setAllowNegative(true);
-        await control.waitForTimeout(250);
         await expect(row).toBeVisible();
 
         await setAllowNegative(false);
-        await control.waitForTimeout(250);
         await expect(row).toBeHidden();
     });
 
     test('введённый лимит разбирается и показывается подсказкой', async () => {
         await enterInputMode();
         await setAllowNegative(true);
-        await control.waitForTimeout(200);
+        // fill сам ждёт, что поле видно и доступно.
         await control.locator('#overrunLimit').fill('2:30');
         await control.locator('#overrunLimit').dispatchEvent('input');
-        await control.waitForTimeout(200);
 
-        expect(await control.locator('#overrunLimitHint').textContent()).toContain('02:30');
+        await expect(control.locator('#overrunLimitHint')).toContainText('02:30');
         await setAllowNegative(false);
     });
 });
