@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForWidget } = require('./window-ready');
+const { waitForWidget, panelRoundTrip } = require('./window-ready');
 
 /**
  * Звуки во времени: КАЖДОЕ событие звучит и звучит РОВНО ОДИН раз.
@@ -51,10 +51,28 @@ async function setup(control, { allowNegative, seconds, adjust = 0 }) {
             window.ipcRenderer.send('timer-command', { type: 'adjust', deltaSeconds: opts.adjust });
         }
     }, { allowNegative, seconds, adjust });
-    await control.waitForTimeout(700);
+    // Галочки пишутся синхронно в change; команды — дошли до main и их
+    // состояние вернулось в панель.
+    await panelRoundTrip(control);
 }
 
 const count = (list, type) => list.filter((t) => t === type).length;
+
+/**
+ * «Ровно один» — утверждение и об ОТСУТСТВИИ второго звука, поэтому здесь
+ * ждут не появления звука, а ТОЧКИ отсчёта, до которой прежде досиживала
+ * пауза: панель показала `remaining ≤ to`. Второй звук пошёл бы из тех же
+ * обработчиков панели (timer-state / timer-minute / timer-reached-zero /
+ * timer-overrun-minute — все синхронные, control-app.js), и все посылки main,
+ * ушедшие до этой точки, круг панель → main → панель (`panelRoundTrip`)
+ * доставляет. Отрезок наблюдения тот же, что давала пауза, но меряется
+ * таймером приложения, а не часами машины.
+ */
+async function runUntil(control, to) {
+    await expect.poll(() => control.evaluate(() => window.timerController.remainingSeconds),
+        { message: `таймер должен дойти до ${to}`, timeout: 15000 }).toBeLessThanOrEqual(to);
+    await panelRoundTrip(control);
+}
 
 test('предупреждение за минуту звучит ровно один раз', async () => {
     const { app, control } = await launchApp();
@@ -64,7 +82,8 @@ test('предупреждение за минуту звучит ровно о�
     await setup(control, { allowNegative: false, seconds: 62 });
     await clearSounds(control);
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-    await control.waitForTimeout(4500);
+    // Прежние 4,5 с от 62 — это 58: порог 60 и два тика после него.
+    await runUntil(control, 58);
 
     const sounds = await readSounds(control);
     expect(count(sounds, 'minute'), `журнал: ${JSON.stringify(sounds)}`).toBe(1);
@@ -81,7 +100,11 @@ test('звук окончания на нуле звучит один раз —
     await setup(control, { allowNegative: false, seconds: 2 });
     await clearSounds(control);
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-    await control.waitForTimeout(4500);
+    // Без минуса таймер стоит на нуле: финиш — последнее, что main пришлёт,
+    // после него посылок нет вовсе, и круг закрывает всё, что ушло.
+    await expect.poll(() => control.evaluate(() => window.timerController.wasFinished),
+        { message: 'таймер должен финишировать', timeout: 15000 }).toBe(true);
+    await panelRoundTrip(control);
     const plain = await readSounds(control);
     expect(count(plain, 'end'), `обычный режим, журнал: ${JSON.stringify(plain)}`).toBe(1);
 
@@ -90,7 +113,8 @@ test('звук окончания на нуле звучит один раз —
     await setup(control, { allowNegative: true, seconds: 2 });
     await clearSounds(control);
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-    await control.waitForTimeout(4500);
+    // Прежние 4,5 с от 2 — это −2: ноль и два тика минуса после него.
+    await runUntil(control, -2);
     const overrun = await readSounds(control);
     expect(count(overrun, 'end'), `режим минуса, журнал: ${JSON.stringify(overrun)}`).toBe(1);
 
@@ -107,7 +131,8 @@ test('сигнал перерасхода звучит на каждой мин�
     await setup(control, { allowNegative: true, seconds: 300, adjust: -359 });
     await clearSounds(control);
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-    await control.waitForTimeout(5000);
+    // Прежние 5 с от −59 — это −64: порог −60 и четыре тика после него.
+    await runUntil(control, -64);
 
     const sounds = await readSounds(control);
     expect(
@@ -129,7 +154,10 @@ test('звук старта не дублируется при локально�
     await setup(control, { allowNegative: false, seconds: 120 });
     await clearSounds(control);
     await control.click('#startBtn');
-    await control.waitForTimeout(2500);
+    // Второй звук старта пошёл бы из перехода !isRunning → isRunning — он
+    // один, в первой посылке состояния после старта. Прежние 2,5 с от 120 —
+    // это 118.
+    await runUntil(control, 118);
 
     const local = await readSounds(control);
     expect(count(local, 'start'), `локальный старт, журнал: ${JSON.stringify(local)}`).toBe(1);
@@ -137,7 +165,7 @@ test('звук старта не дублируется при локально�
     // Запуск ИЗ ДРУГОГО ОКНА: панель узнаёт о нём только по переходу состояния и
     // обязана сыграть ровно один раз.
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
-    await control.waitForTimeout(600);
+    await panelRoundTrip(control);
     await clearSounds(control);
     // Шлёт НАСТОЯЩЕЕ другое окно: `timer-control` — канал клавиш виджета,
     // часов и дисплея, и с SEC-07 главный процесс принимает его только от них.
@@ -145,7 +173,8 @@ test('звук старта не дублируется при локально�
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
     const widget = await waitForWidget(app);
     await widget.evaluate(() => window.ipcRenderer.send('timer-control', 'start'));
-    await control.waitForTimeout(2500);
+    // Старт пришёл от виджета, но отсчёт панель видит своим timer-state.
+    await runUntil(control, 118);
 
     const remote = await readSounds(control);
     expect(count(remote, 'start'), `запуск из другого окна, журнал: ${JSON.stringify(remote)}`).toBe(1);
@@ -166,11 +195,12 @@ test('выключенный мастер-тумблер глушит все с�
         master.checked = false;
         master.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    await control.waitForTimeout(500);
+    // change синхронный: soundEnabled и хранилище записаны в обработчике.
     await clearSounds(control);
 
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-    await control.waitForTimeout(4500);
+    // Прежние 4,5 с от 62 — это 58: порог минуты пройден.
+    await runUntil(control, 58);
 
     // playSound вызвана может быть, но звучать не должна: мастер-флаг проверяется
     // ВНУТРИ неё. Поэтому здесь проверяем сам флаг — он единственный источник правды.
@@ -184,6 +214,6 @@ test('выключенный мастер-тумблер глушит все с�
         master.dispatchEvent(new Event('change', { bubbles: true }));
         window.ipcRenderer.send('timer-command', { type: 'reset' });
     });
-    await control.waitForTimeout(500);
+    await panelRoundTrip(control);
     await app.close();
 });

@@ -514,6 +514,50 @@ async function panelRoundTrip(control, opts = {}) {
 }
 
 /**
+ * Окно панели получило размер, который ему дал main, и утихло.
+ *
+ * Размер панели меняет main — по её же запросу (`resize-control-window` из
+ * ящика, полосы, автоподгонки) или сам (`setBounds` из спеки). Условие точное,
+ * а не «перестало меняться»:
+ *  1. круг панель → main → панель (`panelRoundTrip`): всё, что панель успела
+ *     попросить, main уже применил — его обработчики синхронны;
+ *  2. `innerWidth/innerHeight` страницы = `getContentSize()` окна в main —
+ *     размер дошёл до страницы;
+ *  3. кадр (прямые обработчики `resize` отработали, см. waitForResizeHandled)
+ *     и `waitForQuiet` — переходы раскладки доехали.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} control
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<{w: number, h: number}>} размер страницы
+ */
+async function waitForPanelSized(app, control, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await panelRoundTrip(control, { timeout });
+    const deadline = Date.now() + timeout;
+    let main;
+    let page;
+    for (;;) {
+        main = await app.evaluate(({ BrowserWindow }) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((w) => !w.isDestroyed() && w.webContents.getURL().includes('electron-control.html'));
+            if (!win) { return null; }
+            const [w, h] = win.getContentSize();
+            return { w, h };
+        });
+        page = await control.evaluate(innerSize);
+        if (main && main.w === page.w && main.h === page.h) { break; }
+        if (Date.now() > deadline) {
+            throw new Error(`размер панели не дошёл до страницы за ${timeout} мс: main ${JSON.stringify(main)}, страница ${JSON.stringify(page)}`);
+        }
+        await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+    await control.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+    await waitForQuiet(control);
+    return page;
+}
+
+/**
  * Канал-метка для каждого окна: посылка, которую main шлёт окну и сам, а
  * обработчик окна только запоминает (флаг «открыто ли соседнее окно»). Метка
  * несёт НАСТОЯЩЕЕ состояние соседа, так что для окна это не новость.
@@ -674,6 +718,6 @@ module.exports = {
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
-    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip,
+    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSized,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };

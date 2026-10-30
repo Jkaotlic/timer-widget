@@ -1,5 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { waitForPanelSized } = require('./window-ready');
+const { columnFromWindow } = require('../panel-drawer.js');
 
 /**
  * Ящик настроек не должен ложиться ПОВЕРХ панели — ни при какой ширине окна.
@@ -39,21 +41,81 @@ function measureColumns() {
     };
 }
 
-async function openDrawer(control, tab) {
-    await control.click(`.tab-btn[data-tab="${tab}"]`);
-    await control.waitForTimeout(900);
+/**
+ * Панель встала: окно получило размер от main (`waitForPanelSized`), а при
+ * открытом ящике колонка пересчитана по ФАКТИЧЕСКОЙ ширине окна. Последнее —
+ * отдельное условие: если окно упёрлось в потолок, resize не придёт, и
+ * колонку пересчитывает сторож по времени (control-app.js, settleColumn,
+ * 400 мс) — ждём его итог, а не его срок.
+ */
+async function panelSettled(app, control) {
+    await waitForPanelSized(app, control);
+    const open = await control.evaluate(() =>
+        document.querySelector('.settings-drawer').classList.contains('open'));
+    if (!open) { return; }
+    await expect.poll(() => control.evaluate(() => ({
+        inner: window.innerWidth,
+        extra: window.timerController._drawerExtraWidth,
+        column: getComputedStyle(document.querySelector('.app-shell'))
+            .getPropertyValue('--control-panel-width').trim()
+    })).then(({ inner, extra, column }) => column === `${columnFromWindow(inner, extra)}px`),
+    'колонка панели должна пересчитаться по фактической ширине окна').toBe(true);
+    await waitForPanelSized(app, control);
 }
 
-async function closeDrawer(control) {
+async function openDrawer(app, control, tab) {
+    await control.click(`.tab-btn[data-tab="${tab}"]`);
+    await expect(control.locator('#settingsDrawer')).toHaveClass(/\bopen\b/);
+    await panelSettled(app, control);
+}
+
+async function closeDrawer(app, control) {
     await control.click('#drawerClose');
-    await control.waitForTimeout(900);
+    await expect(control.locator('#settingsDrawer')).not.toHaveClass(/\bopen\b/);
+    await panelSettled(app, control);
+}
+
+/** Запрос панели на размер окна — тот же канал, что у ящика и автоподгонки. */
+async function requestSize(app, control, size) {
+    await control.evaluate((s) => window.ipcRenderer.send('resize-control-window', s), size);
+    await panelSettled(app, control);
+}
+
+/**
+ * Покадровая запись левого края панели — `ms` от первого кадра. Отрезок
+ * задаёт сам замер (траектория движения), поэтому конец записи — флаг, а не
+ * пауза снаружи.
+ */
+function startTrack(control, ms) {
+    return control.evaluate((len) => {
+        window.__panelTrack = [];
+        window.__panelTrackDone = false;
+        const panel = document.querySelector('.control-panel');
+        const t0 = performance.now();
+        const tick = () => {
+            const r = panel.getBoundingClientRect();
+            window.__panelTrack.push({
+                t: Math.round(performance.now() - t0),
+                left: Math.round(r.left * 10) / 10,
+                width: Math.round(r.width * 10) / 10,
+                win: window.innerWidth
+            });
+            if (performance.now() - t0 < len) { requestAnimationFrame(tick); } else { window.__panelTrackDone = true; }
+        };
+        requestAnimationFrame(tick);
+    }, ms);
+}
+
+async function finishTrack(control) {
+    await control.waitForFunction(() => window.__panelTrackDone === true);
+    return control.evaluate(() => window.__panelTrack);
 }
 
 test('ящик настроек не накрывает панель ни при обычной, ни при предельной ширине', async () => {
     const { app, control } = await launchApp();
 
     // --- обычная ширина ---
-    await openDrawer(control, 'clock');
+    await openDrawer(app, control, 'clock');
     const normal = await control.evaluate(measureColumns);
 
     expect(normal.drawerOpen, 'ящик должен быть открыт').toBe(true);
@@ -64,7 +126,7 @@ test('ящик настроек не накрывает панель ни при
         `панель (правый край ${normal.panel.right}) заходит на ящик (левый край ${normal.drawer.left})`
     ).toBeLessThanOrEqual(normal.drawer.left + 1);
 
-    await closeDrawer(control);
+    await closeDrawer(app, control);
 
     // --- узкое, но допустимое окно ---
     // Этот случай важнее предельного: именно он воспроизводит то, на чём упала
@@ -74,11 +136,8 @@ test('ящик настроек не накрывает панель ни при
     // расширялось до запрошенного. На Windows-раннере экран узкий, главный процесс
     // обрезает ширину по `screenWidth - 50`, и наложение вылезло только в CI.
     // Здесь оно ловится на любой машине.
-    await control.evaluate(() => {
-        window.ipcRenderer.send('resize-control-window', { width: 800, height: 700 });
-    });
-    await control.waitForTimeout(900);
-    await openDrawer(control, 'clock');
+    await requestSize(app, control, { width: 800, height: 700 });
+    await openDrawer(app, control, 'clock');
     const narrow = await control.evaluate(measureColumns);
 
     expect(narrow.panel.width, 'панель не должна схлопнуться').toBeGreaterThan(300);
@@ -89,19 +148,16 @@ test('ящик настроек не накрывает панель ни при
         + `--control-panel-width = ${narrow.panelWidthVar}`
     ).toBeLessThanOrEqual(narrow.drawer.left + 1);
 
-    await closeDrawer(control);
+    await closeDrawer(app, control);
 
     // --- предельная ширина ---
     // Просим у главного процесса заведомо больше потолка: он сам обрежет до
     // maxWidth (или до размеров экрана раннера — поэтому дальше считаем от
     // ФАКТИЧЕСКОЙ ширины, а не от ожидаемой).
-    await control.evaluate(() => {
-        window.ipcRenderer.send('resize-control-window', { width: 3000, height: 800 });
-    });
-    await control.waitForTimeout(900);
+    await requestSize(app, control, { width: 3000, height: 800 });
     const widthAtMax = await control.evaluate(() => window.innerWidth);
 
-    await openDrawer(control, 'display');
+    await openDrawer(app, control, 'display');
     const atMax = await control.evaluate(measureColumns);
 
     expect(atMax.drawerOpen, 'ящик должен быть открыт и на предельной ширине').toBe(true);
@@ -172,33 +228,13 @@ test('панель не прыгает горизонтально при отк�
 
     // Растягиваем окно: на ширине по умолчанию дефекта не видно (панель занимает
     // всё окно, центр и край совпадают).
-    await control.evaluate(() => {
-        window.ipcRenderer.send('resize-control-window', { width: 900, height: 700 });
-    });
-    await control.waitForTimeout(900);
+    await requestSize(app, control, { width: 900, height: 700 });
 
     // Пишем траекторию левого края покадрово, а не два её конца.
-    await control.evaluate(() => {
-        window.__panelTrack = [];
-        const panel = document.querySelector('.control-panel');
-        const t0 = performance.now();
-        const tick = () => {
-            const r = panel.getBoundingClientRect();
-            window.__panelTrack.push({
-                t: Math.round(performance.now() - t0),
-                left: Math.round(r.left * 10) / 10,
-                width: Math.round(r.width * 10) / 10,
-                win: window.innerWidth
-            });
-            if (performance.now() - t0 < 1100) { requestAnimationFrame(tick); }
-        };
-        requestAnimationFrame(tick);
-    });
+    await startTrack(control, 1100);
 
     await control.click('.tab-btn[data-tab="clock"]');
-    await control.waitForTimeout(1300);
-
-    const track = await control.evaluate(() => window.__panelTrack);
+    const track = await finishTrack(control);
     expect(track.length, 'траектория открытия не записалась').toBeGreaterThan(10);
 
     const first = track[0];
@@ -253,26 +289,10 @@ test('панель не прыгает горизонтально при отк�
     // 1fr, а 1fr = окно минус вторая дорожка. Пока резерв под ящик схлопывался
     // только вместе с классом, в этот кадр дорожка получалась не 900, а 771 —
     // панель отскакивала назад на 64px и ехала обратно (замер).
-    await control.evaluate(() => {
-        window.__panelTrack = [];
-        const panel = document.querySelector('.control-panel');
-        const t0 = performance.now();
-        const tick = () => {
-            const r = panel.getBoundingClientRect();
-            window.__panelTrack.push({
-                t: Math.round(performance.now() - t0),
-                left: Math.round(r.left * 10) / 10,
-                win: window.innerWidth
-            });
-            if (performance.now() - t0 < 1100) { requestAnimationFrame(tick); }
-        };
-        requestAnimationFrame(tick);
-    });
+    await startTrack(control, 1100);
 
     await control.click('#drawerClose');
-    await control.waitForTimeout(1300);
-
-    const closeTrack = await control.evaluate(() => window.__panelTrack);
+    const closeTrack = await finishTrack(control);
     expect(closeTrack.length, 'траектория закрытия не записалась').toBeGreaterThan(10);
 
     const cFirst = closeTrack[0];
@@ -331,7 +351,7 @@ const NARROW_THRESHOLD = 720;
 test('узкое окно: ящик накрывает панель целиком и остаётся непрозрачным', async () => {
     const { app, control } = await launchApp();
     try {
-        await openDrawer(control, 'display');
+        await openDrawer(app, control, 'display');
 
         const setSize = (w, h) => app.evaluate(({ BrowserWindow }, size) => {
             const win = BrowserWindow.getAllWindows()
@@ -340,7 +360,7 @@ test('узкое окно: ящик накрывает панель целико
             // обязана проверить то состояние, в которое он попадёт.
             win.setMinimumSize(320, 400);
             win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
-        }, [w, h]);
+        }, [w, h]).then(() => panelSettled(app, control));
 
         const probe = () => control.evaluate(() => {
             const panelEl = document.querySelector('.control-panel');
@@ -368,14 +388,12 @@ test('узкое окно: ящик накрывает панель целико
         // окно до 383+336=719 — и панель пропадала под накладкой. Замер:
         // 716 → панель 380px рядом с ящиком; 715 → накладка во всю ширину.
         await setSize(716, 760);
-        await control.waitForTimeout(900);
         const edge = await probe();
         console.log(`   граница ${edge.vw}: панель ${edge.panel.left}…${edge.panel.right}, ящик ${edge.drawer.left}…${edge.drawer.right}`);
         expect(edge.panel.right, '716: панель заходит на ящик').toBeLessThanOrEqual(edge.drawer.left + 1);
 
         // --- широкое окно: две колонки, пересечения нет ---
         await setSize(1000, 760);
-        await control.waitForTimeout(900);
         const wide = await probe();
         console.log(`   широкое ${wide.vw}: панель ${wide.panel.left}…${wide.panel.right}, ящик ${wide.drawer.left}…${wide.drawer.right}`);
         expect(wide.vw, 'окно не приняло широкий размер').toBeGreaterThanOrEqual(NARROW_THRESHOLD);
@@ -384,7 +402,6 @@ test('узкое окно: ящик накрывает панель целико
         // --- узкое окно: ящик накрывает панель ЦЕЛИКОМ ---
         for (const [w, h] of [[700, 700], [560, 660], [420, 640]]) {
             await setSize(w, h);
-            await control.waitForTimeout(900);
             const narrow = await probe();
             console.log(`   узкое ${narrow.vw}: панель ${narrow.panel.left}…${narrow.panel.right}, `
                 + `ящик ${narrow.drawer.left}…${narrow.drawer.right}, фон ${narrow.bg}`);
@@ -406,7 +423,6 @@ test('узкое окно: ящик накрывает панель целико
 
         // --- и обратно: вернули ширину, вернулись колонки ---
         await setSize(1000, 760);
-        await control.waitForTimeout(900);
         const back = await probe();
         expect(back.panel.right, 'после возврата ширины колонки не разъехались').toBeLessThanOrEqual(back.drawer.left + 1);
     } finally {
