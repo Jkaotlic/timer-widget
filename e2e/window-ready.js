@@ -897,20 +897,30 @@ async function relayBarrier(app, control, pages, opts = {}) {
  * @param {import('@playwright/test').Page} control
  * @param {{widget?: import('@playwright/test').Page, clock?: import('@playwright/test').Page, display?: import('@playwright/test').Page}} pages
  * @param {string} style
+ * @param {{displayField?: string}} [opts] displayField — поле стиля в посылке
+ *        дисплею (`timerStyle` по умолчанию; `displayTimerStyle` — своё имя
+ *        дисплея, его панель шлёт рядом с общим)
  */
-async function setWindowStyles(app, control, pages, style) {
+async function setWindowStyles(app, control, pages, style, opts = {}) {
+    const field = opts.displayField || 'timerStyle';
     const waits = [];
     if (pages.widget) { waits.push([await armReceived(pages.widget, 'widget-style-update'), { timerStyle: style }]); }
     if (pages.clock) { waits.push([await armReceived(pages.clock, 'set-clock-style'), style]); }
-    if (pages.display) { waits.push([await armReceived(pages.display, 'display-settings-update'), { timerStyle: style }]); }
-    await control.evaluate(([st, w, c, d]) => {
+    if (pages.display) { waits.push([await armReceived(pages.display, 'display-settings-update'), { [field]: style }]); }
+    await control.evaluate(([st, f, w, c, d]) => {
         if (w) { window.ipcRenderer.send('widget-style-update', { timerStyle: st }); }
         if (c) { window.ipcRenderer.send('clock-widget-set-style', st); }
-        if (d) { window.ipcRenderer.send('display-settings-update', { timerStyle: st }); }
-    }, [style, !!pages.widget, !!pages.clock, !!pages.display]);
+        if (d) { window.ipcRenderer.send('display-settings-update', { [f]: st }); }
+    }, [style, field, !!pages.widget, !!pages.clock, !!pages.display]);
     for (const [received, match] of waits) { await received({ match }); }
-    if (pages.widget) { await waitForWindowSettled(app, pages.widget, 'electron-widget.html'); }
-    if (pages.clock) { await waitForWindowSettled(app, pages.clock, 'electron-clock-widget.html'); }
+    if (pages.widget) {
+        await waitForWindowSettled(app, pages.widget, 'electron-widget.html');
+        await waitForQuiet(pages.widget);
+    }
+    if (pages.clock) {
+        await waitForWindowSettled(app, pages.clock, 'electron-clock-widget.html');
+        await waitForQuiet(pages.clock);
+    }
 }
 
 /** Дисплей получил снимок main. `_control` — прежняя сигнатура (шаг 2 был через панель). */
@@ -1051,6 +1061,48 @@ async function waitForDisplaySettled(app, display, opts = {}) {
     }, CONFIG.RESIZE_DEBOUNCE);
     await waitForQuiet(display);
     return display;
+}
+
+/**
+ * id (`webContents.id`) самого нового живого окна с адресом `urlPart` в
+ * главном процессе, или null.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {string} urlPart
+ * @returns {Promise<number|null>}
+ */
+function newestWindowId(app, urlPart) {
+    return app.evaluate(({ BrowserWindow }, part) => {
+        const ids = BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes(part))
+            .map((w) => w.webContents.id);
+        return ids.length ? Math.max(...ids) : null;
+    }, urlPart);
+}
+
+/**
+ * Окно с этим id в главном процессе РАЗРУШЕНО (закрытие доведено до конца,
+ * включая выход из полноэкранного режима). Для гонок «закрыть и сразу
+ * открыть», где Playwright-страница старого окна ещё отвечает на пробу, а
+ * вопрос — что останется ПОСЛЕ закрытия (window-reopen-race).
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {number} id
+ * @param {{timeout?: number, name?: string}} [opts]
+ */
+async function waitForMainWindowGone(app, id, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const deadline = Date.now() + timeout;
+    for (;;) {
+        const alive = await app.evaluate(({ BrowserWindow }, wid) => BrowserWindow.getAllWindows()
+            .some((w) => !w.isDestroyed() && w.webContents.id === wid), id);
+        if (!alive) { return; }
+        if (Date.now() > deadline) {
+            throw new Error(`${opts.name || 'окно'} (id ${id}) не закрылось в main за ${timeout} мс`);
+        }
+        // шаг опроса: окно разрушено в main
+        await new Promise((r) => setTimeout(r, POLL_MS));
+    }
 }
 
 /**
@@ -1249,7 +1301,7 @@ async function untilMainHandled(app, channel, action, opts = {}) {
 }
 
 module.exports = {
-    relayBarrier, setWindowStyles, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
+    relayBarrier, setWindowStyles, newestWindowId, waitForMainWindowGone, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,

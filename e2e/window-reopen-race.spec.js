@@ -38,12 +38,29 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, findDisplay, waitForWidget, waitForClock, findWindowBy,
-    WIDGET_PROBE, CLOCK_PROBE
+    waitForDisplay, waitForDisplayGone, waitForWidget, waitForClock, panelRoundTrip,
+    newestWindowId, waitForMainWindowGone, waitForDisplaySnapshot
 } = require('./window-ready');
 
-/** Сколько ждать, прежде чем спросить реальность: заведомо больше закрытия. */
-const SETTLE_MS = 6000;
+/**
+ * Было: пауза 6000 / 4000 мс «заведомо больше закрытия», потом вопрос к
+ * реальности. Теперь — сами события, о которых этот вопрос:
+ *  1. main обработал ВСЕ команды теста (круг панели: посылки одного окна он
+ *     берёт по порядку);
+ *  2. старое окно разрушено в main — закрытие доведено до конца, и всё, что
+ *     открытие откладывало до `closed`, уже исполнено (окно создаётся
+ *     синхронно в этом обработчике);
+ *  3. новое окно — опросом с таймаутом (`waitFor*`). Дефект (открытие
+ *     проглочено) — это ОТСУТСТВИЕ окна, и оно видно как «не появилось за
+ *     N мс», с тем же сообщением утверждения.
+ */
+async function closeThenSettle(app, control, urlPart, send) {
+    const oldId = await newestWindowId(app, urlPart);
+    expect(oldId, `окно ${urlPart} не открыто до гонки — проверять нечего`).not.toBeNull();
+    await control.evaluate(send);
+    await panelRoundTrip(control);
+    await waitForMainWindowGone(app, oldId, { name: urlPart });
+}
 
 const openDisplay = (control) => control.evaluate(
     () => window.ipcRenderer.send('open-display', { displayIndex: 'auto' })
@@ -51,13 +68,13 @@ const openDisplay = (control) => control.evaluate(
 const closeDisplay = (control) => control.evaluate(
     () => window.ipcRenderer.send('close-display')
 );
-const countDisplays = async (app) => {
-    let n = 0;
-    for (const w of app.windows()) {
-        if (await w.evaluate(() => !!document.getElementById('progressRing')).catch(() => false)) { n += 1; }
-    }
-    return n;
-};
+/**
+ * Окна дисплея в ГЛАВНОМ процессе: всё живое, кроме панели. Считать
+ * страницы Playwright по пробе нельзя — второе окно, ещё не загрузившее
+ * разметку, пробе не ответит, а именно его и ищет проверка.
+ */
+const countDisplays = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('electron-control.html')).length);
 
 test('закрыть дисплей и сразу открыть — окно дисплея есть', async () => {
     const { app, control } = await launchApp();
@@ -68,13 +85,12 @@ test('закрыть дисплей и сразу открыть — окно д
         // Обе команды одним заходом в рендерер: между ними нет ни одной
         // паузы — ровно тот случай, который на медленном раннере получается
         // сам собой, когда зашитой паузы не хватает.
-        await control.evaluate(() => {
+        await closeThenSettle(app, control, 'display.html', () => {
             window.ipcRenderer.send('close-display');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
 
-        await control.waitForTimeout(SETTLE_MS);
-        const display = await findDisplay(app);
+        const display = await waitForDisplay(app).catch(() => null);
         expect(
             display,
             'после close→open окно дисплея обязано существовать: команду «открыть» '
@@ -104,24 +120,23 @@ test('два «открыть» подряд во время закрытия д
         await openDisplay(control);
         await waitForDisplay(app);
 
-        await control.evaluate(() => {
+        await closeThenSettle(app, control, 'display.html', () => {
             window.ipcRenderer.send('close-display');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
-
-        await control.waitForTimeout(SETTLE_MS);
+        // Новое окно загрузилось и получило снимок: к этому моменту и
+        // обработчик `closed`, и команды давно исполнены — второе окно, будь
+        // оно, уже создано (оба пути создают синхронно).
+        const display = await waitForDisplay(app).catch(() => null);
+        if (display) { await waitForDisplaySnapshot(app, display); }
         const displays = await countDisplays(app);
         expect(displays, 'окон дисплея обязано быть ровно одно').toBe(1);
 
         // И оно управляемое: «закрыть» обязано его убрать.
         await closeDisplay(control);
-        const deadline = Date.now() + 15000;
-        let left = await countDisplays(app);
-        while (left > 0 && Date.now() < deadline) {
-            await control.waitForTimeout(200);
-            left = await countDisplays(app);
-        }
+        await waitForDisplayGone(app, { timeout: 15000 }).catch(() => {});
+        const left = await countDisplays(app);
         expect(left, 'переоткрытое окно обязано слушаться команды «закрыть»').toBe(0);
     } finally {
         await app.close();
@@ -130,8 +145,8 @@ test('два «открыть» подряд во время закрытия д
 
 // Виджет и часы: та же гонка, тот же общий механизм в главном процессе.
 const SMALL_WINDOWS = [
-    { who: 'виджет', open: 'open-widget', close: 'close-widget', wait: waitForWidget, probe: WIDGET_PROBE },
-    { who: 'часы', open: 'open-clock-widget', close: 'close-clock-widget', wait: waitForClock, probe: CLOCK_PROBE }
+    { who: 'виджет', open: 'open-widget', close: 'close-widget', wait: waitForWidget, url: 'electron-widget.html' },
+    { who: 'часы', open: 'open-clock-widget', close: 'close-clock-widget', wait: waitForClock, url: 'electron-clock-widget.html' }
 ];
 
 for (const w of SMALL_WINDOWS) {
@@ -141,13 +156,16 @@ for (const w of SMALL_WINDOWS) {
             await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open);
             await w.wait(app);
 
+            const oldId = await newestWindowId(app, w.url);
+            expect(oldId, `${w.who}: окно не открыто до гонки — проверять нечего`).not.toBeNull();
             await control.evaluate(([close, open]) => {
                 window.ipcRenderer.send(close);
                 window.ipcRenderer.send(open);
             }, [w.close, w.open]);
+            await panelRoundTrip(control);
+            await waitForMainWindowGone(app, oldId, { name: w.who });
 
-            await control.waitForTimeout(4000);
-            const found = await findWindowBy(app, w.probe);
+            const found = await w.wait(app).catch(() => null);
             expect(
                 found,
                 `${w.who}: после close→open окно обязано существовать — команду «открыть» `

@@ -28,7 +28,10 @@
 
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForWidgetSnapshot, waitForDisplaySettled,
+    waitForWindowSettled, setWindowStyles
+} = require('./window-ready');
 
 const TIMES = [-83, -3723];
 
@@ -146,15 +149,16 @@ test('минус стоит внутри рамки во всех стилях �
         const widget = await waitForWidget(app);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
+        await waitForWidgetSnapshot(app, widget);
+        await waitForDisplaySnapshot(app, display);
+        await waitForWindowSettled(app, widget, 'electron-widget.html');
+        await waitForDisplaySettled(app, display);
         // Цвет подложки — ТОТ случай, где «за рамкой» видно глазом.
         await widget.evaluate(() => document.documentElement.style
             .setProperty('--surface-paint', 'rgba(30, 58, 138, 0.9)'));
         for (const style of ['digits', 'flip', 'circle']) {
-            await control.evaluate((s) => {
-                window.ipcRenderer.send('widget-style-update', { timerStyle: s });
-                window.ipcRenderer.send('display-settings-update', { displayTimerStyle: s });
-            }, style);
-            await control.waitForTimeout(1200);
+            // Стиль дошёл до обоих окон, виджет встал под новый размер (было 1200 мс).
+            await setWindowStyles(app, control, { widget, display }, style, { displayField: 'displayTimerStyle' });
 
             for (const secs of TIMES) {
                 for (const [name, page, globalName, sel] of [
@@ -181,8 +185,7 @@ test('минус стоит внутри рамки во всех стилях �
         // Самопроверка зонда «внутри подложки»: старая посадка (`right: 100%`)
         // обязана им ловиться — иначе зелёный значил бы и «внутри», и «зонд
         // ничего не видит».
-        await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits' }));
-        await control.waitForTimeout(1200);
+        await setWindowStyles(app, control, { widget }, 'digits');
         const broken = await measureIn(widget, 'timerWidget', WIDGET, 'digits', -83, true);
         console.log(`   самопроверка, старая посадка: ${JSON.stringify(broken)}`);
         expect(broken.insideLeft, 'зонд не видит знак за рамкой').toBeLessThan(0);

@@ -21,7 +21,7 @@ const { spawnSync } = require('child_process');
 const { test, expect } = require('./fixtures');
 const { _electron: electron } = require('playwright');
 const { track } = require('./failure-artifacts');
-const { MAIN, cleanEnv, waitForControlWindow } = require('./launch');
+const { MAIN, cleanEnv, waitForControlWindow, waitForStartupPush } = require('./launch');
 
 const ELECTRON = require('electron');
 const SEEDER = path.join(__dirname, 'fixtures', 'seed-file-storage.js');
@@ -78,7 +78,9 @@ async function start(dir) {
     const app = track(await electron.launch({ args: [MAIN, `--user-data-dir=${dir}`], env: cleanEnv() }));
     const control = await waitForControlWindow(app);
     await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(900);
+    // Стартовая рассылка панели ушла и ответ на стартовый get-displays дошёл —
+    // тот же признак, что у launchApp (было 900 мс).
+    await waitForStartupPush(control);
     return { app, control };
 }
 
