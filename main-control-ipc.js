@@ -194,7 +194,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             // Высота приходит из рендерера (её знает CSS), но доверять ей нельзя:
             // это тот же непроверенный payload, что и во всех остальных
             // обработчиках размеров.
-            const raw = Number.isFinite(payload.height) ? payload.height : 52;
+            const raw = Number.isFinite(payload.height) ? payload.height : CONFIG.CONTROL_BAR_HEIGHT;
             const barHeight = Math.max(36, Math.min(CONFIG.CONTROL_BAR_MAX_HEIGHT, Math.round(raw)));
 
             // Уже свёрнуто этим окном — границы «до» не перезаписываются

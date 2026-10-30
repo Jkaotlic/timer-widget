@@ -68,6 +68,12 @@ const CONFIG = {
     // сворачивании свою ширину сохраняет, а разворот возвращает прежние
     // границы целиком (главный процесс держит их в controlBoundsBeforeCollapse).
     CONTROL_BAR_MIN_WIDTH: 510,
+    // Высота СВЁРНУТОЙ полосы. Её шлёт полоса (mini-bar.js) в payload
+    // control-collapse, и её же главный процесс берёт запасной, если payload
+    // высоты не принёс. Литерал в двух файлах разошёлся бы молча: полоса
+    // просила бы одно, main без высоты ставил бы другое. CSS повторяет число
+    // в `body.collapsed .mini-bar` — это меряет e2e/mini-bar.spec.js.
+    CONTROL_BAR_HEIGHT: 52,
     // Потолок высоты СВЁРНУТОЙ полосы. Его знают две стороны: главный процесс
     // обрезает им высоту из payload control-collapse, а полоса (mini-bar.js)
     // по нему отличает «окно уже снова панель» от «ещё полоса», когда ждёт
@@ -308,7 +314,8 @@ export const {
     TIMER_TICK_MARGIN_MS, RESIZE_DEBOUNCE, FLASH_INTERVAL, WIDGET_DEFAULT_WIDTH,
     WIDGET_DEFAULT_HEIGHT, WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT,
     CLOCK_WIDGET_DEFAULT_SIZE, CLOCK_WIDGET_MIN_SIZE, CONTROL_WINDOW_WIDTH,
-    CONTROL_WINDOW_HEIGHT, CONTROL_WINDOW_MIN_WIDTH, CONTROL_BAR_MIN_WIDTH, CONTROL_BAR_MAX_HEIGHT,
+    CONTROL_WINDOW_HEIGHT, CONTROL_WINDOW_MIN_WIDTH, CONTROL_BAR_MIN_WIDTH, CONTROL_BAR_HEIGHT,
+    CONTROL_BAR_MAX_HEIGHT,
     CONTROL_WINDOW_MAX_WIDTH, CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER,
     CONTROL_WINDOW_MIN_HEIGHT, CONTROL_WINDOW_MAX_HEIGHT,
     CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER, WINDOW_MIN_VISIBLE_PX,

@@ -95,7 +95,22 @@ async function resizeDisplay(app, display, size, opts = {}) {
         got = await waitForSteady(display, innerSize, { name: 'размер дисплея' });
         if (fits(got)) { break; }
     }
-    await settleResize(display);
+    // Осадка и в ветке «размер совпал сразу» (ревью e2e-B2, M3): система вправе
+    // поправить рамку уже ПОСЛЕ совпадения (constrainFrameRect, второй монитор),
+    // и поздний `resize` перевзведёт debounce приложения позже нашего таймера.
+    // Поэтому после таймера размер сверяется ещё раз; сдвинулся — осесть и
+    // пройти таймер заново. Не осел за три круга — бросить, а не мерить
+    // промежуточное окно.
+    for (let round = 0; ; round++) {
+        await settleResize(display);
+        const now = await display.evaluate(innerSize);
+        if (now.w === got.w && now.h === got.h) { break; }
+        if (round >= 2) {
+            throw new Error(`размер дисплея не осел после setBounds: был ${got.w}×${got.h}, стал ${now.w}×${now.h}`);
+        }
+        console.log(`   размер дисплея сдвинулся после совпадения: ${got.w}×${got.h} → ${now.w}×${now.h}, оседаем заново`);
+        got = await waitForSteady(display, innerSize, { name: 'размер дисплея' });
+    }
     if (fits(got)) { return got; }
     if (opts.strict) {
         throw new Error(`окно не приняло размер ${size.w}×${size.h}: сейчас ${got.w}×${got.h}`);

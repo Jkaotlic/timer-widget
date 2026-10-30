@@ -357,6 +357,23 @@ test('потолок полосы — одна величина с main: окн�
     assert.doesNotMatch(line, /\b120\b/, 'в main снова свой литерал потолка');
 });
 
+test('высота полосы — одна величина с main: полоса шлёт CONTROL_BAR_HEIGHT, main берёт её же запасной', () => {
+    const { CONTROL_BAR_HEIGHT, CONTROL_BAR_MAX_HEIGHT } = require('../constants.js');
+    assert.ok(Number.isFinite(CONTROL_BAR_HEIGHT) && CONTROL_BAR_HEIGHT < CONTROL_BAR_MAX_HEIGHT);
+    assert.equal(MiniBar.BAR_HEIGHT, CONTROL_BAR_HEIGHT, 'полоса шлёт свою высоту, а не общую');
+    // Запасная высота в main — тем же именем, а не своим литералом.
+    const { codeOnly } = require('./helpers/source-scan');
+    const read = (f) => codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', f), 'utf8'));
+    const line = read('main-control-ipc.js').split('\n').find((l) => l.includes('const raw') && l.includes('payload.height'));
+    assert.ok(line, 'нет запасной высоты raw в main-control-ipc.js (самопроверка)');
+    assert.match(line, /CONFIG\.CONTROL_BAR_HEIGHT/);
+    assert.doesNotMatch(line, /\b52\b/, 'в main снова свой литерал высоты полосы');
+    // И в mini-bar.js литерала нет: константа — ссылка на общую.
+    const bar = read('mini-bar.js');
+    assert.match(bar, /const BAR_HEIGHT = CONTROL_BAR_HEIGHT;/);
+    assert.doesNotMatch(bar, /const BAR_HEIGHT = \d/, 'в mini-bar.js снова свой литерал высоты');
+});
+
 test('deferWhileCollapsed без окна: в полосе не мерит, просьбу не хранит и говорит об этом', () => {
     const warns = [];
     const orig = console.warn;

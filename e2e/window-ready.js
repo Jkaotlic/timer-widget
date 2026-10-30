@@ -40,6 +40,7 @@ const WIDGET_PROBE = () => !!document.getElementById('wFlipHoursGroup');
 const CLOCK_PROBE = () => !!document.getElementById('clockGradient');
 
 const CONFIG = require('../constants.js');
+const { waitForStartupPush } = require('./launch');
 
 const DEFAULT_TIMEOUT = 20000;
 const POLL_MS = 100;
@@ -251,13 +252,18 @@ async function waitForSteady(page, read, opts = {}) {
  *
  * Спеки делали `reload()` → `waitForTimeout(1200)`. `reload()` сам ждёт
  * события `load`; недоставало одного — конструктора `TimerController`
- * (control-app.js), после которого ячейки, ящик и тумблеры уже связаны.
+ * (control-app.js), после которого ячейки, ящик и тумблеры уже связаны, и
+ * его стартовой рассылки (зонд `__startupPushed`, как в `launchApp`).
  *
  * @param {import('@playwright/test').Page} control
  */
 async function reloadPanel(control) {
     await control.reload();
     await control.waitForFunction(() => typeof window.timerController === 'object' && !!window.timerController);
+    // Конструктор новой страницы снова заводит стартовую рассылку (таймеры
+    // 100/200/600 мс) — та же гонка, что у запуска (ревью e2e-B2, M4). Зонд
+    // сбрасывается сам: страница новая, `window` новое.
+    await waitForStartupPush(control);
 }
 
 /**

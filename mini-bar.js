@@ -20,12 +20,12 @@
  * minHeight снимается только там (канал control-collapse).
  */
 
-import { CONTROL_BAR_MAX_HEIGHT } from './constants.js';
+import { CONTROL_BAR_HEIGHT, CONTROL_BAR_MAX_HEIGHT } from './constants.js';
 
-// Высота полосы. Число живёт здесь, а CSS повторяет его в правиле
-// `body.collapsed .mini-bar { height: 52px }`. Расхождение поймает
-// e2e/mini-bar.spec.js: он меряет НАСТОЯЩЕЕ окно, а не эту константу.
-const BAR_HEIGHT = 52;
+// Высота полосы — ОДНА величина с main (запасная высота в control-collapse).
+// CSS повторяет её в правиле `body.collapsed .mini-bar { height: 52px }`.
+// Расхождение поймает e2e/mini-bar.spec.js: он меряет НАСТОЯЩЕЕ окно.
+const BAR_HEIGHT = CONTROL_BAR_HEIGHT;
 // Потолок высоты полосы — ОДНА величина с main (main-control-ipc.js,
 // control-collapse): окно выше него — уже панель, а не полоса.
 const BAR_MAX_HEIGHT = CONTROL_BAR_MAX_HEIGHT;
