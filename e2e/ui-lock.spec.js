@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForDisplaySettled, waitForWidgetSnapshot,
+    waitForWindowSettled, untilReceived, armReceived, waitForQuiet
+} = require('./window-ready');
 
 /**
  * Замок «Закрепить положение» ПО КЛИКУ по настоящей кнопке.
@@ -16,22 +19,20 @@ const { waitForDisplay, waitForWidget } = require('./window-ready');
  * снимается, хуже отсутствующего.
  */
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-const IS_WIDGET = () => !!document.getElementById('wFlipHoursGroup');
-
-async function findWindow(app, marker) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(marker).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     const el = document.getElementById(key);
     if (!el) { return; }
     el.checked = on;
     el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [id, value]);
+
+/**
+ * Клик по замку в панели — и замок ДОШЁЛ до окна: main разослал
+ * `ui-lock-update` с нужным значением, обработчик окна (ui-lock.js) поставил
+ * класс. Раньше — пауза 700 мс.
+ */
+const clickLock = (control, page, locked) => untilReceived(page, 'ui-lock-update',
+    () => control.click('#lockToggle'), { match: { locked } });
 
 /** Alt-перетаскивание карточки: тот же жест, что и в display-blocks.spec.js. */
 const dragBlock = (page, id, dx, dy) => page.evaluate(async ([target, ddx, ddy]) => {
@@ -76,12 +77,13 @@ test('замок держит карточки дисплея и снимает�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(2200);
-        const display = await findWindow(app, IS_DISPLAY);
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
-        await setToggle(control, 'showCurrentTime', true);
-        await display.waitForTimeout(600);
+        const display = await waitForDisplay(app);
+        // Снимок main (настройки, замок) и вставшее окно: полноэкранный вход
+        // и раскладка по размеру — раньше пауза 2200 мс.
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
+        await untilReceived(display, 'display-settings-update',
+            () => setToggle(control, 'showCurrentTime', true), { match: { showCurrentTime: true } });
 
         // --- проверка проверки: БЕЗ замка жест работает ---
         const before = await blockBox(display, 'currentTimeBlock');
@@ -91,8 +93,7 @@ test('замок держит карточки дисплея и снимает�
             .toBeGreaterThan(30);
 
         // --- замок ставится КЛИКОМ по кнопке в панели ---
-        await control.click('#lockToggle');
-        await control.waitForTimeout(700);
+        await clickLock(control, display, true);
         const state = await lockState(display);
         console.log(`   замок в окне дисплея: класс ${state.cls}, в хранилище ${state.stored}`);
         expect(state.cls, 'замок не доехал до окна дисплея').toBe(true);
@@ -112,13 +113,15 @@ test('замок держит карточки дисплея и снимает�
                 clientX: r.left + 10, clientY: r.top + 10
             }));
         });
-        await display.waitForTimeout(500);
+        // Обработчик колеса синхронный (display-script.js, `_handlers.wheel`):
+        // под замком он выходит ДО любой записи, без замка масштаб ставится тут
+        // же, а его переход доедет в waitForQuiet. Отложенного пути нет.
+        await waitForQuiet(display);
         const sized1 = await blockBox(display, 'currentTimeBlock');
         expect(sized1.w, 'под замком карточка отмасштабировалась колесом').toBe(sized0.w);
 
         // --- и снимается ТОЙ ЖЕ кнопкой ---
-        await control.click('#lockToggle');
-        await control.waitForTimeout(700);
+        await clickLock(control, display, false);
         expect((await lockState(display)).cls, 'замок не снялся').toBe(false);
 
         const free0 = await blockBox(display, 'currentTimeBlock');
@@ -143,10 +146,13 @@ test('замок держит ОКНО виджета, а панель прод�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(2000);
-        const widget = await findWindow(app, IS_WIDGET);
-        expect(widget, 'окно виджета не найдено').not.toBeNull();
+        const widget = await waitForWidget(app);
+        // Снимок main: стиль с масштабом (без него первая посылка ползунка
+        // виджетом не применяется — widget-app.js, `_lastPushedTimerScale`) и
+        // замок. Затем окно ВСТАЛО: геометрия восстановлена и записана.
+        // Раньше — пауза 2000 мс.
+        await waitForWidgetSnapshot(app, widget);
+        await waitForWindowSettled(app, widget, 'electron-widget.html');
 
         const bounds = () => app.evaluate(({ BrowserWindow }) => {
             const win = BrowserWindow.getAllWindows()
@@ -176,8 +182,7 @@ test('замок держит ОКНО виджета, а панель прод�
         console.log(`   без замка: ${start.x},${start.y} → ${afterFree.x},${afterFree.y}`);
         expect(Math.abs(afterFree.x - start.x), 'без замка окно не поехало — жест сломан').toBeGreaterThan(20);
 
-        await control.click('#lockToggle');
-        await control.waitForTimeout(700);
+        await clickLock(control, widget, true);
         expect(await widget.evaluate(() => document.documentElement.classList.contains('ui-locked')),
             'замок не доехал до виджета').toBe(true);
 
@@ -197,7 +202,14 @@ test('замок держит ОКНО виджета, а панель прод�
         // шириной 1024 — то есть упёртым в экран. Запрошенный размер не равен
         // выданному: система обрезает по рабочей области, ширина не растёт, и
         // тест падал не на дефекте, а на размере чужого монитора.
+        //
+        // Ожидание — цепочка самого пути (раньше пауза 900 мс): виджет получил
+        // стиль с этим масштабом и попросил размер, main его применил и
+        // сообщил окну границы (`window-geometry`). Не пришли границы — не
+        // ждём дальше: решает утверждение ниже, со своим сообщением.
         const setScale = async (pct) => {
+            const style = await armReceived(widget, 'widget-style-update');
+            const geometry = await armReceived(widget, 'window-geometry');
             await control.evaluate((value) => {
                 const el = document.getElementById('timerScale');
                 if (!el) { return; }
@@ -205,7 +217,11 @@ test('замок держит ОКНО виджета, а панель прод�
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }, pct);
-            await control.waitForTimeout(900);
+            await style({ match: { timerScale: pct } });
+            await geometry().catch((err) => console.log(`   ${pct} %: границы от main не пришли — ${err.message.split('\n')[0]}`));
+            // И окно ВСТАЛО: поздние `resize`/`move` этой смены не примут за
+            // посылку следующей.
+            await waitForWindowSettled(app, widget, 'electron-widget.html');
             return bounds();
         };
 
