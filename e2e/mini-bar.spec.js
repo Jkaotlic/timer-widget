@@ -109,7 +109,9 @@ test('свёртка в первые 100 мс после загрузки не �
             global.__barListener = (_e, size) => global.__barAsks.push(size);
             ipcMain.on('resize-control-window', global.__barListener);
         });
-        await reloadPanel(control);
+        // Без ожидания стартовой рассылки: свёртка обязана успеть в первые
+        // 100 мс, до авто-размера.
+        await reloadPanel(control, { awaitStartup: false });
         // Свёртка раньше авто-размера — иначе тест проверяет не тот порядок.
         await control.evaluate(() => window.miniBar.collapse());
         await expect.poll(() => control.evaluate(() => window.miniBar.hasPendingFit()),

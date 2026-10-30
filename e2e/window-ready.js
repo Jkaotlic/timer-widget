@@ -256,14 +256,17 @@ async function waitForSteady(page, read, opts = {}) {
  * его стартовой рассылки (зонд `__startupPushed`, как в `launchApp`).
  *
  * @param {import('@playwright/test').Page} control
+ * @param {{awaitStartup?: boolean}} [opts]
  */
-async function reloadPanel(control) {
+async function reloadPanel(control, opts = {}) {
     await control.reload();
     await control.waitForFunction(() => typeof window.timerController === 'object' && !!window.timerController);
     // Конструктор новой страницы снова заводит стартовую рассылку (таймеры
     // 100/200/600 мс) — та же гонка, что у запуска (ревью e2e-B2, M4). Зонд
-    // сбрасывается сам: страница новая, `window` новое.
-    await waitForStartupPush(control);
+    // сбрасывается сам: страница новая, `window` новое. `awaitStartup: false` —
+    // тесту, которому нужно успеть ДО рассылки (как у launchApp; mini-bar:
+    // свёртка в первые 100 мс).
+    if (opts.awaitStartup !== false) { await waitForStartupPush(control); }
 }
 
 /**

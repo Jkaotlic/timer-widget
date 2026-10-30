@@ -24,7 +24,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { codeOnly, maskNonCode, balancedBlockAt, afterBalanced } = require('./helpers/source-scan');
+const { codeOnly, maskNonCode, balancedBlockAt, afterBalanced, functionBody } = require('./helpers/source-scan');
 
 const repoRoot = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(repoRoot, f), 'utf8');
@@ -146,9 +146,14 @@ test('ожидания старта — по зонду, а не паузой: l
     assert.doesNotMatch(launch, /waitForTimeout|settleMs/, 'в launch.js вернулась пауза старта');
 
     const ready = codeOnly(read('e2e/window-ready.js'));
-    const at = ready.indexOf('async function reloadPanel(');
-    assert.notEqual(at, -1, 'нет reloadPanel (самопроверка)');
-    const body = balancedBlockAt(ready, at, 'reloadPanel');
+    // functionBody пропускает параметры: у `opts = {}` свои фигурные скобки.
+    const body = functionBody(ready, 'reloadPanel');
     assert.match(body, /await waitForStartupPush\(control\)/, 'reloadPanel не ждёт зонд новой страницы');
+    // Отказ от ожидания — только явным `awaitStartup: false`, по умолчанию ждёт.
+    assert.match(body, /if \(opts\.awaitStartup !== false\) \{ await waitForStartupPush\(control\); \}/);
+    // Отказываться вправе только тот, кому нужно успеть ДО рассылки: список явный.
+    const optOut = fs.readdirSync(path.join(repoRoot, 'e2e')).filter((f) => f.endsWith('.js'))
+        .filter((f) => /reloadPanel\([^)]*awaitStartup:\s*false/.test(codeOnly(read(`e2e/${f}`))));
+    assert.deepEqual(optOut, ['mini-bar.spec.js'], 'новый отказ от ожидания рассылки при перезагрузке панели');
     assert.doesNotMatch(body, /waitForTimeout/);
 });
