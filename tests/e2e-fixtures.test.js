@@ -125,3 +125,28 @@ test('живые приложения при сбое: своё — live, зап
     const two = livePlan(new Map([[app(), 3], [app(), 3]]), 3).map((p) => p.phase);
     assert.deepEqual(two, ['live1', 'live2']);
 });
+
+// Ревью B4, M1: помощники снимка (e2e/window-ready.js, waitForMainSnapshot)
+// ЖДУТ снимок, но не доказывают его — и сами шлют окну метку на канале флага
+// соседа. Спека, утверждающая снимок при загрузке, на них дала бы зелёный при
+// снимке, потерявшем поле. Список спек — те, что снимок утверждают.
+const SNAPSHOT_SPECS = ['window-state-sync.spec.js', 'relay-persist.spec.js'];
+const SNAPSHOT_HELPER = /\bwait(?:ForMain|ForDisplay|ForWidget|ForClock)Snapshot\b/;
+
+function usesSnapshotHelper(src) { return SNAPSHOT_HELPER.test(codeOnly(src)); }
+
+test('спеки снимка при загрузке не ждут его помощником, который его подменяет', () => {
+    for (const file of SNAPSHOT_SPECS) {
+        assert.ok(fs.existsSync(path.join(SPEC_DIR, file)), `${file} не найдена — обновите SNAPSHOT_SPECS`);
+        assert.equal(usesSnapshotHelper(fs.readFileSync(path.join(SPEC_DIR, file), 'utf8')), false,
+            `${file} зовёт waitFor*Snapshot: помощник шлёт окну свою метку и снимок не доказывает`);
+    }
+});
+
+test('зонд помощника снимка проверяет сам себя', () => {
+    assert.equal(usesSnapshotHelper('await waitForWidgetSnapshot(app, w);'), true);
+    assert.equal(usesSnapshotHelper('const { waitForMainSnapshot } = require("./window-ready");'), true);
+    assert.equal(usesSnapshotHelper('await waitForDisplaySnapshot(app, d, control);'), true);
+    assert.equal(usesSnapshotHelper('// waitForClockSnapshot тут не нужен'), false);
+    assert.equal(usesSnapshotHelper('await waitForWidget(app);'), false);
+});

@@ -491,6 +491,29 @@ async function untilReceived(page, channel, action, opts = {}) {
 }
 
 /**
+ * Круг панель → main → панель: всё, что панель ОТПРАВИЛА до вызова, главный
+ * процесс обработал, и всё, что он в ответ прислал панели (`timer-state`
+ * команд), панель уже отработала.
+ *
+ * Для команд таймера (ревью B4, M5): прежнее «ждать значение, которого не было
+ * до последней команды» зависело от того, что оставил ПРЕДЫДУЩИЙ тест. Здесь
+ * независимый от соседей признак: панель шлёт `get-displays`, на который main
+ * отвечает `displays-list` — и ТОЛЬКО ответом (main-window-ipc.js; сам он этот
+ * канал не рассылает, так что чужой ответ в пути — лишь от чужого
+ * `get-displays`, а стартовый давно дошёл). Посылки одного окна main
+ * обрабатывает по порядку, `timer-command` рассылает состояние синхронно в
+ * своём обработчике, а посылки main → панель идут по одной трубе в порядке
+ * отправки. Значит, ответ приходит ПОСЛЕ состояния последней команды.
+ *
+ * @param {import('@playwright/test').Page} control — окно панели
+ * @param {{timeout?: number}} [opts]
+ */
+async function panelRoundTrip(control, opts = {}) {
+    await untilReceived(control, 'displays-list',
+        () => control.evaluate(() => window.ipcRenderer.send('get-displays')), opts);
+}
+
+/**
  * Канал-метка для каждого окна: посылка, которую main шлёт окну и сам, а
  * обработчик окна только запоминает (флаг «открыто ли соседнее окно»). Метка
  * несёт НАСТОЯЩЕЕ состояние соседа, так что для окна это не новость.
@@ -522,6 +545,16 @@ const SNAPSHOT_MARK = {
  * метки уникальное содержимое — перепутать её не с чем. И окно выбирается не
  * первым по адресу (ревью B3, M4): метку получают все окна с этим адресом,
  * ждёт её только `page`, так что закрывающееся соседнее окно ничего не решает.
+ *
+ * СНИМОК ЭТО НЕ ДОКАЗЫВАЕТ (ревью B4, M1). Помощник — ожидание, а не проверка:
+ * он знает только, что снимок УШЁЛ раньше метки, и ничего — о том, что в нём
+ * было. Больше того, сам он шлёт окну посылку, которую в жизни шлёт main:
+ * флаг соседа (`*-window-state`) после него — значение МЕТКИ, а не снимка, а
+ * до 8d70a3d шаг 2 и вовсе заново рассылал стили панели. Регрессия «main
+ * перестал класть X в снимок» в спеке на этом помощнике останется зелёной
+ * всякий раз, когда X приносит потом что-то ещё. Поэтому спеки, которые
+ * утверждают сам снимок при загрузке (`window-state-sync`, `relay-persist`),
+ * его не используют — это держит tests/e2e-fixtures.test.js.
  *
  * @param {import('@playwright/test').ElectronApplication} app
  * @param {import('@playwright/test').Page} page
@@ -641,6 +674,6 @@ module.exports = {
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
     waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
-    waitForWidgetSnapshot, waitForClockSnapshot,
+    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };
