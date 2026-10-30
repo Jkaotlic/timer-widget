@@ -533,11 +533,12 @@ const PanelStateMixin = {
     }
 };
 
-// Node (тесты) и браузер (панель) — двойной экспорт, как у остальных модулей.
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PanelStateMixin;
-    module.exports.windowRowSubtitle = windowRowSubtitle;
-}
+// Примесь — отдельным именем, как у остальных: прежний module.exports БЫЛ
+// самой примесью и дописывал в неё windowRowSubtitle (в окне его у объекта
+// не было, в Node — был; формы расходились).
+export { PanelStateMixin, windowRowSubtitle };
+
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
     window.PanelStateMixin = PanelStateMixin;
 }

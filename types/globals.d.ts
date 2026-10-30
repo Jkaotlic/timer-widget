@@ -122,8 +122,7 @@ interface Window {
     CustomSoundsMixin: typeof import('../custom-sounds.js').CustomSoundsMixin;
     LocalBackgroundMixin: typeof import('../local-background.js').LocalBackgroundMixin;
     ThemeGridMixin: typeof import('../theme-grid.js').ThemeGridMixin;
-    /** В Node к экспорту дописан windowRowSubtitle; в окне его у объекта нет. */
-    PanelStateMixin: Omit<typeof import('../panel-state.js'), 'windowRowSubtitle'>;
+    PanelStateMixin: typeof import('../panel-state.js').PanelStateMixin;
     PanelColorsMixin: typeof import('../panel-colors.js').PanelColorsMixin;
     PanelDisplayMixin: typeof import('../panel-display.js').PanelDisplayMixin;
     PanelResetMixin: typeof import('../panel-reset.js').PanelResetMixin;

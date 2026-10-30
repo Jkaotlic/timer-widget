@@ -372,11 +372,9 @@ const CustomSoundsMixin = {
     }
 };
 
-// Node (тесты)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };
-}
+export { CustomSoundsMixin, sanitizeCustomSounds, isPlayableSoundData, mergeCustomSound };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читают e2e (status-and-colors) и классический control-app.js
     window.CustomSoundsMixin = CustomSoundsMixin;
 }

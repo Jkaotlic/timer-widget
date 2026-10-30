@@ -252,7 +252,7 @@ test('ползунок прозрачности не отключается из
 
 /* ─────────────── ряды настроек, применимых не ко всем стилям ──────────────── */
 
-const PanelStateMixin = require('../panel-state');
+const { PanelStateMixin } = require('../panel-state');
 const { PanelClockMixin } = require('../panel-clock');
 
 // Поддельный документ: модулю нужны только getElementById и .style.display.

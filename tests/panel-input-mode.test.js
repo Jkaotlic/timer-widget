@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const RendererShared = require('../renderer-shared.js');
-const PanelStateMixin = require('../panel-state.js');
+const { PanelStateMixin } = require('../panel-state.js');
 
 // Документ, на котором можно вызвать что угодно: проверяется решение о
 // режиме, а не вёрстка.

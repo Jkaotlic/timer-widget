@@ -273,10 +273,9 @@ const LocalBackgroundMixin = {
     }
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { LocalBackgroundMixin };
-}
+export { LocalBackgroundMixin };
 
 if (typeof window !== 'undefined') {
+    // мост до задачи 6: читатель — классический control-app.js
     window.LocalBackgroundMixin = LocalBackgroundMixin;
 }
