@@ -31,6 +31,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Linter } = require('eslint');
 const { windowModuleFiles } = require('../scripts/window-modules.js');
+const { codeOnly } = require('./helpers/source-scan.js');
 
 const REPO = path.join(__dirname, '..');
 
@@ -161,6 +162,82 @@ test('мосты в модулях окон — только из списка, 
     assert.deepEqual(unexpected, [], 'мост не из списка (новый мост — нельзя; крючок e2e — в PERMANENT по спеке)');
     assert.deepEqual(unmarked, [], `у временного моста нет комментария «${BRIDGE_NOTE}»`);
     assert.deepEqual(stale, [], 'мост снят — вычеркни его из TEMPORARY (список только убывает)');
+});
+
+// ---------------------------------------------------------------------------
+// Читатели внутри модулей окон: зависимость — import, а не window
+// ---------------------------------------------------------------------------
+
+// Что модуль вправе читать через window, не ставя сам: глобалы `<head>`-скриптов
+// и моста preload / шима IPC. Всё остальное — чужой экспорт, его импортируют.
+const WINDOW_READABLE = Object.freeze(['UITheme', 'UILock', 'DropGuard', 'ipcRenderer', 'electronAPI']);
+
+/**
+ * Все `window.X` (не computed), которые файл ЧИТАЕТ, — всё, кроме левой части
+ * присваивания, — и имена, которые он присваивает сам.
+ * @param {string} code
+ * @param {string} file
+ * @returns {{reads: {name: string, line: number}[], own: Set<string>}}
+ */
+function windowReads(code, file) {
+    const reads = [];
+    const own = new Set(windowAssignments(code, file).map((a) => a.name));
+    const collect = {
+        create() {
+            return {
+                MemberExpression(node) {
+                    if (!node.computed && node.object.type === 'Identifier' && node.object.name === 'window'
+                        && node.property.type === 'Identifier') {
+                        reads.push({ name: node.property.name, line: node.loc.start.line });
+                    }
+                },
+            };
+        },
+    };
+    const messages = new Linter().verify(code, [{
+        languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: {} },
+        plugins: { scan: { rules: { collect } } },
+        rules: { 'scan/collect': 'error' },
+    }], file);
+    const fatal = messages.find((m) => m.fatal);
+    if (fatal) { throw new Error(`${file}: ${fatal.message}`); }
+    return { reads, own };
+}
+
+/**
+ * Чтения чужого экспорта через window. Комментарии снимает codeOnly, парсер
+ * видит только код.
+ * @param {Map<string, string>} sources
+ * @returns {string[]}
+ */
+function foreignWindowReads(sources) {
+    const out = [];
+    for (const [file, code] of sources) {
+        // Номера строк — по тексту без комментариев (codeOnly), не по файлу.
+        const { reads, own } = windowReads(codeOnly(code), file);
+        for (const { name, line } of reads) {
+            // Свойства самого window (innerWidth, addEventListener…) — не мосты: ищем
+            // только имена крючков (PERMANENT), которые поставил ДРУГОЙ файл.
+            if (!PERMANENT.includes(name) || own.has(name) || WINDOW_READABLE.includes(name)) { continue; }
+            out.push(`${file}:${line} window.${name}`);
+        }
+    }
+    return out;
+}
+
+test('охрана чужих window-чтений проверяет сама себя на фикстуре', () => {
+    const sources = new Map([
+        ['reader.js', 'export function f() {\n  // window.InComment.x();\n  window.Toast.show("x");\n  return window.CONFIG?.A + window.ipcRenderer.send;\n}\n'],
+        ['owner.js', 'export const Toast = {};\nwindow.Toast = Toast;\nwindow.Toast.show("ok");\nwindow.UITheme.x();\n'],
+    ]);
+    assert.deepEqual(foreignWindowReads(sources), ['reader.js:3 window.Toast', 'reader.js:4 window.CONFIG']);
+});
+
+test('модуль окна не читает через window то, что экспортирует другой файл', () => {
+    const files = windowModuleFiles(REPO);
+    const sources = new Map(files.map((f) => [f, fs.readFileSync(path.join(REPO, f), 'utf8')]));
+    assert.deepEqual(foreignWindowReads(sources), [],
+        'чужой экспорт — `import`; window.X в модуле читают только свой мост и глобалы head/preload');
 });
 
 // ---------------------------------------------------------------------------

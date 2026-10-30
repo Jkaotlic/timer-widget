@@ -12,6 +12,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const { installToastDom } = require('./helpers/toast-dom.js');
 const path = require('path');
 const { codeOnly, balancedBlockAt, maskNonCode, afterBalanced } = require('./helpers/source-scan');
 
@@ -541,10 +542,10 @@ function runReset(target, heroModeBefore) {
     const mark = () => { if (trace[trace.length - 1] !== 'schema') { trace.push('schema'); } };
     const control = () => ({ set checked(_v) { mark(); }, set value(_v) { mark(); }, textContent: '' });
     global.document = { getElementById: (id) => (owned.has(id) ? control() : null) };
-    // Крючки, которые примесь по-прежнему берёт из window: шим IPC и Toast.
+    const toastDom = installToastDom(global.document);
+    // Крючок, который примесь по-прежнему берёт из window: шим IPC (Toast — настоящий, import).
     global.window = {
-        ipcRenderer: { send: () => {} },
-        Toast: null
+        ipcRenderer: { send: () => {} }
     };
     try {
         const panel = Object.assign({
@@ -568,6 +569,7 @@ function runReset(target, heroModeBefore) {
         panel.resetWindowSettings(target);
         return { panel, trace };
     } finally {
+        toastDom.restore();
         global.window = prevWindow;
         global.document = prevDocument;
     }

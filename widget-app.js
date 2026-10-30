@@ -23,6 +23,10 @@ import * as RendererShared from './renderer-shared.js';
 import * as CONFIG from './constants.js';
 import * as FlipCard from './flip-card.js';
 
+// Живая привязка: слушатель темы (widget-theme-sync.js) читает её import-ом,
+// а не через window. null до DOMContentLoaded.
+export let activeWidgetTimer = null;
+
         // Размер окна при масштабе 100%. Раньше жил внутри setupEventListeners,
         // а восстановление геометрии считало от той же цифры, вписанной
         // отдельным литералом — то есть база существовала в двух местах.
@@ -1174,6 +1178,7 @@ import * as FlipCard from './flip-card.js';
         // На window — чтобы до окна дотянулся слушатель темы, который стоит
         // ОТДЕЛЬНЫМ <script> после ipc-compat.js и в эту область не заглядывает.
         const widgetTimer = new WidgetTimer();
+        activeWidgetTimer = widgetTimer;
         window.timerWidget = widgetTimer;
 
         // Cleanup при закрытии окна

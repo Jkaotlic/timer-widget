@@ -20,6 +20,8 @@
 // heuristic, no geometry. "Diverges enough" is a claim that has to be re-measured,
 // not inherited.
 
+import * as CONFIG from './constants.js';
+
 // ---------------------------------------------------------------------------
 // breakdown(totalAbsSeconds) → { hours, minutes, seconds, hasHours }
 // ---------------------------------------------------------------------------
@@ -481,14 +483,13 @@ function timerColorBand(remainingSeconds, totalSeconds, thresholds) {
     const total = Number.isFinite(rawTotal) ? rawTotal : 0;
     if (total <= 0) { return 'normal'; }
 
-    const cfg = (typeof window !== 'undefined' && window.CONFIG) ? window.CONFIG : null;
     const t = thresholds || {};
     const dangerPct = Number.isFinite(Number(t.danger))
         ? Number(t.danger)
-        : (cfg && Number.isFinite(Number(cfg.DANGER_PERCENTAGE)) ? Number(cfg.DANGER_PERCENTAGE) : 10);
+        : Number(CONFIG.DANGER_PERCENTAGE);
     const warningPct = Number.isFinite(Number(t.warning))
         ? Number(t.warning)
-        : (cfg && Number.isFinite(Number(cfg.WARNING_PERCENTAGE)) ? Number(cfg.WARNING_PERCENTAGE) : 25);
+        : Number(CONFIG.WARNING_PERCENTAGE);
 
     const percentLeft = (secs / total) * 100;
     // Ноль ВХОДИТ в danger — это конец отсчёта, а не «предупреждение».

@@ -227,9 +227,11 @@ test('модули берут общие зависимости import-ом, а 
     assert.match(colorPicker, /(?<![\w.])ColorUtils\.hsvToRgb\(/);
     assert.doesNotMatch(colorPicker, /window\.ColorUtils/);
 
-    const customSounds = read('custom-sounds.js');
-    assert.match(customSounds, /window\.Toast\./);
-    assert.doesNotMatch(customSounds, /(?<![\w.])Toast\./);
+    // Toast — тоже import: крючок window.Toast живёт для e2e, модули его не читают.
+    const customSounds = codeOnly(read('custom-sounds.js'));
+    assert.match(customSounds, /^import \{ Toast \} from '\.\/ui-feedback\.js';$/m);
+    assert.match(customSounds, /(?<![\w.])Toast\.show\(/);
+    assert.doesNotMatch(customSounds, /window\.Toast/);
 });
 
 test('примесь пользовательских звуков применяется к прототипу', () => {

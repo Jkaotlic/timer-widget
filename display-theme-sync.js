@@ -4,5 +4,6 @@
 // ES-модуль: шим IPC — import-ом, а не соседним тегом. Окно (window.X) —
 // крючок своего входа, тег которого стоит раньше этого.
 import './ipc-compat.js';
+import { displayTimer } from './display-script.js';
 
-window.UITheme.bindThemeSync(window.ipcRenderer, () => window.displayTimer && window.displayTimer.onThemeChanged());
+window.UITheme.bindThemeSync(window.ipcRenderer, () => displayTimer && displayTimer.onThemeChanged());

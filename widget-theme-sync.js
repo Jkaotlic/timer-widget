@@ -4,8 +4,9 @@
 // ES-модуль: шим IPC — import-ом, а не соседним тегом. Окно (window.X) —
 // крючок своего входа, тег которого стоит раньше этого.
 import './ipc-compat.js';
+import { activeWidgetTimer } from './widget-app.js';
 
-window.UITheme.bindThemeSync(window.ipcRenderer, () => window.timerWidget && window.timerWidget.refreshTone());
+window.UITheme.bindThemeSync(window.ipcRenderer, () => activeWidgetTimer && activeWidgetTimer.refreshTone());
 // Замок — тем же путём, что и тема: панель шлёт, главный процесс
 // рассылает всем окнам. Без подписки окно, открытое до включения
 // замка, осталось бы единственным подвижным.

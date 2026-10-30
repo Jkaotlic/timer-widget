@@ -52,6 +52,8 @@ const DISPLAY_TOGGLE_KEYS = BLOCK_KEYS.concat(LABEL_KEYS);
  * и три копии слова «Начало» разъехались бы молча.
  */
 import * as Layouts from './display-layouts.js';
+import { Toast } from './ui-feedback.js';
+import { openModal, closeModal } from './modal-manager.js';
 
 /** Объект из строки хранилища; битое или пустое значение — пустой объект. */
 function safeParseObject(raw) {
@@ -746,12 +748,12 @@ const PanelDisplayMixin = {
             const box = document.getElementById(modalId);
             const cancel = document.getElementById(`${modalId}Cancel`);
             const confirm = document.getElementById(`${modalId}Confirm`);
-            if (btn && box) { btn.addEventListener('click', () => window.openModal(box, cancel)); }
-            if (cancel) { cancel.addEventListener('click', () => window.closeModal(box)); }
+            if (btn && box) { btn.addEventListener('click', () => openModal(box, cancel)); }
+            if (cancel) { cancel.addEventListener('click', () => closeModal(box)); }
             if (confirm) {
                 confirm.addEventListener('click', () => {
                     onConfirm();
-                    window.closeModal(box);
+                    closeModal(box);
                 });
             }
         };
@@ -760,11 +762,11 @@ const PanelDisplayMixin = {
         // главного процесса, а «сработало ли» спрашивают в ту же секунду.
         confirmable('eventFinishBtn', 'eventFinish', () => {
             window.ipcRenderer.send('event-finish');
-            window.Toast.show('Мероприятие завершено — итог заморожен', 'success');
+            Toast.show('Мероприятие завершено — итог заморожен', 'success');
         });
         confirmable('eventResetBtn', 'eventReset', () => {
             window.ipcRenderer.send('event-reset');
-            window.Toast.show('Новое мероприятие — итог обнулён', 'success');
+            Toast.show('Новое мероприятие — итог обнулён', 'success');
         });
 
         // Выгрузка НЕ проходит через confirmable: подтверждения в этом проекте
@@ -785,13 +787,13 @@ const PanelDisplayMixin = {
             if (answer.canceled) { return; }
             if (answer.ok) {
                 const rows = Number(answer.rows) || 0;
-                window.Toast.show(
+                Toast.show(
                     rows > 0 ? `Отчёт сохранён · докладов: ${rows}` : 'Отчёт сохранён',
                     'success'
                 );
                 return;
             }
-            window.Toast.show(`Отчёт не сохранён: ${answer.error || 'неизвестная причина'}`, 'error');
+            Toast.show(`Отчёт не сохранён: ${answer.error || 'неизвестная причина'}`, 'error');
         });
 
         this.renderFloor47();
@@ -951,9 +953,7 @@ const PanelDisplayMixin = {
         this.pushDisplaySettings();
         window.ipcRenderer.send('display-layout', { layout: layout.id });
 
-        if (window.Toast && window.Toast.show) {
-            window.Toast.show(`Раскладка «${layout.name}»`, 'success');
-        }
+        Toast.show(`Раскладка «${layout.name}»`, 'success');
     },
 
     /**

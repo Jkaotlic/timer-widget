@@ -22,6 +22,10 @@ import * as RendererShared from './renderer-shared.js';
 import * as CONFIG from './constants.js';
 import * as FlipCard from './flip-card.js';
 
+// Живая привязка: слушатель темы (clock-widget-theme-sync.js) читает её
+// import-ом, а не через window. null до DOMContentLoaded.
+export let activeClockWidget = null;
+
         function applyShowTicks(showTicks) {
             const el = document.querySelector('.widget-container') || document.body;
             el.classList.toggle('ticks-on', !!showTicks);
@@ -996,6 +1000,7 @@ import * as FlipCard from './flip-card.js';
         // На window — по той же причине, что и в виджете таймера: слушатель
         // темы стоит отдельным <script> и в эту область не заглядывает.
         const clockWidget = new ClockWidget();
+        activeClockWidget = clockWidget;
         window.clockWidget = clockWidget;
 
         // Cleanup при закрытии окна

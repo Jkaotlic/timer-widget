@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 const { PanelResetMixin } = require('../panel-reset.js');
 const { PanelClockMixin } = require('../panel-clock.js');
 const SettingsSchema = require('../settings-schema.js');
+const { installToastDom } = require('./helpers/toast-dom.js');
 
 /**
  * Сброс идёт через НАСТОЯЩУЮ схему (panel-reset.js импортирует её): она
@@ -35,11 +36,11 @@ function runReset(target, init) {
     const trace = [];
     const controls = init.controls;
     global.document = { getElementById: (id) => controls[id] || null };
+    const toastDom = installToastDom(global.document);
     global.localStorage = { setItem: () => {}, getItem: () => null };
-    // Крючки, которые примесь по-прежнему берёт из window: шим IPC и Toast.
+    // Крючок, который примесь по-прежнему берёт из window: шим IPC (Toast — настоящий, import).
     global.window = {
-        ipcRenderer: { send: (channel, payload) => sent.push([channel, payload]) },
-        Toast: null
+        ipcRenderer: { send: (channel, payload) => sent.push([channel, payload]) }
     };
     try {
         const panel = Object.assign({
@@ -62,6 +63,7 @@ function runReset(target, init) {
         panel.resetWindowSettings(target);
         return { panel, trace, sent };
     } finally {
+        toastDom.restore();
         Object.assign(global, prev);
     }
 }

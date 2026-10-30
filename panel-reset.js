@@ -25,6 +25,7 @@ import * as ClockSettingsSchema from './clock-settings-schema.js';
 import * as HeroModes from './hero-modes.js';
 import * as SettingsSchema from './settings-schema.js';
 import { COLOR_FIELDS } from './panel-colors.js';
+import { Toast } from './ui-feedback.js';
 
 const RESET_TARGETS = {
     widget: { mount: 'widgetResetRow', label: 'виджета', toast: 'Настройки виджета сброшены' },
@@ -126,7 +127,7 @@ const PanelResetMixin = {
         this.updateClockAnalogNumbersVisibility();
         this.highlightActiveThemes();
         this.renderSurfaceControls();
-        window.Toast?.show(RESET_TARGETS[target].toast);
+        Toast.show(RESET_TARGETS[target].toast);
     },
 
     // Отправка в само окно. Каналы у каждого свои — общего «применить всё» в

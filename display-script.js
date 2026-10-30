@@ -3955,7 +3955,9 @@ function canSafelyStore(value, limitBytes = 1024 * 1024) {
     }
 }
 
-export { validateBlockPositions, canSafelyStore };
+// `displayTimer` — живая привязка: display-theme-sync.js читает её import-ом
+// (null до DOMContentLoaded).
+export { validateBlockPositions, canSafelyStore, displayTimer };
 
 // Инициализация
 let displayTimer;

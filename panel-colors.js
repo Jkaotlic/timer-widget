@@ -88,6 +88,7 @@ function el(tag, props, children) {
 /** Чистая логика окон: здесь — запасной путь цветов (ownColors). */
 import * as ColorsShared from './renderer-shared.js';
 import { ColorPicker } from './color-picker.js';
+import * as CONFIG from './constants.js';
 
 /**
  * Объект цветов из строки хранилища или null: битое значение не роняет панель.
@@ -121,7 +122,7 @@ const PanelColorsMixin = {
      */
     loadWindowColors(send, fresh) {
         const post = send || ((channel, payload) => window.ipcRenderer.send(channel, payload));
-        const defaults = fresh || window.CONFIG.DEFAULT_TIMER_COLORS;
+        const defaults = fresh || CONFIG.DEFAULT_TIMER_COLORS;
         const widget = parseColors(localStorage.getItem('widgetColors'));
         // Свой ключ виджета, а без него — старый общий timerColors. Формулу
         // запасного пути знает ОДНО место (renderer-shared.ownColors): тем же
