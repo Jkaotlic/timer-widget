@@ -68,7 +68,11 @@ function expectRgb(actual, [r, g, b], message) {
  * доехали. Прежде — паузы 250–1500 мс (e2e/window-ready.js, `untilReceived`).
  */
 const setStyle = (control, widget, style) => untilReceived(widget, 'widget-style-update', () =>
-    control.evaluate((s) => window.electronAPI.send('widget-style-update', { timerStyle: s }), style));
+    control.evaluate((s) => window.electronAPI.send('widget-style-update', { timerStyle: s }), style),
+{ match: { timerStyle: style } });
+
+/** Поле цветов окна, которое обязана нести посылка после действия (ревью B3, I1). */
+const colorsMatch = (match) => ({ match });
 
 /** Окно открылось: документ загружен, стартовые посылки отработаны, переходы доехали. */
 async function windowLoaded(page) {
@@ -109,18 +113,19 @@ async function setPickerOpen(control, target, open) {
  */
 async function pickSurface(control, target, win, huePart, svPart) {
     // Каждый клик по холсту — ровно одна посылка цветов окну (pointerdown →
-    // onColorChange → updateColors → saveColors). Дожидаемся КАЖДОЙ: тогда
-    // следующая взведённая — заведомо от следующего клика.
+    // onColorChange → updateColors → saveColors). Ждём посылку, несущую ТОТ
+    // hex, который пипетка показала после клика (поле обновляется синхронно).
     const channel = `${target}-colors-update`;
+    const shownHex = async () => ({ surface: await control.inputValue(`#${target}SurfaceCpHex`) });
     await setPickerOpen(control, target, true);
     const hue = control.locator(`#${target}SurfaceCpHue`);
     const hueBox = await hue.boundingBox();
     await untilReceived(win, channel,
-        () => hue.click({ position: { x: hueBox.width * huePart, y: hueBox.height / 2 } }));
+        () => hue.click({ position: { x: hueBox.width * huePart, y: hueBox.height / 2 } }), { match: shownHex });
     const sv = control.locator(`#${target}SurfaceCpSv`);
     const svBox = await sv.boundingBox();
     await untilReceived(win, channel,
-        () => sv.click({ position: { x: svBox.width * svPart, y: svBox.height * 0.25 } }));
+        () => sv.click({ position: { x: svBox.width * svPart, y: svBox.height * 0.25 } }), { match: shownHex });
     const hex = await control.inputValue(`#${target}SurfaceCpHex`);
     // Панель пипетки перекрывает контролы ниже — закрываем её тем же жестом.
     await setPickerOpen(control, target, false);
@@ -152,7 +157,8 @@ test.describe('фон виджета и часов', () => {
         // шлётся по IPC, а не кликом: клик пишет выбор в localStorage, а профиль
         // e2e один на весь прогон.
         await untilReceived(widget, 'ui-theme-update',
-            () => control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' })));
+            () => control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' })),
+            { match: { theme: 'dark' } });
         // Эталон подложки LED снимаем ДО первой покраски: сброс обязан вернуть
         // именно её, а не «прозрачный по умолчанию».
         await setStyle(control, widget, 'digits');
@@ -206,7 +212,8 @@ test.describe('фон виджета и часов', () => {
         // Ползунок двигаем КЛАВИАТУРОЙ: Home — нативное событие input, а не
         // синтетическое присваивание .value, которое обошло бы обработчик.
         await control.focus('#widgetSurfaceAlpha');
-        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'));
+        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'),
+            colorsMatch({ surfaceAlpha: 0 }));
 
         const clear = await paintOf(widget, '.widget-digits-time', 'backgroundColor');
         expect(parseColor(clear).a, `подложка «Цифр» ${clear} обязана стать прозрачной`).toBe(0);
@@ -214,7 +221,8 @@ test.describe('фон виджета и часов', () => {
     });
 
     test('сброс возвращает подложку СТИЛЯ, а не «прозрачный по умолчанию»', async () => {
-        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'));
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'),
+            colorsMatch({ surface: null, surfaceAlpha: null }));
 
         const restored = await paintOf(widget, '.widget-digits-time', 'backgroundColor');
         expect(restored, 'подложка «Цифр» обязана вернуться к своей').toBe(ledDefault);
@@ -225,13 +233,15 @@ test.describe('фон виджета и часов', () => {
         // Сброс предыдущего теста снял цвет; ползунок обязан остаться рабочим.
         await expect(control.locator('#widgetSurfaceAlpha')).toBeEnabled();
         await control.focus('#widgetSurfaceAlpha');
-        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'));
+        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'),
+            colorsMatch({ surfaceAlpha: 0 }));
 
         const clear = await paintOf(widget, '.widget-digits-time', 'backgroundColor');
         expect(parseColor(clear).a, `родная подложка «Цифр» ${clear} обязана погаснуть`).toBe(0);
         await expect(control.locator('#widgetSurfaceRow .surface-alpha-value')).toHaveText('0%');
 
-        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'));
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'),
+            colorsMatch({ surface: null, surfaceAlpha: null }));
         expect(await paintOf(widget, '.widget-digits-time', 'backgroundColor'),
             'сброс обязан вернуть родную подложку').toBe(ledDefault);
     });
@@ -278,7 +288,8 @@ test.describe('фон виджета и часов', () => {
 
         // Ползунок в ноль — тем же жестом, что гасит подложку у «Цифр».
         await control.focus('#widgetSurfaceAlpha');
-        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'));
+        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'),
+            colorsMatch({ surfaceAlpha: 0 }));
         await opaque('после прозрачности 0');
 
         // И с выбранным цветом: цвет обязан приехать, прозрачность — нет.
@@ -290,7 +301,8 @@ test.describe('фон виджета и часов', () => {
             .toBe(`rgb(${r}, ${g}, ${b})`);
 
         // Возвращаем состояние: профиль e2e общий на весь прогон.
-        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'));
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'),
+            colorsMatch({ surface: null, surfaceAlpha: null }));
         await setStyle(control, widget, 'digits');
     });
 
@@ -310,7 +322,8 @@ test.describe('фон виджета и часов', () => {
         // Цвет цифр сейчас от темы, выбранной предыдущим тестом; сброс обязан
         // вернуть тот, что описан в CSS.
         const digitsBefore = await paintOf(widget, '.widget-digits-time', 'color');
-        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-timer'));
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-timer'),
+            colorsMatch({ timer: null, progress: null }));
 
         const digitsAfter = await paintOf(widget, '.widget-digits-time', 'color');
         expect(digitsAfter, 'цвет цифр обязан вернуться к описанному в CSS')
@@ -386,10 +399,13 @@ test.describe('сброс настроек окна', () => {
             return win ? win.getBounds() : null;
         }, { name: 'границы виджета' });
 
-        await untilReceived(widget, 'widget-style-update', () => control.click('#timerStyle button[data-val="circle"]'));
+        await untilReceived(widget, 'widget-style-update', () => control.click('#timerStyle button[data-val="circle"]'),
+            { match: { timerStyle: 'circle' } });
         await expect(control.locator('label[for="widgetStatusLabel"]')).toBeVisible();
-        await untilReceived(widget, 'widget-style-update', () => control.click('label[for="widgetStatusLabel"]'));
-        await untilReceived(widget, 'widget-style-update', () => control.click('#timerStyle button[data-val="flip"]'));
+        await untilReceived(widget, 'widget-style-update', () => control.click('label[for="widgetStatusLabel"]'),
+            { match: async () => ({ statusLabel: await control.isChecked('#widgetStatusLabel') }) });
+        await untilReceived(widget, 'widget-style-update', () => control.click('#timerStyle button[data-val="flip"]'),
+            { match: { timerStyle: 'flip' } });
         await pickSurface(control, 'widget', widget, 0.5, 0.8);
         await settledBounds();
         const before = await boundsOf();
@@ -398,7 +414,8 @@ test.describe('сброс настроек окна', () => {
         // Сброс шлёт цвета, затем стиль (panel-reset.js) — ждём ПОСЛЕДНЮЮ. И
         // границы осесть: утверждается, что окно НЕ сдвинулось, а сдвиг пришёл
         // бы через главный процесс уже после обработчика стиля.
-        await untilReceived(widget, 'widget-style-update', () => control.click('#widgetResetRow .reset-all'));
+        await untilReceived(widget, 'widget-style-update', () => control.click('#widgetResetRow .reset-all'),
+            { match: { timerStyle: 'circle', statusLabel: false } });
         await settledBounds();
 
         // Настройки — заводские.

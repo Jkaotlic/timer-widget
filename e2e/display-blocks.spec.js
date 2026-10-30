@@ -1,8 +1,10 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, waitForQuiet
+    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived, untilReceived,
+    waitForQuiet
 } = require('./window-ready');
+const { EVENT_TITLE_MAX } = require('../relay-payload.js');
 
 /**
  * Блоки дисплея: у каждого свой тумблер, каждый тащится и закрывается крестиком.
@@ -52,18 +54,20 @@ async function settle(app, control, display) {
 }
 
 /**
- * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку настроек и
- * утих: тумблер, поле, стиль шлют её синхронно (pushDisplaySettings).
+ * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку настроек,
+ * НЕСУЩУЮ `match`, и утих: тумблер, поле, стиль шлют её синхронно
+ * (pushDisplaySettings). Без `match` ожидание сошлось бы на посылке
+ * предыдущего действия, ещё бывшей в пути (ревью B3, I1).
  */
-function untilDisplayGot(display, action) {
-    return untilReceived(display, 'display-settings-update', action);
+function untilDisplayGot(display, action, match) {
+    return untilReceived(display, 'display-settings-update', action, { match });
 }
 
-/** Поставить тумблеры; ждать посылку ПОСЛЕДНЕГО — порядок одного канала сохраняется. */
+/** Поставить тумблеры; ждать посылку, несущую ВСЕ их значения. */
 async function setToggles(control, display, pairs) {
     for (const [id, on] of pairs.slice(0, -1)) { await setToggle(control, id, on); }
     const [id, on] = pairs[pairs.length - 1];
-    await untilDisplayGot(display, () => setToggle(control, id, on));
+    await untilDisplayGot(display, () => setToggle(control, id, on), Object.fromEntries(pairs));
 }
 
 const visibleIds = (page) => page.evaluate(() => {
@@ -88,14 +92,14 @@ test('каждый тумблер гасит СВОЙ блок и ничего �
 
         // Гасим по одному и проверяем, что гаснет РОВНО он.
         for (const b of BLOCKS) {
-            await untilDisplayGot(display, () => setToggle(control, b.toggle, false));
+            await untilDisplayGot(display, () => setToggle(control, b.toggle, false), { [b.toggle]: false });
             const state = await visibleIds(display);
             for (const other of BLOCKS) {
                 const expected = other.toggle !== b.toggle;
                 expect(state[other.block], `выключили «${b.name}», а «${other.name}» ${expected ? 'исчез' : 'остался'}`)
                     .toBe(expected);
             }
-            await untilDisplayGot(display, () => setToggle(control, b.toggle, true));
+            await untilDisplayGot(display, () => setToggle(control, b.toggle, true), { [b.toggle]: true });
         }
     } finally {
         for (const b of BLOCKS) { await setToggle(control, b.toggle, false).catch(() => {}); }
@@ -117,7 +121,7 @@ test('крестик на блоке снимает ИМЕННО его тумб
         // дисплей. Их приход и есть конец круга: тумблер панель сняла ДО посылки.
         await untilDisplayGot(display, () => display.evaluate((id) => {
             document.getElementById(id).querySelector('.info-close').click();
-        }, target.block));
+        }, target.block), { [target.toggle]: false });
 
         const toggles = await control.evaluate((list) => {
             const out = {};
@@ -136,7 +140,7 @@ test('крестик на блоке снимает ИМЕННО его тумб
         await untilDisplayGot(display, () => control.evaluate(() => {
             const el = document.getElementById('showCurrentTime');
             el.dispatchEvent(new Event('change', { bubbles: true }));
-        }));
+        }), { [target.toggle]: false, showCurrentTime: true });
         const after = await visibleIds(display);
         expect(after[target.block], 'закрытый блок вернулся при следующем пуше настроек').toBe(false);
     } finally {
@@ -488,6 +492,10 @@ test('аналог: круг — у циферблата, подписи не в
         const disp = await openReady(app, control, 0);
 
         await control.click('.tab-btn[data-tab="display"]');
+        // Приёмник — ДО пачки: ждём посылку, несущую ВСЁ (тумблеры, название,
+        // стиль), и если «Аналог» уже стоял, клик посылки не даст — сойдётся
+        // посылка названия, какой бы ни была её очередь относительно взвода.
+        const analogShown = await armReceived(disp, 'display-settings-update');
         for (const b of BLOCKS) { await setToggle(control, b.toggle, true); }
         await control.evaluate(() => {
             const el = document.getElementById('eventTitleInput');
@@ -495,7 +503,11 @@ test('аналог: круг — у циферблата, подписи не в
         });
         // Стиль — последняя посылка; дождавшись её, знаем и про тумблеры с
         // названием. Подписи меряются по шрифту — waitForQuiet ждёт и его.
-        await untilDisplayGot(disp, () => control.click('#displayTimerStyle button[data-val="analog"]'));
+        await control.click('#displayTimerStyle button[data-val="analog"]');
+        await analogShown({
+            match: Object.assign(Object.fromEntries(BLOCKS.map((b) => [b.toggle, true])),
+                { eventTitle: 'Ежегодная конференция', displayTimerStyle: 'analog' })
+        });
 
         const seen = await disp.evaluate(() => {
             const out = [];
@@ -588,7 +600,8 @@ test('аналог: круг — у циферблата, подписи не в
             ).toBeLessThanOrEqual(c.chord);
         }
 
-        await untilDisplayGot(disp, () => control.click('#displayTimerStyle button[data-val="circle"]'));
+        await untilDisplayGot(disp, () => control.click('#displayTimerStyle button[data-val="circle"]'),
+            { displayTimerStyle: 'circle' });
     } finally {
         await app.close();
     }
@@ -611,15 +624,28 @@ test('длинное название мероприятия переносит�
         const display = await openReady(app, control, 0);
 
         await control.click('.tab-btn[data-tab="display"]');
+        // Приёмник — ДО тумблера и названия: клик по уже выбранному «Кругу»
+        // посылки не порождает, и ждать пришлось бы посылку названия, которая
+        // к моменту взвода могла уже отработать. Название доезжает до окна
+        // обрезанным главным процессом (relay-payload.js, EVENT_TITLE_MAX).
+        const titleShown = await armReceived(display, 'display-settings-update');
         await setToggle(control, 'showEventTitle', true);
         await control.evaluate((t) => {
             const el = document.getElementById('eventTitleInput');
             el.value = t;
             el.dispatchEvent(new Event('input', { bubbles: true }));
         }, LONG);
+        const sentTitle = LONG.slice(0, EVENT_TITLE_MAX);
 
         for (const style of ['circle', 'analog', 'flip', 'digits']) {
-            await untilDisplayGot(display, () => control.click(`#displayTimerStyle button[data-val="${style}"]`));
+            const click = () => control.click(`#displayTimerStyle button[data-val="${style}"]`);
+            const want = { displayTimerStyle: style, showEventTitle: true, eventTitle: sentTitle };
+            if (style === 'circle') {
+                await click();
+                await titleShown({ match: want });
+            } else {
+                await untilDisplayGot(display, click, want);
+            }
             const m = await display.evaluate(() => {
                 const block = document.getElementById('eventTitleBlock');
                 const value = document.getElementById('eventTitleValue');
@@ -665,7 +691,8 @@ test('длинное название мероприятия переносит�
             el.dispatchEvent(new Event('input', { bubbles: true }));
         });
         await setToggle(control, 'showEventTitle', false);
-        await untilDisplayGot(display, () => control.click('#displayTimerStyle button[data-val="circle"]'));
+        await untilDisplayGot(display, () => control.click('#displayTimerStyle button[data-val="circle"]'),
+            { displayTimerStyle: 'circle', showEventTitle: false, eventTitle: '' });
     } finally {
         await app.close();
     }

@@ -1,7 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, waitForDisplayGone, waitForDisplaySettled, untilReceived, waitForQuiet, waitForTransitions
+    waitForDisplay, waitForDisplayGone, waitForDisplaySettled, waitForDisplaySnapshot, untilReceived, waitForQuiet,
+    waitForTransitions
 } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 const { pickWindowSizes } = require('./window-sizes');
@@ -160,11 +161,12 @@ async function openDisplayDrawer(control) {
 
 /**
  * Действие в панели, после которого дисплей обязан ПОЛУЧИТЬ посылку канала
- * `channel` и утихнуть. Канал по умолчанию — настройки дисплея: их шлёт
- * каждый тумблер, ползунок и стиль.
+ * `channel`, НЕСУЩУЮ `match`, и утихнуть. Канал по умолчанию — настройки
+ * дисплея: их шлёт каждый тумблер, ползунок и стиль. `match` обязателен по
+ * смыслу: посылка предыдущего действия может прийти после взвода (ревью B3, I1).
  */
-function untilDisplayGot(display, action, channel = 'display-settings-update') {
-    return untilReceived(display, channel, action);
+function untilDisplayGot(display, action, match, channel = 'display-settings-update') {
+    return untilReceived(display, channel, action, { match });
 }
 
 /** Клик по кнопке раскладки — и дождаться, что дисплей её ПРИМЕНИЛ. */
@@ -172,6 +174,7 @@ function clickLayout(control, display, id) {
     return untilDisplayGot(
         display,
         () => control.locator(`#displayLayoutGrid .layout-btn[data-layout="${id}"]`).click(),
+        { layout: id },
         'display-layout'
     );
 }
@@ -185,17 +188,17 @@ async function resetDisplayState(control, display) {
         const on = m.id === 'heroLabel' || m.id === 'statusPill';
         await setToggle(control, m.toggle, on);
     }
-    // Ползунок шлёт настройки последним; дождавшись ЕГО посылки в дисплее,
-    // знаем, что отработали и тумблеры (порядок одного канала сохраняется).
-    // Хранилище дисплея чистится ПОСЛЕ: иначе поздняя посылка, отработав,
-    // могла бы записать места и масштаб обратно.
+    // Ползунок шлёт настройки последним; ждём посылку, несущую ВСЁ ожидаемое
+    // (тумблеры и масштаб 100). Хранилище дисплея чистится ПОСЛЕ: иначе поздняя
+    // посылка, отработав, могла бы записать места и масштаб обратно.
+    const expected = Object.fromEntries(MOVABLE.map((m) => [m.toggle, m.id === 'heroLabel' || m.id === 'statusPill']));
     await untilDisplayGot(display, () => control.evaluate(() => {
         const el = document.getElementById('displayTimerScale');
         if (!el) { return; }
         el.value = '100';
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-    }));
+    }), Object.assign(expected, { displayTimerScale: 100 }));
     await display.evaluate(() => {
         localStorage.removeItem('displayBlockPositions');
         localStorage.removeItem('displayBlockScales');
@@ -206,14 +209,19 @@ async function resetDisplayState(control, display) {
 
 async function openSettledDisplay(control, app) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-    return waitForDisplaySettled(app, await waitForDisplay(app));
+    const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
+    return waitForDisplaySettled(app, display);
 }
 
-/** Включить тумблеры и дождаться, что дисплей получил ПОСЛЕДНИЙ из них. */
+/**
+ * Поставить тумблеры и дождаться посылки, несущей ВСЕ их значения: она и даёт
+ * дисплею нужное состояние (настройки — полный снимок), даже если пришла
+ * раньше посылки последнего тумблера.
+ */
 async function setTogglesOnDisplay(control, display, pairs) {
     const last = pairs[pairs.length - 1];
     for (const [id, on] of pairs.slice(0, -1)) { await setToggle(control, id, on); }
-    await untilDisplayGot(display, () => setToggle(control, last[0], last[1]));
+    await untilDisplayGot(display, () => setToggle(control, last[0], last[1]), Object.fromEntries(pairs));
 }
 
 async function openDisplayWithEverything(control, app) {
@@ -811,7 +819,7 @@ test('перещёлкивание стилей не сдвигает разло
             const el = document.getElementById('eventTitleInput');
             el.value = 'Ежегодная конференция';
             el.dispatchEvent(new Event('input', { bubbles: true }));
-        }));
+        }), { eventTitle: 'Ежегодная конференция' });
 
         const fractions = () => display.evaluate((ids) => {
             const MARGIN = 20;
@@ -847,7 +855,8 @@ test('перещёлкивание стилей не сдвигает разло
             let sizeChanged = false;
             let checked = 0;
             for (const style of ['flip', 'analog', 'digits', 'circle']) {
-                await untilDisplayGot(display, () => control.click(`#displayTimerStyle button[data-val="${style}"]`));
+                await untilDisplayGot(display, () => control.click(`#displayTimerStyle button[data-val="${style}"]`),
+                    { displayTimerStyle: style });
                 const now = await fractions();
                 for (const id of Object.keys(base)) {
                     const a = base[id];
@@ -883,7 +892,8 @@ test('перещёлкивание стилей не сдвигает разло
         // Возвращаем стиль ЯВНО: соседние спеки (дуга кольца, масштаб
         // таймера) открывают дисплей заново и берут стиль из профиля —
         // оставленный «аналог» показал бы им окно без кольца вовсе.
-        await untilDisplayGot(display, () => control.click('#displayTimerStyle button[data-val="circle"]'));
+        await untilDisplayGot(display, () => control.click('#displayTimerStyle button[data-val="circle"]'),
+            { displayTimerStyle: 'circle' });
         await resetDisplayState(control, display);
     } finally {
         await app.close();

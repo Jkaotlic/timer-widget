@@ -342,65 +342,131 @@ function innerSize() { return { w: window.innerWidth, h: window.innerHeight }; }
  * Круг: шрифты (`document.fonts.ready`) → два кадра (кадровые колбэки
  * приложения, взведённые до нас, уже отработали) → все идущие CSSTransition
  * (`finished`). Круг повторяется, пока не выйдет чистым: переход, доехав,
- * может завести пересчёт, а тот — новый переход. Предел кругов — чтобы
- * бесконечно перезапускаемый переход упал на утверждении теста, а не повис.
+ * может завести пересчёт, а тот — новый переход.
+ *
+ * Переходы ТИКА не ждутся (`TICK_TRANSITIONS`): при идущем таймере кольцо
+ * (`stroke-dashoffset`) и полоса прогресса (`width` у `.display-progress-fill`)
+ * заводят переход каждую секунду, и круг не вышел бы чистым никогда. Оба
+ * только красят и коробок соседей не двигают.
+ *
+ * Предел кругов исчерпан — это НЕ «тихо»: печатается, что ещё ехало, чтобы
+ * следующее падение утверждения было с диагнозом.
  *
  * @param {import('@playwright/test').Page} page
  * @param {{rounds?: number}} [opts]
  */
 async function waitForQuiet(page, opts = {}) {
-    await page.evaluate(async (rounds) => {
+    const left = await page.evaluate(async ([rounds, tick]) => {
         const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+        const isTick = (a) => tick.some(([sel, prop]) => a.transitionProperty === prop
+            && (sel === '*' || (a.effect && a.effect.target && a.effect.target.matches && a.effect.target.matches(sel))));
+        const describe = (a) => {
+            const t = a.effect && a.effect.target;
+            const name = t ? (t.id ? '#' + t.id : (t.getAttribute && t.getAttribute('class')) || t.nodeName) : '?';
+            return `${name}:${a.transitionProperty}`;
+        };
+        let running = [];
         for (let i = 0; i < rounds; i++) {
             if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
             await frame();
             await frame();
-            const running = document.getAnimations().filter((a) => a instanceof CSSTransition);
+            running = document.getAnimations().filter((a) => a instanceof CSSTransition && !isTick(a));
             const fontsBusy = document.fonts && document.fonts.status === 'loading';
-            if (!running.length && !fontsBusy) { return; }
+            if (!running.length && !fontsBusy) { return null; }
             await Promise.all(running.map((a) => a.finished.catch(() => {})));
         }
-    }, opts.rounds ?? 6);
+        return running.map(describe).join(', ') || 'шрифты ещё грузятся';
+    }, [opts.rounds ?? 6, TICK_TRANSITIONS]);
+    if (left) {
+        console.warn(`[waitForQuiet] окно не утихло за ${opts.rounds ?? 6} кругов, ещё едет: ${left}`);
+    }
 }
 
+/** Переходы, которые заводит каждый тик таймера: [селектор, свойство]. */
+const TICK_TRANSITIONS = [['*', 'stroke-dashoffset'], ['.display-progress-fill', 'width']];
+
 /**
- * Взвести ожидание СЛЕДУЮЩЕГО сообщения канала в окне — ДО действия, которое
- * его вызовет. Возвращает функцию «дождаться»: сообщение пришло, обработчик
- * окна отработал, окно утихло (`waitForQuiet`).
+ * Взвести приёмник посылок канала в окне — ДО действия, которое их вызовет.
+ * Возвращает функцию «дождаться»: пришла посылка, НЕСУЩАЯ ожидаемое
+ * состояние, обработчик окна её отработал, окно утихло (`waitForQuiet`).
  *
  * Почему это условие, а не ставка. Слушатель ставится через тот же мост
- * (`window.ipcRenderer.once`), что и слушатель приложения, на тот же
+ * (`window.ipcRenderer.on`), что и слушатель приложения, на тот же
  * EventEmitter `ipcRenderer` в preload; приложение подписалось при загрузке,
  * значит раньше, а слушатели одного события вызываются в порядке подписки.
- * Наш флаг поднимается строго ПОСЛЕ синхронного обработчика приложения.
- * Порядок сообщений одного канала main → окно сохраняется, поэтому и все
- * предыдущие посылки уже отработаны.
+ * Наша запись появляется строго ПОСЛЕ синхронного обработчика приложения.
  *
- * Пример: панель шлёт `display-settings-update`, затем `display-layout`;
- * взведя `display-layout`, тест дожидается обоих.
+ * Почему НЕ «первая посылка после взвода» (ревью B3, I1). Действие теста
+ * возвращается сразу после `send`, а посылка идёт панель → main → окно;
+ * взвод же — отдельный вызов по CDP. Посылка ПРЕДЫДУЩЕГО действия может
+ * быть ещё в пути и прийти после взвода — её payload собран без последнего
+ * действия. Поэтому ожидание узнаёт СВОЮ посылку:
+ *  - `match` — поля, которые обязана нести посылка (сравнение по значению;
+ *    `null` — «поля нет или оно null»). Настройки — полный снимок, поэтому
+ *    посылка, несущая все ожидаемые поля, и даёт окну нужное состояние, даже
+ *    если она чужая. Может быть функцией (выполняется ПОСЛЕ действия), когда
+ *    ожидаемое значение видно только после него — например hex пипетки;
+ *  - `count` — сколько посылок обязано прийти (для действий, чьи посылки
+ *    неотличимы по содержимому: взвести ДО первого и ждать N-ю).
+ * Без обоих — первая посылка после взвода; так можно, только когда у
+ * действия посылка одна, а предыдущая уже дождана.
+ *
+ * Приёмник снимается и при успехе, и по таймауту.
  *
  * @param {import('@playwright/test').Page} page — окно-ПОЛУЧАТЕЛЬ
  * @param {string} channel — канал, открытый мостом этого окна на приём
- * @returns {Promise<(opts?: {timeout?: number}) => Promise<any>>} ожидание; отдаёт payload
+ * @returns {Promise<(opts?: ReceiveOpts) => Promise<any>>} ожидание; отдаёт payload
+ *
+ * @typedef {{timeout?: number, match?: object|(() => Promise<object>|object), count?: number}} ReceiveOpts
  */
 async function armReceived(page, channel) {
     const key = `${channel}#${Date.now()}#${Math.random()}`;
     await page.evaluate(([ch, k]) => {
         const box = (window.__e2eReceived = window.__e2eReceived || {});
-        box[k] = { seen: false, payload: null };
-        window.ipcRenderer.once(ch, (_e, payload) => {
-            box[k] = { seen: true, payload: payload === undefined ? null : payload };
-        });
+        const rec = { list: [], listener: null, channel: ch };
+        rec.listener = (_e, payload) => { rec.list.push(payload === undefined ? null : payload); };
+        window.ipcRenderer.on(ch, rec.listener);
+        box[k] = rec;
     }, [channel, key]);
+    const release = () => page.evaluate((k) => {
+        const rec = window.__e2eReceived && window.__e2eReceived[k];
+        if (!rec) { return; }
+        window.ipcRenderer.removeListener(rec.channel, rec.listener);
+        delete window.__e2eReceived[k];
+    }, key).catch(() => {});
     return async (opts = {}) => {
-        const handle = await page.waitForFunction(
-            (k) => window.__e2eReceived[k].seen && window.__e2eReceived[k],
-            key, { timeout: opts.timeout ?? DEFAULT_TIMEOUT }
-        ).catch((err) => {
-            throw new Error(`окно не получило «${channel}»: ${err.message}`);
-        });
+        const match = typeof opts.match === 'function' ? await opts.match() : (opts.match || null);
+        const count = opts.count || 1;
+        let handle;
+        try {
+            handle = await page.waitForFunction(([k, m, n]) => {
+                const rec = window.__e2eReceived[k];
+                const fits = (p) => !m || (!!p && typeof p === 'object' && Object.keys(m).every((f) => (m[f] === null
+                    ? p[f] === null || p[f] === undefined
+                    : JSON.stringify(p[f]) === JSON.stringify(m[f]))));
+                if (rec.list.length < n) { return false; }
+                const hit = rec.list.slice(n - 1).find(fits);
+                return hit === undefined ? false : { payload: hit };
+            }, [key, match, count], { timeout: opts.timeout ?? DEFAULT_TIMEOUT });
+        } catch (err) {
+            // Что пришло на самом деле — по тем же полям, что ждали.
+            const seen = await page.evaluate(([k, m]) => {
+                const rec = window.__e2eReceived && window.__e2eReceived[k];
+                if (!rec) { return { n: -1, last: null }; }
+                const p = rec.list[rec.list.length - 1];
+                const last = p && m && typeof p === 'object'
+                    ? Object.fromEntries(Object.keys(m).map((f) => [f, p[f] === undefined ? null : p[f]]))
+                    : null;
+                return { n: rec.list.length, last };
+            }, [key, match]).catch(() => ({ n: -1, last: null }));
+            await release();
+            const want = match ? ` с ${JSON.stringify(match)}` : '';
+            const last = seen.last ? `; последняя: ${JSON.stringify(seen.last)}` : '';
+            throw new Error(`окно не получило «${channel}»${want} (нужно ${count}, пришло ${seen.n}${last}): ${err.message}`,
+                { cause: err });
+        }
         const got = await handle.jsonValue();
-        await page.evaluate((k) => { delete window.__e2eReceived[k]; }, key);
+        await release();
         await waitForQuiet(page);
         return got.payload;
     };
@@ -410,12 +476,12 @@ async function armReceived(page, channel) {
  * Выполнить действие и дождаться, что окно-получатель ПОЛУЧИЛО вызванную им
  * посылку канала и утихло. Обёртка над `armReceived`: взвести → действие →
  * дождаться. Действие обязано породить посылку, иначе ожидание упадёт по
- * таймауту с именем канала.
+ * таймауту с именем канала и ожидаемыми полями.
  *
  * @param {import('@playwright/test').Page} page — окно-ПОЛУЧАТЕЛЬ
  * @param {string} channel
  * @param {() => Promise<any>} action
- * @param {{timeout?: number}} [opts]
+ * @param {ReceiveOpts} [opts] — см. `armReceived`
  * @returns {Promise<any>} payload посылки
  */
 async function untilReceived(page, channel, action, opts = {}) {
@@ -425,124 +491,139 @@ async function untilReceived(page, channel, action, opts = {}) {
 }
 
 /**
- * Дождаться, что открывшийся дисплей ПОЛУЧИЛ снимок главного процесса —
- * настройки, накопитель перелимита, состояние таймера (`announceWindowOpened`
- * в main-windows.js шлёт их на `did-finish-load`).
+ * Канал-метка для каждого окна: посылка, которую main шлёт окну и сам, а
+ * обработчик окна только запоминает (флаг «открыто ли соседнее окно»). Метка
+ * несёт НАСТОЯЩЕЕ состояние соседа, так что для окна это не новость.
+ */
+const SNAPSHOT_MARK = {
+    'display.html': { channel: 'clock-window-state', neighbour: 'electron-clock-widget.html' },
+    'electron-widget.html': { channel: 'clock-window-state', neighbour: 'electron-clock-widget.html' },
+    'electron-clock-widget.html': { channel: 'widget-window-state', neighbour: 'electron-widget.html' }
+};
+
+/**
+ * Окно ПОЛУЧИЛО снимок главного процесса (`announceWindowOpened` шлёт его на
+ * `did-finish-load`): состояние таймера, накопитель, настройки, цвета, тему.
  *
  * `load` в окне этого не доказывает: `did-finish-load` в главном процессе
- * приходит ПОСЛЕ `load` рендерера, и снимок в этот момент может быть ещё не
- * отправлен. Спеки ждали паузой 2400 мс. Здесь два шага:
+ * приходит ПОСЛЕ `load` рендерера. Два шага:
  *
- * 1. главный процесс видит `!webContents.isLoading()` — `did-stop-loading`
- *    идёт после `did-finish-load`, значит слушатель снимка уже отработал и
- *    посылки ушли;
- * 2. панель шлёт настройки дисплея ещё раз (тот же `change` тумблера, без
- *    смены значения — ровно то, что панель шлёт и сама), и дисплей их
- *    получает. Порядок main → окно сохраняется, поэтому снимок отработан
- *    раньше.
+ * 1. главный процесс видит `!webContents.isLoading()` у ВСЕХ окон с этим
+ *    адресом — `did-stop-loading` идёт после `did-finish-load`, значит
+ *    слушатель снимка отработал и его посылки ушли;
+ * 2. СРАЗУ ЖЕ, в том же вызове main, окну уходит метка (`SNAPSHOT_MARK`) с
+ *    уникальным полем `e2eMarker`, и окно ждёт ИМЕННО её. Посылки main → окно
+ *    идут по одной трубе в порядке отправки, так что метка обработана после
+ *    снимка.
  *
- * @param {import('@playwright/test').ElectronApplication} app
- * @param {import('@playwright/test').Page} display
- * @param {import('@playwright/test').Page} control — окно панели
- * @param {{timeout?: number}} [opts]
- * @returns {Promise<import('@playwright/test').Page>} то же окно
- */
-async function waitForDisplaySnapshot(app, display, control, opts = {}) {
-    await display.waitForLoadState('load');
-    await waitForMainLoaded(app, 'display.html', 'дисплея', opts);
-    await untilReceived(display, 'display-settings-update', () => control.evaluate(() => {
-        document.getElementById('showCurrentTime').dispatchEvent(new Event('change', { bubbles: true }));
-    }), opts);
-    return display;
-}
-
-/**
- * То же для ВИДЖЕТА: снимок главного процесса (`announceWindowOpened` —
- * состояние, настройки дисплея, цвета, стиль, тема) отработан.
- *
- * Шаг 2 — повтор стартовой посылки панели `pushWindowStyles()` (её же панель
- * шлёт через 600 мс после старта): `widget-style-update` идёт через main
- * следом за снимком, порядок main → окно сохраняется. Настройки дисплея
- * виджету этим путём не идут — main шлёт их ему только снимком.
+ * Прежде (B3, B4) шагом 2 была повторная посылка панели и ожидание «первой
+ * посылки канала после взвода». Ревью B3 (I1) показало дыру: посылка,
+ * отправленная main ДО снимка, могла прийти после взвода и сойти за нашу. У
+ * метки уникальное содержимое — перепутать её не с чем. И окно выбирается не
+ * первым по адресу (ревью B3, M4): метку получают все окна с этим адресом,
+ * ждёт её только `page`, так что закрывающееся соседнее окно ничего не решает.
  *
  * @param {import('@playwright/test').ElectronApplication} app
- * @param {import('@playwright/test').Page} widget
- * @param {import('@playwright/test').Page} control — окно панели
+ * @param {import('@playwright/test').Page} page
+ * @param {string} urlPart — ключ `SNAPSHOT_MARK`
+ * @param {string} name — для сообщения об ошибке
  * @param {{timeout?: number}} [opts]
- * @returns {Promise<import('@playwright/test').Page>} то же окно
  */
-async function waitForWidgetSnapshot(app, widget, control, opts = {}) {
-    await widget.waitForLoadState('load');
-    await waitForMainLoaded(app, 'electron-widget.html', 'виджета', opts);
-    await untilReceived(widget, 'widget-style-update',
-        () => control.evaluate(() => window.timerController.pushWindowStyles()), opts);
-    return widget;
-}
-
-/**
- * То же для ЧАСОВ: снимок main отработан. Шаг 2 — тот же повтор
- * `pushWindowStyles()`: его `sendClockStyle()` уходит часам через main
- * каналом `set-clock-style` следом за снимком.
- *
- * @param {import('@playwright/test').ElectronApplication} app
- * @param {import('@playwright/test').Page} clock
- * @param {import('@playwright/test').Page} control — окно панели
- * @param {{timeout?: number}} [opts]
- * @returns {Promise<import('@playwright/test').Page>} то же окно
- */
-async function waitForClockSnapshot(app, clock, control, opts = {}) {
-    await clock.waitForLoadState('load');
-    await waitForMainLoaded(app, 'electron-clock-widget.html', 'часов', opts);
-    await untilReceived(clock, 'set-clock-style',
-        () => control.evaluate(() => window.timerController.pushWindowStyles()), opts);
-    return clock;
-}
-
-/**
- * Главный процесс видит окно с адресом `urlPart` загруженным
- * (`!webContents.isLoading()`): `did-stop-loading` идёт после
- * `did-finish-load`, значит слушатель снимка уже отработал и посылки ушли.
- */
-async function waitForMainLoaded(app, urlPart, name, opts = {}) {
+async function waitForMainSnapshot(app, page, urlPart, name, opts = {}) {
     const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    const mark = SNAPSHOT_MARK[urlPart];
+    await page.waitForLoadState('load');
+    const marker = `e2e-${Date.now()}-${Math.random()}`;
+    const received = await armReceived(page, mark.channel);
     const deadline = Date.now() + timeout;
     for (;;) {
-        const loaded = await app.evaluate(({ BrowserWindow }, part) => {
-            const win = BrowserWindow.getAllWindows()
-                .find((w) => !w.isDestroyed() && w.webContents.getURL().includes(part));
-            return !!win && !win.webContents.isLoading();
-        }, urlPart);
-        if (loaded) { return; }
+        const sent = await app.evaluate(({ BrowserWindow }, [part, m, mk]) => {
+            const live = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+            const own = live.filter((w) => w.webContents.getURL().includes(part));
+            if (!own.length || own.some((w) => w.webContents.isLoading())) { return false; }
+            const isOpen = live.some((w) => w.webContents.getURL().includes(m.neighbour));
+            for (const w of own) { w.webContents.send(m.channel, { isOpen, e2eMarker: mk }); }
+            return true;
+        }, [urlPart, mark, marker]);
+        if (sent) { break; }
         if (Date.now() > deadline) {
+            await received({ timeout: 1 }).catch(() => {});
             throw new Error(`окно ${name} не закончило загрузку за ${timeout} мс`);
         }
         await new Promise((r) => setTimeout(r, POLL_MS));
     }
+    await received({ match: { e2eMarker: marker }, timeout: Math.max(1000, deadline - Date.now()) });
+    return page;
+}
+
+/** Дисплей получил снимок main. `_control` — прежняя сигнатура (шаг 2 был через панель). */
+function waitForDisplaySnapshot(app, display, _control, opts = {}) {
+    return waitForMainSnapshot(app, display, 'display.html', 'дисплея', opts);
+}
+
+/** Виджет получил снимок main. */
+function waitForWidgetSnapshot(app, widget, _control, opts = {}) {
+    return waitForMainSnapshot(app, widget, 'electron-widget.html', 'виджета', opts);
+}
+
+/** Часы получили снимок main. */
+function waitForClockSnapshot(app, clock, _control, opts = {}) {
+    return waitForMainSnapshot(app, clock, 'electron-clock-widget.html', 'часов', opts);
 }
 
 /**
- * Дождаться, что открывшийся дисплей ВСТАЛ: документ загружен, размер окна
- * осел, отложенный пересчёт по последнему `resize` отработал, окно утихло.
+ * Сколько ждать, что заказанный при создании полноэкранный режим включится,
+ * прежде чем признать: здесь он не включается. Отсчёт — от вызова, то есть
+ * уже после `load` и появления окна.
+ */
+const FULLSCREEN_GRACE_MS = 1500;
+
+/**
+ * Дождаться, что открывшийся дисплей ВСТАЛ: полноэкранный режим включился
+ * (или явно не включается), размер окна осел, отложенный пересчёт по
+ * последнему `resize` отработал, окно утихло.
  *
- * Спеки ждали это паузой 2200–2400 мс. Окно создаётся с `fullscreen: true`;
- * где вход в полноэкранный режим анимирован, размер доезжает серией `resize`,
- * а места карточек пересчитываются по `CONFIG.RESIZE_DEBOUNCE` — замер,
- * сделанный раньше, видит промежуточное окно.
+ * Спеки ждали это паузой 2200–2400 мс. Окно создаётся с `fullscreen: true`,
+ * и на macOS вход анимирован около секунды; `setBounds` посреди перехода
+ * роняет Electron (разбор a-fullscreen-transition-is-a-condition-not-a-duration).
  *
- * Признаком служит именно осевший РАЗМЕР, а не `isFullScreen()`: замер
- * 30.10.2026 (macOS, e2e) — флаг остаётся false все 4.7 с наблюдения и на
- * основном мониторе (окно сразу 3440×1440 = границы экрана), и на Sidecar
- * (1314×955 = рабочая область). Ожидание флага висело бы до таймаута на
- * исправном приложении.
+ * Полноэкранный режим — УСЛОВИЕ (ревью B3, I2):
+ *  - флаг уже поднят — переход начат или окончен, дальше решает осевший размер;
+ *  - не поднят — ждём СОБЫТИЕ `enter-full-screen` (конец перехода) не дольше
+ *    `FULLSCREEN_GRACE_MS`. Не пришло — печатаем расхождение (фокус, границы):
+ *    замер 30.10.2026 (macOS, e2e, окно без фокуса) — флаг не поднимается ни
+ *    на основном мониторе, ни на Sidecar, и события нет все 5 с наблюдения.
+ *    Ждать до общего таймаута значило бы падать на исправном приложении.
  *
- * @param {import('@playwright/test').ElectronApplication} _app — для единообразия вызова
+ * Затем — осевший `innerSize` (4×150 мс), кадр и таймер длины debounce,
+ * взведённый после таймера приложения (как в `waitForResizeHandled`).
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
  * @param {import('@playwright/test').Page} display
  * @param {{timeout?: number}} [opts]
  * @returns {Promise<import('@playwright/test').Page>} то же окно
  */
-async function waitForDisplaySettled(_app, display, opts = {}) {
+async function waitForDisplaySettled(app, display, opts = {}) {
     const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
     await display.waitForLoadState('load');
+    const fs = await app.evaluate(async ({ BrowserWindow }, grace) => {
+        // Самое новое окно дисплея: id у webContents растёт с созданием.
+        const win = BrowserWindow.getAllWindows()
+            .filter((w) => !w.isDestroyed() && w.webContents.getURL().includes('display.html'))
+            .sort((a, b) => b.webContents.id - a.webContents.id)[0];
+        if (!win) { return { state: 'нет окна' }; }
+        if (win.isFullScreen()) { return { state: 'full' }; }
+        const state = await new Promise((resolve) => {
+            const onEnter = () => { clearTimeout(timer); resolve('entered'); };
+            const timer = setTimeout(() => { win.removeListener('enter-full-screen', onEnter); resolve('timeout'); }, grace);
+            win.once('enter-full-screen', onEnter);
+        });
+        return { state, focused: win.isFocused(), bounds: win.getBounds() };
+    }, FULLSCREEN_GRACE_MS);
+    if (fs.state !== 'full' && fs.state !== 'entered') {
+        console.log(`   [waitForDisplaySettled] полноэкранный режим не включился за ${FULLSCREEN_GRACE_MS} мс `
+            + `(${fs.state}; фокус ${fs.focused}; границы ${JSON.stringify(fs.bounds)}) — окно мерится оконным`);
+    }
     await waitForSteady(display, innerSize, { samples: 4, timeout, name: 'размер дисплея' });
     // Таймер длины debounce, взведённый ПОСЛЕ таймера приложения, — см.
     // waitForResizeHandled, п. 3.

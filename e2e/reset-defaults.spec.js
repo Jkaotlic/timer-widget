@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForClock, waitForDisplay, waitForWidget, reloadPanel, untilReceived, waitForQuiet,
+    waitForClock, waitForDisplay, waitForWidget, reloadPanel, armReceived, untilReceived, waitForQuiet,
     waitForDisplaySnapshot, waitForWidgetSnapshot, waitForClockSnapshot
 } = require('./window-ready');
 
@@ -108,8 +108,19 @@ test('«Сбросить всё» возвращает окно к виду чи
         }
 
         // --- СБРОС: КЛИКОМ по кнопке в своей вкладке ---
+        //
+        // Сброс ВИДЖЕТА шлёт часам `clock-settings` тоже (panel-reset.js,
+        // pushResetTarget). Посылки неотличимы по виду, и «первая после взвода»
+        // у часов могла бы оказаться этой, ещё бывшей в пути (ревью B3, I1).
+        // Поэтому приёмник часов взводится ДО сброса виджета и ждёт ВТОРУЮ.
+        const clockResets = await armReceived(wins.clock, TABS.clock.resetSent);
         for (const name of ['widget', 'clock', 'display']) {
             await control.click(TABS[name].chevron);
+            if (name === 'clock') {
+                await control.click(`${TABS[name].row} .reset-all`);
+                await clockResets({ count: 2 });
+                continue;
+            }
             await untilReceived(wins[name], TABS[name].resetSent,
                 () => control.click(`${TABS[name].row} .reset-all`));
         }
@@ -173,13 +184,14 @@ test('«Сбросить фон по умолчанию» возвращает �
             const el = document.getElementById('bgSolidColor');
             el.value = '#8b0000';
             el.dispatchEvent(new Event('input', { bubbles: true }));
-        }));
+        }), { match: { bgSolid: '#8b0000' } });
         const messyLook = await bgLook();
         expect(messyLook.color, 'фон не сменился — сбрасывать нечего').not.toBe(cleanLook.color);
 
         // --- КЛИК по кнопке сброса фона ---
         // Кнопка зовёт клик «По теме» — тот шлёт настройки дисплею.
-        await untilReceived(display, 'display-settings-update', () => control.click('#resetStyleBtn'));
+        await untilReceived(display, 'display-settings-update', () => control.click('#resetStyleBtn'),
+            { match: { bgMode: 'theme' } });
         // «Виджет не тронут» — утверждение об ОТСУТСТВИИ посылки. Без паузы:
         // протёкшая посылка виджету ушла бы из того же обработчика, то есть
         // раньше, чем эта, по тому же пути панель → main → виджет, где порядок

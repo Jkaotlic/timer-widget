@@ -51,9 +51,12 @@ async function openDisplay(app, control) {
     return waitForDisplaySnapshot(app, display, control);
 }
 
-/** Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ его посылку и утих. */
-function untilDisplayGot(display, action, channel = 'display-settings-update') {
-    return untilReceived(display, channel, action);
+/**
+ * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку, несущую
+ * `match`, и утих (ревью B3, I1: без `match` сошлась бы чужая посылка в пути).
+ */
+function untilDisplayGot(display, action, match, channel = 'display-settings-update') {
+    return untilReceived(display, channel, action, { match });
 }
 
 /** Текущие суммы на дисплее. */
@@ -238,7 +241,7 @@ test('раскладка «47-й этаж» появляется только с
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
 
-        await untilDisplayGot(display, () => btn.click(), 'display-layout');
+        await untilDisplayGot(display, () => btn.click(), { layout: 'floor47' }, 'display-layout');
 
         const seen = await display.evaluate(() => {
             const box = (id) => {
@@ -302,7 +305,8 @@ test('«Новое мероприятие» обнуляет экран, даж�
         await expect(control.locator('#eventReset')).toBeVisible();
         const resetAt = Date.now();
         // Обнуление — посылка накопителя дисплею (broadcastEventOverrun).
-        await untilDisplayGot(display, () => control.locator('#eventResetConfirm').click(), 'event-overrun-state');
+        await untilDisplayGot(display, () => control.locator('#eventResetConfirm').click(),
+            { finished: false, overrunSeconds: 0 }, 'event-overrun-state');
 
         const after = await money();
         console.log(`   после сброса: перелимит «${after.over}», итого «${after.total}»`);
@@ -357,7 +361,8 @@ test('«Завершить мероприятие» ЗАМОРАЖИВАЕТ и�
 
         await control.locator('#eventFinishBtn').click();
         await expect(control.locator('#eventFinish')).toBeVisible();
-        await untilDisplayGot(display, () => control.locator('#eventFinishConfirm').click(), 'event-overrun-state');
+        await untilDisplayGot(display, () => control.locator('#eventFinishConfirm').click(),
+            { finished: true }, 'event-overrun-state');
 
         const atFreeze = await money();
         console.log(`   в момент заморозки: перелимит «${atFreeze.over}», итого «${atFreeze.total}»`);
@@ -559,7 +564,8 @@ test('47-й этаж: сумма растёт на месте, а таймер �
         await waitForQuiet(display);
 
         await untilDisplayGot(display,
-            () => control.locator('#displayLayoutGrid .layout-btn[data-layout="floor47"]').click(), 'display-layout');
+            () => control.locator('#displayLayoutGrid .layout-btn[data-layout="floor47"]').click(),
+            { layout: 'floor47' }, 'display-layout');
 
         const zero = await display.evaluate(moneyProbe, 0);
         const million = await display.evaluate(moneyProbe, 9);
@@ -571,7 +577,8 @@ test('47-й этаж: сумма растёт на месте, а таймер �
 
         const requested = million.transform;
         for (const style of ['flip', 'digits', 'analog', 'circle']) {
-            await untilDisplayGot(display, () => control.locator(`#displayTimerStyle [data-val="${style}"]`).click());
+            await untilDisplayGot(display, () => control.locator(`#displayTimerStyle [data-val="${style}"]`).click(),
+                { displayTimerStyle: style });
             // Резерв ширины — в КАЖДОМ стиле: у «Флипа» у значения свои поля,
             // и резерв числом в `ch` там не сходился (139 → 151px).
             const low = await display.evaluate(moneyProbe, 0);
@@ -585,7 +592,8 @@ test('47-й этаж: сумма растёт на месте, а таймер �
 
         // Ресайз окна: уступка пересчитывается по НОВЫМ местам карточек, а не
         // по тем, что были до debounce (замечание проверки 30.09.2026).
-        await untilDisplayGot(display, () => control.locator('#displayTimerStyle [data-val="flip"]').click());
+        await untilDisplayGot(display, () => control.locator('#displayTimerStyle [data-val="flip"]').click(),
+            { displayTimerStyle: 'flip' });
         // resizeDisplay сам ждёт размер и отложенный пересчёт; хвосты — кадр
         // и переходы transform.
         const small = await resizeDisplay(app, display, { w: 1100, h: 700 });
@@ -593,7 +601,8 @@ test('47-й этаж: сумма растёт на месте, а таймер �
         const resized = await display.evaluate(moneyProbe, 9);
         console.log(`   после ресайза ${small.w}×${small.h}: пересечение ${resized.overlap}px², ${resized.transform}`);
         expect(resized.overlap, 'после ресайза таймер лёг на деньги').toBe(0);
-        await untilDisplayGot(display, () => control.locator('#displayTimerStyle [data-val="circle"]').click());
+        await untilDisplayGot(display, () => control.locator('#displayTimerStyle [data-val="circle"]').click(),
+            { displayTimerStyle: 'circle' });
         await resizeDisplay(app, display, { w: 1280, h: 720 });
         await waitForQuiet(display);
         // Уступка временная: вернувшись на «Круг», таймер снова того размера,
