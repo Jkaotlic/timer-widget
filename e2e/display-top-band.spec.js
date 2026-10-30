@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const {
+    waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived
+} = require('./window-ready');
 const { pickWindowSizes } = require('./window-sizes');
 const { resizeDisplay } = require('./display-window');
 
@@ -44,6 +46,17 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
 }, [id, value]);
 
 const HERO_GAP = 8;
+
+/**
+ * Послать дисплею стиль (голым общим именем, как и раньше) и дождаться, что
+ * окно его ПОЛУЧИЛО и утихло: обработчик синхронный, за ним — пересчёт
+ * раскладки на кадре и переходы (`waitForQuiet` внутри `untilReceived`).
+ */
+function sendStyle(control, display, style) {
+    return untilReceived(display, 'display-settings-update', () => control.evaluate((st) => {
+        window.ipcRenderer.send('display-settings-update', { timerStyle: st });
+    }, style), { match: { timerStyle: style } });
+}
 
 /**
  * Ставит окну РОВНО запрошенный размер и ждёт, пока окно это подтвердит.
@@ -137,22 +150,28 @@ test('карточка сверху не ложится на подпись «О
         });
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
         const display = await waitForDisplay(app);
-        await control.waitForTimeout(2000);
+        // Снимок main обработан, окно ВСТАЛО (полноэкранный вход или его
+        // невозможность, раскладка) — было 2000 мс.
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
         // И масштаб таймера — тоже к умолчанию. Профиль общий на весь прогон, а
         // соседняя спека (display-timer-scale) оставляет его увеличенным: при
         // 150 % колонка героя выше, и «карточка легла на подпись» означает не
         // дефект полосы, а чужой масштаб. Проверка здесь — про КОМПОЗИЦИЮ ПО
         // УМОЛЧАНИЮ, и начинать её надо от умолчания.
-        await control.evaluate(() => {
-            const el = document.getElementById('displayTimerScale');
-            if (!el) { return; }
-            el.value = '100';
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        await setToggle(control, 'showCurrentTime', true);
-        await setToggle(control, 'showHeroLabel', true);
-        await display.waitForTimeout(900);
+        // Все три правки ДОШЛИ до дисплея (посылка — полный снимок, ждём ту,
+        // что несёт все три значения) и окно утихло — было 900 мс.
+        await untilReceived(display, 'display-settings-update', async () => {
+            await control.evaluate(() => {
+                const el = document.getElementById('displayTimerScale');
+                if (!el) { return; }
+                el.value = '100';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            await setToggle(control, 'showCurrentTime', true);
+            await setToggle(control, 'showHeroLabel', true);
+        }, { match: { displayTimerScale: 100, showCurrentTime: true, showHeroLabel: true } });
 
         // Экран может не вместить крупные размеры. Тогда они не подменяются
         // молча тем, что влезло: список либо сокращается до помещающихся, либо
@@ -169,10 +188,9 @@ test('карточка сверху не ложится на подпись «О
             await resizeDisplay(app, display, size, { strict: true });
 
             for (const style of STYLES) {
-                await control.evaluate((st) => {
-                    window.ipcRenderer.send('display-settings-update', { timerStyle: st });
-                }, style);
-                await display.waitForTimeout(700);
+                // Стиль дошёл, пересчёт раскладки (кадр + переходы) доехал —
+                // было 700 мс.
+                await sendStyle(control, display, style);
 
                 const m = await display.evaluate(measure, HERO_GAP);
                 const where = `${size.w}×${size.h}, ${m.style}`;
@@ -241,16 +259,12 @@ test('карточка сверху не ложится на подпись «О
         // меряют. Стабильность при повторе — это и есть доказательство, что
         // замер приведён к общей точке отсчёта, а не подан себе на вход.
         await resizeDisplay(app, display, sizes[sizes.length - 1]);
-        await control.evaluate(() => {
-            window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' });
-        });
-        await display.waitForTimeout(900);
+        await sendStyle(control, display, 'analog');
         const first = await display.evaluate(measure, HERO_GAP);
         for (let i = 0; i < 3; i++) {
-            await control.evaluate(() => {
-                window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' });
-            });
-            await display.waitForTimeout(500);
+            // Каждая посылка дождана до следующей — одинаковые посылки не
+            // перепутаются (было 500 мс).
+            await sendStyle(control, display, 'analog');
         }
         const again = await display.evaluate(measure, HERO_GAP);
         console.log(`идемпотентность: ${first.shrink}/${first.band} → ${again.shrink}/${again.band}`);

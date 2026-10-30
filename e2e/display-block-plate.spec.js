@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const {
+    waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, armReceived
+} = require('./window-ready');
 
 /**
  * Просьба 24.08.2026: «при градиенте у функциональных блоков белая подложка».
@@ -66,10 +68,13 @@ function painted(surface) {
 test('на цветном градиенте у блоков и плашки нет плиты, а у карточки таймера — есть', async () => {
     test.setTimeout(180000);
     const { app, control } = await launchApp();
+    let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        display = await waitForDisplay(app);
+        // Снимок main обработан, окно встало — было 2200 мс.
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
 
         await control.click('.tab-btn[data-tab="display"]');
         for (const key of ['showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showStatusPill']) {
@@ -78,8 +83,11 @@ test('на цветном градиенте у блоков и плашки н�
 
         // Тот самый фон из жалобы: цветной градиент, среднюю яркость которого
         // страж тона считает светлой.
-        await control.click('.bg-mode-btn[data-mode="gradient"]');
-        await control.waitForTimeout(700);
+        // Режим фона дошёл до дисплея — было 700 мс.
+        await untilReceived(display, 'display-settings-update',
+            () => control.click('.bg-mode-btn[data-mode="gradient"]'), { match: { bgMode: 'gradient' } });
+        // Цвета — посылкой, несущей ОБА (input дебаунсится панелью).
+        const colors = await armReceived(display, 'display-settings-update');
         await control.evaluate(() => {
             for (const [id, hex] of [['bgGrad1', '#0a84ff'], ['bgGrad2', '#30d158']]) {
                 const el = document.getElementById(id);
@@ -88,6 +96,7 @@ test('на цветном градиенте у блоков и плашки н�
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
+        await colors({ match: { bgMode: 'gradient', bgGrad1: '#0a84ff', bgGrad2: '#30d158' } });
         // Настройки уезжают в дисплей с задержкой (панель их дебаунсит), а
         // тон ставит уже само окно — ждём его, а не «на всякий случай».
         await display.waitForFunction(
@@ -99,8 +108,9 @@ test('на цветном градиенте у блоков и плашки н�
         expect(tone, 'сценарий вырожден: страж тона не считает этот фон светлым').toContain('on-light-bg');
 
         // --- «Флип» ---
-        await control.click('#displayTimerStyle button[data-val="flip"]');
-        await display.waitForTimeout(800);
+        // Стиль дошёл, окно утихло (переходы плиты) — было 800 мс.
+        await untilReceived(display, 'display-settings-update',
+            () => control.click('#displayTimerStyle button[data-val="flip"]'), { match: { displayTimerStyle: 'flip' } });
 
         const value = await paint(display, '#eventTimeBlock .info-value');
         expect(painted(value), `флип: у значения блока осталась плита (${JSON.stringify(value)})`).toBe(false);
@@ -117,8 +127,8 @@ test('на цветном градиенте у блоков и плашки н�
         expect(painted(card), 'флип: зонд не видит плиту даже на карточке таймера').toBe(true);
 
         // --- «Аналог» ---
-        await control.click('#displayTimerStyle button[data-val="analog"]');
-        await display.waitForTimeout(800);
+        await untilReceived(display, 'display-settings-update',
+            () => control.click('#displayTimerStyle button[data-val="analog"]'), { match: { displayTimerStyle: 'analog' } });
 
         const analogPill = await paint(display, '.status-pill');
         expect(analogPill.backgroundColor, 'аналог: плашка состояния залита белым').not.toBe('rgb(255, 255, 255)');
@@ -130,6 +140,7 @@ test('на цветном градиенте у блоков и плашки н�
         // Профиль e2e ОБЩИЙ на весь прогон: цветной фон, оставленный здесь,
         // сделал бы «светлым» тон в соседних спеках, которые меряют умолчание.
         // Возвращаем и режим фона, и цвета, и стиль, и тумблеры.
+        const restored = display ? await armReceived(display, 'display-settings-update').catch(() => null) : null;
         await control.evaluate(() => {
             for (const [id, hex] of [['bgGrad1', '#0f0c29'], ['bgGrad2', '#302b63']]) {
                 const el = document.getElementById(id);
@@ -147,7 +158,19 @@ test('на цветном градиенте у блоков и плашки н�
         for (const key of ['showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft']) {
             await setToggle(control, key, false).catch(() => {});
         }
-        await control.waitForTimeout(500);
+        // Возврат ДОШЁЛ до конца (было 500 мс): посылка, несущая все
+        // возвращённые значения, — значит отложенный `input` цветов отработал,
+        // хранилище панели записано, main запомнил. Не дошёл — уборка теста не
+        // роняет, но говорит об этом.
+        if (restored) {
+            await restored({
+                match: {
+                    bgMode: 'theme', bgGrad1: '#0f0c29', bgGrad2: '#302b63', displayTimerStyle: 'circle',
+                    showCurrentTime: false, showEventTime: false, showEndTime: false, showTimeLeft: false
+                },
+                timeout: 5000
+            }).catch((e) => console.log(`   возврат профиля не подтверждён: ${e.message.split('\n')[0]}`));
+        }
         await app.close();
     }
 });
