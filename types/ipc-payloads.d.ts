@@ -130,8 +130,20 @@ interface ColorsUpdate {
 /** Патч цветов (`updateColors`): `null` в поле — «сбрось это поле». */
 type ColorsPatch = { [K in keyof ColorsUpdate]?: ColorsUpdate[K] | null };
 
+/**
+ * Стиль часов: `clock-widget-set-style` (панель → main, panel-clock.js
+ * `sendClockStyle`) и `set-clock-style` (main → часы, main-relay-ipc.js и
+ * снимок при открытии в main-windows.js). Голая строка; main пропускает только
+ * имена CONFIG.TIMER_STYLES (relay-payload.js). Здесь — строка, а не союз
+ * имён: значение берётся из `<select>.value`, и сужать его до союза пришлось бы
+ * приведением, которое ничего не проверяет.
+ */
+type ClockStyleName = string;
+
 interface IpcPayloads {
     'timer-state': TimerState;
+    'clock-widget-set-style': ClockStyleName;
+    'set-clock-style': ClockStyleName;
     'widget-style-update': WidgetStyleUpdate;
     'display-settings-update': DisplaySettingsUpdate;
     'widget-colors-update': ColorsUpdate;
