@@ -42,10 +42,6 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // обработчика размера: он обязан его спрашивать.
     let controlBoundsBeforeCollapse = null;
     let collapsedWindow = null;
-    // Запрос размера по содержимому, пришедший в свёрнутое окно: применяется
-    // при развороте (поля сливаются, последний побеждает). Принадлежит
-    // collapsedWindow и стирается вместе с ним.
-    let deferredControlSize = null;
 
     // Изменение размера окна управления
     // size.width / size.height опциональны: если поле не передано (или не Finite),
@@ -54,34 +50,23 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // при каждом setSize (HiDPI) и сбивает ручную высоту, которую выставил юзер.
     ipcMain.on('resize-control-window', (event, size) => {
         if (!windows.controlWindow || !size || typeof size !== 'object') { return; }
-        // Свёрнутое окно размер по содержимому сейчас НЕ получает: его размер —
-        // полоса. Запрос ОТКЛАДЫВАЕТСЯ до разворота: он про развёрнутую панель,
-        // и он свежее границ «до свёртки». Запрос приходит из рендерера, который
-        // про полосу знать не обязан: отложенный авто-размер после загрузки
-        // (control-app.js, autoResizeWindow через 100 мс) после свёртки,
-        // успевшей раньше, оставлял окно 400×660 поверх всех окон с разметкой
-        // полосы. Правило одно и здесь, у владельца состояния свёртки, — а не
-        // копией в каждом пути рендерера, который шлёт этот канал.
-        if (collapsedWindow === windows.controlWindow) {
-            const next = Object.assign({}, deferredControlSize);
-            if (Number.isFinite(size.width)) { next.width = size.width; }
-            if (Number.isFinite(size.height)) { next.height = size.height; }
-            deferredControlSize = next;
-            return;
-        }
-        applyControlSize(windows.controlWindow, size);
-    });
-
-    function applyControlSize(win, size) {
+        // Свёрнутое окно размер по содержимому НЕ получает: его размер — полоса,
+        // а размер панели вернёт разворот (границы «до»). Запрос приходит из
+        // рендерера, который про полосу знать не обязан: отложенный авто-размер
+        // после загрузки (control-app.js, autoResizeWindow через 100 мс) после
+        // свёртки, успевшей раньше, оставлял окно 400×660 поверх всех окон с
+        // разметкой полосы. Правило одно и здесь, у владельца состояния свёртки,
+        // — а не копией в каждом пути рендерера, который шлёт этот канал.
+        if (collapsedWindow === windows.controlWindow) { return; }
         // Монитор — тот, на котором СТОИТ окно, а не главный, и в глобальных
         // координатах (workArea.x/y). По главному монитору окно на втором,
         // стоящем ниже, на каждом ресайзе «вылезало» за низ и переезжало на
         // главный; а workArea.y (меню macOS, панель задач сверху) не учитывался
         // вовсе (MAIN-01).
-        const area = screen.getDisplayMatching(win.getBounds()).workArea;
+        const area = screen.getDisplayMatching(windows.controlWindow.getBounds()).workArea;
         const screenWidth = area.width;
         const screenHeight = area.height;
-        const [curW, curH] = win.getSize();
+        const [curW, curH] = windows.controlWindow.getSize();
         const w = Number.isFinite(size.width) ? size.width : curW;
         const h = Number.isFinite(size.height) ? size.height : curH;
         // Нижний clamp = BrowserWindow min (см. createControlWindow). Верхний —
@@ -89,7 +74,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         // того, открыт ли ящик (канал control-drawer). Без этого слагаемого запрос
         // «дай 3000» проходил бы мимо потолка в setSize и обрезался уже Electron'ом,
         // а вычисленный тут targetWidth расходился бы с фактическим размером.
-        const [ceilingW, ceilingH] = win.getMaximumSize();
+        const [ceilingW, ceilingH] = windows.controlWindow.getMaximumSize();
         const maxW = ceilingW > 0 ? ceilingW : CONFIG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER;
         const maxH = ceilingH > 0 ? ceilingH : CONFIG.CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER;
         const targetWidth = Math.max(
@@ -105,14 +90,14 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         // иногда округляет outer на 1px при каждом вызове, что даёт дрейф).
         if (targetWidth === curW && targetHeight === curH) { return; }
 
-        const [x, y] = win.getPosition();
-        win.setSize(targetWidth, targetHeight);
+        const [x, y] = windows.controlWindow.getPosition();
+        windows.controlWindow.setSize(targetWidth, targetHeight);
 
         const bottom = area.y + area.height;
         if (y + targetHeight > bottom) {
-            win.setPosition(x, Math.max(area.y, bottom - targetHeight - 20));
+            windows.controlWindow.setPosition(x, Math.max(area.y, bottom - targetHeight - 20));
         }
-    }
+    });
 
     // Ящик настроек — ВТОРОЙ уровень потолка ширины окна управления.
     //
@@ -173,30 +158,20 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // другое окно, и чужие границы ей не годятся.
     const reloadBound = new WeakSet();
 
-    // applyDeferred = false — разворот перезагрузкой: запрос размера был от
-    // СТАРОЙ страницы, новая пришлёт свой.
-    function expandControlWindow(win, applyDeferred) {
+    function expandControlWindow(win) {
         // Разворот: пол возвращается ДО восстановления границ, иначе окно можно
         // оставить панелью высотой 52 — это обрезанная раскладка, которую чинила
         // задача про минимальную высоту.
         win.setMinimumSize(CONFIG.CONTROL_WINDOW_MIN_WIDTH, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
         win.setAlwaysOnTop(false);
         const prev = collapsedWindow === win ? controlBoundsBeforeCollapse : null;
-        const deferred = collapsedWindow === win ? deferredControlSize : null;
         controlBoundsBeforeCollapse = null;
         collapsedWindow = null;
-        deferredControlSize = null;
         if (prev) {
             win.setBounds(prev);
         } else {
             const [curW] = win.getSize();
             win.setSize(curW, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
-        }
-        // Место — до свёртки (верхний край, как и весь разворот), размер — из
-        // отложенного запроса тем же путём, что и любой запрос: потолок,
-        // монитор, подъём от низа.
-        if (applyDeferred && deferred) {
-            applyControlSize(win, deferred);
         }
     }
 
@@ -205,7 +180,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         reloadBound.add(win);
         win.webContents.on('did-start-loading', () => {
             if (collapsedWindow !== win || win.isDestroyed()) { return; }
-            expandControlWindow(win, false);
+            expandControlWindow(win);
         });
     }
 
@@ -227,7 +202,6 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             if (collapsedWindow !== win || !controlBoundsBeforeCollapse) {
                 controlBoundsBeforeCollapse = win.getBounds();
                 collapsedWindow = win;
-                deferredControlSize = null;   // чужой запрос (прежнего окна) не наследуется
             }
             bindReloadExpand(win);
             const { x, y } = win.getBounds();
@@ -243,7 +217,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             return;
         }
 
-        expandControlWindow(win, true);
+        expandControlWindow(win);
     });
 
     // Управление окном панели управления
