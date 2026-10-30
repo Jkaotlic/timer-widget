@@ -546,17 +546,35 @@ test('масштаб виджета действует и на стиль «Ци
         // ниже он либо совпадёт с уже пришедшим 100 и ничего не сделает, либо
         // станет тем самым «первым значением» сам — и тогда РЕАЛЬНОЕ
         // изменение на 250 будет уже вторым, для которого резайз применяется.
+        // Исход прайминга ИЗВЕСТЕН заранее. Смена стиля выше уже отправила
+        // виджету timerScale (сборка widget-style-update в panel-state.js кладёт
+        // его всегда), значит `_lastPushedTimerScale` там определён и равен
+        // значению ползунка. Отсюда два случая:
+        //   - ползунок не на 100 → виджет зовёт resizeToScale(100): окно
+        //     WIDGET_BASE_SIZE × WIDGET_BASE_SIZE (квадрат, windowHeightFor = ширина);
+        //     база 250 = CONFIG.WIDGET_DEFAULT_WIDTH (равенство держит
+        //     tests/constants.test.js и разбор там же);
+        //   - ползунок уже на 100 → посылка ничего не меняет, в пути ничего нет.
+        // Ждём ровно этого, а не «перестало меняться».
+        const primeFrom = await control.evaluate(() => document.getElementById('timerScale').value);
         await control.evaluate(() => {
             const slider = document.getElementById('timerScale');
             slider.value = '100';
             slider.dispatchEvent(new Event('input', { bubbles: true }));
         });
-        // Паузы после прайминга не нужно: 100 и 250 идут одним путём
-        // (панель → главный процесс → виджет), и этот путь сохраняет порядок —
-        // 250 не обгонит 100. Но 100 может и сам поменять окно: общий профиль
-        // мог оставить виджет на другом масштабе. Поэтому «до» — ОСЕВШИЙ размер
-        // (settledSize), и кегль «до» снимается уже с него.
-        const sizeBefore = await settledSize(widget);
+        let sizeBefore;
+        if (primeFrom !== '100') {
+            const base = CONFIG.WIDGET_DEFAULT_WIDTH;
+            await expect.poll(() => widget.evaluate(innerSize),
+                `прайминг 100 % обязан дать окно ${base}×${base}`).toEqual({ w: base, h: base });
+            // Кадр: обработчик resize (подгонка кегля) рассылается до колбэков кадра.
+            await widget.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+            sizeBefore = await widget.evaluate(innerSize);
+            console.log(`   прайминг ${primeFrom} % → 100 %: окно ${sizeBefore.w}×${sizeBefore.h}`);
+        } else {
+            sizeBefore = await settledSize(widget);
+            console.log(`   прайминг: ползунок уже на 100 %, окно ${sizeBefore.w}×${sizeBefore.h}`);
+        }
         const before = await widget.evaluate(measureWidgetDigits);
 
         // Ползунок «Масштаб» во вкладке «Виджет» реально меняет размер ОКНА
