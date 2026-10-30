@@ -167,7 +167,22 @@ test('свёртка в первые 100 мс после загрузки не �
             expect(fit.scroll, `несжатое содержимое ${fit.scroll} не влезло в ${fit.client}: перемер мерил сжатую панель`)
                 .toBeLessThanOrEqual(fit.client + 1);
         }
-        expect(expected, 'содержимое не переросло пол — проверка ничего не различает').toBeGreaterThan(limits.minH);
+        // Различитель «подгонка ≠ пол» осмыслен, только если ЭКРАН вмещает
+        // больше пола: main режет высоту по `область − 50` и потолку окна. На
+        // macOS CI (1024×768, область 677) это 627 < пола 660, и цель равна
+        // полу при любом поведении приложения (диагноз CI 30.10.2026). Тогда
+        // не утверждаем, а говорим вслух: первая половина теста (полоса не
+        // перезаписана, просьба после разворота выполнена) проверена и здесь,
+        // различитель — на экранах выше (ubuntu, windows, локальный).
+        const room = Math.min(limits.areaH - 50, limits.maxH);
+        if (room <= limits.minH) {
+            const note = `экран: область ${limits.areaH} − 50 и потолок ${limits.maxH} дают ${room} ≤ пола ${limits.minH} — `
+                + 'подгонка неотличима от пола, различитель НЕ проверен';
+            console.log(`   ${note}`);
+            test.info().annotations.push({ type: 'not-verified', description: note });
+        } else {
+            expect(expected, 'содержимое не переросло пол — проверка ничего не различает').toBeGreaterThan(limits.minH);
+        }
     } finally {
         await app.close();
     }
