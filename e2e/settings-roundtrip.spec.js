@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { reloadPanel } = require('./window-ready');
 
 /**
  * Круговой рейс настроек: выставил → перезагрузил окно → значение вернулось.
@@ -192,9 +193,8 @@ async function resetStorages(control) {
     await control.evaluate((keys) => {
         for (const key of keys) { localStorage.removeItem(key); }
     }, TOUCHED_KEYS);
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(1200);
+    // Контроллер встал, стартовая рассылка ушла (раньше пауза 1200 мс).
+    await reloadPanel(control);
 }
 
 // Читает текущее состояние тех же контролов.
@@ -234,8 +234,19 @@ test('все настройки панели переживают перезаг
         'значение не удалось выставить — тест бы ничего не проверил'
     ).toEqual([]);
 
-    // Даём обработчикам дописать все три хранилища.
-    await control.waitForTimeout(1200);
+    // Хранилища пишутся СИНХРОННО в обработчиках change/click (saveExtSettings,
+    // pushClockSettings, clockShowTicks) — каждая запись собирает ВСЕ контролы
+    // таблицей. Отложен один путь: `input` цветов фона (debounce →
+    // pushDisplaySettings → saveExtSettings), и пишет он то же, что уже
+    // записали синхронные обработчики после него. Условие — цвета плана в
+    // хранилище (раньше пауза 1200 мс «дать дописать»).
+    const colors = PLAN.filter((i) => i.kind === 'color');
+    await expect.poll(() => control.evaluate((ids) => {
+        const ext = JSON.parse(localStorage.getItem('displayExtSettings') || '{}');
+        const byEl = { bgSolidColor: 'bgSolid', bgGrad1: 'bgGrad1', bgGrad2: 'bgGrad2' };
+        return ids.map((id) => ext[byEl[id]]);
+    }, colors.map((i) => i.id)), 'цвета фона не дошли до displayExtSettings')
+        .toEqual(colors.map((i) => i.value));
 
     const stored = await control.evaluate(() => ({
         ext: localStorage.getItem('displayExtSettings'),
@@ -245,9 +256,9 @@ test('все настройки панели переживают перезаг
     expect(stored.ext, 'displayExtSettings не записан вовсе').toBeTruthy();
 
     // Перезагрузка окна — то же, что перезапуск приложения для рендерера.
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(2000);
+    // loadSettings — синхронная часть конструктора; reloadPanel ждёт его и
+    // стартовую рассылку (раньше пауза 2000 мс).
+    await reloadPanel(control);
 
     const after = await control.evaluate(readPlan, PLAN);
 
@@ -293,7 +304,10 @@ test('синхронизация стиля часов переживает пе
         sync.checked = true;
         sync.dispatchEvent(new Event('change'));
     });
-    await control.waitForTimeout(1200);
+    // Обработчики клика и галочки синхронны; ждётся то, что проверяется
+    // ниже, — запись в хранилище (раньше пауза 1200 мс).
+    await expect.poll(() => control.evaluate(() => JSON.parse(localStorage.getItem('displayExtSettings') || '{}').syncClockStyle),
+        'syncClockStyle не записан в displayExtSettings').toBe(true);
 
     const before = await control.evaluate(() => ({
         sync: document.getElementById('syncClockStyle').checked,
@@ -312,9 +326,7 @@ test('синхронизация стиля часов переживает пе
         'syncClockStyle не записан в displayExtSettings'
     ).toBe(true);
 
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(2000);
+    await reloadPanel(control);
 
     const after = await control.evaluate(() => ({
         sync: document.getElementById('syncClockStyle').checked,
@@ -374,7 +386,12 @@ test('цвета тем переживают перезагрузку окна �
             if (buttons[pick.index]) { buttons[pick.index].click(); }
         }
     }, THEME_PICKS);
-    await control.waitForTimeout(1200);
+    // Клик по теме пишет цвета синхронно (updateColors → хранилище окна);
+    // ждётся записанное — раньше пауза 1200 мс.
+    await expect.poll(() => control.evaluate((picks) => picks.map((p) => {
+        const c = JSON.parse(localStorage.getItem(p.key) || 'null');
+        return c ? c.timer : null;
+    }), THEME_PICKS), 'цвета тем не записаны').toEqual(THEME_PICKS.map((p) => p.timer));
 
     const before = await control.evaluate(readThemes, THEME_PICKS);
 
@@ -384,9 +401,7 @@ test('цвета тем переживают перезагрузку окна �
         .map((p) => `${p.grid}: ожидали активной кнопку #${p.index}, активна #${before[p.grid].activeIndex}`);
     expect(notPicked, 'тему не удалось выбрать — тест бы ничего не проверил').toEqual([]);
 
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
-    await control.waitForTimeout(2000);
+    await reloadPanel(control);
 
     const after = await control.evaluate(readThemes, THEME_PICKS);
 
