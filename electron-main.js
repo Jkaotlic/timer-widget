@@ -175,6 +175,11 @@ if (__forbiddenSwitchFound || __forbiddenEnvFound) {
 //    создаётся здесь ОДИН раз (main-state.js) и передаётся модулям;
 //  • настоящий ipcMain (rawIpcMain) не покидает этот файл — модули получают
 //    только обвязку с проверкой отправителя (SEC-07).
+// Общие файлы окон — ES-модули без "type" в package.json: require(esm) их
+// графа печатает MODULE_TYPELESS_PACKAGE_JSON на каждом старте. Фильтр — ДО
+// первого require общего модуля, но ПОСЛЕ гарда ключей отладки (SEC-04); гасит только этот код (main-warnings.js).
+require('./main-warnings').installWarningFilter();
+
 const NavigationGuard = require('./navigation-guard');
 const AppScheme = require('./app-scheme');
 const { createAppProtocolHandler, registerAppProtocol } = require('./main-app-protocol');
