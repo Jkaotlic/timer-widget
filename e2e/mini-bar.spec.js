@@ -92,6 +92,15 @@ test('окно сжимается в полосу и разворачивает�
 test('свёртка в первые 100 мс после загрузки не перезаписывается отложенным авто-размером', async () => {
     const { app, control } = await launchApp();
     try {
+        // Окно НИЖЕ подгонки (как после ручного ресайза): содержимое панели
+        // на стенде выше пола 660 (замер 30.10.2026: ~730 px дочерних блоков,
+        // подгонка упирается в потолок 740). Без этого разворот на границы
+        // «до свёртки» неотличим от перемера содержимого.
+        await app.evaluate(({ BrowserWindow }, h) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            const b = w.getBounds();
+            w.setBounds({ x: b.x, y: b.y, width: b.width, height: h });
+        }, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
         const startupResize = app.evaluate(({ ipcMain }) => new Promise(
             (resolve) => ipcMain.once('resize-control-window', () => resolve(Date.now()))
         ));
@@ -110,6 +119,48 @@ test('свёртка в первые 100 мс после загрузки не �
         expect(state.onTop, 'полоса обязана быть поверх окон').toBe(true);
         expect(state.bounds.height, `высота окна ${state.bounds.height}: авто-размер развернул полосу`).toBeLessThanOrEqual(120);
         await control.waitForFunction(() => window.innerHeight <= 120);
+
+        // Авто-размер, пришедший в полосу, main отбросил: он мерил СВЁРНУТУЮ
+        // раскладку. Поэтому развёрнутая панель обязана перемерить содержимое
+        // сама — иначе остаётся высота «до свёртки», ниже содержимого.
+        await app.evaluate(({ ipcMain }) => {
+            global.__refitAsked = null;
+            ipcMain.once('resize-control-window', (_e, size) => { global.__refitAsked = size; });
+        });
+        await control.evaluate(() => window.miniBar.expand());
+        await expect.poll(async () => (await app.evaluate(winState)).onTop).toBe(false);
+        await expect.poll(() => app.evaluate(() => global.__refitAsked),
+            { message: 'после разворота панель не попросила размер по содержимому' }).not.toBeNull();
+        const asked = await app.evaluate(() => global.__refitAsked);
+        // Выдано — то, что main делает из просьбы: пол, потолок окна, рабочая
+        // область монитора. Запрошенное ≠ выданное — печатаем обе.
+        const limits = await app.evaluate(({ BrowserWindow, screen }, minH) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            const area = screen.getDisplayMatching(w.getBounds()).workArea;
+            return { maxH: w.getMaximumSize()[1], areaH: area.height, minH };
+        }, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+        const expected = Math.max(limits.minH, Math.min(asked.height, limits.areaH - 50, limits.maxH));
+        const fitted = await waitForSteady(app, winState, { name: 'границы после разворота' });
+        console.log(`   просьба ${JSON.stringify(asked)}, цель ${expected} (потолок ${limits.maxH}, область ${limits.areaH}), выдано ${JSON.stringify(fitted.bounds)}`);
+        expect(fitted.bounds.height, 'после разворота высота окна не подогнана под просьбу').toBe(expected);
+        // Просьба — про НЕСЖАТОЕ содержимое: компактная ступень ужимает панель
+        // ровно в окно, и замер по ней просил «окно + 48» (замер 30.10.2026:
+        // 708 при содержимом 732). Если просьба не упёрлась в потолок, несжатое
+        // содержимое обязано поместиться в выданное окно.
+        if (expected === asked.height) {
+            const fit = await control.evaluate(() => {
+                const b = document.body;
+                const had = ['compact-panel', 'compact-panel-2'].filter((c) => b.classList.contains(c));
+                had.forEach((c) => b.classList.remove(c));
+                const p = document.querySelector('.control-panel');
+                const r = { scroll: p.scrollHeight, client: p.clientHeight };
+                had.forEach((c) => b.classList.add(c));
+                return r;
+            });
+            expect(fit.scroll, `несжатое содержимое ${fit.scroll} не влезло в ${fit.client}: перемер мерил сжатую панель`)
+                .toBeLessThanOrEqual(fit.client + 1);
+        }
+        expect(expected, 'содержимое не переросло пол — проверка ничего не различает').toBeGreaterThan(limits.minH);
     } finally {
         await app.close();
     }

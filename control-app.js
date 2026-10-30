@@ -55,6 +55,10 @@
 
         /** Ячейки вида (panel-presets.js install); до установки — null. */
         let presetsApi = null;
+        // Компактный режим (panel-compact.js): подгонка окна меряет панель через
+        // него НЕСЖАТОЙ (autoResizeWindow).
+        /** @type {ReturnType<typeof PanelCompact.bindCompactMode>} */
+        let panelCompact = null;
         /** Экземпляр панели; создаётся ниже, до этого — null. any: методы примесей типы не видят (как и прежний window.X). @type {any} */
         let timerController = null;
 
@@ -1445,7 +1449,11 @@
                 }
 
                 const panel = document.querySelector('.control-panel');
-                const contentHeight = panel.scrollHeight;
+                // Несжатой: сжатая панель ужата ровно в окно и «сколько нужно»
+                // по ней не узнать (panel-compact.js, naturalHeight).
+                const contentHeight = panelCompact
+                    ? panelCompact.naturalHeight()
+                    : panel.scrollHeight;
                 const margin = 0; // shell is edge-to-edge; no transparent safe-area card
                 const extra = 48; // titlebar/compositor breathing room
 
@@ -1678,9 +1686,24 @@
         Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
         const _tc = () => timerController;
+        // Мерить — когда main УЖЕ вернул окну размер панели: признак — `resize`
+        // окна выше полосы (main ограничивает её 120 px), а не пауза. Свернули
+        // снова раньше — перемер не нужен.
+        const refitAfterExpand = () => {
+            const onResize = () => {
+                if (window.miniBar?.isCollapsed()) { window.removeEventListener('resize', onResize); return; }
+                if (window.innerHeight <= 120) { return; }
+                window.removeEventListener('resize', onResize);
+                requestAnimationFrame(() => { if (!window.miniBar?.isCollapsed()) { _tc()?.autoResizeWindow(); } });
+            };
+            window.addEventListener('resize', onResize);
+        };
         window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer,
             // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
-            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } },
+            // Разворот перемеряет содержимое: запрос размера, пришедший в полосу,
+            // main отбрасывает (main-control-ipc.js) — он мерил бы свёрнутую
+            // раскладку, — и границы «до свёртки» могут быть ниже содержимого.
+            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } else { refitAfterExpand(); } },
             actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
 
         const faqModal = document.getElementById('faqModal');
@@ -1694,7 +1717,7 @@
         PanelTitlebar.bindLockToggle({ doc: document, ipc: window.ipcRenderer || null, lock: window.UILock });
 
         // Пресеты вида: снимок ключей профиля и тот же путь применения, что при запуске панели.
-        PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
+        panelCompact = PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
         presetsApi = PanelPresets.install({
             doc: document, storage: localStorage, presets: Presets, ipc: window.ipcRenderer || null,
             controller: () => timerController, notify: (msg) => Toast && Toast.show(msg, 'success', 1600)
