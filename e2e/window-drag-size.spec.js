@@ -2,7 +2,7 @@ const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
     waitForDisplay, waitForWidget, waitForClock, waitForSteady, waitForResizeHandled, innerSize,
-    armReceived, waitForDisplaySettled
+    armReceived, waitForDisplaySettled, waitForBoundsSettled
 } = require('./window-ready');
 const { leaveFullScreen } = require('./display-window');
 const { SAVE_SETTLE_MS } = require('../window-geometry.js');
@@ -37,11 +37,7 @@ const WINDOWS = [
 ];
 
 /** Границы окна в main, когда они ОСЕЛИ: окно на открытии само доезжает (restore, автоподгонка). */
-function settledBounds(app, urlPart) {
-    // waitForSteady зовёт `evaluate(read)`; адрес окна функции-читателю не
-    // передать, поэтому читатель — готовый boundsOf.
-    return waitForSteady({ evaluate: () => boundsOf(app, urlPart) }, null, { name: `границы ${urlPart}` });
-}
+const settledBounds = (app, urlPart) => waitForBoundsSettled(app, urlPart);
 
 function boundsOf(app, urlPart) {
     return app.evaluate(({ BrowserWindow }, part) => {

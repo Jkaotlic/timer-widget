@@ -1,5 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const {
+    waitForWindow, waitForWindowGone, waitForWindowSettled, resizeOwnWindow, untilReceived,
+    WIDGET_PROBE, CLOCK_PROBE
+} = require('./window-ready');
 
 /**
  * Виджет и часы обязаны доезжать до САМОГО верха экрана, а не упираться в
@@ -31,6 +35,7 @@ const WINDOWS = [
         resize: 'widget-resize',
         move: 'widget-move',
         storageKey: 'widgetGeometry',
+        probe: WIDGET_PROBE,
         base: 250
     },
     {
@@ -41,20 +46,25 @@ const WINDOWS = [
         resize: 'clock-widget-resize',
         move: 'clock-widget-move',
         storageKey: 'clockGeometry',
+        probe: CLOCK_PROBE,
         base: 220
     }
 ];
 
-async function findWindow(app, urlPart) {
-    for (let attempt = 0; attempt < 40; attempt++) {
-        for (const w of app.windows()) {
-            const href = await w.evaluate(() => location.href).catch(() => '');
-            if (href.includes(urlPart)) { return w; }
-        }
-        await new Promise(r => setTimeout(r, 250));
-    }
-    throw new Error(`окно ${urlPart} не появилось`);
-}
+// Окно — общими ожиданиями (window-ready.js), а не своей копией с паузой
+// 250 мс × 40: та же ставка на скорость машины, что и пауза после открытия.
+const openWindow = async (app, control, target) => {
+    await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+    const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
+    // Окно встало: восстановление геометрии доехало, отложенная запись
+    // геометрии отработала (раньше — пауза 800 / 1600 мс).
+    await waitForWindowSettled(app, win, target.url);
+    return win;
+};
+
+/** Вернуть окну базовый размер и дождаться, что оно ВСТАЛО (профиль e2e общий). */
+const backToBase = (app, win, target) => resizeOwnWindow(app, win,
+    { channel: target.resize, urlPart: target.url, size: target.base });
 
 function metricsOf(app, urlPart) {
     return app.evaluate(({ BrowserWindow, screen }, part) => {
@@ -74,25 +84,22 @@ for (const target of WINDOWS) {
         // отвергается — как отверглась бы в приложении.
         let win = null;
         try {
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            win = await findWindow(app, target.url);
-            await win.waitForLoadState('domcontentloaded');
-            await win.waitForTimeout(800);
+            win = await openWindow(app, control, target);
 
             // 400 % тем же каналом, которым это делает Ctrl+колесо.
-            const size = target.base * 4;
-            await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                { ch: target.resize, size });
-            await win.waitForTimeout(700);
+            await resizeOwnWindow(app, win, { channel: target.resize, urlPart: target.url, size: target.base * 4 });
 
             const before = await metricsOf(app, target.url);
             expect(before, 'границы окна должны читаться').toBeTruthy();
 
             // Ровно до верхнего края экрана — тем же каналом, что и перетаскивание.
             const deltaY = before.screenBounds.y - before.bounds.y;
-            await win.evaluate(({ ch, deltaY }) => window.electronAPI.send(ch, { deltaX: 0, deltaY }),
-                { ch: target.move, deltaY });
-            await win.waitForTimeout(500);
+            // Сдвиг применён, когда окно получило `window-geometry`: moveWindowBy
+            // шлёт его всегда, синхронно после setBounds (и при deltaY = 0).
+            // Окно перед этим ВСТАЛО (resizeOwnWindow), чужой посылки в пути нет.
+            await untilReceived(win, 'window-geometry',
+                () => win.evaluate(({ ch, deltaY }) => window.electronAPI.send(ch, { deltaX: 0, deltaY }),
+                    { ch: target.move, deltaY }));
 
             const after = await metricsOf(app, target.url);
             expect(
@@ -101,11 +108,7 @@ for (const target of WINDOWS) {
                 + `(рабочая область начинается с ${after.workArea.y})`
             ).toBe(before.screenBounds.y);
         } finally {
-            if (win) {
-                await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                    { ch: target.resize, size: target.base }).catch(() => {});
-            }
-            await control.waitForTimeout(600).catch(() => {});
+            if (win) { await backToBase(app, win, target).catch(() => {}); }
             await app.close();
         }
     });
@@ -118,10 +121,7 @@ for (const target of WINDOWS) {
         // после перезапуска съезжало вниз на высоту полоски меню.
         const { app, control } = await launchApp();
         try {
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await findWindow(app, target.url);
-            await win.waitForLoadState('domcontentloaded');
-            await win.waitForTimeout(800);
+            const win = await openWindow(app, control, target);
 
             const m = await metricsOf(app, target.url);
             const parked = { scalePct: 200, x: m.screenBounds.x + 600, y: m.screenBounds.y };
@@ -130,11 +130,8 @@ for (const target of WINDOWS) {
             }, { key: target.storageKey, geo: parked });
 
             await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
-            await control.waitForTimeout(700);
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const reopened = await findWindow(app, target.url);
-            await reopened.waitForLoadState('domcontentloaded');
-            await reopened.waitForTimeout(1600);
+            await waitForWindowGone(app, target.probe, { name: `окно ${target.name}` });
+            await openWindow(app, control, target);
 
             const after = await metricsOf(app, target.url);
             expect(
@@ -145,13 +142,12 @@ for (const target of WINDOWS) {
             // Профиль e2e ОДИН на весь прогон: спек, менявший глобальное
             // состояние, обязан его вернуть. Ключ лежит в хранилище САМОГО окна,
             // поэтому чистится в нём же, а не в панели.
-            const alive = await findWindow(app, target.url).catch(() => null);
+            const alive = await waitForWindow(app, target.probe, { name: `окно ${target.name}`, timeout: 2000 })
+                .catch(() => null);
             if (alive) {
                 await alive.evaluate((k) => localStorage.removeItem(k), target.storageKey).catch(() => {});
-                await alive.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                    { ch: target.resize, size: target.base }).catch(() => {});
+                await backToBase(app, alive, target).catch(() => {});
             }
-            await control.waitForTimeout(600).catch(() => {});
             await app.close();
         }
     });

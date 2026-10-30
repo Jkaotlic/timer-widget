@@ -40,6 +40,7 @@ const WIDGET_PROBE = () => !!document.getElementById('wFlipHoursGroup');
 const CLOCK_PROBE = () => !!document.getElementById('clockGradient');
 
 const CONFIG = require('../constants.js');
+const { SAVE_SETTLE_MS } = require('../window-geometry.js');
 const { waitForStartupPush } = require('./launch');
 
 const DEFAULT_TIMEOUT = 20000;
@@ -954,7 +955,94 @@ async function waitForDisplaySettled(app, display, opts = {}) {
     return display;
 }
 
+/**
+ * Границы окна по адресу — как их видит ГЛАВНЫЙ процесс (владелец геометрии
+ * виджета и часов), или null, если такого живого окна нет.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {string} urlPart — часть адреса страницы окна
+ * @returns {Promise<{x: number, y: number, width: number, height: number}|null>}
+ */
+function mainBoundsOf(app, urlPart) {
+    return app.evaluate(({ BrowserWindow }, part) => {
+        const win = BrowserWindow.getAllWindows()
+            .find((w) => !w.isDestroyed() && w.webContents.getURL().includes(part));
+        return win ? win.getBounds() : null;
+    }, urlPart);
+}
+
+/**
+ * Границы окна в main ОСЕЛИ: на открытии виджет и часы сами доезжают —
+ * восстановление геометрии шлёт размер и позицию (`restore()`), система
+ * вправе поправить следом.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {string} urlPart
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<{x: number, y: number, width: number, height: number}>}
+ */
+function waitForBoundsSettled(app, urlPart, opts = {}) {
+    // waitForSteady зовёт `evaluate(read)`; читатель исполняется в main, а не в
+    // странице, поэтому подставляется объект с готовым `evaluate`.
+    return waitForSteady({ evaluate: () => mainBoundsOf(app, urlPart) }, null,
+        { timeout: opts.timeout ?? DEFAULT_TIMEOUT, name: `границы ${urlPart}` });
+}
+
+/**
+ * Виджет или часы ВСТАЛИ: страница загружена, границы в main осели
+ * (`waitForBoundsSettled`), и отложенная запись геометрии по последнему
+ * `resize` окна (`saveSettled`, window-geometry.js, `SAVE_SETTLE_MS`)
+ * отработала.
+ *
+ * Спеки ждали это паузой 800–1600 мс. Запись важна в обе стороны: тест,
+ * кладущий свою геометрию в хранилище, проиграл бы опоздавшей записи окна, а
+ * тест «пережило переоткрытие» закрыл бы окно раньше, чем оно записало.
+ * Последнее — таймер той же длины, взведённый ПОСЛЕ таймера окна (см.
+ * waitForResizeHandled, п. 3): `resize` страница получает раньше, чем main
+ * перестаёт менять границы, а осевшими они считаются не раньше чем через
+ * 300 мс.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} page — окно виджета или часов
+ * @param {string} urlPart
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<{x: number, y: number, width: number, height: number}>} осевшие границы
+ */
+async function waitForWindowSettled(app, page, urlPart, opts = {}) {
+    await page.waitForLoadState('load');
+    const bounds = await waitForBoundsSettled(app, urlPart, opts);
+    await page.evaluate(async (ms) => {
+        await new Promise((r) => requestAnimationFrame(() => r()));
+        await new Promise((r) => setTimeout(r, ms));
+    }, SAVE_SETTLE_MS);
+    return bounds;
+}
+
+/**
+ * Виджет или часы сами просят свой размер (`widget-resize` /
+ * `clock-widget-resize` — тем же каналом, что Ctrl+колесо; главный процесс
+ * принимает его только от самого окна, ipc-senders.js) — и окно ВСТАЛО.
+ *
+ * Условие, что main размер применил: окно получило `window-geometry`.
+ * `resizeWindowClamped` шлёт его ВСЕГДА, синхронно после `setBounds`, даже
+ * если размер не изменился. Принимается первая посылка после взвода: чужой
+ * в пути нет — вызывать только на ВСТАВШЕМ окне (`waitForWindowSettled`),
+ * где последняя посылка ушла не меньше чем 300 мс назад.
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {import('@playwright/test').Page} page
+ * @param {{channel: string, urlPart: string, size: number, timeout?: number}} req
+ * @returns {Promise<{x: number, y: number, width: number, height: number}>} осевшие границы
+ */
+async function resizeOwnWindow(app, page, req) {
+    await untilReceived(page, 'window-geometry',
+        () => page.evaluate(([ch, s]) => window.electronAPI.send(ch, { width: s, height: s }), [req.channel, req.size]),
+        { timeout: req.timeout });
+    return waitForWindowSettled(app, page, req.urlPart, { timeout: req.timeout });
+}
+
 module.exports = {
+    mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
