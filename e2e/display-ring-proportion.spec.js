@@ -1,5 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const {
+    waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, waitForDisplayGone
+} = require('./window-ready');
 
 /**
  * Дуга прогресса занимает долю высоты окна, а не пиксели.
@@ -18,14 +21,11 @@ test('дуга прогресса занимает не менее полови�
     const { app, control } = await launchApp();
     try {
         await control.click('#openDisplayBtn');
-        await control.waitForTimeout(1500);
-
-        let display = null;
-        for (const w of app.windows()) {
-            const hit = await w.evaluate(() => !!document.querySelector('#progressRing')).catch(() => false);
-            if (hit) { display = w; }
-        }
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
+        // Проба бросает, если окно не открылось; снимок main и вставшее окно
+        // (полноэкранный вход, раскладка по размеру) — раньше пауза 1500 мс.
+        const display = await waitForDisplay(app);
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
 
         const m = await display.evaluate(() => {
             const ring = document.querySelector('.timer-ring');
@@ -57,7 +57,7 @@ test('дуга прогресса занимает не менее полови�
         expect(m.r + m.strokeW / 2).toBeLessThanOrEqual(m.bgR);
 
         await control.click('#openDisplayBtn');
-        await control.waitForTimeout(400);
+        await waitForDisplayGone(app);
     } finally {
         await app.close();
     }
