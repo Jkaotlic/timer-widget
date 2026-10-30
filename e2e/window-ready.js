@@ -276,10 +276,51 @@ async function waitForTransitions(page) {
     });
 }
 
+/**
+ * Дождаться, что окно ПОЛУЧИЛО новый размер и его обработчики `resize` отработали.
+ *
+ * Размер окна меняет главный процесс (`setSize`, ползунок масштаба через IPC),
+ * а кегль «Цифр», масштаб и раскладку пересчитывает рендерер — в обработчике
+ * `resize`, у дисплея ещё и через debounce (`CONFIG.RESIZE_DEBOUNCE`). Спеки
+ * ждали это паузой 500–700 мс; здесь три условия по порядку:
+ *
+ * 1. размер в рендерере отличается от `before` — окно дошло до страницы;
+ *    затем он ОСЕЛ (`waitForSteady`): система вправе поправить запрошенный
+ *    размер следом (запрошенный ≠ выданный);
+ * 2. кадр (`requestAnimationFrame`): событие `resize` рассылается в шаге
+ *    отрисовки ДО колбэков кадра, то есть прямые обработчики уже отработали;
+ * 3. `debounceMs` — таймер той же длины, взведённый ПОСЛЕ таймера приложения.
+ *    Это не ставка на скорость: таймеры с равной задержкой исполняются в
+ *    порядке взвода (HTML, timer initialisation steps), поэтому наш
+ *    срабатывает строго после отложенного пересчёта.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{w: number, h: number}} before — размер ДО команды (`innerSize`)
+ * @param {{debounceMs?: number, timeout?: number}} [opts]
+ * @returns {Promise<{w: number, h: number}>} выданный размер
+ */
+async function waitForResizeHandled(page, before, opts = {}) {
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await page.waitForFunction(
+        (b) => window.innerWidth !== b.w || window.innerHeight !== b.h,
+        before, { timeout }
+    );
+    const size = await waitForSteady(page, innerSize, { timeout, name: 'размер окна' });
+    await page.evaluate(async (ms) => {
+        await new Promise((r) => requestAnimationFrame(() => r()));
+        if (ms > 0) { await new Promise((r) => setTimeout(r, ms)); }
+    }, opts.debounceMs || 0);
+    return size;
+}
+
+/** Размер окна глазами страницы — вход для `waitForResizeHandled`. */
+function innerSize() { return { w: window.innerWidth, h: window.innerHeight }; }
+
 module.exports = {
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
+    waitForResizeHandled, innerSize,
     DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
 };
