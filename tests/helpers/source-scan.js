@@ -31,12 +31,15 @@
  *     Эвристика: `/` — начало регулярки, если перед ней (без пробелов) нет
  *     значения — оператор, скобка, запятая, начало текста или слово
  *     `return`/`typeof`/`case`/….
+ *   - `comments: []` — массив, куда складываются диапазоны `[from, to)`
+ *     комментариев (tests/e2e-pauses.test.js ищет пометку ТОЛЬКО в них, а не
+ *     в строковых литералах). Маску не меняет.
  *
  * @param {string} src
- * @param {{keepSubstitutions?: boolean, regexLiterals?: boolean}} [options]
+ * @param {{keepSubstitutions?: boolean, regexLiterals?: boolean, comments?: Array<[number, number]>|null}} [options]
  * @returns {string}
  */
-function maskNonCode(src, { keepSubstitutions = false, regexLiterals = false } = {}) {
+function maskNonCode(src, { keepSubstitutions = false, regexLiterals = false, comments = null } = {}) {
     const out = src.split('');
     const blank = (from, to) => {
         for (let k = from; k < to && k < out.length; k++) {
@@ -55,6 +58,7 @@ function maskNonCode(src, { keepSubstitutions = false, regexLiterals = false } =
             if (ch === '/' && next === '/') {
                 const end = src.indexOf('\n', i);
                 const stop = end === -1 ? src.length : end;
+                if (comments) { comments.push([i, stop]); }
                 blank(i, stop);
                 i = stop;
                 continue;
@@ -62,6 +66,7 @@ function maskNonCode(src, { keepSubstitutions = false, regexLiterals = false } =
             if (ch === '/' && next === '*') {
                 const end = src.indexOf('*/', i + 2);
                 const stop = end === -1 ? src.length : end + 2;
+                if (comments) { comments.push([i, stop]); }
                 blank(i, stop);
                 i = stop;
                 continue;

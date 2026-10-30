@@ -41,6 +41,18 @@ async function digitsFitted(page, timeId) {
         .concat([window.innerWidth, window.innerHeight]), { name: 'кегль «Цифр»' });
 }
 
+/**
+ * Размер окна ДО команды — устоявшийся, а не первый прочитанный.
+ *
+ * `waitForResizeHandled` ждёт ОТЛИЧИЯ от этого размера. Если до команды окно
+ * ещё доезжает после прошлой (смена стиля, прайминг масштаба, выход из
+ * полноэкранного режима), «до» окажется промежуточным, и помощник вернётся
+ * на чужом ресайзе — замер станет зависеть от скорости машины.
+ */
+function settledSize(page) {
+    return waitForSteady(page, innerSize, { samples: 4, name: 'размер окна до команды' });
+}
+
 /** Блок стиля стал активным в окне — стиль дошёл через главный процесс. */
 function styleActive(page, blockId) {
     return expect.poll(
@@ -300,7 +312,7 @@ test('стиль «Цифры» доходит до полноэкранного
         // сам выход тоже меняет окно, и он не должен сойти за наш ресайз.
         await leaveFullScreen(app);
         const debounce = { debounceMs: CONFIG.RESIZE_DEBOUNCE };
-        let size = await display.evaluate(innerSize);
+        let size = await settledSize(display);
         await resizeDisplayWindow(app, { width: 700, height: 520 });
         size = await waitForResizeHandled(display, size, debounce);
         const wide = await display.evaluate(measureDigits);
@@ -478,7 +490,7 @@ test('стиль «Цифры» доходит до виджета кликом,
         expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
 
         await tagWidgetWindow(app);
-        let size = await widget.evaluate(innerSize);
+        let size = await settledSize(widget);
         await resizeWidgetWindow(app, { width: 500, height: 420 });
         size = await waitForResizeHandled(widget, size);
         const wide = await widget.evaluate(measureWidgetDigits);
@@ -541,11 +553,11 @@ test('масштаб виджета действует и на стиль «Ци
         });
         // Паузы после прайминга не нужно: 100 и 250 идут одним путём
         // (панель → главный процесс → виджет), и этот путь сохраняет порядок —
-        // 250 не обгонит 100. Окно 100 не меняет, поэтому замер «до» верен
-        // сразу.
-
+        // 250 не обгонит 100. Но 100 может и сам поменять окно: общий профиль
+        // мог оставить виджет на другом масштабе. Поэтому «до» — ОСЕВШИЙ размер
+        // (settledSize), и кегль «до» снимается уже с него.
+        const sizeBefore = await settledSize(widget);
         const before = await widget.evaluate(measureWidgetDigits);
-        const sizeBefore = await widget.evaluate(innerSize);
 
         // Ползунок «Масштаб» во вкладке «Виджет» реально меняет размер ОКНА
         // (widget-resize IPC), а не CSS-transform: scale — поэтому это тот же
@@ -718,7 +730,7 @@ test('стиль «Цифры» доходит до часов кликом, и 
         expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
 
         await tagClockWindow(app);
-        let size = await clock.evaluate(innerSize);
+        let size = await settledSize(clock);
         await resizeClockWindow(app, { width: 500, height: 420 });
         size = await waitForResizeHandled(clock, size);
         const wide = await clock.evaluate(measureClockDigits);
@@ -794,7 +806,7 @@ test('часы «Цифры» не обрезаются в 12-часовом ф�
         // Небольшое окно — как и для основного теста, сжимаем: переполнение на
         // узком окне заметнее всего.
         await tagClockWindow(app);
-        const size = await clock.evaluate(innerSize);
+        const size = await settledSize(clock);
         await resizeClockWindow(app, { width: 320, height: 260 });
         await waitForResizeHandled(clock, size);
 
@@ -813,7 +825,9 @@ test('часы «Цифры» не обрезаются в 12-часовом ф�
             const el = document.getElementById('clockFormat24h');
             if (el && !el.checked) { el.click(); }
         });
-        await expect(control.locator('#clockFormat24h')).toBeChecked().catch(() => {});
+        // Строго: восстановление, которое молча не удалось, оставит часы в
+        // 12-часовом формате всем следующим спекам. Клик синхронен.
+        await expect(control.locator('#clockFormat24h')).toBeChecked({ timeout: 2000 });
         await resetClockStyle(control);
         await restoreClockGeometry(clock, geometryBefore);
         await app.close();

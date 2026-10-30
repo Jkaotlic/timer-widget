@@ -295,7 +295,10 @@ async function waitForTransitions(page) {
  *    срабатывает строго после отложенного пересчёта.
  *
  * @param {import('@playwright/test').Page} page
- * @param {{w: number, h: number}} before — размер ДО команды (`innerSize`)
+ * `before` обязан быть ОСЕВШИМ (`waitForSteady(page, innerSize)`): если окно ещё
+ * доезжает после прошлой команды, помощник вернётся на ЧУЖОМ ресайзе.
+ *
+ * @param {{w: number, h: number}} before — осевший размер ДО команды
  * @param {{debounceMs?: number, timeout?: number}} [opts]
  * @returns {Promise<{w: number, h: number}>} выданный размер
  */
