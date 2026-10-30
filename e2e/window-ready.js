@@ -1005,7 +1005,8 @@ function settleFullScreenEntry(app, timeout) {
             return { state: await waitEnter(), ...info() };
         }
         const windowed = globalThis.__e2eWindowedDisplays;
-        if ((windowed && windowed.has(id)) || entered) { return { state: 'windowed' }; }
+        const left = globalThis.__e2eLeftDisplays;
+        if ((windowed && windowed.has(id)) || entered || (left && left.has(id))) { return { state: 'windowed' }; }
         if (process.platform !== 'darwin') { return { state: 'no-transition', ...info() }; }
         if (!win.isFocused()) { return { state: 'no-focus', ...info() }; }
         return { state: await waitEnter(), ...info() };
@@ -1223,30 +1224,58 @@ async function resizeOwnWindow(app, page, req) {
  * Барьер окна виджета или часов: всё, что окно ПОСЛАЛО в main до вызова,
  * main уже обработал.
  *
- * Окно шлёт своим каналом перемещения (`widget-move` / `clock-widget-move`)
- * нулевой сдвиг с `first: true` и ждёт `window-geometry`: `moveWindowBy`
- * шлёт её всегда, синхронно после `setBounds` (main-geometry.js), а нулевой
- * сдвиг с началом жеста не меняет ни места, ни размера. Посылки одного окна
- * main обрабатывает по порядку, значит, всё посланное раньше барьера уже
- * применено.
+ * Окно шлёт `timer-command` с неизвестным типом и уникальной меткой: команда
+ * открыта мосту всех окон (ipc-senders.js, ALL), а обработчик main
+ * (main-timer.js) на неизвестный тип не делает НИЧЕГО — `switch` уходит в
+ * `default`, `setConfig` без полей конфига ничего не меняет, рассылки нет.
+ * Мы ждём, что СВОЙ слушатель на настоящем `ipcMain` (подписан позже
+ * слушателя приложения) увидел посылку с этой меткой. Посылки одного окна
+ * main обрабатывает по порядку, значит, всё посланное раньше барьера
+ * (`widget-move` / `clock-widget-move` жеста) уже применено.
+ *
+ * Прежде барьером был нулевой сдвиг `{0, 0, first: true}` с ожиданием
+ * `window-geometry` (ревью B7a, M1): он сам звал `setBounds` тех же границ,
+ * а на дробном масштабе Windows (125–150 %) DIP → пиксели → DIP могут
+ * округлиться иначе и сдвинуть окно на пиксель — точное `toEqual` в
+ * утверждении «жест не сдвинул окно» стало бы ложно-красным. Новый барьер
+ * геометрии не касается вовсе.
  *
  * Для утверждений ОТСУТСТВИЯ («перетаскивание с Ctrl не сдвинуло окно»):
  * обработчик жеста синхронный (window-geometry.js, bindWindowDrag), и
  * посылка, если бы она была, ушла раньше барьера. Пауза доказывала бы то же
  * только на быстрой машине.
  *
- * Принимается первая посылка после взвода — вызывать на ВСТАВШЕМ окне. Если
- * перед барьером всё же ушёл сдвиг (дефект), его `window-geometry` закроет
- * ожидание раньше, но и тогда сдвиг уже применён — утверждение его увидит.
- *
+ * @param {import('@playwright/test').ElectronApplication} app
  * @param {import('@playwright/test').Page} page — окно виджета или часов
- * @param {string} moveChannel — `widget-move` или `clock-widget-move`
  * @param {{timeout?: number}} [opts]
  */
-async function moveBarrier(page, moveChannel, opts = {}) {
-    await untilReceived(page, 'window-geometry',
-        () => page.evaluate((ch) => window.electronAPI.send(ch, { deltaX: 0, deltaY: 0, first: true }), moveChannel),
-        { timeout: opts.timeout });
+async function moveBarrier(app, page, opts = {}) {
+    const key = `barrier#${Date.now()}#${Math.random()}`;
+    const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
+    await app.evaluate(({ ipcMain }, k) => {
+        const box = (globalThis.__e2eBarriers = globalThis.__e2eBarriers || {});
+        const rec = { seen: false };
+        rec.listener = (_e, payload) => { if (payload && payload.e2eBarrier === k) { rec.seen = true; } };
+        ipcMain.on('timer-command', rec.listener);
+        box[k] = rec;
+    }, key);
+    try {
+        await page.evaluate((k) => window.electronAPI.send('timer-command', { type: 'e2e-barrier', e2eBarrier: k }), key);
+        const deadline = Date.now() + timeout;
+        for (;;) {
+            if (await app.evaluate((_e, k) => globalThis.__e2eBarriers[k].seen, key)) { return; }
+            if (Date.now() > deadline) { throw new Error(`барьер окна ${page.url()}: main не получил метку за ${timeout} мс`); }
+            // шаг опроса: main получил метку барьера
+            await new Promise((r) => setTimeout(r, 20));
+        }
+    } finally {
+        await app.evaluate(({ ipcMain }, k) => {
+            const rec = globalThis.__e2eBarriers && globalThis.__e2eBarriers[k];
+            if (!rec) { return; }
+            ipcMain.removeListener('timer-command', rec.listener);
+            delete globalThis.__e2eBarriers[k];
+        }, key).catch(() => {});
+    }
 }
 
 /**
@@ -1262,6 +1291,13 @@ async function moveBarrier(page, moveChannel, opts = {}) {
  * после взвода). Счётчик считает только посылки ПОСЛЕ взвода — чужих нет.
  *
  * @param {import('@playwright/test').ElectronApplication} app
+ * «Обработал» включает «ОТВЕРГ» (ревью B7a, M2): слушатель стоит на настоящем
+ * `ipcMain` рядом с обёрткой ipc-senders.js и её вердикта не видит, так что
+ * посылка от окна, которому канал не положен, тоже засчитается, хотя
+ * обработчик приложения не исполнялся. Звать только для канала, который
+ * отправитель вправе слать (`SENDERS` в ipc-senders.js), и подтверждать
+ * результат утверждением о состоянии, а не самим счётчиком.
+ *
  * @param {string} channel
  * @param {() => Promise<any>} action
  * @param {{count?: number, timeout?: number}} [opts]

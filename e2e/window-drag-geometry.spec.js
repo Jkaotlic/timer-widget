@@ -161,7 +161,7 @@ for (const w of WINDOWS) {
         await dragBy(page, 60, 60, { ctrlKey: true });
         // Отсутствие сдвига — барьером, а не паузой 400 мс: обработчик жеста
         // синхронный, и посылка сдвига, будь она, ушла бы раньше барьера.
-        await moveBarrier(page, w.move);
+        await moveBarrier(app, page);
         expect(await positionOf(app, w.mainRef), `${w.name}: Ctrl+перетаскивание не двигает окно`)
             .toEqual(beforeCtrl);
 
@@ -172,7 +172,7 @@ for (const w of WINDOWS) {
         if (hasButton) {
             const beforeBtn = await positionOf(app, w.mainRef);
             await dragBy(page, 60, 60, { onButton: true });
-            await moveBarrier(page, w.move);
+            await moveBarrier(app, page);
             expect(await positionOf(app, w.mainRef), `${w.name}: перетаскивание с кнопки не двигает окно`)
                 .toEqual(beforeBtn);
         }

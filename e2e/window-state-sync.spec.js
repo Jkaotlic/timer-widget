@@ -53,6 +53,10 @@ async function waitForLoadSnapshot(app, page, urlPart) {
             const live = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
             const own = live.filter((w) => w.webContents.getURL().includes(part));
             if (!own.length || own.some((w) => w.webContents.isLoading())) { return false; }
+            // Окно без адреса — только что созданное: подсчёт «по адресу» счёл
+            // бы его закрытым (охрана N1 ревью B3, как в waitForMainSnapshot;
+            // ревью B7a, M5). Ждём адреса у всех.
+            if (live.some((w) => !w.webContents.getURL())) { return false; }
             const isOpen = live.some((w) => w.webContents.getURL().includes('display.html'));
             for (const w of own) { w.webContents.send('display-window-state', { isOpen, e2eMarker: mk }); }
             return true;

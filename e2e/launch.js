@@ -65,11 +65,21 @@ async function launchApp(opts = {}) {
     // не терялось, если вход кончился раньше вопроса. Читает
     // settleFullScreenEntry (window-ready.js). Ставится до любого окна
     // дисплея: дисплей открывает только тест.
+    //
+    // Журнал помнит ТЕКУЩИЙ вход, а не «входило когда-то» (ревью B7a, M4):
+    // `leave-full-screen` вычёркивает id, иначе поднятый флаг посреди
+    // ПОВТОРНОГО входа того же окна сошёл бы за конец перехода. Что окно уже
+    // выходило — отдельный список `__e2eLeftDisplays` (ветка `windowed`).
     await app.evaluate(({ app: electronApp }) => {
         globalThis.__e2eEnteredDisplays = new Set();
+        globalThis.__e2eLeftDisplays = new Set();
         electronApp.on('browser-window-created', (_e, win) => {
             const id = win.webContents.id;
             win.on('enter-full-screen', () => globalThis.__e2eEnteredDisplays.add(id));
+            win.on('leave-full-screen', () => {
+                globalThis.__e2eEnteredDisplays.delete(id);
+                globalThis.__e2eLeftDisplays.add(id);
+            });
         });
     });
     const control = await waitForControlWindow(app);
