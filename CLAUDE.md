@@ -313,6 +313,9 @@ Release: те же ворота до сборки, Electron — последни
 
 ## Automation
 
+`.claude/` не в репо: его приносит синк приватной памяти проекта, в свежем
+клоне его (и всего ниже) нет.
+
 - **Hooks** (`.claude/settings.json`): Auto-lint on Edit/Write, block `.env` file edits
 - **Subagent** (`.claude/agents/code-reviewer.md`): IPC consistency checker for post-change review
 - **Skills**: `ui-ux-pro-max` installed in `.claude/skills/` for design system generation

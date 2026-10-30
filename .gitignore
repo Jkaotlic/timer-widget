@@ -17,12 +17,9 @@ _electron/.cache/
 .vscode/
 .playwright-mcp/
 
-# Claude Code: commit shared settings/hooks/agents/skills, ignore personal/local state
-.claude/settings.local.json
-.claude/sessions/
-.claude/cache/
-.claude/**/__pycache__/
-.claude/**/*.pyc
+# Claude Code: машинный каталог агента. Канон — в приватной памяти проекта,
+# в рабочее дерево его приносит синк памяти; в публичный репо не попадает.
+.claude/
 
 # Test artifacts
 titlebar-test.png
@@ -52,9 +49,6 @@ coverage/
 
 # Superpowers brainstorm sessions
 .superpowers/
-
-# Изолированные рабочие каталоги (git worktree) — сюда SDD уводит исполнение плана
-.claude/worktrees/
 
 # Разборы и аудиты — рабочий стол, а не продукт (глобальное правило)
 analysis/
