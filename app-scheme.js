@@ -17,8 +17,9 @@
  * Что отдаётся (список, а не каталог):
  *   - четыре страницы окон и страница миграции хранилища;
  *   - то, что эти страницы подключают (`<script src>`, `<link href>`) — список
- *     собирается из самой разметки и статических `import` модулей, поэтому новый модуль окна не нужно
- *     вписывать в третье место: хватит подключить его и упаковать;
+ *     собирается из самой разметки и статических `import` модулей, поэтому
+ *     новый модуль окна не нужно вписывать в третье место: хватит подключить
+ *     его и упаковать;
  *   - плоские файлы каталогов ассетов (`fonts/`, `sounds/`) с их расширениями.
  * Главный процесс, preload.js и package.json ни одна страница не подключает —
  * схема их не отдаёт.
@@ -136,11 +137,21 @@ const EXPORT_FROM_RE = /(?:^|[;}])\s*export\s*(?:\*(?:\s*as\s+[\w$]+)?|\{[^}]*\}
  * @returns {string[]}
  */
 function collectImports(src) {
-    const code = String(src).replace(STRING_OR_COMMENT_RE, (m, str) => (str === undefined ? ' ' : str));
+    // Каждая строка и шаблон уходят в таблицу, в тексте остаётся заглушка
+    // `'N'`: текст внутри строки не должен читаться как import (иначе
+    // "x; import './preload.js'" открыл бы файл main). Шаблон заглушается
+    // обратными кавычками, их IMPORT_RE не принимает вовсе.
+    const literals = [];
+    const code = String(src).replace(STRING_OR_COMMENT_RE, (m, str) => {
+        if (str === undefined) { return ' '; }
+        literals.push(str);
+        const q = str[0];
+        return `${q}${literals.length - 1}${q}`;
+    });
     const found = new Set();
     for (const re of [IMPORT_RE, EXPORT_FROM_RE]) {
         for (const m of code.matchAll(re)) {
-            const spec = m[2];
+            const spec = literals[Number(m[2])].slice(1, -1);
             if (!spec.startsWith('./')) { continue; }
             const name = spec.slice(2);
             if (SAFE_NAME.test(name) && path.posix.extname(name) === '.js') { found.add(name); }
@@ -175,11 +186,13 @@ function collectWebFiles(readText) {
         const file = scripts.pop();
         if (visited.has(file)) { continue; }
         visited.add(file);
-        let text = '';
+        let text;
         try {
             text = readText(file) || '';
         } catch {
-            // Файла нет на диске: отдавать нечего, список от этого не страдает.
+            // Файла нет на диске: отдавать нечего, в список он не попадает.
+            allowed.delete(file);
+            continue;
         }
         for (const dep of collectImports(text)) {
             allowed.add(dep);

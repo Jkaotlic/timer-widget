@@ -278,16 +278,26 @@ test('collectWebFiles: импортированный файл, которого
         throw new Error('ENOENT');
     });
     assert.ok(got.has('a.js'));
+    assert.ok(!got.has('gone.js'), 'несуществующий файл в список не идёт');
+});
+
+test('collectImports: import внутри строки или шаблона — не import', () => {
+    assert.deepEqual(S.collectImports("const s = \"x; import './electron-main.js'\";"), []);
+    assert.deepEqual(S.collectImports("const t = `\nimport \"./preload.js\"\n`;"), []);
+    assert.deepEqual(S.collectImports("const s = 'a'; import './ok.js';"), ['ok.js']);
 });
 
 test('самопроверка: на настоящих страницах граф import не сужает список относительно разметки', () => {
     const REF = /<(?:script|link)\b[^>]*?\s(?:src|href)\s*=\s*"([^"]*)"/gi;
+    let checked = 0;
     for (const page of [...S.WINDOW_PAGES, S.MIGRATION_PAGE]) {
         for (const m of readRepo(page).matchAll(REF)) {
             const ref = m[1];
             if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(ref) && Object.prototype.hasOwnProperty.call(S.MIME_TYPES, path.extname(ref))) {
                 assert.ok(ALLOWED.has(ref), `${page}: ${ref} пропал из списка`);
+                checked++;
             }
         }
     }
+    assert.ok(checked > 0, 'ни одной ссылки страницы не проверено');
 });
