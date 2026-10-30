@@ -20,13 +20,15 @@
  * minHeight снимается только там (канал control-collapse).
  */
 
+import { CONTROL_BAR_MAX_HEIGHT } from './constants.js';
+
 // Высота полосы. Число живёт здесь, а CSS повторяет его в правиле
 // `body.collapsed .mini-bar { height: 52px }`. Расхождение поймает
 // e2e/mini-bar.spec.js: он меряет НАСТОЯЩЕЕ окно, а не эту константу.
 const BAR_HEIGHT = 52;
-// Потолок высоты полосы в main (main-control-ipc.js, control-collapse): окно
-// выше него — уже панель, а не полоса.
-const BAR_MAX_HEIGHT = 120;
+// Потолок высоты полосы — ОДНА величина с main (main-control-ipc.js,
+// control-collapse): окно выше него — уже панель, а не полоса.
+const BAR_MAX_HEIGHT = CONTROL_BAR_MAX_HEIGHT;
 
 function init(deps) {
     const doc = deps && deps.doc;
@@ -40,6 +42,8 @@ function init(deps) {
     // и слушатель resize, который выполнит её после разворота (не больше одного).
     let pendingFit = null;
     let fitListener = null;
+    const canWatchResize = !!win && typeof win.addEventListener === 'function';
+    let warnedNoWindow = false;
 
     const api = {
         isCollapsed: () => collapsed,
@@ -102,6 +106,16 @@ function init(deps) {
      */
     function deferWhileCollapsed(fit) {
         if (!collapsed) { return false; }
+        // Без окна признака «main вернул размер панели» нет: просьба не
+        // хранится (иначе hasPendingFit врал бы «ждёт» вечно) — и это
+        // говорится вслух, а не глотается. В приложении окно есть всегда.
+        if (!canWatchResize) {
+            if (!warnedNoWindow) {
+                warnedNoWindow = true;
+                console.warn('[mini-bar] нет окна (deps.win): подгонка, пропущенная в полосе, после разворота не выполнится');
+            }
+            return true;
+        }
         pendingFit = fit;
         return true;
     }
@@ -109,7 +123,7 @@ function init(deps) {
     // Мерить — когда main УЖЕ вернул окну размер панели: признак — resize
     // окна выше полосы, а не пауза.
     function armPendingFit() {
-        if (!pendingFit || fitListener || !win || typeof win.addEventListener !== 'function') { return; }
+        if (!pendingFit || fitListener || !canWatchResize) { return; }
         fitListener = () => {
             if (collapsed || !(win.innerHeight > BAR_MAX_HEIGHT)) { return; }
             win.removeEventListener('resize', fitListener);

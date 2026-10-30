@@ -195,7 +195,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             // это тот же непроверенный payload, что и во всех остальных
             // обработчиках размеров.
             const raw = Number.isFinite(payload.height) ? payload.height : 52;
-            const barHeight = Math.max(36, Math.min(120, Math.round(raw)));
+            const barHeight = Math.max(36, Math.min(CONFIG.CONTROL_BAR_MAX_HEIGHT, Math.round(raw)));
 
             // Уже свёрнуто этим окном — границы «до» не перезаписываются
             // границами полосы.

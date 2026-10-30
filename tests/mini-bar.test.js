@@ -334,3 +334,42 @@ test('hasPendingFit: видно, что просьба ждёт разворот
     win.resize(700);
     assert.equal(bar.hasPendingFit(), false);
 });
+
+test('потолок полосы — одна величина с main: окно ровно CONTROL_BAR_MAX_HEIGHT ещё полоса, на 1px выше — панель', () => {
+    const { CONTROL_BAR_MAX_HEIGHT } = require('../constants.js');
+    assert.ok(Number.isFinite(CONTROL_BAR_MAX_HEIGHT) && CONTROL_BAR_MAX_HEIGHT > MiniBar.BAR_HEIGHT);
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    let runs = 0;
+    bar.collapse();
+    bar.deferWhileCollapsed(() => { runs++; });
+    bar.expand();
+    win.resize(CONTROL_BAR_MAX_HEIGHT);
+    assert.equal(runs, 0, 'окно высотой потолка полосы — ещё полоса');
+    win.resize(CONTROL_BAR_MAX_HEIGHT + 1);
+    assert.equal(runs, 1);
+    // Обрезка высоты в main — тем же именем, а не своим литералом.
+    const { codeOnly } = require('./helpers/source-scan');
+    const main = codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main-control-ipc.js'), 'utf8'));
+    const line = main.split('\n').find((l) => l.includes('const barHeight'));
+    assert.ok(line, 'нет обрезки barHeight в main-control-ipc.js (самопроверка)');
+    assert.match(line, /CONFIG\.CONTROL_BAR_MAX_HEIGHT/);
+    assert.doesNotMatch(line, /\b120\b/, 'в main снова свой литерал потолка');
+});
+
+test('deferWhileCollapsed без окна: в полосе не мерит, просьбу не хранит и говорит об этом', () => {
+    const warns = [];
+    const orig = console.warn;
+    console.warn = (msg) => warns.push(String(msg));
+    try {
+        const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc() });
+        bar.collapse();
+        assert.equal(bar.deferWhileCollapsed(() => {}), true, 'в полосе вызывающий всё равно не мерит');
+        bar.deferWhileCollapsed(() => {});
+        assert.equal(bar.hasPendingFit(), false, 'ждать её нечем — «ждёт» было бы ложью');
+        assert.equal(warns.length, 1, `предупреждение одно: ${warns.join(' | ')}`);
+        assert.match(warns[0], /нет окна/);
+    } finally {
+        console.warn = orig;
+    }
+});

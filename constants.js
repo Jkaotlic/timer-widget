@@ -68,6 +68,12 @@ const CONFIG = {
     // сворачивании свою ширину сохраняет, а разворот возвращает прежние
     // границы целиком (главный процесс держит их в controlBoundsBeforeCollapse).
     CONTROL_BAR_MIN_WIDTH: 510,
+    // Потолок высоты СВЁРНУТОЙ полосы. Его знают две стороны: главный процесс
+    // обрезает им высоту из payload control-collapse, а полоса (mini-bar.js)
+    // по нему отличает «окно уже снова панель» от «ещё полоса», когда ждёт
+    // разворота для отложенной подгонки. Литерал в двух файлах разошёлся бы
+    // молча: полоса ждала бы resize, которого main не даст.
+    CONTROL_BAR_MAX_HEIGHT: 120,
     // Потолок ширины окна управления. Значение нужно ДВУМ сторонам: главный
     // процесс ставит его в maxWidth, а панель обязана учитывать его, когда
     // считает ширину своей левой колонки при открытии ящика настроек. Пока
@@ -302,7 +308,7 @@ export const {
     TIMER_TICK_MARGIN_MS, RESIZE_DEBOUNCE, FLASH_INTERVAL, WIDGET_DEFAULT_WIDTH,
     WIDGET_DEFAULT_HEIGHT, WIDGET_MIN_WIDTH, WIDGET_MIN_HEIGHT,
     CLOCK_WIDGET_DEFAULT_SIZE, CLOCK_WIDGET_MIN_SIZE, CONTROL_WINDOW_WIDTH,
-    CONTROL_WINDOW_HEIGHT, CONTROL_WINDOW_MIN_WIDTH, CONTROL_BAR_MIN_WIDTH,
+    CONTROL_WINDOW_HEIGHT, CONTROL_WINDOW_MIN_WIDTH, CONTROL_BAR_MIN_WIDTH, CONTROL_BAR_MAX_HEIGHT,
     CONTROL_WINDOW_MAX_WIDTH, CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER,
     CONTROL_WINDOW_MIN_HEIGHT, CONTROL_WINDOW_MAX_HEIGHT,
     CONTROL_WINDOW_MAX_HEIGHT_WITH_DRAWER, WINDOW_MIN_VISIBLE_PX,
