@@ -1,6 +1,44 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForDisplaySettled, waitForWidgetSnapshot,
+    waitForPanelRemaining, waitForQuiet, armReceived
+} = require('./window-ready');
+
+/**
+ * Оба окна ВСТАЛИ после открытия (было 2200 мс): снимок main обработан,
+ * дисплей вошёл в полноэкранный режим (или по состоянию не может) и осел.
+ */
+async function windowsReady(app) {
+    const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
+    await waitForDisplaySettled(app, display);
+    await waitForWidgetSnapshot(app, await waitForWidget(app));
+}
+
+/**
+ * Таймер ушёл в перерасход (было 3500 мс после старта на 1 с): панель видит
+ * −2 с (столько и давала пауза), и оба окна показали перерасход и утихли —
+ * переход цвета доехал. Окна получают состояние своими трубами, поэтому
+ * признак — их собственный статус; не дождались — решают утверждения ниже.
+ */
+async function waitOvertime(control, pages) {
+    await waitForPanelRemaining(control, -2);
+    for (const page of pages) {
+        await page.waitForFunction(() => {
+            const t = document.getElementById('timeDisplay');
+            return !!t && /overtime/.test(`${t.dataset.status || ''} ${t.className}`);
+        }, null, { timeout: 10000 }).catch(() => console.log('   окно не показало перерасход за 10 с'));
+        await waitForQuiet(page);
+    }
+}
+
+/** Тема дошла до обоих окон и переходы палитры доехали (было 700/900 мс). */
+async function setTheme(control, pages, theme) {
+    const got = [];
+    for (const page of pages) { got.push(await armReceived(page, 'ui-theme-update')); }
+    await control.evaluate((t) => window.ipcRenderer.send('ui-theme-update', { theme: t }), theme);
+    for (const received of got) { await received({ match: { theme } }); }
+}
 
 /**
  * Палитра перерасхода: КРАСНЫЙ во всех трёх окнах.
@@ -77,10 +115,7 @@ test('перерасход красный и в дисплее, и в видже
         window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         window.ipcRenderer.send('open-widget');
     });
-    await waitForDisplay(app);
-    await waitForWidget(app);
-    await waitForWidget(app);
-    await control.waitForTimeout(2200);
+    await windowsReady(app);
 
     const display = await findWindow(app, () => !!document.getElementById('progressRing'));
     const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
@@ -92,7 +127,7 @@ test('перерасход красный и в дисплее, и в видже
         window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true });
         window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true });
     });
-    await control.waitForTimeout(3500);
+    await waitOvertime(control, [display, widget]);
 
     // --- Полноэкранный дисплей ---
     const d = await display.evaluate(() => {
@@ -150,10 +185,7 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
             window.ipcRenderer.send('open-widget');
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await waitForWidget(app);
-        await control.waitForTimeout(2200);
+        await windowsReady(app);
 
         const display = await findWindow(app, () => !!document.getElementById('progressRing'));
         const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
@@ -162,7 +194,7 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
 
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true }));
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true }));
-        await control.waitForTimeout(3500);
+        await waitOvertime(control, [display, widget]);
 
         const probe = (page) => page.evaluate(() => {
             const t = document.getElementById('timeDisplay');
@@ -187,15 +219,13 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
         });
 
         // --- тёмный тон: полоса ЯРКАЯ ---
-        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' }));
-        await display.waitForTimeout(700);
+        await setTheme(control, [display, widget], 'dark');
         const darkDisplay = await probe(display);
         const darkWidget = await probe(widget);
         console.log('тёмный тон →', JSON.stringify({ display: darkDisplay, widget: darkWidget }));
 
         // --- светлый тон: полоса ЗАТЕМНЁННАЯ ---
-        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'light' }));
-        await display.waitForTimeout(900);
+        await setTheme(control, [display, widget], 'light');
         const lightDisplay = await probe(display);
         const lightWidget = await probe(widget);
         console.log('светлый тон →', JSON.stringify({ display: lightDisplay, widget: lightWidget }));

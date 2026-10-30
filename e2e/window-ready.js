@@ -404,7 +404,8 @@ const TICK_TRANSITIONS = [['*', 'stroke-dashoffset'], ['.display-progress-fill',
  * быть ещё в пути и прийти после взвода — её payload собран без последнего
  * действия. Поэтому ожидание узнаёт СВОЮ посылку:
  *  - `match` — поля, которые обязана нести посылка (сравнение по значению;
- *    `null` — «поля нет или оно null»). Настройки — полный снимок, поэтому
+ *    `null` — «поля нет или оно null»). Посылку-примитив (строку, число)
+ *    `match`-примитив сравнивает целиком. Настройки — полный снимок, поэтому
  *    посылка, несущая все ожидаемые поля, и даёт окну нужное состояние, даже
  *    если она чужая. Может быть функцией (выполняется ПОСЛЕ действия), когда
  *    ожидаемое значение видно только после него — например hex пипетки;
@@ -443,7 +444,11 @@ async function armReceived(page, channel) {
         try {
             handle = await page.waitForFunction(([k, m, n]) => {
                 const rec = window.__e2eReceived[k];
-                const fits = (p) => !m || (!!p && typeof p === 'object' && Object.keys(m).every((f) => (m[f] === null
+                // Посылка-примитив (`set-clock-style` несёт строку) — сравнение
+                // целиком; посылка-объект — по полям.
+                const fits = (p) => !m || (typeof m !== 'object'
+                    ? JSON.stringify(p) === JSON.stringify(m)
+                    : !!p && typeof p === 'object' && Object.keys(m).every((f) => (m[f] === null
                     ? p[f] === null || p[f] === undefined
                     : JSON.stringify(p[f]) === JSON.stringify(m[f]))));
                 if (rec.list.length < n) { return false; }
