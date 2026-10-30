@@ -63,6 +63,7 @@ async function waitForOwnScale(page, owner, expected, timeout = 8000) {
         if (Date.now() >= deadline) {
             throw new Error(`окно не признало масштаб ${expected} % за ${timeout} мс: у него ${own}`);
         }
+        // шаг опроса: окно признало масштаб
         await new Promise((r) => setTimeout(r, 50));
     }
 }

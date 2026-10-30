@@ -932,6 +932,8 @@ async function traceFontSize(page, selector, debounceMs) {
     for (let i = 0; i < 3; i += 1) {
         await page.evaluate(async (ms) => {
             window.dispatchEvent(new Event('resize'));
+            // пауза законна: таймер той же длины, что debounce, взведён ПОСЛЕ
+            // таймера приложения (см. выше)
             if (ms > 0) { await new Promise((r) => setTimeout(r, ms)); }
         }, debounceMs);
         out.push(await read());

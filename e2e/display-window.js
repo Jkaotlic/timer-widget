@@ -151,6 +151,8 @@ async function resizeDisplay(app, display, size, opts = {}) {
 async function settleResize(display) {
     await display.evaluate(async (ms) => {
         await new Promise((r) => requestAnimationFrame(() => r()));
+        // пауза законна: таймер длины RESIZE_DEBOUNCE взведён после таймера
+        // приложения — равные задержки исполняются в порядке взвода
         await new Promise((r) => setTimeout(r, ms));
     }, CONFIG.RESIZE_DEBOUNCE);
 }

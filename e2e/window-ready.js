@@ -95,6 +95,7 @@ async function waitForWindow(app, probe, opts = {}) {
         if (Date.now() >= deadline) {
             throw new Error(`${name} не появилось за ${timeout} мс: открытых окон ${seen}, проба не сошлась ни в одном`);
         }
+        // шаг опроса: окно с пробой появилось
         await new Promise((r) => setTimeout(r, opts.interval ?? POLL_MS));
     }
 }
@@ -130,6 +131,7 @@ async function waitForWindowGone(app, probe, opts = {}) {
         if (Date.now() >= deadline) {
             throw new Error(`${name} не закрылось за ${timeout} мс: окон открыто ${app.windows().length}`);
         }
+        // шаг опроса: окно с пробой исчезло
         await new Promise((r) => setTimeout(r, POLL_MS));
     }
 }
@@ -245,6 +247,8 @@ async function waitForSteady(page, read, opts = {}) {
         if (Date.now() > deadline) {
             throw new Error(`${opts.name || 'величина'} не осела за ${timeout} мс; последнее: ${key}`);
         }
+        // шаг опроса: величина повторилась `samples` раз подряд (интервал —
+        // это и есть определение «осела»)
         await new Promise((r) => setTimeout(r, interval));
     }
 }
@@ -324,6 +328,8 @@ async function waitForResizeHandled(page, before, opts = {}) {
     const size = await waitForSteady(page, innerSize, { timeout, name: 'размер окна' });
     await page.evaluate(async (ms) => {
         await new Promise((r) => requestAnimationFrame(() => r()));
+        // пауза законна: таймер ТОЙ ЖЕ длины, что debounce приложения, взведён
+        // после него — исполнится строго следом (п. 3 выше)
         if (ms > 0) { await new Promise((r) => setTimeout(r, ms)); }
     }, opts.debounceMs || 0);
     return size;
@@ -592,6 +598,7 @@ async function waitForPanelSized(app, control, opts = {}) {
         if (Date.now() > deadline) {
             throw new Error(`размер панели не дошёл до страницы за ${timeout} мс: main ${JSON.stringify(main)}, страница ${JSON.stringify(page)}`);
         }
+        // шаг опроса: размер main дошёл до страницы
         await new Promise((r) => setTimeout(r, POLL_MS));
     }
     await control.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
@@ -838,6 +845,7 @@ async function waitForMainSnapshot(app, page, urlPart, name, opts = {}) {
             await received({ timeout: 1 }).catch(() => {});
             throw new Error(`окно ${name} не закончило загрузку за ${timeout} мс (или у соседнего окна так и не появился адрес)`);
         }
+        // шаг опроса: окно загружено, метка снимка отправлена
         await new Promise((r) => setTimeout(r, POLL_MS));
     }
     await received({ match: { e2eMarker: marker }, timeout: Math.max(1000, deadline - Date.now()) });
@@ -976,6 +984,8 @@ async function waitForDisplaySettled(app, display, opts = {}) {
     // waitForResizeHandled, п. 3.
     await display.evaluate(async (ms) => {
         await new Promise((r) => requestAnimationFrame(() => r()));
+        // пауза законна: таймер той же длины, что debounce приложения, взведён
+        // после него (waitForResizeHandled, п. 3)
         await new Promise((r) => setTimeout(r, ms));
     }, CONFIG.RESIZE_DEBOUNCE);
     await waitForQuiet(display);
@@ -1050,6 +1060,8 @@ async function waitForWindowSettled(app, page, urlPart, opts = {}) {
     const bounds = await waitForBoundsSettled(app, urlPart, opts);
     await page.evaluate(async (ms) => {
         await new Promise((r) => requestAnimationFrame(() => r()));
+        // пауза законна: таймер длины SAVE_SETTLE_MS взведён после таймера
+        // saveSettled окна (см. JSDoc выше) — исполнится строго следом
         await new Promise((r) => setTimeout(r, ms));
     }, SAVE_SETTLE_MS);
     return bounds;
@@ -1162,6 +1174,7 @@ async function untilMainHandled(app, channel, action, opts = {}) {
             if (Date.now() > deadline) {
                 throw new Error(`main не обработал «${channel}» ×${count} за ${timeout} мс (обработано ${n})`);
             }
+            // шаг опроса: счётчик обработанных main посылок дорос до count
             await new Promise((r) => setTimeout(r, 20));
         }
     } finally {

@@ -140,6 +140,7 @@ async function waitForControlWindow(app, timeout = 20000) {
             throw new Error(`окно панели не появилось за ${timeout} мс; окна: `
                 + (app.windows().map((w) => w.url()).join(', ') || 'нет'));
         }
+        // шаг опроса: окно панели появилось
         await new Promise((r) => setTimeout(r, 50));
     }
 }
