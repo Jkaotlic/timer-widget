@@ -16,7 +16,7 @@
   tests/e2e-pauses.test.js на потолке 0. Считает и сон внутри `evaluate`, и
   помощники-сны из общих модулей; законны три вида с пометкой (отсутствие за
   интервал, `шаг опроса:` в цикле со сроком, таймер той же длины после таймера
-  приложения) — 28 штук. Полный локальный e2e 1443 с → ≈ 810 с.
+  приложения) — 26 штук. Полный локальный e2e 1443 с → ≈ 810 с.
 - Помощники ожидания — e2e/window-ready.js (armReceived с match/count,
   waitForDisplaySettled с состоянием полноэкранного режима, waitForMainSnapshot,
   waitForBoundsSettled, moveBarrier, untilMainHandled …). launchApp ждёт
