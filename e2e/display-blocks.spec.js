@@ -341,7 +341,6 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
                     const r = el.getBoundingClientRect();
                     return { x: Math.round(r.left), y: Math.round(r.top) };
                 };
-                const wait = (ms) => new Promise((r) => setTimeout(r, ms));
                 const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
                 const o = (x, y) => ({
                     bubbles: true, cancelable: true, button: 0, altKey: true,
@@ -359,7 +358,7 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
                 // пауза законна: утверждается ОТСУТСТВИЕ прыжка на нажатии за
                 // интервал — прыжок мог бы прийти и переходом, а не только
                 // синхронно в обработчике
-                await wait(60);
+                await new Promise((r) => setTimeout(r, 60));
                 const afterDown = box();
                 // Шаги — по кадрам (порогов по времени у жеста нет), а не сном.
                 for (let i = 1; i <= 6; i++) {
