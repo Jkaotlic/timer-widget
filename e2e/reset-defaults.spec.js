@@ -69,9 +69,9 @@ async function cleanProfileWindows(app, control, names) {
         if (list.includes('display')) { window.ipcRenderer.send('open-display', { displayIndex: 0 }); }
     }, names);
     const wins = {};
-    if (names.includes('display')) { wins.display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control); }
-    if (names.includes('widget')) { wins.widget = await waitForWidgetSnapshot(app, await waitForWidget(app), control); }
-    if (names.includes('clock')) { wins.clock = await waitForClockSnapshot(app, await waitForClock(app), control); }
+    if (names.includes('display')) { wins.display = await waitForDisplaySnapshot(app, await waitForDisplay(app)); }
+    if (names.includes('widget')) { wins.widget = await waitForWidgetSnapshot(app, await waitForWidget(app)); }
+    if (names.includes('clock')) { wins.clock = await waitForClockSnapshot(app, await waitForClock(app)); }
     return wins;
 }
 

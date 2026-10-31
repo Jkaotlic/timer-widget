@@ -47,14 +47,6 @@ const WINDOWS = [
     }
 ];
 
-async function findWindow(app, marker) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(marker).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
-
 function positionOf(app, ref) {
     return app.evaluate(({ BrowserWindow }, name) => {
         const win = BrowserWindow.getAllWindows().find(w => w.__ref === name);
@@ -103,11 +95,9 @@ for (const w of WINDOWS) {
         await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open);
         // Окно ВСТАЛО (было 1500 мс): восстановление геометрии и её
         // отложенная запись позади — иначе они пришли бы поверх жеста.
-        await waitForWindowSettled(app, await w.wait(app), w.url);
+        const page = await w.wait(app);
+        await waitForWindowSettled(app, page, w.url);
         await tagWindows(app);
-
-        const page = await findWindow(app, w.marker);
-        expect(page, `окно «${w.name}» должно открыться`).not.toBeNull();
 
         const before = await positionOf(app, w.mainRef);
         expect(before, 'позиция окна должна читаться').not.toBeNull();
@@ -149,11 +139,9 @@ for (const w of WINDOWS) {
         await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open);
         // Окно ВСТАЛО (было 1500 мс): восстановление геометрии и её
         // отложенная запись позади — иначе они пришли бы поверх жеста.
-        await waitForWindowSettled(app, await w.wait(app), w.url);
+        const page = await w.wait(app);
+        await waitForWindowSettled(app, page, w.url);
         await tagWindows(app);
-
-        const page = await findWindow(app, w.marker);
-        expect(page).not.toBeNull();
 
         // Ctrl зарезервирован за масштабированием колесом — перетаскивание с ним
         // обязано молчать, иначе масштабирование дёргает окно.

@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForWidget, waitForWindowSettled, reloadPanel, untilReceived } = require('./window-ready');
+const { waitForClock, waitForWidget, waitForWindowSettled, reloadPanel, untilReceived, findWindowBy } = require('./window-ready');
 
 /**
  * Синхронизация состояния окон с окном, которое загрузилось ПОЗЖЕ остальных.
@@ -15,19 +15,10 @@ const { waitForClock, waitForWidget, waitForWindowSettled, reloadPanel, untilRec
  * получал open-clock-widget и лишь фокусировал уже открытое окно.
  */
 
-// Окна различаем по элементам, уникальным для каждого.
-const MARKERS = {
-    clock: () => !!document.getElementById('wFlipSecGroup'),
-    widget: () => !!document.getElementById('wFlipHoursGroup')
-};
-
-async function findWindow(app, kind) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(MARKERS[kind]).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
+// Часы — по элементу, которого нет в остальных окнах. Разовый поиск
+// (`findWindowBy`) — только для вопроса «открыты ли ПРЯМО СЕЙЧАС» внутри
+// опроса; открытое окно берётся из ожидания (`waitForClock`/`waitForWidget`).
+const IS_CLOCK = () => !!document.getElementById('wFlipSecGroup');
 
 /**
  * Окно ПОЛУЧИЛО свой снимок состояний окон при загрузке (did-finish-load →
@@ -78,13 +69,11 @@ test('окно, открытое вторым, знает про уже откр
     const clock = await waitForClock(app);
     // Часы ВСТАЛИ: восстановление геометрии и её отложенная запись позади.
     await waitForWindowSettled(app, clock, 'electron-clock-widget.html');
-    expect(await findWindow(app, 'clock'), 'часы должны открыться').not.toBeNull();
 
     // 2. Потом виджет — он загружается ПОСЛЕ часов.
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-    await waitForLoadSnapshot(app, await waitForWidget(app), 'electron-widget.html');
-    const widget = await findWindow(app, 'widget');
-    expect(widget, 'виджет должен открыться').not.toBeNull();
+    const widget = await waitForWidget(app);
+    await waitForLoadSnapshot(app, widget, 'electron-widget.html');
 
     // 3. C в виджете обязана ЗАКРЫТЬ часы с первого нажатия.
     await pressCode(widget, 'KeyC');
@@ -93,13 +82,13 @@ test('окно, открытое вторым, знает про уже откр
     // Ложно-зелёным это не станет — без снимка виджет слал бы open, и часы
     // остались бы открытыми до таймаута.
     await expect.poll(
-        () => findWindow(app, 'clock'),
+        () => findWindowBy(app, IS_CLOCK),
         { message: 'часы должны закрыться: виджет обязан знать, что они уже открыты' }
     ).toBeNull();
 
     // 4. И обратно — повторное нажатие снова их открывает.
     await pressCode(widget, 'KeyC');
-    await expect.poll(() => findWindow(app, 'clock'), { message: 'повторное нажатие снова открывает часы' })
+    await expect.poll(() => findWindowBy(app, IS_CLOCK), { message: 'повторное нажатие снова открывает часы' })
         .not.toBeNull();
 
     await app.close();
@@ -149,9 +138,7 @@ test('BUG-01: Space в часах ставит идущий таймер на п
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
         // Часы открываются ПОСЛЕ старта — проверяется и снимок при загрузке.
         await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-        await waitForClock(app);
-        const clock = await findWindow(app, 'clock');
-        expect(clock, 'часы должны открыться').not.toBeNull();
+        const clock = await waitForClock(app);
         await expect.poll(() => timerStateOf(control)).toMatchObject({ isRunning: true });
 
         await pressCode(clock, 'Space');

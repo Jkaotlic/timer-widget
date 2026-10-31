@@ -25,7 +25,7 @@
 
 const CONFIG = require('../constants.js');
 const {
-    waitForSteady, innerSize, settleFullScreenEntry, reportFullScreenEntry, DEFAULT_TIMEOUT
+    waitForSteady, innerSize, settleAfterResize, settleFullScreenEntry, reportFullScreenEntry, DEFAULT_TIMEOUT
 } = require('./window-ready');
 
 /**
@@ -125,7 +125,8 @@ async function resizeDisplay(app, display, size, opts = {}) {
     // пройти таймер заново. Не осел за три круга — бросить, а не мерить
     // промежуточное окно.
     for (let round = 0; ; round++) {
-        await settleResize(display);
+        // Кадр + таймер длины RESIZE_DEBOUNCE после таймера приложения.
+        await settleAfterResize(display, CONFIG.RESIZE_DEBOUNCE);
         const now = await display.evaluate(innerSize);
         if (now.w === got.w && now.h === got.h) { break; }
         if (round >= 2) {
@@ -140,21 +141,6 @@ async function resizeDisplay(app, display, size, opts = {}) {
     }
     console.log(`   просили ${size.w}×${size.h}, система дала ${got.w}×${got.h} — считаем по выданному`);
     return got;
-}
-
-/**
- * Обработчики `resize` дисплея отработали: кадр (событие рассылается в шаге
- * отрисовки до колбэков кадра), затем таймер длины `CONFIG.RESIZE_DEBOUNCE`,
- * взведённый ПОСЛЕ таймера приложения, — равные задержки исполняются в
- * порядке взвода. Если размер не менялся, это лишние ~300 мс, а не ошибка.
- */
-async function settleResize(display) {
-    await display.evaluate(async (ms) => {
-        await new Promise((r) => requestAnimationFrame(() => r()));
-        // пауза законна: таймер длины RESIZE_DEBOUNCE взведён после таймера
-        // приложения — равные задержки исполняются в порядке взвода
-        await new Promise((r) => setTimeout(r, ms));
-    }, CONFIG.RESIZE_DEBOUNCE);
 }
 
 module.exports = { resizeDisplay, leaveFullScreen };

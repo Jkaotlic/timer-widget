@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived, waitForQuiet
+    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived, waitForQuiet, untilDisplayGot
 } = require('./window-ready');
 
 /**
@@ -38,17 +38,6 @@ const BLOCK_TOGGLES = ['showCurrentTime', 'showEventTime', 'showEndTime', 'showT
 async function settled(app, display) {
     await waitForDisplaySnapshot(app, display);
     return waitForDisplaySettled(app, display);
-}
-
-/**
- * Действие панели дошло до дисплея: пришла посылка `display-settings-update`,
- * несущая ВСЕ поля `match` (настройки — полный снимок, так что такая посылка
- * и даёт окну нужное состояние), обработчик её отработал, окно утихло.
- */
-async function untilDisplayGot(display, action, match) {
-    const got = await armReceived(display, 'display-settings-update');
-    await action();
-    return got({ match });
 }
 
 const allBlocks = (on) => Object.fromEntries(BLOCK_TOGGLES.map((k) => [k, on]));

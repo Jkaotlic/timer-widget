@@ -326,13 +326,28 @@ async function waitForResizeHandled(page, before, opts = {}) {
         before, { timeout }
     );
     const size = await waitForSteady(page, innerSize, { timeout, name: 'размер окна' });
+    await settleAfterResize(page, opts.debounceMs || 0);
+    return size;
+}
+
+/**
+ * Обработчики `resize` окна отработали — пп. 2–3 `waitForResizeHandled`:
+ * кадр (событие рассылается в шаге отрисовки ДО колбэков кадра), затем таймер
+ * длины `debounceMs`, взведённый ПОСЛЕ таймера приложения (равные задержки
+ * исполняются в порядке взвода). Одна копия на `waitForResizeHandled`,
+ * `waitForDisplaySettled` и `resizeDisplay` (e2e/display-window.js). Если
+ * размер не менялся, это лишние `debounceMs`, а не ошибка.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} debounceMs — 0: только кадр
+ */
+async function settleAfterResize(page, debounceMs) {
     await page.evaluate(async (ms) => {
         await new Promise((r) => requestAnimationFrame(() => r()));
         // пауза законна: таймер ТОЙ ЖЕ длины, что debounce приложения, взведён
-        // после него — исполнится строго следом (п. 3 выше)
+        // после него — исполнится строго следом (п. 3 waitForResizeHandled)
         if (ms > 0) { await new Promise((r) => setTimeout(r, ms)); }
-    }, opts.debounceMs || 0);
-    return size;
+    }, debounceMs);
 }
 
 /** Размер окна глазами страницы — вход для `waitForResizeHandled`. */
@@ -357,11 +372,15 @@ function innerSize() { return { w: window.innerWidth, h: window.innerHeight }; }
  * заводят переход каждую секунду, и круг не вышел бы чистым никогда. Оба
  * только красят и коробок соседей не двигают.
  *
- * Предел кругов исчерпан — это НЕ «тихо»: печатается, что ещё ехало, чтобы
- * следующее падение утверждения было с диагнозом.
+ * Предел кругов исчерпан — это НЕ «тихо», и ожидание ПАДАЕТ с тем, что ещё
+ * ехало: вернуться молча значило бы отдать вызывающему (`armReceived`, каждый
+ * `untilReceived`) окно в движении под именем «утихло» (финальное ревью
+ * ветки modules/es-modules, M8). Полный прогон 31.10.2026 (280 тестов)
+ * предела не достигал ни разу.
  *
  * @param {import('@playwright/test').Page} page
  * @param {{rounds?: number}} [opts]
+ * @returns {Promise<void>}
  */
 async function waitForQuiet(page, opts = {}) {
     const left = await page.evaluate(async ([rounds, tick]) => {
@@ -386,7 +405,7 @@ async function waitForQuiet(page, opts = {}) {
         return running.map(describe).join(', ') || 'шрифты ещё грузятся';
     }, [opts.rounds ?? 6, TICK_TRANSITIONS]);
     if (left) {
-        console.warn(`[waitForQuiet] окно не утихло за ${opts.rounds ?? 6} кругов, ещё едет: ${left}`);
+        throw new Error(`[waitForQuiet] окно не утихло за ${opts.rounds ?? 6} кругов, ещё едет: ${left}`);
     }
 }
 
@@ -501,6 +520,24 @@ async function untilReceived(page, channel, action, opts = {}) {
     const received = await armReceived(page, channel);
     await action();
     return received(opts);
+}
+
+/**
+ * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку канала
+ * `channel`, НЕСУЩУЮ `match`, и утих. Канал по умолчанию — настройки дисплея:
+ * тумблер, поле, ползунок и стиль шлют их синхронно (panel-display.js,
+ * pushDisplaySettings). `match` обязателен по смыслу: без него ожидание
+ * сошлось бы на посылке предыдущего действия, ещё бывшей в пути (ревью B3, I1).
+ * Одна копия вместо пяти по спекам (финальное ревью ветки, M2).
+ *
+ * @param {import('@playwright/test').Page} display
+ * @param {() => Promise<any>} action
+ * @param {object} match
+ * @param {string} [channel]
+ * @returns {Promise<any>} payload посылки
+ */
+function untilDisplayGot(display, action, match, channel = 'display-settings-update') {
+    return untilReceived(display, channel, action, { match });
 }
 
 /**
@@ -964,18 +1001,18 @@ async function setWindowStyles(app, control, pages, style, opts = {}) {
     }
 }
 
-/** Дисплей получил снимок main. `_control` — прежняя сигнатура (шаг 2 был через панель). */
-function waitForDisplaySnapshot(app, display, _control, opts = {}) {
+/** Дисплей получил снимок main. */
+function waitForDisplaySnapshot(app, display, opts = {}) {
     return waitForMainSnapshot(app, display, 'display.html', 'дисплея', opts);
 }
 
 /** Виджет получил снимок main. */
-function waitForWidgetSnapshot(app, widget, _control, opts = {}) {
+function waitForWidgetSnapshot(app, widget, opts = {}) {
     return waitForMainSnapshot(app, widget, 'electron-widget.html', 'виджета', opts);
 }
 
 /** Часы получили снимок main. */
-function waitForClockSnapshot(app, clock, _control, opts = {}) {
+function waitForClockSnapshot(app, clock, opts = {}) {
     return waitForMainSnapshot(app, clock, 'electron-clock-widget.html', 'часов', opts);
 }
 
@@ -1102,14 +1139,24 @@ async function waitForDisplaySettled(app, display, opts = {}) {
     await waitForSteady(display, innerSize, { samples: 4, timeout, name: 'размер дисплея' });
     // Таймер длины debounce, взведённый ПОСЛЕ таймера приложения, — см.
     // waitForResizeHandled, п. 3.
-    await display.evaluate(async (ms) => {
-        await new Promise((r) => requestAnimationFrame(() => r()));
-        // пауза законна: таймер той же длины, что debounce приложения, взведён
-        // после него (waitForResizeHandled, п. 3)
-        await new Promise((r) => setTimeout(r, ms));
-    }, CONFIG.RESIZE_DEBOUNCE);
+    await settleAfterResize(display, CONFIG.RESIZE_DEBOUNCE);
     await waitForQuiet(display);
     return display;
+}
+
+/**
+ * Дисплей открыт, получил снимок main и ВСТАЛ: `waitForDisplay` →
+ * `waitForDisplaySnapshot` → `waitForDisplaySettled`. Одна копия вместо
+ * своей в каждой спеке (финальное ревью ветки, M2).
+ *
+ * @param {import('@playwright/test').ElectronApplication} app
+ * @param {{timeout?: number}} [opts]
+ * @returns {Promise<import('@playwright/test').Page>}
+ */
+async function waitForSettledDisplay(app, opts = {}) {
+    const display = await waitForDisplay(app, opts);
+    await waitForDisplaySnapshot(app, display, opts);
+    return waitForDisplaySettled(app, display, opts);
 }
 
 /**
@@ -1390,8 +1437,9 @@ module.exports = {
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,
     findDisplay, findWindowBy, waitForSteady, reloadPanel, waitForTransitions,
-    waitForResizeHandled, innerSize, waitForQuiet, armReceived, untilReceived, waitForDisplaySettled, waitForDisplaySnapshot,
-    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSized, waitForPanelSettled,
-    waitForFrameSteady, waitForPanelRemaining, settleFullScreenEntry, reportFullScreenEntry, waitForDrawerBeside, DEFAULT_TIMEOUT,
-    DISPLAY_PROBE, WIDGET_PROBE, CLOCK_PROBE
+    waitForResizeHandled, settleAfterResize, innerSize, waitForQuiet, armReceived, untilReceived, untilDisplayGot,
+    waitForDisplaySettled, waitForSettledDisplay, waitForDisplaySnapshot,
+    waitForWidgetSnapshot, waitForClockSnapshot, panelRoundTrip, waitForPanelSettled,
+    waitForPanelRemaining, settleFullScreenEntry, reportFullScreenEntry, waitForDrawerBeside, DEFAULT_TIMEOUT,
+    WIDGET_PROBE, CLOCK_PROBE
 };

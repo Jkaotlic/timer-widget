@@ -79,8 +79,8 @@ test('по умолчанию (светлая тема) виджет и дисп
         const widget = await waitForWidget(app);
         // Тон зависит от снимка main (настройки фона, цвета, тема): до него
         // окно показывает тон по умолчанию, и проверка была бы о нём.
-        await waitForDisplaySnapshot(app, display, control);
-        await waitForWidgetSnapshot(app, widget, control);
+        await waitForDisplaySnapshot(app, display);
+        await waitForWidgetSnapshot(app, widget);
         expect(display, 'полноэкранное окно не найдено').not.toBeNull();
         expect(widget, 'окно виджета не найдено').not.toBeNull();
 
@@ -121,7 +121,7 @@ test('тёмная заливка при светлой теме оставля�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
         expect(display).not.toBeNull();
 
         // Тема светлая (умолчание), но пользователь выбрал ТЁМНУЮ заливку.
@@ -145,7 +145,7 @@ test('блок времени повторяет стиль: у флипа — �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
         expect(display).not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
@@ -239,7 +239,7 @@ test('аналог: стрелки мини-часов в блоке — те ж
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
         expect(display).not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
@@ -281,7 +281,7 @@ test('на светлом тоне у «Круга» и «Цифр» видже�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        const widget = await waitForWidgetSnapshot(app, await waitForWidget(app), control);
+        const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
         expect(widget, 'окно виджета не найдено').not.toBeNull();
 
         // Тема — умолчание приложения, то есть светлая. Стиль ставим кликом.

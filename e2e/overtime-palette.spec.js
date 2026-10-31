@@ -8,11 +8,17 @@ const {
 /**
  * Оба окна ВСТАЛИ после открытия (было 2200 мс): снимок main обработан,
  * дисплей вошёл в полноэкранный режим (или по состоянию не может) и осел.
+ * Отдаёт найденные окна — второй поиск разовым обходом app.windows() был бы
+ * копией того, что ожидание уже сделало (docs/lessons.md, «Окно в e2e ждут
+ * ОПРОСОМ»).
+ *
+ * @returns {Promise<{display: import('@playwright/test').Page, widget: import('@playwright/test').Page}>}
  */
 async function windowsReady(app) {
     const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
     await waitForDisplaySettled(app, display);
-    await waitForWidgetSnapshot(app, await waitForWidget(app));
+    const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
+    return { display, widget };
 }
 
 /**
@@ -101,13 +107,6 @@ function expectRed(value, what) {
     expect(c.r, `${what}: красный не доминирует над синим (${value})`).toBeGreaterThanOrEqual(c.b * 2.5);
 }
 
-async function findWindow(app, probe) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(probe).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 test('перерасход красный и в дисплее, и в виджете — цифры и плашка', async () => {
     const { app, control } = await launchApp();
 
@@ -115,12 +114,7 @@ test('перерасход красный и в дисплее, и в видже
         window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         window.ipcRenderer.send('open-widget');
     });
-    await windowsReady(app);
-
-    const display = await findWindow(app, () => !!document.getElementById('progressRing'));
-    const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
-    expect(display, 'окно дисплея не найдено').not.toBeNull();
-    expect(widget, 'окно виджета не найдено').not.toBeNull();
+    const { display, widget } = await windowsReady(app);
 
     // Уводим таймер в перерасход: 1 секунда с разрешённым минусом.
     await control.evaluate(() => {
@@ -185,12 +179,7 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
             window.ipcRenderer.send('open-widget');
         });
-        await windowsReady(app);
-
-        const display = await findWindow(app, () => !!document.getElementById('progressRing'));
-        const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
-        expect(widget, 'окно виджета не найдено').not.toBeNull();
+        const { display, widget } = await windowsReady(app);
 
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true }));
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true }));

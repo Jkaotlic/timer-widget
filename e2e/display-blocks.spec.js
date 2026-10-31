@@ -1,8 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived, untilReceived,
-    waitForQuiet
+    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived,
+    waitForQuiet, untilDisplayGot
 } = require('./window-ready');
 const { EVENT_TITLE_MAX } = require('../relay-payload.js');
 
@@ -49,18 +49,8 @@ async function openReady(app, control, displayIndex = 'auto') {
 }
 
 async function settle(app, control, display) {
-    await waitForDisplaySnapshot(app, display, control);
+    await waitForDisplaySnapshot(app, display);
     return waitForDisplaySettled(app, display);
-}
-
-/**
- * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку настроек,
- * НЕСУЩУЮ `match`, и утих: тумблер, поле, стиль шлют её синхронно
- * (pushDisplaySettings). Без `match` ожидание сошлось бы на посылке
- * предыдущего действия, ещё бывшей в пути (ревью B3, I1).
- */
-function untilDisplayGot(display, action, match) {
-    return untilReceived(display, 'display-settings-update', action, { match });
 }
 
 /** Поставить тумблеры; ждать посылку, несущую ВСЕ их значения. */

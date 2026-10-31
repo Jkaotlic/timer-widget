@@ -36,19 +36,6 @@ async function waitForSign(page, minus) {
  * Тест меряет обе величины и ТРЕБУЕТ, чтобы по центру были цифры.
  */
 
-const MARKERS = {
-    widget: () => !!document.getElementById('wFlipHoursGroup'),
-    display: () => !!document.getElementById('flipHoursUnit')
-};
-
-async function findWindow(app, kind) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(MARKERS[kind]).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
-
 // Возвращает центры: контейнера, всей надписи и только цифр.
 function measure(sel) {
     const round = (v) => Math.round(v * 10) / 10;
@@ -150,11 +137,9 @@ test('замер центровки времени в перерасходе', a
         window.ipcRenderer.send('open-display');
     });
     // Оба окна получили снимок main и ВСТАЛИ — было 2500 мс.
-    await waitForDisplaySettled(app, await waitForDisplaySnapshot(app, await waitForDisplay(app)));
-    await waitForWindowSettled(app, await waitForWidgetSnapshot(app, await waitForWidget(app)), 'electron-widget.html');
-
-    const widget = await findWindow(app, 'widget');
-    const display = await findWindow(app, 'display');
+    const display = await waitForDisplaySettled(app, await waitForDisplaySnapshot(app, await waitForDisplay(app)));
+    const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
+    await waitForWindowSettled(app, widget, 'electron-widget.html');
 
     // Круглый стиль в обоих окнах — именно про него речь. Ждём, что оба
     // стиля ДОШЛИ до окон (было 800 мс); виджет после стиля ещё и встаёт.

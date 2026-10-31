@@ -4,15 +4,8 @@ const path = require('node:path');
 const { launchApp, USER_DATA_DIR, waitForStartupPush } = require('./launch');
 const {
     waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, armReceived,
-    panelRoundTrip, waitForQuiet
+    panelRoundTrip, waitForQuiet, waitForSettledDisplay
 } = require('./window-ready');
-
-/** Дисплей получил снимок main и ВСТАЛ (полноэкранный вход, раскладка) — раньше пауза 1500 мс. */
-async function settledDisplay(app) {
-    const display = await waitForDisplay(app);
-    await waitForDisplaySnapshot(app, display);
-    return waitForDisplaySettled(app, display);
-}
 
 /**
  * Характеризация: масштаб полноэкранного таймера применяется ко всем блокам
@@ -92,7 +85,7 @@ test('масштаб дисплея применяется ко всем бло�
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        display = await settledDisplay(app);
+        display = await waitForSettledDisplay(app);
 
         // Точка входа 1: приход настроек от панели. Дисплей её получил и утих —
         // раньше пауза 500 мс.
@@ -234,7 +227,7 @@ test('масштаб дисплея не выпускает таймер за о
     let display = null;
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        display = await settledDisplay(app);
+        display = await waitForSettledDisplay(app);
 
         const measure = () => {
             const active = ['timerRing', 'timerFlip', 'timerAnalog', 'timerDigits']

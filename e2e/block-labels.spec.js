@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived, panelRoundTrip
+    panelRoundTrip, untilDisplayGot, waitForSettledDisplay
 } = require('./window-ready');
 
 /**
@@ -25,24 +25,6 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [id, value]);
 
-/** Дисплей открыт, получил снимок main и встал. */
-async function settledDisplay(app) {
-    const display = await waitForDisplay(app);
-    await waitForDisplaySnapshot(app, display);
-    return waitForDisplaySettled(app, display);
-}
-
-/**
- * Поле или тумблер панели дошли до дисплея: пришла `display-settings-update`
- * со ВСЕМИ полями `match` (вход поля шлёт настройки синхронно —
- * panel-display.js, pushDisplaySettings), обработчик её применил.
- */
-async function untilDisplayGot(display, action, match) {
-    const got = await armReceived(display, 'display-settings-update');
-    await action();
-    return got({ match });
-}
-
 const TOGGLES = ['showEventTime', 'showEndTime', 'showTimeLeft', 'showCurrentTime'];
 
 const caption = (display, blockId) => display.evaluate(
@@ -54,7 +36,7 @@ test('своё название плашки доезжает до диспле�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await settledDisplay(app);
+        const display = await waitForSettledDisplay(app);
 
         await control.click('.tab-btn[data-tab="display"]');
         await untilDisplayGot(display, async () => {
@@ -118,7 +100,7 @@ test('своё название переживает перезапуск при
 
         await setToggle(control, 'showCurrentTime', true);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await settledDisplay(app);
+        const display = await waitForSettledDisplay(app);
         expect(await caption(display, 'currentTimeBlock')).toBe('Сейчас');
     } finally {
         // Профиль e2e общий: возвращаем как было.

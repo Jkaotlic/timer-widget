@@ -14,7 +14,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, waitForDisplaySnapshot, untilReceived, waitForQuiet, waitForTransitions
+    waitForDisplay, waitForDisplaySnapshot, waitForQuiet, waitForTransitions, untilDisplayGot
 } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
@@ -48,15 +48,7 @@ async function openDisplay(app, control) {
     // ставка, период и накопитель приезжают им, и без него деньги считались
     // бы по умолчаниям окна (прежде — пауза 2400 мс в части тестов).
     const display = await waitForDisplay(app, { selector: '#totalCostValue' });
-    return waitForDisplaySnapshot(app, display, control);
-}
-
-/**
- * Действие в панели — и дождаться, что дисплей ПОЛУЧИЛ посылку, несущую
- * `match`, и утих (ревью B3, I1: без `match` сошлась бы чужая посылка в пути).
- */
-function untilDisplayGot(display, action, match, channel = 'display-settings-update') {
-    return untilReceived(display, channel, action, { match });
+    return waitForDisplaySnapshot(app, display);
 }
 
 /** Текущие суммы на дисплее. */
@@ -239,7 +231,7 @@ test('раскладка «47-й этаж» появляется только с
         // Денег на экране до раскладки нет (тумблеры выключены), поэтому узел
         // денег здесь не ждём видимым — только окно и снимок.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
 
         await untilDisplayGot(display, () => btn.click(), { layout: 'floor47' }, 'display-layout');
 

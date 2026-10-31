@@ -1,8 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, waitForDisplayGone, waitForDisplaySettled, waitForDisplaySnapshot, untilReceived, waitForQuiet,
-    waitForTransitions
+    waitForDisplay, waitForDisplayGone, waitForDisplaySettled, waitForDisplaySnapshot, waitForQuiet,
+    waitForTransitions, untilDisplayGot
 } = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 const { pickWindowSizes } = require('./window-sizes');
@@ -159,16 +159,6 @@ async function openDisplayDrawer(control) {
     await waitForTransitions(control);
 }
 
-/**
- * Действие в панели, после которого дисплей обязан ПОЛУЧИТЬ посылку канала
- * `channel`, НЕСУЩУЮ `match`, и утихнуть. Канал по умолчанию — настройки
- * дисплея: их шлёт каждый тумблер, ползунок и стиль. `match` обязателен по
- * смыслу: посылка предыдущего действия может прийти после взвода (ревью B3, I1).
- */
-function untilDisplayGot(display, action, match, channel = 'display-settings-update') {
-    return untilReceived(display, channel, action, { match });
-}
-
 /** Клик по кнопке раскладки — и дождаться, что дисплей её ПРИМЕНИЛ. */
 function clickLayout(control, display, id) {
     return untilDisplayGot(
@@ -209,7 +199,7 @@ async function resetDisplayState(control, display) {
 
 async function openSettledDisplay(control, app) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-    const display = await waitForDisplaySnapshot(app, await waitForDisplay(app), control);
+    const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
     return waitForDisplaySettled(app, display);
 }
 

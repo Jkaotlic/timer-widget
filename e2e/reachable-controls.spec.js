@@ -128,7 +128,7 @@ test('вернувшиеся переключатели часов меняют 
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-    const clock = await waitForClockSnapshot(app, await waitForClock(app), control);
+    const clock = await waitForClockSnapshot(app, await waitForClock(app));
     expect(clock, 'окно часов не найдено').not.toBeNull();
 
     // Открываем вкладку «Часы» — настройки живут в выдвижном ящике.
