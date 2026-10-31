@@ -199,7 +199,34 @@ test('аналог: «До завершения» показывает ОСТА�
             start: document.getElementById('eventTimeInput').value,
             end: document.getElementById('endTimeInput').value
         }));
-        const endTime = await control.evaluate(() => {
+        // Слушатель-самописец ставится ДО смены расписания: он снимает блок в
+        // момент прихода посылки — обработчик приложения зарегистрирован раньше
+        // и к этому мгновению уже отработал, а тика между ними быть не может.
+        // Так проверяется ровно то, что обещает правило: значение, выведенное
+        // из настроек, пересчитано НА ЗАПИСИ настроек, а не ближайшим тиком
+        // (до 31.10.2026 блок до секунды показывал остаток по ПРЕЖНЕМУ
+        // расписанию: замер 00:21 — 11:38:52 до старого конца 12:00 вместо 02:00).
+        await display.evaluate(() => {
+            const rotation = (el) => {
+                const m = el && /rotate\(([-\d.]+)deg\)/.exec(el.style.transform);
+                return m ? Number(m[1]) : null;
+            };
+            const rec = { list: [] };
+            rec.listener = (_e, p) => {
+                const block = document.getElementById('timeLeftBlock');
+                rec.list.push({
+                    eventTime: p && p.eventTime,
+                    endTime: p && p.endTime,
+                    text: document.getElementById('timeLeftValue').textContent,
+                    hour: rotation(block.querySelector('.mini-hand-hour')),
+                    minute: rotation(block.querySelector('.mini-hand-minute'))
+                });
+            };
+            window.ipcRenderer.on('display-settings-update', rec.listener);
+            window.__e2eTimeLeftAtReceipt = rec;
+        });
+        const schedule = await armReceived(display, 'display-settings-update');
+        const { startTime, endTime } = await control.evaluate(() => {
             const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             const now = Date.now();
             const set = (id, value) => {
@@ -207,26 +234,41 @@ test('аналог: «До завершения» показывает ОСТА�
                 el.value = value;
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             };
-            set('eventTimeInput', hhmm(new Date(now - 3600 * 1000)));
+            const start = hhmm(new Date(now - 3600 * 1000));
+            set('eventTimeInput', start);
             const value = hhmm(new Date(now + 2 * 3600 * 1000));
             set('endTimeInput', value);
-            return value;
+            return { startTime: start, endTime: value };
         });
         console.log(`   время окончания: ${endTime}`);
+        await schedule({ match: { eventTime: startTime, endTime } });
 
-        // Расписание ушло дисплею тем же каналом раньше стиля; посылка стиля
-        // несёт и его — ждём её со всеми тремя полями.
+        const atReceipt = await display.evaluate(([start, end]) => {
+            const rec = window.__e2eTimeLeftAtReceipt;
+            window.ipcRenderer.removeListener('display-settings-update', rec.listener);
+            delete window.__e2eTimeLeftAtReceipt;
+            return rec.list.find((r) => r.eventTime === start && r.endTime === end) || null;
+        }, [startTime, endTime]);
+        expect(atReceipt, 'самописец не застал посылку с новым расписанием').not.toBeNull();
+        console.log(`   на приходе расписания: «До завершения» = ${atReceipt.text}, стрелки: час ${atReceipt.hour}°, минута ${atReceipt.minute}°`);
+        {
+            const [rh, rm, rs] = atReceipt.text.split(':').map(Number);
+            const left = rh * 3600 + rm * 60 + rs;
+            // Конец через два часа (минуты округлены вниз, плюс запас на переход минуты).
+            expect(left, `на приходе расписания «До завершения» = ${atReceipt.text}, а конец в ${endTime}: ждёт тика`).toBeGreaterThan(7000);
+            expect(left, `на приходе расписания «До завершения» = ${atReceipt.text}, а конец в ${endTime}`).toBeLessThanOrEqual(7200);
+            // Стрелки — той же посылкой, что текст: тот же владелец формулы.
+            expect(atReceipt.hour !== null && atReceipt.minute !== null, 'стрелки блока не найдены или не повёрнуты').toBe(true);
+            expect(atReceipt.hour, 'часовая стрелка на приходе расписания — от прежнего остатка')
+                .toBeCloseTo((rh % 12) * 30 + rm * 0.5, 5);
+            expect(atReceipt.minute, 'минутная стрелка на приходе расписания — от прежнего остатка')
+                .toBeCloseTo(rm * 6 + rs * 0.1, 5);
+        }
+
+        // Посылка стиля несёт и расписание — ждём её со всеми тремя полями.
         await untilDisplayGot(display,
             () => control.click('#displayTimerStyle button[data-val="analog"]'),
-            { displayTimerStyle: 'analog', endTime, eventTime: await control.locator('#eventTimeInput').inputValue() });
-        // «До завершения» пересчитывает ТИК системных часов дисплея
-        // (startCurrentTimeClock), а не приход настроек: до тика блок
-        // показывает остаток по ПРЕЖНЕМУ расписанию, и проверка «стрелки = текст»
-        // сошлась бы и на нём (замер 31.10.2026 00:21: 11:38:52 — до прежнего
-        // конца 12:00 — вместо 02:00). Ждём тик: его видно по смене секунд в
-        // «Сейчас», которое обновляет тот же вызов.
-        const tickBefore = await display.locator('#currentTime').textContent();
-        await expect(display.locator('#currentTime'), 'тик часов дисплея не пришёл').not.toHaveText(tickBefore);
+            { displayTimerStyle: 'analog', endTime, eventTime: startTime });
         await waitForQuiet(display);
 
         const seen = await display.evaluate(() => {

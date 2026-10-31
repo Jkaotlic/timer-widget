@@ -2570,6 +2570,8 @@ payload валиден, канал жив, окно не падает.
 `e2e/panel-states.spec.js` (без тика) и `e2e/clock-style-sync.spec.js` (под
 синхронизацией).
 
+**Ещё случай (31.10.2026, дисплей).** «До завершения» и герой в режимах «до…» считал только тик часов дисплея: после смены расписания блок до секунды показывал остаток по прежнему (`08:53:40` вместо `01:59:xx`, снято на приходе посылки). Владелец — `updateScheduleDerived()`, его зовут и тик, и `applyDisplaySettings()` на реальной смене расписания; закреплено `tests/display-schedule-repaint.test.js` и самописцем на приходе посылки в `e2e/display-block-frames.spec.js`.
+
 ---
 
 <a id="a-fixed-card-and-a-centred-column-are-two-ways-to-say-where"></a>

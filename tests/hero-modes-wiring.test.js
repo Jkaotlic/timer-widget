@@ -152,9 +152,14 @@ test('полоса срочности считается от геройског
 });
 
 test('в не-таймерных режимах тикают системные часы, а не IPC', () => {
+    // Тик перерисовывает героя через владельца выведенного из расписания
+    // (updateScheduleDerived, 31.10.2026) — того же, кого зовёт приход настроек.
     const body = methodBody(SRC, 'startCurrentTimeClock');
-    assert.ok(body.includes('this.updateDisplay()'),
-        'тик системных часов не перерисовывает героя — режимы «часы» и «до…» замрут');
+    assert.ok(body.includes('this.updateScheduleDerived('),
+        'тик системных часов не зовёт updateScheduleDerived() — режимы «часы» и «до…» замрут');
+    const owner = methodBody(SRC, 'updateScheduleDerived');
+    assert.ok(owner.includes('this.updateDisplay()'),
+        'updateScheduleDerived() не перерисовывает героя — режимы «часы» и «до…» замрут');
 });
 
 test('деньги 47-го этажа продолжают читать СЫРОЙ остаток таймера', () => {
