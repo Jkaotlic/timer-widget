@@ -323,6 +323,28 @@ test('deferWhileCollapsed: последняя просьба побеждает;
     assert.deepEqual(seen, ['b']);
 });
 
+// Свёртка и разворот слились в один кадр: рендерер не увидел ни полосы, ни
+// возврата, resize не придёт вовсе. Просьба не должна ждать СЛЕДУЮЩЕГО
+// постороннего resize (ручного растягивания пользователем) и выполниться
+// поверх него — окно уже панель, мерить можно сразу.
+test('deferWhileCollapsed: свёртка-разворот без resize окна — перемер сразу, а не на постороннем resize', () => {
+    const win = fakeWin(700);
+    const ipc = fakeIpc();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc, win });
+    let runs = 0;
+    bar.collapse();
+    bar.deferWhileCollapsed(() => { runs++; ipc.send('resize-control-window', {}); });
+    bar.expand();
+    assert.equal(runs, 1, 'окно уже выше полосы — resize не придёт, ждать нечего');
+    // main глотает resize-control-window, пока панель свёрнута: перемер обязан
+    // уйти ПОСЛЕ разворота, даже если кадр исполнился сразу.
+    assert.deepEqual(ipc.sent.map((m) => m.channel).slice(-2), ['control-collapse', 'resize-control-window']);
+    assert.equal(ipc.sent.at(-2).payload.collapsed, false);
+    assert.equal(win.listeners.size, 0, 'слушатель не остался ждать чужого resize');
+    win.resize(820);
+    assert.equal(runs, 1, 'ручное растягивание пользователя перемер не запускает');
+});
+
 test('hasPendingFit: видно, что просьба ждёт разворота, и что она выполнена', () => {
     const win = fakeWin();
     const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
@@ -389,4 +411,24 @@ test('deferWhileCollapsed без окна: в полосе не мерит, пр
     } finally {
         console.warn = orig;
     }
+});
+
+/**
+ * Панель зовёт полосу через свою переменную модуля (как panelCompact), а не
+ * через `window.miniBar`: зависимость — import/явная ссылка, `window.X` —
+ * только крючок e2e (CLAUDE.md; tests/window-bridges.test.js). Крючок
+ * остаётся одним присваиванием, читать его сам control-app.js не должен.
+ */
+test('control-app.js: полоса — переменная модуля, window.miniBar только присваивается для e2e', () => {
+    const { codeOnly } = require('./helpers/source-scan');
+    const read = (f) => codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', f), 'utf8'));
+    const uses = (code) => code.split('\n').filter((l) => /\bwindow\.miniBar\b/.test(l));
+    // Самопроверка: прежнее чтение регулярка видит.
+    assert.equal(uses('if (window.miniBar && window.miniBar.deferWhileCollapsed(f)) {').length, 1);
+    const lines = uses(read('control-app.js'));
+    assert.equal(lines.length, 1, `обращений к window.miniBar: ${lines.length}\n${lines.join('\n')}`);
+    assert.match(lines[0], /^\s*window\.miniBar = miniBar;\s*$/, 'единственное — присваивание крючка');
+    const code = read('control-app.js');
+    assert.match(code, /\bminiBar = MiniBar\.init\(/, 'полоса создаётся в переменную модуля');
+    assert.match(code, /\bminiBar\s*&&\s*miniBar\.deferWhileCollapsed\(/, 'autoResizeWindow спрашивает полосу через переменную');
 });

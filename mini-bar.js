@@ -137,6 +137,10 @@ function init(deps) {
             if (typeof win.requestAnimationFrame === 'function') { win.requestAnimationFrame(run); } else { run(); }
         };
         win.addEventListener('resize', fitListener);
+        // Свёртка и разворот слились в один кадр: окно так и осталось панелью,
+        // resize не придёт, и без этой проверки просьба дождалась бы чужого
+        // resize (ручного растягивания) и легла бы поверх него.
+        fitListener();
     }
 
     function setState(next) {
@@ -153,12 +157,14 @@ function init(deps) {
             doc.body.classList.remove('collapsed');
         }
         syncAria();
-        if (!collapsed) { armPendingFit(); }
         if (ipc && typeof ipc.send === 'function') {
             ipc.send('control-collapse', collapsed
                 ? { collapsed: true, height: BAR_HEIGHT }
                 : { collapsed: false });
         }
+        // ПОСЛЕ отправки разворота: перемер, выполненный сразу, ушёл бы раньше
+        // него, а main глотает resize-control-window, пока панель свёрнута.
+        if (!collapsed) { armPendingFit(); }
         return api;
     }
 

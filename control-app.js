@@ -59,6 +59,10 @@
         // него НЕСЖАТОЙ (autoResizeWindow).
         /** @type {ReturnType<typeof PanelCompact.bindCompactMode>} */
         let panelCompact = null;
+        // Полоса (mini-bar.js init); до установки — null. Панель зовёт её
+        // через эту переменную, window.miniBar — только крючок e2e.
+        /** @type {ReturnType<typeof MiniBar.init>} */
+        let miniBar = null;
 
         // debounce — только TimeUtils.debounce (utils.js). Здесь стоял
         // `if (typeof debounce === 'undefined') { var debounce = … }`: `var`
@@ -1411,7 +1415,7 @@
                 // Полоса берёт время ОТСЮДА, а не считает своё: второй источник
                 // времени — расхождение, которое проект уже ловил на дисплее.
                 // `resume` — признак паузы, а не слово: как его показать, решает сама полоса.
-                window.miniBar?.render({ text: (_neg ? '−' : '') + _digits,
+                miniBar?.render({ text: (_neg ? '−' : '') + _digits,
                     band: isOvertime ? 'danger' : band, resume: !this.inputMode && !!this.isPaused });
 
                 this.renderPanelState(status, band);
@@ -1444,7 +1448,7 @@
                 // В полосе не мерим и не шлём: раскладка свёрнута. Полоса
                 // запомнит просьбу и выполнит её после разворота (mini-bar.js,
                 // deferWhileCollapsed); main отбрасывает такой запрос и сам.
-                if (window.miniBar && window.miniBar.deferWhileCollapsed(() => this.autoResizeWindow())) {
+                if (miniBar && miniBar.deferWhileCollapsed(() => this.autoResizeWindow())) {
                     return;
                 }
                 // Skip auto-resize while drawer is open — drawer manages width itself.
@@ -1700,10 +1704,12 @@
         // обновления». Подробности и зависимости — в onboarding.js.
         Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
-        window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer, win: window,
+        miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer, win: window,
             // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
             onToggle: (on) => { if (on) { timerController.closeSettingsDrawer(); timerController.setInputMode(false); } },
             actions: { start: () => timerController.start(), pause: () => timerController.pause(), reset: () => timerController.reset() } });
+        // Крючок e2e и стенда съёмки (tests/window-bridges.test.js), не зависимость.
+        window.miniBar = miniBar;
 
         const faqModal = document.getElementById('faqModal');
         const faqClose = document.getElementById('faqClose');
@@ -1916,7 +1922,7 @@
             // свободных; модификаторы не трогаем — Cmd+M остаётся за системой.
             else if (event.code === 'KeyM') {
                 event.preventDefault();
-                if (window.miniBar) { window.miniBar.toggle(); }
+                if (miniBar) { miniBar.toggle(); }
             }
 
             // F1: Show help/shortcuts
