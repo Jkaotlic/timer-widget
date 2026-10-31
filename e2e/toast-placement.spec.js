@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { showToastSettled } = require('./window-ready');
+const { showToastSettled, TOAST_SETTLED } = require('./window-ready');
 
 /**
  * Тост не имеет права закрывать герой-время.
@@ -20,9 +20,9 @@ test('тост не пересекается с герой-временем', as
     const { app, control } = await launchApp();
     try {
         const shown = await showToastSettled(control, 'Проверка размещения тоста');
-        const rects = await control.evaluate((ok) => {
+        const rects = await control.evaluate(([ok, sel]) => {
             if (!ok) { return { noToast: true }; }
-            const toast = document.querySelector('.toast');
+            const toast = document.querySelector(sel);
             const hero = document.querySelector('.timer-display-main');
             if (!toast || !hero) { return { noToast: true }; }
             const t = toast.getBoundingClientRect();
@@ -31,7 +31,7 @@ test('тост не пересекается с герой-временем', as
                 toast: { top: t.top, bottom: t.bottom },
                 hero: { top: h.top, bottom: h.bottom }
             };
-        }, shown);
+        }, [shown, TOAST_SETTLED]);
 
         expect(rects.noToast, 'тост или герой не найдены — проверка ничего не измерила').toBeUndefined();
 

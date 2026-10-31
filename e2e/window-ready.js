@@ -537,17 +537,23 @@ async function panelRoundTrip(control, opts = {}) {
  * evaluate). `Toast.show` (ui-feedback.js) кладёт элемент сразу, а класс
  * `show` — в кадре; наш кадр взведён позже и идёт после него, а запущенный
  * классом переход ждётся до конца (`finished`). Возвращает false, если
- * `Toast` в окне нет.
+ * `Toast` в окне нет. Дождавшийся тост помечен — мерить его селектором
+ * `TOAST_SETTLED`.
  *
  * @param {import('@playwright/test').Page} control
  * @param {string} message
  * @returns {Promise<boolean>}
  */
+const TOAST_SETTLED = '.toast[data-e2e-settled]';
+
 function showToastSettled(control, message) {
     return control.evaluate(async (text) => {
         if (!window.Toast || typeof window.Toast.show !== 'function') { return false; }
         window.Toast.show(text);
+        // Свой тост — последний добавленный; метка — чтобы спека мерила ЕГО,
+        // а не висящий с запуска чужой (ревью e2e-B7b, M5): `TOAST_SETTLED`.
         const toast = [...document.querySelectorAll('.toast')].pop();
+        toast.setAttribute('data-e2e-settled', '');
         await new Promise((r) => requestAnimationFrame(() => r()));
         await Promise.all(toast.getAnimations().map((a) => a.finished.catch(() => {})));
         return true;
@@ -889,8 +895,14 @@ async function waitForMainSnapshot(app, page, urlPart, name, opts = {}) {
  *    порядке отправки, метка — после пересылок. Ожидание метки включает
  *    `waitForQuiet` (переходы, шрифты).
  *
- * Не годится для отложенных посылок ПАНЕЛИ (debounce `input` цветов фона):
- * их на момент вызова ещё нет в трубе. Метка — флаг соседа на канале
+ * Не годится для отложенных посылок ПАНЕЛИ — их на момент вызова ещё нет в
+ * трубе (ревью e2e-B7b, M3):
+ *  - debounce `input` цветов фона (control-app.js, `TimeUtils.debounce`);
+ *  - открытие часов КНОПКОЙ панели или клавишей C: настройки и стиль часов
+ *    панель досылает таймером 500 мс (control-app.js, `pushClockSettings` +
+ *    `sendClockStyle` после `open-clock-widget`). Барьер сразу после такого
+ *    открытия разрешится ДО досылки — ждите её посылки (`set-clock-style`,
+ *    `clock-settings`) по `match`. Метка — флаг соседа на канале
  * `*-window-state` с НАСТОЯЩИМ значением (см. SNAPSHOT_MARK); спеки, которые
  * утверждают снимок при загрузке, барьер не зовут (tests/e2e-fixtures.test.js).
  *
@@ -915,6 +927,11 @@ async function relayBarrier(app, control, pages, opts = {}) {
  * ПОЛУЧИЛО свой стиль, а виджет и часы под новый стиль ВСТАЛИ (размер окна
  * зависит от стиля). Спеки ждали это паузой 1200–2000 мс.
  *
+ * У виджета смена стиля взводит ещё и свой таймер 50 мс (`_scalingTimer`,
+ * widget-app.js: `--flip-scale`, `--analog-scale`) — он ждётся УСЛОВИЕМ
+ * (таймер отработал и обнулил ссылку), а не запасом длительности осадки
+ * (ревью e2e-B7b, M4).
+ *
  * @param {import('@playwright/test').ElectronApplication} app
  * @param {import('@playwright/test').Page} control
  * @param {{widget?: import('@playwright/test').Page, clock?: import('@playwright/test').Page, display?: import('@playwright/test').Page}} pages
@@ -936,6 +953,8 @@ async function setWindowStyles(app, control, pages, style, opts = {}) {
     }, [style, field, !!pages.widget, !!pages.clock, !!pages.display]);
     for (const [received, match] of waits) { await received({ match }); }
     if (pages.widget) {
+        await pages.widget.waitForFunction(() => !!window.timerWidget && window.timerWidget._scalingTimer === null,
+            null, { timeout: DEFAULT_TIMEOUT });
         await waitForWindowSettled(app, pages.widget, 'electron-widget.html');
         await waitForQuiet(pages.widget);
     }
@@ -1001,6 +1020,13 @@ function waitForClockSnapshot(app, clock, _control, opts = {}) {
  *
  * Журнала нет (окно открыто не через `launchApp`) — прежнее поведение:
  * поднятый флаг считается концом.
+ *
+ * ПОВТОРНЫЙ вход того же окна ждётся, только когда флаг уже поднят (журнал
+ * вычеркнул прежний вход на `leave-full-screen`). Если вход заказан, а флаг
+ * ещё НЕ поднялся, окно, уже выходившее, ответит `windowed`, и вызывающий
+ * пойдёт дальше до начала перехода (ревью e2e-B7b, M7): отличить «вышло и
+ * войдёт» от «вышло и останется» по состоянию окна нельзя. Спек с повторным
+ * входом нет; понадобится — ждать `enter-full-screen` явно.
  *
  * @param {import('@playwright/test').ElectronApplication} app
  * @param {number} timeout
@@ -1359,7 +1385,7 @@ async function untilMainHandled(app, channel, action, opts = {}) {
 }
 
 module.exports = {
-    relayBarrier, setWindowStyles, showToastSettled, newestWindowId, waitForMainWindowGone, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
+    relayBarrier, setWindowStyles, showToastSettled, TOAST_SETTLED, newestWindowId, waitForMainWindowGone, mainBoundsOf, waitForBoundsSettled, waitForWindowSettled, resizeOwnWindow, moveBarrier, untilMainHandled,
     openDisplay, closeDisplay, reopenDisplay,
     waitForDisplay, waitForWidget, waitForClock, waitForWindow,
     waitForWindowGone, waitForDisplayGone, waitForWidgetGone, waitForClockGone,

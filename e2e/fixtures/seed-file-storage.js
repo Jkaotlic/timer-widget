@@ -29,8 +29,11 @@ app.whenReady().then(async () => {
     })()`);
     session.defaultSession.flushStorageData();
     console.log(`SEEDED ${count}`);
-    // Выход сам сбрасывает хранилище на диск; пауза — чтобы сброс выше успел.
-    setTimeout(() => app.quit(), 300);
+    // Выход сам сбрасывает хранилище на диск (как и flushStorageData выше) —
+    // пауза 300 мс «чтобы сброс успел» была ставкой поверх двух гарантий
+    // (ревью e2e-B7b, M6). Проверка — сама спека: storage-migration читает
+    // посеянное в новом origin.
+    app.quit();
 }).catch((err) => {
     console.error('SEED FAILED', err && err.message);
     app.exit(1);

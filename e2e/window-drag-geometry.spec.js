@@ -177,6 +177,17 @@ for (const w of WINDOWS) {
                 .toEqual(beforeBtn);
         }
 
+        // Проверка проверки (ревью e2e-B7b, M2): ТОТ ЖЕ барьер обязан увидеть
+        // настоящий сдвиг. Иначе «не сдвинулось» значило бы и «жест молчит», и
+        // «барьер разрешается раньше, чем main применил сдвиги» (если обработку
+        // `*-move` когда-нибудь отложат или сольют по кадру).
+        const beforeFree = await positionOf(app, w.mainRef);
+        await dragBy(page, 30, 20);
+        await moveBarrier(app, page);
+        const afterFree = await positionOf(app, w.mainRef);
+        expect(Math.abs((afterFree[0] - beforeFree[0]) - 30), `${w.name}: барьер не увидел сдвиг по X`).toBeLessThanOrEqual(2);
+        expect(Math.abs((afterFree[1] - beforeFree[1]) - 20), `${w.name}: барьер не увидел сдвиг по Y`).toBeLessThanOrEqual(2);
+
         await app.close();
     });
 }

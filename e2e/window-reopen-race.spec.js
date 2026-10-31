@@ -69,12 +69,15 @@ const closeDisplay = (control) => control.evaluate(
     () => window.ipcRenderer.send('close-display')
 );
 /**
- * Окна дисплея в ГЛАВНОМ процессе: всё живое, кроме панели. Считать
- * страницы Playwright по пробе нельзя — второе окно, ещё не загрузившее
- * разметку, пробе не ответит, а именно его и ищет проверка.
+ * Окна дисплея в ГЛАВНОМ процессе: с адресом дисплея или ещё БЕЗ адреса.
+ * Считать страницы Playwright по пробе нельзя — второе окно, ещё не
+ * загрузившее разметку, пробе не ответит, а именно его и ищет проверка.
+ * Окна с другим адресом (виджет, часы, если тест их откроет) не в счёт
+ * (ревью e2e-B7b, M8); окно без адреса в этих тестах может быть только
+ * дисплеем — других окон они не открывают.
  */
 const countDisplays = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
-    .filter((w) => !w.isDestroyed() && !w.webContents.getURL().includes('electron-control.html')).length);
+    .filter((w) => !w.isDestroyed() && (w.webContents.getURL().includes('display.html') || !w.webContents.getURL())).length);
 
 test('закрыть дисплей и сразу открыть — окно дисплея есть', async () => {
     const { app, control } = await launchApp();

@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const CONFIG = require('../constants.js');
-const { waitForSteady, reloadPanel, showToastSettled } = require('./window-ready');
+const { waitForSteady, reloadPanel, showToastSettled, TOAST_SETTLED } = require('./window-ready');
 
 /** Окно панели глазами главного процесса: границы и уровень. */
 const winState = ({ BrowserWindow }) => {
@@ -399,8 +399,8 @@ test('тост в свёрнутом состоянии виден целико�
         await windowSettled(app, control, true);
 
         await showToastSettled(control, 'Проверка размещения сообщения в полосе');
-        const m = await control.evaluate(() => {
-            const toast = document.querySelector('.toast');
+        const m = await control.evaluate((sel) => {
+            const toast = document.querySelector(sel);
             if (!toast) { return null; }
             const r = toast.getBoundingClientRect();
             return {
@@ -408,7 +408,7 @@ test('тост в свёрнутом состоянии виден целико�
                 left: +r.left.toFixed(1), right: +r.right.toFixed(1),
                 viewportH: window.innerHeight, viewportW: window.innerWidth
             };
-        });
+        }, TOAST_SETTLED);
 
         expect(m, 'тост не появился — проверять нечего').not.toBeNull();
         expect(m.top, `верх тоста ${m.top} выше окна`).toBeGreaterThanOrEqual(0);
