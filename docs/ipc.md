@@ -67,7 +67,7 @@ file:// → app:// нового канала не заводит: у его ск
 | `open-widget` / `close-widget` | open-widget: панель, часы, дисплей; close-widget: панель, виджет, часы, дисплей | Toggle widget window |
 | `open-display` / `close-display` | open-display: панель, виджет, часы; close-display: панель, виджет, часы, дисплей | Toggle display window |
 | `open-clock-widget` / `close-clock-widget` | open-clock-widget: панель, виджет, дисплей; close-clock-widget: панель, виджет, часы, дисплей | Toggle clock widget |
-| `resize-control-window` | панель | `{ width, height }` — validated with `Number.isFinite` + min bounds |
+| `resize-control-window` | панель | `{ width, height }` — validated with `Number.isFinite` + min bounds. **Игнорируется, пока панель свёрнута в полосу** (`control-collapse`): размер свёрнутого окна — полоса, размер панели вернёт разворот. Пропущенную в полосе подгонку по содержимому полоса выполняет один раз после разворота (mini-bar.js, `deferWhileCollapsed`) |
 | `control-drawer` | панель | `{ open }` — ящик настроек. Отдельный канал: потолок окна двухуровневый (760×740 по содержимому, 1096×1100 с ящиком), и из ширины запроса уровень не выводится |
 | `control-collapse` | панель | `{ collapsed, height }` — свернуть панель в полосу. Отдельный канал: `resize-control-window` зажимает высоту минимумом окна (660). Снимает и возвращает пол `minHeight`, держит ВЕРХНИЙ край, `height` в 36…120 |
 | `widget-resize` / `widget-move` / `widget-set-position` | виджет | Геометрия виджета. `widget-move` несёт `{deltaX, deltaY, first}`: `first` помечает начало жеста, и main держит размер окна до конца перетаскивания |

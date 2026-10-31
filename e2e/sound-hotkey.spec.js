@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForWidget } = require('./window-ready');
+const { waitForWidget, waitForWidgetGone, untilReceived } = require('./window-ready');
 
 /**
  * Клавиша `Z` переключает звук — ПО НАЖАТИЮ, из панели и из чужого окна.
@@ -10,14 +10,6 @@ const { waitForWidget } = require('./window-ready');
  * тумблер строки «Звуки», которые не сообщались. Поэтому после каждого нажатия
  * сверяются ОБА вида: чекбокс (он же сохраняемое значение) и тумблер строки.
  */
-
-async function findWidget(app) {
-    for (const w of app.windows()) {
-        const url = w.url();
-        if (url.includes('electron-widget.html')) { return w; }
-    }
-    return null;
-}
 
 const soundState = (control) => control.evaluate(() => {
     const box = document.getElementById('soundMasterEnabled');
@@ -38,8 +30,11 @@ test('Z переключает звук из панели, и оба вида с
         expect(before.rowOn, 'строка «Звуки» показывает не то, что чекбокс').toBe(before.checkbox);
 
         await control.click('.control-panel');
+        // Клавиша в панели переключает СИНХРОННО (keydown → toggleSoundMaster →
+        // change → сохранение): ждать нечего, кроме самого значения.
         await control.keyboard.press('KeyZ');
-        await control.waitForTimeout(500);
+        await expect.poll(async () => (await soundState(control)).checkbox,
+            'клавиша Z не переключила звук').toBe(!before.checkbox);
 
         const after = await soundState(control);
         console.log('   после Z:    ' + JSON.stringify(after));
@@ -51,7 +46,8 @@ test('Z переключает звук из панели, и оба вида с
 
         // И обратно — тем же нажатием.
         await control.keyboard.press('KeyZ');
-        await control.waitForTimeout(500);
+        await expect.poll(async () => (await soundState(control)).checkbox,
+            'вторым нажатием звук не вернулся').toBe(before.checkbox);
         const back = await soundState(control);
         expect(back.checkbox, 'вторым нажатием звук не вернулся').toBe(before.checkbox);
         expect(back.rowOn).toBe(before.checkbox);
@@ -64,15 +60,18 @@ test('Z из окна виджета доезжает до панели', async 
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(2000);
-        const widget = await findWidget(app);
-        expect(widget, 'окно виджета не найдено').not.toBeNull();
+        const widget = await waitForWidget(app);
+        // Обработчик клавиш виджет ставит в конструкторе — `load` достаточно
+        // (раньше пауза 2000 мс).
+        await widget.waitForLoadState('load');
 
         const before = await soundState(control);
         await widget.click('body', { position: { x: 5, y: 5 } }).catch(() => {});
-        await widget.keyboard.press('KeyZ');
-        await control.waitForTimeout(700);
+        // Нажатие в виджете → `sound-toggle` в main → панели; панель
+        // переключает в обработчике этой посылки (panel-state.js), и её
+        // дождались — раньше пауза 700 мс. Не пришла — ожидание упадёт с именем
+        // канала: «нажатие не дошло до панели».
+        await untilReceived(control, 'sound-toggle', () => widget.keyboard.press('KeyZ'));
 
         const after = await soundState(control);
         console.log(`   виджет: ${before.checkbox} → ${after.checkbox}`);
@@ -80,12 +79,11 @@ test('Z из окна виджета доезжает до панели', async 
         expect(after.rowOn, 'строка «Звуки» отстала').toBe(after.checkbox);
 
         // Профиль общий: возвращаем как было.
-        await widget.keyboard.press('KeyZ');
-        await control.waitForTimeout(600);
+        await untilReceived(control, 'sound-toggle', () => widget.keyboard.press('KeyZ'));
         expect((await soundState(control)).checkbox).toBe(before.checkbox);
     } finally {
         await control.evaluate(() => window.ipcRenderer.send('close-widget')).catch(() => {});
-        await control.waitForTimeout(400);
+        await waitForWidgetGone(app).catch(() => {});
         await app.close();
     }
 });
@@ -94,14 +92,17 @@ test('клик по тумблеру строки ведёт себя так ж�
     const { app, control } = await launchApp();
     try {
         const before = await soundState(control);
+        // Клик переключает синхронно (тот же toggleSoundMaster) — ждётся значение.
         await control.click('#soundMasterToggle');
-        await control.waitForTimeout(500);
+        await expect.poll(async () => (await soundState(control)).checkbox,
+            'клик по строке больше не переключает звук').toBe(!before.checkbox);
         const after = await soundState(control);
         expect(after.checkbox, 'клик по строке больше не переключает звук').toBe(!before.checkbox);
         expect(after.rowOn).toBe(after.checkbox);
         expect(after.stored, 'клик по строке не сохранил значение').toBe(after.checkbox);
         await control.click('#soundMasterToggle');
-        await control.waitForTimeout(400);
+        await expect.poll(async () => (await soundState(control)).stored,
+            'обратный клик не вернул сохранённое значение').toBe(before.checkbox);
     } finally {
         await app.close();
     }

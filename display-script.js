@@ -1359,37 +1359,9 @@ class DisplayTimer {
             // Обновляем стрелки мини-часов для текущего времени
             this.updateMiniClockHands(this.currentTimeBlock, now.getHours(), now.getMinutes(), now.getSeconds());
 
-            // «До завершения» — расстояние от системных часов до времени
-            // «Конец». С таймером доклада не связано: тот считает заданную
-            // длительность, а это — сколько идти до конца мероприятия. Формула
-            // одна с героем «До конца» (полночь понимает, начало участвует).
-            if (this.timeLeftValueEl) {
-                const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-                const left = RendererShared.secondsUntilEventEnd(nowSeconds, this.eventTime, this.endTime);
-                // formatTime всегда даёт HH:MM:SS — «02:04:21» с фотографии.
-                this.timeLeftValueEl.textContent = TimeUtils.formatTime(left);
-                // Стрелки мини-циферблата этого блока крутит ДЛИТЕЛЬНОСТЬ, а не
-                // момент: час за 12 часов остатка, минута за 60 минут — та же
-                // арифметика, что у большого циферблата стиля «Аналог»
-                // (updateAnalogDisplay). Разложение на части делается здесь, а
-                // не второй формулой в updateMiniClockHands: у той на входе
-                // часы/минуты/секунды, и для длительности они значат ровно то
-                // же самое.
-                this.updateMiniClockHands(
-                    this.timeLeftBlock,
-                    Math.floor(left / 3600),
-                    Math.floor(left / 60) % 60,
-                    left % 60
-                );
-            }
-
-            // Герой в не-таймерных режимах меняется от СИСТЕМНЫХ ЧАСОВ, а не
-            // от прихода timer-state. Второго таймера не заводим: этот тик уже
-            // самокорректирующийся, и лишний ежесекундный интервал на
-            // презентационном экране — просто вторая точка расхождения.
-            if (this.heroMode !== HeroModes.DEFAULT_MODE) {
-                this.updateDisplay();
-            }
+            // Всё, что выведено из РАСПИСАНИЯ, — у одного владельца: его же
+            // зовёт приход настроек (applyDisplaySettings), и формула одна.
+            this.updateScheduleDerived(now);
         };
         updateClock();
 
@@ -1407,6 +1379,66 @@ class DisplayTimer {
             }, msToNextSecond);
         };
         scheduleNext();
+    }
+
+    /**
+     * Всё, что дисплей выводит из РАСПИСАНИЯ («Начало»/«Окончание») и
+     * системных часов: блок «До завершения» и герой в режимах от расписания.
+     *
+     * Зовут двое — тик часов (startCurrentTimeClock) и приход настроек
+     * (applyDisplaySettings). До 31.10.2026 звал только тик, и после смены
+     * расписания блок до секунды показывал остаток по ПРЕЖНЕМУ (замер:
+     * 11:38:52 до старого конца 12:00 вместо ~02:00) — см.
+     * docs/lessons.md#a-subtitle-is-a-report-and-it-must-not-wait-for-a-tick.
+     *
+     * @param {Date} [now]
+     */
+    updateScheduleDerived(now = new Date()) {
+        // «До завершения» — расстояние от системных часов до времени
+        // «Конец». С таймером доклада не связано: тот считает заданную
+        // длительность, а это — сколько идти до конца мероприятия. Формула
+        // одна с героем «До конца» (полночь понимает, начало участвует).
+        if (this.timeLeftValueEl) {
+            const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            const left = RendererShared.secondsUntilEventEnd(nowSeconds, this.eventTime, this.endTime);
+            // formatTime всегда даёт HH:MM:SS — «02:04:21» с фотографии.
+            this.timeLeftValueEl.textContent = TimeUtils.formatTime(left);
+            // Стрелки мини-циферблата этого блока крутит ДЛИТЕЛЬНОСТЬ, а не
+            // момент: час за 12 часов остатка, минута за 60 минут — та же
+            // арифметика, что у большого циферблата стиля «Аналог»
+            // (updateAnalogDisplay). Разложение на части делается здесь, а
+            // не второй формулой в updateMiniClockHands: у той на входе
+            // часы/минуты/секунды, и для длительности они значат ровно то
+            // же самое.
+            this.updateMiniClockHands(
+                this.timeLeftBlock,
+                Math.floor(left / 3600),
+                Math.floor(left / 60) % 60,
+                left % 60
+            );
+        }
+
+        // Герой в не-таймерных режимах меняется от СИСТЕМНЫХ ЧАСОВ и от
+        // расписания, а не от прихода timer-state. Второго таймера не заводим:
+        // тик уже самокорректирующийся, и лишний ежесекундный интервал на
+        // презентационном экране — просто вторая точка расхождения.
+        if (this.heroMode !== HeroModes.DEFAULT_MODE) {
+            this.updateDisplay();
+        }
+    }
+
+    /**
+     * Забыть кэш кадра героя: следующий updateDisplay() рисует целиком.
+     * Гейт по lastSeconds не видит смены того, что число НЕ меняет, — режима
+     * или тотала (сдвинутое «Начало» в режиме «до конца» меняет полосу, но не
+     * число).
+     */
+    _forgetHeroFrame() {
+        this.cache.lastSeconds = null;
+        this.cache.lastFormatted = null;
+        this.cache.lastProgress = null;
+        this.cache.lastBand = null;
+        this.cache.lastStatus = null;
     }
 
     updateMiniClockHands(block, hours, minutes, seconds = 0) {
@@ -1797,6 +1829,7 @@ class DisplayTimer {
         }
 
         // Время начала
+        const prevSchedule = `${this.eventTime}|${this.endTime}`;
         if (settings.eventTime && this.eventTimeEl) {
             this.eventTime = settings.eventTime;
             this.eventTimeEl.textContent = settings.eventTime;
@@ -1808,6 +1841,15 @@ class DisplayTimer {
             this.endTime = settings.endTime;
             this.endTimeEl.textContent = settings.endTime;
             this.updateStaticMiniClock(this.endTimeBlock, settings.endTime);
+        }
+
+        // Выведенное из расписания перерисовывается ЗДЕСЬ, на записи настроек,
+        // а не ближайшим тиком: до 31.10.2026 «До завершения» до секунды
+        // показывал остаток по прежнему расписанию. Только на реальной смене —
+        // посылка настроек приходит на любое движение ползунка цвета.
+        if (`${this.eventTime}|${this.endTime}` !== prevSchedule) {
+            this._forgetHeroFrame();
+            this.updateScheduleDerived();
         }
 
         // Режим центрального времени. Блок стоит ПОСЛЕ присвоения eventTime и
@@ -1840,11 +1882,7 @@ class DisplayTimer {
             const nextMode = HeroModes.modeById(settings.heroMode).id;
             if (nextMode !== this.heroMode) {
                 this.heroMode = nextMode;
-                this.cache.lastSeconds = null;
-                this.cache.lastFormatted = null;
-                this.cache.lastProgress = null;
-                this.cache.lastBand = null;
-                this.cache.lastStatus = null;
+                this._forgetHeroFrame();
                 this.reflowSoon();
                 this.updateDisplay();
             }

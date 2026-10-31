@@ -56,7 +56,11 @@ test('открытие ящика уводит фокус внутрь, закр
         btn.focus();
         const before = document.activeElement === btn;
         btn.click();
-        await new Promise((r) => setTimeout(r, 700));
+        // Ящик раскрывается синхронно в клике, фокус внутрь ставит
+        // `_focusFirstInDrawer` таймером 0 мс (control-app.js). Было 700 мс.
+        // пауза законна: таймер 0 мс взведён ПОСЛЕ таймера фокуса приложения —
+        // равные задержки исполняются в порядке взвода
+        await new Promise((r) => setTimeout(r, 0));
         const drawer = document.getElementById('settingsDrawer');
         const active = document.activeElement;
         return {
@@ -80,8 +84,9 @@ test('открытие ящика уводит фокус внутрь, закр
 
     // Закрытие через Esc — тот же путь, что у пользователя.
     const closed = await control.evaluate(async () => {
+        // Закрытие и возврат фокуса синхронны (closeSettingsDrawer): класс,
+        // aria-expanded и focus() — в обработчике клавиши. Было 700 мс.
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-        await new Promise((r) => setTimeout(r, 700));
         const btn = document.querySelector('.tab-btn[data-tab="clock"]');
         const drawer = document.getElementById('settingsDrawer');
         return {

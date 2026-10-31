@@ -13,6 +13,7 @@
 
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { untilReceived } = require('./window-ready');
 
 test('список мониторов строится и при кавычке в сохранённом выборе', async () => {
     const { app, control } = await launchApp();
@@ -24,16 +25,22 @@ test('список мониторов строится и при кавычке 
     control.on('pageerror', (err) => errors.push(err.message));
     try {
         saved = await control.evaluate(() => localStorage.getItem('selectedDisplay'));
-        await control.evaluate(() => {
+        // Ответ на ЭТОТ запрос дошёл и отработан: стартовый список уже стоит
+        // (launchApp ждёт его итог), и без ожидания счёт опций ниже мог бы
+        // сойтись на нём, а не на списке, построенном при кавычке.
+        await untilReceived(control, 'displays-list', () => control.evaluate(() => {
             localStorage.setItem('selectedDisplay', '"]');
             window.ipcRenderer.send('get-displays');
-        });
+        }));
         // Опции: «Авто» и по одной на монитор этой машины — число берётся из
         // главного процесса, а не с монитора разработчика.
         const screens = await app.evaluate(({ screen }) => screen.getAllDisplays().length);
         await expect(control.locator('#displaySelect option')).toHaveCount(screens + 1);
         expect(await control.locator('#displaySelect').inputValue()).toBe('auto');
-        await control.waitForTimeout(300);
+        // Было: пауза 300 мс «дать ошибке дойти». Наш приёмник подписан ПОСЛЕ
+        // обработчика панели и сработал после него; исключение обработчика
+        // CDP доставляет событием раньше ответа на последующий опрос того же
+        // окна — к этой строке `pageerror` уже в списке, если оно было.
         expect(errors, `исключение при построении списка: ${errors.join(' | ')}`).toEqual([]);
     } finally {
         if (control && !control.isClosed()) {

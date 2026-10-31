@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForWidgetSnapshot,
+    waitForClockSnapshot, waitForDisplaySettled, setWindowStyles
+} = require('./window-ready');
 
 /**
  * Перекидывание цифры — ЗАМЕРОМ ДВИЖЕНИЯ, а не наличием класса.
@@ -50,24 +53,23 @@ test('перекидывание ВИДНО в виджете, часах и п�
             window.ipcRenderer.send('open-clock-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await waitForClock(app);
-        await control.waitForTimeout(2500);
+        // Пробы бросают, если окно не открылось; снимки main и вставшие окна —
+        // раньше пауза 2500 мс.
+        const display = await waitForDisplay(app);
+        const widget = await waitForWidget(app);
+        const clock = await waitForClock(app);
+        await waitForDisplaySnapshot(app, display);
+        await waitForWidgetSnapshot(app, widget);
+        await waitForClockSnapshot(app, clock);
+        await waitForDisplaySettled(app, display);
 
-        await control.evaluate(() => {
-            window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' });
-            window.ipcRenderer.send('clock-widget-set-style', 'flip');
-            window.ipcRenderer.send('display-settings-update', { timerStyle: 'flip' });
-        });
-        await control.waitForTimeout(1800);
+        // Стиль дошёл до каждого окна и отработан; виджет и часы под новый стиль
+        // меняют размер — ждём, что они ВСТАЛИ (было 1800 мс).
+        await setWindowStyles(app, control, { widget, clock, display }, 'flip');
 
+        const pages = { 'electron-widget': widget, 'electron-clock-widget': clock, 'display.html': display };
         for (const { part, card, digit } of WINDOWS) {
-            let page = null;
-            for (const w of app.windows()) {
-                if ((await w.url()).includes(part)) { page = w; }
-            }
-            expect(page, `окно ${part} должно быть открыто`).toBeTruthy();
+            const page = pages[part];
 
             const res = await page.evaluate(([cardSel, digitSel]) => {
                 // Первая карточка может лежать в скрытой группе часов —
@@ -223,15 +225,10 @@ test('«меньше движения» отменяет створки, а не
     });
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(2000);
-        await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' }));
-        await control.waitForTimeout(1200);
-
-        let widget = null;
-        for (const w of app.windows()) {
-            if ((await w.url()).includes('electron-widget')) { widget = w; }
-        }
+        // Снимок, стиль и вставшее окно (было 2000 + 1200 мс).
+        const widget = await waitForWidget(app);
+        await waitForWidgetSnapshot(app, widget);
+        await setWindowStyles(app, control, { widget }, 'flip');
         const res = await widget.evaluate(() => {
             const el = [...document.querySelectorAll('.widget-flip-card')]
                 .find((c) => c.getBoundingClientRect().height > 0);

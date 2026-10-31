@@ -236,3 +236,199 @@ test('без действий кнопки транспорта не роняю�
     MiniBar.init({ doc, ipc: fakeIpc() });
     assert.doesNotThrow(() => doc._el('miniBarStart').handlers.click());
 });
+
+// Окно для отложенного перемера: resize-слушатели и innerHeight управляются
+// тестом, кадр исполняется сразу.
+function fakeWin(innerHeight = 52) {
+    const listeners = new Set();
+    return {
+        innerHeight,
+        listeners,
+        addEventListener(type, fn) { if (type === 'resize') { listeners.add(fn); } },
+        removeEventListener(type, fn) { if (type === 'resize') { listeners.delete(fn); } },
+        requestAnimationFrame(fn) { fn(); },
+        resize(h) { this.innerHeight = h; for (const fn of [...listeners]) { fn(); } }
+    };
+}
+
+/**
+ * Подгонка размера по содержимому в полосе не мерит и не шлёт ничего:
+ * раскладка свёрнута, и замер был бы замером полосы (замер 30.10.2026:
+ * просьба 400×100, а при откладывании в main — разворот в пол 660). Просьба
+ * запоминается и выполняется ОДИН раз после разворота, когда окно уже снова
+ * панель. Разворот без пропущенной просьбы окно не трогает: прежние границы
+ * пользователя возвращает main целиком.
+ */
+test('deferWhileCollapsed: развёрнутая панель выполняет сразу', () => {
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win: fakeWin(700) });
+    let runs = 0;
+    assert.equal(bar.deferWhileCollapsed(() => { runs++; }), false);
+    assert.equal(runs, 0, 'не отложено — выполняет вызывающий сам');
+});
+
+test('deferWhileCollapsed: в полосе — откладывается и выполняется после разворота, когда окно выросло', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    let runs = 0;
+    bar.collapse();
+    assert.equal(bar.deferWhileCollapsed(() => { runs++; }), true);
+    win.resize(52);
+    assert.equal(runs, 0, 'в полосе не выполняется');
+    bar.expand();
+    assert.equal(runs, 0, 'до resize окна — рано: main ещё не вернул размер панели');
+    win.resize(100);
+    assert.equal(runs, 0, 'окно высотой полосы — ещё не панель');
+    win.resize(700);
+    assert.equal(runs, 1);
+    win.resize(720);
+    assert.equal(runs, 1, 'один раз');
+    assert.equal(win.listeners.size, 0, 'слушатель снят');
+});
+
+test('deferWhileCollapsed: разворот без пропущенной просьбы перемер не заказывает', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    bar.collapse();
+    bar.expand();
+    assert.equal(win.listeners.size, 0);
+});
+
+test('deferWhileCollapsed: две свёртки-разворота до resize — один слушатель и один перемер', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    let runs = 0;
+    bar.collapse();
+    bar.deferWhileCollapsed(() => { runs++; });
+    bar.expand();
+    bar.collapse();
+    bar.expand();
+    assert.ok(win.listeners.size <= 1, `слушателей ${win.listeners.size}`);
+    win.resize(700);
+    assert.equal(runs, 1);
+});
+
+test('deferWhileCollapsed: последняя просьба побеждает; повторная свёртка до resize её сохраняет', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    const seen = [];
+    bar.collapse();
+    bar.deferWhileCollapsed(() => seen.push('a'));
+    bar.deferWhileCollapsed(() => seen.push('b'));
+    bar.expand();
+    bar.collapse();
+    win.resize(52);
+    assert.deepEqual(seen, [], 'свёрнуто снова — не выполняется');
+    bar.expand();
+    win.resize(700);
+    assert.deepEqual(seen, ['b']);
+});
+
+// Свёртка и разворот слились в один кадр: рендерер не увидел ни полосы, ни
+// возврата, resize не придёт вовсе. Просьба не должна ждать СЛЕДУЮЩЕГО
+// постороннего resize (ручного растягивания пользователем) и выполниться
+// поверх него — окно уже панель, мерить можно сразу.
+test('deferWhileCollapsed: свёртка-разворот без resize окна — перемер сразу, а не на постороннем resize', () => {
+    const win = fakeWin(700);
+    const ipc = fakeIpc();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc, win });
+    let runs = 0;
+    bar.collapse();
+    bar.deferWhileCollapsed(() => { runs++; ipc.send('resize-control-window', {}); });
+    bar.expand();
+    assert.equal(runs, 1, 'окно уже выше полосы — resize не придёт, ждать нечего');
+    // main глотает resize-control-window, пока панель свёрнута: перемер обязан
+    // уйти ПОСЛЕ разворота, даже если кадр исполнился сразу.
+    assert.deepEqual(ipc.sent.map((m) => m.channel).slice(-2), ['control-collapse', 'resize-control-window']);
+    assert.equal(ipc.sent.at(-2).payload.collapsed, false);
+    assert.equal(win.listeners.size, 0, 'слушатель не остался ждать чужого resize');
+    win.resize(820);
+    assert.equal(runs, 1, 'ручное растягивание пользователя перемер не запускает');
+});
+
+test('hasPendingFit: видно, что просьба ждёт разворота, и что она выполнена', () => {
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    assert.equal(bar.hasPendingFit(), false);
+    bar.collapse();
+    bar.deferWhileCollapsed(() => {});
+    assert.equal(bar.hasPendingFit(), true);
+    bar.expand();
+    win.resize(700);
+    assert.equal(bar.hasPendingFit(), false);
+});
+
+test('потолок полосы — одна величина с main: окно ровно CONTROL_BAR_MAX_HEIGHT ещё полоса, на 1px выше — панель', () => {
+    const { CONTROL_BAR_MAX_HEIGHT } = require('../constants.js');
+    assert.ok(Number.isFinite(CONTROL_BAR_MAX_HEIGHT) && CONTROL_BAR_MAX_HEIGHT > MiniBar.BAR_HEIGHT);
+    const win = fakeWin();
+    const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc(), win });
+    let runs = 0;
+    bar.collapse();
+    bar.deferWhileCollapsed(() => { runs++; });
+    bar.expand();
+    win.resize(CONTROL_BAR_MAX_HEIGHT);
+    assert.equal(runs, 0, 'окно высотой потолка полосы — ещё полоса');
+    win.resize(CONTROL_BAR_MAX_HEIGHT + 1);
+    assert.equal(runs, 1);
+    // Обрезка высоты в main — тем же именем, а не своим литералом.
+    const { codeOnly } = require('./helpers/source-scan');
+    const main = codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'main-control-ipc.js'), 'utf8'));
+    const line = main.split('\n').find((l) => l.includes('const barHeight'));
+    assert.ok(line, 'нет обрезки barHeight в main-control-ipc.js (самопроверка)');
+    assert.match(line, /CONFIG\.CONTROL_BAR_MAX_HEIGHT/);
+    assert.doesNotMatch(line, /\b120\b/, 'в main снова свой литерал потолка');
+});
+
+test('высота полосы — одна величина с main: полоса шлёт CONTROL_BAR_HEIGHT, main берёт её же запасной', () => {
+    const { CONTROL_BAR_HEIGHT, CONTROL_BAR_MAX_HEIGHT } = require('../constants.js');
+    assert.ok(Number.isFinite(CONTROL_BAR_HEIGHT) && CONTROL_BAR_HEIGHT < CONTROL_BAR_MAX_HEIGHT);
+    assert.equal(MiniBar.BAR_HEIGHT, CONTROL_BAR_HEIGHT, 'полоса шлёт свою высоту, а не общую');
+    // Запасная высота в main — тем же именем, а не своим литералом.
+    const { codeOnly } = require('./helpers/source-scan');
+    const read = (f) => codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', f), 'utf8'));
+    const line = read('main-control-ipc.js').split('\n').find((l) => l.includes('const raw') && l.includes('payload.height'));
+    assert.ok(line, 'нет запасной высоты raw в main-control-ipc.js (самопроверка)');
+    assert.match(line, /CONFIG\.CONTROL_BAR_HEIGHT/);
+    assert.doesNotMatch(line, /\b52\b/, 'в main снова свой литерал высоты полосы');
+    // И в mini-bar.js литерала нет: константа — ссылка на общую.
+    const bar = read('mini-bar.js');
+    assert.match(bar, /const BAR_HEIGHT = CONTROL_BAR_HEIGHT;/);
+    assert.doesNotMatch(bar, /const BAR_HEIGHT = \d/, 'в mini-bar.js снова свой литерал высоты');
+});
+
+test('deferWhileCollapsed без окна: в полосе не мерит, просьбу не хранит и говорит об этом', () => {
+    const warns = [];
+    const orig = console.warn;
+    console.warn = (msg) => warns.push(String(msg));
+    try {
+        const bar = MiniBar.init({ doc: fakeDoc(), ipc: fakeIpc() });
+        bar.collapse();
+        assert.equal(bar.deferWhileCollapsed(() => {}), true, 'в полосе вызывающий всё равно не мерит');
+        bar.deferWhileCollapsed(() => {});
+        assert.equal(bar.hasPendingFit(), false, 'ждать её нечем — «ждёт» было бы ложью');
+        assert.equal(warns.length, 1, `предупреждение одно: ${warns.join(' | ')}`);
+        assert.match(warns[0], /нет окна/);
+    } finally {
+        console.warn = orig;
+    }
+});
+
+/**
+ * Панель зовёт полосу через свою переменную модуля (как panelCompact), а не
+ * через `window.miniBar`: зависимость — import/явная ссылка, `window.X` —
+ * только крючок e2e (CLAUDE.md; tests/window-bridges.test.js). Крючок
+ * остаётся одним присваиванием, читать его сам control-app.js не должен.
+ */
+test('control-app.js: полоса — переменная модуля, window.miniBar только присваивается для e2e', () => {
+    const { codeOnly } = require('./helpers/source-scan');
+    const read = (f) => codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', f), 'utf8'));
+    const uses = (code) => code.split('\n').filter((l) => /\bwindow\.miniBar\b/.test(l));
+    // Самопроверка: прежнее чтение регулярка видит.
+    assert.equal(uses('if (window.miniBar && window.miniBar.deferWhileCollapsed(f)) {').length, 1);
+    const lines = uses(read('control-app.js'));
+    assert.equal(lines.length, 1, `обращений к window.miniBar: ${lines.length}\n${lines.join('\n')}`);
+    assert.match(lines[0], /^\s*window\.miniBar = miniBar;\s*$/, 'единственное — присваивание крючка');
+    const code = read('control-app.js');
+    assert.match(code, /\bminiBar = MiniBar\.init\(/, 'полоса создаётся в переменную модуля');
+    assert.match(code, /\bminiBar\s*&&\s*miniBar\.deferWhileCollapsed\(/, 'autoResizeWindow спрашивает полосу через переменную');
+});

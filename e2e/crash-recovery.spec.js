@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
+const fs = require('node:fs');
+const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { launchApp } = require('./launch');
+const { launchApp, USER_DATA_DIR } = require('./launch');
+const { panelRoundTrip } = require('./window-ready');
 
 /**
  * Восстановление после ПАДЕНИЯ — вживую, с убийством процесса.
@@ -24,6 +27,38 @@ const { launchApp } = require('./launch');
 
 const PRESET = 420; // 7:00 — заметное значение, не совпадает ни с одним пресетом кнопок
 
+const SNAPSHOT_FILE = path.join(USER_DATA_DIR, 'last-state.json');
+
+/** Снимок восстановления на диске (recovery.js) или null. */
+function readSnapshot() {
+    try { return JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8')); } catch { return null; }
+}
+
+/**
+ * Запуск, который ждёт, пока прежний экземпляр ОТПУСТИТ блокировку
+ * единственного экземпляра (было: сон 4000 / 1500 мс «дать ОС отпустить»).
+ * Условие — сам запуск: второй экземпляр при занятой блокировке выходит сразу,
+ * и Playwright видит обрыв (`ECONNRESET`, «Process failed to launch»). Повтор
+ * до срока; неудача по сроку — последняя ошибка.
+ */
+async function launchWhenLockFree(timeout = 30000) {
+    const deadline = Date.now() + timeout;
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await launchApp();
+        } catch (err) {
+            if (Date.now() > deadline) { throw err; }
+            console.log(`   запуск ${attempt} не удался (${String(err.message).split('\n')[0]}) — блокировка ещё занята?`);
+        }
+    }
+}
+
+/** Процесс прежнего экземпляра завершился (событие `exit` или уже мёртв). */
+function exited(child) {
+    if (child.exitCode !== null || child.signalCode !== null) { return Promise.resolve(); }
+    return new Promise((resolve) => child.once('exit', () => resolve()));
+}
+
 async function readTimer(control) {
     return control.evaluate(() => ({
         remaining: window.timerController.remainingSeconds,
@@ -38,6 +73,7 @@ test('после падения время восстанавливается, �
     // при потолке Playwright 30 с). На руннере, который медленнее, она
     // упиралась бы в потолок и падала по времени, ничего не проверив.
     // --- 1. Ставим таймер и даём ему прожить интервал сохранения ---
+    const startedAt = Date.now();
     const first = await launchApp();
     await first.control.evaluate((secs) => {
         window.ipcRenderer.send('timer-command', { type: 'reset' });
@@ -45,8 +81,15 @@ test('после падения время восстанавливается, �
         window.ipcRenderer.send('timer-command', { type: 'start' });
     }, PRESET);
 
-    // Снимок пишется раз в 10 с и только при isRunning — ждём с запасом.
-    await first.control.waitForTimeout(12500);
+    // Снимок пишется раз в 10 с и только при isRunning (было: пауза 12500 мс
+    // «с запасом»). Ждём сам снимок, нужный проверке: свежий, наш пресет, идёт,
+    // и остаток уже меньше пресета — то есть записан ТИКОМ интервала, а не
+    // командой `start` (та пишет полный остаток).
+    await expect.poll(() => {
+        const snap = readSnapshot();
+        return !!snap && snap.savedAt >= startedAt && snap.totalSeconds === PRESET
+            && snap.isRunning === true && snap.remainingSeconds < PRESET;
+    }, { message: `снимок восстановления с идущим таймером не появился в ${SNAPSHOT_FILE}`, timeout: 25000 }).toBe(true);
     const before = await readTimer(first.control);
     expect(before.running, 'таймер должен идти, иначе снимок не пишется').toBe(true);
     expect(before.total).toBe(PRESET);
@@ -68,12 +111,15 @@ test('после падения время восстанавливается, �
     } else {
         first.app.process().kill('SIGKILL');
     }
-    // Даём операционной системе отпустить блокировку единственного экземпляра.
-    await new Promise((r) => setTimeout(r, 4000));
+    await exited(first.app.process());
 
     // --- 3. Поднимаем заново: снимок обязан подхватиться ---
-    const second = await launchApp();
-    await second.control.waitForTimeout(1500);
+    const second = await launchWhenLockFree();
+    // Восстановление main вливает в контроллер ДО окна, а сообщение шлёт по
+    // `did-finish-load` панели (было: пауза 1500 мс). Ждём тост; не пришёл —
+    // решают утверждения ниже со своими сообщениями.
+    await second.control.waitForSelector('.toast-container .toast', { timeout: 10000 }).catch(() => {});
+    await panelRoundTrip(second.control);
     const restored = await readTimer(second.control);
 
     // ...и пользователь должен об этом УЗНАТЬ. Главный процесс шлёт
@@ -101,12 +147,16 @@ test('после падения время восстанавливается, �
 
     // --- 4. Теперь закрываем ЧИСТО и проверяем, что снимка не осталось ---
     await second.control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
-    await second.control.waitForTimeout(500);
+    // main обработал сброс (было 500 мс): посылки панели он берёт по порядку.
+    await panelRoundTrip(second.control);
     await second.app.close();
-    await new Promise((r) => setTimeout(r, 1500));
 
-    const third = await launchApp();
-    await third.control.waitForTimeout(1500);
+    const third = await launchWhenLockFree();
+    // Восстановление — синхронно на старте main, до окна панели; состояние
+    // панель получает по загрузке. Круг панели после стартовой рассылки
+    // (launchApp) доказывает, что всё посланное main на старте отработано
+    // (было: пауза 1500 мс).
+    await panelRoundTrip(third.control);
     const afterCleanExit = await readTimer(third.control);
     expect(
         afterCleanExit.total,

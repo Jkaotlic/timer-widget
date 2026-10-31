@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { waitForPanelSettled } = require('./window-ready');
 
 /**
  * Подпись контрола выбора стиля не ломается на две строки.
@@ -37,7 +38,8 @@ for (const row of ROWS) {
                 console.log('шеврон не нажат, состояние панели:', JSON.stringify(why));
                 throw err;
             });
-            await control.waitForTimeout(600);
+            // Ящик открыт, окно получило ширину, колонка пересчитана (было 600 мс).
+            await waitForPanelSettled(app, control);
 
             const m = await control.evaluate(({ seg, rowId }) => {
                 const el = document.getElementById(seg);

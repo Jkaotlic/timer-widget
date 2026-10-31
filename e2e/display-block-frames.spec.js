@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, reopenDisplay } = require('./window-ready');
+const {
+    waitForDisplay, reopenDisplay, waitForDisplaySnapshot, waitForDisplaySettled, armReceived, waitForQuiet, untilDisplayGot
+} = require('./window-ready');
 
 /**
  * Просьба 19.08.2026, три части — и все три про то, ЧТО НАРИСОВАНО:
@@ -31,6 +33,19 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
 }, [id, value]);
 
 const BLOCK_TOGGLES = ['showCurrentTime', 'showEventTime', 'showEndTime', 'showTimeLeft', 'showEventTitle'];
+
+/** Дисплей открыт, получил снимок main и встал (полноэкранный режим, размер, debounce). */
+async function settled(app, display) {
+    await waitForDisplaySnapshot(app, display);
+    return waitForDisplaySettled(app, display);
+}
+
+const allBlocks = (on) => Object.fromEntries(BLOCK_TOGGLES.map((k) => [k, on]));
+const setAllBlocks = (control, on) => (async () => {
+    for (const key of BLOCK_TOGGLES) { await setToggle(control, key, on); }
+})();
+const clickStyle = (control, display, style) => untilDisplayGot(display,
+    () => control.click(`#displayTimerStyle button[data-val="${style}"]`), { displayTimerStyle: style });
 
 /** Всё, чем можно нарисовать плиту, — одним замером. */
 const probeSurfaces = (page) => page.evaluate(() => {
@@ -73,22 +88,20 @@ test('ни один блок не носит заднюю рамку — чет�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await settled(app, await waitForDisplay(app));
 
         await control.click('.tab-btn[data-tab="display"]');
-        for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
-        await display.waitForTimeout(700);
+        await untilDisplayGot(display, () => setAllBlocks(control, true), allBlocks(true));
 
         // Умолчание приложения — светлая тема; тёмную включает та же кнопка.
         for (const theme of ['светлая', 'тёмная']) {
             if (theme === 'тёмная') {
+                const themed = await armReceived(display, 'ui-theme-update');
                 await control.click('#contrastToggle');
-                await control.waitForTimeout(900);
+                await themed({ match: { theme: 'dark' } });
             }
             for (const style of STYLES) {
-                await control.click(`#displayTimerStyle button[data-val="${style}"]`);
-                await display.waitForTimeout(700);
+                await clickStyle(control, display, style);
 
                 const seen = await probeSurfaces(display);
                 expect(seen.blocks.length, `${theme}/${style}: блоки не показались`).toBeGreaterThanOrEqual(5);
@@ -157,11 +170,10 @@ test('аналог: «До завершения» показывает ОСТА�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await settled(app, await waitForDisplay(app));
 
         await control.click('.tab-btn[data-tab="display"]');
-        for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
+        await untilDisplayGot(display, () => setAllBlocks(control, true), allBlocks(true));
 
         // Расписание задаётся ОТНОСИТЕЛЬНО СЕЙЧАС, а не числом «12:00»:
         // «До завершения» считает расстояние от системных часов до конца, и
@@ -176,7 +188,34 @@ test('аналог: «До завершения» показывает ОСТА�
             start: document.getElementById('eventTimeInput').value,
             end: document.getElementById('endTimeInput').value
         }));
-        const endTime = await control.evaluate(() => {
+        // Слушатель-самописец ставится ДО смены расписания: он снимает блок в
+        // момент прихода посылки — обработчик приложения зарегистрирован раньше
+        // и к этому мгновению уже отработал, а тика между ними быть не может.
+        // Так проверяется ровно то, что обещает правило: значение, выведенное
+        // из настроек, пересчитано НА ЗАПИСИ настроек, а не ближайшим тиком
+        // (до 31.10.2026 блок до секунды показывал остаток по ПРЕЖНЕМУ
+        // расписанию: замер 00:21 — 11:38:52 до старого конца 12:00 вместо 02:00).
+        await display.evaluate(() => {
+            const rotation = (el) => {
+                const m = el && /rotate\(([-\d.]+)deg\)/.exec(el.style.transform);
+                return m ? Number(m[1]) : null;
+            };
+            const rec = { list: [] };
+            rec.listener = (_e, p) => {
+                const block = document.getElementById('timeLeftBlock');
+                rec.list.push({
+                    eventTime: p && p.eventTime,
+                    endTime: p && p.endTime,
+                    text: document.getElementById('timeLeftValue').textContent,
+                    hour: rotation(block.querySelector('.mini-hand-hour')),
+                    minute: rotation(block.querySelector('.mini-hand-minute'))
+                });
+            };
+            window.ipcRenderer.on('display-settings-update', rec.listener);
+            window.__e2eTimeLeftAtReceipt = rec;
+        });
+        const schedule = await armReceived(display, 'display-settings-update');
+        const { startTime, endTime } = await control.evaluate(() => {
             const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
             const now = Date.now();
             const set = (id, value) => {
@@ -184,15 +223,42 @@ test('аналог: «До завершения» показывает ОСТА�
                 el.value = value;
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             };
-            set('eventTimeInput', hhmm(new Date(now - 3600 * 1000)));
+            const start = hhmm(new Date(now - 3600 * 1000));
+            set('eventTimeInput', start);
             const value = hhmm(new Date(now + 2 * 3600 * 1000));
             set('endTimeInput', value);
-            return value;
+            return { startTime: start, endTime: value };
         });
         console.log(`   время окончания: ${endTime}`);
+        await schedule({ match: { eventTime: startTime, endTime } });
 
-        await control.click('#displayTimerStyle button[data-val="analog"]');
-        await display.waitForTimeout(1200);
+        const atReceipt = await display.evaluate(([start, end]) => {
+            const rec = window.__e2eTimeLeftAtReceipt;
+            window.ipcRenderer.removeListener('display-settings-update', rec.listener);
+            delete window.__e2eTimeLeftAtReceipt;
+            return rec.list.find((r) => r.eventTime === start && r.endTime === end) || null;
+        }, [startTime, endTime]);
+        expect(atReceipt, 'самописец не застал посылку с новым расписанием').not.toBeNull();
+        console.log(`   на приходе расписания: «До завершения» = ${atReceipt.text}, стрелки: час ${atReceipt.hour}°, минута ${atReceipt.minute}°`);
+        {
+            const [rh, rm, rs] = atReceipt.text.split(':').map(Number);
+            const left = rh * 3600 + rm * 60 + rs;
+            // Конец через два часа (минуты округлены вниз, плюс запас на переход минуты).
+            expect(left, `на приходе расписания «До завершения» = ${atReceipt.text}, а конец в ${endTime}: ждёт тика`).toBeGreaterThan(7000);
+            expect(left, `на приходе расписания «До завершения» = ${atReceipt.text}, а конец в ${endTime}`).toBeLessThanOrEqual(7200);
+            // Стрелки — той же посылкой, что текст: тот же владелец формулы.
+            expect(atReceipt.hour !== null && atReceipt.minute !== null, 'стрелки блока не найдены или не повёрнуты').toBe(true);
+            expect(atReceipt.hour, 'часовая стрелка на приходе расписания — от прежнего остатка')
+                .toBeCloseTo((rh % 12) * 30 + rm * 0.5, 5);
+            expect(atReceipt.minute, 'минутная стрелка на приходе расписания — от прежнего остатка')
+                .toBeCloseTo(rm * 6 + rs * 0.1, 5);
+        }
+
+        // Посылка стиля несёт и расписание — ждём её со всеми тремя полями.
+        await untilDisplayGot(display,
+            () => control.click('#displayTimerStyle button[data-val="analog"]'),
+            { displayTimerStyle: 'analog', endTime, eventTime: startTime });
+        await waitForQuiet(display);
 
         const seen = await display.evaluate(() => {
             const block = document.getElementById('timeLeftBlock');
@@ -233,6 +299,11 @@ test('аналог: «До завершения» показывает ОСТА�
         // на 12 и совпадение вышло бы на любой разметке) и хотя бы одна
         // стрелка сдвинута.
         expect(h * 3600 + m * 60 + s, `«До завершения» = ${seen.text}: считать нечего`).toBeGreaterThan(60);
+        // И остаток — по НОВОМУ расписанию: конец через два часа (минуты
+        // округлены вниз, плюс запас на переход минуты). Без этого стрелки,
+        // честно повторяющие ПРЕЖНИЙ остаток, проходили бы обе проверки выше.
+        expect(h * 3600 + m * 60 + s, `«До завершения» = ${seen.text}, а конец в ${endTime}`).toBeGreaterThan(7000);
+        expect(h * 3600 + m * 60 + s, `«До завершения» = ${seen.text}, а конец в ${endTime}`).toBeLessThanOrEqual(7200);
         expect(
             Math.max(seen.hour, seen.minute),
             'обе стрелки на 12 при ненулевом остатке — блок никто не крутит'
@@ -270,8 +341,7 @@ test('верхний ряд блоков выровнен: подписи на �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await settled(app, await waitForDisplay(app));
 
         // Сохранённые в общем профиле позиции и масштабы сдвинули бы ряд —
         // меряем блоки на их домашних местах и в одном масштабе.
@@ -280,16 +350,16 @@ test('верхний ряд блоков выровнен: подписи на �
             localStorage.removeItem('displayBlockScales');
             localStorage.removeItem('displayBlockScale');
         });
-        const disp = await reopenDisplay(app, control, { displayIndex: 0 });
-        await control.waitForTimeout(2500);
+        const disp = await settled(app, await reopenDisplay(app, control, { displayIndex: 0 }));
 
         await control.click('.tab-btn[data-tab="display"]');
-        for (const key of BLOCK_TOGGLES) { await setToggle(control, key, true); }
-        await control.evaluate(() => {
-            const el = document.getElementById('eventTitleInput');
-            if (el) { el.value = 'Ежегодная конференция'; el.dispatchEvent(new Event('input', { bubbles: true })); }
-        });
-        await disp.waitForTimeout(900);
+        await untilDisplayGot(disp, async () => {
+            await setAllBlocks(control, true);
+            await control.evaluate(() => {
+                const el = document.getElementById('eventTitleInput');
+                if (el) { el.value = 'Ежегодная конференция'; el.dispatchEvent(new Event('input', { bubbles: true })); }
+            });
+        }, { ...allBlocks(true), eventTitle: 'Ежегодная конференция' });
 
         const TOP_ROW = ['timeLeftBlock', 'currentTimeBlock', 'eventTitleBlock'];
 
@@ -297,8 +367,7 @@ test('верхний ряд блоков выровнен: подписи на �
         // живут ВНУТРИ циферблата у блоков с циферблатом и строкой у названия,
         // поэтому на одной линии обязаны стоять ПОДПИСИ — их и меряем.
         for (const style of ['circle', 'flip', 'digits', 'analog']) {
-            await control.click(`#displayTimerStyle button[data-val="${style}"]`);
-            await disp.waitForTimeout(700);
+            await clickStyle(control, disp, style);
 
             const rows = await disp.evaluate((ids) => ids.map((id) => {
                 const el = document.getElementById(id);

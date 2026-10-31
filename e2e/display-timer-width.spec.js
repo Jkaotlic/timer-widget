@@ -29,7 +29,9 @@
 
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const {
+    waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, waitForQuiet
+} = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
 /**
@@ -51,22 +53,32 @@ const measureInk = () => {
     };
 };
 
-/** Поставить масштаб таймера дисплея ползунком панели — тем же путём, что пользователь. */
-async function setScale(control, pct) {
-    await control.evaluate((p) => {
+/**
+ * Поставить масштаб таймера дисплея ползунком панели — тем же путём, что
+ * пользователь, — и дождаться, что дисплей ПОЛУЧИЛ настройки с этим масштабом
+ * и утих (подгонка кегля по кадру, переходы). Раньше — пауза 1100–1200 мс.
+ * `match` — прочие поля, которые посылка обязана нести (тумблер, отправленный
+ * перед масштабом).
+ */
+async function setScale(control, display, pct, match = {}) {
+    await untilReceived(display, 'display-settings-update', () => control.evaluate((p) => {
         const el = document.getElementById('displayTimerScale');
         el.value = String(p);
         el.dispatchEvent(new Event('input', { bubbles: true }));
-    }, pct);
+    }, pct), { match: { ...match, displayTimerScale: pct } });
 }
 
 async function openDisplayWithDigits(app, control) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
     const display = await waitForDisplay(app);
-    await control.waitForTimeout(1500);
+    // Снимок main и вставшее окно (полноэкранный вход) — раньше пауза 1500 мс.
+    await waitForDisplaySnapshot(app, display);
+    await waitForDisplaySettled(app, display);
     await control.click('.tab-btn[data-tab="display"]');
-    await control.click('#displayTimerStyle button[data-val="digits"]');
-    await control.waitForTimeout(900);
+    // Стиль дошёл до дисплея — раньше пауза 900 мс.
+    await untilReceived(display, 'display-settings-update',
+        () => control.click('#displayTimerStyle button[data-val="digits"]'),
+        { match: { displayTimerStyle: 'digits' } });
 
     await display.waitForSelector('#timerDigits.active');
 
@@ -74,7 +86,9 @@ async function openDisplayWithDigits(app, control) {
     // ВЫДАННОМУ размеру: система обрезает молча.
     const area = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workAreaSize);
     await resizeDisplay(app, display, { w: Math.floor(area.width - 60), h: Math.floor(area.height - 60) });
-    await display.waitForTimeout(1000);
+    // resizeDisplay уже дождался debounce пересчёта; остаются кадры подгонки
+    // и переходы раскладки (раньше пауза 1000 мс).
+    await waitForQuiet(display);
     return display;
 }
 
@@ -97,8 +111,7 @@ test('размер цифр — функция запрошенного проц
 
         const seen = [];
         for (const pct of [100, 150, 100, 150, 150, 100]) {
-            await setScale(control, pct);
-            await display.waitForTimeout(1100);
+            await setScale(control, display, pct);
             const m = await display.evaluate(measureInk);
             console.log(`  просили ${pct}% → кегль ${m.font}px, чернила ${m.w}×${m.h} (окно ${m.vw}×${m.vh})`);
             seen.push({ pct, ...m });
@@ -147,8 +160,7 @@ test('потолок масштаба упирается в ЧЕРНИЛА, а �
     try {
         const display = await openDisplayWithDigits(app, control);
 
-        await setScale(control, 100);
-        await display.waitForTimeout(1100);
+        await setScale(control, display, 100);
         const base = await display.evaluate(measureInk);
         console.log(`  100 % → чернила ${base.w}×${base.h} в окне ${base.vw}×${base.vh}`
             + ` (${(base.h / base.vh * 100).toFixed(1)} % высоты)`);
@@ -159,8 +171,7 @@ test('потолок масштаба упирается в ЧЕРНИЛА, а �
         test.skip(base.h / base.vh >= 0.65,
             `цифры на этом экране уже занимают ${(base.h / base.vh * 100).toFixed(0)} % высоты — расти некуда`);
 
-        await setScale(control, 300);
-        await display.waitForTimeout(1200);
+        await setScale(control, display, 300);
         const max = await display.evaluate(measureInk);
         console.log(`  300 % → чернила ${max.w}×${max.h} (${(max.h / max.vh * 100).toFixed(1)} % высоты)`);
 
@@ -215,8 +226,8 @@ test('прозрачная рама «Цифр» не перехватывает
             const el = document.getElementById('showStatusPill');
             if (el && !el.checked) { el.click(); }
         });
-        await setScale(control, 300);
-        await display.waitForTimeout(1200);
+        // Посылка масштаба несёт и включённую плашку: тумблер ушёл раньше.
+        await setScale(control, display, 300, { showStatusPill: true });
 
         const hit = await display.evaluate(() => {
             const pill = document.querySelector('.status-pill');

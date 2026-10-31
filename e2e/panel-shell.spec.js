@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { waitForPanelSettled } = require('./window-ready');
 const CONFIG = require('../constants.js');
 const MIN_PANEL_HEIGHT = CONFIG.CONTROL_WINDOW_MIN_HEIGHT;
 const MAX_PANEL_HEIGHT = CONFIG.CONTROL_WINDOW_MAX_HEIGHT;
@@ -66,11 +67,13 @@ function measureShell() {
     };
 }
 
-async function resizeWindow(control, width, height) {
+// Размер окна меняет main по запросу панели; ждём, что он дошёл до страницы,
+// ступени компакта отработали и окно утихло (waitForPanelSettled).
+async function resizeWindow(app, control, width, height) {
     await control.evaluate(({ width: w, height: h }) => {
         window.ipcRenderer.send('resize-control-window', { width: w, height: h });
     }, { width, height });
-    await control.waitForTimeout(900);
+    await waitForPanelSettled(app, control);
 }
 
 test('на растянутом окне панель не отращивает вторую оболочку', async () => {
@@ -78,7 +81,7 @@ test('на растянутом окне панель не отращивает 
 
     // Просим заведомо больше потолка: главный процесс обрежет сам. Дальше
     // считаем от ФАКТИЧЕСКОЙ высоты и ширины — экран раннера может быть меньше.
-    await resizeWindow(control, 3000, 1000);
+    await resizeWindow(app, control, 3000, 1000);
     const m = await control.evaluate(measureShell);
 
     console.log(
@@ -147,7 +150,7 @@ test('на растянутом окне панель не отращивает 
 test('при закрытом ящике окно не растягивается шире панели, а ящик потолок поднимает', async () => {
     const { app, control } = await launchApp();
 
-    await resizeWindow(control, 3000, 900);
+    await resizeWindow(app, control, 3000, 900);
     const closed = await control.evaluate(measureShell);
     const availWidth = await control.evaluate(() => window.screen.availWidth);
 
@@ -178,7 +181,8 @@ test('при закрытом ящике окно не растягиваетс�
     // Только если экран раннера вообще позволяет окну стать шире: на узком
     // экране главный процесс режет по `screenWidth - 50` и проверять нечего.
     await control.click('.tab-btn[data-tab="clock"]');
-    await control.waitForTimeout(1200);
+    await expect(control.locator('#settingsDrawer')).toHaveClass(/\bopen\b/);
+    await waitForPanelSettled(app, control);
     const opened = await control.evaluate(measureShell);
 
     console.log(`открытый ящик: окно ${opened.innerWidth}px`);
@@ -212,7 +216,8 @@ test('при закрытом ящике окно не растягиваетс�
 test('низкое окно: низ панели достижим прокруткой, на обычном размере прокрутки нет', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.waitForTimeout(1000);
+        // Стартовая автоподгонка окна (autoResizeWindow) отработала.
+        await waitForPanelSettled(app, control);
 
         const setSize = (w, h) => app.evaluate(({ BrowserWindow }, size) => {
             const win = BrowserWindow.getAllWindows()
@@ -222,7 +227,7 @@ test('низкое окно: низ панели достижим прокрут
             // проверяется.
             win.setMinimumSize(320, 380);
             win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
-        }, [w, h]);
+        }, [w, h]).then(() => waitForPanelSettled(app, control));
 
         const probe = () => control.evaluate(() => {
             const panel = document.querySelector('.control-panel');
@@ -244,7 +249,6 @@ test('низкое окно: низ панели достижим прокрут
 
         // Обычный размер: содержимое умещается, прокрутки нет.
         await setSize(400, 740);
-        await control.waitForTimeout(700);
         const normal = await probe();
         console.log(`   обычное окно ${normal.vh}: содержимое ${normal.content} при ${normal.client}, прокрутка=${normal.scrollable}`);
         expect(normal.scrollable, 'на обычном размере панель зачем-то прокручивается').toBe(false);
@@ -257,7 +261,6 @@ test('низкое окно: низ панели достижим прокрут
         // формулировка проверяла способ, а не результат.
         for (const h of [600, 520, 440]) {
             await setSize(380, h);
-            await control.waitForTimeout(700);
             const low = await probe();
             console.log(`   низкое окно ${low.vh}: содержимое ${low.content} при ${low.client}, `
                 + `прокрутка=${low.scrollable}, низ достижим=${low.reachable}`);
@@ -292,14 +295,15 @@ test('низкое окно: низ панели достижим прокрут
 test('низкое окно: время не наезжает на пресеты, а панель не прокручивается на своём минимуме', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.waitForTimeout(1000);
+        // Стартовая автоподгонка окна (autoResizeWindow) отработала.
+        await waitForPanelSettled(app, control);
 
         const setSize = (w, h) => app.evaluate(({ BrowserWindow }, size) => {
             const win = BrowserWindow.getAllWindows()
                 .find((x) => x.webContents.getURL().includes('electron-control.html'));
             win.setMinimumSize(320, 380);
             win.setBounds({ x: 40, y: 40, width: size[0], height: size[1] });
-        }, [w, h]);
+        }, [w, h]).then(() => waitForPanelSettled(app, control));
 
         const probe = () => control.evaluate(() => {
             const panel = document.querySelector('.control-panel');
@@ -335,7 +339,6 @@ test('низкое окно: время не наезжает на пресет�
         // разжаться, когда места снова хватает.
         for (const [w, h] of [[400, 740], [761, 737], [380, 700], [380, 660], [376, 650], [1000, 800]]) {
             await setSize(w, h);
-            await control.waitForTimeout(700);
             const m = await probe();
             console.log(`   ${w}×${h}: компакт=${m.compact}, кегль ${m.fontSize}, зазор до пресетов ${m.gapToPresets}px, `
                 + `содержимое ${m.content}/${m.client}`);
@@ -398,20 +401,23 @@ test('низкое окно: время не наезжает на пресет�
 test('«Считать ниже нуля» на минимальном окне: подсказки целы, панель влезает', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.waitForTimeout(1000);
+        // Стартовая автоподгонка окна (autoResizeWindow) отработала.
+        await waitForPanelSettled(app, control);
         await app.evaluate(({ BrowserWindow }, h) => {
             const win = BrowserWindow.getAllWindows()
                 .find((x) => x.webContents.getURL().includes('electron-control.html'));
             win.setBounds({ x: 40, y: 40, width: 383, height: h });
         }, MIN_PANEL_HEIGHT);
-        await control.waitForTimeout(900);
+        await waitForPanelSettled(app, control);
 
         await control.evaluate(() => {
             const el = document.getElementById('allowNegative');
             el.checked = true;
             el.dispatchEvent(new Event('change', { bubbles: true }));
         });
-        await control.waitForTimeout(1200);
+        // Строки появляются синхронно в change; ступень компакта пересчитывает
+        // ResizeObserver по кадрам — это и ждёт waitForPanelSettled.
+        await waitForPanelSettled(app, control);
 
         const m = await control.evaluate(() => {
             const panel = document.querySelector('.control-panel');

@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const {
+    panelRoundTrip, untilDisplayGot, waitForSettledDisplay
+} = require('./window-ready');
 
 /**
  * Свои названия плашек (просьба 24.08.2026) — ПО КЛИКУ.
@@ -23,6 +25,8 @@ const setToggle = (control, id, value) => control.evaluate(([key, on]) => {
     el.dispatchEvent(new Event('change', { bubbles: true }));
 }, [id, value]);
 
+const TOGGLES = ['showEventTime', 'showEndTime', 'showTimeLeft', 'showCurrentTime'];
+
 const caption = (display, blockId) => display.evaluate(
     (id) => document.querySelector(`#${id} .info-label`).textContent,
     blockId
@@ -32,14 +36,12 @@ test('своё название плашки доезжает до диспле�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2200);
+        const display = await waitForSettledDisplay(app);
 
         await control.click('.tab-btn[data-tab="display"]');
-        for (const key of ['showEventTime', 'showEndTime', 'showTimeLeft', 'showCurrentTime']) {
-            await setToggle(control, key, true);
-        }
-        await display.waitForTimeout(600);
+        await untilDisplayGot(display, async () => {
+            for (const key of TOGGLES) { await setToggle(control, key, true); }
+        }, Object.fromEntries(TOGGLES.map((k) => [k, true])));
 
         // Поле существует, видно и доступно мыши — иначе настройки для
         // пользователя не существует.
@@ -47,26 +49,28 @@ test('своё название плашки доезжает до диспле�
         await expect(field).toBeVisible();
         expect(await caption(display, 'eventTimeBlock')).toBe('Начало');
 
-        await field.fill('Доклад Иванова');
-        await display.waitForTimeout(900);
+        await untilDisplayGot(display, () => field.fill('Доклад Иванова'), { labelEventTime: 'Доклад Иванова' });
         expect(await caption(display, 'eventTimeBlock')).toBe('Доклад Иванова');
         // Соседи чужого имени не получили.
         expect(await caption(display, 'endTimeBlock')).toBe('Окончание');
 
         // Длина обрезается по потолку реестра, а не по вкусу поля ввода.
-        await control.locator('#labelTimeLeft').fill('я'.repeat(80));
-        await display.waitForTimeout(900);
+        // Ждём посылку с тем, что ОСТАЛОСЬ в поле (у него свой maxlength), —
+        // обрезку утверждает уже подпись в окне.
+        await untilDisplayGot(display, () => control.locator('#labelTimeLeft').fill('я'.repeat(80)),
+            async () => ({ labelTimeLeft: await control.locator('#labelTimeLeft').inputValue() }));
         const long = await caption(display, 'timeLeftBlock');
         expect(long.length).toBe(40);
 
         // Стёрли — вернулось стандартное слово.
-        await field.fill('');
-        await display.waitForTimeout(900);
+        await untilDisplayGot(display, () => field.fill(''), { labelEventTime: '' });
         expect(await caption(display, 'eventTimeBlock')).toBe('Начало');
     } finally {
+        // Поле пишет профиль синхронно в input (saveExtSettings); круг — и
+        // main получил настройки.
         await control.locator('#labelTimeLeft').fill('').catch(() => {});
-        await control.waitForTimeout(400);
-        for (const key of ['showEventTime', 'showEndTime', 'showTimeLeft', 'showCurrentTime']) {
+        await panelRoundTrip(control).catch(() => {});
+        for (const key of TOGGLES) {
             await setToggle(control, key, false).catch(() => {});
         }
         await app.close();
@@ -82,7 +86,9 @@ test('своё название переживает перезапуск при
         app1 = first.app;
         await first.control.click('.tab-btn[data-tab="display"]');
         await first.control.locator('#labelCurrentTime').fill('Сейчас');
-        await first.control.waitForTimeout(900);
+        // Профиль записан синхронно в input; круг — main получил настройки
+        // (relay сбрасывается на выходе, main-lifecycle.js).
+        await panelRoundTrip(first.control);
     } finally {
         if (app1) { await app1.close(); }
     }
@@ -94,13 +100,12 @@ test('своё название переживает перезапуск при
 
         await setToggle(control, 'showCurrentTime', true);
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
+        const display = await waitForSettledDisplay(app);
         expect(await caption(display, 'currentTimeBlock')).toBe('Сейчас');
     } finally {
         // Профиль e2e общий: возвращаем как было.
         await control.locator('#labelCurrentTime').fill('').catch(() => {});
-        await control.waitForTimeout(400);
+        await panelRoundTrip(control).catch(() => {});
         await setToggle(control, 'showCurrentTime', false).catch(() => {});
         await app.close();
     }

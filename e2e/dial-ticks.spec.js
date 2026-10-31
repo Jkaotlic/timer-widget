@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForDisplay, waitForWidget, waitForClockGone, untilReceived,
+    waitForWidgetSnapshot, waitForClockSnapshot, waitForDisplaySnapshot, waitForDisplaySettled
+} = require('./window-ready');
 
 /**
  * Деления круглого циферблата — настройка ЧАСОВ.
@@ -18,20 +21,6 @@ const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready'
  * и их разметки нет у виджета — иначе «настройка переехала» означало бы просто
  * «контрол спрятали, мёртвый код остался», ровно как в первой части истории.
  */
-
-const MARKERS = {
-    clock: () => !!document.getElementById('wFlipSecGroup'),
-    widget: () => !!document.getElementById('wFlipHoursGroup'),
-    display: () => !!document.getElementById('progressRing')
-};
-
-async function findWindow(app, kind) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(MARKERS[kind]).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
 
 // Замеряем то, что видит пользователь: рисуются ли линии делений.
 function measureTicks() {
@@ -52,6 +41,14 @@ async function setTicks(control, on) {
     }, on);
 }
 
+/**
+ * Тумблер дошёл до часов: change пишет ключ и шлёт `clock-widget-settings`
+ * синхронно (control-app.js → pushClockSettings), main пересылает часам
+ * `clock-settings` с полем showTicks, обработчик часов применяет его сразу.
+ */
+const setTicksOnClock = (control, clock, on) =>
+    untilReceived(clock, 'clock-settings', () => setTicks(control, on), { match: { showTicks: on } });
+
 test('деления включаются и выключаются у часов, а у виджета их нет вовсе', async () => {
     const { app, control } = await launchApp();
 
@@ -64,18 +61,11 @@ test('деления включаются и выключаются у часо�
         window.ipcRenderer.send('open-widget');
         window.ipcRenderer.send('open-clock-widget');
     });
-    await waitForWidget(app);
-    await waitForClock(app);
-    await control.waitForTimeout(2000);
-
-    const widget = await findWindow(app, 'widget');
-    const clock = await findWindow(app, 'clock');
-    expect(widget).not.toBeNull();
-    expect(clock).not.toBeNull();
+    const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
+    const clock = await waitForClockSnapshot(app, await waitForClock(app));
 
     // --- Включаем ---
-    await setTicks(control, true);
-    await control.waitForTimeout(900);
+    await setTicksOnClock(control, clock, true);
 
     const clockOn = await clock.evaluate(measureTicks);
     const widgetState = await widget.evaluate(measureTicks);
@@ -87,8 +77,7 @@ test('деления включаются и выключаются у часо�
     expect(widgetState.hasGroup, 'у виджета не должно остаться группы делений').toBe(false);
 
     // --- Выключаем ---
-    await setTicks(control, false);
-    await control.waitForTimeout(900);
+    await setTicksOnClock(control, clock, false);
 
     const clockOff = await clock.evaluate(measureTicks);
     console.log('выкл → часы:', JSON.stringify(clockOff));
@@ -108,10 +97,12 @@ test('у кольца дисплея делений нет — как и у ко
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(2200);
-        const display = await findWindow(app, 'display');
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
+        // Разметка дисплея — его страница плюс то, что строит инициализация;
+        // снимок main приходит после неё. Осевшее окно — чтобы app.close не
+        // пришёлся на полноэкранный переход.
+        const display = await waitForDisplay(app);
+        await waitForDisplaySnapshot(app, display);
+        await waitForDisplaySettled(app, display);
 
         const state = await display.evaluate(() => ({
             // Сама группа засечек кольца.
@@ -140,26 +131,21 @@ test('включённые деления переживают переоткр�
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-    await waitForClock(app);
-    await control.waitForTimeout(1500);
-    await setTicks(control, true);
-    await control.waitForTimeout(700);
+    const first = await waitForClockSnapshot(app, await waitForClock(app));
+    await setTicksOnClock(control, first, true);
 
     // Закрываем и открываем заново — состояние обязано подняться из хранилища,
     // не дожидаясь посылки настроек из панели.
     await control.evaluate(() => window.ipcRenderer.send('close-clock-widget'));
-    await control.waitForTimeout(800);
+    await waitForClockGone(app);
     await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-    await waitForClock(app);
-    await control.waitForTimeout(1500);
+    const clock = await waitForClockSnapshot(app, await waitForClock(app));
 
-    const clock = await findWindow(app, 'clock');
     const state = await clock.evaluate(measureTicks);
     console.log('после переоткрытия →', JSON.stringify(state));
     expect(state.groupDisplay, 'деления должны остаться включёнными').toBe('inline');
 
     // Профиль e2e общий на весь прогон — возвращаем как было.
-    await setTicks(control, false);
-    await control.waitForTimeout(500);
+    await setTicksOnClock(control, clock, false);
     await app.close();
 });

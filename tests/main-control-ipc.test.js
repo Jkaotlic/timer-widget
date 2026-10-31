@@ -190,3 +190,52 @@ test('MAIN-09: обработчик перезагрузки вешается н
     }
     assert.ok(win.webContents.listenerCount('did-start-loading') <= 1);
 });
+
+test('MINIBAR-RACE: запрос размера по содержимому, пришедший в свёрнутую панель, окно не разворачивает', () => {
+    // Панель через 100 мс после загрузки шлёт resize-control-window
+    // (autoResizeWindow, control-app.js). Свёртка, успевшая раньше, им
+    // перезаписывалась: окно 400×660 поверх всех окон, разметка полосой.
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    const bar = win.getBounds();
+
+    handlers.get('resize-control-window')(null, { width: 400, height: 660 });
+    handlers.get('resize-control-window')(null, { width: 736 });
+
+    assert.deepEqual(win.getBounds(), bar, 'полоса осталась полосой');
+    assert.equal(win._onTop, true);
+
+    handlers.get('control-collapse')(null, { collapsed: false });
+    assert.deepEqual(win.getBounds(), { x: 100, y: 200, width: 400, height: 700 }, 'разворот вернул границы до свёртки');
+});
+
+test('MINIBAR-RACE: после разворота запрос размера снова работает', () => {
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    handlers.get('control-collapse')(null, { collapsed: false });
+    handlers.get('resize-control-window')(null, { height: 800 });
+    assert.equal(win.getBounds().height, 800);
+});
+
+test('MINIBAR-RACE: перезагрузка свёрнутой панели снимает запрет на размер', () => {
+    // Путь краш-обработчика: reload разворачивает окно в main (MAIN-09), и
+    // первый авто-размер новой страницы обязан пройти.
+    const win = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers } = setup(win, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    win.webContents.emit('did-start-loading');
+    handlers.get('resize-control-window')(null, { height: 800 });
+    assert.equal(win.getBounds().height, 800);
+});
+
+test('MINIBAR-RACE: запрет — у свёрнутого ОКНА, панель, пересозданная из трея, его не наследует', () => {
+    const first = makeWindow({ x: 100, y: 200, width: 400, height: 700 });
+    const { handlers, windows } = setup(first, [PRIMARY]);
+    handlers.get('control-collapse')(null, { collapsed: true, height: 52 });
+    const second = makeWindow({ x: 500, y: 300, width: 420, height: 720 });
+    windows.controlWindow = second;
+    handlers.get('resize-control-window')(null, { height: 800 });
+    assert.equal(second.getBounds().height, 800);
+});

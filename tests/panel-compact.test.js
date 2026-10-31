@@ -196,3 +196,33 @@ test('после срабатывания новое окно снова реш�
     t += 2000; ctl.update();
     assert.equal(ctl.locked(), false, 'пользователь поменял размер окна, а ступень заморожена навсегда');
 });
+
+/**
+ * Подгонка окна под содержимое (autoResizeWindow) обязана мерить панель
+ * НЕСЖАТОЙ: в окне ниже содержимого компактная ступень ужимает панель ровно в
+ * окно, и замер «сколько нужно» возвращал высоту окна (замер 30.10.2026:
+ * окно 660, содержимое 732, подгонка просила 660 + 48 = 708). Ступень после
+ * замера — прежняя: решать её — дело самого режима, на resize.
+ */
+test('naturalHeight: замер на нулевой ступени, ступень потом возвращается', () => {
+    const classes = new Set(['compact-panel', 'compact-panel-2']);
+    const level = () => (classes.has('compact-panel-2') ? 2 : classes.has('compact-panel') ? 1 : 0);
+    const panel = {
+        children: [],
+        get offsetHeight() { return 660; },
+        get clientHeight() { return 660; },
+        get scrollHeight() { return level() === 0 ? 732 : 660; }
+    };
+    const doc = {
+        querySelector: () => panel,
+        body: { classList: {
+            toggle: (c, on) => { if (on) { classes.add(c); } else { classes.delete(c); } },
+            contains: (c) => classes.has(c)
+        } }
+    };
+    const ctl = bindCompactMode({ doc, getViewport: () => ({ w: 400, h: 660 }) });
+    const before = level();
+    assert.ok(before > 0, 'стенд: в окне 660 панель сжата');
+    assert.equal(ctl.naturalHeight(), 732);
+    assert.equal(level(), before, 'ступень после замера не та, что была');
+});

@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { panelRoundTrip, waitForWidget } = require('./window-ready');
 
 let electronApp;
 let controlWindow;
@@ -41,8 +42,9 @@ test('clicking preset sets timer value', async () => {
     const preset5 = await controlWindow.locator('[data-minutes="5"]').first();
     if (await preset5.isVisible()) {
         await preset5.click();
-        // Timer display should show 05:00 or 5:00
-        await controlWindow.waitForTimeout(500);
+        // Timer display should show 05:00 or 5:00. Клик шлёт команду синхронно;
+        // круг панели — main её обработал и состояние панель отрисовала (было 500 мс).
+        await panelRoundTrip(controlWindow);
         const display = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display').first();
         const text = await display.textContent();
         expect(text).toMatch(/5:00|05:00/);
@@ -54,7 +56,7 @@ test('start/pause timer cycle', async () => {
     const preset5 = await controlWindow.locator('[data-minutes="5"]').first();
     if (await preset5.isVisible()) {
         await preset5.click();
-        await controlWindow.waitForTimeout(300);
+        await panelRoundTrip(controlWindow);
     }
 
     // Find start button
@@ -84,7 +86,7 @@ test('reset timer', async () => {
     const resetBtn = await controlWindow.locator('#resetBtn, button:has-text("Сброс"), button:has-text("Reset")').first();
     if (await resetBtn.isVisible()) {
         await resetBtn.click();
-        await controlWindow.waitForTimeout(500);
+        await panelRoundTrip(controlWindow);
     }
 });
 
@@ -102,7 +104,8 @@ test('widget window can be opened', async () => {
     const widgetToggle = controlWindow.locator('#openWidgetBtn');
     if (await widgetToggle.isVisible()) {
         await widgetToggle.click();
-        await controlWindow.waitForTimeout(1000);
+        // Окно — опросом по пробе (было 1000 мс).
+        await waitForWidget(electronApp);
 
         const windows = electronApp.windows();
         // Should have more than just control window
@@ -117,6 +120,7 @@ test('no console errors on launch', async () => {
             errors.push(msg.text());
         }
     });
+    // пауза законна: тест утверждает ОТСУТСТВИЕ ошибок консоли за интервал наблюдения.
     await controlWindow.waitForTimeout(1000);
     // Filter out expected warnings
     const realErrors = errors.filter(e => !e.includes('JSON parse error'));

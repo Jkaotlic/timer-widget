@@ -21,6 +21,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { launchApp } = require('./launch');
+const { waitForQuiet, panelRoundTrip, waitForPanelRemaining, armReceived } = require('./window-ready');
 
 /** Разблокировка — ОДНИМ жестом: она смотрит на event.detail. */
 async function unlock(control) {
@@ -38,7 +39,8 @@ async function relock(control) {
 
 async function openDisplayTab(control) {
     await control.click('.tab-btn[data-tab="display"]');
-    await control.waitForTimeout(600);
+    await expect(control.locator('#settingsDrawer')).toHaveClass(/\bopen\b/);
+    await waitForQuiet(control);
 }
 
 /**
@@ -52,13 +54,19 @@ async function stubSaveDialog(app, filePath) {
     }, filePath);
 }
 
-/** Увести таймер в минус ПО-НАСТОЯЩЕМУ: перелимит должен знать главный процесс. */
-async function makeOverrun(control, ms = 6000) {
+/**
+ * Увести таймер в минус ПО-НАСТОЯЩЕМУ: перелимит должен знать главный процесс.
+ *
+ * Глубина — по табло, а не по часам машины: прежние паузы 6000 и 4500 мс от
+ * одной секунды — это −5 и −3. Накопитель main растёт в том же onState, что
+ * рассылает состояние (main-timer.js → accrueOverrun), так что табло панели
+ * отстаёт от него, а не опережает. set и start — один канал, порядок держится.
+ */
+async function makeOverrun(control, depth = -5) {
     await control.evaluate(() => window.ipcRenderer.send('timer-command',
         { type: 'set', seconds: 1, allowNegative: true }));
-    await control.waitForTimeout(300);
     await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-    await control.waitForTimeout(ms);
+    await waitForPanelRemaining(control, depth);
 }
 
 test('клик по «Выгрузить отчёт» создаёт файл с итогом и строками докладов', async () => {
@@ -71,7 +79,9 @@ test('клик по «Выгрузить отчёт» создаёт файл с
         await control.fill('#overrunPrice', '1000');
         await control.fill('#overrunPeriod', '3');
         await control.fill('#eventTitleInput', 'Открытие сезона');
-        await control.waitForTimeout(400);
+        // Поля шлют настройки синхронно в input; круг — main их получил:
+        // выгрузка читает ставку и название из lastDisplaySettings.
+        await panelRoundTrip(control);
 
         await stubSaveDialog(app, target);
         await makeOverrun(control);
@@ -81,7 +91,8 @@ test('клик по «Выгрузить отчёт» создаёт файл с
         await control.locator('#eventFinishBtn').click();
         await expect(control.locator('#eventFinish')).toBeVisible();
         await control.locator('#eventFinishConfirm').click();
-        await control.waitForTimeout(800);
+        // event-finish обработан main, его рассылка накопителя дошла до панели.
+        await panelRoundTrip(control);
 
         await expect(control.locator('#eventExportBtn')).toBeEnabled();
         await control.locator('#eventExportBtn').click();
@@ -124,10 +135,13 @@ test('зонд проверяет себя: без подмены диалога
         await app.evaluate(({ dialog }) => {
             dialog.showSaveDialog = async () => ({ canceled: true });
         });
-        await makeOverrun(control, 4500);
+        await makeOverrun(control, -3);
 
+        // Ответ main приходит ПОСЛЕ записи файла (writeFileSync, затем answer),
+        // так что, когда пришла отмена, файла уже не появится.
+        const done = await armReceived(control, 'event-export-done');
         await control.locator('#eventExportBtn').click();
-        await control.waitForTimeout(1500);
+        await done({ match: { canceled: true } });
 
         expect(
             fs.existsSync(target),
@@ -170,15 +184,16 @@ test('уложившиеся доклады — в отчёте, а фильтр
         // Доклад 1 — уложился: запущен, прошла секунда с лишним, сброшен.
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 30 }));
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-        await control.waitForTimeout(1600);
+        // Прежние 1,6 с от 30 — это 29: прошла секунда с лишним.
+        await waitForPanelRemaining(control, 29);
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
-        await control.waitForTimeout(400);
+        await panelRoundTrip(control);
 
         // Доклад 2 — с перелимитом, закрыт «Завершить».
         await makeOverrun(control);
         await control.locator('#eventFinishBtn').click();
         await control.locator('#eventFinishConfirm').click();
-        await control.waitForTimeout(800);
+        await panelRoundTrip(control);
 
         // Без фильтра — оба доклада.
         await stubSaveDialog(app, full);
@@ -193,7 +208,8 @@ test('уложившиеся доклады — в отчёте, а фильтр
 
         // С фильтром — только доклад с перелимитом, и отчёт об этом говорит.
         await setToggle(control, 'reportOnlyOverruns', true);
-        await control.waitForTimeout(300);
+        // change шлёт настройки синхронно; фильтр main читает из них.
+        await panelRoundTrip(control);
         await stubSaveDialog(app, filtered);
         await control.locator('#eventExportBtn').click();
         await expect.poll(() => fs.existsSync(filtered)).toBe(true);

@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForWidget, waitForClockSnapshot, waitForWidgetSnapshot, waitForWindowSettled,
+    untilReceived
+} = require('./window-ready');
 
 /**
  * Раскладка flip-стиля виджета таймера в режиме с часами (H:MM:SS).
@@ -59,10 +62,15 @@ test('flip-часы: разделитель — тоже точки, а не г�
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-        await waitForClock(app);
-        await control.waitForTimeout(1500);
-        await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'flip'));
-        await control.waitForTimeout(800);
+        // Часы получили снимок main и ВСТАЛИ (было 1500 мс); затем стиль дошёл
+        // до окна (`set-clock-style` несёт строку), и окно встало после смены
+        // стиля — было 800 мс.
+        const opened = await waitForClockSnapshot(app, await waitForClock(app));
+        await waitForWindowSettled(app, opened, 'electron-clock-widget.html');
+        await untilReceived(opened, 'set-clock-style',
+            () => control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'flip')),
+            { match: 'flip' });
+        await waitForWindowSettled(app, opened, 'electron-clock-widget.html');
 
         let clock = null;
         for (const w of app.windows()) {
@@ -104,17 +112,22 @@ test('flip-виджет: разделитель остаётся точками 
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-    await waitForWidget(app);
-    await control.waitForTimeout(1500);
-    await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' }));
-    await control.waitForTimeout(500);
+    // Снимок и вставшее окно (было 1500 мс), затем стиль в окне (было 500 мс).
+    const opened = await waitForWidgetSnapshot(app, await waitForWidget(app));
+    await waitForWindowSettled(app, opened, 'electron-widget.html');
+    await untilReceived(opened, 'widget-style-update',
+        () => control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' })),
+        { match: { timerStyle: 'flip' } });
+    await waitForWindowSettled(app, opened, 'electron-widget.html');
 
     const widget = await findTimerWidget(app);
     expect(widget, 'окно виджета таймера не найдено').not.toBeNull();
 
     // --- Режим MM:SS (5 минут) — базовая раскладка ---
-    await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 300 }));
-    await control.waitForTimeout(600);
+    // Состояние с этим временем дошло до виджета и окно утихло — было 600 мс.
+    await untilReceived(widget, 'timer-state',
+        () => control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 300 })),
+        { match: { remainingSeconds: 300 } });
 
     const short = await widget.evaluate(measure);
     console.log('MM:SS →', JSON.stringify(short));
@@ -128,8 +141,9 @@ test('flip-виджет: разделитель остаётся точками 
     }
 
     // --- Режим H:MM:SS (1 час) — тот самый адаптив ---
-    await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 3600 }));
-    await control.waitForTimeout(600);
+    await untilReceived(widget, 'timer-state',
+        () => control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 3600 })),
+        { match: { remainingSeconds: 3600 } });
 
     const long = await widget.evaluate(measure);
     console.log('H:MM:SS →', JSON.stringify(long));

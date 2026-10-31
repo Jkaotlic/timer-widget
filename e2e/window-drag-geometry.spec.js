@@ -1,5 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const {
+    waitForWidget, waitForClock, waitForWindowSettled, untilReceived, moveBarrier
+} = require('./window-ready');
 
 /**
  * Перетаскивание окна и сохранение геометрии — виджет и часы.
@@ -27,24 +30,22 @@ const WINDOWS = [
         // Опознаём окно по элементу, которого нет в остальных.
         marker: () => !!document.getElementById('wFlipHoursGroup'),
         storageKey: 'widgetGeometry',
-        mainRef: 'widgetWindow'
+        mainRef: 'widgetWindow',
+        url: 'electron-widget.html',
+        move: 'widget-move',
+        wait: waitForWidget
     },
     {
         name: 'часы',
         open: 'open-clock-widget',
         marker: () => !!document.getElementById('wFlipSecGroup'),
         storageKey: 'clockGeometry',
-        mainRef: 'clockWidgetWindow'
+        mainRef: 'clockWidgetWindow',
+        url: 'electron-clock-widget.html',
+        move: 'clock-widget-move',
+        wait: waitForClock
     }
 ];
-
-async function findWindow(app, marker) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(marker).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
 
 function positionOf(app, ref) {
     return app.evaluate(({ BrowserWindow }, name) => {
@@ -92,19 +93,23 @@ for (const w of WINDOWS) {
         const { app, control } = await launchApp();
 
         await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open);
-        await control.waitForTimeout(1500);
+        // Окно ВСТАЛО (было 1500 мс): восстановление геометрии и её
+        // отложенная запись позади — иначе они пришли бы поверх жеста.
+        const page = await w.wait(app);
+        await waitForWindowSettled(app, page, w.url);
         await tagWindows(app);
-
-        const page = await findWindow(app, w.marker);
-        expect(page, `окно «${w.name}» должно открыться`).not.toBeNull();
 
         const before = await positionOf(app, w.mainRef);
         expect(before, 'позиция окна должна читаться').not.toBeNull();
 
         const DX = 40;
         const DY = 25;
-        await dragBy(page, DX, DY);
-        await control.waitForTimeout(600);
+        // Сдвиг применён: `moveWindowBy` шлёт окну `window-geometry` синхронно
+        // после setBounds; затем окно встало — запись по отпусканию и по
+        // `move` отработала (было 600 мс). Окно перед жестом ВСТАЛО, чужой
+        // посылки в пути нет.
+        await untilReceived(page, 'window-geometry', () => dragBy(page, DX, DY));
+        await waitForWindowSettled(app, page, w.url);
 
         const after = await positionOf(app, w.mainRef);
 
@@ -132,17 +137,19 @@ for (const w of WINDOWS) {
         const { app, control } = await launchApp();
 
         await control.evaluate((ch) => window.ipcRenderer.send(ch), w.open);
-        await control.waitForTimeout(1500);
+        // Окно ВСТАЛО (было 1500 мс): восстановление геометрии и её
+        // отложенная запись позади — иначе они пришли бы поверх жеста.
+        const page = await w.wait(app);
+        await waitForWindowSettled(app, page, w.url);
         await tagWindows(app);
-
-        const page = await findWindow(app, w.marker);
-        expect(page).not.toBeNull();
 
         // Ctrl зарезервирован за масштабированием колесом — перетаскивание с ним
         // обязано молчать, иначе масштабирование дёргает окно.
         const beforeCtrl = await positionOf(app, w.mainRef);
         await dragBy(page, 60, 60, { ctrlKey: true });
-        await control.waitForTimeout(400);
+        // Отсутствие сдвига — барьером, а не паузой 400 мс: обработчик жеста
+        // синхронный, и посылка сдвига, будь она, ушла бы раньше барьера.
+        await moveBarrier(app, page);
         expect(await positionOf(app, w.mainRef), `${w.name}: Ctrl+перетаскивание не двигает окно`)
             .toEqual(beforeCtrl);
 
@@ -153,10 +160,21 @@ for (const w of WINDOWS) {
         if (hasButton) {
             const beforeBtn = await positionOf(app, w.mainRef);
             await dragBy(page, 60, 60, { onButton: true });
-            await control.waitForTimeout(400);
+            await moveBarrier(app, page);
             expect(await positionOf(app, w.mainRef), `${w.name}: перетаскивание с кнопки не двигает окно`)
                 .toEqual(beforeBtn);
         }
+
+        // Проверка проверки (ревью e2e-B7b, M2): ТОТ ЖЕ барьер обязан увидеть
+        // настоящий сдвиг. Иначе «не сдвинулось» значило бы и «жест молчит», и
+        // «барьер разрешается раньше, чем main применил сдвиги» (если обработку
+        // `*-move` когда-нибудь отложат или сольют по кадру).
+        const beforeFree = await positionOf(app, w.mainRef);
+        await dragBy(page, 30, 20);
+        await moveBarrier(app, page);
+        const afterFree = await positionOf(app, w.mainRef);
+        expect(Math.abs((afterFree[0] - beforeFree[0]) - 30), `${w.name}: барьер не увидел сдвиг по X`).toBeLessThanOrEqual(2);
+        expect(Math.abs((afterFree[1] - beforeFree[1]) - 20), `${w.name}: барьер не увидел сдвиг по Y`).toBeLessThanOrEqual(2);
 
         await app.close();
     });

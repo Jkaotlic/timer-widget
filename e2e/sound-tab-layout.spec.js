@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { reloadPanel, waitForPanelSettled } = require('./window-ready');
 
 /**
  * Вкладка «Звуки»: ничего не обрезано и колонки стоят в одной вертикали.
@@ -18,10 +19,12 @@ test('в списках звуков ничего не обрезано, а ко
     const { app, control } = await launchApp();
     try {
         await control.evaluate(() => localStorage.clear());
-        await control.reload();
-        await control.waitForTimeout(1400);
+        // Контроллер встал, стартовая рассылка ушла (было 1400 мс).
+        await reloadPanel(control);
+        await waitForPanelSettled(app, control);
         await control.click('.wrow:has(#soundMasterToggle) .wrow-chevron');
-        await control.waitForTimeout(900);
+        // Ящик открыт, окно получило ширину, колонка пересчитана (было 900 мс).
+        await waitForPanelSettled(app, control);
 
         const m = await control.evaluate(() => {
             const textWidth = (el, text) => {
@@ -93,7 +96,8 @@ test('строки звуков не обведены рамкой — вкла�
     const { app, control } = await launchApp();
     try {
         await control.click('.wrow:has(#soundMasterToggle) .wrow-chevron');
-        await control.waitForTimeout(900);
+        // Ящик открыт, окно получило ширину, колонка пересчитана (было 900 мс).
+        await waitForPanelSettled(app, control);
         const m = await control.evaluate(() => {
             const item = document.querySelector('.sound-item');
             const cs = getComputedStyle(item);

@@ -1,6 +1,50 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForDisplaySettled, waitForWidgetSnapshot,
+    waitForPanelRemaining, waitForQuiet, armReceived
+} = require('./window-ready');
+
+/**
+ * Оба окна ВСТАЛИ после открытия (было 2200 мс): снимок main обработан,
+ * дисплей вошёл в полноэкранный режим (или по состоянию не может) и осел.
+ * Отдаёт найденные окна — второй поиск разовым обходом app.windows() был бы
+ * копией того, что ожидание уже сделало (docs/lessons.md, «Окно в e2e ждут
+ * ОПРОСОМ»).
+ *
+ * @returns {Promise<{display: import('@playwright/test').Page, widget: import('@playwright/test').Page}>}
+ */
+async function windowsReady(app) {
+    const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
+    await waitForDisplaySettled(app, display);
+    const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
+    return { display, widget };
+}
+
+/**
+ * Таймер ушёл в перерасход (было 3500 мс после старта на 1 с): панель видит
+ * −2 с (столько и давала пауза), и оба окна показали перерасход и утихли —
+ * переход цвета доехал. Окна получают состояние своими трубами, поэтому
+ * признак — их собственный статус; не дождались — решают утверждения ниже.
+ */
+async function waitOvertime(control, pages) {
+    await waitForPanelRemaining(control, -2);
+    for (const page of pages) {
+        await page.waitForFunction(() => {
+            const t = document.getElementById('timeDisplay');
+            return !!t && /overtime/.test(`${t.dataset.status || ''} ${t.className}`);
+        }, null, { timeout: 10000 }).catch(() => console.log('   окно не показало перерасход за 10 с'));
+        await waitForQuiet(page);
+    }
+}
+
+/** Тема дошла до обоих окон и переходы палитры доехали (было 700/900 мс). */
+async function setTheme(control, pages, theme) {
+    const got = [];
+    for (const page of pages) { got.push(await armReceived(page, 'ui-theme-update')); }
+    await control.evaluate((t) => window.ipcRenderer.send('ui-theme-update', { theme: t }), theme);
+    for (const received of got) { await received({ match: { theme } }); }
+}
 
 /**
  * Палитра перерасхода: КРАСНЫЙ во всех трёх окнах.
@@ -63,13 +107,6 @@ function expectRed(value, what) {
     expect(c.r, `${what}: красный не доминирует над синим (${value})`).toBeGreaterThanOrEqual(c.b * 2.5);
 }
 
-async function findWindow(app, probe) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(probe).catch(() => false)) { return w; }
-    }
-    return null;
-}
-
 test('перерасход красный и в дисплее, и в виджете — цифры и плашка', async () => {
     const { app, control } = await launchApp();
 
@@ -77,22 +114,14 @@ test('перерасход красный и в дисплее, и в видже
         window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         window.ipcRenderer.send('open-widget');
     });
-    await waitForDisplay(app);
-    await waitForWidget(app);
-    await waitForWidget(app);
-    await control.waitForTimeout(2200);
-
-    const display = await findWindow(app, () => !!document.getElementById('progressRing'));
-    const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
-    expect(display, 'окно дисплея не найдено').not.toBeNull();
-    expect(widget, 'окно виджета не найдено').not.toBeNull();
+    const { display, widget } = await windowsReady(app);
 
     // Уводим таймер в перерасход: 1 секунда с разрешённым минусом.
     await control.evaluate(() => {
         window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true });
         window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true });
     });
-    await control.waitForTimeout(3500);
+    await waitOvertime(control, [display, widget]);
 
     // --- Полноэкранный дисплей ---
     const d = await display.evaluate(() => {
@@ -150,19 +179,11 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
             window.ipcRenderer.send('open-widget');
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await waitForWidget(app);
-        await control.waitForTimeout(2200);
-
-        const display = await findWindow(app, () => !!document.getElementById('progressRing'));
-        const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
-        expect(display, 'окно дисплея не найдено').not.toBeNull();
-        expect(widget, 'окно виджета не найдено').not.toBeNull();
+        const { display, widget } = await windowsReady(app);
 
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true }));
         await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true }));
-        await control.waitForTimeout(3500);
+        await waitOvertime(control, [display, widget]);
 
         const probe = (page) => page.evaluate(() => {
             const t = document.getElementById('timeDisplay');
@@ -187,15 +208,13 @@ test('на светлом тоне перерасход берёт ЗАТЕМН�
         });
 
         // --- тёмный тон: полоса ЯРКАЯ ---
-        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' }));
-        await display.waitForTimeout(700);
+        await setTheme(control, [display, widget], 'dark');
         const darkDisplay = await probe(display);
         const darkWidget = await probe(widget);
         console.log('тёмный тон →', JSON.stringify({ display: darkDisplay, widget: darkWidget }));
 
         // --- светлый тон: полоса ЗАТЕМНЁННАЯ ---
-        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'light' }));
-        await display.waitForTimeout(900);
+        await setTheme(control, [display, widget], 'light');
         const lightDisplay = await probe(display);
         const lightWidget = await probe(widget);
         console.log('светлый тон →', JSON.stringify({ display: lightDisplay, widget: lightWidget }));

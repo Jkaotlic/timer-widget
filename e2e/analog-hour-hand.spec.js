@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const { waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived } = require('./window-ready');
 
 /**
  * Часовая стрелка аналогового стиля полноэкранного режима обязана двигаться.
@@ -29,17 +29,17 @@ test('часовая стрелка отражает остаток, а не с�
     const { app, control } = await launchApp();
 
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 'auto' }));
-    await waitForDisplay(app);
-    await control.waitForTimeout(2000);
+    // Окно найдено пробой (бросает, если не появилось), получило снимок main
+    // и встало — раньше пауза 2000 мс.
+    const display = await waitForDisplay(app);
+    await waitForDisplaySnapshot(app, display);
+    await waitForDisplaySettled(app, display);
 
-    let display = null;
-    for (const w of app.windows()) {
-        if (await w.evaluate(() => !!document.getElementById('analogHandHour')).catch(() => false)) { display = w; }
-    }
-    expect(display, 'окно дисплея не найдено').not.toBeNull();
-
-    await control.evaluate(() => window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' }));
-    // Ждём СОСТОЯНИЯ, а не времени: блок стиля появляется по приходу настроек.
+    // Ждём СОСТОЯНИЯ, а не времени: посылка со стилем дошла и отработана, блок
+    // стиля появляется по её приходу.
+    await untilReceived(display, 'display-settings-update',
+        () => control.evaluate(() => window.ipcRenderer.send('display-settings-update', { timerStyle: 'analog' })),
+        { match: { timerStyle: 'analog' } });
     await display.waitForSelector('#timerAnalog.active');
 
     const cases = [
@@ -60,6 +60,7 @@ test('часовая стрелка отражает остаток, а не с�
         while (Date.now() < deadline) {
             last = await display.evaluate(readAngle);
             if (Math.abs(last.deg - expected) < 1.5) { return last; }
+            // шаг опроса: угол стрелки дошёл до ожидаемого
             await display.waitForTimeout(120);
         }
         return last;

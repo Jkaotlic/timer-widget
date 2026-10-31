@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForWidget, waitForQuiet, waitForTransitions, waitForSteady, untilReceived
+} = require('./window-ready');
 
 /**
  * Цвет ФОНА виджета и часов — по клику в панели, с замером на живом окне.
@@ -60,15 +62,24 @@ function expectRgb(actual, [r, g, b], message) {
     expect(Math.abs(parsed.b - b), `${message}: ${actual}`).toBeLessThanOrEqual(2);
 }
 
-const findWindow = async (app, part) => {
-    for (const page of app.windows()) {
-        if ((await page.url()).includes(part)) { return page; }
-    }
-    return null;
-};
+/**
+ * Ожидание — то, что проверяет следующее утверждение: посылка ДОШЛА до окна,
+ * обработчик отработал, переходы цвета (`--tw-dur-base` на background/fill)
+ * доехали. Прежде — паузы 250–1500 мс (e2e/window-ready.js, `untilReceived`).
+ */
+const setStyle = (control, widget, style) => untilReceived(widget, 'widget-style-update', () =>
+    control.evaluate((s) => window.electronAPI.send('widget-style-update', { timerStyle: s }), style),
+{ match: { timerStyle: style } });
 
-const setStyle = (control, style) =>
-    control.evaluate((s) => window.electronAPI.send('widget-style-update', { timerStyle: s }), style);
+/** Поле цветов окна, которое обязана нести посылка после действия (ревью B3, I1). */
+const colorsMatch = (match) => ({ match });
+
+/** Окно открылось: документ загружен, стартовые посылки отработаны, переходы доехали. */
+async function windowLoaded(page) {
+    await page.waitForLoadState('load');
+    await waitForQuiet(page);
+    return page;
+}
 
 const paintOf = (page, selector, prop) =>
     page.evaluate(([sel, p]) => {
@@ -83,7 +94,10 @@ async function setPickerOpen(control, target, open) {
     const isOpen = await control.getAttribute(swatch, 'aria-expanded') === 'true';
     if (isOpen !== open) {
         await control.click(swatch);
-        await control.waitForTimeout(250);
+        await expect(control.locator(swatch)).toHaveAttribute('aria-expanded', String(open));
+        // Панель пипетки раскрывается переходом, а координаты клика по холсту
+        // считаются от его коробки — она обязана быть конечной.
+        await waitForTransitions(control);
     }
 }
 
@@ -97,15 +111,21 @@ async function setPickerOpen(control, target, open) {
  * проверяла состояние, оставшееся от предыдущего теста. Клик по холсту такого
  * состояния не имеет: жест всегда даёт цвет, и тест сверяет окно ровно с ним.
  */
-async function pickSurface(control, target, huePart, svPart) {
+async function pickSurface(control, target, win, huePart, svPart) {
+    // Каждый клик по холсту — ровно одна посылка цветов окну (pointerdown →
+    // onColorChange → updateColors → saveColors). Ждём посылку, несущую ТОТ
+    // hex, который пипетка показала после клика (поле обновляется синхронно).
+    const channel = `${target}-colors-update`;
+    const shownHex = async () => ({ surface: await control.inputValue(`#${target}SurfaceCpHex`) });
     await setPickerOpen(control, target, true);
     const hue = control.locator(`#${target}SurfaceCpHue`);
     const hueBox = await hue.boundingBox();
-    await hue.click({ position: { x: hueBox.width * huePart, y: hueBox.height / 2 } });
+    await untilReceived(win, channel,
+        () => hue.click({ position: { x: hueBox.width * huePart, y: hueBox.height / 2 } }), { match: shownHex });
     const sv = control.locator(`#${target}SurfaceCpSv`);
     const svBox = await sv.boundingBox();
-    await sv.click({ position: { x: svBox.width * svPart, y: svBox.height * 0.25 } });
-    await control.waitForTimeout(500);
+    await untilReceived(win, channel,
+        () => sv.click({ position: { x: svBox.width * svPart, y: svBox.height * 0.25 } }), { match: shownHex });
     const hex = await control.inputValue(`#${target}SurfaceCpHex`);
     // Панель пипетки перекрывает контролы ниже — закрываем её тем же жестом.
     await setPickerOpen(control, target, false);
@@ -128,10 +148,7 @@ test.describe('фон виджета и часов', () => {
     test.beforeAll(async () => {
         ({ app, control } = await launchApp());
         await control.evaluate(() => window.electronAPI.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(1500);
-        widget = await findWindow(app, 'electron-widget');
-        expect(widget, 'окно виджета должно открыться').toBeTruthy();
+        widget = await windowLoaded(await waitForWidget(app));
         // Весь этот describe меряет ТЁМНЫЙ тон, и это не удобство, а предмет:
         // «у круга и „Цифр“ своей подложки нет» — правило редизайна 12.08.2026,
         // и оно про светлые чернила на чужих обоях. С 18.08.2026 у окна два
@@ -139,12 +156,12 @@ test.describe('фон виджета и часов', () => {
         // на тёмном рабочем столе — замер в e2e/style-tone.spec.js). Тема
         // шлётся по IPC, а не кликом: клик пишет выбор в localStorage, а профиль
         // e2e один на весь прогон.
-        await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' }));
-        await widget.waitForTimeout(500);
+        await untilReceived(widget, 'ui-theme-update',
+            () => control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' })),
+            { match: { theme: 'dark' } });
         // Эталон подложки LED снимаем ДО первой покраски: сброс обязан вернуть
         // именно её, а не «прозрачный по умолчанию».
-        await setStyle(control, 'digits');
-        await widget.waitForTimeout(900);
+        await setStyle(control, widget, 'digits');
         // У «Цифр» своей подложки нет — эталон здесь «прозрачно», и сброс
         // обязан вернуть именно его. Стиль LED, у которого подложка была своя,
         // слит с этим стилем 13.08.2026.
@@ -153,7 +170,8 @@ test.describe('фон виджета и часов', () => {
             'у «Цифр» своей подложки быть не должно').toBe(0);
 
         await control.click('.wrow:has(#openWidgetBtn) .wrow-chevron');
-        await control.waitForTimeout(400);
+        await expect(control.locator(swatchOf('widget'))).toBeVisible();
+        await waitForTransitions(control);
     });
 
     test.afterAll(async () => {
@@ -177,17 +195,15 @@ test.describe('фон виджета и часов', () => {
     });
 
     test('выбранный фон красит подложку ТЕКУЩЕГО стиля', async () => {
-        await setStyle(control, 'circle');
-        await widget.waitForTimeout(700);
+        await setStyle(control, widget, 'circle');
         const before = await paintOf(widget, '.bg-circle', 'fill');
         expect(before, 'у круга не должно быть своей заливки до выбора фона').toBe('none');
 
-        widgetHex = await pickSurface(control, 'widget', 0.7, 0.9);
+        widgetHex = await pickSurface(control, 'widget', widget, 0.7, 0.9);
         expectRgb(await paintOf(widget, '.bg-circle', 'fill'), hexToRgb(widgetHex), 'заливка круга');
 
         // Тот же цвет — и у следующего стиля: пара одна на окно.
-        await setStyle(control, 'digits');
-        await widget.waitForTimeout(900);
+        await setStyle(control, widget, 'digits');
         expectRgb(await paintOf(widget, '.widget-digits-time', 'backgroundColor'),
             hexToRgb(widgetHex), 'подложка «Цифр»');
     });
@@ -196,8 +212,8 @@ test.describe('фон виджета и часов', () => {
         // Ползунок двигаем КЛАВИАТУРОЙ: Home — нативное событие input, а не
         // синтетическое присваивание .value, которое обошло бы обработчик.
         await control.focus('#widgetSurfaceAlpha');
-        await control.press('#widgetSurfaceAlpha', 'Home');
-        await control.waitForTimeout(600);
+        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'),
+            colorsMatch({ surfaceAlpha: 0 }));
 
         const clear = await paintOf(widget, '.widget-digits-time', 'backgroundColor');
         expect(parseColor(clear).a, `подложка «Цифр» ${clear} обязана стать прозрачной`).toBe(0);
@@ -205,8 +221,8 @@ test.describe('фон виджета и часов', () => {
     });
 
     test('сброс возвращает подложку СТИЛЯ, а не «прозрачный по умолчанию»', async () => {
-        await control.click('#widgetSurfaceRow .surface-reset-bg');
-        await control.waitForTimeout(600);
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'),
+            colorsMatch({ surface: null, surfaceAlpha: null }));
 
         const restored = await paintOf(widget, '.widget-digits-time', 'backgroundColor');
         expect(restored, 'подложка «Цифр» обязана вернуться к своей').toBe(ledDefault);
@@ -217,15 +233,15 @@ test.describe('фон виджета и часов', () => {
         // Сброс предыдущего теста снял цвет; ползунок обязан остаться рабочим.
         await expect(control.locator('#widgetSurfaceAlpha')).toBeEnabled();
         await control.focus('#widgetSurfaceAlpha');
-        await control.press('#widgetSurfaceAlpha', 'Home');
-        await control.waitForTimeout(600);
+        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'),
+            colorsMatch({ surfaceAlpha: 0 }));
 
         const clear = await paintOf(widget, '.widget-digits-time', 'backgroundColor');
         expect(parseColor(clear).a, `родная подложка «Цифр» ${clear} обязана погаснуть`).toBe(0);
         await expect(control.locator('#widgetSurfaceRow .surface-alpha-value')).toHaveText('0%');
 
-        await control.click('#widgetSurfaceRow .surface-reset-bg');
-        await control.waitForTimeout(500);
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'),
+            colorsMatch({ surface: null, surfaceAlpha: null }));
         expect(await paintOf(widget, '.widget-digits-time', 'backgroundColor'),
             'сброс обязан вернуть родную подложку').toBe(ledDefault);
     });
@@ -239,8 +255,7 @@ test.describe('фон виджета и часов', () => {
         // а не как настройка. Ползунок для флипа в панели и так спрятан — но
         // спрятанный контрол не мешает значению, сохранённому при другом
         // стиле, приехать в CSS. Поэтому проверяется САМА подложка.
-        await setStyle(control, 'flip');
-        await widget.waitForTimeout(900);
+        await setStyle(control, widget, 'flip');
 
         /**
          * Меряем ТУ заливку, которая реально рисуется, а не шорткод.
@@ -273,13 +288,12 @@ test.describe('фон виджета и часов', () => {
 
         // Ползунок в ноль — тем же жестом, что гасит подложку у «Цифр».
         await control.focus('#widgetSurfaceAlpha');
-        await control.press('#widgetSurfaceAlpha', 'Home');
-        await control.waitForTimeout(700);
+        await untilReceived(widget, 'widget-colors-update', () => control.press('#widgetSurfaceAlpha', 'Home'),
+            colorsMatch({ surfaceAlpha: 0 }));
         await opaque('после прозрачности 0');
 
         // И с выбранным цветом: цвет обязан приехать, прозрачность — нет.
-        const hex = await pickSurface(control, 'widget', 0.6, 0.8);
-        await control.waitForTimeout(600);
+        const hex = await pickSurface(control, 'widget', widget, 0.6, 0.8);
         await opaque('с выбранным цветом и прозрачностью 0');
         const painted = await paintOf(widget, '.widget-flip-inner', 'backgroundColor');
         const [r, g, b] = hexToRgb(hex);
@@ -287,18 +301,18 @@ test.describe('фон виджета и часов', () => {
             .toBe(`rgb(${r}, ${g}, ${b})`);
 
         // Возвращаем состояние: профиль e2e общий на весь прогон.
-        await control.click('#widgetSurfaceRow .surface-reset-bg');
-        await control.waitForTimeout(600);
-        await setStyle(control, 'digits');
-        await widget.waitForTimeout(700);
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-bg'),
+            colorsMatch({ surface: null, surfaceAlpha: null }));
+        await setStyle(control, widget, 'digits');
     });
 
     test('выбор темы НЕ стирает выбранный фон окна', async () => {
         // Раньше каждая тема и каждая пипетка пересобирали объект цветов
         // целиком — то есть первый же клик по теме уносил бы фон.
-        widgetHex = await pickSurface(control, 'widget', 0.35, 0.85);
-        await control.locator('#themesGrid .theme-btn').nth(1).click();
-        await control.waitForTimeout(700);
+        widgetHex = await pickSurface(control, 'widget', widget, 0.35, 0.85);
+        // Тема шлёт цвета, а затем стиль (theme-grid.js) — ждём ПОСЛЕДНЮЮ.
+        await untilReceived(widget, 'widget-style-update',
+            () => control.locator('#themesGrid .theme-btn').nth(1).click());
 
         expectRgb(await paintOf(widget, '.widget-digits-time', 'backgroundColor'),
             hexToRgb(widgetHex), 'фон после выбора темы');
@@ -308,8 +322,8 @@ test.describe('фон виджета и часов', () => {
         // Цвет цифр сейчас от темы, выбранной предыдущим тестом; сброс обязан
         // вернуть тот, что описан в CSS.
         const digitsBefore = await paintOf(widget, '.widget-digits-time', 'color');
-        await control.click('#widgetSurfaceRow .surface-reset-timer');
-        await control.waitForTimeout(700);
+        await untilReceived(widget, 'widget-colors-update', () => control.click('#widgetSurfaceRow .surface-reset-timer'),
+            colorsMatch({ timer: null, progress: null }));
 
         const digitsAfter = await paintOf(widget, '.widget-digits-time', 'color');
         expect(digitsAfter, 'цвет цифр обязан вернуться к описанному в CSS')
@@ -321,17 +335,19 @@ test.describe('фон виджета и часов', () => {
     test('фон часов не течёт в виджет', async () => {
         await control.click('#drawerClose');
         await control.evaluate(() => window.electronAPI.send('open-clock-widget'));
-        await waitForClock(app);
-        await control.waitForTimeout(1500);
-        const clock = await findWindow(app, 'electron-clock-widget');
-        expect(clock, 'окно часов должно открыться').toBeTruthy();
+        const clock = await windowLoaded(await waitForClock(app));
 
         await control.click('.wrow:has(#openClockBtn) .wrow-chevron');
-        await control.waitForTimeout(400);
+        await expect(control.locator(swatchOf('clock'))).toBeVisible();
+        await waitForTransitions(control);
         // Другая точка на холсте — заведомо другой цвет, иначе «не течёт»
         // нельзя было бы отличить от «совпало».
-        const clockHex = await pickSurface(control, 'clock', 0.3, 0.95);
+        const clockHex = await pickSurface(control, 'clock', clock, 0.3, 0.95);
         expect(clockHex, 'цвета окон обязаны различаться').not.toBe(widgetHex);
+        // Утверждение об ОТСУТСТВИИ утечки: протёкшая посылка ушла бы из того
+        // же обработчика панели, что и посылка часам, — к этому месту она уже
+        // дошла бы. Переход цвета, если она его завела, обязан доехать до замера.
+        await waitForQuiet(widget);
 
         expectRgb(await paintOf(clock, '.bg-circle', 'fill'), hexToRgb(clockHex), 'фон часов');
         expectRgb(await paintOf(widget, '.widget-digits-time', 'backgroundColor'),
@@ -354,13 +370,10 @@ test.describe('сброс настроек окна', () => {
     test.beforeAll(async () => {
         ({ app, control } = await launchApp());
         await control.evaluate(() => window.electronAPI.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(1500);
-        for (const page of app.windows()) {
-            if ((await page.url()).includes('electron-widget')) { widget = page; }
-        }
+        widget = await windowLoaded(await waitForWidget(app));
         await control.click('.wrow:has(#openWidgetBtn) .wrow-chevron');
-        await control.waitForTimeout(400);
+        await expect(control.locator(swatchOf('widget'))).toBeVisible();
+        await waitForTransitions(control);
     });
 
     test.afterAll(async () => {
@@ -378,17 +391,32 @@ test.describe('сброс настроек окна', () => {
         // Профиль e2e общий, поэтому стиль сначала приводим к кругу: ряд
         // «Подпись состояния» виден только у него — настройка к остальным
         // стилям неприменима. Кликаем ПОДПИСЬ: сам чекбокс скрыт под тумблером.
-        await control.click('#timerStyle button[data-val="circle"]');
-        await control.waitForTimeout(400);
-        await control.click('label[for="widgetStatusLabel"]');
-        await control.click('#timerStyle button[data-val="flip"]');
-        await pickSurface(control, 'widget', 0.5, 0.8);
-        await control.waitForTimeout(700);
+        // Окно меняет размер САМО (стиль, масштаб — через главный процесс),
+        // поэтому «до» и «после» — ОСЕВШИЕ границы, а не первый замер.
+        const settledBounds = () => waitForSteady(app, ({ BrowserWindow }) => {
+            const win = BrowserWindow.getAllWindows()
+                .find((w) => w.webContents.getURL().includes('electron-widget.html'));
+            return win ? win.getBounds() : null;
+        }, { name: 'границы виджета' });
+
+        await untilReceived(widget, 'widget-style-update', () => control.click('#timerStyle button[data-val="circle"]'),
+            { match: { timerStyle: 'circle' } });
+        await expect(control.locator('label[for="widgetStatusLabel"]')).toBeVisible();
+        await untilReceived(widget, 'widget-style-update', () => control.click('label[for="widgetStatusLabel"]'),
+            { match: async () => ({ statusLabel: await control.isChecked('#widgetStatusLabel') }) });
+        await untilReceived(widget, 'widget-style-update', () => control.click('#timerStyle button[data-val="flip"]'),
+            { match: { timerStyle: 'flip' } });
+        await pickSurface(control, 'widget', widget, 0.5, 0.8);
+        await settledBounds();
         const before = await boundsOf();
         expect(before, 'окно виджета должно существовать').toBeTruthy();
 
-        await control.click('#widgetResetRow .reset-all');
-        await control.waitForTimeout(900);
+        // Сброс шлёт цвета, затем стиль (panel-reset.js) — ждём ПОСЛЕДНЮЮ. И
+        // границы осесть: утверждается, что окно НЕ сдвинулось, а сдвиг пришёл
+        // бы через главный процесс уже после обработчика стиля.
+        await untilReceived(widget, 'widget-style-update', () => control.click('#widgetResetRow .reset-all'),
+            { match: { timerStyle: 'circle', statusLabel: false } });
+        await settledBounds();
 
         // Настройки — заводские.
         await expect(control.locator('#widgetStatusLabel')).not.toBeChecked();

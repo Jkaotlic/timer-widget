@@ -11,9 +11,9 @@
 // Список, написанный здесь рукой (раньше — `electron-main.js` + `main-*.js`),
 // не видел app-scheme.js, atomic-write.js, timer-engine.js и ещё десяток.
 //
-// Исключение — DUAL_WORLD: модуль, который tsc проверяет только в main, но
-// написан для двух миров (`typeof window !== 'undefined'` и экспорт в window).
-// Каждое исключение обязано это подтверждать, иначе оно устарело.
+// Исключений нет: последнее (event-report.js, писан под оба мира) снято в
+// f67eadf вместе с его веткой `typeof window`. Модуль, которому window нужен,
+// — общий и живёт в обоих проектах tsc.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -47,8 +47,7 @@ const MAIN = expand(readJson('tsconfig.main.json').include);
 const rendererCfg = readJson('tsconfig.renderer.json');
 const rendererExcluded = expand(rendererCfg.exclude || []);
 const RENDERER = new Set([...expand(rendererCfg.include)].filter((f) => !rendererExcluded.has(f)));
-const DUAL_WORLD = [];
-const MAIN_ONLY = [...MAIN].filter((f) => !RENDERER.has(f) && !DUAL_WORLD.includes(f)).sort();
+const MAIN_ONLY = [...MAIN].filter((f) => !RENDERER.has(f)).sort();
 
 test('охрана проверяет сама себя: регулярка ловит window.CONFIG и document', () => {
     assert.match(scan('const c = window.CONFIG;'), DOM_RE);
@@ -67,13 +66,6 @@ test('охрана проверяет сама себя: кавычка в ре�
     assert.match(scan("s.replace(/[&<>\"'/]/g, f);\ndocument.body;"), DOM_RE);
     assert.doesNotMatch(scan('const half = a / b; const r = /window/;'), DOM_RE);
 });
-
-for (const file of DUAL_WORLD) {
-    test(`${file}: исключение не устарело — модуль main-only по tsconfig и спрашивает typeof window`, () => {
-        assert.ok(MAIN.has(file) && !RENDERER.has(file), `${file} больше не main-only — убери из DUAL_WORLD`);
-        assert.match(codeOnly(fs.readFileSync(path.join(REPO, file), 'utf8')), /typeof window !== 'undefined'/);
-    });
-}
 
 test('список файлов главного процесса выведен из конфигов tsc и не пуст', () => {
     for (const f of ['electron-main.js', 'main-state.js', 'app-scheme.js', 'atomic-write.js',

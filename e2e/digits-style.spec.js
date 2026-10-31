@@ -1,6 +1,69 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
+const CONFIG = require('../constants.js');
+const {
+    waitForClock, waitForDisplay, waitForWidget, waitForResizeHandled, innerSize, waitForSteady,
+    waitForDisplaySettled, waitForDrawerBeside
+} = require('./window-ready');
+const { leaveFullScreen } = require('./display-window');
+
+/**
+ * Окно открыто и приняло стартовый снимок: главный процесс шлёт его по
+ * `did-finish-load` (main-window-hooks.js), то есть после события `load`, когда
+ * слушатели окна уже стоят. Команда панели, ушедшая после, не потеряется.
+ */
+async function windowLoaded(page) {
+    await page.waitForLoadState('load');
+    return page;
+}
+
+/**
+ * Подгонка кегля «Цифр» отработала и ОСЕЛА.
+ *
+ * Активный класс ставится раньше подгонки: переменная `--digits-font-size`
+ * выставляется в updateScaling(), а та бежит и по ресайзу окна, которым
+ * главный процесс отвечает на смену стиля (окно меняет форму под стиль).
+ * Замер 30.10.2026 без этого ожидания: виджет — 40 → 48.35 (первое значение
+ * — CSS-фоллбэк). Поэтому ждём переменную, затем — что кегль и размер окна
+ * перестали меняться.
+ */
+async function digitsFitted(page, timeId) {
+    await expect.poll(
+        () => page.evaluate(
+            (id) => document.getElementById(id).style.getPropertyValue('--digits-font-size').trim(), timeId
+        ),
+        '--digits-font-size обязана быть реально выставлена, а не пуста'
+    ).not.toBe('');
+    await waitForSteady(page, () => ['digitsTime', 'widgetDigitsTime', 'clockDigitsTime']
+        .map((id) => {
+            const el = document.getElementById(id);
+            return el ? getComputedStyle(el).fontSize : null;
+        })
+        .concat([window.innerWidth, window.innerHeight]), { name: 'кегль «Цифр»' });
+}
+
+/**
+ * Размер окна ДО команды — устоявшийся, а не первый прочитанный.
+ *
+ * `waitForResizeHandled` ждёт ОТЛИЧИЯ от этого размера. Если до команды окно
+ * ещё доезжает после прошлой (смена стиля, прайминг масштаба, выход из
+ * полноэкранного режима), «до» окажется промежуточным, и помощник вернётся
+ * на чужом ресайзе — замер станет зависеть от скорости машины.
+ */
+function settledSize(page) {
+    return waitForSteady(page, innerSize, { samples: 4, name: 'размер окна до команды' });
+}
+
+/** Блок стиля стал активным в окне — стиль дошёл через главный процесс. */
+function styleActive(page, blockId) {
+    return expect.poll(
+        () => page.evaluate((id) => {
+            const el = document.getElementById(id);
+            return !!el && el.classList.contains('active');
+        }, blockId),
+        `блок #${blockId} не стал активным`
+    ).toBe(true);
+}
 
 /**
  * Стиль «Цифры» и выбор шрифта.
@@ -12,14 +75,6 @@ const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready'
  * Профиль e2e ОДИН на весь прогон, поэтому в конце стиль и шрифт возвращаются
  * обратно: спек, оставивший приложение в чужом состоянии, ронял соседний.
  */
-
-async function findWindow(app, probe) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(probe).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
 
 // Помечаем окно дисплея в ГЛАВНОМ процессе (тот же приём, что в
 // e2e/window-drag-geometry.spec.js), чтобы дальше найти его через
@@ -35,15 +90,16 @@ async function tagDisplayWindow(app) {
 }
 
 async function resizeDisplayWindow(app, size) {
+    // Выход из полноэкранного режима — по СОБЫТИЮ (e2e/display-window.js):
+    // `setSize` посреди перехода роняет Electron на macOS. Здесь стояло
+    // `setFullScreen(false)` и сразу `setSize` — та самая мина.
+    await leaveFullScreen(app);
     await app.evaluate(({ BrowserWindow }, { width, height }) => {
         const win = BrowserWindow.getAllWindows().find((w) => w.__ref === 'displayWindow');
         if (!win) { throw new Error('displayWindow не помечено — забыт вызов tagDisplayWindow()'); }
-        if (win.isFullScreen()) { win.setFullScreen(false); }
         win.setSize(width, height);
     }, size);
 }
-
-const IS_DISPLAY = () => !!document.getElementById('timerDigits') && !!document.getElementById('timerRing');
 
 function measureDigits() {
     const time = document.getElementById('digitsTime');
@@ -201,18 +257,16 @@ test('стиль «Цифры» доходит до полноэкранного
         await control.waitForLoadState('domcontentloaded');
 
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
+        const display = await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // Открыть вкладку «Дисплей» — только кликом.
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
         // (у .tab-btn стоит aria-controls="settingsDrawer").
         await control.click('.tab-btn[data-tab="display"]');
         await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.waitForTimeout(700);
 
-        const display = await findWindow(app, IS_DISPLAY);
-        expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
+        await styleActive(display, 'timerDigits');
+        await digitsFitted(display, 'digitsTime');
 
         const m = await display.evaluate(measureDigits);
         expect(m.active, 'блок «Цифры» должен стать активным').toBe(true);
@@ -243,12 +297,17 @@ test('стиль «Цифры» доходит до полноэкранного
         expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
 
         await tagDisplayWindow(app);
+        // Сначала выходим из полноэкранного режима, потом снимаем «размер до»:
+        // сам выход тоже меняет окно, и он не должен сойти за наш ресайз.
+        await leaveFullScreen(app);
+        const debounce = { debounceMs: CONFIG.RESIZE_DEBOUNCE };
+        let size = await settledSize(display);
         await resizeDisplayWindow(app, { width: 700, height: 520 });
-        await display.waitForTimeout(700);
+        size = await waitForResizeHandled(display, size, debounce);
         const wide = await display.evaluate(measureDigits);
 
         await resizeDisplayWindow(app, { width: 420, height: 340 });
-        await display.waitForTimeout(700);
+        await waitForResizeHandled(display, size, debounce);
         const narrow = await display.evaluate(measureDigits);
 
         expect(wide.fontSize, 'кегль на широком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
@@ -272,16 +331,15 @@ test('масштаб дисплея действует и на стиль «Ци
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
+        const display = await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
         // (у .tab-btn стоит aria-controls="settingsDrawer").
         await control.click('.tab-btn[data-tab="display"]');
         await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.waitForTimeout(700);
 
-        const display = await findWindow(app, IS_DISPLAY);
+        await styleActive(display, 'timerDigits');
+        await digitsFitted(display, 'digitsTime');
         const readTransform = () => document.getElementById('timerDigits').style.transform;
 
         const before = await display.evaluate(readTransform);
@@ -303,7 +361,7 @@ test('масштаб дисплея действует и на стиль «Ци
             slider.value = '80';
             slider.dispatchEvent(new Event('input', { bubbles: true }));
         });
-        await display.waitForTimeout(500);
+        await expect.poll(() => display.evaluate(readTransform)).toContain('scale(0.8)');
         const afterSlider = await display.evaluate(readTransform);
         expect(afterSlider).toContain('scale(0.8)');
         expect(afterSlider).not.toBe(before);
@@ -314,9 +372,8 @@ test('масштаб дисплея действует и на стиль «Ци
                 deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true
             }));
         });
-        await display.waitForTimeout(300);
-        const afterWheel = await display.evaluate(readTransform);
-        expect(afterWheel, 'колесо обязано менять масштаб').not.toBe(afterSlider);
+        await expect.poll(() => display.evaluate(readTransform), 'колесо обязано менять масштаб')
+            .not.toBe(afterSlider);
 
         // Возвращаем масштаб дисплея к дефолту — тот же общий ключ, что чинит
         // e2e/display-timer-scale.spec.js, живёт в общем профиле.
@@ -341,23 +398,23 @@ test('в перерасходе ЦИФРЫ остаются на оси окна
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
+        const display = await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // Отдельной кнопки открытия ящика нет: вкладка сама его открывает
         // (у .tab-btn стоит aria-controls="settingsDrawer").
         await control.click('.tab-btn[data-tab="display"]');
         await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.waitForTimeout(500);
+        await styleActive(display, 'timerDigits');
+        await digitsFitted(display, 'digitsTime');
 
         // Загнать таймер в перерасход.
         await control.evaluate(() => {
             window.ipcRenderer.send('timer-command', { type: 'set', seconds: 1, allowNegative: true });
             window.ipcRenderer.send('timer-command', { type: 'start' });
         });
-        await control.waitForTimeout(3500);
+        // Перерасход — это знак минуса в надписи дисплея: ждём его, а не 3.5 с.
+        await expect(display.locator('#digitsSign')).toHaveText('−', { timeout: 15000 });
 
-        const display = await findWindow(app, IS_DISPLAY);
         const m = await display.evaluate(measureDigits);
 
         expect(Math.abs(m.digitsCenter - m.blockCenter),
@@ -387,7 +444,7 @@ test('стиль «Цифры» доходит до виджета кликом,
         // Опросом с дедлайном (waitForWidget/waitForClock), а не событием
         // 'window': событие приходит РОВНО раз, и если окно успело открыться
         // между возвратом из click() и подпиской, ждать его больше нечего —
-        // тест висит до таймаута. Голый findWindow() тоже не годится: сразу
+        // тест висит до таймаута. Голый поиск по app.windows() тоже не годится: сразу
         // после click() окна ещё нет. Опрос верен в обоих случаях.
         await control.click('#openWidgetBtn');
         widget = await waitForWidget(app);
@@ -399,7 +456,8 @@ test('стиль «Цифры» доходит до виджета кликом,
         await control.click('.tab-btn[data-tab="timer"]');
         await control.waitForSelector('#settingsDrawer.open');
         await control.click('#timerStyle button[data-val="digits"]');
-        await control.waitForTimeout(500);
+        await styleActive(widget, 'widgetDigits');
+        await digitsFitted(widget, 'widgetDigitsTime');
 
         const m = await widget.evaluate(measureWidgetDigits);
         expect(m, 'блок #widgetDigits должен существовать в разметке').not.toBeNull();
@@ -420,12 +478,13 @@ test('стиль «Цифры» доходит до виджета кликом,
         expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
 
         await tagWidgetWindow(app);
+        let size = await settledSize(widget);
         await resizeWidgetWindow(app, { width: 500, height: 420 });
-        await widget.waitForTimeout(500);
+        size = await waitForResizeHandled(widget, size);
         const wide = await widget.evaluate(measureWidgetDigits);
 
         await resizeWidgetWindow(app, { width: 220, height: 180 });
-        await widget.waitForTimeout(500);
+        await waitForResizeHandled(widget, size);
         const narrow = await widget.evaluate(measureWidgetDigits);
 
         expect(wide.fontSize, 'кегль на широком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
@@ -461,7 +520,8 @@ test('масштаб виджета действует и на стиль «Ци
         await control.click('.tab-btn[data-tab="timer"]');
         await control.waitForSelector('#settingsDrawer.open');
         await control.click('#timerStyle button[data-val="digits"]');
-        await control.waitForTimeout(500);
+        await styleActive(widget, 'widgetDigits');
+        await digitsFitted(widget, 'widgetDigitsTime');
 
         // Панель шлёт СВОЙ начальный widget-style-update (с текущим
         // timerScale) через 600мс после своей загрузки — независимо от того,
@@ -474,13 +534,35 @@ test('масштаб виджета действует и на стиль «Ци
         // ниже он либо совпадёт с уже пришедшим 100 и ничего не сделает, либо
         // станет тем самым «первым значением» сам — и тогда РЕАЛЬНОЕ
         // изменение на 250 будет уже вторым, для которого резайз применяется.
+        // Исход прайминга ИЗВЕСТЕН заранее. Смена стиля выше уже отправила
+        // виджету timerScale (сборка widget-style-update в panel-state.js кладёт
+        // его всегда), значит `_lastPushedTimerScale` там определён и равен
+        // значению ползунка. Отсюда два случая:
+        //   - ползунок не на 100 → виджет зовёт resizeToScale(100): окно
+        //     WIDGET_BASE_SIZE × WIDGET_BASE_SIZE (квадрат, windowHeightFor = ширина);
+        //     база 250 = CONFIG.WIDGET_DEFAULT_WIDTH (равенство держит
+        //     tests/constants.test.js и разбор там же);
+        //   - ползунок уже на 100 → посылка ничего не меняет, в пути ничего нет.
+        // Ждём ровно этого, а не «перестало меняться».
+        const primeFrom = await control.evaluate(() => document.getElementById('timerScale').value);
         await control.evaluate(() => {
             const slider = document.getElementById('timerScale');
             slider.value = '100';
             slider.dispatchEvent(new Event('input', { bubbles: true }));
         });
-        await widget.waitForTimeout(300);
-
+        let sizeBefore;
+        if (primeFrom !== '100') {
+            const base = CONFIG.WIDGET_DEFAULT_WIDTH;
+            await expect.poll(() => widget.evaluate(innerSize),
+                `прайминг 100 % обязан дать окно ${base}×${base}`).toEqual({ w: base, h: base });
+            // Кадр: обработчик resize (подгонка кегля) рассылается до колбэков кадра.
+            await widget.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+            sizeBefore = await widget.evaluate(innerSize);
+            console.log(`   прайминг ${primeFrom} % → 100 %: окно ${sizeBefore.w}×${sizeBefore.h}`);
+        } else {
+            sizeBefore = await settledSize(widget);
+            console.log(`   прайминг: ползунок уже на 100 %, окно ${sizeBefore.w}×${sizeBefore.h}`);
+        }
         const before = await widget.evaluate(measureWidgetDigits);
 
         // Ползунок «Масштаб» во вкладке «Виджет» реально меняет размер ОКНА
@@ -492,7 +574,7 @@ test('масштаб виджета действует и на стиль «Ци
             slider.value = '250';
             slider.dispatchEvent(new Event('input', { bubbles: true }));
         });
-        await widget.waitForTimeout(600);
+        await waitForResizeHandled(widget, sizeBefore);
 
         const after = await widget.evaluate(measureWidgetDigits);
         expect(after.fontSize, 'кегль обязан вырасти вместе с масштабом виджета')
@@ -621,7 +703,7 @@ test('стиль «Цифры» доходит до часов кликом, и 
         // Опросом с дедлайном (waitForWidget/waitForClock), а не событием
         // 'window': событие приходит РОВНО раз, и если окно успело открыться
         // между возвратом из click() и подпиской, ждать его больше нечего —
-        // тест висит до таймаута. Голый findWindow() тоже не годится: сразу
+        // тест висит до таймаута. Голый поиск по app.windows() тоже не годится: сразу
         // после click() окна ещё нет. Опрос верен в обоих случаях.
         await control.click('#openClockBtn');
         clock = await waitForClock(app);
@@ -633,7 +715,8 @@ test('стиль «Цифры» доходит до часов кликом, и 
         await control.click('.tab-btn[data-tab="clock"]');
         await control.waitForSelector('#settingsDrawer.open');
         await control.click('#clockStyle button[data-val="digits"]');
-        await control.waitForTimeout(500);
+        await styleActive(clock, 'clockDigits');
+        await digitsFitted(clock, 'clockDigitsTime');
 
         const m = await clock.evaluate(measureClockDigits);
         expect(m, 'блок #clockDigits должен существовать в разметке').not.toBeNull();
@@ -653,12 +736,13 @@ test('стиль «Цифры» доходит до часов кликом, и 
         expect(varBeforeResize, '--digits-font-size обязана быть реально выставлена, а не пуста').not.toBe('');
 
         await tagClockWindow(app);
+        let size = await settledSize(clock);
         await resizeClockWindow(app, { width: 500, height: 420 });
-        await clock.waitForTimeout(500);
+        size = await waitForResizeHandled(clock, size);
         const wide = await clock.evaluate(measureClockDigits);
 
         await resizeClockWindow(app, { width: 220, height: 180 });
-        await clock.waitForTimeout(500);
+        await waitForResizeHandled(clock, size);
         const narrow = await clock.evaluate(measureClockDigits);
 
         expect(wide.fontSize, 'кегль на широком окне обязан быть подобран, а не нулевым').toBeGreaterThan(0);
@@ -714,16 +798,23 @@ test('часы «Цифры» не обрезаются в 12-часовом ф�
         if (format24hChecked) {
             await control.click('label[for="clockFormat24h"]');
         }
-        await control.waitForTimeout(400);
+        await expect(control.locator('#clockFormat24h')).not.toBeChecked();
 
         await control.click('#clockStyle button[data-val="digits"]');
-        await control.waitForTimeout(500);
+        await styleActive(clock, 'clockDigits');
+        await digitsFitted(clock, 'clockDigitsTime');
+        // 12-часовой формат дошёл до окна часов: суффикс уже в строке.
+        await expect.poll(
+            () => clock.evaluate(() => document.getElementById('clockDigitsValue').textContent),
+            'должен присутствовать суффикс AM/PM'
+        ).toMatch(/[AP]M$/);
 
         // Небольшое окно — как и для основного теста, сжимаем: переполнение на
         // узком окне заметнее всего.
         await tagClockWindow(app);
+        const size = await settledSize(clock);
         await resizeClockWindow(app, { width: 320, height: 260 });
-        await clock.waitForTimeout(500);
+        await waitForResizeHandled(clock, size);
 
         const m = await clock.evaluate(measureClockDigits);
         console.log('12h+секунды →', JSON.stringify(m));
@@ -740,7 +831,9 @@ test('часы «Цифры» не обрезаются в 12-часовом ф�
             const el = document.getElementById('clockFormat24h');
             if (el && !el.checked) { el.click(); }
         });
-        await control.waitForTimeout(300);
+        // Строго: восстановление, которое молча не удалось, оставит часы в
+        // 12-часовом формате всем следующим спекам. Клик синхронен.
+        await expect(control.locator('#clockFormat24h')).toBeChecked({ timeout: 2000 });
         await resetClockStyle(control);
         await restoreClockGeometry(clock, geometryBefore);
         await app.close();
@@ -764,7 +857,10 @@ test('выбор «Цифры» для часов не включает синх
         expect(before, 'синхронизация обязана быть выключена по умолчанию').toBe(false);
 
         await control.click('#clockStyle button[data-val="digits"]');
-        await control.waitForTimeout(400);
+        // Выбор и решение о синхронизации — синхронно в обработчике сегмента
+        // (panel-clock.js): позже синхронизация включиться не может, ждать её
+        // «отсутствия» нечего. Ждём сам выбор.
+        await expect.poll(() => control.evaluate(() => document.getElementById('clockStyle').value)).toBe('digits');
 
         const after = await control.evaluate(() => ({
             syncChecked: document.getElementById('syncClockStyle').checked,
@@ -807,17 +903,26 @@ async function resetDigitsFonts(page) {
 }
 
 // Кегль до и после трёх пересчётов подряд. Пересчёт вызывается тем же
-// событием `resize`, на которое подписаны все три окна; `settleMs` — время на
-// debounce (у дисплея он есть, у виджета и часов обработчик прямой).
-async function traceFontSize(page, selector, settleMs) {
+// событием `resize`, на которое подписаны все три окна. `debounceMs` — задержка
+// отложенного пересчёта (у дисплея `CONFIG.RESIZE_DEBOUNCE`, у виджета и часов
+// обработчик прямой — 0: `dispatchEvent` исполняет его синхронно).
+//
+// Ожидание debounce — не пауза-ставка: таймер той же длины взводится ПОСЛЕ
+// таймера приложения (тот взвёлся внутри dispatchEvent), а таймеры с равной
+// задержкой исполняются в порядке взвода (HTML, timer initialisation steps).
+async function traceFontSize(page, selector, debounceMs) {
     const read = () => page.evaluate(
         (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize),
         selector
     );
     const out = [await read()];
     for (let i = 0; i < 3; i += 1) {
-        await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-        await page.waitForTimeout(settleMs);
+        await page.evaluate(async (ms) => {
+            window.dispatchEvent(new Event('resize'));
+            // пауза законна: таймер той же длины, что debounce, взведён ПОСЛЕ
+            // таймера приложения (см. выше)
+            if (ms > 0) { await new Promise((r) => setTimeout(r, ms)); }
+        }, debounceMs);
         out.push(await read());
     }
     return out;
@@ -848,20 +953,19 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
     // ожидание), и ни один спек в e2e/ не лезет во внутренние объекты окна.
     const { app, control } = await launchApp();
     const geometry = { widget: null };
+    let widget = null;
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
+        const display = await waitForDisplaySettled(app, await waitForDisplay(app));
 
         // --- Дисплей ---
         await control.click('.tab-btn[data-tab="display"]');
         await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.waitForTimeout(800);
 
-        const display = await findWindow(app, IS_DISPLAY);
-        expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
-        const displayTrace = await traceFontSize(display, '#digitsTime', 500);
+        await styleActive(display, 'timerDigits');
+        await digitsFitted(display, 'digitsTime');
+        const displayTrace = await traceFontSize(display, '#digitsTime', CONFIG.RESIZE_DEBOUNCE);
         expect(
             Math.max(...displayTrace) - Math.min(...displayTrace),
             `дисплей: три пересчёта подряд обязаны дать один кегль, получено ${displayTrace.join(' → ')}`
@@ -871,16 +975,20 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
         // Окно открываем кнопкой и ждём ОПРОСОМ с дедлайном: сразу после
         // click() окна ещё нет (так этот тест и упал первый раз), а событие
         // 'window' приходит один раз и теряется, если окно опередило подписку.
+        // Кнопка — в ГЛАВНОЙ колонке, а ящик открыт: клик дойдёт, только если
+        // ящик встал рядом, а не накладкой (CI macOS 30.10.2026). Факт, а не срок.
+        await waitForDrawerBeside(app, control);
         await control.click('#openWidgetBtn');
-        const widget = await waitForWidget(app);
+        widget = await waitForWidget(app);
         await widget.waitForLoadState('domcontentloaded');
         expect(await widget.evaluate(IS_WIDGET), 'открывшееся окно должно быть виджетом').toBe(true);
 
         await control.click('.tab-btn[data-tab="timer"]');
         await control.click('#timerStyle button[data-val="digits"]');
-        await control.waitForTimeout(900);
+        await styleActive(widget, 'widgetDigits');
+        await digitsFitted(widget, 'widgetDigitsTime');
         geometry.widget = await snapshotWidgetGeometry(widget);
-        const widgetTrace = await traceFontSize(widget, '#widgetDigitsTime', 200);
+        const widgetTrace = await traceFontSize(widget, '#widgetDigitsTime', 0);
         expect(
             Math.max(...widgetTrace) - Math.min(...widgetTrace),
             `виджет: три пересчёта подряд обязаны дать один кегль, получено ${widgetTrace.join(' → ')}`
@@ -894,8 +1002,9 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
 
         await control.click('.tab-btn[data-tab="clock"]');
         await control.click('#clockStyle button[data-val="digits"]');
-        await control.waitForTimeout(900);
-        const clockTrace = await traceFontSize(clock, '#clockDigitsTime', 200);
+        await styleActive(clock, 'clockDigits');
+        await digitsFitted(clock, 'clockDigitsTime');
+        const clockTrace = await traceFontSize(clock, '#clockDigitsTime', 0);
         expect(
             Math.max(...clockTrace) - Math.min(...clockTrace),
             `часы: три пересчёта подряд обязаны дать один кегль, получено ${clockTrace.join(' → ')}`
@@ -904,7 +1013,6 @@ test('пересчёт кегля «Цифры» ИДЕМПОТЕНТЕН — в
         await resetDisplayStyle(control);
         await resetWidgetStyle(control);
         await resetClockStyle(control);
-        const widget = await findWindow(app, IS_WIDGET);
         if (widget && geometry.widget !== null) { await restoreWidgetGeometry(widget, geometry.widget); }
         await app.close();
     }
@@ -1032,14 +1140,12 @@ test('выбор шрифта доходит до СВОЕГО окна клик
 
         // Дисплей открывается по IPC, как и в остальных тестах этого файла.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
-        const display = await findWindow(app, IS_DISPLAY);
-        expect(display, 'полноэкранное окно должно быть найдено').not.toBeNull();
+        const display = await waitForDisplaySettled(app, await waitForDisplay(app));
 
-        // Панель шлёт свой начальный widget-style-update ~600мс после загрузки
-        // (см. loadSettings) — даём этой гонке отгреметь до первого замера.
-        await control.waitForTimeout(900);
+        // Стартовая рассылка панели (widget-style-update через 600 мс после её
+        // загрузки, control-app.js) к этому месту давно прошла: launchApp ждёт
+        // её зонд (`__startupPushed`) и ответ на стартовый get-displays
+        // (waitForStartupPush), а три окна открылись уже после.
 
         const fontFamilyOf = (win, elId) => win.evaluate(
             (id) => getComputedStyle(document.getElementById(id)).fontFamily, elId
@@ -1057,6 +1163,9 @@ test('выбор шрифта доходит до СВОЕГО окна клик
         await control.click('#timerStyle button[data-val="digits"]');
         await expect(control.locator('#widgetDigitsFontRow')).toBeVisible();
         await control.click('#widgetDigitsFont .font-option[data-val="bebas"]');
+        await expect.poll(() => fontFamilyOf(widget, 'widgetDigitsTime'), 'виджет обязан получить выбранный шрифт')
+            .toContain('Bebas Neue');
+        // пауза законна: дальше утверждается, что часы и дисплей шрифт виджета НЕ получили — отсутствие за интервал
         await widget.waitForTimeout(400);
 
         const afterWidget = {
@@ -1069,11 +1178,17 @@ test('выбор шрифта доходит до СВОЕГО окна клик
         expect(afterWidget.display, 'дисплей не должен увидеть шрифт виджета').toBe(baseline.display);
 
         // --- Часы: «Цифры» → Oswald ---
+        // Вкладки — в ГЛАВНОЙ колонке, а ящик открыт: клик дойдёт, только если
+        // ящик встал рядом, а не накладкой (CI macOS 30.10.2026).
+        await waitForDrawerBeside(app, control);
         await control.click('.tab-btn[data-tab="clock"]');
         await control.waitForSelector('#settingsDrawer.open');
         await control.click('#clockStyle button[data-val="digits"]');
         await expect(control.locator('#clockDigitsFontRow')).toBeVisible();
         await control.click('#clockDigitsFont .font-option[data-val="oswald"]');
+        await expect.poll(() => fontFamilyOf(clock, 'clockDigitsTime'), 'часы обязаны получить выбранный шрифт')
+            .toContain('Oswald');
+        // пауза законна: дальше утверждается, что виджет и дисплей шрифт часов НЕ получили — отсутствие за интервал
         await clock.waitForTimeout(400);
 
         const afterClock = {
@@ -1091,6 +1206,9 @@ test('выбор шрифта доходит до СВОЕГО окна клик
         await control.click('#displayTimerStyle button[data-val="digits"]');
         await expect(control.locator('#displayDigitsFontRow')).toBeVisible();
         await control.click('#displayDigitsFont .font-option[data-val="orbitron"]');
+        await expect.poll(() => fontFamilyOf(display, 'digitsTime'), 'дисплей обязан получить выбранный шрифт')
+            .toContain('Orbitron');
+        // пауза законна: дальше утверждается, что виджет и часы шрифт дисплея НЕ получили — отсутствие за интервал
         await display.waitForTimeout(400);
 
         const afterDisplay = {
@@ -1134,17 +1252,23 @@ test('часы «Цифры»: дата и пояс встают ПОД врем
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-clock-widget'));
-        await waitForClock(app);
-        await control.waitForTimeout(2000);
-        const clock = await findWindow(app, IS_CLOCK);
-        expect(clock, 'окно часов не найдено').not.toBeNull();
+        const clock = await waitForClock(app);
+        await windowLoaded(clock);
 
         await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'digits'));
-        await clock.waitForTimeout(900);
+        await styleActive(clock, 'clockDigits');
+        await digitsFitted(clock, 'clockDigitsTime');
         await control.evaluate(() => window.ipcRenderer.send('clock-widget-settings', {
             showDate: true, showTimezone: true, showSeconds: false
         }));
-        await clock.waitForTimeout(1200);
+        // Тумблеры дошли до окна: оба шильдика на экране (то же «проверка
+        // проверки», что ниже, только с повтором).
+        const shown = (id) => clock.evaluate((i) => {
+            const el = document.getElementById(i);
+            return !!el && getComputedStyle(el).display !== 'none';
+        }, id);
+        await expect.poll(() => shown('digitsDateBadge'), 'дата не показалась — тумблер не сработал').toBe(true);
+        await expect.poll(() => shown('digitsTimezoneBadge'), 'пояс не показался — тумблер не сработал').toBe(true);
 
         const m = await clock.evaluate(() => {
             const box = (id) => {
@@ -1201,7 +1325,9 @@ test('часы «Цифры»: дата и пояс встают ПОД врем
             showDate: false, showTimezone: false, showSeconds: true
         }));
         await control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'circle'));
-        await clock.waitForTimeout(500);
+        await expect.poll(() => clock.evaluate(
+            () => document.getElementById('clockDigits').classList.contains('active')
+        )).toBe(false);
     } finally {
         await app.close();
     }

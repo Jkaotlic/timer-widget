@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock } = require('./window-ready');
+const { waitForClock, waitForClockSnapshot, waitForWindowSettled, untilReceived } = require('./window-ready');
 
 /**
  * Испорченное значение стиля не должно ломать окно часов.
@@ -29,14 +29,6 @@ const BAD_STYLES = [
     'style-flip; drop'
 ];
 
-async function findClock(app) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(() => !!document.getElementById('wFlipSecGroup')).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
-}
-
 // Часы «живы», если ровно один из стилей отрисован и на body стоит
 // ровно один класс style-*.
 function measureStyleState() {
@@ -56,15 +48,16 @@ test('испорченный стиль часов откатывается на
     const { app, control } = await launchApp();
 
     await control.evaluate(() => { window.ipcRenderer.send('open-clock-widget'); });
-    await waitForClock(app);
-    await control.waitForTimeout(2000);
-
-    const clock = await findClock(app);
-    expect(clock, 'окно часов должно открыться').not.toBeNull();
+    // Окно найдено пробой (бросает, если не открылось), получило снимок main
+    // и встало — раньше пауза 2000 мс.
+    const clock = await waitForClock(app);
+    await waitForClockSnapshot(app, clock);
+    await waitForWindowSettled(app, clock, 'electron-clock-widget.html');
 
     // Заведомо валидный стиль — чтобы старт был из известного состояния.
-    await control.evaluate(() => { window.ipcRenderer.send('clock-widget-set-style', 'flip'); });
-    await control.waitForTimeout(600);
+    // Посылка дошла и отработана (было 600 мс).
+    await untilReceived(clock, 'set-clock-style',
+        () => control.evaluate(() => { window.ipcRenderer.send('clock-widget-set-style', 'flip'); }), { match: 'flip' });
     const before = await clock.evaluate(measureStyleState);
     console.log('до мусора:', JSON.stringify(before));
     expect(before.active, 'исходный стиль должен примениться').toEqual(['flip']);
@@ -104,7 +97,8 @@ test('испорченный стиль часов откатывается на
     }
 
     // Убираем за собой: стиль часов персистится в общем localStorage.
-    await control.evaluate(() => { window.ipcRenderer.send('clock-widget-set-style', 'circle'); });
-    await control.waitForTimeout(500);
+    // Стиль часы пишут в обработчике посылки — дождаться её (было 500 мс).
+    await untilReceived(clock, 'set-clock-style',
+        () => control.evaluate(() => { window.ipcRenderer.send('clock-widget-set-style', 'circle'); }), { match: 'circle' });
     await app.close();
 });

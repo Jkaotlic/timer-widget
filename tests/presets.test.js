@@ -248,7 +248,8 @@ test('стиль виджета и часов пресет шлёт СРАЗУ, 
     const body = control.slice(at, control.indexOf('\n            saveColors(', at));
     assert.ok(body.length > 500, 'тело loadSettings найдено (самопроверка)');
     assert.doesNotMatch(body, /sendClockStyle\(|'widget-style-update'/, 'loadSettings снова шлёт стиль сам');
-    assert.match(control, /setTimeout\(\(\) => this\.pushWindowStyles\(\)/, 'запуск панели не шлёт стиль окнам');
+    // Тело таймера — выражение или блок (в блоке за посылкой ставится зонд e2e).
+    assert.match(control, /setTimeout\(\(\) => (?:\{\s*)?this\.pushWindowStyles\(\)/, 'запуск панели не шлёт стиль окнам');
 
     const state = codeOnly(read('panel-state.js'));
     const pw = state.indexOf('pushWindowStyles() {');

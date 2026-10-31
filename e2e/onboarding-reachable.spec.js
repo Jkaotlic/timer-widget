@@ -1,5 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
+const { waitForQuiet } = require('./window-ready');
 
 /**
  * Достижимость кнопки «Проверить обновления».
@@ -37,7 +38,9 @@ test('кнопка «Проверить обновления» видима в �
         // Идентификатор кнопки справки за версии менялся — пробуем по надписи.
         await control.click('text=Справка');
     });
-    await control.waitForTimeout(400);
+    // Модалка открывается классом в клике; появление — переходом, его конец
+    // ждёт waitForQuiet: прямоугольники ниже меряются осевшими (было 400 мс).
+    await waitForQuiet(control);
 
     const button = control.locator('#checkUpdatesBtn');
     await expect(button, 'кнопки нет в разметке').toHaveCount(1);

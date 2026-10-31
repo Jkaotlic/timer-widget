@@ -1,6 +1,42 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const CONFIG = require('../constants.js');
+const { waitForSteady, reloadPanel, showToastSettled, TOAST_SETTLED } = require('./window-ready');
+
+/** Окно панели глазами главного процесса: границы и уровень. */
+const winState = ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    return { bounds: w.getBounds(), onTop: w.isAlwaysOnTop() };
+};
+
+/**
+ * Свёртка (или разворот) дошла до окна — по УСЛОВИЮ, а не паузой.
+ *
+ * Цепочка: класс `collapsed` на body (mini-bar.js, синхронно) → канал
+ * `control-collapse` → обработчик в main-control-ipc.js меняет размер, место и
+ * уровень окна ОДНИМ синхронным вызовом. Признак, что он отработал, — уровень:
+ * поверх окон панель только в полосе. Границы после этого ждём ОСЕВШИМИ —
+ * запрошенный размер не обязан совпасть с выданным, и система вправе
+ * поправить его следом. Последнее — рендерер увидел новое окно: раскладка
+ * полосы и место тоста считаются от `innerHeight`.
+ *
+ * @returns {Promise<{bounds: object, onTop: boolean}>} осевшее состояние окна
+ */
+async function windowSettled(app, control, collapsed) {
+    if (collapsed) {
+        await expect(control.locator('body')).toHaveClass(/\bcollapsed\b/);
+    } else {
+        await expect(control.locator('body')).not.toHaveClass(/\bcollapsed\b/);
+    }
+    await expect.poll(async () => (await app.evaluate(winState)).onTop).toBe(collapsed);
+    const state = await waitForSteady(app, winState, { name: 'границы панели' });
+    // Полоса не выше 120 px (потолок в обработчике), панель — заведомо выше.
+    await control.waitForFunction((c) => (c ? window.innerHeight <= 120 : window.innerHeight > 120), collapsed);
+    return state;
+}
+
+/** Таймер идёт / стоит — ответ главного процесса, отражённый контроллером. */
+const isRunning = (control) => control.evaluate(() => window.timerController.isRunning);
 
 /**
  * Режим полосы: окно действительно сжимается, полоса действительно управляет.
@@ -17,12 +53,7 @@ test('окно сжимается в полосу и разворачивает�
         const before = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
-
-        const collapsed = await app.evaluate(({ BrowserWindow }) => {
-            const w = BrowserWindow.getAllWindows()[0];
-            return { bounds: w.getBounds(), onTop: w.isAlwaysOnTop() };
-        });
+        const collapsed = await windowSettled(app, control, true);
 
         expect(collapsed.bounds.height, `высота окна ${collapsed.bounds.height}`).toBeLessThanOrEqual(60);
         // Ширину задаёт СОДЕРЖИМОЕ полосы: с 20.08.2026 в ней ещё четыре ячейки
@@ -42,14 +73,160 @@ test('окно сжимается в полосу и разворачивает�
         expect(seen.hero).toBe(0);
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(700);
-
-        const restored = await app.evaluate(({ BrowserWindow }) => {
-            const w = BrowserWindow.getAllWindows()[0];
-            return { bounds: w.getBounds(), onTop: w.isAlwaysOnTop() };
-        });
+        const restored = await windowSettled(app, control, false);
         expect(restored.bounds).toEqual(before);
         expect(restored.onTop).toBe(false);
+    } finally {
+        await app.close();
+    }
+});
+
+/**
+ * Свёртка сразу после загрузки панели: отложенный авто-размер (control-app.js,
+ * `setTimeout(autoResizeWindow, 100)`) срабатывает уже ПОСЛЕ неё и не должен
+ * развернуть окно обратно в 400×660 (замер до починки: окно 400×660 поверх
+ * всех окон с классом `collapsed`). Тот же путь — перезагрузка панели
+ * краш-обработчиком. В полосе авто-размер не мерит и не шлёт ничего, а
+ * просьбу запоминает полоса (mini-bar.js, deferWhileCollapsed) — признак
+ * того, что гонка воспроизведена, — и выполняет её после разворота.
+ */
+test('свёртка в первые 100 мс после загрузки не перезаписывается отложенным авто-размером', async () => {
+    const { app, control } = await launchApp();
+    try {
+        // Окно НИЖЕ подгонки (как после ручного ресайза): содержимое панели
+        // на стенде выше пола 660 (замер 30.10.2026: ~730 px дочерних блоков,
+        // подгонка упирается в потолок 740). Без этого разворот на границы
+        // «до свёртки» неотличим от перемера содержимого.
+        await app.evaluate(({ BrowserWindow }, h) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            const b = w.getBounds();
+            w.setBounds({ x: b.x, y: b.y, width: b.width, height: h });
+        }, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+        // Всё, что панель попросит у main за время в полосе. Подписка — ДО
+        // перезагрузки.
+        await app.evaluate(({ ipcMain }) => {
+            global.__barAsks = [];
+            global.__barListener = (_e, size) => global.__barAsks.push(size);
+            ipcMain.on('resize-control-window', global.__barListener);
+        });
+        // Без ожидания стартовой рассылки: свёртка обязана успеть в первые
+        // 100 мс, до авто-размера.
+        await reloadPanel(control, { awaitStartup: false });
+        // Свёртка раньше авто-размера — иначе тест проверяет не тот порядок.
+        await control.evaluate(() => window.miniBar.collapse());
+        await expect.poll(() => control.evaluate(() => window.miniBar.hasPendingFit()),
+            { message: 'авто-размер не попал в полосу — гонка не воспроизведена' }).toBe(true);
+        const barAsks = await app.evaluate(({ ipcMain }) => {
+            ipcMain.removeListener('resize-control-window', global.__barListener);
+            return global.__barAsks;
+        });
+        expect(barAsks, 'свёрнутая панель мерила и слала размер').toEqual([]);
+
+        const state = await waitForSteady(app, winState, { name: 'границы полосы' });
+        console.log(`   после авто-размера: ${JSON.stringify(state)}`);
+        expect(state.onTop, 'полоса обязана быть поверх окон').toBe(true);
+        expect(state.bounds.height, `высота окна ${state.bounds.height}: авто-размер развернул полосу`).toBeLessThanOrEqual(120);
+        await control.waitForFunction(() => window.innerHeight <= 120);
+
+        // Пропущенный в полосе авто-размер выполняется после разворота —
+        // иначе остаётся высота «до свёртки», ниже содержимого.
+        await app.evaluate(({ ipcMain }) => {
+            global.__refitAsked = null;
+            ipcMain.once('resize-control-window', (_e, size) => { global.__refitAsked = size; });
+        });
+        await control.evaluate(() => window.miniBar.expand());
+        await expect.poll(async () => (await app.evaluate(winState)).onTop).toBe(false);
+        await expect.poll(() => app.evaluate(() => global.__refitAsked),
+            { message: 'после разворота панель не попросила размер по содержимому' }).not.toBeNull();
+        const asked = await app.evaluate(() => global.__refitAsked);
+        // Выдано — то, что main делает из просьбы: пол, потолок окна, рабочая
+        // область монитора. Запрошенное ≠ выданное — печатаем обе.
+        const limits = await app.evaluate(({ BrowserWindow, screen }, minH) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            const area = screen.getDisplayMatching(w.getBounds()).workArea;
+            return { maxH: w.getMaximumSize()[1], areaH: area.height, minH };
+        }, CONFIG.CONTROL_WINDOW_MIN_HEIGHT);
+        const expected = Math.max(limits.minH, Math.min(asked.height, limits.areaH - 50, limits.maxH));
+        const fitted = await waitForSteady(app, winState, { name: 'границы после разворота' });
+        console.log(`   просьба ${JSON.stringify(asked)}, цель ${expected} (потолок ${limits.maxH}, область ${limits.areaH}), выдано ${JSON.stringify(fitted.bounds)}`);
+        expect(fitted.bounds.height, 'после разворота высота окна не подогнана под просьбу').toBe(expected);
+        // Просьба — про НЕСЖАТОЕ содержимое: компактная ступень ужимает панель
+        // ровно в окно, и замер по ней просил «окно + 48» (замер 30.10.2026:
+        // 708 при содержимом 732). Если просьба не упёрлась в потолок, несжатое
+        // содержимое обязано поместиться в выданное окно.
+        if (expected === asked.height) {
+            const fit = await control.evaluate(() => {
+                const b = document.body;
+                const had = ['compact-panel', 'compact-panel-2'].filter((c) => b.classList.contains(c));
+                had.forEach((c) => b.classList.remove(c));
+                const p = document.querySelector('.control-panel');
+                const r = { scroll: p.scrollHeight, client: p.clientHeight };
+                had.forEach((c) => b.classList.add(c));
+                return r;
+            });
+            expect(fit.scroll, `несжатое содержимое ${fit.scroll} не влезло в ${fit.client}: перемер мерил сжатую панель`)
+                .toBeLessThanOrEqual(fit.client + 1);
+        }
+        // Различитель «подгонка ≠ пол» осмыслен, только если ЭКРАН вмещает
+        // больше пола: main режет высоту по `область − 50` и потолку окна. На
+        // macOS CI (1024×768, область 677) это 627 < пола 660, и цель равна
+        // полу при любом поведении приложения (диагноз CI 30.10.2026). Тогда
+        // не утверждаем, а говорим вслух: первая половина теста (полоса не
+        // перезаписана, просьба после разворота выполнена) проверена и здесь,
+        // различитель — на экранах выше (ubuntu, windows, локальный).
+        const room = Math.min(limits.areaH - 50, limits.maxH);
+        if (room <= limits.minH) {
+            const note = `экран: область ${limits.areaH} − 50 и потолок ${limits.maxH} дают ${room} ≤ пола ${limits.minH} — `
+                + 'подгонка неотличима от пола, различитель НЕ проверен';
+            console.log(`   ${note}`);
+            test.info().annotations.push({ type: 'not-verified', description: note });
+        } else {
+            expect(expected, 'содержимое не переросло пол — проверка ничего не различает').toBeGreaterThan(limits.minH);
+        }
+    } finally {
+        await app.close();
+    }
+});
+
+/**
+ * Обычные свёртка и разворот (без гонки) возвращают ТОЧНО прежние границы,
+ * выставленные пользователем: перемер по содержимому — только если просьба о
+ * размере была пропущена в полосе (mini-bar.js, deferWhileCollapsed). Ревью
+ * 30.10.2026: перемер на КАЖДОМ развороте превращал 700×700 в 400×740.
+ */
+test('обычный разворот возвращает границы пользователя целиком, без перемера', async () => {
+    const { app, control } = await launchApp();
+    try {
+        const requested = { width: 700, height: 700 };
+        const granted = await app.evaluate(({ BrowserWindow }, size) => {
+            const w = BrowserWindow.getAllWindows()[0];
+            const b = w.getBounds();
+            w.setBounds({ x: b.x, y: b.y, width: size.width, height: size.height });
+            return w.getBounds();
+        }, requested);
+        const before = await waitForSteady(app, winState, { name: 'границы пользователя' });
+        console.log(`   запрошено ${JSON.stringify(requested)}, выдано ${JSON.stringify(granted)}, осело ${JSON.stringify(before.bounds)}`);
+
+        await app.evaluate(({ ipcMain }) => {
+            global.__fitAsks = [];
+            global.__fitListener = (_e, size) => global.__fitAsks.push(size);
+            ipcMain.on('resize-control-window', global.__fitListener);
+        });
+        await control.click('#miniBarToggle');
+        await windowSettled(app, control, true);
+        await control.click('#miniBarExpand');
+        const restored = await windowSettled(app, control, false);
+        // Перемер, если бы он был, шёл бы кадром после resize окна: ждём два кадра.
+        await control.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const asks = await app.evaluate(({ ipcMain }) => {
+            ipcMain.removeListener('resize-control-window', global.__fitListener);
+            return global.__fitAsks;
+        });
+        const after = await waitForSteady(app, winState, { name: 'границы после разворота' });
+        console.log(`   после разворота ${JSON.stringify(after.bounds)}, просьб размера ${asks.length}`);
+        expect(asks, 'разворот без пропущенной просьбы перемерил панель').toEqual([]);
+        expect(restored.bounds).toEqual(before.bounds);
+        expect(after.bounds, 'границы пользователя не вернулись целиком').toEqual(before.bounds);
     } finally {
         await app.close();
     }
@@ -62,13 +239,15 @@ test('полоса показывает то же время, что и пане
         // полосе одно действие из двух по состоянию таймера, и без пресета
         // «Старт» не переводит панель в отсчёт — «Паузы» не появится вовсе.
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('05:00');
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(600);
+        await windowSettled(app, control, true);
 
         await control.click('#miniBarStart');
-        await control.waitForTimeout(2200);
+        // Отсчёт пошёл, и тик дошёл до полосы: время в ней уже не 05:00.
+        await expect(control.locator('#miniBarTime')).not.toHaveText('05:00');
+        await expect(control.locator('#miniBarDot')).toHaveClass(/ok/);
 
         const running = await control.evaluate(() => ({
             bar: document.getElementById('miniBarTime').textContent.trim(),
@@ -80,14 +259,16 @@ test('полоса показывает то же время, что и пане
         expect(running.dot).toContain('ok');
 
         await control.click('#miniBarPause');
-        await control.waitForTimeout(700);
+        // Состояние «пауза» пришло от главного процесса: после него тиков нет.
+        await expect(control.locator('#statusText')).toHaveText('Пауза');
         const paused = await control.evaluate(() => document.getElementById('miniBarTime').textContent.trim());
+        // пауза законна: утверждается ОТСУТСТВИЕ тика за интервал длиннее секунды отсчёта
         await control.waitForTimeout(1500);
         const stillPaused = await control.evaluate(() => document.getElementById('miniBarTime').textContent.trim());
         expect(stillPaused, 'после паузы время не должно идти').toBe(paused);
 
         await control.click('#miniBarReset');
-        await control.waitForTimeout(700);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
         const afterReset = await control.evaluate(() => ({
             bar: document.getElementById('miniBarTime').textContent.trim(),
             hero: document.getElementById('controlTimeDigits').textContent.trim()
@@ -96,7 +277,7 @@ test('полоса показывает то же время, что и пане
 
         // Профиль e2e общий: возвращаем окно в развёрнутое состояние.
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
     } finally {
         await app.close();
     }
@@ -115,14 +296,14 @@ test('в паузе полоса предлагает продолжить, и �
     const { app, control } = await launchApp();
     try {
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('05:00');
         await control.click('#startBtn');
-        await control.waitForTimeout(1300);
+        await expect(control.locator('body')).toHaveClass(/state-running/);
         await control.click('#pauseBtn');
-        await control.waitForTimeout(500);
+        await expect(control.locator('#statusText')).toHaveText('Пауза');
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         const visible = await control.evaluate(() => {
             const vis = (id) => getComputedStyle(document.getElementById(id)).display !== 'none';
@@ -132,13 +313,13 @@ test('в паузе полоса предлагает продолжить, и �
         expect(visible.pause, 'кнопка «Пауза» в паузе не делает ничего').toBe(false);
 
         await control.click('#miniBarStart');
-        await control.waitForTimeout(1300);
-        expect(await control.evaluate(() => window.timerController.isRunning)).toBe(true);
+        await expect.poll(() => isRunning(control)).toBe(true);
+        await expect(control.locator('#statusText')).not.toHaveText('Пауза');
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
         await control.click('#resetBtn');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     } finally {
         await app.close();
     }
@@ -157,25 +338,23 @@ test('сворачивание выходит из режима ввода, и �
     const { app, control } = await launchApp();
     try {
         await control.click('.preset[data-minutes="5"]');
-        await control.waitForTimeout(300);
+        await expect(control.locator('#controlTimeDigits')).toHaveText('05:00');
         await control.click('#controlTime');
-        await control.waitForTimeout(500);
         await expect(control.locator('body')).toHaveClass(/state-input/);
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
         await expect(control.locator('body')).not.toHaveClass(/state-input/);
 
         await control.keyboard.press('Space');
-        await control.waitForTimeout(1300);
-        expect(await control.evaluate(() => window.timerController.isRunning),
+        await expect.poll(() => isRunning(control),
             'пробел обязан запускать таймер из полосы').toBe(true);
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
         await control.click('#pauseBtn');
         await control.click('#resetBtn');
-        await control.waitForTimeout(400);
+        await expect(control.locator('body')).toHaveClass(/state-idle/);
     } finally {
         await app.close();
     }
@@ -185,19 +364,16 @@ test('клавиша M переключает режим, а ящик настр
     const { app, control } = await launchApp();
     try {
         await control.click('.tab-btn[data-tab="timer"]');
-        await control.waitForTimeout(700);
+        await expect(control.locator('#settingsDrawer')).toHaveClass(/open/);
 
         await control.keyboard.press('m');
-        await control.waitForTimeout(800);
-
-        const collapsed = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+        const collapsed = (await windowSettled(app, control, true)).bounds;
         expect(collapsed.height).toBeLessThanOrEqual(60);
         const drawerOpen = await control.evaluate(() => document.getElementById('settingsDrawer').classList.contains('open'));
         expect(drawerOpen, 'ящик обязан закрыться до сжатия').toBe(false);
 
         await control.keyboard.press('m');
-        await control.waitForTimeout(800);
-        const expanded = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+        const expanded = (await windowSettled(app, control, false)).bounds;
         expect(expanded.height).toBeGreaterThan(400);
     } finally {
         await app.close();
@@ -220,12 +396,11 @@ test('тост в свёрнутом состоянии виден целико�
     const { app, control } = await launchApp();
     try {
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
-        const m = await control.evaluate(async () => {
-            window.Toast.show('Проверка размещения сообщения в полосе');
-            await new Promise((r) => setTimeout(r, 400));
-            const toast = document.querySelector('.toast');
+        await showToastSettled(control, 'Проверка размещения сообщения в полосе');
+        const m = await control.evaluate((sel) => {
+            const toast = document.querySelector(sel);
             if (!toast) { return null; }
             const r = toast.getBoundingClientRect();
             return {
@@ -233,7 +408,7 @@ test('тост в свёрнутом состоянии виден целико�
                 left: +r.left.toFixed(1), right: +r.right.toFixed(1),
                 viewportH: window.innerHeight, viewportW: window.innerWidth
             };
-        });
+        }, TOAST_SETTLED);
 
         expect(m, 'тост не появился — проверять нечего').not.toBeNull();
         expect(m.top, `верх тоста ${m.top} выше окна`).toBeGreaterThanOrEqual(0);
@@ -243,7 +418,7 @@ test('тост в свёрнутом состоянии виден целико�
         expect(m.right).toBeLessThanOrEqual(m.viewportW);
 
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(400);
+        await windowSettled(app, control, false);
     } finally {
         await app.close();
     }
@@ -267,7 +442,7 @@ test('в полосе всё помещается: замер кнопок и п
     const { app, control } = await launchApp();
     try {
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         const measure = () => control.evaluate(() => {
             const bar = document.getElementById('miniBar');
@@ -350,7 +525,7 @@ test('в полосе всё помещается: замер кнопок и п
             document.getElementById('miniBarStart').style.display = 'block';
             document.getElementById('miniBarPause').style.display = 'none';
         });
-        await control.waitForTimeout(120);
+        // Паузы нет: getBoundingClientRect в measure() сам досчитывает раскладку.
         const worst = await measure();
         console.log('   [худший случай] по элементам: '
             + worst.kids.map((k) => `${k.id} ${k.w.toFixed(1)}`).join(', '));
@@ -362,7 +537,7 @@ test('в полосе всё помещается: замер кнопок и п
             document.getElementById('miniBarPause').style.display = '';
         });
         await control.click('#miniBarExpand');
-        await control.waitForTimeout(500);
+        await windowSettled(app, control, false);
     } finally {
         await app.close();
     }
@@ -386,11 +561,19 @@ test('в полосе замок и ячейки вида — те же самы
             localStorage.removeItem('uiPresets');
             localStorage.setItem('uiLocked', '0');
         });
-        await control.reload();
-        await control.waitForTimeout(1200);
+        // Панель через 100 мс после загрузки подгоняет высоту окна под
+        // содержимое (autoResizeWindow, control-app.js). Свёрнутое окно main
+        // этот запрос больше не применяет (гонку стережёт отдельный тест выше);
+        // здесь ждём авто-размер, чтобы проверять замок и ячейки на осевшей
+        // панели, а не порядок событий. Подписка стоит ДО перезагрузки.
+        const startupResize = app.evaluate(({ ipcMain }) => new Promise(
+            (resolve) => ipcMain.once('resize-control-window', () => resolve(true))
+        ));
+        await reloadPanel(control);
+        await startupResize;
 
         await control.click('#miniBarToggle');
-        await control.waitForTimeout(700);
+        await windowSettled(app, control, true);
 
         // Кнопки в полосе ВИДНЫ: зелёный тест на скрытой кнопке ничего не значит.
         const seen = await control.evaluate(() => {
@@ -407,7 +590,9 @@ test('в полосе замок и ячейки вида — те же самы
 
         // --- замок ---
         await control.click('#miniBarLock');
-        await control.waitForTimeout(500);
+        // Замок ставится СИНХРОННО в обработчике клика (panel-titlebar.js, set):
+        // запись, класс на <html> и глифы всех кнопок — одним вызовом.
+        await expect(control.locator('html')).toHaveClass(/ui-locked/);
         const locked = await control.evaluate(() => ({
             html: document.documentElement.classList.contains('ui-locked'),
             bar: document.getElementById('miniBarLock').textContent.trim(),
@@ -421,13 +606,14 @@ test('в полосе замок и ячейки вида — те же самы
         expect(locked.titlebar, 'кнопка титлбара осталась с прежним глифом — значит владельцев два').toBe('🔒');
 
         await control.click('#miniBarLock');
-        await control.waitForTimeout(500);
+        await expect(control.locator('#miniBarLock')).toHaveText('🔓');
         expect(await control.evaluate(() => document.documentElement.classList.contains('ui-locked')),
             'второй клик не снял замок').toBe(false);
 
         // --- ячейки вида: пустая ЗАПИСЫВАЕТ, и метку видно в обоих комплектах ---
         await control.click('#miniPresetSlot2');
-        await control.waitForTimeout(800);
+        // Запись и отметки — синхронно в обработчике (panel-presets.js, save).
+        await expect(control.locator('#miniPresetSlot2')).toHaveClass(/\bfilled\b/);
         const marked = await control.evaluate(() => {
             const mini = document.getElementById('miniPresetSlot2');
             const panel = document.getElementById('presetSlot2');
@@ -452,7 +638,7 @@ test('в полосе замок и ячейки вида — те же самы
             if (window.ipcRenderer) { window.ipcRenderer.send('ui-lock-update', { locked: false }); }
         }).catch(() => {});
         await control.click('#miniBarExpand').catch(() => {});
-        await control.waitForTimeout(400);
+        await windowSettled(app, control, false).catch(() => {});
         await app.close();
     }
 });

@@ -32,8 +32,17 @@ const fs = require('fs');
 /** Сколько ждать одно окно: скрытое окно может не отдать кадр вовсе. */
 const STEP_TIMEOUT_MS = 3000;
 
-/** Живые приложения, которые зарегистрировал launchApp / track. */
-const live = new Set();
+/**
+ * Живые приложения, которые зарегистрировал launchApp / track, → номер теста,
+ * в котором они запущены. Между тестами список НЕ очищается: приложение из
+ * `beforeAll` живёт через всю группу, и при сбое его снимок нужен. Но
+ * приложение, запущенное ДО текущего теста, помечается в имени вложения
+ * (`live-earlier`), чтобы чужое окно не выдавалось за окно упавшего теста, а
+ * умершее без события `close` (SIGKILL, сбой) выбрасывается в начале теста.
+ */
+const live = new Map();
+/** Номер текущего теста в воркере (beginTest). */
+let generation = 0;
 /** Последний снимок до закрытия в ТЕКУЩЕМ тесте (перезапуск его перезаписывает). */
 let lastClose = null;
 
@@ -145,7 +154,7 @@ async function capture(app, opts = {}) {
  * @returns {import('@playwright/test').ElectronApplication} то же приложение
  */
 function track(app) {
-    live.add(app);
+    live.set(app, generation);
     try { app.once('close', () => live.delete(app)); } catch { /* не EventEmitter — не беда */ }
     const close = app.close.bind(app);
     app.close = async () => {
@@ -158,9 +167,45 @@ function track(app) {
     return app;
 }
 
+/** Процесс приложения уже завершён (событие `close` могло не прийти). */
+function exited(app) {
+    try {
+        const proc = typeof app.process === 'function' ? app.process() : null;
+        return !!proc && (proc.exitCode !== null || proc.signalCode !== null);
+    } catch {
+        return false;
+    }
+}
+
 /** Начало теста: снимки прошлого теста к этому отношения не имеют. */
 function beginTest() {
     lastClose = null;
+    generation += 1;
+    for (const app of [...live.keys()]) {
+        if (exited(app)) { live.delete(app); }
+    }
+}
+
+/**
+ * Какие живые приложения снимать при сбое и под каким именем. Чистая —
+ * проверяется в tests/e2e-fixtures.test.js на подставных приложениях.
+ *
+ * @param {Map<object, number>} apps — приложение → номер теста запуска
+ * @param {number} current — номер текущего теста
+ * @returns {{app: object, phase: string}[]}
+ */
+function livePlan(apps, current) {
+    const own = [];
+    const earlier = [];
+    for (const [app, born] of apps) {
+        if (exited(app)) { continue; }
+        (born === current ? own : earlier).push(app);
+    }
+    const name = (base, list, i) => (list.length > 1 ? `${base}${i + 1}` : base);
+    return [
+        ...own.map((app, i) => ({ app, phase: name('live', own, i) })),
+        ...earlier.map((app, i) => ({ app, phase: name('live-earlier', earlier, i) }))
+    ];
 }
 
 /**
@@ -198,16 +243,14 @@ async function attachOnFailure(testInfo) {
     } catch (e) {
         console.warn(`[failure-artifacts] снимок до закрытия не приложен: ${e && e.message}`);
     }
-    let i = 0;
-    for (const app of [...live]) {
-        i += 1;
+    for (const { app, phase } of livePlan(live, generation)) {
         try {
             const snap = await capture(app);
-            await attachCapture(testInfo, live.size > 1 ? `live${i}` : 'live', snap);
+            await attachCapture(testInfo, phase, snap);
         } catch (e) {
             console.warn(`[failure-artifacts] живой снимок не приложен: ${e && e.message}`);
         }
     }
 }
 
-module.exports = { track, capture, beginTest, attachOnFailure, windowName, STEP_TIMEOUT_MS };
+module.exports = { track, capture, beginTest, attachOnFailure, livePlan, windowName, STEP_TIMEOUT_MS };

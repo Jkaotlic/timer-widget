@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForWidgetSnapshot, waitForDisplaySnapshot, waitForDisplaySettled,
+    untilReceived, armReceived
+} = require('./window-ready');
 
 /**
  * Минус перерасхода в виджете: он ЧАСТЬ табло, а не отдельная деталь.
@@ -27,11 +30,18 @@ const { waitForDisplay, waitForWidget } = require('./window-ready');
 const FRAMES = 24;
 const FRAME_MS = 60;
 
-async function findWindow(app, probe) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(probe).catch(() => false)) { return w; }
-    }
-    return null;
+/**
+ * Открыть виджет и дать ему стиль: окно получило снимок main (раньше пауза
+ * 2200 мс), затем — посылку стиля, и утихло (раньше 800 мс).
+ */
+async function openWidgetWithStyle(app, control, timerStyle) {
+    await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+    const widget = await waitForWidget(app);
+    await waitForWidgetSnapshot(app, widget);
+    await untilReceived(widget, 'widget-style-update',
+        () => control.evaluate((st) => window.ipcRenderer.send('widget-style-update', { timerStyle: st }), timerStyle),
+        { match: { timerStyle } });
+    return widget;
 }
 
 // Прозрачность меряется ЭФФЕКТИВНАЯ — произведение opacity по цепочке предков
@@ -62,14 +72,7 @@ async function overtime(control) {
 test('перекидыш: минус мигает в одной фазе с цифрами', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(2200);
-        await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'flip' }));
-        await control.waitForTimeout(800);
-
-        const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
-        expect(widget, 'окно виджета не найдено').not.toBeNull();
+        const widget = await openWidgetWithStyle(app, control, 'flip');
 
         await overtime(control);
 
@@ -94,6 +97,7 @@ test('перекидыш: минус мигает в одной фазе с ци
                 return { digit: eff(digitSel), minus: eff(minusSel) };
             }, ['#wFlipSec2', '#wFlipMinus']);
             samples.push(pair);
+            // пауза законна: замер покадровый — шаг снимков по времени и есть измеряемое (фаза пульсации на отрезке FRAMES × FRAME_MS)
             await widget.waitForTimeout(FRAME_MS);
         }
 
@@ -167,23 +171,17 @@ async function measureSignInk() {
 test('«Цифры»: чернила минуса по центру чернил цифр во ВСЕХ шрифтах', async () => {
     const { app, control } = await launchApp();
     try {
-        await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(2200);
-        await control.evaluate(() => window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits' }));
-        await control.waitForTimeout(800);
-
-        const widget = await findWindow(app, () => !!document.getElementById('wFlipHoursGroup'));
-        expect(widget, 'окно виджета не найдено').not.toBeNull();
+        const widget = await openWidgetWithStyle(app, control, 'digits');
         await overtime(control);
 
         const worst = { font: null, value: 0 };
         for (const font of DIGIT_FONTS) {
-            await control.evaluate(
+            // Шрифт дошёл до виджета, окно утихло (шрифты, кадры подгонки) —
+            // раньше пауза 600 мс.
+            await untilReceived(widget, 'widget-style-update', () => control.evaluate(
                 (f) => window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits', digitsFont: f }),
                 font
-            );
-            await widget.waitForTimeout(600);
+            ), { match: { digitsFont: font } });
 
             // Знак должен БЫТЬ — иначе замер ниже меряет пустой span и
             // выдаёт правдоподобное «смещение» (см. overtime()).
@@ -234,13 +232,11 @@ test('«Цифры»: чернила минуса по центру чернил
 const DIGITS_WINDOWS = [
     {
         name: 'виджет',
-        probe: () => !!document.getElementById('wFlipHoursGroup'),
         ids: ['widgetDigitsTime', 'widgetDigitsSign', 'widgetDigitsValue'],
         style: () => window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits' })
     },
     {
         name: 'полноэкранное',
-        probe: () => !!document.getElementById('progressRing'),
         ids: ['digitsTime', 'digitsSign', 'digitsValue'],
         style: () => window.ipcRenderer.send('display-settings-update', { timerStyle: 'digits' })
     }
@@ -253,20 +249,27 @@ test('«Цифры»: минус прижат к числу и не обреза
             window.ipcRenderer.send('open-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 'auto' });
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await control.waitForTimeout(2500);
+        // Оба окна получили снимок main, дисплей встал (полноэкранный вход,
+        // раскладка) — раньше пауза 2500 мс.
+        const display = await waitForDisplay(app);
+        const widget = await waitForWidget(app);
+        await waitForDisplaySnapshot(app, display);
+        await waitForWidgetSnapshot(app, widget);
+        await waitForDisplaySettled(app, display);
+        // Стиль дошёл до обоих окон — раньше пауза 1000 мс.
+        const widgetStyle = await armReceived(widget, 'widget-style-update');
+        const displayStyle = await armReceived(display, 'display-settings-update');
         await control.evaluate(() => {
             window.ipcRenderer.send('widget-style-update', { timerStyle: 'digits' });
             window.ipcRenderer.send('display-settings-update', { timerStyle: 'digits' });
         });
-        await control.waitForTimeout(1000);
+        await widgetStyle({ match: { timerStyle: 'digits' } });
+        await displayStyle({ match: { timerStyle: 'digits' } });
 
         await overtime(control);
 
         for (const w of DIGITS_WINDOWS) {
-            const page = await findWindow(app, w.probe);
-            expect(page, `окно ${w.name} не найдено`).not.toBeNull();
+            const page = w.name === 'виджет' ? widget : display;
             const m = await page.evaluate((ids) => {
             const [boxId, signId, valueId] = ids;
             const box = document.getElementById(boxId);

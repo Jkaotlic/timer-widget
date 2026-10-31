@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForDisplaySettled, waitForWidgetSnapshot,
+    armReceived, untilReceived, panelRoundTrip
+} = require('./window-ready');
 
 /**
  * ХАРАКТЕРИЗАЦИЯ цвета: 5 стилей × 4 полосы × 2 окна.
@@ -131,30 +134,41 @@ const BASELINE = {
     'display.digits.overtime': { color: 'rgb(255, 69, 58)', textShadow: 'none' }
 };
 
+/** Команда таймера, обработанная main (круг панели) — было 350 мс. */
 async function sendCommand(cmd) {
     await control.evaluate((c) => { window.ipcRenderer.send('timer-command', c); }, cmd);
-    await control.waitForTimeout(350);
+    await panelRoundTrip(control);
 }
 
 // Полоса считается от ОСТАТКА к ОБЩЕМУ, поэтому нужно и то и другое: `set`
 // ставит оба разом, `adjust` двигает только остаток.
+//
+// Ждём, что ОБА окна получили состояние с этой парой чисел (было 2 × 350 мс):
+// у каждого окна своя труба от main, круг панели о них ничего не говорит.
+// `adjust` рассылает состояние всегда (main-timer.js), и оно — полный снимок.
 async function setBand(band) {
-    await sendCommand({ type: 'set', seconds: band.total, allowNegative: !!band.allowNegative });
-    await sendCommand({ type: 'adjust', deltaSeconds: band.remaining - band.total, allowNegative: !!band.allowNegative });
+    const got = [await armReceived(widget, 'timer-state'), await armReceived(display, 'timer-state')];
+    await control.evaluate((c) => { window.ipcRenderer.send('timer-command', c); },
+        { type: 'set', seconds: band.total, allowNegative: !!band.allowNegative });
+    await control.evaluate((c) => { window.ipcRenderer.send('timer-command', c); },
+        { type: 'adjust', deltaSeconds: band.remaining - band.total, allowNegative: !!band.allowNegative });
+    for (const received of got) {
+        await received({ match: { totalSeconds: band.total, remainingSeconds: band.remaining } });
+    }
 }
 
+/** Стиль дошёл до виджета — было 300 мс. */
 async function setWidgetStyle(style) {
-    await control.evaluate((s) => {
+    await untilReceived(widget, 'widget-style-update', () => control.evaluate((s) => {
         window.ipcRenderer.send('widget-style-update', { timerStyle: s, timerScale: 100 });
-    }, style);
-    await control.waitForTimeout(300);
+    }, style), { match: { timerStyle: style } });
 }
 
+/** Стиль дошёл до дисплея — было 300 мс. */
 async function setDisplayStyle(style) {
-    await control.evaluate((s) => {
+    await untilReceived(display, 'display-settings-update', () => control.evaluate((s) => {
         window.ipcRenderer.send('display-settings-update', { displayTimerStyle: s, timerStyle: s });
-    }, style);
-    await control.waitForTimeout(300);
+    }, style), { match: { displayTimerStyle: style } });
 }
 
 // Возвращает вычисленные цвет и тень. null — элемента в разметке нет (стиль
@@ -207,14 +221,11 @@ test.beforeAll(async () => {
         window.ipcRenderer.send('open-widget');
         window.ipcRenderer.send('open-display');
     });
-    await waitForDisplay(app);
-    await waitForWidget(app);
-    await control.waitForTimeout(2500);
-    for (const page of app.windows()) {
-        const url = await page.url();
-        if (url.includes('electron-widget')) { widget = page; }
-        if (url.includes('display.html')) { display = page; }
-    }
+    // Оба окна — опросом по пробе; снимок main обработан, дисплей ВСТАЛ
+    // (было 2500 мс).
+    display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
+    await waitForDisplaySettled(app, display);
+    widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
     expect(widget, 'виджет должен открыться').toBeTruthy();
     // Эталон снят в ТЁМНОМ тоне, и меряться обязан он же. С 18.08.2026 у окон
     // два тона (surface-tones.css), а умолчание приложения — светлая тема:
@@ -222,8 +233,10 @@ test.beforeAll(async () => {
     // рапортовала «окраска изменилась» о правке, которая её и вводила.
     // Светлый тон меряет e2e/style-tone.spec.js — отдельно и по своим числам.
     // Тема шлётся по IPC, а не кликом: клик пишет её в общий профиль прогона.
+    // Тема дошла до обоих окон и переходы доехали — было 600 мс.
+    const themed = [await armReceived(widget, 'ui-theme-update'), await armReceived(display, 'ui-theme-update')];
     await control.evaluate(() => window.ipcRenderer.send('ui-theme-update', { theme: 'dark' }));
-    await control.waitForTimeout(600);
+    for (const received of themed) { await received({ match: { theme: 'dark' } }); }
     expect(display, 'полноэкранное окно должно открыться').toBeTruthy();
 });
 

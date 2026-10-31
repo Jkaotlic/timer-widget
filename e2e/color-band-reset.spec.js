@@ -1,6 +1,8 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForWidget } = require('./window-ready');
+const {
+    waitForWidget, waitForWidgetSnapshot, waitForWindowSettled, armReceived, untilReceived
+} = require('./window-ready');
 
 /**
  * Возврат из цветовой полосы обязан снимать ВСЁ, что полоса нарисовала.
@@ -47,20 +49,29 @@ let app;
 let control;
 let widget;
 
-async function sendCommand(cmd) {
-    await control.evaluate((c) => { window.ipcRenderer.send('timer-command', c); }, cmd);
-    await control.waitForTimeout(400);
+/**
+ * Команды таймера — и виджет ПОЛУЧИЛ состояние, которое они дают (было по
+ * 400 мс на команду): main рассылает `timer-state` синхронно в обработчике
+ * команды, полосу виджет ставит в обработчике посылки, а переход цвета
+ * дожидается `waitForQuiet` внутри ожидания.
+ */
+async function sendCommands(cmds, state) {
+    const received = await armReceived(widget, 'timer-state');
+    for (const c of cmds) {
+        await control.evaluate((x) => { window.ipcRenderer.send('timer-command', x); }, c);
+    }
+    await received({ match: state });
 }
 
 // Полоса зависит от ОСТАТКА в процентах от общего, поэтому danger набирается
 // через set + adjust, а не одним set: `set` переписывает и total, и remaining.
 async function enterDanger() {
-    await sendCommand({ type: 'set', seconds: 100 });
-    await sendCommand({ type: 'adjust', deltaSeconds: -95 });
+    await sendCommands([{ type: 'set', seconds: 100 }, { type: 'adjust', deltaSeconds: -95 }],
+        { totalSeconds: 100, remainingSeconds: 5 });
 }
 
 async function backToNormal() {
-    await sendCommand({ type: 'set', seconds: 600 });
+    await sendCommands([{ type: 'set', seconds: 600 }], { totalSeconds: 600, remainingSeconds: 600 });
 }
 
 // Тень редизайна: серая, без цвета. Одна и та же во всех полосах.
@@ -80,12 +91,11 @@ function readGlow() {
 test.beforeAll(async () => {
     ({ app, control } = await launchApp());
     await control.evaluate(() => { window.ipcRenderer.send('open-widget'); });
-    await waitForWidget(app);
-    await control.waitForTimeout(1500);
-    for (const page of app.windows()) {
-        if ((await page.url()).includes('electron-widget')) { widget = page; }
-    }
-    expect(widget, 'окно виджета должно открыться').toBeTruthy();
+    // Проба бросает, если окно не открылось; снимок main и вставшее окно —
+    // раньше пауза 1500 мс.
+    widget = await waitForWidget(app);
+    await waitForWidgetSnapshot(app, widget);
+    await waitForWindowSettled(app, widget, 'electron-widget.html');
 });
 
 test.afterAll(async () => {
@@ -105,7 +115,8 @@ test('на чистом профиле выход из danger снимает В�
     // тень в любой полосе означала бы откат редизайна.
     await widget.evaluate(() => { localStorage.removeItem('timerColors'); });
     await widget.reload();
-    await widget.waitForTimeout(900);
+    // Перезагруженное окно получило снимок main (было 900 мс).
+    await waitForWidgetSnapshot(app, widget);
 
     await enterDanger();
     const danger = await widget.evaluate(readGlow);
@@ -125,10 +136,9 @@ test('на чистом профиле выход из danger снимает В�
 test('выбранный пользователем цвет виден в норме, но danger его перебивает', async () => {
     // Цвета виджета шлёт ПАНЕЛЬ: главный процесс проверяет отправителя
     // (ipc-senders.js), и посылка из самого виджета отвергается.
-    await control.evaluate((color) => {
+    await untilReceived(widget, 'widget-colors-update', () => control.evaluate((color) => {
         window.ipcRenderer.send('widget-colors-update', { timer: color, progress: color });
-    }, USER_COLOR);
-    await widget.waitForTimeout(400);
+    }, USER_COLOR), { match: { timer: USER_COLOR } });
 
     await backToNormal();
     const normal = await widget.evaluate(readGlow);

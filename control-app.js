@@ -55,8 +55,14 @@
 
         /** Ячейки вида (panel-presets.js install); до установки — null. */
         let presetsApi = null;
-        /** Экземпляр панели; создаётся ниже, до этого — null. any: методы примесей типы не видят (как и прежний window.X). @type {any} */
-        let timerController = null;
+        // Компактный режим (panel-compact.js): подгонка окна меряет панель через
+        // него НЕСЖАТОЙ (autoResizeWindow).
+        /** @type {ReturnType<typeof PanelCompact.bindCompactMode>} */
+        let panelCompact = null;
+        // Полоса (mini-bar.js init); до установки — null. Панель зовёт её
+        // через эту переменную, window.miniBar — только крючок e2e.
+        /** @type {ReturnType<typeof MiniBar.init>} */
+        let miniBar = null;
 
         // debounce — только TimeUtils.debounce (utils.js). Здесь стоял
         // `if (typeof debounce === 'undefined') { var debounce = … }`: `var`
@@ -136,7 +142,13 @@
                 }, 200);
                 // Стиль окнам — позже настроек, как было всегда (500/600 мс
                 // стояли в loadSettings). Пресет зовёт его без задержки.
-                setTimeout(() => this.pushWindowStyles(), 600);
+                setTimeout(() => {
+                    this.pushWindowStyles();
+                    // Зонд e2e: стартовая рассылка ушла — это последний из
+                    // трёх таймеров выше (100/200/600 мс). e2e/launch.js ждёт
+                    // его вместо паузы 900 мс. Приложение его не читает.
+                    window.__startupPushed = true;
+                }, 600);
             }
 
             initElements() {
@@ -1403,7 +1415,7 @@
                 // Полоса берёт время ОТСЮДА, а не считает своё: второй источник
                 // времени — расхождение, которое проект уже ловил на дисплее.
                 // `resume` — признак паузы, а не слово: как его показать, решает сама полоса.
-                window.miniBar?.render({ text: (_neg ? '−' : '') + _digits,
+                miniBar?.render({ text: (_neg ? '−' : '') + _digits,
                     band: isOvertime ? 'danger' : band, resume: !this.inputMode && !!this.isPaused });
 
                 this.renderPanelState(status, band);
@@ -1433,6 +1445,12 @@
             // выбор монитора встраивался в CSS-селектор без экранирования).
 
             autoResizeWindow() {
+                // В полосе не мерим и не шлём: раскладка свёрнута. Полоса
+                // запомнит просьбу и выполнит её после разворота (mini-bar.js,
+                // deferWhileCollapsed); main отбрасывает такой запрос и сам.
+                if (miniBar && miniBar.deferWhileCollapsed(() => this.autoResizeWindow())) {
+                    return;
+                }
                 // Skip auto-resize while drawer is open — drawer manages width itself.
                 if (this.settingsDrawerEl && this.settingsDrawerEl.classList.contains('open')) {
                     return;
@@ -1445,7 +1463,11 @@
                 }
 
                 const panel = document.querySelector('.control-panel');
-                const contentHeight = panel.scrollHeight;
+                // Несжатой: сжатая панель ужата ровно в окно и «сколько нужно»
+                // по ней не узнать (panel-compact.js, naturalHeight).
+                const contentHeight = panelCompact
+                    ? panelCompact.naturalHeight()
+                    : panel.scrollHeight;
                 const margin = 0; // shell is edge-to-edge; no transparent safe-area card
                 const extra = 48; // titlebar/compositor breathing room
 
@@ -1562,7 +1584,12 @@
         Object.assign(TimerController.prototype, PanelResetMixin);
         Object.assign(TimerController.prototype, PanelClockMixin);
 
-        timerController = new TimerController();
+        // Создаётся синхронно на верхнем уровне модуля: всё ниже его уже видит
+        // (исключение в конструкторе обрывает модуль целиком), поэтому
+        // проверок «а есть ли контроллер» ниже нет. any: методы примесей типы
+        // не видят (как и прежний window.X).
+        /** @type {any} */
+        const timerController = new TimerController();
         // Крючок e2e (tests/window-bridges.test.js); сам файл читает timerController.
         window.timerController = timerController;
         // Ряд «Фон» строится ПОСЛЕ конструктора: ему нужны загруженные цвета.
@@ -1608,7 +1635,7 @@
             // стиля, масштаба и монитора из самих контролов настроек. Первая
             // версия писала здесь просто «показан» — то есть теряла ровно ту
             // часть, ради которой строка и заведена.
-            timerController?.renderWindowRows?.();
+            timerController.renderWindowRows();
             if (isOpen) {
                 button.title = button.title.replace(/открыть|Компактный|Часы в реальном|На весь экран/i, 'Закрыть');
             } else if (buttonId === 'openWidgetBtn') {
@@ -1621,7 +1648,7 @@
         }
 
         // Слушатели для обновления состояния окон
-        if (window.ipcRenderer && timerController) {
+        if (window.ipcRenderer) {
             const tc = timerController;
             tc._handlers.onDisplayWindowState = (event, data) => {
                 isDisplayOpen = data.isOpen;
@@ -1677,11 +1704,12 @@
         // обновления». Подробности и зависимости — в onboarding.js.
         Onboarding.init();
         // Режим «полоса». Логика — в mini-bar.js, здесь только проводка.
-        const _tc = () => timerController;
-        window.miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer,
+        miniBar = MiniBar.init({ doc: document, ipc: window.ipcRenderer, win: window,
             // Сворачивание закрывает ящик И выходит из ввода: полей в полосе нет.
-            onToggle: (on) => { if (on) { _tc()?.closeSettingsDrawer(); _tc()?.setInputMode(false); } },
-            actions: { start: () => _tc()?.start(), pause: () => _tc()?.pause(), reset: () => _tc()?.reset() } });
+            onToggle: (on) => { if (on) { timerController.closeSettingsDrawer(); timerController.setInputMode(false); } },
+            actions: { start: () => timerController.start(), pause: () => timerController.pause(), reset: () => timerController.reset() } });
+        // Крючок e2e и стенда съёмки (tests/window-bridges.test.js), не зависимость.
+        window.miniBar = miniBar;
 
         const faqModal = document.getElementById('faqModal');
         const faqClose = document.getElementById('faqClose');
@@ -1694,7 +1722,7 @@
         PanelTitlebar.bindLockToggle({ doc: document, ipc: window.ipcRenderer || null, lock: window.UILock });
 
         // Пресеты вида: снимок ключей профиля и тот же путь применения, что при запуске панели.
-        PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
+        panelCompact = PanelCompact.bindCompactMode({ doc: document }); // компактный режим по ЗАМЕРУ
         presetsApi = PanelPresets.install({
             doc: document, storage: localStorage, presets: Presets, ipc: window.ipcRenderer || null,
             controller: () => timerController, notify: (msg) => Toast && Toast.show(msg, 'success', 1600)
@@ -1742,9 +1770,7 @@
             }
         };
         document.addEventListener('keydown', _onEscapeKeydown);
-        if (timerController) {
-            timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
-        }
+        timerController._handlers.onEscapeKeydown = _onEscapeKeydown;
 
         // Аккордеон справки: в секции открыт максимум один ответ.
         //
@@ -1800,29 +1826,23 @@
             // Space: Start/Pause timer
             if (event.code === 'Space') {
                 event.preventDefault();
-                if (timerController) {
-                    if (timerController.isRunning) {
-                        timerController.pause();
-                    } else {
-                        timerController.start();
-                    }
+                if (timerController.isRunning) {
+                    timerController.pause();
+                } else {
+                    timerController.start();
                 }
             }
 
             // R: Reset timer
             else if (event.code === 'KeyR') {
                 event.preventDefault();
-                if (timerController) {
-                    timerController.reset();
-                }
+                timerController.reset();
             }
 
             // S: Stop timer (pause)
             else if (event.code === 'KeyS') {
                 event.preventDefault();
-                if (timerController) {
-                    timerController.pause();
-                }
+                timerController.pause();
             }
 
             // W: Toggle widget (open/close)
@@ -1845,12 +1865,10 @@
                         window.ipcRenderer.send('close-clock-widget');
                     } else {
                         window.ipcRenderer.send('open-clock-widget');
-                        if (timerController) {
-                            setTimeout(() => {
-                                timerController.pushClockSettings();
-                                timerController.sendClockStyle();
-                            }, 500);
-                        }
+                        setTimeout(() => {
+                            timerController.pushClockSettings();
+                            timerController.sendClockStyle();
+                        }, 500);
                     }
                 }
             }
@@ -1877,13 +1895,11 @@
                 const presetIndex = parseInt(event.code.replace('Digit', '')) - 1;
                 if (presetIndex < presets.length) {
                     event.preventDefault();
-                    if (timerController) {
-                        timerController.setTime(presets[presetIndex]);
-                    }
+                    timerController.setTime(presets[presetIndex]);
                 } else if (presetIndex === presets.length) {
                     // Клавиша сразу за последним пресетом — та же «мин».
                     event.preventDefault();
-                    timerController?.setInputMode(true);
+                    timerController.setInputMode(true);
                 }
             }
 
@@ -1899,14 +1915,14 @@
             // же, что у клика по тумблеру строки (panel-state.js).
             else if (event.code === 'KeyZ') {
                 event.preventDefault();
-                timerController?.toggleSoundMaster();
+                timerController.toggleSoundMaster();
             }
 
             // M: свернуть окно в полосу и обратно. Клавиша выбрана по коду из
             // свободных; модификаторы не трогаем — Cmd+M остаётся за системой.
             else if (event.code === 'KeyM') {
                 event.preventDefault();
-                if (window.miniBar) { window.miniBar.toggle(); }
+                if (miniBar) { miniBar.toggle(); }
             }
 
             // F1: Show help/shortcuts
@@ -1916,6 +1932,4 @@
             }
         };
         document.addEventListener('keydown', _onGlobalShortcutsKeydown);
-        if (timerController) {
-            timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;
-        }
+        timerController._handlers.onGlobalShortcutsKeydown = _onGlobalShortcutsKeydown;

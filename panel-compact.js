@@ -103,7 +103,7 @@ const UNLOCK_DELTA_PX = 4;
  * @param {string[]} [deps.classNames] классы ступеней сжатия на <body>
  * @param {() => number} [deps.now]  часы предохранителя (в тестах — поддельные)
  * @param {() => {w: number, h: number}} [deps.getViewport]  размер окна
- * @returns {{update: () => boolean, stop: () => void, locked: () => boolean}|null}
+ * @returns {{update: () => boolean, naturalHeight: () => number, stop: () => void, locked: () => boolean}|null}
  */
 function bindCompactMode({
     doc, selector = '.control-panel', classNames = ['compact-panel', 'compact-panel-2'],
@@ -206,8 +206,23 @@ function bindCompactMode({
 
     update();
 
+    /**
+     * Сколько панели нужно НЕСЖАТОЙ — для подгонки окна (autoResizeWindow).
+     * В окне ниже содержимого ступень ужимает панель ровно в окно, и замер
+     * сжатой возвращал бы высоту окна, а не содержимого. Ступень после замера
+     * возвращается прежней: решает её update() по resize, а не подгонка.
+     */
+    const naturalHeight = () => {
+        const prev = currentLevel();
+        setLevel(0);
+        const h = panel.scrollHeight;
+        setLevel(prev);
+        return h;
+    };
+
     return {
         update,
+        naturalHeight,
         locked: () => lockedAt !== null,
         stop() {
             if (observer) { observer.disconnect(); }

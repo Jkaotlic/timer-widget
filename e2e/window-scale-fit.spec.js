@@ -7,7 +7,10 @@ const { launchApp } = require('./launch');
 // появилось», при том что в логе главного процесса за это время нет ни одной
 // ошибки. Общий помощник ещё и называет, сколько окон было, — по «не появилось»
 // диагностировать нечего.
-const { waitForWindow, waitForWindowGone, WIDGET_PROBE, CLOCK_PROBE } = require('./window-ready');
+const {
+    waitForWindow, waitForWindowGone, waitForWindowSettled, waitForBoundsSettled, resizeOwnWindow,
+    WIDGET_PROBE, CLOCK_PROBE
+} = require('./window-ready');
 
 /**
  * Масштабирование окна не должно выбрасывать его за край экрана.
@@ -80,27 +83,40 @@ function parkAtTopRight(app, urlPart) {
     }, urlPart);
 }
 
+/**
+ * Открыть окно и дождаться, что оно ВСТАЛО: восстановление геометрии доехало,
+ * отложенная запись геометрии отработала (раньше — пауза 800 / 1400 / 1600 мс).
+ */
+async function openWindow(app, control, target) {
+    await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
+    const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
+    await waitForWindowSettled(app, win, target.url);
+    return win;
+}
+
+/** Размер тем же каналом, что Ctrl+колесо, — и окно ВСТАЛО (см. resizeOwnWindow). */
+const resizeTo = (app, win, target, size) => resizeOwnWindow(app, win,
+    { channel: target.resize, urlPart: target.url, size });
+
 for (const target of WINDOWS) {
     test(`${target.name}: после увеличения масштаба окно целиком на экране`, async () => {
         const { app, control } = await launchApp();
         try {
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
-            await win.waitForLoadState('domcontentloaded');
-            await win.waitForTimeout(800);
+            const win = await openWindow(app, control, target);
 
             const parked = await parkAtTopRight(app, target.url);
             expect(parked, 'окно должно найтись в главном процессе').toBeTruthy();
+            // Сдвиг из main — тоже смена границ: посылки `window-geometry` от
+            // него (и запись геометрии по `move`) должны уйти ДО того, как
+            // resizeOwnWindow примет первую посылку после взвода за свою.
+            await waitForWindowSettled(app, win, target.url);
 
             // 400 % ТЕМ ЖЕ каналом, которым это делает Ctrl+колесо и ползунок
             // «Масштаб» в панели, — иначе тест проверял бы обходной путь.
-            const size = target.base * 4;
             // Шлёт САМО окно: `widget-resize` мост панели не открывает, а главный
             // процесс отвергает от неё (ipc-senders.js) — посылка из панели
             // оставляла виджет прежнего размера, и тест проверял пустоту.
-            await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                { ch: target.resize, size });
-            await win.waitForTimeout(700);
+            await resizeTo(app, win, target, target.base * 4);
 
             const bounds = await boundsOf(app, target.url);
             const area = await screenBoundsOf(app, target.url);
@@ -157,10 +173,9 @@ function rightmostDisplay(displays) {
 }
 
 async function restoreFromPoint(app, control, target, point, scalePct) {
-    await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-    const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
-    await win.waitForLoadState('domcontentloaded');
-    await win.waitForTimeout(800);
+    // Окно ВСТАЛО до записи: опоздавшая запись геометрии самого окна затёрла
+    // бы подложенную точку.
+    const win = await openWindow(app, control, target);
 
     const area = await screenBoundsOf(app, target.url);
     const geo = { scalePct, x: point(area).x, y: point(area).y };
@@ -169,12 +184,9 @@ async function restoreFromPoint(app, control, target, point, scalePct) {
 
     await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
     await waitForWindowGone(app, target.probe, { name: `окно ${target.name}` });
-    await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-    const reopened = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
-    await reopened.waitForLoadState('domcontentloaded');
-    await reopened.waitForTimeout(1600);
+    await openWindow(app, control, target);
 
-    return { area, geo, bounds: await boundsOf(app, target.url) };
+    return { area, geo, bounds: await waitForBoundsSettled(app, target.url) };
 }
 
 for (const target of WINDOWS) {
@@ -238,25 +250,16 @@ for (const target of WINDOWS) {
     test(`${target.name}: масштаб и позиция переживают переоткрытие`, async () => {
         const { app, control } = await launchApp();
         try {
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const win = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
-            await win.waitForLoadState('domcontentloaded');
-            await win.waitForTimeout(800);
+            const win = await openWindow(app, control, target);
 
-            const size = target.base * 3;
-            await win.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                { ch: target.resize, size });
-            // Ждём дольше обычного: setBounds вызывает в рендерере resize, тот
-            // пишет геометрию в localStorage, и записи надо дать случиться.
-            await win.waitForTimeout(1200);
-            const before = await boundsOf(app, target.url);
+            // setBounds вызывает в рендерере resize, тот пишет геометрию в
+            // localStorage ОТЛОЖЕННО (saveSettled) — resizeOwnWindow ждёт и эту
+            // запись, а не «подольше».
+            const before = await resizeTo(app, win, target, target.base * 3);
 
             await control.evaluate((ch) => window.electronAPI.send(ch), target.close);
             await waitForWindowGone(app, target.probe, { name: `окно ${target.name}` });
-            await control.evaluate((ch) => window.electronAPI.send(ch), target.open);
-            const reopened = await waitForWindow(app, target.probe, { name: `окно ${target.name}` });
-            await reopened.waitForLoadState('domcontentloaded');
-            await reopened.waitForTimeout(1400);
+            await openWindow(app, control, target);
 
             const after = await boundsOf(app, target.url);
 
@@ -273,11 +276,7 @@ for (const target of WINDOWS) {
             // глобальное состояние, обязан его вернуть: иначе следующий файл
             // получит виджет чужого размера в чужом месте.
             const alive = await waitForWindow(app, target.probe, { name: `окно ${target.name}`, timeout: 2000 }).catch(() => null);
-            if (alive) {
-                await alive.evaluate(({ ch, size }) => window.electronAPI.send(ch, { width: size, height: size }),
-                    { ch: target.resize, size: target.base }).catch(() => {});
-            }
-            await control.waitForTimeout(600).catch(() => {});
+            if (alive) { await resizeTo(app, alive, target, target.base).catch(() => {}); }
             await app.close();
         }
     });

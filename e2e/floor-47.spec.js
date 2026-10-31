@@ -13,7 +13,9 @@
 
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay } = require('./window-ready');
+const {
+    waitForDisplay, waitForDisplaySnapshot, waitForQuiet, waitForTransitions, untilDisplayGot
+} = require('./window-ready');
 const { resizeDisplay } = require('./display-window');
 
 /** Неразрывный пробел — им разделены разряды суммы (money-meter.js). */
@@ -42,14 +44,42 @@ async function setToggle(control, id, on) {
 async function openDisplay(app, control) {
     await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
     // Окно может появиться раньше, чем скрипт разложит блоки по узлам, поэтому
-    // ждём не только окно, но и узел денег.
-    return waitForDisplay(app, { selector: '#totalCostValue' });
+    // ждём не только окно, но и узел денег. И СНИМОК главного процесса:
+    // ставка, период и накопитель приезжают им, и без него деньги считались
+    // бы по умолчаниям окна (прежде — пауза 2400 мс в части тестов).
+    const display = await waitForDisplay(app, { selector: '#totalCostValue' });
+    return waitForDisplaySnapshot(app, display);
+}
+
+/** Текущие суммы на дисплее. */
+const moneyOf = (display) => display.evaluate(() => ({
+    over: document.getElementById('overrunCostValue').textContent,
+    total: document.getElementById('totalCostValue').textContent
+}));
+
+/**
+ * Увести таймер в НАСТОЯЩИЙ минус и дождаться первой ступени итога.
+ *
+ * Прежде — пауза 8 с после старта. Утверждение за ней одно: итог не ноль.
+ * Здесь ждётся ровно оно, с тем же бюджетом (8 с от старта), — опрос не
+ * разрешает ничего, чего не разрешала пауза.
+ */
+async function runIntoMinus(control, display) {
+    // `set` и `start` идут одним каналом панель → main, порядок сохраняется:
+    // пауза между ними ничего не ждала.
+    await control.evaluate(() => window.ipcRenderer.send('timer-command',
+        { type: 'set', seconds: 1, allowNegative: true }));
+    await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
+    await expect.poll(async () => (await moneyOf(display)).total,
+        { message: 'таймер не ушёл в минус за 8 с', timeout: 8000 }).not.toBe(`0${NB}₽`);
 }
 
 /** Секция живёт в ящике настроек — без открытой вкладки её не видно. */
 async function openDisplayTab(control) {
     await control.click('.tab-btn[data-tab="display"]');
-    await control.waitForTimeout(600);
+    await expect(control.locator('#tab-display')).toHaveClass(/active/);
+    // Ящик выезжает переходом; геометрия кнопок мероприятия меряется в нём.
+    await waitForTransitions(control);
 }
 
 /**
@@ -103,11 +133,9 @@ test('ступени: 1000 ₽ за каждые 3 секунды перелим
         await control.fill('#overrunPeriod', '3');
         await setToggle(control, 'showOverrunCost', true);
         await setToggle(control, 'showTotalCost', true);
-        await control.waitForTimeout(400);
-
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
+        // Паузы перед открытием не нужно: тумблеры и поля пишутся в панели
+        // синхронно (pushDisplaySettings), а новое окно получает их снимком.
+        const display = await openDisplay(app, control);
 
         // Перелимит задаётся ПРЯМО, а не выжидается: настоящие секунды сделали
         // бы спеку медленной и зависящей от скорости машины, а проверяется
@@ -174,9 +202,7 @@ test('«Новое мероприятие» спрашивает и обнуля
 
         // Обнуление обязано доехать до накопителя, а не только до кнопки:
         // окно, открытое ПОСЛЕ него, снимает состояние на загрузке.
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
+        const display = await openDisplay(app, control);
         const total = await display.locator('#totalCostValue').textContent();
         console.log(`   итого после обнуления: «${total}»`);
         expect(total).toBe('0\u00A0₽');
@@ -202,12 +228,12 @@ test('раскладка «47-й этаж» появляется только с
         await unlock(control);
         await expect(btn).toHaveCount(1);
 
+        // Денег на экране до раскладки нет (тумблеры выключены), поэтому узел
+        // денег здесь не ждём видимым — только окно и снимок.
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
 
-        await btn.click();
-        await display.waitForTimeout(1600);
+        await untilDisplayGot(display, () => btn.click(), { layout: 'floor47' }, 'display-layout');
 
         const seen = await display.evaluate(() => {
             const box = (id) => {
@@ -259,28 +285,20 @@ test('«Новое мероприятие» обнуляет экран, даж�
         await control.fill('#overrunPeriod', '3');
         await setToggle(control, 'showOverrunCost', true);
         await setToggle(control, 'showTotalCost', true);
-        await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        const display = await waitForDisplay(app);
-        await control.waitForTimeout(2400);
+        const display = await openDisplay(app, control);
+        await runIntoMinus(control, display);
 
-        await control.evaluate(() => window.ipcRenderer.send('timer-command',
-            { type: 'set', seconds: 1, allowNegative: true }));
-        await control.waitForTimeout(300);
-        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-        await control.waitForTimeout(8000);
-
-        const money = () => display.evaluate(() => ({
-            over: document.getElementById('overrunCostValue').textContent,
-            total: document.getElementById('totalCostValue').textContent
-        }));
+        const money = () => moneyOf(display);
         const before = await money();
         console.log(`   в минусе: перелимит «${before.over}», итого «${before.total}»`);
         expect(before.total, 'таймер не ушёл в минус — обнулять нечего').not.toBe(`0${NB}₽`);
 
         await control.locator('#eventResetBtn').click();
         await expect(control.locator('#eventReset')).toBeVisible();
-        await control.locator('#eventResetConfirm').click();
-        await control.waitForTimeout(1200);
+        const resetAt = Date.now();
+        // Обнуление — посылка накопителя дисплею (broadcastEventOverrun).
+        await untilDisplayGot(display, () => control.locator('#eventResetConfirm').click(),
+            { finished: false, overrunSeconds: 0 }, 'event-overrun-state');
 
         const after = await money();
         console.log(`   после сброса: перелимит «${after.over}», итого «${after.total}»`);
@@ -288,9 +306,12 @@ test('«Новое мероприятие» обнуляет экран, даж�
         expect(after.over, 'перелимит не обнулился, пока таймер в минусе').toBe(`0${NB}₽`);
 
         // Отсечка снимается сама: минус, натикавший ПОСЛЕ сброса, снова считается.
-        await control.waitForTimeout(4500);
+        // Бюджет — прежний: пауза 1200 после сброса + 4500 = 5,7 с от клика.
+        const budget = Math.max(1, 5700 - (Date.now() - resetAt));
+        await expect.poll(async () => (await money()).over,
+            { message: `после сброса счёт не возобновился за ${budget} мс`, timeout: budget }).not.toBe(`0${NB}₽`);
         const later = await money();
-        console.log(`   ещё 4,5 с спустя: перелимит «${later.over}»`);
+        console.log(`   ${((Date.now() - resetAt) / 1000).toFixed(1)} с после сброса: перелимит «${later.over}»`);
         expect(later.over, 'после сброса счёт не возобновился').not.toBe(`0${NB}₽`);
     } finally {
         await control.evaluate(() => {
@@ -323,16 +344,8 @@ test('«Завершить мероприятие» ЗАМОРАЖИВАЕТ и�
         const display = await openDisplay(app, control);
         expect(display, 'окно дисплея не найдено').not.toBeNull();
 
-        const money = () => display.evaluate(() => ({
-            over: document.getElementById('overrunCostValue').textContent,
-            total: document.getElementById('totalCostValue').textContent
-        }));
-
-        await control.evaluate(() => window.ipcRenderer.send('timer-command',
-            { type: 'set', seconds: 1, allowNegative: true }));
-        await control.waitForTimeout(300);
-        await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'start' }));
-        await control.waitForTimeout(8000);
+        const money = () => moneyOf(display);
+        await runIntoMinus(control, display);
 
         const before = await money();
         console.log(`   до заморозки: перелимит «${before.over}», итого «${before.total}»`);
@@ -340,8 +353,8 @@ test('«Завершить мероприятие» ЗАМОРАЖИВАЕТ и�
 
         await control.locator('#eventFinishBtn').click();
         await expect(control.locator('#eventFinish')).toBeVisible();
-        await control.locator('#eventFinishConfirm').click();
-        await control.waitForTimeout(1200);
+        await untilDisplayGot(display, () => control.locator('#eventFinishConfirm').click(),
+            { finished: true }, 'event-overrun-state');
 
         const atFreeze = await money();
         console.log(`   в момент заморозки: перелимит «${atFreeze.over}», итого «${atFreeze.total}»`);
@@ -355,6 +368,7 @@ test('«Завершить мероприятие» ЗАМОРАЖИВАЕТ и�
             .toBe(`0${NB}₽`);
 
         // Главное: ждём заведомо больше периода (3 с) — итог не двигается.
+        // пауза законна: утверждается ОТСУТСТВИЕ роста за интервал длиннее периода
         await control.waitForTimeout(7000);
         const later = await money();
         console.log(`   ещё 7 с спустя: перелимит «${later.over}», итого «${later.total}»`);
@@ -418,7 +432,9 @@ test('панель отчитывается о мероприятии слово
         await control.locator('#eventFinishBtn').click();
         await expect(control.locator('#eventFinish')).toBeVisible();
         await control.locator('#eventFinishConfirm').click();
-        await control.waitForTimeout(1200);
+        // Строку пишет панель, получив накопитель от главного процесса; ждём
+        // ТО, что утверждается ниже, — смену слова.
+        await expect(status).not.toHaveText(running);
 
         // Завершённое: слово ДРУГОЕ, и завершать больше нечего.
         const frozen = (await status.textContent()).trim();
@@ -432,7 +448,7 @@ test('панель отчитывается о мероприятии слово
         await control.locator('#eventResetBtn').click();
         await expect(control.locator('#eventReset')).toBeVisible();
         await control.locator('#eventResetConfirm').click();
-        await control.waitForTimeout(1200);
+        await expect(status).toHaveText(/Идёт/);
         const again = (await status.textContent()).trim();
         console.log(`   после нового: «${again}»`);
         expect(again, 'строка не вернулась в «идёт»').toMatch(/Идёт/);
@@ -537,10 +553,11 @@ test('47-й этаж: сумма растёт на месте, а таймер �
         const display = await openDisplay(app, control);
         const got = await resizeDisplay(app, display, { w: 1280, h: 720 });
         console.log(`   окно ${got.w}×${got.h}`);
-        await control.waitForTimeout(800);
+        await waitForQuiet(display);
 
-        await control.locator('#displayLayoutGrid .layout-btn[data-layout="floor47"]').click();
-        await display.waitForTimeout(1600);
+        await untilDisplayGot(display,
+            () => control.locator('#displayLayoutGrid .layout-btn[data-layout="floor47"]').click(),
+            { layout: 'floor47' }, 'display-layout');
 
         const zero = await display.evaluate(moneyProbe, 0);
         const million = await display.evaluate(moneyProbe, 9);
@@ -552,8 +569,8 @@ test('47-й этаж: сумма растёт на месте, а таймер �
 
         const requested = million.transform;
         for (const style of ['flip', 'digits', 'analog', 'circle']) {
-            await control.locator(`#displayTimerStyle [data-val="${style}"]`).click();
-            await display.waitForTimeout(1500);
+            await untilDisplayGot(display, () => control.locator(`#displayTimerStyle [data-val="${style}"]`).click(),
+                { displayTimerStyle: style });
             // Резерв ширины — в КАЖДОМ стиле: у «Флипа» у значения свои поля,
             // и резерв числом в `ch` там не сходился (139 → 151px).
             const low = await display.evaluate(moneyProbe, 0);
@@ -567,17 +584,19 @@ test('47-й этаж: сумма растёт на месте, а таймер �
 
         // Ресайз окна: уступка пересчитывается по НОВЫМ местам карточек, а не
         // по тем, что были до debounce (замечание проверки 30.09.2026).
-        await control.locator('#displayTimerStyle [data-val="flip"]').click();
-        await display.waitForTimeout(1500);
+        await untilDisplayGot(display, () => control.locator('#displayTimerStyle [data-val="flip"]').click(),
+            { displayTimerStyle: 'flip' });
+        // resizeDisplay сам ждёт размер и отложенный пересчёт; хвосты — кадр
+        // и переходы transform.
         const small = await resizeDisplay(app, display, { w: 1100, h: 700 });
-        await display.waitForTimeout(1500);
+        await waitForQuiet(display);
         const resized = await display.evaluate(moneyProbe, 9);
         console.log(`   после ресайза ${small.w}×${small.h}: пересечение ${resized.overlap}px², ${resized.transform}`);
         expect(resized.overlap, 'после ресайза таймер лёг на деньги').toBe(0);
-        await control.locator('#displayTimerStyle [data-val="circle"]').click();
-        await display.waitForTimeout(1500);
+        await untilDisplayGot(display, () => control.locator('#displayTimerStyle [data-val="circle"]').click(),
+            { displayTimerStyle: 'circle' });
         await resizeDisplay(app, display, { w: 1280, h: 720 });
-        await display.waitForTimeout(1500);
+        await waitForQuiet(display);
         // Уступка временная: вернувшись на «Круг», таймер снова того размера,
         // который выбрала раскладка, а не сжатого «Цифрами».
         const back = await display.evaluate(moneyProbe, 9);

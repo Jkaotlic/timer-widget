@@ -1,6 +1,10 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForClock, waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForWidgetSnapshot,
+    waitForClockSnapshot, waitForDisplaySettled, waitForWindowSettled, armReceived, waitForQuiet,
+    reloadPanel, waitForPanelSettled
+} = require('./window-ready');
 
 /**
  * Тема интерфейса: переключение доходит до всех окон и переживает перезагрузку.
@@ -16,19 +20,17 @@ const { waitForClock, waitForDisplay, waitForWidget } = require('./window-ready'
  * тема не доезжать до правил (например, если окно не грузит design-tokens.css).
  */
 
-// Маркеры окон — те же, что в остальных спеках: по уникальному id разметки.
-const MARKERS = {
-    widget: () => !!document.getElementById('wFlipHoursGroup'),
-    clock: () => !!document.getElementById('wFlipSecGroup'),
-    display: () => !!document.getElementById('flipHoursUnit')
-};
-
-async function findWindow(app, kind) {
-    for (const w of app.windows()) {
-        const hit = await w.evaluate(MARKERS[kind]).catch(() => false);
-        if (hit) { return w; }
-    }
-    return null;
+/**
+ * Клик по кнопке темы — и тема ДОШЛА до трёх окон (было 800 мс): main
+ * рассылает `ui-theme-update`, окно ставит атрибут в обработчике; переходы
+ * цветов дожидаются внутри ожидания (`waitForQuiet`), в панели — отдельно.
+ */
+async function clickTheme(control, pages, theme) {
+    const got = [];
+    for (const page of pages) { got.push(await armReceived(page, 'ui-theme-update')); }
+    await control.click('#contrastToggle');
+    for (const received of got) { await received({ match: { theme } }); }
+    await waitForQuiet(control);
 }
 
 // Что видит пользователь: тема на корне + признак, что правила темы применились.
@@ -57,17 +59,17 @@ test('светлая тема включается во всех четырёх 
         window.ipcRenderer.send('open-clock-widget');
         window.ipcRenderer.send('open-display');
     });
-    await waitForDisplay(app);
-    await waitForWidget(app);
-    await waitForClock(app);
-    await control.waitForTimeout(2500);
-
-    const widget = await findWindow(app, 'widget');
-    const clock = await findWindow(app, 'clock');
-    const display = await findWindow(app, 'display');
-    expect(widget, 'окно виджета не найдено').not.toBeNull();
-    expect(clock, 'окно часов не найдено').not.toBeNull();
-    expect(display, 'полноэкранное окно не найдено').not.toBeNull();
+    // Пробы бросают, если окна нет; снимки main и вставшие окна — раньше
+    // пауза 2500 мс.
+    const display = await waitForDisplay(app);
+    const widget = await waitForWidget(app);
+    const clock = await waitForClock(app);
+    await waitForDisplaySnapshot(app, display);
+    await waitForWidgetSnapshot(app, widget);
+    await waitForClockSnapshot(app, clock);
+    await waitForDisplaySettled(app, display);
+    await waitForWindowSettled(app, widget, 'electron-widget.html');
+    await waitForWindowSettled(app, clock, 'electron-clock-widget.html');
 
     const windows = { control, widget, clock, display };
 
@@ -82,8 +84,7 @@ test('светлая тема включается во всех четырёх 
     }
 
     // Переключаем кнопкой — именно так, как это делает пользователь.
-    await control.click('#contrastToggle');
-    await control.waitForTimeout(800);
+    await clickTheme(control, [widget, clock, display], 'dark');
 
     // Атрибут обязан доехать до ВСЕХ четырёх окон.
     for (const [name, w] of Object.entries(windows)) {
@@ -126,8 +127,8 @@ test('светлая тема включается во всех четырёх 
 
     // Тема переживает перезагрузку окна: значение читается из localStorage до
     // первого кадра (скрипт в <head>), а не приходит потом по IPC.
-    await control.reload();
-    await control.waitForLoadState('domcontentloaded');
+    // Контроллер встал — иначе клик ниже ушёл бы в кнопку без обработчика.
+    await reloadPanel(control);
     const afterReload = await control.evaluate(probeTheme);
     // Переживает перезагрузку ВЫБРАННАЯ тема, а выбрали мы тёмную: дефолт
     // теперь светлый, и проверка «после перезагрузки снова light» ничего бы не
@@ -137,8 +138,7 @@ test('светлая тема включается во всех четырёх 
     expect(pressedAfterReload, 'кнопка после перезагрузки не показывает выбранную тему').toBe('false');
 
     // И обратно — переключатель двусторонний.
-    await control.click('#contrastToggle');
-    await control.waitForTimeout(800);
+    await clickTheme(control, [widget, clock, display], 'light');
     for (const [name, w] of Object.entries(windows)) {
         const back = await w.evaluate(probeTheme);
         expect(back.attr, `${name}: возврат к светлой теме не доехал`).toBe('light');
@@ -186,7 +186,8 @@ test('светлая тема перекрашивает сами контрол
         document.querySelector('.preset[data-minutes="5"]').click();
         document.querySelector('.wrow-chevron[data-tab="clock"]').click();
     });
-    await control.waitForTimeout(900);
+    // Ящик открыт, колонка пересчитана, переходы цветов доехали (было 900 мс).
+    await waitForPanelSettled(app, control);
 
     const probe = await control.evaluate(() => {
         const css = (el, pseudo) => (el ? getComputedStyle(el, pseudo || null) : null);

@@ -20,21 +20,35 @@
  * minHeight снимается только там (канал control-collapse).
  */
 
-// Высота полосы. Число живёт здесь, а CSS повторяет его в правиле
-// `body.collapsed .mini-bar { height: 52px }`. Расхождение поймает
-// e2e/mini-bar.spec.js: он меряет НАСТОЯЩЕЕ окно, а не эту константу.
-const BAR_HEIGHT = 52;
+import { CONTROL_BAR_HEIGHT, CONTROL_BAR_MAX_HEIGHT } from './constants.js';
+
+// Высота полосы — ОДНА величина с main (запасная высота в control-collapse).
+// CSS повторяет её в правиле `body.collapsed .mini-bar { height: 52px }`.
+// Расхождение поймает e2e/mini-bar.spec.js: он меряет НАСТОЯЩЕЕ окно.
+const BAR_HEIGHT = CONTROL_BAR_HEIGHT;
+// Потолок высоты полосы — ОДНА величина с main (main-control-ipc.js,
+// control-collapse): окно выше него — уже панель, а не полоса.
+const BAR_MAX_HEIGHT = CONTROL_BAR_MAX_HEIGHT;
 
 function init(deps) {
     const doc = deps && deps.doc;
     const ipc = (deps && deps.ipc) || null;
     const onToggle = (deps && deps.onToggle) || null;
+    const win = (deps && deps.win) || null;
     if (!doc || !doc.body) { return null; }
 
     let collapsed = false;
+    // Пропущенная в полосе подгонка по содержимому (одна; последняя побеждает)
+    // и слушатель resize, который выполнит её после разворота (не больше одного).
+    let pendingFit = null;
+    let fitListener = null;
+    const canWatchResize = !!win && typeof win.addEventListener === 'function';
+    let warnedNoWindow = false;
 
     const api = {
         isCollapsed: () => collapsed,
+        deferWhileCollapsed,
+        hasPendingFit: () => pendingFit !== null,
         collapse: () => setState(true),
         expand: () => setState(false),
         toggle: () => setState(!collapsed),
@@ -79,6 +93,56 @@ function init(deps) {
         return api;
     }
 
+    /**
+     * Подгонка окна по содержимому в полосе не мерит и не шлёт ничего:
+     * раскладка свёрнута, и замер был бы замером полосы (замер 30.10.2026:
+     * отложенный autoResizeWindow просил 400×100). Просьба запоминается и
+     * выполняется ОДИН раз после разворота, когда окно уже снова панель.
+     * Разворот без пропущенной просьбы окно не трогает: прежние границы
+     * пользователя целиком возвращает main.
+     *
+     * @param {() => void} fit
+     * @returns {boolean} true — отложено, вызывающий ничего не делает
+     */
+    function deferWhileCollapsed(fit) {
+        if (!collapsed) { return false; }
+        // Без окна признака «main вернул размер панели» нет: просьба не
+        // хранится (иначе hasPendingFit врал бы «ждёт» вечно) — и это
+        // говорится вслух, а не глотается. В приложении окно есть всегда.
+        if (!canWatchResize) {
+            if (!warnedNoWindow) {
+                warnedNoWindow = true;
+                console.warn('[mini-bar] нет окна (deps.win): подгонка, пропущенная в полосе, после разворота не выполнится');
+            }
+            return true;
+        }
+        pendingFit = fit;
+        return true;
+    }
+
+    // Мерить — когда main УЖЕ вернул окну размер панели: признак — resize
+    // окна выше полосы, а не пауза.
+    function armPendingFit() {
+        if (!pendingFit || fitListener || !canWatchResize) { return; }
+        fitListener = () => {
+            if (collapsed || !(win.innerHeight > BAR_MAX_HEIGHT)) { return; }
+            win.removeEventListener('resize', fitListener);
+            fitListener = null;
+            const run = () => {
+                if (collapsed || !pendingFit) { return; }
+                const fit = pendingFit;
+                pendingFit = null;
+                fit();
+            };
+            if (typeof win.requestAnimationFrame === 'function') { win.requestAnimationFrame(run); } else { run(); }
+        };
+        win.addEventListener('resize', fitListener);
+        // Свёртка и разворот слились в один кадр: окно так и осталось панелью,
+        // resize не придёт, и без этой проверки просьба дождалась бы чужого
+        // resize (ручного растягивания) и легла бы поверх него.
+        fitListener();
+    }
+
     function setState(next) {
         // Без дребезга: каждый лишний setSize на Windows округляет внешний
         // размер окна и копит дрейф — этим уже болел resize-control-window.
@@ -98,6 +162,9 @@ function init(deps) {
                 ? { collapsed: true, height: BAR_HEIGHT }
                 : { collapsed: false });
         }
+        // ПОСЛЕ отправки разворота: перемер, выполненный сразу, ушёл бы раньше
+        // него, а main глотает resize-control-window, пока панель свёрнута.
+        if (!collapsed) { armPendingFit(); }
         return api;
     }
 

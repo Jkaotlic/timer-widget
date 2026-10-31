@@ -1,6 +1,9 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { waitForDisplay, waitForWidget } = require('./window-ready');
+const {
+    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForWidgetSnapshot,
+    armReceived, untilReceived, waitForQuiet
+} = require('./window-ready');
 
 /**
  * Две просьбы 18.08.2026, обе проверяются ПО КЛИКУ и ЗАМЕРОМ.
@@ -21,15 +24,32 @@ const { waitForDisplay, waitForWidget } = require('./window-ready');
  * палитра не доехать — ровно так однажды жила недостижимая светлая тема.
  */
 
-const IS_DISPLAY = () => !!document.getElementById('progressRing');
-const IS_WIDGET = () => !!document.getElementById('wFlipHoursGroup');
 
-async function findWindow(app, marker) {
-    for (const w of app.windows()) {
-        if (await w.evaluate(marker).catch(() => false)) { return w; }
-    }
-    return null;
+/**
+ * Кнопка темы шлёт `ui-theme-update`; main раздаёт его всем окнам. Ждём, что
+ * КАЖДОЕ окно его получило и утихло: тон пересчитывается в том же обработчике
+ * (bindThemeSync → onThemeChanged / refreshTone).
+ */
+async function toggleTheme(control, pages) {
+    const received = await Promise.all(pages.map((p) => armReceived(p, 'ui-theme-update')));
+    await control.click('#contrastToggle');
+    await Promise.all(received.map((done) => done()));
 }
+
+/** Клик в панели, порождающий `display-settings-update`, — до обработки дисплеем. */
+const displayClick = (display, control, selector) =>
+    untilReceived(display, 'display-settings-update', () => control.click(selector));
+
+/** Клик в панели, порождающий `widget-style-update`, — до обработки виджетом. */
+const widgetClick = (widget, control, selector) =>
+    untilReceived(widget, 'widget-style-update', () => control.click(selector));
+
+/** Тумблер блока «Начало» (шлёт настройки дисплею). */
+const setEventTime = (display, control, on) => untilReceived(display, 'display-settings-update', () => control.evaluate((v) => {
+    const el = document.getElementById('showEventTime');
+    el.checked = v;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+}, on));
 
 /** Тон окна так, как его видит пользователь: цвет основного текста. */
 const probeTone = (page) => page.evaluate(() => {
@@ -55,12 +75,12 @@ test('по умолчанию (светлая тема) виджет и дисп
             window.ipcRenderer.send('open-widget');
             window.ipcRenderer.send('open-display', { displayIndex: 0 });
         });
-        await waitForDisplay(app);
-        await waitForWidget(app);
-        await control.waitForTimeout(2000);
-
-        const display = await findWindow(app, IS_DISPLAY);
-        const widget = await findWindow(app, IS_WIDGET);
+        const display = await waitForDisplay(app);
+        const widget = await waitForWidget(app);
+        // Тон зависит от снимка main (настройки фона, цвета, тема): до него
+        // окно показывает тон по умолчанию, и проверка была бы о нём.
+        await waitForDisplaySnapshot(app, display);
+        await waitForWidgetSnapshot(app, widget);
         expect(display, 'полноэкранное окно не найдено').not.toBeNull();
         expect(widget, 'окно виджета не найдено').not.toBeNull();
 
@@ -74,8 +94,7 @@ test('по умолчанию (светлая тема) виджет и дисп
         }
 
         // Переключаем ТЕМУ кнопкой в титлбаре — именно так, как пользователь.
-        await control.click('#contrastToggle');
-        await control.waitForTimeout(900);
+        await toggleTheme(control, [display, widget]);
 
         for (const [name, page] of [['дисплей', display], ['виджет', widget]]) {
             const tone = await probeTone(page);
@@ -86,8 +105,7 @@ test('по умолчанию (светлая тема) виджет и дисп
         // Пластина перекидыша обязана переворачиваться ВМЕСТЕ с тоном: до
         // правки она была литералом, и тема до неё не доезжала в принципе.
         const darkPlate = (await probeTone(display)).plate;
-        await control.click('#contrastToggle');
-        await control.waitForTimeout(900);
+        await toggleTheme(control, [display, widget]);
         const lightPlate = (await probeTone(display)).plate;
         expect(lightPlate).not.toBe('');
         expect(lightPlate, 'пластина не изменилась при смене тона').not.toBe(darkPlate);
@@ -103,22 +121,18 @@ test('тёмная заливка при светлой теме оставля�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
-        const display = await findWindow(app, IS_DISPLAY);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
         expect(display).not.toBeNull();
 
         // Тема светлая (умолчание), но пользователь выбрал ТЁМНУЮ заливку.
         await control.click('.tab-btn[data-tab="display"]');
-        await control.click('.bg-mode-btn[data-mode="solid"]');
-        await control.waitForTimeout(600);
+        await displayClick(display, control, '.bg-mode-btn[data-mode="solid"]');
 
         const tone = await probeTone(display);
         expect(tone.toneIsLight, `тёмная заливка обязана дать светлый текст (--tw-fg=${tone.fg})`).toBe(false);
 
         // И обратно: «По теме» возвращает светлый холст.
-        await control.click('.bg-mode-btn[data-mode="theme"]');
-        await control.waitForTimeout(600);
+        await displayClick(display, control, '.bg-mode-btn[data-mode="theme"]');
         const back = await probeTone(display);
         expect(back.toneIsLight, 'режим «По теме» в светлой теме обязан дать светлый холст').toBe(true);
     } finally {
@@ -131,23 +145,16 @@ test('блок времени повторяет стиль: у флипа — �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
-        const display = await findWindow(app, IS_DISPLAY);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
         expect(display).not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
         // Блок «Начало» — не живое время, значение стабильно между замерами.
-        await control.evaluate(() => {
-            const el = document.getElementById('showEventTime');
-            el.checked = true;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+        await setEventTime(display, control, true);
 
         // --- КРУГ: пластины у значения быть НЕ должно (проверка себя самой:
         // без неё «пластина есть» было бы зелёным и там, где она везде).
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await control.waitForTimeout(600);
+        await displayClick(display, control, '#displayTimerStyle button[data-val="circle"]');
         const circle = await display.evaluate(() => {
             const cs = getComputedStyle(document.getElementById('eventTime'));
             return { image: cs.backgroundImage, font: cs.fontFamily };
@@ -163,8 +170,7 @@ test('блок времени повторяет стиль: у флипа — �
         // прямоугольник, а тон выбирается по яркости ФОНА, и на цветном
         // градиенте это четыре белые карточки поверх картинки
         // (см. e2e/display-block-plate.spec.js).
-        await control.click('#displayTimerStyle button[data-val="flip"]');
-        await control.waitForTimeout(600);
+        await displayClick(display, control, '#displayTimerStyle button[data-val="flip"]');
         const flip = await display.evaluate(() => {
             const el = document.getElementById('eventTime');
             const cs = getComputedStyle(el);
@@ -191,10 +197,8 @@ test('блок времени повторяет стиль: у флипа — �
         expect(flip.font, 'значение блока набрано не шрифтом табло').toBe(flip.digitFont);
 
         // --- ЦИФРЫ: значение блока набрано ВЫБРАННЫМ шрифтом стиля.
-        await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.waitForTimeout(600);
-        await control.click('#displayDigitsFont .font-option[data-val="orbitron"]');
-        await control.waitForTimeout(700);
+        await displayClick(display, control, '#displayTimerStyle button[data-val="digits"]');
+        await displayClick(display, control, '#displayDigitsFont .font-option[data-val="orbitron"]');
         const digits = await display.evaluate(() => ({
             block: getComputedStyle(document.getElementById('eventTime')).fontFamily,
             timer: getComputedStyle(document.getElementById('digitsTime')).fontFamily
@@ -205,23 +209,26 @@ test('блок времени повторяет стиль: у флипа — �
         // И он обязан УЙТИ вместе со стилем: переменная, а не инлайн. Инлайн на
         // элементе остался бы на блоках круга и аналога — стиль сменили, а
         // блоки рядом продолжали бы стоять цифрами табло.
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await control.waitForTimeout(600);
+        await displayClick(display, control, '#displayTimerStyle button[data-val="circle"]');
         const backToCircle = await display.evaluate(
             () => getComputedStyle(document.getElementById('eventTime')).fontFamily
         );
         expect(backToCircle.toLowerCase(), 'шрифт «Цифр» залип на блоке после смены стиля').not.toContain('orbitron');
 
         // Возвращаем и шрифт, и тумблер блока: профиль общий на весь прогон.
-        await control.click('#displayTimerStyle button[data-val="digits"]');
-        await control.click('#displayDigitsFont .font-option[data-val="inter"]');
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await control.evaluate(() => {
-            const el = document.getElementById('showEventTime');
-            el.checked = false;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        await display.waitForTimeout(500);
+        // Каждый шаг шлёт ПОЛНЫЙ снимок настроек (pushDisplaySettings), так что
+        // ждём посылку, несущую всё возвращённое разом (ревью B4, M2): «первая
+        // посылка после взвода» могла быть посылкой одного из кликов выше.
+        await untilReceived(display, 'display-settings-update', async () => {
+            await control.click('#displayTimerStyle button[data-val="digits"]');
+            await control.click('#displayDigitsFont .font-option[data-val="inter"]');
+            await control.click('#displayTimerStyle button[data-val="circle"]');
+            await control.evaluate(() => {
+                const el = document.getElementById('showEventTime');
+                el.checked = false;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        }, { match: { displayTimerStyle: 'circle', displayDigitsFont: 'inter', showEventTime: false } });
     } finally {
         await app.close();
     }
@@ -232,19 +239,12 @@ test('аналог: стрелки мини-часов в блоке — те ж
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-display', { displayIndex: 0 }));
-        await waitForDisplay(app);
-        await control.waitForTimeout(1500);
-        const display = await findWindow(app, IS_DISPLAY);
+        const display = await waitForDisplaySnapshot(app, await waitForDisplay(app));
         expect(display).not.toBeNull();
 
         await control.click('.tab-btn[data-tab="display"]');
-        await control.evaluate(() => {
-            const el = document.getElementById('showEventTime');
-            el.checked = true;
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        await control.click('#displayTimerStyle button[data-val="analog"]');
-        await control.waitForTimeout(700);
+        await setEventTime(display, control, true);
+        await displayClick(display, control, '#displayTimerStyle button[data-val="analog"]');
 
         const m = await display.evaluate(() => ({
             big: getComputedStyle(document.getElementById('analogHandHour')).backgroundImage,
@@ -263,8 +263,7 @@ test('аналог: стрелки мини-часов в блоке — те ж
         // `.timer-ring` (у waitForSelector состояние по умолчанию 'visible'), а
         // в аналоге кольцо скрыто `display: none` — 30 секунд ожидания и
         // таймаут. В одиночку обе спеки при этом зелёные.
-        await control.click('#displayTimerStyle button[data-val="circle"]');
-        await display.waitForTimeout(500);
+        await displayClick(display, control, '#displayTimerStyle button[data-val="circle"]');
     } finally {
         await app.close();
     }
@@ -282,23 +281,19 @@ test('на светлом тоне у «Круга» и «Цифр» видже�
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.evaluate(() => window.ipcRenderer.send('open-widget'));
-        await waitForWidget(app);
-        await control.waitForTimeout(1500);
-        const widget = await findWindow(app, IS_WIDGET);
+        const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
         expect(widget, 'окно виджета не найдено').not.toBeNull();
 
         // Тема — умолчание приложения, то есть светлая. Стиль ставим кликом.
         await control.click('.tab-btn[data-tab="timer"]');
-        await control.click('#timerStyle button[data-val="circle"]');
-        await control.waitForTimeout(700);
+        await widgetClick(widget, control, '#timerStyle button[data-val="circle"]');
         const circleFill = await widget.evaluate(
             () => getComputedStyle(document.querySelector('.bg-circle')).fill
         );
         expect(circleFill, `у круга на светлом тоне обязана быть подложка (${circleFill})`).not.toBe('none');
         expect(circleFill, 'подложка круга не может быть полностью прозрачной').not.toMatch(/,\s*0\)$/);
 
-        await control.click('#timerStyle button[data-val="digits"]');
-        await control.waitForTimeout(700);
+        await widgetClick(widget, control, '#timerStyle button[data-val="digits"]');
         const digitsBg = await widget.evaluate(
             () => getComputedStyle(document.querySelector('.widget-digits-time')).backgroundColor
         );
@@ -307,8 +302,7 @@ test('на светлом тоне у «Круга» и «Цифр» видже�
             .toBeGreaterThan(0.5);
 
         // Профиль e2e общий: возвращаем стиль, как это делают соседние спеки.
-        await control.click('#timerStyle button[data-val="circle"]');
-        await control.waitForTimeout(400);
+        await widgetClick(widget, control, '#timerStyle button[data-val="circle"]');
     } finally {
         await app.close();
     }
@@ -322,7 +316,9 @@ test('четвёртый режим фона помещается в ряд и �
     try {
         await control.waitForLoadState('domcontentloaded');
         await control.click('.tab-btn[data-tab="display"]');
-        await control.waitForTimeout(600);
+        // Вкладка переключается классом синхронно; ряд меряется после кадров,
+        // шрифтов и переходов вкладки.
+        await waitForQuiet(control);
 
         const row = await control.evaluate(() => {
             const tabs = document.querySelector('.bg-mode-tabs');

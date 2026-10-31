@@ -48,7 +48,7 @@ function cleanEnv(extra = {}) {
  * Поднимает приложение и возвращает { app, control } с уже загруженным
  * окном управления.
  *
- * @param {{args?: string[], env?: Record<string,string>, settleMs?: number, keepProfile?: boolean}} [opts]
+ * @param {{args?: string[], env?: Record<string,string>, awaitStartup?: boolean, keepProfile?: boolean}} [opts]
  */
 async function launchApp(opts = {}) {
     const app = await electron.launch({
@@ -58,11 +58,41 @@ async function launchApp(opts = {}) {
         args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`, ...(opts.args || [])],
         env: cleanEnv(opts.env)
     });
+    // Журнал полноэкранных входов (ревью CI-правки, R1): на macOS флаг
+    // `isFullScreen()` поднимается в НАЧАЛЕ анимированного перехода, и по нему
+    // «вход окончен» не отличить от «вход идёт». Событие `enter-full-screen`
+    // приходит в конце — его копим по id окна с момента СОЗДАНИЯ, чтобы оно
+    // не терялось, если вход кончился раньше вопроса. Читает
+    // settleFullScreenEntry (window-ready.js). Ставится до любого окна
+    // дисплея: дисплей открывает только тест.
+    //
+    // Журнал помнит ТЕКУЩИЙ вход, а не «входило когда-то» (ревью B7a, M4):
+    // `leave-full-screen` вычёркивает id, иначе поднятый флаг посреди
+    // ПОВТОРНОГО входа того же окна сошёл бы за конец перехода. Что окно уже
+    // выходило — отдельный список `__e2eLeftDisplays` (ветка `windowed`).
+    await app.evaluate(({ app: electronApp }) => {
+        globalThis.__e2eEnteredDisplays = new Set();
+        globalThis.__e2eLeftDisplays = new Set();
+        electronApp.on('browser-window-created', (_e, win) => {
+            const id = win.webContents.id;
+            win.on('enter-full-screen', () => globalThis.__e2eEnteredDisplays.add(id));
+            win.on('leave-full-screen', () => {
+                globalThis.__e2eEnteredDisplays.delete(id);
+                globalThis.__e2eLeftDisplays.add(id);
+            });
+        });
+    });
     const control = await waitForControlWindow(app);
     await control.waitForLoadState('domcontentloaded');
-    // Панель досылает стартовые настройки с задержкой до 600 мс; ждём тишины,
-    // иначе тест успевает прочитать промежуточное состояние.
-    await control.waitForTimeout(opts.settleMs ?? 900);
+    // Панель досылает стартовые настройки таймерами конструктора (подгонка
+    // 100 мс, настройки 200 мс, стиль окнам 600 мс — control-app.js); тест,
+    // начавший раньше, читает промежуточное состояние. Ждём ЗОНД, который
+    // ставит последний из них сразу после своей посылки, — а не паузу 900 мс:
+    // пауза — ставка на скорость машины. Посылка ушла в main ДО того, как
+    // опрос увидел зонд, поэтому следующая команда теста приходит в main
+    // после неё. `awaitStartup: false` — тесту, которому нужно успеть ДО
+    // рассылки (display-timer-scale).
+    if (opts.awaitStartup !== false) { await waitForStartupPush(control); }
     // Сторож общего профиля (e2e/profile-guard.js): «было» — здесь, на
     // app.close() — сверка и возврат. `keepProfile` — для первого запуска
     // теста с перезапуском, которому настройка нужна во втором.
@@ -73,6 +103,34 @@ async function launchApp(opts = {}) {
     // того, как сторож закрыл дисплей и вернул профиль.
     track(app);
     return { app, control };
+}
+
+/**
+ * Дождаться, что стартовая рассылка панели ушла: зонд `window.__startupPushed`
+ * (control-app.js, таймер 600 мс конструктора). Таймаут — с запасом на
+ * загруженную машину; не дождались — ошибка с названием условия, а не тест,
+ * читающий полузапущенную панель.
+ *
+ * И что ДОШЁЛ ответ на стартовый `get-displays` (setupIPC шлёт его при каждой
+ * загрузке страницы): `panelRoundTrip` (window-ready.js) ждёт «следующий
+ * `displays-list`», а ответы неотличимы — стартовый, ещё бывший в пути,
+ * закрыл бы первый круг теста раньше его команд (ревью B5, M1). Признак —
+ * ИТОГ ответа, а не срок: `fillDisplaySelect` (panel-display.js) добавляет в
+ * `#displaySelect` мониторы, в разметке там только «Авто». После этого
+ * других `get-displays` в пути нет, пока их не пошлёт сам тест.
+ *
+ * @param {import('@playwright/test').Page} control
+ * @param {number} [timeout]
+ */
+async function waitForStartupPush(control, timeout = 15000) {
+    await control.waitForFunction(() => window.__startupPushed === true, null, { timeout })
+        .catch((e) => {
+            throw new Error(`стартовая рассылка панели не ушла за ${timeout} мс (зонд __startupPushed): ${e.message}`);
+        });
+    await control.waitForFunction(() => !!document.querySelector('#displaySelect option[value="0"]'), null, { timeout })
+        .catch((e) => {
+            throw new Error(`ответ на стартовый get-displays не дошёл за ${timeout} мс (в #displaySelect нет мониторов): ${e.message}`);
+        });
 }
 
 /**
@@ -92,8 +150,9 @@ async function waitForControlWindow(app, timeout = 20000) {
             throw new Error(`окно панели не появилось за ${timeout} мс; окна: `
                 + (app.windows().map((w) => w.url()).join(', ') || 'нет'));
         }
+        // шаг опроса: окно панели появилось
         await new Promise((r) => setTimeout(r, 50));
     }
 }
 
-module.exports = { launchApp, waitForControlWindow, cleanEnv, MAIN, USER_DATA_DIR };
+module.exports = { launchApp, waitForControlWindow, waitForStartupPush, cleanEnv, MAIN, USER_DATA_DIR };
