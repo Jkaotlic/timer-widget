@@ -63,7 +63,7 @@ Repository: https://github.com/electron/osx-sign
 Publisher: electron
 
 === @electron/rebuild ===
-Version: 4.2.0
+Version: 4.2.1
 License: MIT
 Repository: https://github.com/electron/rebuild
 
@@ -188,21 +188,14 @@ Repository: https://github.com/malept/flatpak-bundler
 Publisher: Matt Watson
 
 === @noble/hashes ===
-Version: 1.4.0
-License: MIT
-Repository: https://github.com/paulmillr/noble-hashes
-Publisher: Paul Miller
-Homepage: https://paulmillr.com
-
-=== @noble/hashes ===
-Version: 2.3.0
+Version: 1.8.0
 License: MIT
 Repository: https://github.com/paulmillr/noble-hashes
 Publisher: Paul Miller
 Homepage: https://paulmillr.com
 
 === @peculiar/asn1-schema ===
-Version: 2.9.3
+Version: 2.11.1
 License: MIT
 Repository: https://github.com/PeculiarVentures/asn1-schema
 Publisher: PeculiarVentures, LLC
@@ -220,13 +213,13 @@ Repository: https://github.com/PeculiarVentures/pvtsutils
 Publisher: PeculiarVentures
 
 === @peculiar/webcrypto ===
-Version: 1.7.1
+Version: 1.7.2
 License: MIT
 Repository: https://github.com/PeculiarVentures/webcrypto
 Publisher: PeculiarVentures
 
 === @playwright/test ===
-Version: 1.63.0
+Version: 1.64.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
@@ -354,7 +347,7 @@ Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
 
 === app-builder-lib ===
-Version: 26.15.3
+Version: 26.18.0
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -365,7 +358,7 @@ License: Python-2.0
 Repository: https://github.com/nodeca/argparse
 
 === asn1js ===
-Version: 3.0.10
+Version: 3.1.0
 License: BSD-3-Clause
 Repository: https://github.com/PeculiarVentures/ASN1.js
 Publisher: Yury Strozhevsky
@@ -442,7 +435,7 @@ Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
 
 === builder-util ===
-Version: 26.15.3
+Version: 26.16.0
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -637,7 +630,7 @@ Repository: https://github.com/gliviu/dir-compare
 Publisher: Liviu Grigorescu
 
 === dmg-builder ===
-Version: 26.15.3
+Version: 26.18.0
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -698,13 +691,13 @@ Publisher: Matthew Eernisse
 Homepage: http://fleegix.org
 
 === electron-builder-squirrel-windows ===
-Version: 26.15.3
+Version: 26.18.0
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
 
 === electron-builder ===
-Version: 26.15.3
+Version: 26.18.0
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -716,7 +709,7 @@ Repository: https://github.com/megahertz/electron-log
 Publisher: Alexey Prokhorov
 
 === electron-publish ===
-Version: 26.15.3
+Version: 26.18.0
 License: MIT
 Repository: https://github.com/electron-userland/electron-builder
 Publisher: Vladimir Krivosheev
@@ -847,7 +840,7 @@ Publisher: Toru Nagashima
 Homepage: https://github.com/mysticatea
 
 === eslint ===
-Version: 10.11.0
+Version: 10.14.0
 License: MIT
 Repository: https://github.com/eslint/eslint
 Publisher: Nicholas C. Zakas
@@ -970,7 +963,7 @@ Repository: https://github.com/jprichardson/node-fs-extra
 Publisher: JP Richardson
 
 === fs-extra ===
-Version: 11.4.0
+Version: 11.4.1
 License: MIT
 Repository: https://github.com/jprichardson/node-fs-extra
 Publisher: JP Richardson
@@ -1053,7 +1046,7 @@ Publisher: Gajus Kuizinas
 Homepage: http://gajus.com
 
 === globals ===
-Version: 17.12.0
+Version: 17.14.0
 License: MIT
 Repository: https://github.com/sindresorhus/globals
 Publisher: Sindre Sorhus
@@ -1490,7 +1483,7 @@ Publisher: Lauri Rooden
 Homepage: https://github.com/litejs/natural-compare-lite
 
 === node-abi ===
-Version: 4.33.0
+Version: 4.40.0
 License: MIT
 Repository: https://github.com/electron/node-abi
 Publisher: Lukas Geiger
@@ -1602,26 +1595,26 @@ Repository: https://github.com/alexeyraspopov/picocolors
 Publisher: Alexey Raspopov
 
 === picomatch ===
-Version: 4.0.5
+Version: 4.0.7
 License: MIT
 Repository: https://github.com/micromatch/picomatch
 Publisher: Jon Schlinkert
 Homepage: https://github.com/jonschlinkert
 
 === pkijs ===
-Version: 3.4.0
+Version: 3.4.3
 License: BSD-3-Clause
 Repository: https://github.com/PeculiarVentures/PKI.js
 Publisher: Yury Strozhevsky
 
 === playwright-core ===
-Version: 1.63.0
+Version: 1.64.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
 
 === playwright ===
-Version: 1.63.0
+Version: 1.64.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
@@ -1964,7 +1957,7 @@ Repository: https://github.com/parshap/truncate-utf8-bytes
 Publisher: Carl Xiong
 
 === tslib ===
-Version: 2.8.1
+Version: 2.9.1
 License: 0BSD
 Repository: https://github.com/Microsoft/tslib
 Publisher: Microsoft Corp.

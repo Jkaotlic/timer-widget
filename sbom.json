@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:f32e8202-2b3a-4954-a6bb-da5724639bdb",
+  "serialNumber": "urn:uuid:91d543f1-59ee-4750-8072-8d48a757e0fa",
   "metadata": {
-    "timestamp": "2026-10-29T05:21:11.180Z",
+    "timestamp": "2026-11-02T06:37:25.853Z",
     "tools": {
       "components": [
         {
@@ -296,8 +296,8 @@
       "type": "library",
       "name": "test",
       "group": "@playwright",
-      "version": "1.63.0",
-      "bom-ref": "timer-widget@2.12.2|@playwright/test@1.63.0",
+      "version": "1.64.1",
+      "bom-ref": "timer-widget@2.12.2|@playwright/test@1.64.1",
       "author": "Microsoft Corporation",
       "description": "A high-level API to automate web browsers",
       "licenses": [
@@ -307,7 +307,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40playwright/test@1.63.0",
+      "purl": "pkg:npm/%40playwright/test@1.64.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/microsoft/playwright.git",
@@ -325,12 +325,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/@playwright/test/-/test-1.63.0.tgz",
+          "url": "https://registry.npmjs.org/@playwright/test/-/test-1.64.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "a3130ae2f96507d44ae4d436975a6ad487ce7f602f9c4ba3fef6060e3d07da732d9ad6692ad0b0b7f974d0610eeb18c67e904d02f8e8bef61d0a6e74751424a5"
+              "content": "21a6069a5fe748e89959139f3edb882fb9debaef6a0ce6774cdbcd963508ae10ccc6219380f8f38ff83da7d471a52dad49ea4f0d163e53001a11e88ab54bc802"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -408,8 +408,8 @@
     {
       "type": "library",
       "name": "electron-builder",
-      "version": "26.15.3",
-      "bom-ref": "timer-widget@2.12.2|electron-builder@26.15.3",
+      "version": "26.18.0",
+      "bom-ref": "timer-widget@2.12.2|electron-builder@26.18.0",
       "author": "Vladimir Krivosheev",
       "description": "A complete solution to package and build a ready for distribution Electron app for MacOS, Windows and Linux with “auto update” support out of the box",
       "licenses": [
@@ -419,7 +419,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/electron-builder@26.15.3",
+      "purl": "pkg:npm/electron-builder@26.18.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron-userland/electron-builder.git#packages/electron-builder",
@@ -437,12 +437,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/electron-builder/-/electron-builder-26.15.3.tgz",
+          "url": "https://registry.npmjs.org/electron-builder/-/electron-builder-26.18.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "6b528ce617aa4b7810099ce2cd7108f118c9cb7415a2050b3dd792927b7beae2c3a41216fc70c6b0c83f5e03f4ae23fa3c8f423ac46f1484ca2860ea03c7c9c4"
+              "content": "012808b909ceab846e0fc8cc852f612342d2dc43114f523f33947abadaa27c1fc11cdf3421c0a305db7e0c40fe36634fbe606012dae51315d98ad35d03b9173a"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -635,8 +635,8 @@
     {
       "type": "library",
       "name": "eslint",
-      "version": "10.11.0",
-      "bom-ref": "timer-widget@2.12.2|eslint@10.11.0",
+      "version": "10.14.0",
+      "bom-ref": "timer-widget@2.12.2|eslint@10.14.0",
       "author": "Nicholas C. Zakas",
       "description": "An AST-based pattern checker for JavaScript.",
       "licenses": [
@@ -646,7 +646,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/eslint@10.11.0",
+      "purl": "pkg:npm/eslint@10.14.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/eslint/eslint.git",
@@ -664,12 +664,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/eslint/-/eslint-10.11.0.tgz",
+          "url": "https://registry.npmjs.org/eslint/-/eslint-10.14.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "3fb6ba50412a6fd1bde4c600b6a926b136d55c8632cc87e5e8d18e209935eb63da6a117117278672b9576054a26a0102838b049bc22c78975904a477af1e8cb1"
+              "content": "4f4a4db3191bf482a6b508e1a4adddee758ea45bfe607b8c6d326749532841b945d289ef5df12baeda785758c7b6c40f6a7edd29a1950f4ab55825e7ccc177d4"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -694,7 +694,7 @@
           "type": "library",
           "name": "ajv",
           "version": "6.15.0",
-          "bom-ref": "timer-widget@2.12.2|eslint@10.11.0|ajv@6.15.0",
+          "bom-ref": "timer-widget@2.12.2|eslint@10.14.0|ajv@6.15.0",
           "author": "Evgeny Poberezkin",
           "description": "Another JSON Schema Validator",
           "licenses": [
@@ -748,7 +748,7 @@
           "type": "library",
           "name": "json-schema-traverse",
           "version": "0.4.1",
-          "bom-ref": "timer-widget@2.12.2|eslint@10.11.0|json-schema-traverse@0.4.1",
+          "bom-ref": "timer-widget@2.12.2|eslint@10.14.0|json-schema-traverse@0.4.1",
           "author": "Evgeny Poberezkin",
           "description": "Traverse JSON Schema passing each schema object to callback",
           "licenses": [
@@ -803,8 +803,8 @@
     {
       "type": "library",
       "name": "globals",
-      "version": "17.12.0",
-      "bom-ref": "timer-widget@2.12.2|globals@17.12.0",
+      "version": "17.14.0",
+      "bom-ref": "timer-widget@2.12.2|globals@17.14.0",
       "author": "Sindre Sorhus",
       "description": "Global identifiers from different JavaScript environments",
       "licenses": [
@@ -814,7 +814,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/globals@17.12.0",
+      "purl": "pkg:npm/globals@17.14.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/sindresorhus/globals.git",
@@ -832,12 +832,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/globals/-/globals-17.12.0.tgz",
+          "url": "https://registry.npmjs.org/globals/-/globals-17.14.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "71ecc477f0d3cb286df5cbd2494472ca05cf7f2d381ad58eff97ba64fbc7edf0ad8cacfd3d83a6b9ac29870d42b5dd5fe82fb9272a577c60fb6a134c5ef7af04"
+              "content": "52d7644d5c8025e3d0bf427633d5dee0bd2bb8d483577d785e2209b000c8d997f8d1b71d0289c4fc3fce84053c013f7da228fd9a12c1c9bf8dbc0dd05996200a"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -1030,8 +1030,8 @@
     {
       "type": "library",
       "name": "playwright",
-      "version": "1.63.0",
-      "bom-ref": "timer-widget@2.12.2|playwright@1.63.0",
+      "version": "1.64.1",
+      "bom-ref": "timer-widget@2.12.2|playwright@1.64.1",
       "author": "Microsoft Corporation",
       "description": "A high-level API to automate web browsers",
       "licenses": [
@@ -1041,7 +1041,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/playwright@1.63.0",
+      "purl": "pkg:npm/playwright@1.64.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/microsoft/playwright.git",
@@ -1059,12 +1059,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/playwright/-/playwright-1.63.0.tgz",
+          "url": "https://registry.npmjs.org/playwright/-/playwright-1.64.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "fbbce204b89d4b835a34276de7b4940d3fb062699de5f9a241e8d489cfe46fe62c61208fc8e384f6c79bccc8cd990aec9cda4326a778587bd5ffc95f29f50352"
+              "content": "1c2ad5847af9410bb0628b301141936fb806a79db6c9f95bbff493f27178b05586b8b8d00add7b43f12e6e918648d2989f5b6c4c23d9c6a1e11c27d5511bbb50"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -1141,8 +1141,8 @@
     {
       "type": "library",
       "name": "app-builder-lib",
-      "version": "26.15.3",
-      "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3",
+      "version": "26.18.0",
+      "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0",
       "author": "Vladimir Krivosheev",
       "description": "electron-builder lib",
       "licenses": [
@@ -1152,7 +1152,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/app-builder-lib@26.15.3",
+      "purl": "pkg:npm/app-builder-lib@26.18.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron-userland/electron-builder.git#packages/app-builder-lib",
@@ -1170,12 +1170,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/app-builder-lib/-/app-builder-lib-26.15.3.tgz",
+          "url": "https://registry.npmjs.org/app-builder-lib/-/app-builder-lib-26.18.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "d959f25a4aac3f9bf95db0612f7b43e52cb1f2234f058b2853b918e12d9fcfbc20f118ff9f3b5628253318a685453bf45f07f7fc7d39f024752afb5dff7951a3"
+              "content": "971f8a92e09264771b1027f8477200702f55385934f9c314c258ceeb7b39cbccaa4b52f0d2c4469a33da5ac3f03f7cefde885961b32152f8d77a24175d98495c"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -1201,7 +1201,7 @@
           "name": "get",
           "group": "@electron",
           "version": "3.1.0",
-          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0",
+          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0",
           "author": "Samuel Attard",
           "description": "Utility for downloading artifacts from different versions of Electron",
           "licenses": [
@@ -1259,7 +1259,7 @@
               "type": "library",
               "name": "fs-extra",
               "version": "8.1.0",
-              "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0|fs-extra@8.1.0",
+              "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0|fs-extra@8.1.0",
               "author": "JP Richardson",
               "description": "fs-extra contains methods that aren't included in the vanilla Node.js fs package. Such as mkdir -p, cp -r, and rm -rf.",
               "licenses": [
@@ -1317,7 +1317,7 @@
               "type": "library",
               "name": "semver",
               "version": "6.3.1",
-              "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0|semver@6.3.1",
+              "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0|semver@6.3.1",
               "author": "GitHub Inc.",
               "description": "The semantic version parser used by npm.",
               "licenses": [
@@ -1373,7 +1373,7 @@
           "type": "library",
           "name": "ci-info",
           "version": "4.3.1",
-          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|ci-info@4.3.1",
+          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|ci-info@4.3.1",
           "author": "Thomas Watson Steen",
           "description": "Get details about the current Continuous Integration environment",
           "licenses": [
@@ -1431,7 +1431,7 @@
           "type": "library",
           "name": "semver",
           "version": "7.7.4",
-          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|semver@7.7.4",
+          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|semver@7.7.4",
           "author": "GitHub Inc.",
           "description": "The semantic version parser used by npm.",
           "licenses": [
@@ -1489,7 +1489,7 @@
           "type": "library",
           "name": "env-paths",
           "version": "2.2.1",
-          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|env-paths@2.2.1",
+          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|env-paths@2.2.1",
           "author": "Sindre Sorhus",
           "description": "Get paths for storing things like data, config, cache, etc",
           "licenses": [
@@ -1547,7 +1547,7 @@
           "type": "library",
           "name": "jsonfile",
           "version": "4.0.0",
-          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|jsonfile@4.0.0",
+          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|jsonfile@4.0.0",
           "author": "JP Richardson",
           "description": "Easily read/write JSON files.",
           "licenses": [
@@ -1601,7 +1601,7 @@
           "type": "library",
           "name": "universalify",
           "version": "0.1.2",
-          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|universalify@0.1.2",
+          "bom-ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|universalify@0.1.2",
           "author": "Ryan Zimmerman",
           "description": "Make a callback- or promise-based function support both promises and callbacks.",
           "licenses": [
@@ -1717,8 +1717,8 @@
     {
       "type": "library",
       "name": "builder-util",
-      "version": "26.15.3",
-      "bom-ref": "timer-widget@2.12.2|builder-util@26.15.3",
+      "version": "26.16.0",
+      "bom-ref": "timer-widget@2.12.2|builder-util@26.16.0",
       "author": "Vladimir Krivosheev",
       "licenses": [
         {
@@ -1727,7 +1727,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/builder-util@26.15.3",
+      "purl": "pkg:npm/builder-util@26.16.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron-userland/electron-builder.git#packages/builder-util",
@@ -1745,12 +1745,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/builder-util/-/builder-util-26.15.3.tgz",
+          "url": "https://registry.npmjs.org/builder-util/-/builder-util-26.16.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "ab6867ecc6e8da714d9157a43e21c5c7a35fa37854466112ded7c19fe9393eac65d919263f7406a995211ffabd3dc87fe06d3935184f8c39558f53bcab84f1bf"
+              "content": "44bc89841ed28b7624cca47db9b42c956b975b7561b370867b58be49e8b1059d2a4ddd669375c19acb2f636d93941e824b96e5ca4a3c1aed49ce9624f1491802"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -1832,8 +1832,8 @@
     {
       "type": "library",
       "name": "dmg-builder",
-      "version": "26.15.3",
-      "bom-ref": "timer-widget@2.12.2|dmg-builder@26.15.3",
+      "version": "26.18.0",
+      "bom-ref": "timer-widget@2.12.2|dmg-builder@26.18.0",
       "author": "Vladimir Krivosheev",
       "licenses": [
         {
@@ -1842,7 +1842,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/dmg-builder@26.15.3",
+      "purl": "pkg:npm/dmg-builder@26.18.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron-userland/electron-builder.git#packages/dmg-builder",
@@ -1860,12 +1860,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/dmg-builder/-/dmg-builder-26.15.3.tgz",
+          "url": "https://registry.npmjs.org/dmg-builder/-/dmg-builder-26.18.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "3b7cc95055181c92a0ccfaa2a07c5fc730739520b5797092afbf6031204a04fe408238e99abc9d32c30ba2d120f5f009177eaf7549dc6fee27751371a0f76549"
+              "content": "a330860b9e308b60b54644b6bfaf72f65431be84350a887e893f029968b263ccb566e38a56fb8db289f61ddf8710eb3df8464d36c3816f32a0419e1236a59dd3"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4516,8 +4516,8 @@
     {
       "type": "library",
       "name": "playwright-core",
-      "version": "1.63.0",
-      "bom-ref": "timer-widget@2.12.2|playwright-core@1.63.0",
+      "version": "1.64.1",
+      "bom-ref": "timer-widget@2.12.2|playwright-core@1.64.1",
       "author": "Microsoft Corporation",
       "description": "A high-level API to automate web browsers",
       "licenses": [
@@ -4527,7 +4527,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/playwright-core@1.63.0",
+      "purl": "pkg:npm/playwright-core@1.64.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/microsoft/playwright.git",
@@ -4545,12 +4545,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.63.0.tgz",
+          "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "ad80ac045fcce478d4721e766dbb5538d1058efe97bbcb26f21ef674d951e5bcc81357ef0bf6f182ca7392349f53e3307843263ccf0a25e6c6ea79f2c68e660a"
+              "content": "042e2cf32e9211503a435ad2c594eda3c848d4a508df15e51c6660bc6a8fe08a8f748fdae855fd1f6f480cdcfbbcaa3d976d5be8b7d8a2c49c3cbe8cdf1c720d"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -4930,8 +4930,8 @@
       "type": "library",
       "name": "rebuild",
       "group": "@electron",
-      "version": "4.2.0",
-      "bom-ref": "timer-widget@2.12.2|@electron/rebuild@4.2.0",
+      "version": "4.2.1",
+      "bom-ref": "timer-widget@2.12.2|@electron/rebuild@4.2.1",
       "description": "Electron supporting package to rebuild native node modules against the currently installed electron",
       "licenses": [
         {
@@ -4940,7 +4940,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40electron/rebuild@4.2.0",
+      "purl": "pkg:npm/%40electron/rebuild@4.2.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron/rebuild.git",
@@ -4958,12 +4958,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/@electron/rebuild/-/rebuild-4.2.0.tgz",
+          "url": "https://registry.npmjs.org/@electron/rebuild/-/rebuild-4.2.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "44a2ff3be8c6a1724cc6bc7fe7bef5cb59f4c532a616e39818ede0326c32a4133aaec1f4928bb49acc3075703626b848904e31c82eeff6f1a4d27e8d3f380ec5"
+              "content": "212e291b7072b11ac22c9f314c07ef83e2100db894a00cdd272d927e37182a72c3cb90e909d8e73dd852e597f950c7eb901db8c6ed0a0be4ea70ec60f9e1beeb"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -5046,8 +5046,8 @@
         {
           "type": "library",
           "name": "fs-extra",
-          "version": "11.4.0",
-          "bom-ref": "timer-widget@2.12.2|@electron/universal@2.0.3|fs-extra@11.4.0",
+          "version": "11.4.1",
+          "bom-ref": "timer-widget@2.12.2|@electron/universal@2.0.3|fs-extra@11.4.1",
           "author": "JP Richardson",
           "description": "fs-extra contains methods that aren't included in the vanilla Node.js fs package. Such as recursive mkdir, copy, and remove.",
           "licenses": [
@@ -5057,7 +5057,7 @@
               }
             }
           ],
-          "purl": "pkg:npm/fs-extra@11.4.0",
+          "purl": "pkg:npm/fs-extra@11.4.1",
           "externalReferences": [
             {
               "url": "git+https://github.com/jprichardson/node-fs-extra.git",
@@ -5075,12 +5075,12 @@
               "comment": "as detected from PackageJson property \"bugs.url\""
             },
             {
-              "url": "https://registry.npmjs.org/fs-extra/-/fs-extra-11.4.0.tgz",
+              "url": "https://registry.npmjs.org/fs-extra/-/fs-extra-11.4.1.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "110b05ccc509902286af578faa56000e42149875b5b37657af962acbac1b1ab7d40a986997699a33f932388440d87a4fdc06854136570f895d8de93e9dc71d74"
+                  "content": "29801be1cf4125023a42a18ab6157af0e1ded1b69dced7572562a8d16b4103d22e0853d32af13965d5018253fcdf768c8e16923cd3b80398ff124cd9b4694a8c"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -5284,8 +5284,8 @@
       "type": "library",
       "name": "hashes",
       "group": "@noble",
-      "version": "2.3.0",
-      "bom-ref": "timer-widget@2.12.2|@noble/hashes@2.3.0",
+      "version": "1.8.0",
+      "bom-ref": "timer-widget@2.12.2|@noble/hashes@1.8.0",
       "author": "Paul Miller",
       "description": "Audited & minimal 0-dependency JS implementation of SHA, RIPEMD, BLAKE, HMAC, HKDF, PBKDF & Scrypt",
       "licenses": [
@@ -5295,7 +5295,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40noble/hashes@2.3.0",
+      "purl": "pkg:npm/%40noble/hashes@1.8.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/paulmillr/noble-hashes.git",
@@ -5313,12 +5313,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/@noble/hashes/-/hashes-2.3.0.tgz",
+          "url": "https://registry.npmjs.org/@noble/hashes/-/hashes-1.8.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "a0df90c325fb5521e8b626f0b9b1b7929cdbc0aadf9f247a38e3bedcd93fe770032fb1668071f3e1382b6da60abef3b0d3dbba413c74a221f570d0883ae37409"
+              "content": "8c2b3d95d77b370ce98170c87fa3f7f8dac787dfec0fa0907711f28d023e87feab0cda3cf32a41c71cf8e540ee647cfdaf7b4dcfb37f5489d256855db57108e0"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -5327,7 +5327,7 @@
       "properties": [
         {
           "name": "cdx:npm:package:constraint:engine:node",
-          "value": ">= 20.19.0"
+          "value": "^14.21.3 || >=16"
         },
         {
           "name": "cdx:npm:package:development",
@@ -5343,8 +5343,8 @@
       "type": "library",
       "name": "webcrypto",
       "group": "@peculiar",
-      "version": "1.7.1",
-      "bom-ref": "timer-widget@2.12.2|@peculiar/webcrypto@1.7.1",
+      "version": "1.7.2",
+      "bom-ref": "timer-widget@2.12.2|@peculiar/webcrypto@1.7.2",
       "author": "PeculiarVentures",
       "description": "A WebCrypto Polyfill for NodeJS",
       "licenses": [
@@ -5354,7 +5354,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40peculiar/webcrypto@1.7.1",
+      "purl": "pkg:npm/%40peculiar/webcrypto@1.7.2",
       "externalReferences": [
         {
           "url": "git+https://github.com/PeculiarVentures/webcrypto.git",
@@ -5372,12 +5372,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/@peculiar/webcrypto/-/webcrypto-1.7.1.tgz",
+          "url": "https://registry.npmjs.org/@peculiar/webcrypto/-/webcrypto-1.7.2.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "3833a8bf4b0630931fde33e89ce9201aa3e49d3b2ef83750ee40fefa0cfc688f9a14c38c1c56d6000dad6aa5d755374ff8e4ce411ff39c6bd2a6691e23459361"
+              "content": "92d4d2002449e567697e31e3153d845894103da706bf570f0837c46dd9a90073b1745898a8f7b895f9d7180dc3f0383dff49073d84afc91960ba320e5654ddbd"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -5509,8 +5509,8 @@
     {
       "type": "library",
       "name": "asn1js",
-      "version": "3.0.10",
-      "bom-ref": "timer-widget@2.12.2|asn1js@3.0.10",
+      "version": "3.1.0",
+      "bom-ref": "timer-widget@2.12.2|asn1js@3.1.0",
       "author": "Yury Strozhevsky",
       "description": "asn1js is a pure JavaScript library implementing this standard. ASN.1 is the basis of all X.509 related data structures and numerous other protocols used on the web",
       "licenses": [
@@ -5520,7 +5520,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/asn1js@3.0.10",
+      "purl": "pkg:npm/asn1js@3.1.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/PeculiarVentures/ASN1.js.git",
@@ -5538,12 +5538,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/asn1js/-/asn1js-3.0.10.tgz",
+          "url": "https://registry.npmjs.org/asn1js/-/asn1js-3.1.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "4b6b3768ecad88a74545dba5c36a8f139d4cce3cd53a2b29a5c56fee354547e2b0d24c70bc5ac371803487b35da9b9a3d0790c2176166a88fb7e58bc920c757a"
+              "content": "1d6622d531e43aa82e0a23bebf08f4f59910143da4284b1e8d81c0602b57d03f345957680e7bd173d22e9175ff8de6f44fd3515899d1b6ac1d6c796d9c58f05c"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -5851,8 +5851,8 @@
     {
       "type": "library",
       "name": "electron-builder-squirrel-windows",
-      "version": "26.15.3",
-      "bom-ref": "timer-widget@2.12.2|electron-builder-squirrel-windows@26.15.3",
+      "version": "26.18.0",
+      "bom-ref": "timer-widget@2.12.2|electron-builder-squirrel-windows@26.18.0",
       "author": "Vladimir Krivosheev",
       "licenses": [
         {
@@ -5861,7 +5861,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/electron-builder-squirrel-windows@26.15.3",
+      "purl": "pkg:npm/electron-builder-squirrel-windows@26.18.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron-userland/electron-builder.git#packages/electron-builder-squirrel-windows",
@@ -5879,12 +5879,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/electron-builder-squirrel-windows/-/electron-builder-squirrel-windows-26.15.3.tgz",
+          "url": "https://registry.npmjs.org/electron-builder-squirrel-windows/-/electron-builder-squirrel-windows-26.18.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "25cd7d5cf57dcbdfb66c07593e45ee54d18d204141abda681c2eb597c2afe8574aec3446dfe21cd2b7ab0b40d739a787373f325b47e0fc99c5f0641138e17930"
+              "content": "6b67a58138a96e85cd22cc6a4b51ce987306a783dddcb26021939d2054ceb240526b0bf12b265661643577b28a0380ad20d49c85809810ace1c51aa22997aff5"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -5904,8 +5904,8 @@
     {
       "type": "library",
       "name": "electron-publish",
-      "version": "26.15.3",
-      "bom-ref": "timer-widget@2.12.2|electron-publish@26.15.3",
+      "version": "26.18.0",
+      "bom-ref": "timer-widget@2.12.2|electron-publish@26.18.0",
       "author": "Vladimir Krivosheev",
       "licenses": [
         {
@@ -5914,7 +5914,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/electron-publish@26.15.3",
+      "purl": "pkg:npm/electron-publish@26.18.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron-userland/electron-builder.git#packages/electron-publish",
@@ -5932,12 +5932,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/electron-publish/-/electron-publish-26.15.3.tgz",
+          "url": "https://registry.npmjs.org/electron-publish/-/electron-publish-26.18.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "83fd9b9fc6136af63872e4b917e8ce4bbce665b5d7055f0a67cc8729f26314fa0ab7306aae909d34fc41777b6a741c0fec155dd251b37fb064dacd0a7ac599e1"
+              "content": "31a827a9a65200b4968dc74abb91c4561614643ff60432f7abb5f3aea5b0b9bea07ff51f0f722d3209ad8550eff70e72f44d201f50b7256a8a697c1fe9fe113a"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -6184,8 +6184,8 @@
     {
       "type": "library",
       "name": "pkijs",
-      "version": "3.4.0",
-      "bom-ref": "timer-widget@2.12.2|pkijs@3.4.0",
+      "version": "3.4.3",
+      "bom-ref": "timer-widget@2.12.2|pkijs@3.4.3",
       "author": "Yury Strozhevsky",
       "description": "Public Key Infrastructure (PKI) is the basis of how identity and key management is performed on the web today. PKIjs is a pure JavaScript library implementing the formats that are used in PKI applications. It is built on WebCrypto and aspires to make it possible to build native web applications that utilize X.509 and the related formats on the web without plug-ins",
       "licenses": [
@@ -6195,10 +6195,10 @@
           }
         }
       ],
-      "purl": "pkg:npm/pkijs@3.4.0",
+      "purl": "pkg:npm/pkijs@3.4.3",
       "externalReferences": [
         {
-          "url": "git://github.com/PeculiarVentures/PKI.js.git",
+          "url": "git+https://github.com/PeculiarVentures/PKI.js.git",
           "type": "vcs",
           "comment": "as detected from PackageJson property \"repository.url\""
         },
@@ -6213,12 +6213,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/pkijs/-/pkijs-3.4.0.tgz",
+          "url": "https://registry.npmjs.org/pkijs/-/pkijs-3.4.3.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "7a611c2eea26b768f4defc43e78822541e12c538e7b2a914ebddb164e6571c3568632ca9126f9bde3a624dc73e09ffa6ca8a1cfbf2f2d33d358ea78d1d58091b"
+              "content": "57d90ecda22dc0382a96bca15f2b10b005d410a8b93bb92a59468fddd5c8ecc2ef90fa9658c6f8c156f5400b6610308a23e5c800836c66834a30517bb196f57a"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -6236,67 +6236,6 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/pkijs"
-        }
-      ],
-      "components": [
-        {
-          "type": "library",
-          "name": "hashes",
-          "group": "@noble",
-          "version": "1.4.0",
-          "bom-ref": "timer-widget@2.12.2|pkijs@3.4.0|@noble/hashes@1.4.0",
-          "author": "Paul Miller",
-          "description": "Audited & minimal 0-dependency JS implementation of SHA, RIPEMD, BLAKE, HMAC, HKDF, PBKDF & Scrypt",
-          "licenses": [
-            {
-              "license": {
-                "id": "MIT"
-              }
-            }
-          ],
-          "purl": "pkg:npm/%40noble/hashes@1.4.0",
-          "externalReferences": [
-            {
-              "url": "git+https://github.com/paulmillr/noble-hashes.git",
-              "type": "vcs",
-              "comment": "as detected from PackageJson property \"repository.url\""
-            },
-            {
-              "url": "https://paulmillr.com/noble/",
-              "type": "website",
-              "comment": "as detected from PackageJson property \"homepage\""
-            },
-            {
-              "url": "https://github.com/paulmillr/noble-hashes/issues",
-              "type": "issue-tracker",
-              "comment": "as detected from PackageJson property \"bugs.url\""
-            },
-            {
-              "url": "https://registry.npmjs.org/@noble/hashes/-/hashes-1.4.0.tgz",
-              "type": "distribution",
-              "hashes": [
-                {
-                  "alg": "SHA-512",
-                  "content": "575249d564d152a1c7ace4a1e7dee151170ca9529518bfde6b792fd204a711db04674ffe5723e084cd6530d19cd34cfb088428ad2bdb2a9b89931bee1dbbdd6e"
-                }
-              ],
-              "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-            }
-          ],
-          "properties": [
-            {
-              "name": "cdx:npm:package:constraint:engine:node",
-              "value": ">= 16"
-            },
-            {
-              "name": "cdx:npm:package:development",
-              "value": "true"
-            },
-            {
-              "name": "cdx:npm:package:path",
-              "value": "node_modules/pkijs/node_modules/@noble/hashes"
-            }
-          ]
         }
       ]
     },
@@ -10234,8 +10173,8 @@
     {
       "type": "library",
       "name": "node-abi",
-      "version": "4.33.0",
-      "bom-ref": "timer-widget@2.12.2|node-abi@4.33.0",
+      "version": "4.40.0",
+      "bom-ref": "timer-widget@2.12.2|node-abi@4.40.0",
       "author": "Lukas Geiger",
       "description": "Get the Node ABI for a given target and runtime, and vice versa.",
       "licenses": [
@@ -10245,7 +10184,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/node-abi@4.33.0",
+      "purl": "pkg:npm/node-abi@4.40.0",
       "externalReferences": [
         {
           "url": "git+https://github.com/electron/node-abi.git",
@@ -10263,12 +10202,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/node-abi/-/node-abi-4.33.0.tgz",
+          "url": "https://registry.npmjs.org/node-abi/-/node-abi-4.40.0.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "bcb05608a6feecb5ac5fe4db7f358e930d16f359b7efbb72c7784ec1e0538cee370976674464b5fc93d6b36d1faf43e06720d793a44e62bca5b04c9c2bcada0c"
+              "content": "1aebeabedace93e002dbb462741c41b0ccd5364c0d97b3e31e07383576e676f4952e02148e96aa706d458cd4589edd989fd62dabe2e7dfb5ec05a82551cb5eff"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -10914,8 +10853,8 @@
       "type": "library",
       "name": "asn1-schema",
       "group": "@peculiar",
-      "version": "2.9.3",
-      "bom-ref": "timer-widget@2.12.2|@peculiar/asn1-schema@2.9.3",
+      "version": "2.11.1",
+      "bom-ref": "timer-widget@2.12.2|@peculiar/asn1-schema@2.11.1",
       "author": "PeculiarVentures, LLC",
       "description": "Decorators and helper APIs for declaring ASN.1 schemas in TypeScript.",
       "licenses": [
@@ -10925,7 +10864,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40peculiar/asn1-schema@2.9.3",
+      "purl": "pkg:npm/%40peculiar/asn1-schema@2.11.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/PeculiarVentures/asn1-schema.git#packages/schema",
@@ -10943,18 +10882,22 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/@peculiar/asn1-schema/-/asn1-schema-2.9.3.tgz",
+          "url": "https://registry.npmjs.org/@peculiar/asn1-schema/-/asn1-schema-2.11.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "48ebb1e3e8e29029cec2826fa41a7f82b3aacc59893e7352c1edec020d419fddd87660a20edbe895989f24886246ad1458c4e72d13e3f7f6423007365bd56c31"
+              "content": "8da53d39a09c6d951dc97c7d84c113641f71a0d9b14c68ce185a9dddc3b02859292a7c8a77d5b1177baa8f83ef5f873238c3fd6d274783963230bdaab71fddfe"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
         }
       ],
       "properties": [
+        {
+          "name": "cdx:npm:package:constraint:engine:node",
+          "value": ">=14"
+        },
         {
           "name": "cdx:npm:package:development",
           "value": "true"
@@ -11082,8 +11025,8 @@
     {
       "type": "library",
       "name": "tslib",
-      "version": "2.8.1",
-      "bom-ref": "timer-widget@2.12.2|tslib@2.8.1",
+      "version": "2.9.1",
+      "bom-ref": "timer-widget@2.12.2|tslib@2.9.1",
       "author": "Microsoft Corp.",
       "description": "Runtime library for TypeScript helper functions",
       "licenses": [
@@ -11093,7 +11036,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/tslib@2.8.1",
+      "purl": "pkg:npm/tslib@2.9.1",
       "externalReferences": [
         {
           "url": "git+https://github.com/Microsoft/tslib.git",
@@ -11111,12 +11054,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz",
+          "url": "https://registry.npmjs.org/tslib/-/tslib-2.9.1.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "a0916ef781d06fe29576e49440bef09e99aa9df98bb0e03f9c087a6fa107d30084a0ad3f98f79753a737c0a0d5f373243ae1cf447b525ca294f7d2016b34bfdb"
+              "content": "6b8531f552ae20c1ec392ec435b12aea12b66466084f6ed1b65d04e1e0fd2aac3184a89078c644ffdc5bdc8758c166923b220140b1318508170d3628882c6758"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -15939,8 +15882,8 @@
         {
           "type": "library",
           "name": "fs-extra",
-          "version": "11.4.0",
-          "bom-ref": "timer-widget@2.12.2|@electron/windows-sign@1.2.2|fs-extra@11.4.0",
+          "version": "11.4.1",
+          "bom-ref": "timer-widget@2.12.2|@electron/windows-sign@1.2.2|fs-extra@11.4.1",
           "author": "JP Richardson",
           "description": "fs-extra contains methods that aren't included in the vanilla Node.js fs package. Such as recursive mkdir, copy, and remove.",
           "scope": "optional",
@@ -15951,7 +15894,7 @@
               }
             }
           ],
-          "purl": "pkg:npm/fs-extra@11.4.0",
+          "purl": "pkg:npm/fs-extra@11.4.1",
           "externalReferences": [
             {
               "url": "git+https://github.com/jprichardson/node-fs-extra.git",
@@ -15969,12 +15912,12 @@
               "comment": "as detected from PackageJson property \"bugs.url\""
             },
             {
-              "url": "https://registry.npmjs.org/fs-extra/-/fs-extra-11.4.0.tgz",
+              "url": "https://registry.npmjs.org/fs-extra/-/fs-extra-11.4.1.tgz",
               "type": "distribution",
               "hashes": [
                 {
                   "alg": "SHA-512",
-                  "content": "110b05ccc509902286af578faa56000e42149875b5b37657af962acbac1b1ab7d40a986997699a33f932388440d87a4fdc06854136570f895d8de93e9dc71d74"
+                  "content": "29801be1cf4125023a42a18ab6157af0e1ded1b69dced7572562a8d16b4103d22e0853d32af13965d5018253fcdf768c8e16923cd3b80398ff124cd9b4694a8c"
                 }
               ],
               "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -18017,8 +17960,8 @@
     {
       "type": "library",
       "name": "picomatch",
-      "version": "4.0.5",
-      "bom-ref": "timer-widget@2.12.2|picomatch@4.0.5",
+      "version": "4.0.7",
+      "bom-ref": "timer-widget@2.12.2|picomatch@4.0.7",
       "author": "Jon Schlinkert",
       "description": "Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.",
       "licenses": [
@@ -18028,7 +17971,7 @@
           }
         }
       ],
-      "purl": "pkg:npm/picomatch@4.0.5",
+      "purl": "pkg:npm/picomatch@4.0.7",
       "externalReferences": [
         {
           "url": "git+https://github.com/micromatch/picomatch.git",
@@ -18046,12 +17989,12 @@
           "comment": "as detected from PackageJson property \"bugs.url\""
         },
         {
-          "url": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.5.tgz",
+          "url": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.7.tgz",
           "type": "distribution",
           "hashes": [
             {
               "alg": "SHA-512",
-              "content": "46fc3072bb8d8c8d67713e7145a91ec92f4b7fc95c22dbf7e0a0fe6a27fe547f6476e0327d8062a46875db6ef8c6d7a720f675d7dfd1f4175305af200304a1d0"
+              "content": "a9c26ef3c436216a89b030f9dbd24a31dc069bf76f2275b81ef427470887f49b62849bf318eb1c0ed1c4df1d6904a794393cac43c91598b9c9da426eef285c18"
             }
           ],
           "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
@@ -20111,14 +20054,14 @@
       "dependsOn": [
         "timer-widget@2.12.2|@electron/fuses@1.8.0",
         "timer-widget@2.12.2|@eslint/js@10.0.1",
-        "timer-widget@2.12.2|@playwright/test@1.63.0",
+        "timer-widget@2.12.2|@playwright/test@1.64.1",
         "timer-widget@2.12.2|@types/node@24.13.3",
-        "timer-widget@2.12.2|electron-builder@26.15.3",
+        "timer-widget@2.12.2|electron-builder@26.18.0",
         "timer-widget@2.12.2|electron-log@5.4.4",
         "timer-widget@2.12.2|electron@44.10.0",
         "timer-widget@2.12.2|eslint-plugin-html@8.2.1",
-        "timer-widget@2.12.2|eslint@10.11.0",
-        "timer-widget@2.12.2|globals@17.12.0",
+        "timer-widget@2.12.2|eslint@10.14.0",
+        "timer-widget@2.12.2|globals@17.14.0",
         "timer-widget@2.12.2|typescript@6.0.3"
       ]
     },
@@ -20142,13 +20085,13 @@
     {
       "ref": "timer-widget@2.12.2|@eslint/js@10.0.1",
       "dependsOn": [
-        "timer-widget@2.12.2|eslint@10.11.0"
+        "timer-widget@2.12.2|eslint@10.14.0"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|@playwright/test@1.63.0",
+      "ref": "timer-widget@2.12.2|@playwright/test@1.64.1",
       "dependsOn": [
-        "timer-widget@2.12.2|playwright@1.63.0"
+        "timer-widget@2.12.2|playwright@1.64.1"
       ]
     },
     {
@@ -20158,14 +20101,14 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|electron-builder@26.15.3",
+      "ref": "timer-widget@2.12.2|electron-builder@26.18.0",
       "dependsOn": [
-        "timer-widget@2.12.2|app-builder-lib@26.15.3",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0",
         "timer-widget@2.12.2|builder-util-runtime@9.7.0",
-        "timer-widget@2.12.2|builder-util@26.15.3",
+        "timer-widget@2.12.2|builder-util@26.16.0",
         "timer-widget@2.12.2|chalk@4.1.2",
         "timer-widget@2.12.2|ci-info@4.4.0",
-        "timer-widget@2.12.2|dmg-builder@26.15.3",
+        "timer-widget@2.12.2|dmg-builder@26.18.0",
         "timer-widget@2.12.2|fs-extra@10.1.0",
         "timer-widget@2.12.2|lazy-val@1.0.5",
         "timer-widget@2.12.2|simple-update-notifier@2.0.0",
@@ -20190,7 +20133,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|eslint@10.11.0",
+      "ref": "timer-widget@2.12.2|eslint@10.14.0",
       "dependsOn": [
         "timer-widget@2.12.2|@eslint-community/eslint-utils@4.10.1",
         "timer-widget@2.12.2|@eslint-community/regexpp@4.12.2",
@@ -20202,7 +20145,7 @@
         "timer-widget@2.12.2|@humanwhocodes/module-importer@1.0.1",
         "timer-widget@2.12.2|@humanwhocodes/retry@0.4.3",
         "timer-widget@2.12.2|@types/estree@1.0.9",
-        "timer-widget@2.12.2|eslint@10.11.0|ajv@6.15.0",
+        "timer-widget@2.12.2|eslint@10.14.0|ajv@6.15.0",
         "timer-widget@2.12.2|cross-spawn@7.0.6",
         "timer-widget@2.12.2|debug@4.4.3",
         "timer-widget@2.12.2|escape-string-regexp@4.0.0",
@@ -20226,19 +20169,19 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|eslint@10.11.0|ajv@6.15.0",
+      "ref": "timer-widget@2.12.2|eslint@10.14.0|ajv@6.15.0",
       "dependsOn": [
         "timer-widget@2.12.2|fast-deep-equal@3.1.3",
         "timer-widget@2.12.2|fast-json-stable-stringify@2.1.0",
-        "timer-widget@2.12.2|eslint@10.11.0|json-schema-traverse@0.4.1",
+        "timer-widget@2.12.2|eslint@10.14.0|json-schema-traverse@0.4.1",
         "timer-widget@2.12.2|uri-js@4.4.1"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|eslint@10.11.0|json-schema-traverse@0.4.1"
+      "ref": "timer-widget@2.12.2|eslint@10.14.0|json-schema-traverse@0.4.1"
     },
     {
-      "ref": "timer-widget@2.12.2|globals@17.12.0"
+      "ref": "timer-widget@2.12.2|globals@17.14.0"
     },
     {
       "ref": "timer-widget@2.12.2|typescript@6.0.3"
@@ -20254,42 +20197,42 @@
       "ref": "timer-widget@2.12.2|minimist@1.2.8"
     },
     {
-      "ref": "timer-widget@2.12.2|playwright@1.63.0",
+      "ref": "timer-widget@2.12.2|playwright@1.64.1",
       "dependsOn": [
-        "timer-widget@2.12.2|playwright-core@1.63.0"
+        "timer-widget@2.12.2|playwright-core@1.64.1"
       ]
     },
     {
       "ref": "timer-widget@2.12.2|undici-types@7.18.2"
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3",
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0",
       "dependsOn": [
         "timer-widget@2.12.2|@electron/asar@3.4.1",
         "timer-widget@2.12.2|@electron/fuses@1.8.0",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0",
         "timer-widget@2.12.2|@electron/notarize@2.5.0",
         "timer-widget@2.12.2|@electron/osx-sign@1.3.3",
-        "timer-widget@2.12.2|@electron/rebuild@4.2.0",
+        "timer-widget@2.12.2|@electron/rebuild@4.2.1",
         "timer-widget@2.12.2|@electron/universal@2.0.3",
         "timer-widget@2.12.2|@malept/flatpak-bundler@0.4.0",
-        "timer-widget@2.12.2|@noble/hashes@2.3.0",
-        "timer-widget@2.12.2|@peculiar/webcrypto@1.7.1",
+        "timer-widget@2.12.2|@noble/hashes@1.8.0",
+        "timer-widget@2.12.2|@peculiar/webcrypto@1.7.2",
         "timer-widget@2.12.2|@types/fs-extra@9.0.13",
         "timer-widget@2.12.2|ajv@8.20.0",
-        "timer-widget@2.12.2|asn1js@3.0.10",
+        "timer-widget@2.12.2|asn1js@3.1.0",
         "timer-widget@2.12.2|async-exit-hook@2.0.1",
         "timer-widget@2.12.2|builder-util-runtime@9.7.0",
-        "timer-widget@2.12.2|builder-util@26.15.3",
+        "timer-widget@2.12.2|builder-util@26.16.0",
         "timer-widget@2.12.2|chromium-pickle-js@0.2.0",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|ci-info@4.3.1",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|ci-info@4.3.1",
         "timer-widget@2.12.2|debug@4.4.3",
-        "timer-widget@2.12.2|dmg-builder@26.15.3",
+        "timer-widget@2.12.2|dmg-builder@26.18.0",
         "timer-widget@2.12.2|dotenv-expand@11.0.7",
         "timer-widget@2.12.2|dotenv@16.6.1",
         "timer-widget@2.12.2|ejs@3.1.10",
-        "timer-widget@2.12.2|electron-builder-squirrel-windows@26.15.3",
-        "timer-widget@2.12.2|electron-publish@26.15.3",
+        "timer-widget@2.12.2|electron-builder-squirrel-windows@26.18.0",
+        "timer-widget@2.12.2|electron-publish@26.18.0",
         "timer-widget@2.12.2|fs-extra@10.1.0",
         "timer-widget@2.12.2|hosted-git-info@4.1.0",
         "timer-widget@2.12.2|isbinaryfile@5.0.7",
@@ -20298,11 +20241,11 @@
         "timer-widget@2.12.2|json5@2.2.3",
         "timer-widget@2.12.2|lazy-val@1.0.5",
         "timer-widget@2.12.2|minimatch@10.2.6",
-        "timer-widget@2.12.2|pkijs@3.4.0",
+        "timer-widget@2.12.2|pkijs@3.4.3",
         "timer-widget@2.12.2|plist@3.1.0",
         "timer-widget@2.12.2|proper-lockfile@4.1.2",
         "timer-widget@2.12.2|resedit@1.7.2",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|semver@7.7.4",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|semver@7.7.4",
         "timer-widget@2.12.2|tar@7.5.22",
         "timer-widget@2.12.2|temp-file@3.4.0",
         "timer-widget@2.12.2|tiny-async-pool@1.3.0",
@@ -20311,46 +20254,46 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0",
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0",
       "dependsOn": [
         "timer-widget@2.12.2|debug@4.4.3",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|env-paths@2.2.1",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0|fs-extra@8.1.0",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|env-paths@2.2.1",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0|fs-extra@8.1.0",
         "timer-widget@2.12.2|global-agent@3.0.0",
         "timer-widget@2.12.2|got@11.8.6",
         "timer-widget@2.12.2|progress@2.0.3",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0|semver@6.3.1",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0|semver@6.3.1",
         "timer-widget@2.12.2|sumchecker@3.0.1"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0|fs-extra@8.1.0",
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0|fs-extra@8.1.0",
       "dependsOn": [
         "timer-widget@2.12.2|graceful-fs@4.2.11",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|jsonfile@4.0.0",
-        "timer-widget@2.12.2|app-builder-lib@26.15.3|universalify@0.1.2"
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|jsonfile@4.0.0",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0|universalify@0.1.2"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|@electron/get@3.1.0|semver@6.3.1"
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|@electron/get@3.1.0|semver@6.3.1"
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|ci-info@4.3.1"
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|ci-info@4.3.1"
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|semver@7.7.4"
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|semver@7.7.4"
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|env-paths@2.2.1"
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|env-paths@2.2.1"
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|jsonfile@4.0.0",
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|jsonfile@4.0.0",
       "dependsOn": [
         "timer-widget@2.12.2|graceful-fs@4.2.11"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|app-builder-lib@26.15.3|universalify@0.1.2"
+      "ref": "timer-widget@2.12.2|app-builder-lib@26.18.0|universalify@0.1.2"
     },
     {
       "ref": "timer-widget@2.12.2|builder-util-runtime@9.7.0",
@@ -20360,7 +20303,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|builder-util@26.15.3",
+      "ref": "timer-widget@2.12.2|builder-util@26.16.0",
       "dependsOn": [
         "timer-widget@2.12.2|@types/debug@4.1.13",
         "timer-widget@2.12.2|builder-util-runtime@9.7.0",
@@ -20382,10 +20325,10 @@
       "ref": "timer-widget@2.12.2|ci-info@4.4.0"
     },
     {
-      "ref": "timer-widget@2.12.2|dmg-builder@26.15.3",
+      "ref": "timer-widget@2.12.2|dmg-builder@26.18.0",
       "dependsOn": [
-        "timer-widget@2.12.2|app-builder-lib@26.15.3",
-        "timer-widget@2.12.2|builder-util@26.15.3",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0",
+        "timer-widget@2.12.2|builder-util@26.16.0",
         "timer-widget@2.12.2|fs-extra@10.1.0",
         "timer-widget@2.12.2|js-yaml@4.3.2"
       ]
@@ -20447,7 +20390,7 @@
       "ref": "timer-widget@2.12.2|@eslint-community/eslint-utils@4.10.1",
       "dependsOn": [
         "timer-widget@2.12.2|@eslint-community/eslint-utils@4.10.1|eslint-visitor-keys@3.4.3",
-        "timer-widget@2.12.2|eslint@10.11.0"
+        "timer-widget@2.12.2|eslint@10.14.0"
       ]
     },
     {
@@ -20644,7 +20587,7 @@
       "ref": "timer-widget@2.12.2|universalify@2.0.1"
     },
     {
-      "ref": "timer-widget@2.12.2|playwright-core@1.63.0"
+      "ref": "timer-widget@2.12.2|playwright-core@1.64.1"
     },
     {
       "ref": "timer-widget@2.12.2|@electron/asar@3.4.1",
@@ -20692,11 +20635,11 @@
       "ref": "timer-widget@2.12.2|@electron/osx-sign@1.3.3|isbinaryfile@4.0.10"
     },
     {
-      "ref": "timer-widget@2.12.2|@electron/rebuild@4.2.0",
+      "ref": "timer-widget@2.12.2|@electron/rebuild@4.2.1",
       "dependsOn": [
         "timer-widget@2.12.2|@malept/cross-spawn-promise@2.0.0",
         "timer-widget@2.12.2|debug@4.4.3",
-        "timer-widget@2.12.2|node-abi@4.33.0",
+        "timer-widget@2.12.2|node-abi@4.40.0",
         "timer-widget@2.12.2|node-api-version@0.2.1",
         "timer-widget@2.12.2|node-gyp@12.4.0",
         "timer-widget@2.12.2|read-binary-file-arch@1.0.6"
@@ -20709,13 +20652,13 @@
         "timer-widget@2.12.2|@malept/cross-spawn-promise@2.0.0",
         "timer-widget@2.12.2|debug@4.4.3",
         "timer-widget@2.12.2|dir-compare@4.2.0",
-        "timer-widget@2.12.2|@electron/universal@2.0.3|fs-extra@11.4.0",
+        "timer-widget@2.12.2|@electron/universal@2.0.3|fs-extra@11.4.1",
         "timer-widget@2.12.2|@electron/universal@2.0.3|minimatch@9.0.9",
         "timer-widget@2.12.2|plist@3.1.0"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|@electron/universal@2.0.3|fs-extra@11.4.0",
+      "ref": "timer-widget@2.12.2|@electron/universal@2.0.3|fs-extra@11.4.1",
       "dependsOn": [
         "timer-widget@2.12.2|graceful-fs@4.2.11",
         "timer-widget@2.12.2|jsonfile@6.2.1",
@@ -20747,15 +20690,15 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|@noble/hashes@2.3.0"
+      "ref": "timer-widget@2.12.2|@noble/hashes@1.8.0"
     },
     {
-      "ref": "timer-widget@2.12.2|@peculiar/webcrypto@1.7.1",
+      "ref": "timer-widget@2.12.2|@peculiar/webcrypto@1.7.2",
       "dependsOn": [
-        "timer-widget@2.12.2|@peculiar/asn1-schema@2.9.3",
+        "timer-widget@2.12.2|@peculiar/asn1-schema@2.11.1",
         "timer-widget@2.12.2|@peculiar/json-schema@1.1.12",
         "timer-widget@2.12.2|@peculiar/utils@2.0.3",
-        "timer-widget@2.12.2|tslib@2.8.1",
+        "timer-widget@2.12.2|tslib@2.9.1",
         "timer-widget@2.12.2|webcrypto-core@1.9.2"
       ]
     },
@@ -20775,11 +20718,11 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|asn1js@3.0.10",
+      "ref": "timer-widget@2.12.2|asn1js@3.1.0",
       "dependsOn": [
         "timer-widget@2.12.2|pvtsutils@1.3.6",
         "timer-widget@2.12.2|pvutils@1.2.0",
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
     },
     {
@@ -20804,20 +20747,20 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|electron-builder-squirrel-windows@26.15.3",
+      "ref": "timer-widget@2.12.2|electron-builder-squirrel-windows@26.18.0",
       "dependsOn": [
-        "timer-widget@2.12.2|app-builder-lib@26.15.3",
-        "timer-widget@2.12.2|builder-util@26.15.3",
+        "timer-widget@2.12.2|app-builder-lib@26.18.0",
+        "timer-widget@2.12.2|builder-util@26.16.0",
         "timer-widget@2.12.2|electron-winstaller@5.4.0"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|electron-publish@26.15.3",
+      "ref": "timer-widget@2.12.2|electron-publish@26.18.0",
       "dependsOn": [
         "timer-widget@2.12.2|@types/fs-extra@9.0.13",
         "timer-widget@2.12.2|aws4@1.13.2",
         "timer-widget@2.12.2|builder-util-runtime@9.7.0",
-        "timer-widget@2.12.2|builder-util@26.15.3",
+        "timer-widget@2.12.2|builder-util@26.16.0",
         "timer-widget@2.12.2|chalk@4.1.2",
         "timer-widget@2.12.2|form-data@4.0.6",
         "timer-widget@2.12.2|fs-extra@10.1.0",
@@ -20844,18 +20787,15 @@
       "ref": "timer-widget@2.12.2|json5@2.2.3"
     },
     {
-      "ref": "timer-widget@2.12.2|pkijs@3.4.0",
+      "ref": "timer-widget@2.12.2|pkijs@3.4.3",
       "dependsOn": [
-        "timer-widget@2.12.2|pkijs@3.4.0|@noble/hashes@1.4.0",
-        "timer-widget@2.12.2|asn1js@3.0.10",
+        "timer-widget@2.12.2|@noble/hashes@1.8.0",
+        "timer-widget@2.12.2|asn1js@3.1.0",
         "timer-widget@2.12.2|bytestreamjs@2.0.1",
         "timer-widget@2.12.2|pvtsutils@1.3.6",
         "timer-widget@2.12.2|pvutils@1.2.0",
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
-    },
-    {
-      "ref": "timer-widget@2.12.2|pkijs@3.4.0|@noble/hashes@1.4.0"
     },
     {
       "ref": "timer-widget@2.12.2|plist@3.1.0",
@@ -21221,7 +21161,7 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|node-abi@4.33.0",
+      "ref": "timer-widget@2.12.2|node-abi@4.40.0",
       "dependsOn": [
         "timer-widget@2.12.2|semver@7.8.5"
       ]
@@ -21291,36 +21231,36 @@
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|@peculiar/asn1-schema@2.9.3",
+      "ref": "timer-widget@2.12.2|@peculiar/asn1-schema@2.11.1",
       "dependsOn": [
         "timer-widget@2.12.2|@peculiar/utils@2.0.3",
-        "timer-widget@2.12.2|asn1js@3.0.10",
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|asn1js@3.1.0",
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
     },
     {
       "ref": "timer-widget@2.12.2|@peculiar/json-schema@1.1.12",
       "dependsOn": [
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
     },
     {
       "ref": "timer-widget@2.12.2|@peculiar/utils@2.0.3",
       "dependsOn": [
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|tslib@2.8.1"
+      "ref": "timer-widget@2.12.2|tslib@2.9.1"
     },
     {
       "ref": "timer-widget@2.12.2|webcrypto-core@1.9.2",
       "dependsOn": [
-        "timer-widget@2.12.2|@peculiar/asn1-schema@2.9.3",
+        "timer-widget@2.12.2|@peculiar/asn1-schema@2.11.1",
         "timer-widget@2.12.2|@peculiar/json-schema@1.1.12",
         "timer-widget@2.12.2|@peculiar/utils@2.0.3",
-        "timer-widget@2.12.2|asn1js@3.0.10",
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|asn1js@3.1.0",
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
     },
     {
@@ -21335,7 +21275,7 @@
     {
       "ref": "timer-widget@2.12.2|pvtsutils@1.3.6",
       "dependsOn": [
-        "timer-widget@2.12.2|tslib@2.8.1"
+        "timer-widget@2.12.2|tslib@2.9.1"
       ]
     },
     {
@@ -21682,7 +21622,7 @@
       "ref": "timer-widget@2.12.2|tinyglobby@0.2.17",
       "dependsOn": [
         "timer-widget@2.12.2|fdir@6.5.0",
-        "timer-widget@2.12.2|picomatch@4.0.5"
+        "timer-widget@2.12.2|picomatch@4.0.7"
       ]
     },
     {
@@ -21717,13 +21657,13 @@
       "dependsOn": [
         "timer-widget@2.12.2|cross-dirname@0.1.0",
         "timer-widget@2.12.2|debug@4.4.3",
-        "timer-widget@2.12.2|@electron/windows-sign@1.2.2|fs-extra@11.4.0",
+        "timer-widget@2.12.2|@electron/windows-sign@1.2.2|fs-extra@11.4.1",
         "timer-widget@2.12.2|minimist@1.2.8",
         "timer-widget@2.12.2|postject@1.0.0-alpha.6"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|@electron/windows-sign@1.2.2|fs-extra@11.4.0",
+      "ref": "timer-widget@2.12.2|@electron/windows-sign@1.2.2|fs-extra@11.4.1",
       "dependsOn": [
         "timer-widget@2.12.2|graceful-fs@4.2.11",
         "timer-widget@2.12.2|jsonfile@6.2.1",
@@ -21906,11 +21846,11 @@
     {
       "ref": "timer-widget@2.12.2|fdir@6.5.0",
       "dependsOn": [
-        "timer-widget@2.12.2|picomatch@4.0.5"
+        "timer-widget@2.12.2|picomatch@4.0.7"
       ]
     },
     {
-      "ref": "timer-widget@2.12.2|picomatch@4.0.5"
+      "ref": "timer-widget@2.12.2|picomatch@4.0.7"
     },
     {
       "ref": "timer-widget@2.12.2|yocto-queue@0.1.0"
