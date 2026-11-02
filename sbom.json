@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:91d543f1-59ee-4750-8072-8d48a757e0fa",
+  "serialNumber": "urn:uuid:8a467535-4265-4196-8511-d76509d55526",
   "metadata": {
-    "timestamp": "2026-11-02T06:37:25.853Z",
+    "timestamp": "2026-11-02T06:44:58.140Z",
     "tools": {
       "components": [
         {
@@ -797,6 +797,64 @@
               "value": "node_modules/eslint/node_modules/json-schema-traverse"
             }
           ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "fast-check",
+      "version": "4.10.2",
+      "bom-ref": "timer-widget@2.12.2|fast-check@4.10.2",
+      "author": "Nicolas DUBIEN",
+      "description": "Property based testing framework for JavaScript (like QuickCheck)",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/fast-check@4.10.2",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/dubzzz/fast-check.git#packages/fast-check",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\" and \"repository.directory\""
+        },
+        {
+          "url": "https://fast-check.dev/",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/dubzzz/fast-check/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/fast-check/-/fast-check-4.10.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "88ad9ff98adc9a8786aa4e9f03479ad9ba6d72efe2b4c226e0d7c4a33aba376e7e686ea1eece4765b07f935695edbe70e6c14b3026dbb5152c4d547e0600b7c7"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:constraint:engine:node",
+          "value": ">=12.17.0"
+        },
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/fast-check"
         }
       ]
     },
@@ -4171,6 +4229,60 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/optionator"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pure-rand",
+      "version": "8.4.2",
+      "bom-ref": "timer-widget@2.12.2|pure-rand@8.4.2",
+      "author": "Nicolas DUBIEN",
+      "description": " Pure random number generator written in TypeScript",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/pure-rand@8.4.2",
+      "externalReferences": [
+        {
+          "url": "git+https://github.com/dubzzz/pure-rand.git",
+          "type": "vcs",
+          "comment": "as detected from PackageJson property \"repository.url\""
+        },
+        {
+          "url": "https://github.com/dubzzz/pure-rand#readme",
+          "type": "website",
+          "comment": "as detected from PackageJson property \"homepage\""
+        },
+        {
+          "url": "https://github.com/dubzzz/pure-rand/issues",
+          "type": "issue-tracker",
+          "comment": "as detected from PackageJson property \"bugs.url\""
+        },
+        {
+          "url": "https://registry.npmjs.org/pure-rand/-/pure-rand-8.4.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "befb8e1a072e3c9022ae51efb90c354eb3a2c3ba6d6885d79886cdba234e63a94d189247e3d3d0d4a8f89ddefcde73dd42141d89c80e8d5236c88ffd043ebf36"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/pure-rand"
         }
       ]
     },
@@ -20061,6 +20173,7 @@
         "timer-widget@2.12.2|electron@44.10.0",
         "timer-widget@2.12.2|eslint-plugin-html@8.2.1",
         "timer-widget@2.12.2|eslint@10.14.0",
+        "timer-widget@2.12.2|fast-check@4.10.2",
         "timer-widget@2.12.2|globals@17.14.0",
         "timer-widget@2.12.2|typescript@6.0.3"
       ]
@@ -20179,6 +20292,12 @@
     },
     {
       "ref": "timer-widget@2.12.2|eslint@10.14.0|json-schema-traverse@0.4.1"
+    },
+    {
+      "ref": "timer-widget@2.12.2|fast-check@4.10.2",
+      "dependsOn": [
+        "timer-widget@2.12.2|pure-rand@8.4.2"
+      ]
     },
     {
       "ref": "timer-widget@2.12.2|globals@17.14.0"
@@ -20557,6 +20676,9 @@
         "timer-widget@2.12.2|type-check@0.4.0",
         "timer-widget@2.12.2|word-wrap@1.2.5"
       ]
+    },
+    {
+      "ref": "timer-widget@2.12.2|pure-rand@8.4.2"
     },
     {
       "ref": "timer-widget@2.12.2|ansi-styles@4.3.0",
