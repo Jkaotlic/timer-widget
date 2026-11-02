@@ -100,6 +100,14 @@ function tick(state, config = {}, stepSeconds = 1) {
         shouldFinish = true;
     }
 
+    // Потолок формата (MAX_SECONDS) действует и без заданного лимита: поправка
+    // ограничивала минус им всегда, а ход секунд уводил ниже −99:59:59, которых
+    // табло не покажет (найдено случайными цепочками, tests/timer-chains.test.js).
+    if (nextRemaining <= -MAX_SECONDS) {
+        nextRemaining = -MAX_SECONDS;
+        shouldFinish = true;
+    }
+
     const newState = {
         ...state,
         remainingSeconds: nextRemaining,

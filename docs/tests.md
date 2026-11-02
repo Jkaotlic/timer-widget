@@ -43,6 +43,9 @@
 | `constants.test.js` | CONFIG immutability and structure, plus the orphan check — every key needs a reader outside `constants.js` and this test |
 | `timer-engine.test.js` | `tick`/`adjust`/`reset`/`setPreset` arithmetic + boundary events |
 | `timer-controller.test.js` | State machine with a fake clock (start/pause/reset/reconcile) |
+| `timer-chains.test.js` | Случайные цепочки команд (fast-check, seed закреплён) на настоящих контроллере и движке: состояние допустимо, отсчёт точен при паузах, поправках, сне и переводе часов; лимит не отматывает назад, минус встаёт на −99:59:59 |
+| `logic-edges.test.js` | Границы, которые нашёл Stryker (02.11.2026): якоря и компоненты `isSafeColor`, снимок восстановления (возраст, битый файл, удаление), события движка, сон у стоящего таймера, CSV отчёта байт в байт |
+| `soak-verdict.test.js` | Правила провала долгого прогона `npm run soak` (scripts/soak.js): утечка, расхождение табло, ошибка в окне, слишком короткий прогон |
 | `recovery.test.js` | Crash-recovery persist/load/validate |
 | `event-overrun-store.test.js` | Накопитель перелимита на диске: битый/чужой файл — чистое состояние, журнал ≤ 500 с перенумерацией, `pending` сворачивается ровно один раз (BUG-04) |
 | `electron-main-load.test.js` | НАСТОЯЩИЙ главный процесс (`electron-main.js` + `main-*.js`) на заглушке `electron`: загрузка, IPC-обработчики поведением — геометрия, переоткрытие окон, журнал докладов и выгрузка, SEC-04/05/07/10/11, BUG-01/04/07/10/15/17 |
@@ -196,6 +199,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `relay-persist.spec.js` | Перезапуск с тем же профилем: виджет рождается НЕ поверх окон по файлу, CSV сразу после старта несёт название и ставку — до посылок панели (зонд в main считает посылки и проверяет себя); часы получают стиль снимком из файла при заглушённой панели (`e2e/clock-style-probe.js`) |
 | `crash-recovery.spec.js` | SIGKILL → перезапуск возвращает время и НЕ стартует сам; чистый выход без следов |
 | `settings-roundtrip.spec.js` | Настройки четырёх хранилищ переживают перезагрузку; отдельно стиль часов и тема |
+| `upgrade-from-2-12-2.spec.js` | Снимок профиля, снятый с настоящего кода тега v2.12.2 (`e2e/fixtures/profile-2.12.2.json`, не править): ключи не потеряны, значения дошли до контролов, все четыре окна поднимаются без ошибок, таймер идёт |
 | `window-drag-geometry.spec.js` | Перетаскивание двигает НАСТОЯЩЕЕ окно на точную дельту и пишет `{scalePct,x,y}` |
 | `reachable-controls.spec.js` | Help accordion by mouse AND keyboard; clock toggles really change the clock window |
 | `digits-style.spec.js` | «Цифры» доезжают до трёх окон ПО КЛИКУ: кегль подогнан, шрифт в СВОЁМ окне, подгонка идемпотентна |
