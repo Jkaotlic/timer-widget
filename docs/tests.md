@@ -44,6 +44,8 @@
 | `timer-engine.test.js` | `tick`/`adjust`/`reset`/`setPreset` arithmetic + boundary events |
 | `timer-controller.test.js` | State machine with a fake clock (start/pause/reset/reconcile) |
 | `timer-chains.test.js` | Случайные цепочки команд (fast-check, seed закреплён) на настоящих контроллере и движке: состояние допустимо, отсчёт точен при паузах, поправках, сне и переводе часов; лимит не отматывает назад, минус встаёт на −99:59:59 |
+| `logic-edges.test.js` | Границы, которые нашёл Stryker (02.11.2026): якоря и компоненты `isSafeColor`, снимок восстановления (возраст, битый файл, удаление), события движка, сон у стоящего таймера, CSV отчёта байт в байт |
+| `soak-verdict.test.js` | Правила провала долгого прогона `npm run soak` (scripts/soak.js): утечка, расхождение табло, ошибка в окне, слишком короткий прогон |
 | `recovery.test.js` | Crash-recovery persist/load/validate |
 | `event-overrun-store.test.js` | Накопитель перелимита на диске: битый/чужой файл — чистое состояние, журнал ≤ 500 с перенумерацией, `pending` сворачивается ровно один раз (BUG-04) |
 | `electron-main-load.test.js` | НАСТОЯЩИЙ главный процесс (`electron-main.js` + `main-*.js`) на заглушке `electron`: загрузка, IPC-обработчики поведением — геометрия, переоткрытие окон, журнал докладов и выгрузка, SEC-04/05/07/10/11, BUG-01/04/07/10/15/17 |
