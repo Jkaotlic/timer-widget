@@ -391,8 +391,15 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
-            margin: 0 4px;
+            margin: 0 1px;
             height: 70px;
+            /* Подложка тона: на светлом тоне тёмные точки стоят прямо на обоях и
+               на тёмных пропадали. Шире точек её делают боковые поля, отнятые
+               у `margin` (было на 3px больше): ширина ряда та же в обоих тонах,
+               а на тёмном подложки нет вовсе. */
+            background: var(--style-sep-plate);
+            padding-inline: 3px;
+            border-radius: 3px;
         }
 
         .widget-flip-separator::before,
@@ -481,7 +488,7 @@
         .widget-flip.has-seconds .widget-flip-separator {
             height: 56px;
             gap: 8px;
-            margin: 0 3px;
+            margin: 0;
         }
 
         .widget-flip.has-seconds .widget-flip-separator::before,
@@ -581,6 +588,9 @@
             height: 20px;
             background: var(--tw-ring);
             top: 6px;
+            /* Своя ось при своём `top`: 6 + 93 = 99. С общей 87 крупные деления
+               вращались вокруг точки на 6px выше центра (замер 03.11.2026). */
+            transform-origin: 50% 93px;
             margin-left: -2px;
         }
 
@@ -784,7 +794,10 @@
                настраивается, а шрифт выбирается.
                Значения совпадают с FRAME_PAD_*_EM в digits-style.js — по ним
                считается подгонка кегля (проверяется тестом). */
-            background: var(--surface-paint, transparent);
+            /* Подложка по умолчанию — токен тона, как у «Цифр» виджета: на
+               светлом тоне тёмное время без неё не читалось на тёмных обоях
+               (кадр 03.11.2026), на тёмном токен — `none`. */
+            background: var(--surface-paint, var(--style-face));
             padding: 0.18em 0.34em;
             border-radius: 0.22em;
             line-height: 1;

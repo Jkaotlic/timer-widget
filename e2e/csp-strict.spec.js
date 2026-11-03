@@ -171,6 +171,47 @@ function tickAngles(selector) {
     });
 }
 
+/**
+ * Ось делений: каждое деление обязано лежать на луче из ЦЕНТРА циферблата под
+ * своим углом, а деления одного класса — на одном радиусе. Угол прав и при
+ * кривой оси: на дисплее крупные деления 3 и 9 часов висели на 15px выше
+ * стрелок (свой `top` при общей transform-origin), а у виджета всё кольцо
+ * уезжало вправо на половину ширины деления (`left: 50%` без `margin-left`).
+ * Замер — в НЕмасштабированных пикселях циферблата: виджет растянут
+ * трансформацией, и экранный порог проверял бы размер окна.
+ */
+function tickAxis([tickSel, dialSel, n]) {
+    const dialEl = document.querySelectorAll(dialSel)[n];
+    const dial = dialEl.getBoundingClientRect();
+    const scale = dial.width / dialEl.offsetWidth;
+    const cx = dial.left + dial.width / 2;
+    const cy = dial.top + dial.height / 2;
+    const radii = {};
+    let perp = 0;
+    for (const el of dialEl.querySelectorAll(tickSel)) {
+        const m = /^matrix\(([^)]+)\)$/.exec(getComputedStyle(el).transform);
+        if (!m) { continue; }
+        const [a, b] = m[1].split(',').map(Number);
+        const th = Math.atan2(b, a);
+        const r = el.getBoundingClientRect();
+        const vx = (r.left + r.width / 2 - cx) / scale;
+        const vy = (r.top + r.height / 2 - cy) / scale;
+        // Луч деления от центра — (sin θ, −cos θ): отход от него и радиус.
+        perp = Math.max(perp, Math.abs(vx * Math.cos(th) + vy * Math.sin(th)));
+        (radii[el.className] = radii[el.className] || []).push(vx * Math.sin(th) - vy * Math.cos(th));
+    }
+    const spread = Math.max(...Object.values(radii).map((v) => Math.max(...v) - Math.min(...v)));
+    return { perp: Math.round(perp * 100) / 100, spread: Math.round(spread * 100) / 100, classes: Object.keys(radii).length };
+}
+
+async function expectAxis(page, tickSel, dialSel, what, n = 0) {
+    const a = await page.evaluate(tickAxis, [tickSel, dialSel, n]);
+    console.log(`   ось делений, ${what}: отход ${a.perp}px, разброс радиуса ${a.spread}px`);
+    expect(a.classes, `${what}: делений не нашлось`).toBeGreaterThan(0);
+    expect.soft(a.perp, `${what}: деления сошли с луча из центра на ${a.perp}px`).toBeLessThan(0.25);
+    expect.soft(a.spread, `${what}: деления одного класса стоят на разных радиусах (${a.spread}px)`).toBeLessThan(0.25);
+}
+
 function expectDial(angles, step, count, what) {
     expect(angles.length, `${what}: делений`).toBe(count);
     angles.forEach((a, k) => {
@@ -209,7 +250,11 @@ test('деления циферблатов стоят под своими уг�
                 });
             }, i);
             expectDial(angles, 30, 12, `дисплей, мини-часы ${i + 1}`);
+            await expectAxis(display, ':scope > .mini-tick', '.mini-clock', `дисплей, мини-часы ${i + 1}`, i);
         }
+        await expectAxis(widget, ':scope > .widget-clock-tick', '.widget-analog-clock', 'виджет');
+        await expectAxis(clock, ':scope > .widget-analog-tick', '.widget-analog-clock', 'часы');
+        await expectAxis(display, '.clock-face > .clock-tick', '.analog-clock', 'дисплей');
     } finally {
         const open = app.windows().filter((w) => /display\.html|electron-widget\.html|electron-clock-widget\.html/.test(w.url()));
         await applyControls(control, before, app, open).catch(() => {});

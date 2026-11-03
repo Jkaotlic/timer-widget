@@ -107,3 +107,29 @@ test('клик по тумблеру строки ведёт себя так ж�
         await app.close();
     }
 });
+
+test('подпись строки «Звуки» — отчёт о включённых сигналах, по клику в ящике', async () => {
+    // До 03.11.2026 подпись была текстом разметки «сигналы старта, минуты и
+    // финиша» при умолчании «только окончание». Проверка — ПО КЛИКУ: чистая
+    // функция в unit-тесте не доказывает, что её зовут на записи настроек.
+    const { app, control } = await launchApp();
+    const sub = () => control.locator('#subSound');
+    const flip = (id) => control.evaluate((i) => {
+        const el = document.getElementById(i);
+        el.checked = !el.checked;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, id);
+    try {
+        await expect(sub(), 'чистый профиль: звучит только окончание').toHaveText('окончание');
+        await flip('soundOverrunEnabled');
+        await expect(sub(), 'включённый перерасход не попал в подпись').toHaveText('окончание · перерасход');
+        await control.click('#soundMasterToggle');
+        await expect(sub(), 'мастер выключен, а подпись перечисляет сигналы').toHaveText('звук выключен');
+        // Профиль e2e общий: возвращаем оба значения.
+        await control.click('#soundMasterToggle');
+        await flip('soundOverrunEnabled');
+        await expect(sub()).toHaveText('окончание');
+    } finally {
+        await app.close();
+    }
+});

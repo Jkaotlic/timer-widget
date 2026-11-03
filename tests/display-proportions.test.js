@@ -77,3 +77,29 @@ test('таймер НАМЕРЕННО остался на высоте окна'
     assert.ok(/ВЫСОТЕ|высоте/.test(CSS.slice(CSS.indexOf('--content-band') - 1200, CSS.indexOf('--content-band'))),
         'решение про таймер не объяснено рядом с мерой — следующий сведёт их к одному закону');
 });
+
+test('флип: табло — доли ОДНОЙ высоты карточки от рамы героя, потолка нет', () => {
+    // 03.11.2026: у каждой детали флипа был свой clamp(…, 16vw, 200px), и
+    // потолок 200px держал карточку одинаковой на 720p и 1080p — 21 % высоты
+    // окна против 51 % у круга. Рама героя (--timer-box) уже растёт с экраном
+    // и уступает верхней полосе; флип обязан брать размер из неё.
+    const flip = rule('.timer-flip');
+    assert.match(flip, /--flip-h:[^;]*var\(--timer-box\)/,
+        'высота карточки флипа не ведётся от рамы героя');
+    const sized = {
+        '.flip-card': ['width', 'height', '--fc-perspective'],
+        '.flip-digit': ['font-size'],
+        '.flip-minus': ['width', 'height'],
+        '.flip-minus-sign': ['font-size'],
+        '.flip-separator': ['gap', 'height']
+    };
+    for (const [selector, props] of Object.entries(sized)) {
+        const body = rule(selector);
+        for (const prop of props) {
+            const m = new RegExp(`\\n\\s*${prop}:\\s*([^;]+);`).exec(body);
+            assert.ok(m, `${selector}: нет ${prop}`);
+            assert.ok(m[1].includes('var(--flip-h)'), `${selector} ${prop} не доля высоты карточки — ${m[1]}`);
+            assert.ok(!m[1].includes('clamp('), `${selector} ${prop} снова в clamp() с потолком — ${m[1]}`);
+        }
+    }
+});

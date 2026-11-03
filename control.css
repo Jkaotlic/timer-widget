@@ -3153,7 +3153,11 @@ select optgroup,
 
 .exit-btn-confirm {
     background: var(--tw-red);
-    color: var(--tw-fg);
+    /* Цвет ФОНА ОКНА, как у .preset-slot.active: тема меняет его вместе с
+       красным, и одна декларация даёт тёмную надпись на ярком красном и белую
+       на затемнённом. С --tw-fg было 2,42:1 в светлой теме и 3,41:1 в тёмной
+       (tests/contrast.test.js). */
+    color: var(--tw-bg-surface);
 }
 
 .exit-btn-confirm:hover { filter: brightness(1.15); }
@@ -3467,7 +3471,11 @@ select optgroup,
 
 .reset-btn-confirm {
     background: var(--tw-red);
-    color: var(--tw-fg);
+    /* Цвет ФОНА ОКНА, как у .preset-slot.active: тема меняет его вместе с
+       красным, и одна декларация даёт тёмную надпись на ярком красном и белую
+       на затемнённом. С --tw-fg было 2,42:1 в светлой теме и 3,41:1 в тёмной
+       (tests/contrast.test.js). */
+    color: var(--tw-bg-surface);
 }
 
 .reset-btn-confirm:hover { filter: brightness(1.12); }

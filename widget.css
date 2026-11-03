@@ -424,8 +424,15 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            margin: 0 6px;
+            margin: 0 3px;
             height: 90px;
+            /* Подложка тона: на светлом тоне тёмные точки стоят прямо на обоях и
+               на тёмных пропадали. Шире точек её делают боковые поля, отнятые
+               у `margin` (было на 3px больше): ширина ряда та же в обоих тонах,
+               а на тёмном подложки нет вовсе. */
+            background: var(--style-sep-plate);
+            padding-inline: 3px;
+            border-radius: 3px;
         }
         .widget-flip-separator::before,
         .widget-flip-separator::after {
@@ -632,7 +639,7 @@
         .widget-flip.has-hours .widget-flip-separator {
             height: 64px;
             gap: 8px;
-            margin: 0 4px;
+            margin: 0 1px;
         }
 
         .widget-flip.has-hours .widget-flip-separator::before,
@@ -721,6 +728,10 @@
             height: 6px;
             background: var(--style-tick);
             left: 50%;
+            /* `left: 50%` ставит на ось ЛЕВЫЙ край, поэтому минус половина
+               ширины — как у стрелок. Без него кольцо делений стояло на 1–1.5px
+               правее центра (×масштаб окна). */
+            margin-left: -1px;
             /* 11px, а не 8%. Правило простое: `top` + вертикаль
                transform-origin обязаны дать РОВНО середину padding-бокса
                циферблата, иначе деления вращаются вокруг оси, смещённой
@@ -739,7 +750,7 @@
 
         /* Индивидуального top у классов больше нет: он сдвигал точку вращения,
            и деления на 3 и 9 часах висели ВЫШЕ горизонтальной оси циферблата
-           (замер: 23.5px на кадре 800px). При едином top: 8% и общей
+           (замер: 23.5px на кадре 800px). При едином top (11px) и общей
            transform-origin все двенадцать делений вращаются вокруг настоящего
            центра, а растут только внутрь — за счёт высоты. */
         .widget-clock-tick.major {
@@ -751,6 +762,7 @@
         .widget-clock-tick.quarter {
             width: 3px;
             height: 14px;
+            margin-left: -1.5px;
             background: var(--tw-ring);
         }
 

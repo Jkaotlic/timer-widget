@@ -47,6 +47,55 @@ function windowRowSubtitle(p) {
     return parts.join(' · ');
 }
 
+/**
+ * Подзаголовок строки «Звуки»: какие сигналы прозвучат.
+ *
+ * Отчёт, а не реклама. До 03.11.2026 здесь стоял текст разметки «сигналы
+ * старта, минуты и финиша» — при умолчании, где включено одно окончание, а
+ * «минута» означает сигнал ЗА минуту до конца. Слова — подписи строк ящика.
+ *
+ * @param {{master: boolean, start: boolean, minute: boolean, end: boolean, overrun: boolean}} s
+ * @returns {string}
+ */
+function soundRowSubtitle(s) {
+    if (!s) { return ''; }
+    if (!s.master) { return 'звук выключен'; }
+    // Порядок — порядок событий таймера, а не строк ящика.
+    const parts = [
+        s.start && 'старт',
+        s.minute && 'за минуту',
+        s.end && 'окончание',
+        s.overrun && 'перерасход'
+    ].filter(Boolean);
+    return parts.length ? parts.join(' · ') : 'сигналы не выбраны';
+}
+
+/**
+ * Подсказка в подвале панели — то, что пробел сделает СЕЙЧАС; в перерасходе —
+ * как часто прозвучит уведомление.
+ *
+ * `overrunEvery` — интервал в минутах, только если уведомление действительно
+ * прозвучит (включены и мастер, и звук перерасхода), иначе null. До
+ * 03.11.2026 подвал обещал «Уведомление каждые 1 мин» при выключенном звуке
+ * перерасхода — а это умолчание.
+ *
+ * @param {{mode: string, paused: boolean, overrunEvery: number|null}} p
+ * @returns {string}
+ */
+function panelFooterText({ mode, paused, overrunEvery }) {
+    if (paused) { return 'Space — продолжить · R — сброс'; }
+    if (mode === 'overtime') {
+        if (!Number.isFinite(overrunEvery) || overrunEvery <= 0) {
+            // Кнопка транспорта в перерасходе называется «Стоп», пробел жмёт её.
+            return 'Space — стоп · R — сброс';
+        }
+        if (overrunEvery === 1) { return 'Уведомление каждую минуту'; }
+        const one = overrunEvery % 10 === 1 && overrunEvery % 100 !== 11;
+        return `Уведомление ${one ? 'каждую' : 'каждые'} ${overrunEvery} мин`;
+    }
+    return mode === 'running' ? 'Space — пауза · R — сброс' : 'Space — старт · R — сброс · 1–4 — пресеты';
+}
+
 /** Человеческие имена стилей — те же слова, что на кнопках выбора стиля. */
 const STYLE_LABELS = {
     circle: 'круг',
@@ -166,6 +215,8 @@ const PanelStateMixin = {
                 where: row.where
             });
         }
+        // Строка «Звуки» — в том же списке и такой же отчёт о настройках.
+        this.renderSoundRow();
     },
 
     /**
@@ -329,7 +380,11 @@ const PanelStateMixin = {
         this.renderSoundRow();
     },
 
-    /** Вид тумблера строки — ВЫВОД из чекбокса, а не второй флаг. */
+    /**
+     * Вид строки «Звуки» — ВЫВОД из чекбоксов, а не второй флаг: тумблер
+     * повторяет мастер, подпись перечисляет включённые сигналы. Зовётся и из
+     * renderWindowRows, то есть на каждой записи настроек.
+     */
     renderSoundRow() {
         const box = this.soundMasterEl || document.getElementById('soundMasterEnabled');
         const row = document.getElementById('soundMasterToggle');
@@ -337,6 +392,17 @@ const PanelStateMixin = {
         row.setAttribute('aria-checked', String(!!box.checked));
         row.classList.toggle('active', !!box.checked);
         row.title = box.checked ? 'Звук включён' : 'Звук выключен';
+        const sub = document.getElementById('subSound');
+        if (sub) {
+            const on = (id) => !!/** @type {HTMLInputElement|null} */ (document.getElementById(id))?.checked;
+            sub.textContent = soundRowSubtitle({
+                master: !!box.checked,
+                start: on('soundStartEnabled'),
+                minute: on('soundMinuteEnabled'),
+                end: on('soundEndEnabled'),
+                overrun: on('soundOverrunEnabled')
+            });
+        }
     },
 
     /**
@@ -483,14 +549,10 @@ const PanelStateMixin = {
         // в паузе он продолжает отсчёт, а не ставит паузу ещё раз.
         const footer = document.getElementById('panelFooter');
         if (footer) {
+            // Те же два условия, что у playSound: мастер и звук перерасхода.
+            const sounds = !!this.soundMasterEl?.checked && !!this.soundOverrunEl?.checked;
             const every = parseInt(this.overrunIntervalEl?.value, 10);
-            footer.textContent = mode === 'overtime' && !paused && Number.isFinite(every) && every > 0
-                ? `Уведомление каждые ${every} мин`
-                : paused
-                    ? 'Space — продолжить · R — сброс'
-                    : mode === 'running'
-                        ? 'Space — пауза · R — сброс'
-                        : 'Space — старт · R — сброс · 1–4 — пресеты';
+            footer.textContent = panelFooterText({ mode, paused, overrunEvery: sounds ? every : null });
         }
 
         // Кнопка одна, названий у неё четыре: пауза добавила «Продолжить».
@@ -551,4 +613,4 @@ const PanelStateMixin = {
 // Примесь — отдельным именем, как у остальных: прежний module.exports БЫЛ
 // самой примесью и дописывал в неё windowRowSubtitle (в окне его у объекта
 // не было, в Node — был; формы расходились).
-export { PanelStateMixin, windowRowSubtitle };
+export { PanelStateMixin, windowRowSubtitle, soundRowSubtitle, panelFooterText };

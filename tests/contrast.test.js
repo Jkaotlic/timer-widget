@@ -865,3 +865,30 @@ test('.preset-slot.active (применённая ячейка вида) чит�
     assert.ok(white < AA_NORMAL,
         `белая цифра на --${bgTok[1]} даёт ${white.toFixed(2)}:1 — порог перестал что-либо различать`);
 });
+
+test('необратимые кнопки модальных окон («Закрыть», «Сбросить») читаемы в ОБЕИХ темах', () => {
+    // Замер 03.11.2026: надпись --tw-fg на --tw-red давала 2,42:1 в светлой
+    // теме (тёмный текст на тёмном красном) и 3,41:1 в тёмной (белый на ярком).
+    // Правило читается ИЗ control.css, как у .preset-slot.active.
+    const control = readSource('control.css');
+    for (const sel of ['.exit-btn-confirm', '.reset-btn-confirm']) {
+        const rule = new RegExp(`^${sel.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`, 'm').exec(control);
+        assert.ok(rule, `не найдено правило ${sel}`);
+        const body = codeOnly(rule[1]);
+        const bgTok = /background:\s*var\(--([a-z0-9-]+)\)/.exec(body);
+        const fgTok = /(?:^|[;{\s])color:\s*var\(--([a-z0-9-]+)\)/.exec(body);
+        assert.ok(bgTok && fgTok, `${sel}: заливка и надпись должны быть ТОКЕНАМИ`);
+        const pair = (tok) => {
+            const bg = parseColor(tok(bgTok[1])).rgb;
+            return contrast(composite(tok(fgTok[1]), bg), bg);
+        };
+        const dark = pair(darkToken);
+        const light = pair(hcToken);
+        console.log(`   ${sel}: тёмная ${dark.toFixed(2)}:1, светлая ${light.toFixed(2)}:1 (--${fgTok[1]} на --${bgTok[1]})`);
+        assert.ok(dark >= AA_NORMAL, `${sel}, тёмная тема: ${dark.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+        assert.ok(light >= AA_NORMAL, `${sel}, светлая тема: ${light.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+    }
+    // Проверка проверки: прежняя надпись --tw-fg этот порог НЕ проходит.
+    const old = contrast(composite(hcToken('tw-fg'), parseColor(hcToken('tw-red')).rgb), parseColor(hcToken('tw-red')).rgb);
+    assert.ok(old < AA_NORMAL, `--tw-fg на --tw-red в светлой теме ${old.toFixed(2)}:1 — порог перестал различать`);
+});
