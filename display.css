@@ -931,7 +931,9 @@ body.style-digits .status-pill {
     background: transparent;
     border: 1px solid var(--tw-border);
     border-radius: var(--tw-r-md);
-    color: var(--tw-led-green);
+    /* Покой — цвет покоя, как у остальных стилей. Здесь стоял зелёный, и
+       «Готов к запуску» читался так же, как «Таймер активен». */
+    color: var(--tw-fg-secondary);
     box-shadow: none;
 }
 body.style-digits .status-pill.running  { color: var(--tw-led-green); }
@@ -975,6 +977,14 @@ body.flash-mode { animation: flash-bg 0.3s; }
    FLIP STYLE
    ============================================================ */
 .timer-flip {
+    /* Пластина табло — ОДНА формула на карточки цифр и карточку минуса.
+       Блик — слой ФОНА, под цифрой, как у виджета. Он жил в `::after` поверх
+       цифры (z-index 5): в тёмном тоне это незаметно, а в светлом белый блик
+       0.65 красил верхнюю половину тёмной цифры в серый. Створки наследуют
+       фон по цепочке (flip-card.css), поэтому блик едет и на них. */
+    --flip-plate:
+        linear-gradient(180deg, var(--style-gloss) 0%, transparent 50%),
+        var(--surface-solid, var(--style-plate));
     display: none;
     flex-direction: row;
     align-items: center;
@@ -1061,8 +1071,8 @@ body.flash-mode { animation: flash-bg 0.3s; }
     justify-content: center;
     /* ТА ЖЕ подложка, что у .flip-card-inner: минус — карточка того же табло.
        Здесь стоял свой двухстоповый градиент, из-за которого карточка минуса
-       читалась как деталь от другого стиля. */
-    background: var(--surface-solid, var(--style-plate));
+       читалась как деталь от другого стиля. Формула одна — `--flip-plate`. */
+    background: var(--flip-plate);
     border-radius: var(--tw-r-md);
     border: 1px solid var(--tw-border);
     box-shadow:
@@ -1105,7 +1115,7 @@ body.flash-mode { animation: flash-bg 0.3s; }
     position: relative;
     width: 100%;
     height: 100%;
-    background: var(--surface-solid, var(--style-plate));
+    background: var(--flip-plate);
     border: 1px solid var(--style-edge);
     border-radius: var(--tw-r-lg);
     box-shadow:
@@ -1122,16 +1132,6 @@ body.flash-mode { animation: flash-bg 0.3s; }
     background: var(--style-hinge);
     z-index: 10;
 }
-.flip-card-inner::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 50%;
-    background: linear-gradient(180deg, var(--style-gloss) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 5;
-}
-
 .flip-digit {
     position: absolute;
     top: 50%; left: 50%;

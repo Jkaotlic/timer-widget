@@ -154,7 +154,7 @@ Deliberately NOT in a preset: the background image (megabytes — four slots wou
 blow the storage quota), the on-screen position and size of the widget and clock
 windows, and the timer duration — a preset owns the look, not the run.
 
-**Position lock** — the 🔓 / 🔒 button in the panel titlebar, next to the theme
+**Position lock** — the padlock button in the panel titlebar, next to the theme
 switch. Once everything is set up, the lock cancels the gestures that can move
 the composition by accident:
 
@@ -192,7 +192,7 @@ Work from **any** window.
 | `Shift` + wheel | Scale info blocks on fullscreen |
 | `Alt` + drag | Move an info block — or the timer itself — on fullscreen |
 
-Scaling and dragging gestures are disabled by the position lock (the 🔒 button
+Scaling and dragging gestures are disabled by the position lock (the padlock button
 in the panel titlebar).
 
 ---

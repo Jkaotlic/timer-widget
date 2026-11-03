@@ -1008,7 +1008,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 9999;
-            background: rgba(0, 0, 0, 0.6);
+            background: var(--style-hint-plate);
             color: var(--tw-fg-secondary);
             font-size: 10px;
             font-family: var(--tw-font-sans);

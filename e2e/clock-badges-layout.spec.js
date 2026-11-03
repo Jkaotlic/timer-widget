@@ -112,3 +112,43 @@ test('дата и часовой пояс в круговых часах не п
     await resizeOwnWindow(app, clock, { channel: 'clock-widget-resize', urlPart: CLOCK_URL, size: 220 });
     await app.close();
 });
+
+/**
+ * Без даты и пояса циферблат и флип стоят по ЦЕНТРУ окна. Пустой блок значков
+ * держал свой margin-top (10px у аналога, 6px у флипа), колонка
+ * центрировалась вместе с ним, и часы уезжали вверх на половину отступа:
+ * замер 03.11.2026 — −4.4px у аналога при окне 220. Со значками колонка
+ * законно выше: под ней дата, это проверяется отдельно.
+ */
+test('без значков аналог и флип часов стоят по центру окна', async () => {
+    const { app, control } = await launchApp();
+    try {
+        await control.evaluate(() => { window.ipcRenderer.send('open-clock-widget'); });
+        const clock = await waitForClock(app);
+        await waitForClockSnapshot(app, clock);
+        await waitForWindowSettled(app, clock, CLOCK_URL);
+        expect(await clock.evaluate(() => document.body.classList.contains('no-clock-badges')),
+            'сценарий вырожден: на профиле включены дата или пояс').toBe(true);
+
+        const offsetY = (sel) => clock.evaluate((s) => {
+            const el = [...document.querySelectorAll(s)].find((e) => e.getBoundingClientRect().width > 0);
+            const r = el.getBoundingClientRect();
+            return r.top + r.height / 2 - innerHeight / 2;
+        }, sel);
+        for (const [style, sel] of [['analog', '.widget-analog-clock'], ['flip', '.widget-flip-card']]) {
+            await untilReceived(clock, 'set-clock-style',
+                () => control.evaluate((st) => window.ipcRenderer.send('clock-widget-set-style', st), style), { match: style });
+            const dy = await offsetY(sel);
+            console.log(`   ${style}: центр по вертикали ${dy.toFixed(2)}px от середины окна`);
+            expect(Math.abs(dy), `${style}: часы стоят не по центру окна (${dy.toFixed(2)}px)`).toBeLessThan(0.5);
+        }
+    } finally {
+        // Стиль — как в тесте выше: явно обратно на круг.
+        const clock = app.windows().find((w) => w.url().includes(CLOCK_URL));
+        if (clock) {
+            await untilReceived(clock, 'set-clock-style',
+                () => control.evaluate(() => window.ipcRenderer.send('clock-widget-set-style', 'circle')), { match: 'circle' });
+        }
+        await app.close();
+    }
+});

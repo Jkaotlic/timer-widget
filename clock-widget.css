@@ -553,10 +553,14 @@
             box-shadow: inset 0 1px 0 var(--style-edge);
         }
 
+        /* Блик — на весь циферблат и кончается на ОБОДЕ, где у циферблата и так
+           кромка. С отступом 5% его круг обрезал градиент, не успевший
+           погаснуть (вверху слева ещё ~2/3 силы): на большом окне и в светлом
+           тоне (блик 0.65) внутри циферблата был виден уступ. */
         .widget-analog-clock::before {
             content: '';
             position: absolute;
-            inset: 5%;
+            inset: 0;
             border-radius: 50%;
             background: radial-gradient(circle at 30% 30%, var(--style-gloss), transparent 60%);
             pointer-events: none;
@@ -725,6 +729,10 @@
         }
 
         /* Дата и зона под циферблатом */
+        /* Без значков блок не занимает места: см. updateDateTimezoneVisibility. */
+        body.no-clock-badges .widget-analog-info,
+        body.no-clock-badges .widget-flip-info { display: none; }
+
         .widget-analog-info {
             margin-top: 10px;
             text-align: center;
@@ -824,7 +832,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 9999;
-            background: var(--tw-overlay);
+            background: var(--style-hint-plate);
             color: var(--tw-fg-secondary);
             font-size: 10px;
             font-family: var(--tw-font-sans);

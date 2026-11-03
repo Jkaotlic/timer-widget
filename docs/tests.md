@@ -90,7 +90,7 @@
 | `audit-2026-07-fixes.test.js` | Regressions from the July 2026 audit (sound, Esc, scales, geometry) |
 | `audit-2026-07-30-fixes.test.js` | Regressions from the 30 Jul 2026 pass (flip, finish flash, geometry, modifiers, F1) |
 | `storage-keys.test.js` | `CONFIG.STORAGE_KEYS` matches the keys the code uses — both directions; no key is write- or read-only |
-| `contrast.test.js` | WCAG contrast WITH alpha compositing, BOTH themes (dark ≥ AA, light ≥ AAA), light surface ladder, accents on accent fills, modal confirm buttons |
+| `contrast.test.js` | WCAG contrast WITH alpha compositing, BOTH themes (dark ≥ AA, light ≥ AAA), light surface ladder, accents on accent fills, modal confirm buttons, filled panel buttons + key hint (transport, active preset) |
 | `ui-lock.test.js` | Замок: логика на поддельном хранилище, модуль в 4 окнах, канал в оба конца, вопрос к замку в КАЖДОМ жесте |
 | `presets.test.js` | Пресеты вида: состав снимка (включая записанное ОТСУТСТВИЕ), сравнение по подмножеству, рейс, квота |
 | `ui-theme.test.js` | Theme logic + wiring: module → four windows' `<head>` → channel in the panel's send and every window's receive bridge → main's relay → panel button |
@@ -179,7 +179,7 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `toast-placement.spec.js` | Тост не закрывает герой-время |
 | `sound-controls.spec.js` | Вкладка «Звуки»: один вид контрола на смысл, мишень не меньше нормы |
 | `reset-defaults.spec.js` | «Сбросить всё» возвращает заводской вид — сверка с чистым профилем |
-| `clock-badges-layout.spec.js` | Шильдики даты и пояса в круговых часах не налезают при любом размере |
+| `clock-badges-layout.spec.js` | Шильдики даты и пояса в круговых часах не налезают при любом размере; без шильдиков аналог и флип стоят по центру окна |
 | `clock-style-hardening.spec.js` | Испорченное значение стиля не оставляет часы пустым окном |
 | `clock-style-sync.spec.js` | Ряд стиля часов зеркалит виджет при синхронизации, клик снимает её; часы, открытые каналом после смены стиля при закрытых часах, получают стиль снимком main и без посылки дисплея |
 | `display-ring-proportion.spec.js` | Дуга прогресса занимает долю высоты окна, а не пиксели |
@@ -210,8 +210,8 @@ e2e specs (`npx playwright test`, `workers: 1`):
 | `color-ownership.spec.js` | Окраска: 5 стилей × 4 полосы × 2 окна, ВЫЧИСЛЕННЫЕ цвет и тень на тёмном тоне |
 | `onboarding-reachable.spec.js` | Кнопка «Проверить обновления» ВИДИМА и не схлопнута; не кликается — открылся бы браузер |
 | `color-band-reset.spec.js` | Выход из полосы снимает ВСЁ, что она нарисовала: на чистом профиле и с выбранным цветом |
-| `panel-states.spec.js` | Четыре состояния панели ПО КЛИКУ: какая кнопка и каким словом названа, есть ли пресеты и ряд ± |
-| `window-surface-color.spec.js` | Фон виджета и часов ПО КЛИКУ: подложка стиля, прозрачность 0, сброс, тема не стирает фон, окна независимы |
+| `panel-states.spec.js` | Четыре состояния панели ПО КЛИКУ: какая кнопка и каким словом названа, есть ли пресеты и ряд ±; полоса на минусе полная и после скачка |
+| `window-surface-color.spec.js` | Фон виджета и часов ПО КЛИКУ: подложка стиля, прозрачность 0, сброс, тема не стирает фон, окна независимы; правка подложки на чистом профиле не красит цифры |
 | `display-blocks.spec.js` | Блоки дисплея: тумблер гасит СВОЙ блок, крестик снимает СВОЙ тумблер, подпись тащится |
 | `display-timer-scale.spec.js` | Масштаб таймера дисплея во всех стилях: настройки, Ctrl+колесо, восстановление |
 | `style-tone.spec.js` | Тон ПО КЛИКУ: светлая тема — светлые виджет и дисплей, тёмная заливка держит текст светлым; на светлом тоне «Цифры» часов и двоеточие флипа на подложке, на тёмном — без |

@@ -159,11 +159,11 @@ test('проводка кнопки замка работает на подде�
     assert.ok(api, 'проводка не вернула управление');
     // Старт: состояние ушло в окна ещё до первого клика.
     assert.deepEqual(sent[0], ['ui-lock-update', { locked: false }]);
-    assert.equal(button.textContent, '🔓');
+    assert.equal(button.getAttribute('data-glyph'), 'unlocked');
 
     listeners.click();
     assert.equal(stored, true, 'клик не сохранил состояние');
-    assert.equal(button.textContent, '🔒', 'глиф не сменился — состояние отличимо только цветом');
+    assert.equal(button.getAttribute('data-glyph'), 'locked', 'глиф не сменился — состояние отличимо только цветом');
     assert.equal(button.getAttribute('aria-pressed'), 'true');
     assert.deepEqual(sent[sent.length - 1], ['ui-lock-update', { locked: true }]);
 
@@ -235,20 +235,20 @@ test('замок в ПОЛОСЕ и замок в титлбаре — одна 
     const sent = [];
     const api = PanelTitlebar.bindLockToggle({ doc, ipc: { send: (c, p) => sent.push([c, p]) }, lock });
     assert.ok(api);
-    assert.equal(bar.textContent, '🔓', 'кнопка в полосе не получила начального состояния');
+    assert.equal(bar.getAttribute('data-glyph'), 'unlocked', 'кнопка в полосе не получила начального состояния');
 
     // Щёлкнули в ПОЛОСЕ — титлбар обязан показать то же самое.
     bar.listeners.click();
     assert.equal(stored, true, 'клик в полосе не запер');
-    assert.equal(titlebar.textContent, '🔒', 'кнопка титлбара осталась с прежним глифом');
-    assert.equal(bar.textContent, '🔒');
+    assert.equal(titlebar.getAttribute('data-glyph'), 'locked', 'кнопка титлбара осталась с прежним глифом');
+    assert.equal(bar.getAttribute('data-glyph'), 'locked');
     assert.equal(titlebar.getAttribute('aria-pressed'), 'true');
     assert.deepEqual(sent[sent.length - 1], ['ui-lock-update', { locked: true }]);
 
     // И обратно: щёлкнули в титлбаре — полоса отпустила замок вместе с ним.
     titlebar.listeners.click();
     assert.equal(stored, false);
-    assert.equal(bar.textContent, '🔓', 'кнопка в полосе осталась запертой');
+    assert.equal(bar.getAttribute('data-glyph'), 'unlocked', 'кнопка в полосе осталась запертой');
 });
 
 test('в полосе есть замок и четыре ячейки пресетов', () => {

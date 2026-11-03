@@ -634,6 +634,12 @@ export let activeClockWidget = null;
                     }
                 });
                 
+                // Ни даты, ни пояса — блок под циферблатом и под флипом убирается
+                // целиком. Пустой, он держал свой margin-top (10 и 6px), и
+                // колонка, центрированная вместе с ним, стояла выше середины
+                // окна на половину отступа (замер 03.11.2026: −4.4px у аналога).
+                document.body.classList.toggle('no-clock-badges', !this.showDate && !this.showTimezone);
+
                 // Пересчитываем масштаб
                 this.updateScaling();
             }

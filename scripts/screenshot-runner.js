@@ -58,8 +58,11 @@ const CONFIG = require('../constants.js');
 
 const MIN_SIZES = {
     control: { width: CONFIG.CONTROL_WINDOW_MIN_WIDTH, height: CONFIG.CONTROL_WINDOW_MIN_HEIGHT },
-    widget:  { width: 120, height: 140 },
-    clock:   { width: 120, height: 120 },
+    // Пол окна — из реестра (размер при MIN_SCALE_PCT), а не свои цифры:
+    // 120×140 и 120×120 устарели, когда пол стал достижимым, и кадр
+    // «минимум» снимал размер, которого у окна уже не бывает.
+    widget:  { width: CONFIG.WIDGET_MIN_WIDTH, height: CONFIG.WIDGET_MIN_HEIGHT },
+    clock:   { width: CONFIG.CLOCK_WIDGET_MIN_SIZE, height: CONFIG.CLOCK_WIDGET_MIN_SIZE },
     display: { width: 1280, height: 720 } // display doesn't resize, but keep consistent
 };
 
@@ -667,21 +670,16 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                 }
                 if (w.widget && !w.widget.isDestroyed()) {
                     sendWidgetStyle(style, ctx().control);
-                    // Размер задаётся ПОСЛЕ смены стиля, а не до неё: с 12.08.2026
-                    // форму окна выбирает сам стиль (LED — полоса по размеру цифр,
-                    // остальные — квадрат), и выставленная заранее геометрия
-                    // перебивалась переходом ИЗ полосы в квадрат — кадры flip
-                    // уезжали с 320×260 на 320×320 в зависимости от того, какой
-                    // стиль снимался перед ним.
-                    //
-                    // Для LED размер не навязывается вовсе: полосу задаёт
-                    // приложение, и подменять её здесь значило бы снимать не то,
-                    // что видит пользователь.
-                    if (style !== 'digital') {
-                        setTimeout(() => {
-                            if (!w.widget.isDestroyed()) { w.widget.setSize(320, 260); }
-                        }, 120);
-                    }
+                    // Размер задаётся ПОСЛЕ смены стиля, а не до неё: форму окна
+                    // выбирает сам стиль, и выставленная заранее геометрия
+                    // перебивалась сменой формы — кадры flip уезжали с 320×260
+                    // на 320×320 в зависимости от того, какой стиль снимался
+                    // перед ним. Исключение для LED («digital») снято: стиль
+                    // слит с «Цифрами», имени `digital` в STYLES больше нет, и
+                    // условие было истинным всегда.
+                    setTimeout(() => {
+                        if (!w.widget.isDestroyed()) { w.widget.setSize(320, 260); }
+                    }, 120);
                 }
             } catch (e) {
                 log.warn(`[screenshot] hour formats: style ${style} failed: ${e.message}`);
@@ -690,10 +688,12 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             await sleep(450);
 
             for (const hs of HOUR_STATES) {
-                // Максимум снимаем только для digital и flip: там строка длиннее
+                // Максимум снимаем только для «Цифр» и флипа: там строка длиннее
                 // всего и есть чему не поместиться. Круг и аналог показывают то же
-                // время внутри фиксированного циферблата.
-                if (hs.name === 'hmax' && style !== 'digital' && style !== 'flip') { continue; }
+                // время внутри фиксированного циферблата. Здесь стояло имя
+                // `digital` — его в STYLES нет со слияния LED, и кадра hmax у
+                // «Цифр» не было вовсе.
+                if (hs.name === 'hmax' && style !== 'digits' && style !== 'flip') { continue; }
                 try {
                     applyTimerState({
                         totalSeconds: hs.total, presetSeconds: hs.total,

@@ -536,13 +536,16 @@ const PanelStateMixin = {
         const hintEl = document.getElementById('heroHint');
         if (hintEl) { hintEl.textContent = HINT[mode]; }
 
-        // Полоса. В перерасходе её заливка прибита к 100% в CSS —
-        // проценты там уже не значат ничего.
+        // Полоса. Панель отдаёт ДОЛЮ переменной, ширину считает CSS. В
+        // перерасходе заливку прибивает к 100 % правило состояния — и оно
+        // обязано выигрывать. Пока здесь писался инлайн `style.width`, он
+        // перебивал это правило: в минус, попавший скачком («−5»,
+        // восстановление), полоса оставалась на последней доле отсчёта.
         const fill = document.getElementById('panelProgressFill');
         if (fill && mode === 'running') {
             const total = this.totalSeconds || 0;
             const done = total > 0 ? (total - this.remainingSeconds) / total : 0;
-            fill.style.width = Math.max(0, Math.min(1, done)) * 100 + '%';
+            fill.style.setProperty('--progress', String(Math.max(0, Math.min(1, done))));
         }
 
         // Подсказка внизу называет то действие, которое пробел сделает СЕЙЧАС:

@@ -136,7 +136,8 @@ for (const tab of WINDOW_TABS) {
         const next = src.indexOf('class="tab-content"', at + 1);
         const chunk = src.slice(at, next === -1 ? src.length : next);
 
-        const hint = /<span class="hint-text">([\s\S]*?)<\/span>/.exec(chunk);
+        // До конца БЛОКА подсказки: внутри есть вложенные <span class="kbd-combo">.
+        const hint = /<span class="hint-text">([\s\S]*?)<\/span>\s*<\/div>/.exec(chunk);
         assert.ok(hint, `${tab.id}: подсказки нет вовсе — заменять нечего`);
         // Зонд живой: в подсказке уже написано про жесты этого окна.
         assert.match(hint[1], new RegExp(tab.word), `${tab.id}: подсказка не про это окно`);

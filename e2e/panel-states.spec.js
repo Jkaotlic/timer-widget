@@ -83,8 +83,8 @@ test.describe('панель: четыре состояния', () => {
         // Полоса действительно заполняется, а не стоит на нуле.
         // Ширину пишет тик таймера — ждём первый, а не секунду.
         await expect.poll(() => control.evaluate(
-            () => document.getElementById('panelProgressFill').style.width
-        )).toMatch(/%$/);
+            () => document.getElementById('panelProgressFill').style.getPropertyValue('--progress')
+        )).toMatch(/^\d/);
     });
 
     test('ряд ± меняет время прямо во время отсчёта', async () => {
@@ -396,5 +396,49 @@ test.describe('панель: строки окон', () => {
         await expect(control.locator('#drawerTitle')).toHaveText('Звуки');
         await control.click('#drawerClose');
         await expect(control.locator('#settingsDrawer')).not.toHaveClass(/open/);
+    });
+
+    /**
+     * В минус можно попасть СКАЧКОМ: «−5» при трёх оставшихся минутах,
+     * восстановление после перезапуска. Ширину полосы писал инлайн-стиль, а
+     * инлайн перебивает правило `width: 100%` перерасхода, поэтому полоса
+     * оставалась на последней доле отсчёта. Плавный уход в ноль этого не
+     * показывал: последний тик отсчёта и так доводил её почти до 100 %.
+     */
+    test('полоса на минусе заполнена целиком и после скачка', async () => {
+        const fillRatio = () => control.evaluate(() => {
+            const track = document.querySelector('.panel-progress').getBoundingClientRect().width;
+            const fill = document.getElementById('panelProgressFill').getBoundingClientRect().width;
+            return track > 0 ? fill / track : -1;
+        });
+        // «Считать ниже нуля» — настройка панели: без неё «−5» упирается в ноль.
+        const setAllowNegative = (on) => control.evaluate((v) => {
+            const el = document.getElementById('allowNegative');
+            if (el.checked !== v) {
+                el.checked = v;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }, on);
+        try {
+            await setAllowNegative(true);
+            await control.evaluate(() => {
+                window.ipcRenderer.send('timer-command', { type: 'set', seconds: 180, allowNegative: true });
+                window.ipcRenderer.send('timer-command', { type: 'start', allowNegative: true });
+            });
+            await expect(control.locator('body')).toHaveClass(/state-running/);
+            // Отсчёт успел записать свою долю: она мала, а не 100 %.
+            await expect.poll(fillRatio, { message: 'полоса отсчёта не получила долю' }).toBeGreaterThanOrEqual(0);
+            expect(await fillRatio(), 'сценарий вырожден: полоса отсчёта уже полная').toBeLessThan(0.5);
+
+            await control.click('.adjust-btn[data-adjust="-300"]');
+            await expect(control.locator('body')).toHaveClass(/state-overtime/);
+            // Переход ширины идёт `--tw-dur-base`: ждём условием, а не паузой.
+            await expect.poll(fillRatio, { message: 'полоса на минусе не заполнилась' }).toBeGreaterThan(0.99);
+        } finally {
+            await control.evaluate(() => window.ipcRenderer.send('timer-command', { type: 'reset' }));
+            await expect(control.locator('body')).toHaveClass(/state-idle/);
+            // Профиль e2e общий: настройку возвращаем.
+            await setAllowNegative(false);
+        }
     });
 });

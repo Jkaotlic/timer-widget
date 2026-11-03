@@ -595,18 +595,18 @@ test('в полосе замок и ячейки вида — те же самы
         await expect(control.locator('html')).toHaveClass(/ui-locked/);
         const locked = await control.evaluate(() => ({
             html: document.documentElement.classList.contains('ui-locked'),
-            bar: document.getElementById('miniBarLock').textContent.trim(),
-            titlebar: document.getElementById('lockToggle').textContent.trim(),
+            bar: document.getElementById('miniBarLock').getAttribute('data-glyph'),
+            titlebar: document.getElementById('lockToggle').getAttribute('data-glyph'),
             stored: localStorage.getItem('uiLocked')
         }));
         console.log(`   после клика по замку в полосе: ${JSON.stringify(locked)}`);
         expect(locked.html, 'замок из полосы не заперся').toBe(true);
         expect(locked.stored).toBe('1');
-        expect(locked.bar, 'глиф в полосе не сменился').toBe('🔒');
-        expect(locked.titlebar, 'кнопка титлбара осталась с прежним глифом — значит владельцев два').toBe('🔒');
+        expect(locked.bar, 'глиф в полосе не сменился').toBe('locked');
+        expect(locked.titlebar, 'кнопка титлбара осталась с прежним глифом — значит владельцев два').toBe('locked');
 
         await control.click('#miniBarLock');
-        await expect(control.locator('#miniBarLock')).toHaveText('🔓');
+        await expect(control.locator('#miniBarLock')).toHaveAttribute('data-glyph', 'unlocked');
         expect(await control.evaluate(() => document.documentElement.classList.contains('ui-locked')),
             'второй клик не снял замок').toBe(false);
 

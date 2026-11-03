@@ -255,28 +255,12 @@ const CONFIG = {
         DISPLAY_HINT_SHOWN: 'displayHintShown'
     },
 
-    // ============================================
-    // DEFAULT COLORS
-    // ============================================
-    /**
-     * Дефолтные цвета таймера — ОДИН владелец на четыре окна.
-     *
-     * Их было три, и они разъехались: панель держала #667eea/#764ba2 —
-     * фиолетовую пару, которой нет в токенах вообще; виджет подставлял
-     * #0a84ff/#30d158; дисплей не применял НИЧЕГО и оставался на CSS-зелёном.
-     * Поэтому один и тот же стиль LED выглядел зелёным на полноэкранном окне и
-     * синим в виджете: расхождение было не в CSS, а в данных.
-     *
-     * Здесь стояла ещё и пятая палитра DEFAULT_COLORS (primary/secondary/
-     * warning/danger/overtime/text/…). Её не читал НИКТО — ни одного
-     * обращения по всему репозиторию, — а держала она overtime: '#ff6b35',
-     * то есть оранжевый перерасход, который в этом проекте запрещён и был
-     * вычищен из всех живых мест. Удалена.
-     */
-    DEFAULT_TIMER_COLORS: {
-        timer: '#0a84ff',
-        progress: '#30d158'
-    },
+    // Дефолтных цветов таймера здесь НЕТ: владелец умолчания — CSS окна.
+    // DEFAULT_TIMER_COLORS (#0a84ff/#30d158) удалён 03.11.2026 вместе с
+    // последним потребителем — стартовой моделью панели, которая отсылала эти
+    // цвета виджету с первой правкой подложки (docs/lessons.md, «A colour
+    // default has an owner too»). До него здесь же удалена пятая палитра
+    // DEFAULT_COLORS с оранжевым перерасходом — её не читал никто.
 
     // ============================================
     // TIMER STYLES
@@ -299,7 +283,6 @@ const CONFIG = {
 // Freeze объект чтобы предотвратить изменения
 Object.freeze(CONFIG);
 Object.freeze(CONFIG.STORAGE_KEYS);
-Object.freeze(CONFIG.DEFAULT_TIMER_COLORS);
 Object.freeze(CONFIG.TIMER_STYLES);
 if (CONFIG.ALLOWED_AUDIO_TYPES) { Object.freeze(CONFIG.ALLOWED_AUDIO_TYPES); }
 if (CONFIG.ALLOWED_IMAGE_TYPES) { Object.freeze(CONFIG.ALLOWED_IMAGE_TYPES); }
@@ -323,7 +306,7 @@ export const {
     MAX_MOVE_DELTA, SCALE_STEP, DEFAULT_SCALE, WARNING_THRESHOLD,
     WARNING_PERCENTAGE, DANGER_PERCENTAGE, PRESET_DURATIONS, MAX_SOUND_FILE_SIZE,
     MAX_IMAGE_FILE_SIZE, MIN_TIMER_SCALE, MAX_TIMER_SCALE, MAX_FLASH_COUNT,
-    STORAGE_KEYS, DEFAULT_TIMER_COLORS, TIMER_STYLES, ALLOWED_AUDIO_TYPES,
+    STORAGE_KEYS, TIMER_STYLES, ALLOWED_AUDIO_TYPES,
     ALLOWED_IMAGE_TYPES
 } = CONFIG;
 

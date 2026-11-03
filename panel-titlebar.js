@@ -54,8 +54,11 @@ function bindLockToggle({ doc, ipc, lock, buttonId = LOCK_BUTTON_IDS }) {
             button.setAttribute('aria-pressed', String(locked));
             button.classList.toggle('active', locked);
             // Глиф — ВТОРОЙ признак состояния помимо цвета: индикатор, отличимый
-            // только цветом, в этом проекте уже был отдельным дефектом.
-            button.textContent = locked ? '🔒' : '🔓';
+            // только цветом, в этом проекте уже был отдельным дефектом. Глиф —
+            // SVG из разметки (дужка закрыта / откинута), показывает его CSS
+            // по этому атрибуту. Эмодзи 🔒/🔓 был цветным среди монохромных
+            // кнопок и на каждой ОС рисовался по-своему.
+            button.setAttribute('data-glyph', locked ? 'locked' : 'unlocked');
             button.title = label(locked);
             button.setAttribute('aria-label', label(locked));
         }

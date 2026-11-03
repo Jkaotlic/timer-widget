@@ -617,16 +617,11 @@ body::after {
 [data-theme="light"] .sound-formats {
     color: var(--tw-fg-dim);
 }
-/* Крестик описан белыми литералами, а светлая тема перекрывала у него ТОЛЬКО
-   цвет текста: подложка и рамка исчезали целиком, оставался голый символ без
-   границ мишени. Там же пропадал разделитель шапки — белый 5% на светлом фоне
-   не существует. Чиним точечно, а не подменой литерала на токен: подмена
-   сдвинула бы тёмную тему с 5% на 8% и переписала эталоны. */
-[data-theme="light"] .drawer-close {
-    background: var(--tw-level-2);
-    border-color: var(--tw-border);
-}
-
+/* Крестик в покое — голый символ в ОБЕИХ темах, как кнопка «назад» рядом
+   (редизайн шапки ящика ниже по файлу). Здесь до 03.11.2026 стояла ещё и
+   плашка с рамкой для светлой темы — остаток прежней шапки: специфичнее
+   редизайна, она рисовала кнопку в светлой теме иначе, чем в тёмной.
+   Подложка на наведении — в обеих темах (тёмная — в первом правиле файла). */
 [data-theme="light"] .drawer-close:hover {
     background: var(--tw-level-3);
     border-color: var(--tw-border-strong);
@@ -644,7 +639,6 @@ body::after {
 /* .sound-check отсюда убран вместе с самим классом: подпись ряда звука теперь
    .sound-name и красится токеном --tw-fg, то есть работает в обеих темах без
    отдельного переопределения. */
-[data-theme="light"] .drawer-close,
 [data-theme="light"] .drawer-body .toggle-label {
     color: var(--tw-fg-secondary);
 }
@@ -796,6 +790,15 @@ body::after {
     height: 11px;
     flex: 0 0 auto;
 }
+/* Замок (титлбар и полоса): одна иконка, дужку выбирает `data-glyph`,
+   который ставит panel-titlebar.js — владелец состояния один. */
+.lock-glyph {
+    width: 13px;
+    height: 13px;
+    flex: 0 0 auto;
+}
+[data-glyph="unlocked"] .lock-shackle-closed,
+[data-glyph="locked"] .lock-shackle-open { display: none; }
 .custom-titlebar .window-controls {
     display: flex;
     gap: 7px;
@@ -2846,21 +2849,18 @@ select optgroup,
     margin: 6px 0;
 }
 
+/* Список у панели один — «Монитор». Синий текст модификатора `is-accent`
+   давал ~3,5:1 и выдавал его за ссылку среди остальных контролов; надпись —
+   основной цвет текста, как у соседних значений. */
 .settings-select {
     padding: 6px 10px;
-    border-radius: var(--tw-r-xs);
-    border: 1px solid var(--tw-border-strong);
-    background: var(--tw-overlay-light);
+    border-radius: var(--tw-r-sm);
+    border: 1px solid var(--tw-border);
+    background: var(--tw-overlay-medium);
     color: var(--tw-fg);
     font-family: inherit;
     font-size: 0.85em;
     cursor: pointer;
-}
-.settings-select.is-accent {
-    border-radius: var(--tw-r-sm);
-    border-color: var(--tw-border);
-    background: var(--tw-overlay-medium);
-    color: var(--tw-blue);
     max-width: 140px;
 }
 .settings-select:focus-visible { outline: none; box-shadow: var(--tw-focus-ring); }
@@ -3865,7 +3865,7 @@ body.collapsed .mini-bar button {
 /* Запертый замок в полосе — тем же языком, что и применённая ячейка вида:
    примесь акцента в подложке и акцентная кромка. Ниже :hover намеренно —
    специфичность равная, и состояние обязано быть видно под курсором тоже.
-   Одного глифа 🔒 мало: он отличается от 🔓 на 24px деталью в пару пикселей. */
+   Одного глифа мало: закрытая дужка отличается от откинутой деталью в пару пикселей. */
 .mini-btn.active {
     background: color-mix(in srgb, var(--tw-blue) 18%, var(--tw-level-2));
     border-color: var(--tw-blue);
@@ -4108,7 +4108,9 @@ body.state-overtime .panel-progress { display: block; }
 .panel-progress-fill {
     display: block;
     height: 3px;
-    width: 0;
+    /* Долю пишет panel-state.js переменной, а не шириной: инлайн-ширина
+       перебила бы `width: 100%` перерасхода ниже. */
+    width: calc(var(--progress, 0) * 100%);
     background: var(--tw-green);
     transition: width var(--tw-dur-base) var(--tw-ease);
 }
@@ -4138,7 +4140,8 @@ body:not(.state-idle) .presets { display: none; }
 .preset:hover { background: var(--tw-level-3); }
 .preset.active {
     background: var(--tw-blue);
-    color: var(--tw-on-accent);
+    /* Цвет фона окна, как у кнопок транспорта: белый давал 3,65:1 в тёмной. */
+    color: var(--tw-bg-surface);
     font-weight: 600;
 }
 .preset-custom {
@@ -4175,15 +4178,18 @@ body:not(.state-idle) .presets { display: none; }
     color: var(--tw-fg-dim);
 }
 /* Покой и ввод ведёт синяя кнопка, отсчёт — нейтральная, перерасход — красная.
-   Подсказка клавиши на залитой кнопке гасится прозрачностью, а не своим
-   цветом: у неё один фон с текстом, и второй токен тут только разошёлся бы. */
+   Надпись на заливке — цвет ФОНА ОКНА, как у модалок и .preset-slot.active:
+   тема меняет его вместе с акцентом. Белая (--tw-on-accent) в тёмной теме
+   давала 3,65:1 на синем и 3,41:1 на красном, а подсказка клавиши под
+   прозрачностью 0.72 — 2,58:1 (tests/contrast.test.js). Подсказка берёт тот
+   же цвет без прозрачности: от слова её отличает моноширинный кегль 11px. */
 body.state-idle  #startBtn,
-body.state-input #startBtn { display: inline-flex; background: var(--tw-blue); color: var(--tw-on-accent); }
+body.state-input #startBtn { display: inline-flex; background: var(--tw-blue); color: var(--tw-bg-surface); }
 body.state-idle  #startBtn .transport-key,
-body.state-input #startBtn .transport-key { color: currentColor; opacity: 0.72; }
+body.state-input #startBtn .transport-key { color: currentColor; }
 body.state-running  #pauseBtn { display: inline-flex; }
-body.state-overtime #pauseBtn { display: inline-flex; background: var(--tw-red); color: var(--tw-on-accent); }
-body.state-overtime #pauseBtn .transport-key { color: currentColor; opacity: 0.72; }
+body.state-overtime #pauseBtn { display: inline-flex; background: var(--tw-red); color: var(--tw-bg-surface); }
+body.state-overtime #pauseBtn .transport-key { color: currentColor; }
 
 /* Пауза — модификатор, а не пятое состояние: раскладка остаётся от отсчёта,
    меняется ТОЛЬКО предлагаемое действие. Кнопка «Пауза» в паузе не делает
@@ -4203,8 +4209,8 @@ body.state-overtime #pauseBtn .transport-key { color: currentColor; opacity: 0.7
 body.paused .hero-label { color: var(--tw-orange); }
 
 body.paused #pauseBtn { display: none; }
-body.paused #startBtn { display: inline-flex; background: var(--tw-blue); color: var(--tw-on-accent); }
-body.paused #startBtn .transport-key { color: currentColor; opacity: 0.72; }
+body.paused #startBtn { display: inline-flex; background: var(--tw-blue); color: var(--tw-bg-surface); }
+body.paused #startBtn .transport-key { color: currentColor; }
 /* Пауза, наступившая в перерасходе, остаётся красной темой экрана: синяя
    кнопка посреди красного означала бы, что состояние сменилось. */
 body.state-overtime.paused #startBtn { background: var(--tw-red); }
@@ -4679,6 +4685,10 @@ body.state-input .panel-footer { display: none; }
     margin-bottom: 12px;
 }
 .settings-hint kbd { font-size: 10px; padding: 0 4px; }
+/* Сочетание не рвётся на строки: «Ctrl» в конце одной строки и «+колесо» в
+   начале следующей, «(» отдельно от «Esc» — так подсказка читалась на кадре
+   ящика (аудит 03.11.2026). Между <kbd>-блоками браузер переносит строку. */
+.kbd-combo { white-space: nowrap; }
 .settings-hint .hint-icon { opacity: 0.6; }
 
 /* Строка настройки: имя, пояснение, контрол справа. Числа из мока. */
