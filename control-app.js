@@ -109,16 +109,11 @@
                 // FIX BUG-023: Track active theme button to avoid querySelectorAll
                 this.activeThemeButton = null;
 
-                // Стартовые цвета панели. Здесь стояла пара #667eea/#764ba2 —
-                // фиолетовая, которой нет в наборе токенов вообще: наследство
-                // первой версии. Именно она уходила в widgetColors при первом
-                // же изменении настроек, то есть окна красились цветом, не
-                // принадлежащим палитре приложения.
-                /** @type {ColorsUpdate} */ this.currentColors = {
-                    timer: CONFIG.DEFAULT_TIMER_COLORS.timer,
-                    progress: CONFIG.DEFAULT_TIMER_COLORS.progress,
-                    bg: '#0f0c29'
-                };
+                // Стартовых цветов у панели нет: умолчание окна — его CSS.
+                // Здесь стояла сначала фиолетовая пара #667eea/#764ba2, потом
+                // #0a84ff/#30d158 — и обе уходили в widgetColors при первой же
+                // правке подложки (panel-colors.js, loadWindowColors).
+                /** @type {ColorsUpdate} */ this.currentColors = {};
 
                 // Списки звуков строятся ДО чтения настроек: applyStoredSettings
                 // ставит select.value, а значение без <option> браузер молча

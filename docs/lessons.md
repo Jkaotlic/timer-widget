@@ -254,7 +254,8 @@
 
 ### A colour default has an owner too, and the owner is CSS
 
-- **A colour default has an owner too, and the owner is CSS**: the same style looked different per window, and the cause was data, not CSS. The panel held `#667eea`/`#764ba2` — a purple pair absent from the token set entirely; the widget substituted a hardcoded `#0a84ff` inline; the display and the clock substituted nothing. Since inline beats every rule, the widget's substitution killed several *documented* states outright: the promised `--tw-led-green` on LED digits never once applied, flip digits rendered blue instead of `--tw-fg`, and the analog second hand came out blue-green instead of its own red. Three of four styles did not look the way they were written. The substitution is gone; CSS owns the default and the user's colour still overrides it inline, exactly as in the clock. `CONFIG.DEFAULT_TIMER_COLORS` has ONE consumer left — the panel's initial state. Deleted alongside: `CONFIG.DEFAULT_COLORS`, a fifth palette no file ever read, carrying `overtime: '#ff6b35'` — the orange this project banned everywhere else.
+- **A colour default has an owner too, and the owner is CSS**: the same style looked different per window, and the cause was data, not CSS. The panel held `#667eea`/`#764ba2` — a purple pair absent from the token set entirely; the widget substituted a hardcoded `#0a84ff` inline; the display and the clock substituted nothing. Since inline beats every rule, the widget's substitution killed several *documented* states outright: the promised `--tw-led-green` on LED digits never once applied, flip digits rendered blue instead of `--tw-fg`, and the analog second hand came out blue-green instead of its own red. Three of four styles did not look the way they were written. The substitution is gone; CSS owns the default and the user's colour still overrides it inline, exactly as in the clock. Deleted alongside: `CONFIG.DEFAULT_COLORS`, a fifth palette no file ever read, carrying `overtime: '#ff6b35'` — the orange this project banned everywhere else.
+- **03.11.2026: the panel's OWN start state was the same leak, one step removed.** `CONFIG.DEFAULT_TIMER_COLORS` kept one consumer — the panel's in-memory widget colours on a fresh profile (`#0a84ff`/`#30d158` + bg `#0f0c29`). The window never received them at load (`loadWindowColors` sends `own || {}`), so every load-time check was green. But `saveColors('widget')` sends the WHOLE model, and the first touch of an unrelated field — the «Фон» opacity slider — shipped the invented colours with it: widget digits went from the tone's `rgb(29, 29, 31)` to `rgb(10, 132, 255)` and stopped following the tone; the «Сбросить» digit-colour button was lit on a profile where nothing had been chosen. Rule: a model that is SENT whole must contain only what the user set. The panel now starts with `{}` like the clock and the display; `e2e/window-surface-color.spec.js` moves the slider on a clean profile and compares the digits.
 
 ---
 
@@ -1343,6 +1344,15 @@ JS» — прятать было нечего, и пользователь ви�
 (`--tw-band-*`) со ЗНАЧЕНИЯМИ ПЕРЕНЕСЁННЫМИ ДОСЛОВНО. Свести их к одному —
 значит поменять пиксели, и это отдельное решение, не рефакторинг.
 
+**То же правило не только про цвет (03.11.2026).** Полоса панели писала ширину
+инлайном (`fill.style.width = …%`), а перерасход прибивал её правилом
+`body.state-overtime .panel-progress-fill { width: 100% }`. Инлайн выигрывает у
+любого правила, и в минус, попавший скачком («−5», восстановление), полоса
+оставалась на последней доле отсчёта; плавный уход в ноль этого не показывал —
+последний тик и так доводил её до ~100 %. Теперь JS пишет ДОЛЮ переменной
+(`--progress`), ширину считает CSS, и правило состояния выигрывает. Признак
+ловушки: инлайн и правило состояния на ОДНОМ свойстве одного элемента.
+
 ---
 
 <a id="a-state-indicator-is-colour-too-and-it-has-an-owner"></a>
@@ -1839,6 +1849,18 @@ macOS и Windows ещё в прогоне 14.08.2026 («панель дёрну�
 но здесь скрытым параметром был не экран, а собственный `transform` элемента.
 
 После правки: 0.00px на всех размерах от 180 до 600.
+
+**Продолжение 03.11.2026: правило проверяли на ОДНОМ делении из 133.** Тест
+мерил деление на 3 часах у виджета — и только. Визуальный аудит нашёл ту же
+арифметику ещё в четырёх местах: на дисплее крупные деления меняли `top` (6 %,
+4 %) при общей origin 42 % — метки 3 и 9 часов висели на 15px выше стрелок; у
+часов крупное деление `top: 6px` при origin 87 — ось на 6px выше центра; у
+мини-часов блоков 4 + 46 = 50 при середине 49. Плюс горизонталь: `left: 50%` без
+`margin-left` ставит на ось ЛЕВЫЙ край, у виджета кольцо уезжало на 1–1.5px.
+Теперь `tickAxis` в `e2e/csp-strict.spec.js` меряет КАЖДОЕ деление всех четырёх
+видов циферблатов (семь на экране): отход от луча из центра и разброс радиуса внутри класса. На
+старом коде он дал 19.13 / 6 / 1.5 / 1px. У дисплея `top` и origin выведены из
+одной `--tick-inset`, так что разойтись им больше нечем.
 
 ---
 

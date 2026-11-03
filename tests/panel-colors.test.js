@@ -361,8 +361,6 @@ function memStorage(initial = {}) {
     };
 }
 
-const FRESH = { timer: '#0a84ff', progress: '#0a84ff' };
-
 test('PANEL-002: профиль без цветов окон возвращает окна к умолчанию и шлёт им сброс', () => {
     // Сценарий аудита 27.10.2026: ячейка пресета записана при цветах по
     // умолчанию (widgetColors/clockColors/displayColors = null, применение
@@ -374,10 +372,11 @@ test('PANEL-002: профиль без цветов окон возвращае�
     tc.clockColors = { timer: '#ff0000' };
     tc.displayColors = { timer: '#00ff00' };
     const sent = [];
-    withStorage({}, () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload]), FRESH));
+    withStorage({}, () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload])));
 
-    assert.equal(tc.currentColors.timer, FRESH.timer, 'цвет виджета не вернулся к стартовому');
-    assert.ok(!('surface' in tc.currentColors), 'фон виджета пережил пресет без цветов');
+    // Модель виджета ПУСТАЯ, как у часов и дисплея: стартовых цветов у панели
+    // нет, иначе первая правка подложки разослала бы их окну (03.11.2026).
+    assert.deepEqual(tc.currentColors, {}, 'цвета виджета пережили пресет без цветов или выдуманы панелью');
     assert.equal(tc.clockColors, null, 'цвета часов пережили пресет без цветов');
     assert.equal(tc.displayColors, null, 'цвета дисплея пережили пресет без цветов');
     // Окнам уходит ПУСТОЙ объект: владелец умолчания — CSS, а не панель.
@@ -395,20 +394,19 @@ test('PANEL-002: сохранённые цвета окон раскладыва
         widgetColors: JSON.stringify({ timer: '#222222' }),
         clockColors: JSON.stringify({ timer: '#333333' }),
         displayColors: JSON.stringify({ timer: '#444444' })
-    }, () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload]), FRESH));
+    }, () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload])));
     assert.deepEqual(tc.currentColors, { timer: '#222222' });
     assert.deepEqual(tc.clockColors, { timer: '#333333' });
     assert.deepEqual(tc.displayColors, { timer: '#444444' });
     assert.deepEqual(sent.map((s) => s[0]), ['widget-colors-update', 'clock-colors-update', 'display-colors-update']);
 });
 
-test('PANEL-002: старый общий ключ timerColors по-прежнему дополняет стартовые цвета виджета', () => {
+test('PANEL-002: старый общий ключ timerColors по-прежнему даёт цвета виджета', () => {
     const tc = fakeController({ timer: '#39ff14' });
     const sent = [];
     withStorage({ timerColors: JSON.stringify({ timer: '#abcdef' }) },
-        () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload]), FRESH));
-    assert.equal(tc.currentColors.timer, '#abcdef');
-    assert.equal(tc.currentColors.progress, FRESH.progress, 'стартовое поле потеряно');
+        () => tc.loadWindowColors((channel, payload) => sent.push([channel, payload])));
+    assert.deepEqual(tc.currentColors, { timer: '#abcdef' }, 'к цветам старого ключа панель досочинила поля');
     assert.deepEqual(sent[0], ['widget-colors-update', { timer: '#abcdef' }],
         'виджет обязан получить цвета старого ключа, а не сброс');
 });

@@ -88,7 +88,6 @@ function el(tag, props, children) {
 /** Чистая логика окон: здесь — запасной путь цветов (ownColors). */
 import * as ColorsShared from './renderer-shared.js';
 import { ColorPicker } from './color-picker.js';
-import * as CONFIG from './constants.js';
 
 /**
  * Объект цветов из строки хранилища или null: битое значение не роняет панель.
@@ -111,28 +110,30 @@ const PanelColorsMixin = {
      * записанный при цветах по умолчанию, применяется как removeItem, и
      * «нет ключа — ничего не делаем» оставляло на экране и в панели прежние
      * цвета (а первая же правка писала их обратно). Поэтому:
-     *  - виджет без своего ключа возвращается к СТАРТОВЫМ цветам панели
-     *    (`fresh`, дополненным старым общим ключом timerColors);
+     *  - виджет без своего ключа — к старому общему ключу timerColors, а без
+     *    него к ПУСТОМУ объекту, как часы и дисплей;
      *  - часы и дисплей — к null, как на чистом профиле;
      *  - окнам уходит то, что они показали бы на чистом профиле: пустой объект
      *    (владелец умолчания — CSS) или цвета старого ключа.
      *
+     * Стартовых цветов у панели НЕТ. До 03.11.2026 виджет без ключа получал
+     * здесь #0a84ff/#30d158 и фон #0f0c29 — «чтобы было что показать». Окну
+     * они не уходили, но жили в модели: первая же правка подложки (ползунок
+     * «Фон») рассылала объект целиком, и цифры виджета на чистом профиле
+     * становились синими и переставали следовать тону. И кнопка «Сбросить»
+     * цвета цифр горела, хотя сбрасывать было нечего.
+     *
      * @param {(channel: 'widget-colors-update'|'clock-colors-update'|'display-colors-update', payload: ColorsUpdate) => void} [send]
-     * @param {{timer: string, progress: string}} [fresh] стартовые цвета
      */
-    loadWindowColors(send, fresh) {
+    loadWindowColors(send) {
         const post = send || ((channel, payload) => window.ipcRenderer.send(channel, payload));
-        const defaults = fresh || CONFIG.DEFAULT_TIMER_COLORS;
         const widget = parseColors(localStorage.getItem('widgetColors'));
         // Свой ключ виджета, а без него — старый общий timerColors. Формулу
         // запасного пути знает ОДНО место (renderer-shared.ownColors): тем же
         // путём виджет красится сам на старте.
         const own = ColorsShared.ownColors(localStorage, 'widgetColors');
 
-        this.currentColors = widget || mergeColors(
-            { timer: defaults.timer, progress: defaults.progress, bg: '#0f0c29' },
-            own || {}
-        );
+        this.currentColors = widget || mergeColors({}, own || {});
         this.clockColors = parseColors(localStorage.getItem('clockColors'));
         this.displayColors = parseColors(localStorage.getItem('displayColors'));
 

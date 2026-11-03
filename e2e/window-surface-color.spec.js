@@ -435,3 +435,64 @@ test.describe('сброс настроек окна', () => {
             .toEqual({ x: before.x, y: before.y, w: before.width, h: before.height });
     });
 });
+
+/**
+ * Правка подложки не красит цифры. На чистом профиле панель держала в модели
+ * выдуманные цвета виджета (#0a84ff/#30d158) и рассылала их с первым же
+ * движением ползунка «Фон»: цифры становились синими и переставали следовать
+ * тону, а кнопка «Сбросить» цвета цифр горела, хотя сбрасывать было нечего.
+ * Замер 03.11.2026 до правки: rgb(29, 29, 31) → rgb(10, 132, 255).
+ */
+test.describe('подложка без выбранного цвета цифр', () => {
+    let app;
+    let control;
+
+    test.beforeAll(async () => {
+        ({ app, control } = await launchApp());
+    });
+
+    test.afterAll(async () => {
+        await app.close();
+    });
+
+    // Профиль e2e общий: цвета виджета, оставленные другой спекой, сделали бы
+    // сценарий не «чистым». Убираем ключи и раскладываем цвета заново.
+    const freshColors = () => control.evaluate(() => {
+        localStorage.removeItem('widgetColors');
+        localStorage.removeItem('timerColors');
+        window.timerController.loadWindowColors();
+        window.timerController.renderSurfaceControls();
+    });
+
+    test('ползунок «Фон» не меняет цвет цифр, «Сбросить» цвета цифр погашена', async () => {
+        await freshColors();
+        await control.click('#openWidgetBtn');
+        const widget = await waitForWidget(app);
+        const digits = () => widget.evaluate(() => getComputedStyle(document.getElementById('timeDisplayDigits')).color);
+        try {
+            await control.click('.wrow:has(#openWidgetBtn) .wrow-chevron');
+            await expect(control.locator('#widgetSurfaceRow .surface-reset-timer')).toBeDisabled();
+            // Сброс цветов из freshColors доехал и осел.
+            const before = await waitForSteady(widget,
+                () => getComputedStyle(document.getElementById('timeDisplayDigits')).color);
+
+            await untilReceived(widget, 'widget-colors-update', () => control.evaluate(() => {
+                const a = document.querySelector('#widgetSurfaceRow .surface-alpha');
+                a.value = '80';
+                a.dispatchEvent(new Event('input', { bubbles: true }));
+            }), { match: { surfaceAlpha: 0.8 } });
+            await waitForTransitions(widget);
+
+            expect(await digits(), 'правка подложки перекрасила цифры').toBe(before);
+            const stored = await control.evaluate(() => JSON.parse(localStorage.getItem('widgetColors') || '{}'));
+            expect(stored, 'в профиль записан цвет, которого пользователь не выбирал').toEqual({ surfaceAlpha: 0.8 });
+            await expect(control.locator('#widgetSurfaceRow .surface-reset-timer')).toBeDisabled();
+            await expect(control.locator('#widgetSurfaceRow .surface-reset-bg')).toBeEnabled();
+        } finally {
+            await freshColors();
+            await control.click('#drawerClose').catch(() => {});
+            await control.click('#openWidgetBtn');
+            await expect(control.locator('#openWidgetBtn')).toHaveAttribute('aria-checked', 'false', { timeout: 15000 });
+        }
+    });
+});

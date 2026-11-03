@@ -865,3 +865,74 @@ test('.preset-slot.active (применённая ячейка вида) чит�
     assert.ok(white < AA_NORMAL,
         `белая цифра на --${bgTok[1]} даёт ${white.toFixed(2)}:1 — порог перестал что-либо различать`);
 });
+
+test('необратимые кнопки модальных окон («Закрыть», «Сбросить») читаемы в ОБЕИХ темах', () => {
+    // Замер 03.11.2026: надпись --tw-fg на --tw-red давала 2,42:1 в светлой
+    // теме (тёмный текст на тёмном красном) и 3,41:1 в тёмной (белый на ярком).
+    // Правило читается ИЗ control.css, как у .preset-slot.active.
+    const control = readSource('control.css');
+    for (const sel of ['.exit-btn-confirm', '.reset-btn-confirm']) {
+        const rule = new RegExp(`^${sel.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`, 'm').exec(control);
+        assert.ok(rule, `не найдено правило ${sel}`);
+        const body = codeOnly(rule[1]);
+        const bgTok = /background:\s*var\(--([a-z0-9-]+)\)/.exec(body);
+        const fgTok = /(?:^|[;{\s])color:\s*var\(--([a-z0-9-]+)\)/.exec(body);
+        assert.ok(bgTok && fgTok, `${sel}: заливка и надпись должны быть ТОКЕНАМИ`);
+        const pair = (tok) => {
+            const bg = parseColor(tok(bgTok[1])).rgb;
+            return contrast(composite(tok(fgTok[1]), bg), bg);
+        };
+        const dark = pair(darkToken);
+        const light = pair(hcToken);
+        console.log(`   ${sel}: тёмная ${dark.toFixed(2)}:1, светлая ${light.toFixed(2)}:1 (--${fgTok[1]} на --${bgTok[1]})`);
+        assert.ok(dark >= AA_NORMAL, `${sel}, тёмная тема: ${dark.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+        assert.ok(light >= AA_NORMAL, `${sel}, светлая тема: ${light.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+    }
+    // Проверка проверки: прежняя надпись --tw-fg этот порог НЕ проходит.
+    const old = contrast(composite(hcToken('tw-fg'), parseColor(hcToken('tw-red')).rgb), parseColor(hcToken('tw-red')).rgb);
+    assert.ok(old < AA_NORMAL, `--tw-fg на --tw-red в светлой теме ${old.toFixed(2)}:1 — порог перестал различать`);
+});
+
+test('залитые кнопки панели (транспорт, активный пресет) и подсказка клавиши читаемы в ОБЕИХ темах', () => {
+    // Замер 03.11.2026: белая надпись (--tw-on-accent) в тёмной теме давала
+    // 3,65:1 на синем и 3,41:1 на красном («Стоп» на минусе), подсказка
+    // «Space» под opacity 0.72 — 2,58:1. Правила читаются ИЗ control.css: и
+    // заливка, и надпись обязаны быть токенами, а прозрачность подсказки —
+    // учитываться, если она вернётся.
+    const control = codeOnly(readSource('control.css'));
+    const rules = [
+        ['body.state-idle  #startBtn', 'body.state-idle  #startBtn .transport-key'],
+        ['body.state-overtime #pauseBtn', 'body.state-overtime #pauseBtn .transport-key'],
+        ['body.paused #startBtn', 'body.paused #startBtn .transport-key'],
+        ['.preset.active', null]
+    ];
+    const ruleBody = (sel) => {
+        const esc = sel.replace(/[.#]/g, (c) => '\\' + c).replace(/ +/g, '\\s+');
+        const m = new RegExp(`(?:^|\\n|,)\\s*${esc}\\s*(?:,[^{]*)?\\{([^}]*)\\}`).exec(control);
+        assert.ok(m, `не найдено правило ${sel}`);
+        return m[1];
+    };
+    for (const [btnSel, keySel] of rules) {
+        const body = ruleBody(btnSel);
+        const bgTok = /background:\s*var\(--([a-z0-9-]+)\)/.exec(body);
+        const fgTok = /(?:^|[;{\s])color:\s*var\(--([a-z0-9-]+)\)/.exec(body);
+        assert.ok(bgTok && fgTok, `${btnSel}: заливка и надпись должны быть ТОКЕНАМИ`);
+        const keyBody = keySel ? ruleBody(keySel) : '';
+        const op = /opacity:\s*([\d.]+)/.exec(keyBody);
+        const alpha = op ? Number(op[1]) : 1;
+        for (const [name, tok] of [['тёмная', darkToken], ['светлая', hcToken]]) {
+            const bg = parseColor(tok(bgTok[1])).rgb;
+            const fg = composite(tok(fgTok[1]), bg);
+            const text = contrast(fg, bg);
+            assert.ok(text >= AA_NORMAL, `${btnSel}, ${name}: надпись ${text.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+            if (keySel) {
+                const hint = contrast(fg.map((v, i) => v * alpha + bg[i] * (1 - alpha)), bg);
+                assert.ok(hint >= AA_NORMAL, `${keySel}, ${name}: подсказка ${hint.toFixed(2)}:1, нужно ${AA_NORMAL}:1`);
+            }
+        }
+    }
+    // Проверка проверки: прежняя пара (белый на синем в тёмной теме) порог не проходит.
+    const blue = parseColor(darkToken('tw-blue')).rgb;
+    const old = contrast(composite(darkToken('tw-on-accent'), blue), blue);
+    assert.ok(old < AA_NORMAL, `--tw-on-accent на --tw-blue в тёмной ${old.toFixed(2)}:1 — порог перестал различать`);
+});

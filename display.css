@@ -589,13 +589,15 @@ body.style-analog .info-block .mini-tick {
     width: 1px; height: 4px;
     background: var(--style-tick);
     left: 50%; top: 4px;
-    transform-origin: center 46px;
+    /* `top` + origin = середина padding-бокса: 100px с рамкой 1px → 98 → 49.
+       Было 4 + 46 = 50, ось на 1px ниже центра. */
+    transform-origin: center 45px;
 }
 body.style-analog .info-block .mini-tick.quarter {
     width: 2px; height: 6px;
     background: var(--style-tick-strong);
     top: 3px;
-    transform-origin: center 47px;
+    transform-origin: center 46px;
 }
 /* Угол мини-деления — тем же приёмом, что у .clock-tick (см. ниже). Сдвиг
    translateX(-50%) — часть того же transform, как и было в разметке. Правило
@@ -929,7 +931,9 @@ body.style-digits .status-pill {
     background: transparent;
     border: 1px solid var(--tw-border);
     border-radius: var(--tw-r-md);
-    color: var(--tw-led-green);
+    /* Покой — цвет покоя, как у остальных стилей. Здесь стоял зелёный, и
+       «Готов к запуску» читался так же, как «Таймер активен». */
+    color: var(--tw-fg-secondary);
     box-shadow: none;
 }
 body.style-digits .status-pill.running  { color: var(--tw-led-green); }
@@ -973,12 +977,29 @@ body.flash-mode { animation: flash-bg 0.3s; }
    FLIP STYLE
    ============================================================ */
 .timer-flip {
+    /* Пластина табло — ОДНА формула на карточки цифр и карточку минуса.
+       Блик — слой ФОНА, под цифрой, как у виджета. Он жил в `::after` поверх
+       цифры (z-index 5): в тёмном тоне это незаметно, а в светлом белый блик
+       0.65 красил верхнюю половину тёмной цифры в серый. Створки наследуют
+       фон по цепочке (flip-card.css), поэтому блик едет и на них. */
+    --flip-plate:
+        linear-gradient(180deg, var(--style-gloss) 0%, transparent 50%),
+        var(--surface-solid, var(--style-plate));
     display: none;
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: 20px;
     padding: var(--tw-s-10);
+    /* Высота карточки — ОДНА величина, от неё в долях всё табло: ширина,
+       кегль, минус, разделитель, перспектива. Доля рамы героя (--timer-box),
+       как у круга и аналога, поэтому уступка верхней полосе действует и тут.
+       16vw — прежняя доля ширины: на узком окне шесть карточек с часами
+       обязаны влезть по ширине.
+       До 03.11.2026 размеры были clamp(…, 16vw, 200px) у каждой детали
+       порознь, и потолок 200px держал карточку одной и той же на 720p и
+       1080p: 21 % высоты против 51 % у круга. */
+    --flip-h: max(80px, min(var(--timer-box) * 0.5, 16vw));
 }
 .timer-flip.active { display: flex; }
 
@@ -1009,9 +1030,9 @@ body.flash-mode { animation: flash-bg 0.3s; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(10px, 2vw, 26px);
-    /* Высота колонки равна высоте карточки — те же значения, что у .flip-card. */
-    height: clamp(80px, 16vw, 200px);
+    gap: calc(var(--flip-h) * 0.125);
+    /* Высота колонки равна высоте карточки. */
+    height: var(--flip-h);
     padding: 0 10px;
     /* Приехало из удалённого components.css и это ЕДИНСТВЕННОЕ, что
        оттуда меняло геометрию: без этих полей ряд карточек ужимался
@@ -1022,8 +1043,8 @@ body.flash-mode { animation: flash-bg 0.3s; }
 .flip-separator::before,
 .flip-separator::after {
     content: '';
-    width: clamp(5px, 1vw, 12px);
-    height: clamp(5px, 1vw, 12px);
+    width: calc(var(--flip-h) * 0.0625);
+    height: calc(var(--flip-h) * 0.0625);
     border-radius: 50%;
     /* Тот же цвет, что у цифр, включая значение по умолчанию. */
     background: var(--timer-color, var(--tw-fg));
@@ -1043,15 +1064,15 @@ body.flash-mode { animation: flash-bg 0.3s; }
    и читался отдельной деталью (жалоба 30.09.2026). */
 .flip-minus {
     position: relative;
-    width: clamp(35px, 6vw, 80px);
-    height: clamp(80px, 16vw, 200px);
+    width: calc(var(--flip-h) * 0.375);
+    height: var(--flip-h);
     display: none;
     align-items: center;
     justify-content: center;
     /* ТА ЖЕ подложка, что у .flip-card-inner: минус — карточка того же табло.
        Здесь стоял свой двухстоповый градиент, из-за которого карточка минуса
-       читалась как деталь от другого стиля. */
-    background: var(--surface-solid, var(--style-plate));
+       читалась как деталь от другого стиля. Формула одна — `--flip-plate`. */
+    background: var(--flip-plate);
     border-radius: var(--tw-r-md);
     border: 1px solid var(--tw-border);
     box-shadow:
@@ -1068,8 +1089,8 @@ body.flash-mode { animation: flash-bg 0.3s; }
 .flip-minus-sign {
     font-family: var(--tw-font-display);
     /* 0.8 кегля цифр: глиф минуса шире цифры (≈0.67 кегля), и полный кегль
-       упирался бы в края карточки шириной 6vw. */
-    font-size: clamp(2rem, 7.2vw, 5.6rem);
+       упирался бы в края карточки шириной в 0.375 её высоты. */
+    font-size: calc(var(--flip-h) * 0.45);
     font-weight: 600;
     line-height: 1;
     /* ТА ЖЕ полоса, что у цифр в перерасходе (.flip-card.danger .flip-digit).
@@ -1082,20 +1103,19 @@ body.flash-mode { animation: flash-bg 0.3s; }
 
 .flip-card {
     position: relative;
-    width: clamp(60px, 12vw, 160px);
-    height: clamp(80px, 16vw, 200px);
+    width: calc(var(--flip-h) * 0.75);
+    height: var(--flip-h);
     /* Сам `perspective` стоит на `.fc-flip` (flip-card.css) — прямом родителе
        створок; прежнее `perspective: 1000px` здесь не действовало, створки
-       карточке внуки. Значение — те же ≈2.8 высоты, поэтому и оно clamp:
-       высота карточки на этом окне зависит от ширины экрана. */
-    --fc-perspective: clamp(224px, 45vw, 560px);
+       карточке внуки. Значение — те же ≈2.8 высоты карточки. */
+    --fc-perspective: calc(var(--flip-h) * 2.8);
 }
 
 .flip-card-inner {
     position: relative;
     width: 100%;
     height: 100%;
-    background: var(--surface-solid, var(--style-plate));
+    background: var(--flip-plate);
     border: 1px solid var(--style-edge);
     border-radius: var(--tw-r-lg);
     box-shadow:
@@ -1112,22 +1132,12 @@ body.flash-mode { animation: flash-bg 0.3s; }
     background: var(--style-hinge);
     z-index: 10;
 }
-.flip-card-inner::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 50%;
-    background: linear-gradient(180deg, var(--style-gloss) 0%, transparent 100%);
-    pointer-events: none;
-    z-index: 5;
-}
-
 .flip-digit {
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     font-family: var(--tw-font-display);
-    font-size: clamp(2.5rem, 9vw, 7rem);
+    font-size: calc(var(--flip-h) * 0.5625);
     font-weight: 600;
     color: var(--timer-color, var(--tw-fg));
     letter-spacing: -0.02em;
@@ -1200,23 +1210,34 @@ body.flash-mode { animation: flash-bg 0.3s; }
 
 .clock-face { position: absolute; width: 100%; height: 100%; }
 
+/* Ось вращения — центр циферблата для ЛЮБОГО класса: `top` и вертикаль
+   transform-origin считаются из одного отступа --tick-inset (в долях
+   --analog-size), их сумма всегда ровно половина. До 03.11.2026 крупные
+   деления меняли только `top` при общей origin, и метки 3 и 9 часов висели
+   на 15px выше стрелок. margin-left — половина ширины: `left: 50%` ставит
+   на ось ЛЕВЫЙ край. Замер — e2e/csp-strict.spec.js (tickAxis). */
 .clock-tick {
+    --tick-inset: 0.08;
     position: absolute;
     width: 2px; height: 12px;
     background: var(--style-tick);
-    left: 50%; top: 8%;
-    transform-origin: 50% calc(var(--analog-size) * 0.42);
+    left: 50%;
+    margin-left: -1px;
+    top: calc(var(--analog-size) * var(--tick-inset));
+    transform-origin: 50% calc(var(--analog-size) * (0.5 - var(--tick-inset)));
     border-radius: 1px;
 }
 .clock-tick.major {
+    --tick-inset: 0.06;
     width: 3px; height: 20px;
+    margin-left: -1.5px;
     background: var(--style-tick-strong);
-    top: 6%;
 }
 .clock-tick.quarter {
+    --tick-inset: 0.04;
     width: 4px; height: 28px;
+    margin-left: -2px;
     background: linear-gradient(180deg, #0a84ff 0%, #30d158 100%);
-    top: 4%;
 }
 
 /* Угол деления — из его места среди соседей: sibling-index() (1-based).

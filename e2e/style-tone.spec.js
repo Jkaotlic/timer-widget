@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, waitForWidget, waitForDisplaySnapshot, waitForWidgetSnapshot,
+    waitForDisplay, waitForWidget, waitForClock, waitForDisplaySnapshot, waitForWidgetSnapshot, waitForClockSnapshot,
     armReceived, untilReceived, waitForQuiet
 } = require('./window-ready');
 
@@ -303,6 +303,88 @@ test('на светлом тоне у «Круга» и «Цифр» видже�
 
         // Профиль e2e общий: возвращаем стиль, как это делают соседние спеки.
         await widgetClick(widget, control, '#timerStyle button[data-val="circle"]');
+    } finally {
+        await app.close();
+    }
+});
+
+test('на светлом тоне «Цифры» часов и двоеточие флипа стоят на подложке', async () => {
+    // Кадры 03.11.2026 на тёмных обоях: у часов в «Цифрах» тёмное время без
+    // подложки почти не читалось, а у флипа виджета и часов пропадали точки
+    // двоеточия — тёмные точки стоят не на карточке, а прямо на обоях.
+    // Ободок на самих точках (первая попытка) читался пустыми кольцами;
+    // полупрозрачная подложка (вторая) гасла ползунком прозрачности.
+    // Стиль не переключаем: вычисленные значения есть и у скрытого контейнера.
+    const { app, control } = await launchApp();
+    try {
+        await control.waitForLoadState('domcontentloaded');
+        await control.evaluate(() => {
+            window.ipcRenderer.send('open-widget');
+            window.ipcRenderer.send('open-clock-widget');
+        });
+        const widget = await waitForWidgetSnapshot(app, await waitForWidget(app));
+        const clock = await waitForClockSnapshot(app, await waitForClock(app));
+        const probe = (page) => page.evaluate(() => {
+            const dots = [...document.querySelectorAll('.widget-flip-separator')].map((el) => {
+                const cs = getComputedStyle(el);
+                // Плашка — пластина карточек (градиент) или выбранный цвет;
+                // точки остаются цвета цифр (::before).
+                return { image: cs.backgroundImage, color: cs.backgroundColor, dot: getComputedStyle(el, '::before').backgroundColor };
+            });
+            const digits = document.querySelector('.clock-digits-time');
+            return { dots, digitsBg: digits ? getComputedStyle(digits).backgroundColor : null };
+        });
+        const alpha = (c) => { const m = /rgba?\(([^)]*)\)/.exec(c || ''); const p = m ? m[1].split(',') : []; return p.length === 4 ? Number(p[3]) : (m ? 1 : 0); };
+        // Глухая пластина: градиент из непрозрачных стопов либо плотный цвет.
+        const opaque = (d) => (d.image !== 'none' && !/rgba\([^)]*,\s*0?\.\d+\)/.test(d.image)) || alpha(d.color) === 1;
+        const expectPlates = (name, d) => {
+            expect(d.length, `${name}: разделителей флипа не нашлось`).toBeGreaterThan(0);
+            for (const dot of d) {
+                expect(opaque(dot), `${name}: у двоеточия нет глухой подложки (${dot.image} / ${dot.color})`).toBe(true);
+                expect(alpha(dot.dot), `${name}: точки двоеточия пропали`).toBe(1);
+            }
+        };
+
+        for (const [name, page] of [['виджет', widget], ['часы', clock]]) {
+            expect((await probeTone(page)).toneIsLight, `${name}: умолчание обязано быть светлым тоном`).toBe(true);
+        }
+        const w = await probe(widget);
+        const c = await probe(clock);
+        console.log('светлый тон → виджет:', JSON.stringify(w.dots[0]), 'часы:', JSON.stringify(c.dots[0]), 'фон «Цифр» часов:', c.digitsBg);
+        expectPlates('виджет', w.dots);
+        expectPlates('часы', c.dots);
+        expect(alpha(c.digitsBg), `часы: у «Цифр» на светлом тоне обязана быть подложка (${c.digitsBg})`).toBeGreaterThan(0.5);
+
+        // Ползунок «Фон» гасит подложку стилей, но не карточки флипа — и не
+        // их двоеточие. Окно кладёт альфу в --surface-alpha (widget-app.js);
+        // для флипа ползунок спрятан, но значение из другого стиля доезжает.
+        const lowAlpha = await widget.evaluate(() => {
+            document.documentElement.style.setProperty('--surface-alpha', '0.2');
+            const cs = getComputedStyle(document.querySelector('.widget-flip-separator'));
+            const out = { image: cs.backgroundImage, color: cs.backgroundColor, dot: getComputedStyle(document.querySelector('.widget-flip-separator'), '::before').backgroundColor };
+            document.documentElement.style.removeProperty('--surface-alpha');
+            return out;
+        });
+        expectPlates('виджет при прозрачности 0.2', [lowAlpha]);
+
+        // Тёмный тон — обратное утверждение: там чернила белые, и решение
+        // «подложки нет» (редизайн 12.08.2026) остаётся в силе.
+        await toggleTheme(control, [widget, clock]);
+        try {
+            const wd = await probe(widget);
+            const cd = await probe(clock);
+            console.log('тёмный тон → подложка двоеточия:', wd.dots[0].image, wd.dots[0].color, 'фон «Цифр» часов:', cd.digitsBg);
+            for (const [name, d] of [['виджет', wd.dots], ['часы', cd.dots]]) {
+                for (const dot of d) {
+                    expect(dot.image, `${name}, тёмный тон: подложки у двоеточия быть не должно`).toBe('none');
+                    expect(alpha(dot.color), `${name}, тёмный тон: подложки у двоеточия быть не должно`).toBe(0);
+                }
+            }
+            expect(alpha(cd.digitsBg), 'тёмный тон: подложки у «Цифр» часов быть не должно').toBe(0);
+        } finally {
+            // Профиль e2e общий: тема — глобальное состояние.
+            await toggleTheme(control, [widget, clock]);
+        }
     } finally {
         await app.close();
     }
