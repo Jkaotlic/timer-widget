@@ -323,7 +323,7 @@ test('endsAt: мусор даёт null, а не NaN в подписи', () => {
 // ---------------------------------------------------------------------------
 // secondsUntilEventEnd — блок «До завершения» (17.08.2026, полночь — 26.09.2026)
 // ---------------------------------------------------------------------------
-const { clockToSeconds, secondsUntilEventEnd, signedSecondsUntilClock, eventClockDistances: eventDistancesForBlock } = require('../renderer-shared');
+const { clockToSeconds, secondsUntilEventEnd, eventClockDistances: eventDistancesForBlock } = require('../renderer-shared');
 
 test('clockToSeconds: парсит HH:MM и возвращает секунды с начала суток', () => {
     // 10:30 — 10 часов * 3600 + 30 минут * 60 = 37800 секунд
@@ -405,28 +405,6 @@ test('secondsUntilEventEnd: мусор даёт 0, а не NaN', () => {
         assert.equal(secondsUntilEventEnd(3600, bad, bad), 0, `вход ${JSON.stringify(bad)}`);
     }
     assert.equal(secondsUntilEventEnd(NaN, '10:00', '15:00'), 0);
-});
-
-test('signedSecondsUntilClock уходит в минус на прошедшей отметке', () => {
-    // 15:01, отметка 15:00 — мероприятие вылезло за расписание на 60 секунд.
-    const now = 15 * 3600 + 1 * 60;
-    assert.equal(signedSecondsUntilClock(now, '15:00'), -60);
-});
-
-test('signedSecondsUntilClock даёт положительное до отметки', () => {
-    const now = 14 * 3600;
-    assert.equal(signedSecondsUntilClock(now, '15:30'), 5400);
-});
-
-test('signedSecondsUntilClock на мусоре даёт ноль, а не минус', () => {
-    const now = 15 * 3600;
-    // Ноль здесь значит «отметка сейчас», а не «отметка прошла»: герой покажет
-    // 00:00:00 вместо выдуманного минуса.
-    assert.equal(signedSecondsUntilClock(now, 'нет'), 0);
-    assert.equal(signedSecondsUntilClock(now, '25:00'), 0);
-    assert.equal(signedSecondsUntilClock(now, '12:99'), 0);
-    assert.equal(signedSecondsUntilClock(NaN, '12:00'), 0);
-    assert.equal(signedSecondsUntilClock(now, null), 0);
 });
 
 test('secondsUntilClock больше не экспортируется: у «До завершения» одна формула с героем', () => {
@@ -748,19 +726,7 @@ test('windowRowSubtitle: мусор вместо объекта не роняе�
 // Страж яркости дисплея (редизайн 2026-08-12)
 // ---------------------------------------------------------------------------
 
-const { relativeLuminance, backgroundTone } = require('../renderer-shared');
-
-test('relativeLuminance: крайние точки и краткая запись', () => {
-    assert.equal(relativeLuminance('#ffffff'), 1);
-    assert.equal(relativeLuminance('#000000'), 0);
-    assert.equal(relativeLuminance('#fff'), 1, 'краткая запись обязана разбираться');
-});
-
-test('relativeLuminance: мусор даёт null, а не NaN', () => {
-    for (const junk of ['', '#xyz', 'red', null, undefined, 42, {}, '#12345']) {
-        assert.equal(relativeLuminance(junk), null, `цвет ${String(junk)}`);
-    }
-});
+const { backgroundTone } = require('../renderer-shared');
 
 test('backgroundTone: заливка решает сама, вопреки теме', () => {
     // Ровно тот случай, ради которого страж и написан: тёмная заливка при
@@ -1040,7 +1006,7 @@ test('BUG-08: мусор в одной отметке даёт 0 ей, а дру
 // ---------------------------------------------------------------------------
 // `overlay || 30` превращал законный 0 в 30: снять затемнение с картинки было
 // невозможно — ползунок стоял на 0 %, а дисплей темнил на 30 %.
-const { bgOverlayPercent, DEFAULT_BG_OVERLAY } = require('../renderer-shared');
+const { bgOverlayPercent } = require('../renderer-shared');
 
 test('BUG-16: затемнение 0 % — это 0, а не умолчание', () => {
     assert.equal(bgOverlayPercent(0), 0);
@@ -1048,7 +1014,6 @@ test('BUG-16: затемнение 0 % — это 0, а не умолчание'
 });
 
 test('BUG-16: отсутствие и мусор дают умолчание, число — себя в [0, 100]', () => {
-    assert.equal(DEFAULT_BG_OVERLAY, 30);
     for (const v of [undefined, null, '', 'abc', NaN, Infinity, {}]) {
         assert.equal(bgOverlayPercent(v), 30, JSON.stringify(v));
     }
@@ -1121,4 +1086,10 @@ test('sideCardBand: из двух карточек с одной стороны 
 test('sideCardBand: мусорные коробки пропускаются, а не роняют расчёт', () => {
     const boxes = [null, { left: NaN, right: 5, top: 0, bottom: 1 }, { left: 97, right: 338, top: 309, bottom: 411 }];
     assert.deepEqual(sideCardBand({ ...HERO, boxes, gap: 8, free: WIN }), { left: 346, right: 1280 });
+});
+
+test('углы длительности сохраняют обороты, часы учитывают минуты и секунды', () => {
+    const { timerHandAngles, clockHandAngles } = require('../renderer-shared');
+    assert.deepEqual(timerHandAngles(-5400), { hour: 45, minute: 540, second: 0 });
+    assert.deepEqual(clockHandAngles(13, 30, 15), { hour: 45, minute: 181.5, second: 90 });
 });

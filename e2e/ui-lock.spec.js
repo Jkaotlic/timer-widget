@@ -52,7 +52,7 @@ const dragBlock = (page, id, dx, dy) => page.evaluate(async ([target, ddx, ddy])
     await frame();
     const steps = [];
     for (let i = 1; i <= 6; i++) {
-        document.dispatchEvent(new MouseEvent('mousemove', o(px + (ddx * i) / 6, py + (ddy * i) / 6)));
+        document.dispatchEvent(new MouseEvent('mousemove', { ...o(px + (ddx * i) / 6, py + (ddy * i) / 6), buttons: 1 }));
         await frame();
         steps.push(Math.round(el.getBoundingClientRect().left));
     }

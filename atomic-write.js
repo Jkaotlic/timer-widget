@@ -36,7 +36,7 @@ function writeFileAtomicSync(filePath, data) {
         // 0o600: файл состояния может нести итог перелимита (деньги) —
         // читать и писать его должен только владелец процесса.
         fd = fs.openSync(tmpPath, 'wx', 0o600);
-        fs.writeSync(fd, data);
+        fs.writeFileSync(fd, Buffer.from(data));
         fs.fsyncSync(fd);
         fs.closeSync(fd);
         fd = null;
@@ -50,4 +50,37 @@ function writeFileAtomicSync(filePath, data) {
     }
 }
 
-module.exports = { writeFileAtomicSync };
+// Profile files are small. Reject oversized or non-regular files before reading.
+function readProfileJson(filePath, maxBytes) {
+    const fd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+    try {
+        const stat = fs.fstatSync(fd);
+        if (!stat.isFile() || stat.size > maxBytes) {
+            throw Object.assign(new Error('Invalid profile file size'), { code: 'EFBIG' });
+        }
+        // Read from the inspected descriptor and cap the allocation even if a
+        // different process changes the file between fstat and the read.
+        const bytes = Buffer.alloc(stat.size);
+        let offset = 0;
+        while (offset < bytes.length) {
+            const count = fs.readSync(fd, bytes, offset, bytes.length - offset, null);
+            if (!count) { break; }
+            offset += count;
+        }
+        return JSON.parse(bytes.toString('utf8', 0, offset));
+    } finally {
+        fs.closeSync(fd);
+    }
+}
+
+function removeProfileFile(filePath) {
+    try { fs.unlinkSync(filePath); } catch (err) {
+        if (err.code !== 'ENOENT') { throw err; }
+    }
+}
+
+function errorCode(err) {
+    return (err && (err.code || err.name)) || 'ошибка';
+}
+
+module.exports = { writeFileAtomicSync, readProfileJson, removeProfileFile, errorCode };

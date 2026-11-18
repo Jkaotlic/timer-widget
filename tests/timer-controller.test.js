@@ -718,3 +718,15 @@ test('msUntilNextSecond учитывает перенесённую долю п�
     h.controller.start();
     assert.equal(h.controller.msUntilNextSecond(), 600, 'доля 400 мс перенесена через паузу (BUG-05)');
 });
+
+test('restoreState keeps initial seconds for invalid fields before reset', () => {
+    const { controller } = makeHarness();
+    controller.restoreState({ presetSeconds: 90, totalSeconds: 100, remainingSeconds: -30 });
+    controller.restoreState({ presetSeconds: 3.7, totalSeconds: -20, remainingSeconds: MAX_SECONDS + 1 });
+    const restored = controller.getState();
+    assert.equal(restored.presetSeconds, 90);
+    assert.equal(restored.totalSeconds, 100);
+    assert.equal(restored.remainingSeconds, -30);
+    controller.reset();
+    assert.equal(controller.getState().remainingSeconds, 90);
+});

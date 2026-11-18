@@ -29,6 +29,28 @@ const FULLSCREEN_EXIT_TIMEOUT_MS = 2000;
  */
 const WINDOW_REOPEN_TIMEOUT_MS = 3000;
 
+// Closing the display and quitting the app wait on the same native transition.
+// Electron can report isFullScreen() === false before leave-full-screen fires.
+function waitForFullScreenExit(win, afterExit) {
+    if (win._closingFullScreen) {
+        win._closingFullScreen.push(afterExit);
+        return;
+    }
+    const callbacks = [afterExit];
+    win._closingFullScreen = callbacks;
+    const finish = () => {
+        if (win._closingFullScreen !== callbacks) { return; }
+        delete win._closingFullScreen;
+        for (const callback of callbacks) { callback(); }
+    };
+    const timer = setTimeout(finish, FULLSCREEN_EXIT_TIMEOUT_MS);
+    win.once('leave-full-screen', () => {
+        clearTimeout(timer);
+        setTimeout(finish, 120);
+    });
+    win.setFullScreen(false);
+}
+
 /**
  * @param {object} deps
  * @param {object} deps.windows — реестр окон (main-state.js)
@@ -144,36 +166,33 @@ function createWindowClosing({ windows }) {
         // окно: `isFullScreen()` к тому моменту уже false, а обход окон системой
         // ещё идёт, и голый close() снова попал бы в середину. Метка на окне, а не
         // переменная модуля: окон дисплея за жизнь приложения много.
-        if (win._closingFullScreen) { return; }
-        // Метка «этому окну жить осталось недолго» ставится ВО ВСЕХ ветках, включая
-        // мгновенную: `close()` возвращает управление сразу, а событие `closed`
-        // приходит следующим оборотом цикла. Между ними ссылка `displayWindow` ещё
-        // указывает на окно, и без метки команда «открыть» приняла бы его за
-        // работающее (см. обработчик `open-display`).
+        if (win._closing) { return; }
         win._closing = true;
-        if (!win.isFullScreen()) {
-            win.close();
-            return;
+        const close = () => { if (!win.isDestroyed()) { win.close(); } };
+        if (win._closingFullScreen || win.isFullScreen()) {
+            waitForFullScreenExit(win, close);
+        } else {
+            close();
         }
-        win._closingFullScreen = true;
-
-        let done = false;
-        const finish = () => {
-            if (done) { return; }
-            done = true;
-            if (!win.isDestroyed()) { win.close(); }
-        };
-        const timer = setTimeout(finish, FULLSCREEN_EXIT_TIMEOUT_MS);
-        win.once('leave-full-screen', () => {
-            clearTimeout(timer);
-            // Ещё один оборот цикла событий: `leave-full-screen` приходит в начале
-            // завершения перехода, а обход окон системой идёт следом за ним.
-            setTimeout(finish, 120);
-        });
-        win.setFullScreen(false);
     }
 
-    return { markClosing, isUsableWindow, queueOpenAfterClose, cancelQueuedOpen, closeDisplayWindow };
+    // Widget and clock are opened from IPC and toggled from the tray.
+    function openAuxWindow(key, win, create) {
+        if (isUsableWindow(win)) { win.focus(); return; }
+        if (!queueOpenAfterClose(key, win, create)) { create(); }
+    }
+
+    function closeAuxWindow(key, win) {
+        cancelQueuedOpen(key);
+        if (isUsableWindow(win)) { markClosing(win).close(); }
+    }
+
+    function toggleAuxWindow(key, win, create) {
+        if (isUsableWindow(win) || pendingOpens.has(key)) { closeAuxWindow(key, win); }
+        else { openAuxWindow(key, win, create); }
+    }
+
+    return { openAuxWindow, closeAuxWindow, toggleAuxWindow, markClosing, isUsableWindow, queueOpenAfterClose, cancelQueuedOpen, closeDisplayWindow };
 }
 
-module.exports = { createWindowClosing, FULLSCREEN_EXIT_TIMEOUT_MS, WINDOW_REOPEN_TIMEOUT_MS };
+module.exports = { createWindowClosing, waitForFullScreenExit, FULLSCREEN_EXIT_TIMEOUT_MS, WINDOW_REOPEN_TIMEOUT_MS };

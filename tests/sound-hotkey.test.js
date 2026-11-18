@@ -52,7 +52,7 @@ test('у мастер-звука ОДИН путь переключения — 
     );
     // 3. Посылка из чужого окна.
     assert.match(
-        state, /'sound-toggle'[\s\S]{0,200}?toggleSoundMaster\(\)/,
+        state, /onSoundToggle\s*=\s*\(\) => this\.toggleSoundMaster\(\);\s*ipcRenderer\.on\('sound-toggle', this\._handlers\.onSoundToggle\)/,
         'канал sound-toggle не ведёт к общему пути'
     );
 });

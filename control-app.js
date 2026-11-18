@@ -209,7 +209,9 @@
                 // Display-specific style/scale (Полноэкранный tab)
                 this.displayTimerStyleEl = document.getElementById('displayTimerStyle');
                 this._attachSegmented(this.displayTimerStyleEl, 'circle');
-                this.displayTimerScaleEl = document.getElementById('displayTimerScale');
+                this.displayTimerScaleEl = /** @type {HTMLInputElement} */ (document.getElementById('displayTimerScale'));
+                this.displayTimerScaleEl.min = String(CONFIG.MIN_TIMER_SCALE);
+                this.displayTimerScaleEl.max = String(CONFIG.MAX_TIMER_SCALE);
                 this.displayTimerScaleValueEl = document.getElementById('displayTimerScaleValue');
 
                 // Настройки виджета часов
@@ -968,22 +970,6 @@
                 this.syncClockStyle = applied.syncClockStyle;
                 if (this.syncClockStyle) { this.clockStyleEl.value = this.timerStyleEl.value; }
 
-                // Ползунок «Масштаб часов». Единственный источник правды здесь —
-                // clockGeometry, который пишет САМО окно часов (localStorage общий
-                // для всех окон приложения). В displayExtSettings масштаба часов
-                // нет вообще, поэтому без этого чтения ползунок при каждом запуске
-                // показывал «100%» независимо от реального размера окна.
-                const clockGeo = SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
-                const clockScaleSliderEl = document.getElementById('clockScale');
-                const clockScaleLabelEl = document.getElementById('clockScaleValue');
-                if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
-                    // Присваивание .value НЕ порождает 'input', поэтому обратной
-                    // отправки в окно часов не происходит и петля не замыкается.
-                    const pct = RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
-                    clockScaleSliderEl.value = pct;
-                    if (clockScaleLabelEl) { clockScaleLabelEl.textContent = pct + '%'; }
-                }
-
                 // Обновляем видимость опции цифр для часов
                 this.updateClockAnalogNumbersVisibility();
                 // Строки выбора шрифта «Цифры» — видимость зависит от
@@ -1206,7 +1192,10 @@
                     });
                     // Подписи строк — отчёт о ДЕЙСТВУЮЩИХ значениях, и масштаб
                     // в них входит (см. renderWindowRows).
-                    if (applied !== null) { this.renderWindowRows(); }
+                    if (applied !== null) {
+                        this.renderWindowRows();
+                        this.refreshPresetMarks();
+                    }
                 };
                 window.ipcRenderer.on('scale-report', this._onScaleReport);
 
@@ -1272,6 +1261,10 @@
 
                 // Удаляем глобальные DOM и IPC handlers из _handlers
                 const h = this._handlers || {};
+                if (h.onSoundToggle) { window.ipcRenderer.removeListener('sound-toggle', h.onSoundToggle); }
+                h.eventOverrunState?.();
+                h.eventTimerState?.();
+                h.eventExportDone?.();
                 if (h.onDisplayWindowState) { window.ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState); }
                 if (h.onWidgetWindowState) { window.ipcRenderer.removeListener('widget-window-state', h.onWidgetWindowState); }
                 if (h.onClockWindowState) { window.ipcRenderer.removeListener('clock-window-state', h.onClockWindowState); }
@@ -1752,7 +1745,6 @@
             if (e.target === resetModal) { closeModal(resetModal); }
         });
         document.getElementById('resetConfirm').addEventListener('click', () => {
-            localStorage.clear();
             window.ipcRenderer.send('reset-and-relaunch');
         });
 

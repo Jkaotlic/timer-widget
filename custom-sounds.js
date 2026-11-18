@@ -13,11 +13,10 @@
  * сохраняет семантику this один в один, поэтому перенос кода получается
  * дословным и не меняет поведение — что важно, когда рядом нет типов.
  *
- * Зависимости — import (Toast, RendererStorage, CONFIG, safeJSONParse) —
+ * Зависимости — import (Toast, RendererStorage, CONFIG) —
  * так же, как во всех остальных модулях рендерера: сборщика в проекте нет.
  */
 
-import * as SecurityUtils from './security.js';
 import * as RendererStorage from './renderer-storage.js';
 import { Toast } from './ui-feedback.js';
 import * as CONFIG from './constants.js';
@@ -39,7 +38,7 @@ function sanitizeCustomSounds(raw) {
 
 /** Прочитать список звуков из хранилища — один вход на все методы. */
 function readCustomSounds() {
-    return sanitizeCustomSounds(SecurityUtils.safeJSONParse(localStorage.getItem('customSounds'), []));
+    return sanitizeCustomSounds(RendererStorage.safeGetJSON(localStorage, 'customSounds', []));
 }
 
 /**

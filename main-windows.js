@@ -191,8 +191,9 @@ function createWindows(deps) {
             log.info(`[perf] control window ready in ${Date.now() - __ctrlT0}ms`);
         });
 
-        windows.controlWindow.on('closed', () => {
-            windows.controlWindow = null;
+        const control = windows.controlWindow;
+        control.on('closed', () => {
+            if (windows.controlWindow === control) { windows.controlWindow = null; }
         });
     }
 

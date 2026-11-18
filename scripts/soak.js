@@ -48,23 +48,63 @@ async function waitForPage(app, part) {
 
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
+// Runs inside the renderer, reading the digits actually displayed by its active style.
+function readTimerWindow(role) {
+    const widget = role === 'widget';
+    const timer = widget ? window.timerWidget : window.displayTimer;
+    const style = timer.timerStyle;
+    const byId = (id) => document.getElementById(id);
+    let text;
+    if (style === 'flip') {
+        const prefix = widget ? 'wFlip' : 'flip';
+        const cells = (part) => [1, 2].map((n) => {
+            const card = byId(prefix + part + n);
+            if (!card.checkVisibility()) { throw new Error(`hidden flip digit: ${card.id}`); }
+            return card.querySelector(widget ? '.widget-flip-digit' : '.flip-digit').textContent;
+        }).join('');
+        const hasHours = byId(widget ? 'widgetFlip' : 'timerFlip').classList.contains('has-hours');
+        const sign = byId(prefix + 'Minus').classList.contains('visible') ? '-' : '';
+        text = sign + (hasHours ? cells('Hr') + ':' : '') + cells('Min') + ':' + cells('Sec');
+    } else {
+        const ids = {
+            circle: 'timeDisplay',
+            analog: widget ? 'widgetAnalogDigital' : 'analogDigitalTime',
+            digits: widget ? 'widgetDigitsTime' : 'digitsTime'
+        };
+        const element = byId(ids[style]);
+        if (!element?.checkVisibility()) { throw new Error(`hidden timer: ${role} ${style}`); }
+        text = element.innerText.replace(/\s/g, '').replace('−', '-');
+    }
+    if (!/^-?\d+(?::\d{2}){1,2}$/.test(text)) { throw new Error(`invalid timer: ${role} ${text}`); }
+    const absolute = text.replace('-', '').split(':').reduce((sum, part) => sum * 60 + Number(part), 0);
+    return { remaining: timer.remainingSeconds, visible: text.startsWith('-') ? -absolute : absolute, style };
+}
+
 /**
  * Вердикт по снятым замерам — чистая функция, её проверяет tests/soak-verdict.test.js.
  *
  * Сравниваются медианы первой (после прогрева) и последней четверти: одиночный
  * всплеск сборки мусора не должен ни провалить прогон, ни скрыть утечку.
  *
- * @param {{samples: {rssMb: number, driftSeconds: number}[], errors: string[], gone: string[]}} run
+ * @param {{samples: {rssMb: number, driftSeconds: Record<string, number>}[], errors: string[], gone: string[], fatal?: string}} run
  * @returns {string[]} причины провала, пусто — прошёл
  */
-function soakVerdict({ samples, errors, gone }) {
+function soakVerdict({ samples, errors, gone, fatal }) {
     const problems = [...errors.map((e) => `ошибка в окне: ${e}`), ...gone.map((g) => `упал процесс: ${g}`)];
+    if (fatal) { problems.push(fatal); }
     if (samples.length < 8) {
         problems.push(`мало замеров для вывода: ${samples.length}`);
         return problems;
     }
-    const worst = Math.max(...samples.map((s) => Math.abs(s.driftSeconds)));
-    if (worst > MAX_DRIFT_SECONDS) { problems.push(`табло разошлось на ${worst} с`); }
+    for (const name of ['control', 'widget', 'widgetVisible', 'display', 'displayVisible']) {
+        const values = samples.map((sample) => sample.driftSeconds[name]);
+        if (!values.every(Number.isFinite)) {
+            problems.push(`${name}: нет измерения`);
+            continue;
+        }
+        const worst = Math.max(...values.map(Math.abs));
+        if (worst > MAX_DRIFT_SECONDS) { problems.push(`${name}: табло разошлось на ${worst} с`); }
+    }
     const quarter = Math.floor(samples.length / 4);
     const early = median(samples.slice(quarter, quarter * 2).map((s) => s.rssMb));
     const late = median(samples.slice(-quarter).map((s) => s.rssMb));
@@ -72,35 +112,33 @@ function soakVerdict({ samples, errors, gone }) {
     return problems;
 }
 
-async function main() {
-    const minutes = Number(arg('minutes', '120'));
-    const out = arg('out', path.join(os.tmpdir(), `timer-widget-soak-${Date.now()}.json`));
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-soak-'));
+async function measure(minutes, run) {
+    let dir;
+    let app;
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
 
-    const run = { samples: [], errors: [], gone: [] };
-    const app = await electron.launch({ args: [path.join(ROOT, 'electron-main.js'), `--user-data-dir=${dir}`], env });
     const watch = (page) => {
         const name = () => page.url().split('/').pop();
         page.on('pageerror', (e) => run.errors.push(`${name()}: ${e.message}`));
         page.on('crash', () => run.gone.push(name()));
         page.on('console', (m) => { if (m.type() === 'error') { run.errors.push(`${name()}: ${m.text()}`); } });
     };
-    app.windows().forEach(watch);
-    app.on('window', watch);
-
     try {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-soak-'));
+        app = await electron.launch({ args: [path.join(ROOT, 'electron-main.js'), `--user-data-dir=${dir}`], env });
+        app.windows().forEach(watch);
+        app.on('window', watch);
         const control = await waitForPage(app, 'electron-control');
         await control.waitForFunction(() => window.__startupPushed === true);
         const send = (channel, payload) => control.evaluate(([c, p]) => window.ipcRenderer.send(c, p), [channel, payload]);
 
         await send('open-widget');
-        await waitForPage(app, 'electron-widget');
+        const widget = await waitForPage(app, 'electron-widget');
         await send('open-clock-widget');
-        await waitForPage(app, 'electron-clock-widget');
+        const clock = await waitForPage(app, 'electron-clock-widget');
         await send('open-display', { displayIndex: 'auto' });
-        await waitForPage(app, 'display.html');
+        const display = await waitForPage(app, 'display.html');
 
         // Половина прогона в плюсе, половина в минусе: оба режима рисуют по-разному.
         const seconds = Math.round(minutes * 30);
@@ -111,28 +149,64 @@ async function main() {
         const startedAt = performance.now();
 
         const end = startedAt + minutes * 60000;
+        let styleIndex = 0;
         for (let i = 1; performance.now() < end; i++) {
+            if (i <= STYLES.length || i % STYLE_EVERY_SAMPLES === 0) {
+                const style = STYLES[styleIndex++ % STYLES.length];
+                await send('widget-style-update', { timerStyle: style });
+                await send('clock-widget-set-style', style);
+                await send('display-settings-update', { displayTimerStyle: style });
+                await Promise.all([
+                    widget.waitForFunction((s) => window.timerWidget?.timerStyle === s, style),
+                    clock.waitForFunction((s) => window.clockWidget?.clockStyle === s, style),
+                    display.waitForFunction((s) => window.displayTimer?.timerStyle === s, style)
+                ]);
+            }
             await sleep(SAMPLE_MS);
-            const remaining = await control.evaluate(() => window.timerController.remainingSeconds);
+            const [remaining, widgetTime, displayTime] = await Promise.all([
+                control.evaluate(() => window.timerController.remainingSeconds),
+                widget.evaluate(readTimerWindow, 'widget'),
+                display.evaluate(readTimerWindow, 'display')
+            ]);
             const expected = seconds - Math.floor((performance.now() - startedAt) / 1000);
             const metrics = await app.evaluate(({ app: a }) => a.getAppMetrics().map((m) => m.memory.workingSetSize));
             const rssMb = Math.round(metrics.reduce((sum, kb) => sum + kb, 0) / 1024);
-            const sample = { minute: Math.round((i * SAMPLE_MS) / 6000) / 10, remaining, driftSeconds: remaining - expected, rssMb, processes: metrics.length };
+            const driftSeconds = {
+                control: remaining - expected, widget: widgetTime.remaining - expected,
+                widgetVisible: widgetTime.visible - expected, display: displayTime.remaining - expected,
+                displayVisible: displayTime.visible - expected
+            };
+            const sample = { minute: Math.round((i * SAMPLE_MS) / 6000) / 10, remaining, widgetTime, displayTime, driftSeconds, rssMb, processes: metrics.length };
             run.samples.push(sample);
             console.log(JSON.stringify(sample));
-            if (i % STYLE_EVERY_SAMPLES === 0) {
-                const style = STYLES[(i / STYLE_EVERY_SAMPLES) % STYLES.length];
-                await send('widget-style-update', { timerStyle: style });
-                await send('clock-widget-set-style', style);
-            }
         }
     } finally {
-        await app.close().catch(() => {});
-        fs.rmSync(dir, { recursive: true, force: true });
+        if (app) { await app.close().catch((error) => run.errors.push(String(error))); }
+        if (dir) {
+            try { fs.rmSync(dir, { recursive: true, force: true }); }
+            catch (error) { run.errors.push(String(error)); }
+        }
     }
+}
 
-    const problems = soakVerdict(run);
-    fs.writeFileSync(out, JSON.stringify({ minutes, problems, ...run }, null, 1));
+async function writeSoakReport(out, minutes, collect) {
+    const run = { samples: [], errors: [], gone: [] };
+    let problems;
+    try {
+        await collect(minutes, run);
+    } catch (error) {
+        run.fatal = String(error.stack || error);
+    } finally {
+        problems = soakVerdict(run);
+        fs.writeFileSync(out, JSON.stringify({ minutes, problems, ...run }, null, 1));
+    }
+    return problems;
+}
+
+async function main() {
+    const minutes = Number(arg('minutes', '120'));
+    const out = arg('out', path.join(os.tmpdir(), `timer-widget-soak-${Date.now()}.json`));
+    const problems = await writeSoakReport(out, minutes, measure);
     console.log(`[soak] отчёт: ${out}`);
     if (problems.length) {
         problems.forEach((p) => console.error(`[soak] ПРОВАЛ: ${p}`));
@@ -149,4 +223,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { soakVerdict };
+module.exports = { soakVerdict, writeSoakReport };

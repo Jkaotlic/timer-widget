@@ -27,32 +27,18 @@ const { isPayloadObject } = require('./relay-payload');
  * @param {object} deps.geometry — main-geometry.js
  */
 function registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, closing, creators, geometry }) {
-    const { isUsableWindow, queueOpenAfterClose, cancelQueuedOpen, markClosing, closeDisplayWindow } = closing;
+    const { isUsableWindow, queueOpenAfterClose, cancelQueuedOpen, openAuxWindow, closeAuxWindow, closeDisplayWindow } = closing;
     const { createWidgetWindow, createClockWidgetWindow, createDisplayWindow } = creators;
     const { moveWindowBy, resizeWindowClamped, positionWindowClamped } = geometry;
 
     // Обработчик намеренно тонкий: рассылка состояния и досылка настроек живут в
     // createWidgetWindow, потому что окно открывают ещё и из трея — мимо этого канала.
     ipcMain.on('open-widget', () => {
-        // ЗАКРЫВАЮЩЕЕСЯ окно открытым не считается — см. pendingOpens в
-        // main-window-closing.js.
-        if (isUsableWindow(windows.widgetWindow)) {
-            windows.widgetWindow.focus();
-            return;
-        }
-        if (windows.widgetWindow && queueOpenAfterClose('widget', windows.widgetWindow, createWidgetWindow)) {
-            return;
-        }
-        createWidgetWindow();
+        openAuxWindow('widget', windows.widgetWindow, createWidgetWindow);
     });
 
     ipcMain.on('close-widget', () => {
-        // «Закрыть» отменяет отложенное открытие: человек передумал.
-        cancelQueuedOpen('widget');
-        if (windows.widgetWindow) {
-            markClosing(windows.widgetWindow).close();
-            // Уведомление отправится в обработчике 'closed' события окна
-        }
+        closeAuxWindow('widget', windows.widgetWindow);
     });
 
     ipcMain.on('minimize-window', (event) => {
@@ -77,23 +63,11 @@ function registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, clo
     // Виджет часов
     // Тонкий обработчик — см. комментарий у open-widget.
     ipcMain.on('open-clock-widget', () => {
-        if (isUsableWindow(windows.clockWidgetWindow)) {
-            windows.clockWidgetWindow.focus();
-            return;
-        }
-        if (windows.clockWidgetWindow
-            && queueOpenAfterClose('clock', windows.clockWidgetWindow, createClockWidgetWindow)) {
-            return;
-        }
-        createClockWidgetWindow();
+        openAuxWindow('clock', windows.clockWidgetWindow, createClockWidgetWindow);
     });
 
     ipcMain.on('close-clock-widget', () => {
-        cancelQueuedOpen('clock');
-        if (windows.clockWidgetWindow) {
-            markClosing(windows.clockWidgetWindow).close();
-            // Уведомление отправится в обработчике 'closed' события окна
-        }
+        closeAuxWindow('clock', windows.clockWidgetWindow);
     });
 
     ipcMain.on('clock-widget-resize', (_event, payload) => {
@@ -171,7 +145,6 @@ function registerWindowIpc({ ipcMain, windows, relay, screen, BrowserWindow, clo
         if (windows.displayWindow) {
             const closingWindow = windows.displayWindow;
             closeDisplayWindow();
-            windows.displayWindow = null;
             if (queueOpenAfterClose('display', closingWindow, () => createDisplayWindow(displayIndex))) {
                 return;
             }

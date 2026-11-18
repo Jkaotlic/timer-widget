@@ -45,7 +45,7 @@
 const fs = require('fs');
 const path = require('path');
 const AppScheme = require('./app-scheme');
-const { writeFileAtomicSync } = require('./atomic-write');
+const { writeFileAtomicSync, readProfileJson } = require('./atomic-write');
 
 const MARKER_FILE = 'storage-migration.json';
 const MARKER_VERSION = 1;
@@ -114,7 +114,7 @@ function parseEntries(raw) {
 
 function readMarker(file) {
     try {
-        const m = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const m = readProfileJson(file, 16 * 1024);
         if (m && typeof m === 'object') { return m; }
     } catch { /* нет или битая — как «нет метки» */ }
     return null;

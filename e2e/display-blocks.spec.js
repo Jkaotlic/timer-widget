@@ -204,7 +204,7 @@ test('подпись над таймером и плашка состояния:
             });
             el.dispatchEvent(new MouseEvent('mousedown', opts(r.left + 5, r.top + 5)));
             for (let i = 1; i <= 4; i++) {
-                document.dispatchEvent(new MouseEvent('mousemove', opts(r.left + 5 + (dx * i) / 4, r.top + 5 + (dy * i) / 4)));
+                document.dispatchEvent(new MouseEvent('mousemove', { ...opts(r.left + 5 + (dx * i) / 4, r.top + 5 + (dy * i) / 4), buttons: 1 }));
             }
             document.dispatchEvent(new MouseEvent('mouseup', opts(r.left + 5 + dx, r.top + 5 + dy)));
         }, ['heroLabel', DX, DY]);
@@ -352,7 +352,7 @@ test('Alt не двигает НИ ОДИН элемент, и жест не п�
                 const afterDown = box();
                 // Шаги — по кадрам (порогов по времени у жеста нет), а не сном.
                 for (let i = 1; i <= 6; i++) {
-                    document.dispatchEvent(new MouseEvent('mousemove', o(px + (DX * i) / 6, py + (DY * i) / 6)));
+                    document.dispatchEvent(new MouseEvent('mousemove', { ...o(px + (DX * i) / 6, py + (DY * i) / 6), buttons: 1 }));
                     await frame();
                 }
                 document.dispatchEvent(new MouseEvent('mouseup', o(px + DX, py + DY)));

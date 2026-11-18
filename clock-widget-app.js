@@ -899,11 +899,6 @@ export let activeClockWidget = null;
                 const offset = this.circumference - (ratio * this.circumference);
                 this.secondsBar.style.strokeDashoffset = offset;
 
-                // Обновляем цифровой стиль
-                if (this.widgetDigitalTime) {
-                    this.widgetDigitalTime.textContent = timeStr;
-                }
-
                 // Цифры: та же готовая строка (_uses24h() и showSeconds уже
                 // учтены выше) — в отличие от flip, у «Цифр» есть место под
                 // AM/PM, поэтому 24-часовое ограничение сюда не переносится.
@@ -938,25 +933,16 @@ export let activeClockWidget = null;
             updateAnalogClock(hours, minutes, seconds) {
                 if (!this.clockAnalogHour || !this.clockAnalogMinute || !this.clockAnalogSecond) {return;}
 
-                // Часовая стрелка - полный оборот за 12 часов
-                // Плавное движение с учетом минут
-                const hourDeg = ((hours % 12) / 12) * 360 + (minutes / 60) * 30;
-                this.clockAnalogHour.style.transform = `rotate(${hourDeg}deg)`;
-
-                // Минутная стрелка - полный оборот за 60 минут
-                // Плавное движение с учетом секунд
-                const minuteDeg = (minutes / 60) * 360 + (seconds / 60) * 6;
-                this.clockAnalogMinute.style.transform = `rotate(${minuteDeg}deg)`;
-
-                // Секундная стрелка - полный оборот за 60 секунд
-                const secondDeg = (seconds / 60) * 360;
+                const angles = RendererShared.clockHandAngles(hours, minutes, seconds);
+                this.clockAnalogHour.style.transform = `rotate(${angles.hour}deg)`;
+                this.clockAnalogMinute.style.transform = `rotate(${angles.minute}deg)`;
                 // Отключаем transition при переходе 59→0 чтобы не было обратного оборота
                 if (seconds === 0) {
                     this.clockAnalogSecond.style.transition = 'none';
                 } else if (this.clockAnalogSecond.style.transition === 'none') {
                     this.clockAnalogSecond.style.transition = '';
                 }
-                this.clockAnalogSecond.style.transform = `rotate(${secondDeg}deg)`;
+                this.clockAnalogSecond.style.transform = `rotate(${angles.second}deg)`;
                 
                 // Скрываем/показываем секундную стрелку
                 if (this.clockAnalogSecond) {

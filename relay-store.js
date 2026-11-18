@@ -31,7 +31,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { writeFileAtomicSync } = require('./atomic-write');
+const { writeFileAtomicSync, removeProfileFile, errorCode } = require('./atomic-write');
 const { sanitizeRelayPayload, withoutBgImage } = require('./relay-payload');
 
 const RELAY_STATE_FILE = 'relay-state.json';
@@ -130,11 +130,6 @@ function parseRelayState(text) {
     return out;
 }
 
-/** Код ошибки без пути: сообщение fs несёт путь профиля, а в нём имя учётной записи (SEC-11). */
-function errorCode(err) {
-    return (err && (err.code || err.name)) || 'ошибка';
-}
-
 /**
  * Прочитать файл в память. Никогда не бросает: старт с пустой памятью лучше,
  * чем приложение, которое не открывается.
@@ -170,7 +165,7 @@ function writeRelayState(userDataPath, relay) {
 
 /** Удалить файл. Его могло и не быть. */
 function deleteRelayState(userDataPath) {
-    try { fs.unlinkSync(getRelayStatePath(userDataPath)); } catch { /* его могло и не быть */ }
+    removeProfileFile(getRelayStatePath(userDataPath));
 }
 
 /**
@@ -237,9 +232,17 @@ function createRelayPersister({
     }
 
     function discard() {
+        deleteRelayState(getUserDataPath());
         cancel();
         discarded = true;
-        deleteRelayState(getUserDataPath());
+        // The app stays open if clearing Chromium storage or the migration
+        // marker fails. Restore the current relay settings, including edits
+        // received while the asynchronous clear was in progress.
+        return () => {
+            discarded = !!disabled;
+            lastWritten = null;
+            flush();
+        };
     }
 
     return { loadOnStart, schedule, flush, discard };

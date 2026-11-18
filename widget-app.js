@@ -440,17 +440,6 @@ export let activeWidgetTimer = null;
                 this._geometry.save(scalePct);
             }
 
-            saveSettings() {
-                const settings = {
-                    opacity: parseFloat(this.container.style.opacity) || 1
-                };
-                localStorage.setItem('widgetSettings', JSON.stringify(settings));
-            }
-
-            // FIX BUG-020: Removed checkColorChanges() - dead code
-            // Colors are updated via the per-window 'widget-colors-update' IPC event, no polling needed
-
-
             /**
              * Пересчитать тон окна. Отдельный метод, потому что поводов два:
              * пришли цвета (сменилась подложка) и сменилась тема (сменился фон
@@ -593,7 +582,7 @@ export let activeWidgetTimer = null;
                 // text-shadow правила [data-status="danger"] ровно так же, как
                 // это делал инлайновый color: в перерасходе цифры стали бы
                 // красными, а ореол вокруг них остался бы цвета темы.
-                setVar('--timer-analog-glow', timerColor ? `${timerColor}4d` : null);
+                setVar('--timer-analog-glow', timerColor ? `color-mix(in srgb, ${timerColor} 30%, transparent)` : null);
             }
 
             /**
@@ -1089,29 +1078,16 @@ export let activeWidgetTimer = null;
                 if (!this.widgetHandMinute || !this.widgetHandSecond) {return;}
 
                 const absSecs = Math.abs(secs);
-                const totalMins = absSecs / 60;
-                const seconds = absSecs % 60;
-
-                // Минутная стрелка - полный оборот за 60 минут
-                const minuteDeg = (totalMins / 60) * 360;
-                this.widgetHandMinute.style.transform = `rotate(${minuteDeg}deg)`;
-
-                // Секундная стрелка - полный оборот за 60 секунд
-                const secondDeg = (seconds / 60) * 360;
-                this.widgetHandSecond.style.transform = `rotate(${secondDeg}deg)`;
-
-                // Часовая — полный оборот за 12 часов. Формула строго как в
-                // display-script.js, где она уже работает. Проверка на null
-                // отдельная: расширять ранний выход выше нельзя, иначе старый
-                // профиль без этого элемента заблокировал бы весь аналоговый
-                // рендер.
+                const angles = RendererShared.timerHandAngles(secs);
+                this.widgetHandMinute.style.transform = `rotate(${angles.minute}deg)`;
+                this.widgetHandSecond.style.transform = `rotate(${angles.second}deg)`;
                 if (this.widgetHandHour) {
-                    this.widgetHandHour.style.transform = `rotate(${((absSecs / 3600) % 12) * 30}deg)`;
+                    this.widgetHandHour.style.transform = `rotate(${angles.hour}deg)`;
                 }
 
                 // Обновляем цифровое время
                 if (this.widgetAnalogDigital) {
-                    const { hours, minutes: mins } = RendererShared.breakdown(absSecs);
+                    const { hours, minutes: mins, seconds } = RendererShared.breakdown(absSecs);
                     const prefix = secs < 0 ? '-' : '';
                     if (hours > 0) {
                         this.widgetAnalogDigital.textContent = `${prefix}${hours}:${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;

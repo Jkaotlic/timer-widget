@@ -26,18 +26,20 @@ const RELEASES_URL = 'https://github.com/Jkaotlic/timer-widget/releases';
  * @param {object} deps.windows — реестр окон (main-state.js)
  * @param {object} deps.screen
  * @param {object} deps.CONFIG
+ * @param {object} deps.dialog
  * @param {object} deps.shell — electron.shell
  * @param {object} deps.app
  * @param {object} deps.log
  * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
  * @param {() => void} deps.clearTimerInterval — main-timer.js
+ * @param {() => boolean} [deps.clearRecovery] - удалить снимок при сбросе
  * @param {() => void} [deps.settleMigration] - метка переноса настроек после
  *        сброса (main-storage-migration.js)
- * @param {() => void} [deps.discardRelayState] - «Сбросить всё» стирает и память
+ * @param {() => (() => void)} [deps.discardRelayState] - «Сбросить всё» стирает и память
  *        ретрансляторов в файле (relay-store.js), иначе следующий старт
  *        досылал бы окнам настройки, которых уже нет
  */
-function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval, settleMigration, discardRelayState }) {
+function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, dialog, app, log, getSession, clearTimerInterval, clearRecovery, settleMigration, discardRelayState }) {
     // Состояние режима «полоса» (канал control-collapse ниже). Объявлено ДО
     // обработчика размера: он обязан его спрашивать.
     let controlBoundsBeforeCollapse = null;
@@ -49,7 +51,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // менял ТОЛЬКО ширину — иначе перезапись height=window.innerHeight округляется
     // при каждом setSize (HiDPI) и сбивает ручную высоту, которую выставил юзер.
     ipcMain.on('resize-control-window', (event, size) => {
-        if (!windows.controlWindow || !size || typeof size !== 'object') { return; }
+        if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !size || typeof size !== 'object') { return; }
         // Свёрнутое окно размер по содержимому НЕ получает: его размер — полоса,
         // а размер панели вернёт разворот (границы «до»). Запрос приходит из
         // рендерера, который про полосу знать не обязан: отложенный авто-размер
@@ -232,31 +234,29 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         app.quit();
     });
 
+    let resetInProgress = false;
     ipcMain.on('reset-and-relaunch', async () => {
-        clearTimerInterval();
-        const session = getSession();
+        if (resetInProgress) { return; }
+        resetInProgress = true;
+        let resumeRelayWrites;
         try {
-            await Promise.all([
-                session.defaultSession.clearStorageData(),
-                session.defaultSession.clearCache()
-            ]);
-        } catch (err) {
-            log.error('Storage clear failed:', err);
-        }
-        // Сброс сильнее переноса: без метки сверка следующего запуска увидела
-        // бы пустой app:// и вернула старые настройки из file://.
-        try {
+            if (clearRecovery && !clearRecovery()) {
+                throw Object.assign(new Error('Cannot remove timer snapshot'), { code: 'RECOVERY_CLEAR_FAILED' });
+            }
+            resumeRelayWrites = discardRelayState?.();
+            const session = getSession();
+            await session.defaultSession.clearStorageData();
+            await session.defaultSession.clearCache();
+            // Mark the app:// profile as settled so migration cannot restore old settings.
             if (settleMigration) { settleMigration(); }
         } catch (err) {
-            log.warn('метка переноса после сброса не записана:', err && err.message);
+            resetInProgress = false;
+            resumeRelayWrites?.();
+            log.warn('Сброс настроек не завершён:', err.code || err.name);
+            dialog.showErrorBox('Сброс настроек', 'Часть настроек осталась на диске. Проверьте права на папку профиля и повторите сброс.');
+            return;
         }
-        // Память ретрансляторов — тоже профиль: удаляется, и выход её не
-        // перезапишет (relay-store.js, discard).
-        try {
-            if (discardRelayState) { discardRelayState(); }
-        } catch (err) {
-            log.warn('память ретрансляторов после сброса не удалена:', err && err.code);
-        }
+        clearTimerInterval();
         app.quit();
     });
 }

@@ -707,12 +707,12 @@ const PanelDisplayMixin = {
         // чем эта секция появляется в документе.
         const ipc = window.ipcRenderer;
         if (ipc) {
-            ipc.on('event-overrun-state', (_event, payload) => {
+            this._handlers.eventOverrunState = ipc.on('event-overrun-state', (_event, payload) => {
                 if (!payload || typeof payload !== 'object') { return; }
                 this.eventOverrunState = payload;
                 this.renderEventStatus();
             });
-            ipc.on('timer-state', (_event, state) => {
+            this._handlers.eventTimerState = ipc.on('timer-state', (_event, state) => {
                 if (!state || typeof state !== 'object') { return; }
                 this.eventRemainingSeconds = state.remainingSeconds;
                 this.renderEventStatus();
@@ -782,7 +782,7 @@ const PanelDisplayMixin = {
         // Ответ обязателен в любом исходе: кнопка, после которой ничего не
         // происходит и ничего не сказано, читается как сломанное окно. Отмена
         // диалога — не событие: человек передумал, и тост об этом был бы шумом.
-        window.ipcRenderer.on('event-export-done', (_event, result) => {
+        this._handlers.eventExportDone = window.ipcRenderer.on('event-export-done', (_event, result) => {
             const answer = result || {};
             if (answer.canceled) { return; }
             if (answer.ok) {

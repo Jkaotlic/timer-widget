@@ -81,3 +81,19 @@ test('MAIN-03: «закрыть» отменяет и страховку; пос
     w2.emit('closed');
     assert.deepEqual(made, ['new']);
 });
+
+test('a second tray toggle reopens the closing widget and a third cancels reopening', () => {
+    const closing = createWindowClosing({ windows: {} });
+    for (const toggles of [2, 3]) {
+        const win = fakeWindow();
+        let closes = 0;
+        let creates = 0;
+        win.close = () => { closes++; };
+        for (let i = 0; i < toggles; i++) {
+            closing.toggleAuxWindow('widget', win, () => { creates++; });
+        }
+        win.emit('closed');
+        assert.equal(closes, 1);
+        assert.equal(creates, toggles === 2 ? 1 : 0);
+    }
+});

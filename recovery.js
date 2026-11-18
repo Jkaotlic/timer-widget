@@ -11,9 +11,9 @@
  * Stale threshold: 5 minutes. Anything older is discarded.
  */
 
-const fs = require('fs');
+const { isTimerSeconds, MAX_SECONDS } = require('./timer-engine');
 const path = require('path');
-const { writeFileAtomicSync } = require('./atomic-write');
+const { writeFileAtomicSync, readProfileJson, removeProfileFile, errorCode } = require('./atomic-write');
 
 const STATE_FILENAME = 'last-state.json';
 const MAX_AGE_MS = 5 * 60 * 1000;
@@ -50,7 +50,7 @@ function saveTimerStateToFileSync(userDataPath, timerState, logger) {
         // не обрезанный JSON.
         writeFileAtomicSync(statePath, data);
     } catch (err) {
-        if (logger && logger.error) { logger.error('saveTimerStateToFileSync:', err); }
+        if (logger && logger.error) { logger.error('saveTimerStateToFileSync:', errorCode(err)); }
     }
 }
 
@@ -65,25 +65,32 @@ function saveTimerStateToFileSync(userDataPath, timerState, logger) {
 function loadSavedTimerState(userDataPath, logger) {
     try {
         const statePath = getRecoveryStatePath(userDataPath);
-        if (!fs.existsSync(statePath)) { return null; }
-        const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        const parsed = readProfileJson(statePath, 4096);
         const ageMs = Date.now() - (parsed.savedAt || 0);
         if (ageMs > MAX_AGE_MS) {
-            try { fs.unlinkSync(statePath); } catch { /* ignore */ }
+            clearSavedTimerState(userDataPath, logger);
             return null;
         }
         return parsed;
     } catch (err) {
-        if (logger && logger.warn) { logger.warn('loadSavedTimerState failed:', err); }
+        if (err.code !== 'ENOENT' && logger && logger.warn) { logger.warn('loadSavedTimerState failed:', errorCode(err)); }
         return null;
     }
 }
 
-function clearSavedTimerState(userDataPath) {
+function clearSavedTimerState(userDataPath, logger) {
     try {
-        const statePath = getRecoveryStatePath(userDataPath);
-        if (fs.existsSync(statePath)) { fs.unlinkSync(statePath); }
-    } catch { /* ignore */ }
+        removeProfileFile(getRecoveryStatePath(userDataPath));
+        return true;
+    } catch (err) {
+        if (logger && logger.warn) { logger.warn('clearSavedTimerState failed:', errorCode(err)); }
+        // Some filesystem locks block unlink but still allow replacement.
+        // Leave an invalid snapshot if possible so the old timer cannot resume.
+        try { writeFileAtomicSync(getRecoveryStatePath(userDataPath), '{}'); } catch (writeErr) {
+            if (logger && logger.warn) { logger.warn('invalidateSavedTimerState failed:', errorCode(writeErr)); }
+        }
+        return false;
+    }
 }
 
 /**
@@ -97,8 +104,9 @@ function isRecoveryValid(data, now) {
     if (typeof data.savedAt !== 'number' || !Number.isFinite(data.savedAt)) { return false; }
     const age = (now || Date.now()) - data.savedAt;
     if (age < 0 || age > MAX_AGE_MS) { return false; }
-    if (typeof data.presetSeconds !== 'number' || data.presetSeconds < 0) { return false; }
-    return true;
+    return isTimerSeconds(data.presetSeconds)
+        && (data.totalSeconds === undefined || isTimerSeconds(data.totalSeconds))
+        && (data.remainingSeconds === undefined || isTimerSeconds(data.remainingSeconds, -MAX_SECONDS));
 }
 
 module.exports = {

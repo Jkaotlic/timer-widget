@@ -91,6 +91,10 @@ SBOM пакета (`--override-default-catalogers image`: по каталогу 
 `release.yml`: job `security` (те же шаги, Electron с `--require-latest`) —
 `needs` у всех четырёх сборок; `build-linux` повторяет `deb-scan` и lintian
 (`scripts/lintian-check.sh`) на том самом deb, что уходит в релиз.
+Перед сборкой workflow сверяет тег с версией пакета. На коммите тега проходят
+e2e для Linux, Windows и macOS, затем каждая платформа проверяет упакованное
+приложение. Право публикации получает только финальный job после проверки
+имён и непустого содержимого всех семи загрузок.
 
 ## Установка и запуск deb
 

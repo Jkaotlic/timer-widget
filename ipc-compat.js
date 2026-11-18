@@ -56,13 +56,20 @@
             if (!this._listeners.has(channel)) {
                 this._listeners.set(channel, []);
             }
-            this._listeners.get(channel).push({
+            const listeners = this._listeners.get(channel);
+            const entry = {
                 original: callback,
                 wrapped: wrappedCallback,
-                cleanup: cleanup
-            });
-
-            return cleanup;
+                cleanup: () => {
+                    const index = listeners.indexOf(entry);
+                    if (index < 0) { return; }
+                    listeners.splice(index, 1);
+                    if (listeners.length === 0) { this._listeners.delete(channel); }
+                    cleanup();
+                }
+            };
+            listeners.push(entry);
+            return entry.cleanup;
         },
 
         /**
@@ -91,16 +98,7 @@
             const listeners = this._listeners.get(channel);
             const target = listeners.find(l => l.original === callback);
 
-            if (target) {
-                target.cleanup();
-                const remaining = listeners.filter(l => l.original !== callback);
-
-                if (remaining.length === 0) {
-                    this._listeners.delete(channel);
-                } else {
-                    this._listeners.set(channel, remaining);
-                }
-            }
+            if (target) { target.cleanup(); }
         },
 
         /**
@@ -111,7 +109,7 @@
             if (this._listeners && this._listeners.has(channel)) {
                 const listeners = this._listeners.get(channel);
                 // Call all cleanup functions
-                listeners.forEach(l => l.cleanup());
+                listeners.slice().forEach(l => l.cleanup());
                 this._listeners.delete(channel);
             }
             window.electronAPI.removeAllListeners(channel);

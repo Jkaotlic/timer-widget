@@ -379,10 +379,10 @@ function countRepoFilesUnder(root, dir) {
 }
 
 async function main() {
-    const distDir = path.join(ROOT, 'dist');
+    const distDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(ROOT, 'dist');
     const asarPath = findAsar(distDir);
     if (!asarPath) {
-        console.error('[verify-packed] app.asar не найден в dist/ — сначала `npm run pack`');
+        console.error(`[verify-packed] app.asar не найден в ${distDir}`);
         process.exit(1);
     }
     console.log(`[verify-packed] читаю ${path.relative(ROOT, asarPath)}`);

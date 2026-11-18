@@ -123,52 +123,16 @@ test('закрывающееся окно не считается открыты
     // Проверяются ТЕЛА обработчиков, а не файл целиком: `isUsableWindow` есть
     // в файле по определению, и поиск по всему исходнику был бы зелёным при
     // полностью пустом обработчике.
-    const OPENERS = ['open-widget', 'open-clock-widget', 'open-display'];
-    for (const channel of OPENERS) {
-        const code = codeOnly(ipcHandlerBody(source, channel));
-        assert.match(
-            code,
-            /isUsableWindow\(/,
-            `${channel}: ветка «просто сфокусировать» обязана спрашивать, не закрывается ли окно`
-        );
-        assert.match(
-            code,
-            /queueOpenAfterClose\(/,
-            `${channel}: запрос, пришедший во время закрытия, обязан быть ОТЛОЖЕН, а не потерян`
-        );
-    }
-
-    // «Закрыть» отменяет отложенное открытие — иначе окно возрождается само.
-    for (const channel of ['close-widget', 'close-clock-widget', 'close-display']) {
-        assert.match(
-            codeOnly(ipcHandlerBody(source, channel)),
-            /cancelQueuedOpen\(/,
-            `${channel}: «закрыть» обязано отменять запланированное открытие`
-        );
-    }
-
-    // Метка «закрываюсь» ставится ВЕЗДЕ, где зовётся close(): у виджета и
-    // часов — и в обработчике канала, и в пункте трея (трей ходит МИМО IPC),
-    // у дисплея — в closeDisplayWindow.
-    //
-    // Считать вхождения `markClosing(` по всему файлу нельзя: в счёт попадает
-    // её собственное объявление, и проверка «вызовов не меньше четырёх»
-    // остаётся зелёной, когда один вызов убрали. Это не выдумка — ровно так
-    // первая версия этой проверки и прошла мутацию.
-    for (const channel of ['close-widget', 'close-clock-widget']) {
-        assert.match(
-            codeOnly(ipcHandlerBody(source, channel)),
-            /markClosing\(/,
-            `${channel}: закрытие обязано помечать окно, иначе «открыть» в тот же миг видит его живым`
-        );
-    }
+    const displayOpen = codeOnly(ipcHandlerBody(source, 'open-display'));
+    assert.match(displayOpen, /isUsableWindow\(/);
+    assert.match(displayOpen, /queueOpenAfterClose\(/);
+    assert.match(codeOnly(ipcHandlerBody(source, 'close-display')), /cancelQueuedOpen\(/);
     const tray = codeOnly(functionBody(source, 'rebuildTrayMenu'));
-    const trayMarks = (tray.match(/markClosing\(/g) || []).length;
-    assert.equal(
-        trayMarks, 2,
-        `в rebuildTrayMenu ${trayMarks} пометок вместо двух (виджет и часы): трей закрывает окна МИМО IPC, `
-        + 'и без метки там дефект возвращается только для этого пути'
-    );
+    for (const [channel, key] of [['widget', 'widget'], ['clock-widget', 'clock']]) {
+        assert.ok(ipcHandlerBody(source, 'open-' + channel).includes(`openAuxWindow('${key}'`));
+        assert.ok(ipcHandlerBody(source, 'close-' + channel).includes(`closeAuxWindow('${key}'`));
+        assert.ok(tray.includes(`toggleAuxWindow('${key}'`));
+    }
 
     const closeBody = codeOnly(functionBody(source, 'closeDisplayWindow'));
     const markIdx = closeBody.indexOf('_closing = true');
@@ -193,7 +157,7 @@ test('закрывающееся окно не считается открыты
     );
 
     // Проверка себя: на исходнике с вырезанной проверкой тест обязан краснеть.
-    const mutated = codeOnly(ipcHandlerBody(source, 'open-widget')).replace('isUsableWindow(', 'Boolean(');
+    const mutated = displayOpen.replace('isUsableWindow(', 'Boolean(');
     assert.doesNotMatch(
         mutated,
         /isUsableWindow\(/,

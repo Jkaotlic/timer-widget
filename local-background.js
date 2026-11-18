@@ -222,8 +222,11 @@ const LocalBackgroundMixin = {
 
     loadLocalBackground() {
             const savedBg = localStorage.getItem('localBgImage');
-            if (savedBg) {
-                this.showLocalBgPreview(savedBg);
+            const image = SecurityUtils.validateImageSource(savedBg);
+            if (image.valid) {
+                this.showLocalBgPreview(image.sanitized);
+            } else {
+                this.hideLocalBgPreview();
             }
             // Вписывание и затемнение раскладываются ВСЕГДА, а не только при
             // картинке: их читает и пресет (applyProfile), и удаление фона, и
