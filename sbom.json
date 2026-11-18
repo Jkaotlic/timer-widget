@@ -3097,6 +3097,40 @@
     },
     {
       "type": "library",
+      "name": "node-gyp-glob",
+      "group": "@timer-widget",
+      "version": "1.0.0",
+      "bom-ref": "timer-widget@2.13.0|@timer-widget/node-gyp-glob@1.0.0",
+      "description": "File-only glob for the two Windows build-file lookups in node-gyp 12.4.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40timer-widget/node-gyp-glob@1.0.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:constraint:engine:node",
+          "value": ">=22.17.0"
+        },
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/tinyglobby"
+        },
+        {
+          "name": "cdx:npm:package:private",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "cacheable-request",
       "group": "@types",
       "version": "6.0.3",
@@ -10132,64 +10166,6 @@
     },
     {
       "type": "library",
-      "name": "fdir",
-      "version": "6.5.0",
-      "bom-ref": "timer-widget@2.13.0|fdir@6.5.0",
-      "author": "thecodrr",
-      "description": "The fastest directory crawler & globbing alternative to glob, fast-glob, & tiny-glob. Crawls 1m files in < 1s",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:npm/fdir@6.5.0",
-      "externalReferences": [
-        {
-          "url": "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz",
-          "type": "distribution",
-          "hashes": [
-            {
-              "alg": "SHA-512",
-              "content": "b486d8b596ee70eb340511aa3c992c84951874bf920c7edd54cf208f2f84469dd60148cb105244fb4da46a7c87b708d63a7c2b298062c0098cd29e242c90275e"
-            }
-          ],
-          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-        },
-        {
-          "url": "https://github.com/thecodrr/fdir/issues",
-          "type": "issue-tracker",
-          "comment": "as detected from PackageJson property \"bugs.url\""
-        },
-        {
-          "url": "git+https://github.com/thecodrr/fdir.git",
-          "type": "vcs",
-          "comment": "as detected from PackageJson property \"repository.url\""
-        },
-        {
-          "url": "https://github.com/thecodrr/fdir#readme",
-          "type": "website",
-          "comment": "as detected from PackageJson property \"homepage\""
-        }
-      ],
-      "properties": [
-        {
-          "name": "cdx:npm:package:constraint:engine:node",
-          "value": ">=12.0.0"
-        },
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        },
-        {
-          "name": "cdx:npm:package:path",
-          "value": "node_modules/fdir"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "file-entry-cache",
       "version": "11.1.5",
       "bom-ref": "timer-widget@2.13.0|file-entry-cache@11.1.5",
@@ -15865,64 +15841,6 @@
     },
     {
       "type": "library",
-      "name": "picomatch",
-      "version": "4.0.7",
-      "bom-ref": "timer-widget@2.13.0|picomatch@4.0.7",
-      "author": "Jon Schlinkert",
-      "description": "Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:npm/picomatch@4.0.7",
-      "externalReferences": [
-        {
-          "url": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.7.tgz",
-          "type": "distribution",
-          "hashes": [
-            {
-              "alg": "SHA-512",
-              "content": "a9c26ef3c436216a89b030f9dbd24a31dc069bf76f2275b81ef427470887f49b62849bf318eb1c0ed1c4df1d6904a794393cac43c91598b9c9da426eef285c18"
-            }
-          ],
-          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-        },
-        {
-          "url": "https://github.com/micromatch/picomatch/issues",
-          "type": "issue-tracker",
-          "comment": "as detected from PackageJson property \"bugs.url\""
-        },
-        {
-          "url": "git+https://github.com/micromatch/picomatch.git",
-          "type": "vcs",
-          "comment": "as detected from PackageJson property \"repository.url\""
-        },
-        {
-          "url": "https://github.com/micromatch/picomatch",
-          "type": "website",
-          "comment": "as detected from PackageJson property \"homepage\""
-        }
-      ],
-      "properties": [
-        {
-          "name": "cdx:npm:package:constraint:engine:node",
-          "value": ">=12"
-        },
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        },
-        {
-          "name": "cdx:npm:package:path",
-          "value": "node_modules/picomatch"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "pkijs",
       "version": "3.4.3",
       "bom-ref": "timer-widget@2.13.0|pkijs@3.4.3",
@@ -19310,64 +19228,6 @@
     },
     {
       "type": "library",
-      "name": "tinyglobby",
-      "version": "0.2.17",
-      "bom-ref": "timer-widget@2.13.0|tinyglobby@0.2.17",
-      "author": "Superchupu",
-      "description": "A fast and minimal alternative to globby and fast-glob",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "purl": "pkg:npm/tinyglobby@0.2.17",
-      "externalReferences": [
-        {
-          "url": "https://registry.npmjs.org/tinyglobby/-/tinyglobby-0.2.17.tgz",
-          "type": "distribution",
-          "hashes": [
-            {
-              "alg": "SHA-512",
-              "content": "c1747f758a5ca8a99f5a911d66388a24ec023459dd0f40cc9eb5bf7188d51adb449017d581c2c51e836b963e3b9a339589cf72c8dbbae5a96c805e0d4324dada"
-            }
-          ],
-          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-        },
-        {
-          "url": "https://github.com/SuperchupuDev/tinyglobby/issues",
-          "type": "issue-tracker",
-          "comment": "as detected from PackageJson property \"bugs.url\""
-        },
-        {
-          "url": "git+https://github.com/SuperchupuDev/tinyglobby.git",
-          "type": "vcs",
-          "comment": "as detected from PackageJson property \"repository.url\""
-        },
-        {
-          "url": "https://superchupu.dev/tinyglobby",
-          "type": "website",
-          "comment": "as detected from PackageJson property \"homepage\""
-        }
-      ],
-      "properties": [
-        {
-          "name": "cdx:npm:package:constraint:engine:node",
-          "value": ">=12.0.0"
-        },
-        {
-          "name": "cdx:npm:package:development",
-          "value": "true"
-        },
-        {
-          "name": "cdx:npm:package:path",
-          "value": "node_modules/tinyglobby"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "tmp-promise",
       "version": "3.0.3",
       "bom-ref": "timer-widget@2.13.0|tmp-promise@3.0.3",
@@ -20946,6 +20806,7 @@
         "timer-widget@2.13.0|@electron/fuses@1.8.0",
         "timer-widget@2.13.0|@eslint/js@10.0.1",
         "timer-widget@2.13.0|@playwright/test@1.64.1",
+        "timer-widget@2.13.0|@timer-widget/node-gyp-glob@1.0.0",
         "timer-widget@2.13.0|@types/node@24.13.3",
         "timer-widget@2.13.0|electron-builder@26.18.0",
         "timer-widget@2.13.0|electron-log@5.4.4",
@@ -21295,6 +21156,9 @@
       "dependsOn": [
         "timer-widget@2.13.0|defer-to-connect@2.0.1"
       ]
+    },
+    {
+      "ref": "timer-widget@2.13.0|@timer-widget/node-gyp-glob@1.0.0"
     },
     {
       "ref": "timer-widget@2.13.0|@types/cacheable-request@6.0.3",
@@ -22024,12 +21888,6 @@
       "ref": "timer-widget@2.13.0|fast-uri@3.1.9"
     },
     {
-      "ref": "timer-widget@2.13.0|fdir@6.5.0",
-      "dependsOn": [
-        "timer-widget@2.13.0|picomatch@4.0.7"
-      ]
-    },
-    {
       "ref": "timer-widget@2.13.0|file-entry-cache@11.1.5",
       "dependsOn": [
         "timer-widget@2.13.0|flat-cache@6.1.23"
@@ -22438,6 +22296,7 @@
     {
       "ref": "timer-widget@2.13.0|node-gyp@12.4.0",
       "dependsOn": [
+        "timer-widget@2.13.0|@timer-widget/node-gyp-glob@1.0.0",
         "timer-widget@2.13.0|exponential-backoff@3.1.3",
         "timer-widget@2.13.0|graceful-fs@4.2.11",
         "timer-widget@2.13.0|node-gyp@12.4.0|env-paths@2.2.1",
@@ -22446,8 +22305,7 @@
         "timer-widget@2.13.0|nopt@9.0.0",
         "timer-widget@2.13.0|proc-log@6.1.0",
         "timer-widget@2.13.0|semver@7.8.5",
-        "timer-widget@2.13.0|tar@7.5.22",
-        "timer-widget@2.13.0|tinyglobby@0.2.17"
+        "timer-widget@2.13.0|tar@7.5.22"
       ]
     },
     {
@@ -22546,9 +22404,6 @@
     },
     {
       "ref": "timer-widget@2.13.0|picocolors@1.1.1"
-    },
-    {
-      "ref": "timer-widget@2.13.0|picomatch@4.0.7"
     },
     {
       "ref": "timer-widget@2.13.0|pkijs@3.4.3",
@@ -22859,13 +22714,6 @@
     },
     {
       "ref": "timer-widget@2.13.0|tiny-async-pool@1.3.0|semver@5.7.2"
-    },
-    {
-      "ref": "timer-widget@2.13.0|tinyglobby@0.2.17",
-      "dependsOn": [
-        "timer-widget@2.13.0|fdir@6.5.0",
-        "timer-widget@2.13.0|picomatch@4.0.7"
-      ]
     },
     {
       "ref": "timer-widget@2.13.0|tmp-promise@3.0.3",
