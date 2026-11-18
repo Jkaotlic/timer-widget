@@ -109,11 +109,13 @@ test('свёртка в первые 100 мс после загрузки не �
             global.__barListener = (_e, size) => global.__barAsks.push(size);
             ipcMain.on('resize-control-window', global.__barListener);
         });
-        // Без ожидания стартовой рассылки: свёртка обязана успеть в первые
-        // 100 мс, до авто-размера.
+        // Свернуть внутри новой страницы, как только модуль панели готов.
+        // Отдельная команда Playwright после reload на медленном раннере
+        // могла прийти уже после стартового авто-размера.
+        await control.addInitScript(() => {
+            document.addEventListener('DOMContentLoaded', () => window.miniBar.collapse(), { once: true });
+        });
         await reloadPanel(control, { awaitStartup: false });
-        // Свёртка раньше авто-размера — иначе тест проверяет не тот порядок.
-        await control.evaluate(() => window.miniBar.collapse());
         await expect.poll(() => control.evaluate(() => window.miniBar.hasPendingFit()),
             { message: 'авто-размер не попал в полосу — гонка не воспроизведена' }).toBe(true);
         const barAsks = await app.evaluate(({ ipcMain }) => {
