@@ -73,12 +73,14 @@ test('помощник выходит из полноэкранного и ЖД�
 
     assert.match(body, /isFullScreen\(\)/,
         'помощник не спрашивает, полноэкранное ли окно');
-    assert.match(body, /setFullScreen\(false\)/,
+    assert.match(body, /waitForFullScreenExit\(win, close\)/);
+    const transition = functionBody(MAIN, 'waitForFullScreenExit');
+    assert.match(transition, /setFullScreen\(false\)/,
         'помощник не выводит окно из полноэкранного режима перед закрытием');
-    assert.match(body, /once\(\s*'leave-full-screen'/,
+    assert.match(transition, /once\(\s*'leave-full-screen'/,
         'выход из полноэкранного ждут не по СОБЫТИЮ — пауза это ставка на скорость машины');
     // Страховка обязательна: если событие не придёт, окно всё равно должно
     // закрыться, иначе «защита от падения» превращается в незакрываемое окно.
-    assert.match(body, /setTimeout/,
+    assert.match(transition, /setTimeout/,
         'нет страховки по времени — не пришло событие, и окно не закроется никогда');
 });

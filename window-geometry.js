@@ -69,6 +69,7 @@ function createWindowGeometry(cfg) {
     // запись и стирала восстановленное (см. saveSettled). Теперь сравнение
     // живёт внутри модуля и выполняется, когда размер устоялся.
     let scalePct;
+    let awaitingResizeBounds = false;
 
     // Отложенная запись по событию resize. См. saveSettled() ниже.
     let settleTimer = null;
@@ -127,10 +128,19 @@ function createWindowGeometry(cfg) {
             const { x, y, width, height } = bounds;
             if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) { return; }
             reported = { x, y, width, height };
+            // Ответ на явное масштабирование содержит новую позицию центра.
+            if (awaitingResizeBounds && bounds.requestedWidth === Math.round(baseSize * scalePct / 100)) {
+                awaitingResizeBounds = false;
+                const requested = scalePct;
+                const actual = Math.round(width / baseSize * 100);
+                save(actual);
+                if (actual !== requested && onScaleSettled) { onScaleSettled(actual); }
+            }
         },
 
         /** Восстанавливает размер и позицию прошлой сессии. */
         restore() {
+            awaitingResizeBounds = false;
             const geo = /** @type {{scalePct?: unknown, x?: number, y?: number} | null} */ (
                 parseJSON(storage.getItem(storageKey), null));
             if (!geo || typeof geo !== 'object') { return; }
@@ -150,7 +160,10 @@ function createWindowGeometry(cfg) {
             }
         },
 
-        save,
+        save(explicitPct) {
+            awaitingResizeBounds = Number.isFinite(explicitPct);
+            save(explicitPct);
+        },
 
         /**
          * Запись по событию `resize` — ПОСЛЕ того, как размер устоялся.
@@ -183,8 +196,10 @@ function createWindowGeometry(cfg) {
                 // и панель, получив отчёт, сохраняла ВЕСЬ свой набор настроек
                 // поверх профиля, затирая то, что туда положили мимо неё.
                 const known = Number.isFinite(scalePct) ? scalePct : 100;
-                if (pct === known) { return; }
+                if (pct === known && !awaitingResizeBounds) { return; }
+                awaitingResizeBounds = false;
                 save(pct);
+                if (pct === known) { return; }
                 // О новом масштабе узнаёт и панель. Без этого путь Ctrl+колеса
                 // был ЕДИНСТВЕННЫМ, который сообщал масштаб, — а окно можно
                 // растянуть за край рамки. Замер: окно 500 px (200 %), в

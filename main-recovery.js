@@ -39,7 +39,7 @@ function createRecoverySnapshot({ getUserDataPath, getTimerState, flags, isAtRes
     }
 
     function clearSavedTimerState() {
-        recovery.clearSavedTimerState(getUserDataPath());
+        return recovery.clearSavedTimerState(getUserDataPath(), log);
     }
 
     /**

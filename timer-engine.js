@@ -239,7 +239,12 @@ function pause(state) {
     };
 }
 
+function isTimerSeconds(value, min = 0) {
+    return Number.isInteger(value) && value >= min && value <= MAX_SECONDS;
+}
+
 module.exports = {
+    isTimerSeconds,
     MAX_SECONDS,
     toWholeSeconds,
     tick,

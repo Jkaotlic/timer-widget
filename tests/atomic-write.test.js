@@ -10,7 +10,7 @@
  * fsync, и только потом rename поверх старого.
  *
  * Отказ записи имитируется подменой ОДНОЙ функции `fs` — той, что в середине
- * пути (fsyncSync / writeSync): так проверяется ровно «запись сорвалась на
+ * пути (fsyncSync / writeFileSync): так проверяется ровно «запись сорвалась на
  * полпути», а не «файл не открылся».
  */
 
@@ -58,7 +58,7 @@ test('сорвавшаяся запись оставляет старый фай
 test('накопитель перелимита: сорвавшаяся запись не обнуляет итог на диске', (t) => {
     const dir = tmpDir();
     OverrunStore.saveStore(dir, { overrunSeconds: 900, finished: false, talks: [] });
-    t.mock.method(fs, 'writeSync', () => { throw Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }); });
+    t.mock.method(fs, 'writeFileSync', () => { throw Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }); });
 
     const errors = [];
     OverrunStore.saveStore(dir, { overrunSeconds: 1200, finished: false, talks: [] },
@@ -115,4 +115,43 @@ test('R7 source-level: временный файл открывается wx с 
         'atomic-write.js обязан открывать временный файл эксклюзивно (wx) с правами 0o600');
     assert.doesNotMatch(src, /openSync\(tmpPath,\s*'w'\)/,
         'старое открытие без wx/0o600 не должно остаться в коде');
+});
+
+test('oversized journal and recovery files fall back without reading bytes or logging profile paths', (t) => {
+    const dir = tmpDir();
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    for (const file of [OverrunStore.getStorePath(dir), recovery.getRecoveryStatePath(dir)]) {
+        fs.writeFileSync(file, '');
+        fs.truncateSync(file, 256 * 1024);
+    }
+    const read = t.mock.method(fs, 'readSync');
+    const wholeFile = t.mock.method(fs, 'readFileSync');
+    const warnings = [];
+    const log = { warn: (...args) => warnings.push(args.join(' ')) };
+    assert.equal(OverrunStore.loadStore(dir, log).overrunSeconds, 0);
+    assert.equal(recovery.loadSavedTimerState(dir, log), null);
+    assert.equal(read.mock.callCount(), 0);
+    assert.equal(wholeFile.mock.callCount(), 0);
+    assert.equal(warnings.length, 2);
+    for (const warning of warnings) {
+        assert.match(warning, /EFBIG/);
+        assert.ok(!warning.includes(dir));
+    }
+});
+
+test('atomic writer persists the entire UTF-8 payload when a raw write would be short', (t) => {
+    const dir = tmpDir();
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const file = path.join(dir, 'state.json');
+    const data = JSON.stringify({ title: 'Доклад'.repeat(1000) });
+    const rawWrite = fs.writeSync.bind(fs);
+    let partialWrites = 0;
+    t.mock.method(fs, 'writeSync', (fd, buffer, offset, length) => {
+        const chunk = Math.min(length, 127);
+        if (chunk < length) { partialWrites++; }
+        return rawWrite(fd, buffer, offset, chunk);
+    });
+    writeFileAtomicSync(file, data);
+    assert.ok(partialWrites > 1);
+    assert.equal(fs.readFileSync(file, 'utf8'), data);
 });

@@ -52,7 +52,8 @@ function fakeWin() {
 }
 
 test('R5: перезагрузка не чаще CRASH_RELOAD_LIMIT раз за CRASH_RELOAD_WINDOW_MS', (t) => {
-    t.mock.timers.enable({ apis: ['Date'] });
+    let elapsed = 0;
+    t.mock.method(performance, 'now', () => elapsed);
     const { hooks } = makeHooks();
     const win = fakeWin();
     hooks.bindRenderCrashHandler(win, 'widget');
@@ -67,7 +68,7 @@ test('R5: перезагрузка не чаще CRASH_RELOAD_LIMIT раз за 
 
     // Сдвиг времени за пределы скользящего окна — лимит не счётчик на жизнь,
     // а именно окно 60 с: следующий краш обязан снова перезагрузить.
-    t.mock.timers.tick(61000);
+    elapsed += 61000;
     win.fire({ reason: 'crashed' });
     assert.equal(win.reloadCalls, 4, 'краш через 61 с после серии обязан перезагрузить — лимит скользящий, не пожизненный');
 });

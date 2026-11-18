@@ -18,9 +18,8 @@
  * проверяется в голом `node --test`.
  */
 
-const fs = require('fs');
 const path = require('path');
-const { writeFileAtomicSync } = require('./atomic-write');
+const { writeFileAtomicSync, readProfileJson, errorCode } = require('./atomic-write');
 
 const STORE_FILENAME = 'event-overrun.json';
 
@@ -102,6 +101,11 @@ function normalizeStore(data) {
     // accrueOverrun после «Завершить» его не копит).
     const pending = store.finished ? null : normalizePending(data.pending);
     if (pending) { store.pending = pending; }
+    const resume = data.resume;
+    if (!store.finished && resume && Number.isSafeInteger(resume.excluded) && resume.excluded >= 0
+        && Number.isSafeInteger(resume.overrun) && resume.overrun >= 0) {
+        store.resume = { excluded: resume.excluded, overrun: resume.overrun, skip: resume.skip === true };
+    }
     return store;
 }
 
@@ -185,11 +189,11 @@ function foldPending(store, opts = {}) {
  */
 function loadStore(userDataPath, logger) {
     try {
-        const raw = fs.readFileSync(getStorePath(userDataPath), 'utf8');
-        return normalizeStore(JSON.parse(raw));
+        // 500 journal entries plus the active talk fit comfortably in 128 KiB.
+        return normalizeStore(readProfileJson(getStorePath(userDataPath), 128 * 1024));
     } catch (err) {
         if (err && err.code !== 'ENOENT' && logger && logger.warn) {
-            logger.warn('loadStore failed:', err);
+            logger.warn('loadStore failed:', errorCode(err));
         }
         return { overrunSeconds: 0, finished: false, talks: [] };
     }
@@ -210,7 +214,7 @@ function saveStore(userDataPath, state, logger) {
     try {
         writeFileAtomicSync(getStorePath(userDataPath), JSON.stringify(normalizeStore(state)));
     } catch (err) {
-        if (logger && logger.error) { logger.error('saveStore failed:', err); }
+        if (logger && logger.error) { logger.error('saveStore failed:', errorCode(err)); }
     }
 }
 

@@ -114,7 +114,7 @@ test('виджет: изменение размера окна тоже сохр
 });
 
 test('панель: ползунок масштаба часов восстанавливается из clockGeometry', () => {
-    const src = read('electron-control.html');
+    const src = read('panel-clock.js');
     assert.match(
         src,
         /localStorage\.getItem\('clockGeometry'\)/,
@@ -122,7 +122,7 @@ test('панель: ползунок масштаба часов восстан�
     );
     // Восстановление идёт присваиванием .value, которое НЕ порождает 'input',
     // иначе загрузка панели переслала бы масштаб в часы и затерла их размер.
-    const block = src.match(/clockScaleSliderEl\.value = pct;/);
+    const block = src.match(/clockScaleSliderEl\.value = String\(pct\);/);
     assert.ok(block, 'значение ползунка часов не выставляется');
     assert.doesNotMatch(
         src,

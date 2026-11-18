@@ -57,7 +57,8 @@ function makeGeometry(overrides = {}) {
         parseJSON,
         storage,
         getOuterWidth: overrides.getOuterWidth || (() => 250),
-        getScreenPosition: overrides.getScreenPosition || (() => ({ x: 10, y: 20 }))
+        getScreenPosition: overrides.getScreenPosition || (() => ({ x: 10, y: 20 })),
+        onScaleSettled: overrides.onScaleSettled
     });
     return { geo, sent, storage };
 }
@@ -736,4 +737,23 @@ test('BUG-19: правая кнопка, зажатая вместо левой,
     container.fire('mousedown', mouseEvent({ screenX: 100, screenY: 100 }));
     doc.fire('mousemove', mouseEvent({ screenX: 150, screenY: 150, buttons: 2 }));
     assert.deepEqual(moves, []);
+});
+
+test('после масштабирования сохраняется новая позиция из главного процесса', () => {
+    const { geo, storage } = makeGeometry();
+    geo.setWindowBounds({ x: 100, y: 100, width: 250, height: 250 });
+    geo.save(200);
+    geo.setWindowBounds({ x: -25, y: -25, width: 500, height: 500, requestedWidth: 500 });
+    assert.deepEqual(JSON.parse(storage.data.widgetGeometry), { scalePct: 200, x: -25, y: -25 });
+});
+
+test('у границы монитора подтверждение обновляет масштаб даже без события resize', () => {
+    const reports = [];
+    const { geo, storage } = makeGeometry({ onScaleSettled: pct => reports.push(pct) });
+    const bounds = { x: 0, y: 0, width: 1000, height: 1000 };
+    geo.setWindowBounds(bounds);
+    geo.save(500);
+    geo.setWindowBounds({ ...bounds, requestedWidth: 1250 });
+    assert.deepEqual(JSON.parse(storage.data.widgetGeometry), { scalePct: 400, x: 0, y: 0 });
+    assert.deepEqual(reports, [400]);
 });

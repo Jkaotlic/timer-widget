@@ -60,6 +60,16 @@ function breakdown(totalAbsSeconds) {
     return { hours, minutes, seconds, hasHours: hours > 0 };
 }
 
+/** Часовая стрелка длительности учитывает и секунды, минутная сохраняет полные обороты. */
+function timerHandAngles(seconds) {
+    const elapsed = Math.abs(seconds);
+    return { hour: (elapsed / 3600 % 12) * 30, minute: elapsed / 10, second: elapsed % 60 * 6 };
+}
+
+function clockHandAngles(hours, minutes, seconds) {
+    return { hour: hours % 12 * 30 + minutes / 2, minute: minutes * 6 + seconds / 10, second: seconds * 6 };
+}
+
 // ---------------------------------------------------------------------------
 // flipCells(absSeconds[, presetTotalSeconds]) → individual digit characters
 // ---------------------------------------------------------------------------
@@ -850,41 +860,6 @@ function clockToSeconds(clock) {
     return hours * 3600 + minutes * 60;
 }
 
-// signedSecondsUntilClock(nowSeconds, 'HH:MM') → знаковое расстояние до отметки сегодня
-// ---------------------------------------------------------------------------
-/**
- * ЗНАКОВОЕ расстояние от системных часов до отметки: минус означает, что
- * отметка прошла.
- *
- * Разбор входа живёт в `clockToSeconds()`, в одном месте: отсюда и из
- * `eventClockDistances()` ниже. Две копии регулярки и диапазонов разошлись бы
- * на первом же исправлении.
- *
- * Точная формулировка: через `clockToSeconds()` идёт ВСЁ НОВОЕ, что разбирает
- * `'HH:MM'`, — но «единственный в проекте» сказать нельзя. `updateStaticMiniClock()`
- * в display-script.js разбирает ту же строку своими `split(':')` + `parseInt`;
- * он предсуществующий, у него другой потребитель (стрелки мини-циферблата на
- * плашках) и своя ветка. Сведение их — отдельная работа; писать здесь, что
- * копий нет, было бы неправдой.
- *
- * Невалидный вход даёт 0, и для знаковой версии это значит «отметка сейчас»,
- * а не «отметка прошла»: выдумывать минус из мусора нельзя.
- *
- * @param {number} nowSeconds — секунды с начала суток
- * @param {string} clock — 'HH:MM'
- * @returns {number} секунды; отрицательные, если отметка позади
- */
-function signedSecondsUntilClock(nowSeconds, clock) {
-    const now = Number(nowSeconds);
-    if (!Number.isFinite(now)) { return 0; }
-
-    const mark = clockToSeconds(clock);
-    if (mark === null) { return 0; }
-
-    return mark - now;
-}
-
-// ---------------------------------------------------------------------------
 // bgOverlayPercent(value) → затемнение фона дисплея, % (BUG-16)
 // ---------------------------------------------------------------------------
 /** Затемнение картинки фона по умолчанию — то же, что `value` ползунка. */
@@ -916,7 +891,7 @@ const EVENT_OVERRUN_GRACE = 6 * 3600;
  * Знаковые расстояния от «сейчас» до начала и до конца мероприятия — с
  * пониманием полуночи.
  *
- * `signedSecondsUntilClock` вычитает секунды-с-полуночи и потому считает
+ * Простое вычитание секунд с полуночи считает
  * мероприятие СЕГОДНЯШНИМ всегда. Через полночь это давало сутки ошибки:
  * в 23:00 при конце 01:00 «До конца» — −22:00:00 красным, в 23:50 при
  * начале 00:10 «До начала» — −23:40:00. Даты у отметок нет, есть только
@@ -931,8 +906,7 @@ const EVENT_OVERRUN_GRACE = 6 * 3600;
  *    Иначе утро перед вечерним мероприятием читалось бы как «кончилось
  *    вчера», а вечер перед ранним — как «началось сутки назад».
  *
- * Мусор в отметке даёт ей 0 («отметка сейчас», как у signedSecondsUntilClock:
- * минус из мусора не выдумывается), а сутки выбираются по второй.
+ * Мусор в отметке даёт ей 0 («отметка сейчас»), а сутки выбираются по второй.
  *
  * @param {number} nowSeconds — секунды с начала суток
  * @param {string} startClock — 'HH:MM'
@@ -1033,10 +1007,10 @@ function migrateDisplayBlocks(settings) {
 
 export {
     breakdown, flipCells, clampScale, fitBlockScale, sideCardBand, topBandReserve,
-    heroFrameShrink, clockToSeconds, secondsUntilEventEnd, signedSecondsUntilClock,
-    eventClockDistances, bgOverlayPercent, DEFAULT_BG_OVERLAY, migrateDisplayBlocks,
+    heroFrameShrink, clockToSeconds, secondsUntilEventEnd, timerHandAngles, clockHandAngles,
+    eventClockDistances, bgOverlayPercent, migrateDisplayBlocks,
     timerLifecycleStatus, timerColorBand, pickOwnSetting, ownColors, storedColors,
-    LEGACY_COLORS_KEY, endsAt, relativeLuminance, backgroundTone, surfaceTone,
+    LEGACY_COLORS_KEY, endsAt, backgroundTone, surfaceTone,
     surfacePaint, surfaceSolid, surfaceAlpha, migrateTimerStyle
 };
 

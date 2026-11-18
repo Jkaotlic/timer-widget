@@ -83,12 +83,25 @@ function softClipCurve() {
     return curve;
 }
 
+const limiterCurve = softClipCurve();
+const buffersByContext = new WeakMap();
+
+function cachedBuffer(ctx, key, create) {
+    let buffers = buffersByContext.get(ctx);
+    if (!buffers) {
+        buffers = new Map();
+        buffersByContext.set(ctx, buffers);
+    }
+    if (!buffers.has(key)) { buffers.set(key, create()); }
+    return buffers.get(key);
+}
+
 /**
  * Короткий алгоритмический ревер: шум с экспоненциальным затуханием как
  * импульсная характеристика. Именно хвост отличает «звук из приложения» от
  * «бипа осциллятора» — без него любой синтез звучит плоско и дёшево.
  */
-function makeReverb(ctx, seconds, decay) {
+function reverbImpulse(ctx, seconds, decay) {
     const rate = ctx.sampleRate;
     const len = Math.max(1, Math.floor(rate * seconds));
     const impulse = ctx.createBuffer(2, len, rate);
@@ -102,8 +115,12 @@ function makeReverb(ctx, seconds, decay) {
             data[i] = ((noise - Math.floor(noise)) * 2 - 1) * Math.pow(1 - i / len, decay);
         }
     }
+    return impulse;
+}
+
+function makeReverb(ctx, seconds, decay) {
     const conv = ctx.createConvolver();
-    conv.buffer = impulse;
+    conv.buffer = cachedBuffer(ctx, `reverb-${seconds}-${decay}`, () => reverbImpulse(ctx, seconds, decay));
     return conv;
 }
 
@@ -122,7 +139,7 @@ function playBuiltInPreset(ctx, name) {
             const out = ctx.createGain();
             out.gain.value = PRESET_GAIN[name] || 2.5;
             const limiter = ctx.createWaveShaper();
-            limiter.curve = softClipCurve();
+            limiter.curve = limiterCurve;
             const trim = ctx.createGain();
             trim.gain.value = 0.9;
             out.connect(limiter);
@@ -185,12 +202,15 @@ function playBuiltInPreset(ctx, name) {
             // звучит как включённая гуделка.
             const transient = (at, dur, freq, peak, dest) => {
                 const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
-                const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-                const data = buf.getChannelData(0);
-                for (let i = 0; i < len; i++) {
-                    const n = Math.sin(i * 12.9898) * 43758.5453;
-                    data[i] = ((n - Math.floor(n)) * 2 - 1) * (1 - i / len);
-                }
+                const buf = cachedBuffer(ctx, `transient-${len}`, () => {
+                    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < len; i++) {
+                        const n = Math.sin(i * 12.9898) * 43758.5453;
+                        data[i] = ((n - Math.floor(n)) * 2 - 1) * (1 - i / len);
+                    }
+                    return buffer;
+                });
                 const src = ctx.createBufferSource();
                 src.buffer = buf;
                 const bp = ctx.createBiquadFilter();

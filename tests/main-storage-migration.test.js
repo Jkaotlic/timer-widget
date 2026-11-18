@@ -415,3 +415,19 @@ test('сброс помечает перенос завершённым и св�
     assert.equal(env.created.length, 0);
     assert.equal(env.origins.app.length, 0, 'сброс отменён старыми настройками');
 });
+
+test('oversized marker is ignored before reading it', async (t) => {
+    const env = makeEnv({ hasLocalStorageDir: false });
+    t.after(() => fs.rmSync(env.dir, { recursive: true, force: true }));
+    const file = path.join(env.dir, M.MARKER_FILE);
+    fs.writeFileSync(file, '');
+    fs.truncateSync(file, 64 * 1024);
+    const read = t.mock.method(fs, 'readSync');
+    const wholeFile = t.mock.method(fs, 'readFileSync');
+    const migration = await M.migrateStorage(env.deps);
+    migration.dispose();
+    assert.equal(migration.outcome, 'fresh');
+    assert.equal(read.mock.callCount(), 0);
+    assert.equal(wholeFile.mock.callCount(), 0);
+    assert.equal(env.readMarker().status, 'done');
+});

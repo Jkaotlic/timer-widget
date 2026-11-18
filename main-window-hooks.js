@@ -65,7 +65,7 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
             log.error(`Render process gone in ${label}: ${JSON.stringify(details)}`);
             if (details.reason === 'clean-exit' || win.isDestroyed()) { return; }
 
-            const now = Date.now();
+            const now = performance.now();
             const recent = (win.__crashReloads || []).filter((t) => now - t < CONFIG.CRASH_RELOAD_WINDOW_MS);
             if (recent.length >= CONFIG.CRASH_RELOAD_LIMIT) {
                 win.__crashReloads = recent;

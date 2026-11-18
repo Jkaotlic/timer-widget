@@ -30,7 +30,7 @@ const { formatTimeShort } = require('./utils');
  */
 function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flags, getTimerState, timer, creators, closing }) {
     const { handleTimerStart, handleTimerPause, handleTimerReset } = timer;
-    const { markClosing, cancelQueuedOpen } = closing;
+    const { toggleAuxWindow } = closing;
 
     // ============================================================================
     // System Tray
@@ -53,7 +53,7 @@ function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flag
             rebuildTrayMenu();
             updateTrayTime();
             tray.on('click', () => {
-                if (!windows.controlWindow) { creators.createControlWindow(); return; }
+                if (!windows.controlWindow || windows.controlWindow.isDestroyed()) { creators.createControlWindow(); return; }
                 if (windows.controlWindow.isVisible()) { windows.controlWindow.hide(); }
                 else { windows.controlWindow.show(); windows.controlWindow.focus(); }
             });
@@ -89,18 +89,16 @@ function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flag
             { label: 'Сбросить', click: () => { handleTimerReset(); updateTrayMenu(); }},
             { type: 'separator' },
             { label: 'Панель управления', click: () => {
-                if (!windows.controlWindow) { creators.createControlWindow(); return; }
+                if (!windows.controlWindow || windows.controlWindow.isDestroyed()) { creators.createControlWindow(); return; }
                 windows.controlWindow.show();
                 windows.controlWindow.focus();
             }},
             { label: 'Виджет', type: 'checkbox', checked: widgetOpen, click: () => {
-                if (windows.widgetWindow) { cancelQueuedOpen('widget'); markClosing(windows.widgetWindow).close(); }
-                else { creators.createWidgetWindow(); }
+                toggleAuxWindow('widget', windows.widgetWindow, creators.createWidgetWindow);
                 setTimeout(updateTrayMenu, 200);
             }},
             { label: 'Часы', type: 'checkbox', checked: clockOpen, click: () => {
-                if (windows.clockWidgetWindow) { cancelQueuedOpen('clock'); markClosing(windows.clockWidgetWindow).close(); }
-                else { creators.createClockWidgetWindow(); }
+                toggleAuxWindow('clock', windows.clockWidgetWindow, creators.createClockWidgetWindow);
                 setTimeout(updateTrayMenu, 200);
             }},
             { type: 'separator' },

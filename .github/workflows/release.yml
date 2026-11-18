@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Ворота уязвимостей ДО сборки: релиз с известной high/critical не
@@ -22,6 +22,8 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+      - name: Verify release tag and changelog
+        run: node scripts/release-notes.js "$GITHUB_REF_NAME" --out RELEASE_NOTES.md
       - name: npm audit (high и выше блокирует, dev включён)
         run: npm audit --audit-level=high
       - name: SBOM совпадает с lockfile
@@ -70,10 +72,18 @@ jobs:
         run: npm test
 
       - name: Build macOS Intel
-        run: npx electron-builder --mac --x64
+        run: npx electron-builder --mac --x64 --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Check documented minimum macOS against packaged Info.plist
+        run: |
+          plist=(dist/mac*/*.app/Contents/Info.plist)
+          minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist[0]}")
+          test "$minimum" = "$(node -p "require('./scripts/release-notes').MAC_MINIMUM")"
+
+      - name: Verify the packaged app
+        run: node scripts/verify-packed.js
 
       - name: Upload artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -82,6 +92,7 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
+          if-no-files-found: error
           retention-days: 5
 
   build-macos-arm:
@@ -109,11 +120,22 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run end-to-end tests on the tagged commit
+        run: npx playwright test
+
       - name: Build macOS ARM
-        run: npx electron-builder --mac --arm64
+        run: npx electron-builder --mac --arm64 --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Check documented minimum macOS against packaged Info.plist
+        run: |
+          plist=(dist/mac*/*.app/Contents/Info.plist)
+          minimum=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${plist[0]}")
+          test "$minimum" = "$(node -p "require('./scripts/release-notes').MAC_MINIMUM")"
+
+      - name: Verify the packaged app
+        run: node scripts/verify-packed.js
 
       - name: Upload artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -122,6 +144,7 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
+          if-no-files-found: error
           retention-days: 5
 
   build-windows:
@@ -149,10 +172,14 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run end-to-end tests on the tagged commit
+        run: npx playwright test
+
       - name: Build Windows
-        run: npx electron-builder --win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish never
+
+      - name: Verify the packaged app
+        run: node scripts/verify-packed.js
 
       - name: Upload artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -160,6 +187,7 @@ jobs:
           name: windows
           path: |
             dist/*.exe
+          if-no-files-found: error
           retention-days: 5
 
   build-linux:
@@ -187,10 +215,17 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Prepare Electron sandbox for the Linux runtime
+        run: |
+          node node_modules/electron/install.js
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      - name: Run end-to-end tests on the tagged commit
+        run: xvfb-run --auto-servernum npx playwright test
+
       - name: Build Linux
-        run: npx electron-builder --linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux --publish never
 
       # Проверяется ТОТ пакет, что уходит в релиз, а не соседняя сборка из CI:
       # песочница и профиль AppArmor видны только в готовом postinst.
@@ -235,15 +270,21 @@ jobs:
           output-format: table
           config: .grype.yaml
 
+      - name: Verify the packaged app
+        run: node scripts/verify-packed.js
+
       - name: Upload artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux
           path: |
             dist/*.deb
+          if-no-files-found: error
           retention-days: 5
 
   release:
+    permissions:
+      contents: write
     needs: [build-macos-intel, build-macos-arm, build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
@@ -254,8 +295,21 @@ jobs:
         with:
           path: artifacts
 
-      - name: List artifacts
-        run: find artifacts -type f | head -50
+      - name: Verify the seven downloads
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          expected=(
+            "macos-intel/TimerWidget-$version-x64.dmg"
+            "macos-intel/TimerWidget-$version-x64.zip"
+            "macos-arm/TimerWidget-$version-arm64.dmg"
+            "macos-arm/TimerWidget-$version-arm64.zip"
+            "windows/TimerWidget-Setup-$version.exe"
+            "windows/TimerWidget-Portable.exe"
+            "linux/TimerWidget-$version-amd64.deb"
+          )
+          cd artifacts
+          for file in "${expected[@]}"; do test -s "$file"; done
+          diff <(printf '%s\n' "${expected[@]}" | sort) <(find . -type f | sed 's|^\./||' | sort)
 
       # Описание релиза собирается из CHANGELOG.md, а не пишется здесь руками.
       # Раньше тело было захардкожено (~70 строк markdown) и к версии 2.4.0 врало:
@@ -264,7 +318,7 @@ jobs:
       # macOS «правый клик → Открыть». Текст, живущий отдельно от кода, расходится
       # с ним молча — тот же дефект, что была врущая справка внутри приложения.
       - name: Build release notes from CHANGELOG
-        run: node scripts/release-notes.js "${{ github.ref_name }}" --out RELEASE_NOTES.md
+        run: node scripts/release-notes.js "$GITHUB_REF_NAME" --out RELEASE_NOTES.md
 
       # Имена в файле — ПЛОСКИЕ, без папок артефактов: скачивают файлы по
       # одному в свой каталог, и `sha256sum -c SHA256SUMS.txt` с путями вида
@@ -289,6 +343,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           name: "TimerWidget ${{ github.ref_name }}"
+          fail_on_unmatched_files: true
           generate_release_notes: false
           body_path: RELEASE_NOTES.md
           draft: false

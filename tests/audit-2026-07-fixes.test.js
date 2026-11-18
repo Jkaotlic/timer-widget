@@ -181,7 +181,8 @@ test('ползунки масштаба совпадают по диапазон
     // Значение вне общего диапазона молча терялось при перезапуске.
     // Между id и границами диапазона могут стоять другие атрибуты (class
     // появился, когда инлайновые style= переехали в CSS) — важен сам диапазон.
-    assert.match(controlHtml, /id="displayTimerScale"[^>]*min="30"[^>]*max="300"/);
+    assert.match(controlHtml, /this\.displayTimerScaleEl\.min = String\(CONFIG\.MIN_TIMER_SCALE\)/);
+    assert.match(controlHtml, /this\.displayTimerScaleEl\.max = String\(CONFIG\.MAX_TIMER_SCALE\)/);
     assert.match(controlHtml, /id="timeBlocksScale"[^>]*min="50"[^>]*max="600"/);
 
     // У границы ОДИН владелец — атрибуты ползунка. Раньше их дублировали

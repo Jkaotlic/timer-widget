@@ -105,7 +105,11 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
     }
 
     function persistEventOverrun() {
-        OverrunStore.saveStore(getUserDataPath(), eventOverrun, log);
+        // A second restart must retain both the already-counted seconds and
+        // whether this talk belongs to the current event.
+        const resume = { excluded: excludedLiveSeconds, overrun: currentTalk.overrun, skip: currentTalk.skip };
+        const needsResume = !eventOverrun.finished && !talkClosedOnQuit && (resume.excluded || resume.overrun || resume.skip);
+        OverrunStore.saveStore(getUserDataPath(), needsResume ? { ...eventOverrun, resume } : eventOverrun, log);
     }
 
     /**
@@ -246,12 +250,12 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
         }
         // Таймер вышел из минуса — отсечка своё отработала, следующий доклад
         // считается целиком.
+        let changed = false;
         if (excludedLiveSeconds > 0 && MoneyMeter.overrunSeconds(state.remainingSeconds) <= 0) {
             excludedLiveSeconds = 0;
-            broadcastEventOverrun();
+            changed = true;
         }
 
-        let changed = false;
         if (liveOverrunSeconds > 0) {
             // Итог растёт СРАЗУ — он виден на экране. Доклад же свой перелимит
             // только копит: запись о нём появится, когда он кончится.
@@ -271,6 +275,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
                 eventOverrun = Object.assign({}, eventOverrun, { talks: appendTalk(currentTalk.overrun) });
                 changed = true;
             }
+            changed ||= currentTalk.skip || currentTalk.overrun > 0;
             currentTalk = freshTalk();
         }
         if (!changed) { return; }
@@ -296,14 +301,22 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
      */
     function foldPendingOnStart(restoredRemaining) {
         const folded = OverrunStore.foldPending(eventOverrun, { restoredRemaining });
+        const resume = folded.store.resume;
         eventOverrun = folded.store;
+        delete eventOverrun.resume;
         if (folded.resumed) {
             excludedLiveSeconds = folded.excludedLiveSeconds;
             currentTalk = folded.resumeTalk
                 ? Object.assign(freshTalk(), { active: true, elapsed: true, overrun: folded.resumeTalk.overrun })
                 : Object.assign(freshTalk(), { active: true, skip: true });
+        } else if (restoredRemaining !== null && !eventOverrun.finished) {
+            if (resume) {
+                excludedLiveSeconds = resume.excluded;
+                currentTalk = { active: true, elapsed: true, skip: resume.skip, overrun: resume.overrun };
+            }
+            liveOverrunSeconds = MoneyMeter.liveOverrun(restoredRemaining, excludedLiveSeconds);
         }
-        if (folded.changed) { persistEventOverrun(); }
+        if (folded.changed || (resume && restoredRemaining === null)) { persistEventOverrun(); }
     }
 
     function registerIpc(ipcMain) {

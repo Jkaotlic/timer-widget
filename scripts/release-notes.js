@@ -28,6 +28,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
+// Checked against the packaged Info.plist on both Mac release runners.
+const MAC_MINIMUM = '13.0';
 
 /**
  * Вырезает из CHANGELOG раздел одной версии: от её заголовка `## [X.Y.Z]` до
@@ -62,7 +64,8 @@ function footer(pkg) {
         rows.push('| Windows | `TimerWidget-Setup-*.exe` | Установщик, права администратора не нужны |');
     }
     if (pkg.build.win.target.includes('portable')) {
-        rows.push('| Windows | `TimerWidget-*-portable.exe` | Портативная версия, без установки |');
+        const filename = pkg.build.portable.artifactName.replace('${productName}', pkg.build.productName);
+        rows.push(`| Windows | \`${filename}\` | Портативная версия, без установки |`);
     }
     if (pkg.build.mac.target.includes('dmg')) {
         rows.push('| macOS Apple Silicon | `*-arm64.dmg` | Для M1 и новее |');
@@ -94,7 +97,7 @@ namespaces обычным пользователям.
 ## Требования
 
 - Windows 10/11 (x64)
-- macOS 11+ (Intel или Apple Silicon)
+- macOS ${MAC_MINIMUM}+ (Intel или Apple Silicon)
 - Linux (glibc 2.28+)
 
 Приложение работает **полностью офлайн**: шрифты лежат в пакете, звуки
@@ -141,6 +144,9 @@ function build(version) {
     const changelog = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
     const clean = String(version || pkg.version).replace(/^v/, '');
 
+    if (clean !== pkg.version) {
+        throw new Error(`версия тега ${clean} отличается от package.json (${pkg.version})`);
+    }
     const section = extractSection(changelog, clean);
     if (!section) {
         throw new Error(
@@ -192,4 +198,4 @@ if (require.main === module) {
     }
 }
 
-module.exports = { extractSection, footer, build };
+module.exports = { extractSection, footer, build, MAC_MINIMUM };

@@ -28,9 +28,13 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
     // то, что пришло сюда, а не то, что насчитали сами по outerWidth/screenX:
     // владелец геометрии — главный процесс, и на мониторе с масштабом ≠ 100 % его
     // DIP и CSS-пиксели рендерера — разные единицы (см. window-geometry.js).
-    function reportGeometry(win) {
+    function reportGeometry(win, requestedWidth = null) {
         if (!win || win.isDestroyed()) { return; }
-        safelySendToWindow(win, 'window-geometry', win.getBounds());
+        const bounds = win.getBounds();
+        if (Number.isFinite(requestedWidth) && requestedWidth > 0) {
+            bounds.requestedWidth = requestedWidth;
+        }
+        safelySendToWindow(win, 'window-geometry', bounds);
     }
 
     /**
@@ -125,7 +129,7 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
         const { bounds: screenBounds } = screen.getDisplayMatching(current);
 
         win.setBounds(fitScaledBounds(current, payload, screenBounds, { width: minWidth, height: minHeight }));
-        reportGeometry(win);
+        reportGeometry(win, payload.width);
     }
 
     // Shared position restore for a frameless widget window. Reads x/y from the

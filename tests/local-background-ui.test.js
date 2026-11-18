@@ -105,3 +105,14 @@ test('PANEL-008(б): пресет перечитывает локальный ф
     assert.ok(calls.includes('loadLocalBackground'), 'пресет не перечитывает контролы локального фона');
     assert.ok(calls.indexOf('loadLocalBackground') < calls.indexOf('pushDisplaySettings'));
 });
+
+test('профиль с неподходящим адресом скрывает старое превью', () => {
+    const h = harness({ localBgImage: 'https://example.com/image.png' });
+    withGlobals(h, (Mixin) => {
+        const panel = Object.assign({}, Mixin);
+        panel.showLocalBgPreview('data:image/png;base64,AAAA');
+        panel.loadLocalBackground();
+        assert.equal(h.els.localBgImage.src, '');
+        assert.equal(h.els.localBgImage.style.display, 'none');
+    });
+});

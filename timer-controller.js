@@ -367,13 +367,13 @@ function createTimerController(deps = {}) {
     // bump, no onState (nothing is listening yet at startup).
     function restoreState(partial = {}) {
         if (partial === null || typeof partial !== 'object') { return; }
-        if (partial.presetSeconds !== undefined) {
+        if (engine.isTimerSeconds(partial.presetSeconds)) {
             timerState.presetSeconds = partial.presetSeconds;
         }
-        if (Number.isFinite(partial.totalSeconds)) {
+        if (engine.isTimerSeconds(partial.totalSeconds)) {
             timerState.totalSeconds = partial.totalSeconds;
         }
-        if (Number.isFinite(partial.remainingSeconds)) {
+        if (engine.isTimerSeconds(partial.remainingSeconds, -engine.MAX_SECONDS)) {
             timerState.remainingSeconds = partial.remainingSeconds;
         }
     }

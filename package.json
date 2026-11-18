@@ -16,7 +16,7 @@
     "visual:audit": "node scripts/visual-audit.js",
     "visual:baseline": "node scripts/visual-baseline.js",
     "visual:check": "node scripts/run-electron.js --screenshot --visual-check",
-    "sbom": "node scripts/sbom-fresh-lockfile.js && npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format json --spec-version 1.5 && node scripts/sbom-normalize.js",
+    "sbom": "node scripts/sbom-fresh-lockfile.js && cyclonedx-npm --output-reproducible --output-file sbom.json --output-format json --spec-version 1.5 && node scripts/sbom-normalize.js",
     "notice": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/generate-notice.js",
     "csp:check": "node scripts/csp-guard.js",
     "preload:channels": "node scripts/preload-channels.js",
@@ -45,20 +45,38 @@
     "brace-expansion": "^5.0.12",
     "@xmldom/xmldom": "^0.8.15",
     "fast-uri": "^3.1.9",
-    "js-yaml": "^4.3.2"
+    "js-yaml": "^4.3.2",
+    "minimatch": "11.0.1",
+    "glob@7": {
+      "minimatch": "3.1.5"
+    },
+    "@electron/asar@3": {
+      "minimatch": "3.1.5"
+    },
+    "dir-compare@4": {
+      "minimatch": "3.1.5"
+    },
+    "filelist@1": {
+      "minimatch": "5.1.9"
+    },
+    "node-gyp@12.4.0": {
+      "tinyglobby": "$tinyglobby"
+    }
   },
   "devDependencies": {
+    "@cyclonedx/cyclonedx-npm": "7.0.1",
     "@electron/fuses": "^1.8.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "@types/node": "24.13.3",
-    "electron": "^44.10.1",
+    "electron": "44.11.4",
     "electron-builder": "^26.18.0",
     "eslint": "^10.14.0",
     "eslint-plugin-html": "^8.2.1",
     "fast-check": "^4.10.2",
     "globals": "^17.14.0",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "tinyglobby": "file:scripts/node-gyp-glob"
   },
   "build": {
     "appId": "com.timer.widget",
@@ -256,5 +274,6 @@
   },
   "dependencies": {
     "electron-log": "^5.4.4"
-  }
+  },
+  "comment:node-gyp-glob": "GHSA-fc5q-39xc-vjpf: node-gyp 12.4.0 uses tinyglobby only for build/*.sln and build/*.mk on Windows. Use Node 22 file globbing for those calls. Review the override when updating node-gyp and remove it when the upstream tree passes npm audit."
 }

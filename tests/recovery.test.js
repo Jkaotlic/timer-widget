@@ -103,3 +103,33 @@ test('saveTimerStateToFileSync: swallows errors on a bad path (best-effort, no t
         saveTimerStateToFileSync(badDir, { totalSeconds: 1, remainingSeconds: 1, presetSeconds: 1, isRunning: false }, null);
     });
 });
+
+test('each seconds field rejects fractions and out-of-range values', () => {
+    const { MAX_SECONDS } = require('../timer-engine');
+    const data = { savedAt: NOW, presetSeconds: MAX_SECONDS, totalSeconds: 0, remainingSeconds: -MAX_SECONDS };
+    assert.equal(isRecoveryValid(data, NOW), true);
+    for (const key of ['presetSeconds', 'totalSeconds', 'remainingSeconds']) {
+        for (const bad of [3.7, Infinity, MAX_SECONDS + 1, -MAX_SECONDS - 1]) {
+            assert.equal(isRecoveryValid({ ...data, [key]: bad }, NOW), false);
+        }
+    }
+    assert.equal(isRecoveryValid({ ...data, totalSeconds: -1 }, NOW), false);
+});
+
+test('failed removal is reported without the profile path and invalidates the old snapshot when possible', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-delete-snapshot-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const file = getRecoveryStatePath(dir);
+    saveTimerStateToFileSync(dir, { presetSeconds: 30, remainingSeconds: 10, totalSeconds: 30 });
+    const unlink = fs.unlinkSync.bind(fs);
+    t.mock.method(fs, 'unlinkSync', (target) => {
+        if (target === file) { throw Object.assign(new Error(file), { code: 'EACCES' }); }
+        unlink(target);
+    });
+    const warnings = [];
+    const ok = require('../recovery').clearSavedTimerState(dir, { warn: (...args) => warnings.push(args) });
+    assert.equal(ok, false);
+    assert.match(warnings.flat().join(' '), /EACCES/);
+    assert.ok(!warnings.flat().join(' ').includes(dir));
+    assert.equal(isRecoveryValid(JSON.parse(fs.readFileSync(file, 'utf8')), Date.now()), false);
+});
