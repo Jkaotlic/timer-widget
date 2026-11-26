@@ -14,7 +14,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test, expect } = require('./fixtures');
 const { readLedger, VOLATILE_KEYS } = require('./profile-guard');
-const { launchApp, USER_DATA_DIR } = require('./launch');
+const { launchApp } = require('./launch');
+const { getUserDataDir } = require('./run-profile');
 const { RELAY_STATE_FILE } = require('../relay-store.js');
 
 test('каждый тест вернул общий профиль таким, каким получил', async () => {
@@ -46,7 +47,7 @@ test('память ретрансляторов main не переживает �
     // Сторож удаляет файл после закрытия. Проверка на себе: пока приложение
     // живо, файл ЕСТЬ (панель прислала настройки, склейка их записала) —
     // иначе «файла нет» значило бы и «удалён», и «не писался вовсе».
-    const file = path.join(USER_DATA_DIR, RELAY_STATE_FILE);
+    const file = path.join(getUserDataDir(), RELAY_STATE_FILE);
     const { app } = await launchApp();
     await expect.poll(() => fs.existsSync(file), {
         message: 'живое приложение не записало relay-state.json — проверка ниже ничего не докажет'

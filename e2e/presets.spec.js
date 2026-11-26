@@ -1,7 +1,7 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
 const {
-    waitForDisplay, waitForDisplaySettled, waitForDrawerBeside, reloadPanel, waitForTransitions
+    waitForWidget, waitForWindowSettled, waitForDisplay, waitForDisplaySettled, waitForDrawerBeside, reloadPanel, waitForTransitions
 } = require('./window-ready');
 
 /**
@@ -268,6 +268,20 @@ test('ячейка помечается применённой и гаснет, 
         expect(back[1].active, 'применённый вид не помечен').toBe(true);
         expect(back[1].bg, 'заливка не вернулась').toBe(saved[1].bg);
         expect(back.caption).toContain('1');
+
+        // Колесо меняет профиль через scale-report. Панель должна сразу снять отметку.
+        await control.evaluate(() => window.ipcRenderer.send('open-widget'));
+        const widget = await waitForWidget(app);
+        await waitForWindowSettled(app, widget, 'electron-widget.html');
+        await expect(control.locator('#presetSlot1')).toHaveClass(/\bactive\b/);
+        const beforeScale = await control.locator('#timerScale').inputValue();
+        const direction = Number(beforeScale) >= 300 ? 120 : -120;
+        await widget.evaluate((deltaY) => document.dispatchEvent(new WheelEvent('wheel', {
+            deltaY, ctrlKey: true, bubbles: true, cancelable: true
+        })), direction);
+        await expect(control.locator('#timerScale')).not.toHaveValue(beforeScale);
+        await expect(control.locator('#presetSlot1')).not.toHaveClass(/\bactive\b/);
+
     } finally {
         await control.evaluate(() => {
             localStorage.removeItem('uiPresets');

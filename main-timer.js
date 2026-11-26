@@ -19,10 +19,10 @@ const { isPayloadObject } = require('./relay-payload');
 
 /**
  * @param {object} deps
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.CONFIG
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {typeof import('./constants.js')} deps.CONFIG
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {(state: object) => void} deps.accrueOverrun — учёт перелимита (main-event-overrun.js)
+ * @param {(state: TimerState) => void} deps.accrueOverrun — учёт перелимита (main-event-overrun.js)
  * @param {() => void} deps.persistRecoverySnapshot — снимок восстановления (main-recovery.js)
  * @param {() => void} deps.updateTrayMenu — трей (main-tray.js)
  */
@@ -36,6 +36,7 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
     // via the onState callback so the rest of the main process (tray, recovery, IPC
     // reply, window-open snapshots) can read it synchronously exactly as before —
     // через getState() этого модуля.
+    /** @type {TimerState} */
     let timerState = {
         totalSeconds: 0,
         remainingSeconds: 0,
@@ -46,8 +47,10 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
         timestamp: Date.now(),
         updateCounter: 0  // Монотонный счетчик для надежной синхронизации
     };
+    /** @type {ReturnType<typeof setTimeout> | null} */
     let timerInterval = null;
 
+    /** @param {import('./timer-engine.js').TimerEvent} eventName */
     function broadcastEvent(eventName) {
         safelySendToWindow(windows.controlWindow, eventName);
         safelySendToWindow(windows.widgetWindow, eventName);
@@ -112,6 +115,7 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
     // Thin wrapper preserved so the screenshot-runner's applyTimerState and any
     // other caller keep working. Delegates to the controller's patch() (which owns
     // the counter bump + stamping + the onState broadcast above).
+    /** @param {Partial<TimerState>} [partial] */
     function emitTimerState(partial = {}) {
         timerController.patch(partial);
     }
@@ -158,6 +162,8 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
      * Linux), поэтому сон controller засчитывает сам: suspend запоминает обе
      * пары часов, resume добавляет разницу (BUG-03). После пробуждения сразу
      * сверяемся — setInterval во сне не тикал. Safe no-op when stopped.
+     * @param {import('electron').PowerMonitor} powerMonitor
+     * @param {Pick<import('electron-log').LogFunctions, 'warn'>} log
      */
     function bindPowerMonitor(powerMonitor, log) {
         try {
@@ -173,6 +179,7 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
      * Восстановление после сбоя: снимок (preset always, total/remaining only
      * when finite) — в controller. No emit/counter bump — nothing is listening
      * yet. Автостарта нет: таймер просто показывает, где его прервали.
+     * @param {import('./timer-controller.js').RecoveryTimes} saved
      */
     function restoreState(saved) {
         timerController.restoreState({
@@ -183,6 +190,7 @@ function createTimer({ windows, CONFIG, safelySendToWindow, accrueOverrun, persi
         timerState = timerController.getState();
     }
 
+    /** @param {ReturnType<typeof import('./ipc-senders.js').guardIpcMain>} ipcMain */
     function registerIpc(ipcMain) {
         // IPC обработчики для синхронизации
         ipcMain.on('timer-command', (_event, payload) => {

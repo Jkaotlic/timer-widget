@@ -1,26 +1,29 @@
 'use strict';
 
-/**
- * Одна подготовка на весь прогон: каталог профиля сносится и создаётся заново.
- *
- * Иначе прогон зависит от того, что оставил после себя предыдущий: тесты пишут
- * в общий localStorage (стиль часов, шильдики, геометрия окон), а снимок
- * восстановления вообще переживает выход по замыслу. Без чистки «зелено» могло
- * означать «повезло с остатками», а первый прогон на свежей машине падал.
- *
- * Чистим ЗДЕСЬ, а не в launch.js: каталог обязан быть один на прогон —
- * e2e/crash-recovery.spec.js перезапускает приложение и ждёт, что снимок
- * останется на месте.
- */
-
-const fs = require('fs');
-const { USER_DATA_DIR } = require('./launch');
-const { resetLedger } = require('./profile-guard');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { RUN_PROFILE_ENV } = require('./run-profile');
 
 module.exports = function globalSetup() {
-    fs.rmSync(USER_DATA_DIR, { recursive: true, force: true });
-    fs.mkdirSync(USER_DATA_DIR, { recursive: true });
-    // Журнал сторожа профиля — тоже на прогон: утечки прошлого прогона не наши.
-    resetLedger();
-    console.log(`[e2e] профиль тестов: ${USER_DATA_DIR}`);
+    // Воркеры и повторные запуски Electron наследуют один профиль прогона.
+    // При параллельном прогоне mkdtemp создаёт другой каталог.
+    const previousProfile = process.env[RUN_PROFILE_ENV];
+    const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-widget-e2e-'));
+    process.env[RUN_PROFILE_ENV] = profile;
+    console.log(`[e2e] профиль тестов: ${profile}`);
+
+    return () => {
+        try {
+            fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5 });
+        } finally {
+            if (process.env[RUN_PROFILE_ENV] === profile) {
+                if (previousProfile === undefined) {
+                    delete process.env[RUN_PROFILE_ENV];
+                } else {
+                    process.env[RUN_PROFILE_ENV] = previousProfile;
+                }
+            }
+        }
+    };
 };

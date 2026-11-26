@@ -112,7 +112,7 @@ Rules when working here:
 ## Code Style
 
 - 2-space indentation, single quotes, camelCase for variables/functions, UPPER_CASE for constants
-- ESLint 9 with flat config (`eslint.config.js`) enforces `eqeqeq: always` and `curly: always`
+- ESLint 10 with flat config (`eslint.config.js`) enforces `eqeqeq: always` and `curly: always`
 - Unused variables prefixed with `_` are allowed (`argsIgnorePattern: '^_'`)
 
 ## Security
@@ -159,7 +159,7 @@ GitHub Actions, Node 22. Что делает каждый job, пороги ск
 
 | Job | What |
 |-----|------|
-| `build` | `npm run ci` + `visual:check` под xvfb (`chmod 4755` на `chrome-sandbox`, иначе код 133) |
+| `build` | `npm run ci` + съёмка окон под xvfb (`chmod 4755` на `chrome-sandbox`, иначе код 133) |
 | `e2e` | ubuntu + windows + macos, the ONLY real Electron runtime |
 | `pack` | `electron-builder --dir` + `verify-packed.js` on the real `app.asar` |
 | `linux-sandbox` | builds the deb once, `verify-linux-sandbox.js`, uploads it |

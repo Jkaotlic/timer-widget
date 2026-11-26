@@ -68,7 +68,7 @@ function safeParseObject(raw) {
  * Значения полей с кастомными подписями блоков.
  *
  * @param {Document} doc
- * @returns {object} ключ настройки → введённая строка (как есть)
+ * @returns {any} ключ настройки → введённая строка (как есть)
  *
  * Обрезкой и подстановкой умолчания занимается ДИСПЛЕЙ (blockCaption): панель
  * хранит ровно то, что человек напечатал, иначе его собственный текст
@@ -87,7 +87,7 @@ function collectBlockLabels(doc) {
  * Значения всех тумблеров дисплея одним объектом.
  *
  * @param {Document} doc
- * @returns {object} ключ → boolean; отсутствующий контрол пропускается
+ * @returns {any} ключ → boolean; отсутствующий контрол пропускается
  */
 function collectDisplayToggles(doc) {
     const out = {};
@@ -107,7 +107,7 @@ function collectDisplayToggles(doc) {
  * значит «без изменений», пустая строка — «картинки нет». Главный процесс
  * помнит последнюю и досылает её окну, открытому позже; дисплей держит копию.
  *
- * @param {object} settings — собираемый payload (дополняется на месте)
+ * @param {any} settings — собираемый payload (дополняется на месте)
  * @param {string} image — картинка, которую дисплей должен показывать сейчас
  * @param {string|undefined} lastSent — последняя отправленная
  * @returns {string} новая «последняя отправленная»
@@ -707,12 +707,12 @@ const PanelDisplayMixin = {
         // чем эта секция появляется в документе.
         const ipc = window.ipcRenderer;
         if (ipc) {
-            ipc.on('event-overrun-state', (_event, payload) => {
+            this._handlers.eventOverrunState = ipc.on('event-overrun-state', (_event, payload) => {
                 if (!payload || typeof payload !== 'object') { return; }
                 this.eventOverrunState = payload;
                 this.renderEventStatus();
             });
-            ipc.on('timer-state', (_event, state) => {
+            this._handlers.eventTimerState = ipc.on('timer-state', (_event, state) => {
                 if (!state || typeof state !== 'object') { return; }
                 this.eventRemainingSeconds = state.remainingSeconds;
                 this.renderEventStatus();
@@ -782,7 +782,7 @@ const PanelDisplayMixin = {
         // Ответ обязателен в любом исходе: кнопка, после которой ничего не
         // происходит и ничего не сказано, читается как сломанное окно. Отмена
         // диалога — не событие: человек передумал, и тост об этом был бы шумом.
-        window.ipcRenderer.on('event-export-done', (_event, result) => {
+        this._handlers.eventExportDone = window.ipcRenderer.on('event-export-done', (_event, result) => {
             const answer = result || {};
             if (answer.canceled) { return; }
             if (answer.ok) {

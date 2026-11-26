@@ -237,3 +237,15 @@ test('удалённый «Чирп» не остался ни в банке, н
     assert.equal(inRegistry('chirp'), false, '«Чирп» вернулся в реестр');
     assert.equal(BUILT_IN_PRESETS.includes('chirp'), false, '«Чирп» вернулся в банк');
 });
+
+test('повтор сигнала использует готовые буферы своего аудиоконтекста', () => {
+    const ctx = fakeContext();
+    playBuiltInPreset(ctx, 'minute-mark');
+    const allocated = ctx.stats.buffers;
+    assert.ok(allocated > 0);
+    playBuiltInPreset(ctx, 'minute-mark');
+    assert.equal(ctx.stats.buffers, allocated);
+    const next = fakeContext();
+    playBuiltInPreset(next, 'minute-mark');
+    assert.equal(next.stats.buffers, allocated);
+});

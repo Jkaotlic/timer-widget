@@ -20,23 +20,12 @@
  */
 
 const path = require('path');
-const os = require('os');
 const { _electron: electron } = require('playwright');
 const profileGuard = require('./profile-guard');
+const { getUserDataDir } = require('./run-profile');
 const { track } = require('./failure-artifacts');
 
 const MAIN = path.join(__dirname, '..', 'electron-main.js');
-
-/**
- * Каталог профиля — ОДИН на весь прогон и намеренно ВНЕ репозитория.
- *
- * Имя фиксированное, а не уникальное на каждый launch: e2e/crash-recovery.spec.js
- * убивает приложение SIGKILL и поднимает заново, ожидая, что снимок
- * восстановления (он лежит в userData) переживёт перезапуск. Каталог на запуск
- * сделал бы этот тест бессмысленно зелёным-наоборот — восстанавливать всегда
- * было бы нечего. Чистит каталог globalSetup, ровно один раз перед прогоном.
- */
-const USER_DATA_DIR = path.join(os.tmpdir(), 'timer-widget-e2e-profile');
 
 function cleanEnv(extra = {}) {
     const env = { ...process.env, ...extra };
@@ -55,7 +44,7 @@ async function launchApp(opts = {}) {
         // --user-data-dir читает сам Chromium из командной строки, до app.ready,
         // поэтому app.getPath('userData') указывает уже сюда — подменять пути
         // изнутри electron-main.js не нужно.
-        args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`, ...(opts.args || [])],
+        args: [MAIN, `--user-data-dir=${getUserDataDir()}`, ...(opts.args || [])],
         env: cleanEnv(opts.env)
     });
     // Журнал полноэкранных входов (ревью CI-правки, R1): на macOS флаг
@@ -155,4 +144,4 @@ async function waitForControlWindow(app, timeout = 20000) {
     }
 }
 
-module.exports = { launchApp, waitForControlWindow, waitForStartupPush, cleanEnv, MAIN, USER_DATA_DIR };
+module.exports = { launchApp, waitForControlWindow, waitForStartupPush, cleanEnv, MAIN };

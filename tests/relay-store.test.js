@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const RelayStore = require('../relay-store');
 const { createRelayMemory } = require('../main-state');
@@ -180,13 +181,31 @@ test('слишком большой файл не читается в памят
     assert.ok(log.lines.some((l) => l.level === 'warn'));
 });
 
+test('именованный канал вместо файла настроек не блокирует старт', { skip: process.platform === 'win32' }, (t) => {
+    const dir = tempDir();
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const fifo = spawnSync('mkfifo', [RelayStore.getRelayStatePath(dir)], { encoding: 'utf8' });
+    assert.equal(fifo.status, 0, fifo.error?.message || fifo.stderr);
+
+    const child = spawnSync(process.execPath, ['-e', `
+        const relay = {};
+        const { loadRelayState } = require(process.argv[1]);
+        loadRelayState(process.argv[2], relay, console);
+        process.stdout.write(JSON.stringify(relay));
+    `, require.resolve('../relay-store'), dir], { encoding: 'utf8', timeout: 2000 });
+    assert.ifError(child.error);
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(child.stdout, '{}');
+    assert.match(child.stderr, /relay-state.*EFBIG/);
+});
+
 test('проверка отсутствия проверяет сама себя: тот же разбор ПРИНИМАЕТ верное значение', () => {
     // Без этой пары зелёный «тема neon отвергнута» значил бы и «правило работает»,
     // и «разбор не принимает ничего».
-    const accepted = RelayStore.parseRelayState(JSON.stringify({
+    const accepted = RelayStore.sanitizeRelayState({
         version: RelayStore.RELAY_STATE_VERSION,
         relay: { lastWidgetStyle: { alwaysOnTop: false }, lastClockSettings: { showDate: true, showTicks: true } }
-    }));
+    });
     assert.deepEqual(accepted, {
         lastWidgetStyle: { alwaysOnTop: false }, lastClockSettings: { showDate: true, showTicks: true }
     });

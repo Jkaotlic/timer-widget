@@ -90,6 +90,19 @@ test('версия Electron читается из бинаря', () => {
     assert.deepEqual(gate.electronVersionInBinary(Buffer.from('ничего')), []);
 });
 
+test('lockfile сохраняет все нативные пакеты TypeScript для чистой установки на других ОС', () => {
+    const { packages } = JSON.parse(fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8'));
+    const optional = Object.entries(packages['node_modules/typescript'].optionalDependencies || {});
+    assert.ok(optional.length > 0, 'пакет TypeScript должен объявлять нативные компиляторы');
+    for (const [name, version] of optional) {
+        const entry = packages[`node_modules/${name}`];
+        assert.ok(entry, `lockfile потерял ${name}`);
+        assert.equal(entry.version, version, name);
+        assert.equal(entry.optional, true, name);
+        assert.ok(entry.integrity && entry.cpu?.length && entry.os?.length, name);
+    }
+});
+
 test('последний патч ищется в своей мажорной линии, пререлизы не считаются', () => {
     const v = ['43.9.9', '44.1.1', '44.4.5', '44.10.0', '45.0.0-alpha.1', '45.0.0'];
     assert.equal(gate.latestInMajor(v, '44.1.1'), '44.10.0');

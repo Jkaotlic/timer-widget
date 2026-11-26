@@ -84,6 +84,21 @@ async function until(cond) {
     assert.ok(cond(), 'условие не наступило');
 }
 
+test('при сбое подготовки хранилища старт продолжается, в журнале остаётся код ошибки', async () => {
+    const h = makeDeps();
+    const logged = [];
+    h.deps.log.error = (...parts) => logged.push(parts.join(' '));
+    h.deps.prepareStorage = async () => {
+        throw Object.assign(new Error('open failed: /example/profile'), { code: 'EIO' });
+    };
+
+    startApp(h.deps);
+    await until(() => h.createdCount() === 1);
+    const messages = logged.join('\n');
+    assert.doesNotMatch(messages, /\/example\/profile/);
+    assert.match(messages, /перенос настроек.*EIO/);
+});
+
 test('MAIN-06: activate (клик по Dock) показывает спрятанную в трей панель', async () => {
     const h = makeDeps();
     startApp(h.deps);
@@ -208,3 +223,77 @@ test('проверка второго экземпляра проверяет с
     h.appHandlers.get('before-quit')({ preventDefault() {} });
     assert.deepEqual(touched, ['clearSavedTimerState']);
 });
+
+test('repeated quit waits through the fullscreen transition and quits once', async (t) => {
+    const h = makeDeps();
+    startApp(h.deps);
+    await until(() => h.appHandlers.has('activate'));
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const display = new (require('node:events').EventEmitter)();
+    let fullscreen = true;
+    display.isDestroyed = () => false;
+    display.isFullScreen = () => fullscreen;
+    display.setFullScreen = (value) => { fullscreen = value; };
+    h.windows.displayWindow = display;
+    const quit = h.appHandlers.get('before-quit');
+    let prevented = 0;
+    const event = { preventDefault: () => { prevented++; } };
+    let retries = 0;
+    h.deps.app.quit = () => { retries++; quit(event); };
+    quit(event);
+    quit(event);
+    display.emit('leave-full-screen');
+    quit(event);
+    assert.equal(prevented, 3);
+    assert.equal(h.deps.flags.isQuitting, false);
+    t.mock.timers.tick(3000);
+    assert.equal(retries, 1);
+    assert.equal(h.deps.flags.isQuitting, true);
+});
+
+test('macOS keeps counting across last-window close and recreates a destroyed panel', async () => {
+    const h = makeDeps();
+    let stopped = false;
+    h.deps.timer.clearTimerInterval = () => { stopped = true; };
+    startApp(h.deps);
+    await until(() => h.appHandlers.has('activate'));
+    h.windows.controlWindow.isDestroyed = () => true;
+    h.appHandlers.get('window-all-closed')();
+    h.appHandlers.get('activate')();
+    assert.equal(stopped, false);
+    assert.equal(h.createdCount(), 2);
+});
+
+for (const quitFirst of [false, true]) {
+    test('display close and app quit share one fullscreen exit, quitFirst=' + quitFirst, async (t) => {
+        const h = makeDeps();
+        startApp(h.deps);
+        await until(() => h.appHandlers.has('activate'));
+        t.mock.timers.enable({ apis: ['setTimeout'] });
+        const display = new (require('node:events').EventEmitter)();
+        let fullscreen = true;
+        let transitions = 0;
+        let closes = 0;
+        display.isFullScreen = () => fullscreen;
+        display.isDestroyed = () => false;
+        display.setFullScreen = (value) => { transitions++; fullscreen = value; };
+        display.close = () => { closes++; };
+        h.windows.displayWindow = display;
+        const closing = require('../main-window-closing').createWindowClosing({ windows: h.windows });
+        let prevented = 0;
+        const event = { preventDefault: () => { prevented++; } };
+        const quit = () => h.appHandlers.get('before-quit')(event);
+        h.deps.app.quit = quit;
+        if (quitFirst) { quit(); closing.closeDisplayWindow(); }
+        else { closing.closeDisplayWindow(); quit(); }
+        quit();
+        assert.equal(prevented, 2);
+        assert.equal(transitions, 1);
+        assert.equal(closes, 0);
+        assert.equal(h.deps.flags.isQuitting, false);
+        display.emit('leave-full-screen');
+        t.mock.timers.tick(120);
+        assert.equal(closes, 1);
+        assert.equal(h.deps.flags.isQuitting, true);
+    });
+}

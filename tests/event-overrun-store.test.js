@@ -247,3 +247,41 @@ test('BUG-04: без pending свёртка ничего не меняет', () 
     assert.strictEqual(out.resumeTalk, null);
     assert.strictEqual(out.changed, false);
 });
+
+test('recovered overtime can be reset or closed before the panel sends any settings', (t) => {
+    const { createEventOverrun } = require('../main-event-overrun');
+    for (const end of ['quit', 'reset']) {
+        for (const scenario of ['ordinary', 'new event', 'finished', 'folded pending']) {
+            const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-recovered-talk-'));
+            t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+            let state = { remainingSeconds: -20, totalSeconds: 60, isRunning: true };
+            function boot(remaining) {
+                const handlers = new Map();
+                const events = createEventOverrun({ windows: {}, relay: {}, getTimerState: () => state,
+                    safelySendToWindow: () => {}, getUserDataPath: () => dir, log: {}, dialog: {} });
+                events.registerIpc({ on: (key, fn) => handlers.set(key, fn) });
+                events.loadOnStart();
+                events.foldPendingOnStart(remaining);
+                return { events, handlers };
+            }
+            const first = boot(null);
+            first.events.accrueOverrun(state);
+            if (scenario === 'new event') { first.handlers.get('event-reset')(); }
+            if (scenario === 'finished') { first.handlers.get('event-finish')(); }
+            if (scenario === 'folded pending') {
+                first.events.persistPendingOverrun();
+                boot(-20); // restart a second time after pending was folded
+            }
+
+            state = { remainingSeconds: -30, totalSeconds: 60, isRunning: false };
+            const { events } = boot(-30);
+            if (end === 'quit') { events.closeTalkOnQuit(); }
+            else { events.accrueOverrun({ remainingSeconds: 60, totalSeconds: 60 }); }
+            const store = Store.loadStore(dir);
+            const expected = scenario === 'new event' ? 10 : scenario === 'finished' ? 20 : 30;
+            assert.equal(store.overrunSeconds, expected, end + ' ' + scenario);
+            assert.deepEqual(store.talks.map((talk) => talk.overrunSeconds),
+                scenario === 'new event' ? [] : [expected], end + ' ' + scenario);
+        }
+    }
+});

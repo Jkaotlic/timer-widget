@@ -355,7 +355,7 @@ function collectSettings(doc) {
  *
  * @param {'widget'|'clock'|'display'} owner
  * @param {Document} [doc]
- * @returns {Object} применённые значения (ключ → значение по умолчанию)
+ * @returns {any} применённые значения (ключ → значение по умолчанию)
  */
 /**
  * Общая механика сброса: «как вернуть контрол к умолчанию» знает ОДНО место.

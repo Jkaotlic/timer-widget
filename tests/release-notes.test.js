@@ -65,10 +65,10 @@ test('описание для текущей версии собирается �
     assert.equal(build(`v${PKG.version}`), notes, 'тег с префиксом v даёт другой результат');
 });
 
-test('отсутствие раздела в CHANGELOG — это ошибка, а не пустой релиз', () => {
+test('тег другой версии отклоняется до выпуска', () => {
     assert.throws(
-        () => build('0.0.1-нет-такой'),
-        /нет раздела для версии/,
+        () => build('v2.12.2'),
+        /отличается от package.json/,
         'генератор обязан падать, а не выпускать релиз с пустым описанием'
     );
 });
@@ -77,7 +77,7 @@ test('таблица загрузок соответствует реальны�
     const notes = build(PKG.version);
     const targets = {
         'TimerWidget-Setup': PKG.build.win.target.includes('nsis'),
-        'portable.exe': PKG.build.win.target.includes('portable'),
+        'TimerWidget-Portable.exe': PKG.build.win.target.includes('portable'),
         'arm64.dmg': PKG.build.mac.target.includes('dmg'),
         '*.deb': PKG.build.linux.target.includes('deb'),
         '*.AppImage': PKG.build.linux.target.includes('AppImage')

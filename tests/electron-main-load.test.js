@@ -221,7 +221,7 @@ function createStubs({ userDataDir: givenUserDataDir } = {}) {
         Tray: class { setToolTip() {} setContextMenu() {} on() {} },
         nativeImage: { createFromPath: () => ({ isEmpty: () => true }), createEmpty: () => ({}) },
         powerMonitor: { on: noop },
-        session: { defaultSession: {} },
+        session: { defaultSession: { clearStorageData: async () => {}, clearCache: async () => {} } },
         // Схема app:// (SEC-12): привилегии регистрируются при загрузке модуля,
         // обработчик — в whenReady (здесь он не наступает).
         protocol: {
@@ -2145,4 +2145,65 @@ test('чистый профиль: файла нет — окна открыва
     widget.webContents.emit('did-finish-load');
     assert.equal(lastSentTo(stubs, widget, 'ui-theme-update'), null);
     assert.equal(lastSentTo(stubs, widget, 'ui-lock-update'), null);
+});
+
+test('profile reset reports a relay deletion error and can be retried', async (t) => {
+    const stubs = createStubs();
+    const warnings = [];
+    let exits = 0;
+    stubs.electron.app.quit = () => { exits++; };
+    stubs.electron.dialog = { showErrorBox: (...args) => warnings.push(args) };
+    loadMain(stubs);
+    const file = path.join(stubs.userDataDir, 'relay-state.json');
+    const remove = fs.unlinkSync.bind(fs);
+    const mock = t.mock.method(fs, 'unlinkSync', (target) => {
+        if (target === file) { throw Object.assign(new Error(file), { code: 'EACCES' }); }
+        remove(target);
+    });
+    const reset = stubs.ipcRaw.get('reset-and-relaunch');
+    const event = eventFrom(openControl(stubs));
+    await reset(event);
+    assert.equal(exits, 0);
+    assert.equal(warnings.length, 1);
+    assert.ok(!warnings.flat().join(' ').includes(file));
+    mock.mock.restore();
+    await reset(event);
+    assert.ok(await until(() => exits === 1));
+});
+
+test('a failed asynchronous profile reset resumes relay writes and serializes retries', async () => {
+    const dir = firstLifeWithSettings();
+    const file = path.join(dir, 'relay-state.json');
+    const stubs = createStubs({ userDataDir: dir });
+    let rejectClear;
+    let clears = 0;
+    let exits = 0;
+    const errors = [];
+    stubs.electron.app.quit = () => { exits++; };
+    stubs.electron.dialog = { showErrorBox: (...args) => errors.push(args) };
+    stubs.electron.session.defaultSession.clearStorageData = () => {
+        clears++;
+        return new Promise((_resolve, reject) => { rejectClear = reject; });
+    };
+    loadMain(stubs);
+    const reset = stubs.ipcRaw.get('reset-and-relaunch');
+    const event = eventFrom(openControl(stubs));
+    const first = reset(event);
+    await reset(event);
+    assert.equal(clears, 1);
+    assert.ok(!fs.existsSync(file));
+    stubs.ipcHandlers.get('widget-style-update')(null, { style: 'analog' });
+    rejectClear(new Error('clear failed'));
+    await first;
+    assert.equal(exits, 0);
+    assert.equal(errors.length, 1);
+    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).relay.lastWidgetStyle.style, 'analog');
+    stubs.ipcHandlers.get('widget-style-update')(null, { style: 'circle' });
+    stubs.appHandlers.get('will-quit')();
+    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).relay.lastWidgetStyle.style, 'circle');
+    stubs.electron.session.defaultSession.clearStorageData = async () => { clears++; };
+    await reset(event);
+    assert.equal(clears, 2);
+    assert.equal(exits, 1);
+    assert.ok(!fs.existsSync(file));
 });

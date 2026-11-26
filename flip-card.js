@@ -134,7 +134,7 @@ function flipCardTo(card, digitSelector, value, opts = {}) {
     // контейнер слоёв непрозрачен и закрывает её целиком, а обе половины
     // табло рисуют слои (см. buildFlipLayers).
     digit.textContent = next;
-    const layers = buildFlipLayers(digit, prev, next);
+    const layers = buildFlipLayers(/** @type {HTMLElement} */ (digit), prev, next);
     card.classList.add(FLIP_CLASS);
 
     const id = setTimeout(() => {

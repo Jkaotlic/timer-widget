@@ -70,7 +70,7 @@ function isPrimitive(value) {
 /**
  * @param {string} channel
  * @param {unknown} payload
- * @returns {object|string|null} проверенная копия или null — «не принимать»
+ * @returns {any} проверенная копия или null — «не принимать»
  */
 function sanitizeRelayPayload(channel, payload) {
     if (channel === 'clock-widget-set-style') {
@@ -137,6 +137,10 @@ function withoutBgImage(settings) {
  * payload: `payload = {}` спасает только от undefined, а явный null доходил до
  * деструктуризации и ронял обработчик. Живёт здесь, а не в одном из модулей
  * main-*.js, потому что её зовут все: геометрия, таймер, окна, ретрансляторы.
+ */
+/**
+ * @param {unknown} payload
+ * @returns {payload is Record<string, unknown>}
  */
 function isPayloadObject(payload) {
     return payload !== null && typeof payload === 'object';

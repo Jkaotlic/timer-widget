@@ -21,6 +21,7 @@ const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
 
 /** Покой: остаток равен тоталу, таймер не идёт и не на паузе. Так выглядят и сброс, и новый пресет. */
+/** @param {import('./timer-engine.js').TimerEngineState | null} state */
 function isAtRest(state) {
     return !!state && !state.isRunning && !state.isPaused && !state.finished
         && Number(state.remainingSeconds) === Number(state.totalSeconds);
@@ -28,14 +29,14 @@ function isAtRest(state) {
 
 /**
  * @param {object} deps
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.relay — память ретрансляторов (main-state.js): ставка,
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {ReturnType<typeof import('./main-state.js').createRelayMemory>} deps.relay — память ретрансляторов (main-state.js): ставка,
  *        период и название мероприятия лежат в lastDisplaySettings
- * @param {() => object} deps.getTimerState — зеркало состояния таймера
+ * @param {() => TimerState} deps.getTimerState — зеркало состояния таймера
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {object} deps.log
+ * @param {import('electron-log').LogFunctions} deps.log
  * @param {() => string} deps.getUserDataPath — app.getPath('userData')
- * @param {object} deps.dialog — electron.dialog (метод зовётся на объекте:
+ * @param {import('electron').Dialog} deps.dialog — electron.dialog (метод зовётся на объекте:
  *        e2e подменяет showSaveDialog прямо на нём)
  */
 function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow, log, getUserDataPath, dialog }) {
@@ -105,7 +106,11 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
     }
 
     function persistEventOverrun() {
-        OverrunStore.saveStore(getUserDataPath(), eventOverrun, log);
+        // A second restart must retain both the already-counted seconds and
+        // whether this talk belongs to the current event.
+        const resume = { excluded: excludedLiveSeconds, overrun: currentTalk.overrun, skip: currentTalk.skip };
+        const needsResume = !eventOverrun.finished && !talkClosedOnQuit && (resume.excluded || resume.overrun || resume.skip);
+        OverrunStore.saveStore(getUserDataPath(), needsResume ? { ...eventOverrun, resume } : eventOverrun, log);
     }
 
     /**
@@ -140,6 +145,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
     }
     let currentTalk = freshTalk();
 
+    /** @param {TimerState} state */
     function trackTalk(state) {
         if (state.isRunning) { currentTalk.active = true; }
         if (currentTalk.active && Number(state.remainingSeconds) < Number(state.totalSeconds)) {
@@ -235,6 +241,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
         OverrunStore.saveStore(getUserDataPath(), Object.assign({}, eventOverrun, { pending }), log);
     }
 
+    /** @param {TimerState} state */
     function accrueOverrun(state) {
         trackTalk(state);
         // Считается перелимит ЗА ВЫЧЕТОМ отсечки: секунды, натикавшие до «Нового
@@ -246,12 +253,12 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
         }
         // Таймер вышел из минуса — отсечка своё отработала, следующий доклад
         // считается целиком.
+        let changed = false;
         if (excludedLiveSeconds > 0 && MoneyMeter.overrunSeconds(state.remainingSeconds) <= 0) {
             excludedLiveSeconds = 0;
-            broadcastEventOverrun();
+            changed = true;
         }
 
-        let changed = false;
         if (liveOverrunSeconds > 0) {
             // Итог растёт СРАЗУ — он виден на экране. Доклад же свой перелимит
             // только копит: запись о нём появится, когда он кончится.
@@ -271,6 +278,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
                 eventOverrun = Object.assign({}, eventOverrun, { talks: appendTalk(currentTalk.overrun) });
                 changed = true;
             }
+            changed ||= currentTalk.skip || currentTalk.overrun > 0;
             currentTalk = freshTalk();
         }
         if (!changed) { return; }
@@ -296,16 +304,25 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
      */
     function foldPendingOnStart(restoredRemaining) {
         const folded = OverrunStore.foldPending(eventOverrun, { restoredRemaining });
+        const resume = folded.store.resume;
         eventOverrun = folded.store;
+        delete eventOverrun.resume;
         if (folded.resumed) {
             excludedLiveSeconds = folded.excludedLiveSeconds;
             currentTalk = folded.resumeTalk
                 ? Object.assign(freshTalk(), { active: true, elapsed: true, overrun: folded.resumeTalk.overrun })
                 : Object.assign(freshTalk(), { active: true, skip: true });
+        } else if (restoredRemaining !== null && !eventOverrun.finished) {
+            if (resume) {
+                excludedLiveSeconds = resume.excluded;
+                currentTalk = { active: true, elapsed: true, skip: resume.skip, overrun: resume.overrun };
+            }
+            liveOverrunSeconds = MoneyMeter.liveOverrun(restoredRemaining, excludedLiveSeconds);
         }
-        if (folded.changed) { persistEventOverrun(); }
+        if (folded.changed || (resume && restoredRemaining === null)) { persistEventOverrun(); }
     }
 
+    /** @param {ReturnType<typeof import('./ipc-senders.js').guardIpcMain>} ipcMain */
     function registerIpc(ipcMain) {
         // Завершить мероприятие принудительно: закрыть текущий перелимит и заморозить
         // итог. Полезной нагрузки нет — это ДЕЙСТВИЕ, а не настройка: величину знает
@@ -352,6 +369,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
             };
 
             try {
+                /** @type {Partial<DisplaySettingsUpdate>} */
                 const settings = relay.lastDisplaySettings || {};
                 const report = EventReport.buildReportCSV({
                     talks: eventOverrun.talks,

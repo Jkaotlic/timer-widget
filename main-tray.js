@@ -16,25 +16,26 @@ const { formatTimeShort } = require('./utils');
 
 /**
  * @param {object} deps
- * @param {Function} deps.Tray
- * @param {object} deps.Menu
- * @param {object} deps.nativeImage
- * @param {object} deps.app
- * @param {object} deps.log
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.flags — флаги приложения (main-state.js)
- * @param {() => object} deps.getTimerState
- * @param {object} deps.timer — handleTimerStart / handleTimerPause / handleTimerReset
- * @param {object} deps.creators — create-функции main-windows.js и getAppIconPath
- * @param {object} deps.closing — main-window-closing.js
+ * @param {typeof import('electron').Tray} deps.Tray
+ * @param {typeof import('electron').Menu} deps.Menu
+ * @param {typeof import('electron').nativeImage} deps.nativeImage
+ * @param {import('electron').App} deps.app
+ * @param {import('electron-log').LogFunctions} deps.log
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {ReturnType<typeof import('./main-state.js').createAppFlags>} deps.flags — флаги приложения (main-state.js)
+ * @param {() => TimerState} deps.getTimerState
+ * @param {ReturnType<typeof import('./main-timer.js').createTimer>} deps.timer — handleTimerStart / handleTimerPause / handleTimerReset
+ * @param {ReturnType<typeof import('./main-windows.js').createWindows>} deps.creators — create-функции main-windows.js и getAppIconPath
+ * @param {ReturnType<typeof import('./main-window-closing.js').createWindowClosing>} deps.closing — main-window-closing.js
  */
 function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flags, getTimerState, timer, creators, closing }) {
     const { handleTimerStart, handleTimerPause, handleTimerReset } = timer;
-    const { markClosing, cancelQueuedOpen } = closing;
+    const { toggleAuxWindow } = closing;
 
     // ============================================================================
     // System Tray
     // ============================================================================
+    /** @type {import('electron').Tray | null} */
     let tray = null;
 
     // F-022: cache last-seen booleans; only rebuild Menu when they actually change.
@@ -53,7 +54,7 @@ function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flag
             rebuildTrayMenu();
             updateTrayTime();
             tray.on('click', () => {
-                if (!windows.controlWindow) { creators.createControlWindow(); return; }
+                if (!windows.controlWindow || windows.controlWindow.isDestroyed()) { creators.createControlWindow(); return; }
                 if (windows.controlWindow.isVisible()) { windows.controlWindow.hide(); }
                 else { windows.controlWindow.show(); windows.controlWindow.focus(); }
             });
@@ -89,18 +90,16 @@ function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flag
             { label: 'Сбросить', click: () => { handleTimerReset(); updateTrayMenu(); }},
             { type: 'separator' },
             { label: 'Панель управления', click: () => {
-                if (!windows.controlWindow) { creators.createControlWindow(); return; }
+                if (!windows.controlWindow || windows.controlWindow.isDestroyed()) { creators.createControlWindow(); return; }
                 windows.controlWindow.show();
                 windows.controlWindow.focus();
             }},
             { label: 'Виджет', type: 'checkbox', checked: widgetOpen, click: () => {
-                if (windows.widgetWindow) { cancelQueuedOpen('widget'); markClosing(windows.widgetWindow).close(); }
-                else { creators.createWidgetWindow(); }
+                toggleAuxWindow('widget', windows.widgetWindow, creators.createWidgetWindow);
                 setTimeout(updateTrayMenu, 200);
             }},
             { label: 'Часы', type: 'checkbox', checked: clockOpen, click: () => {
-                if (windows.clockWidgetWindow) { cancelQueuedOpen('clock'); markClosing(windows.clockWidgetWindow).close(); }
-                else { creators.createClockWidgetWindow(); }
+                toggleAuxWindow('clock', windows.clockWidgetWindow, creators.createClockWidgetWindow);
                 setTimeout(updateTrayMenu, 200);
             }},
             { type: 'separator' },
@@ -132,6 +131,7 @@ function createTrayController({ Tray, Menu, nativeImage, app, log, windows, flag
     }
 
     // Intercept control window close — hide to tray instead of quit
+    /** @param {import('electron').BrowserWindow | null} win */
     function bindTrayBehavior(win) {
         if (!win) { return; }
         win.on('close', (event) => {

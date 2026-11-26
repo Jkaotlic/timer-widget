@@ -14,10 +14,12 @@
 const { fitScaledBounds, fitRestoredBounds } = require('./window-geometry');
 const { isPayloadObject } = require('./relay-payload');
 
+/** @typedef {import('./main-state.js').AppWindow} AppWindow */
+
 /**
  * @param {object} deps
- * @param {object} deps.screen — electron.screen
- * @param {object} deps.CONFIG — constants.js
+ * @param {import('electron').Screen} deps.screen — electron.screen
+ * @param {typeof import('./constants.js')} deps.CONFIG — constants.js
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow — utils.js
  */
 function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
@@ -28,9 +30,18 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
     // то, что пришло сюда, а не то, что насчитали сами по outerWidth/screenX:
     // владелец геометрии — главный процесс, и на мониторе с масштабом ≠ 100 % его
     // DIP и CSS-пиксели рендерера — разные единицы (см. window-geometry.js).
-    function reportGeometry(win) {
+    /**
+     * @param {AppWindow | null} win
+     * @param {unknown} [requestedWidth]
+     */
+    function reportGeometry(win, requestedWidth = null) {
         if (!win || win.isDestroyed()) { return; }
-        safelySendToWindow(win, 'window-geometry', win.getBounds());
+        /** @type {import('electron').Rectangle & {requestedWidth?: number}} */
+        const bounds = win.getBounds();
+        if (typeof requestedWidth === 'number' && Number.isFinite(requestedWidth) && requestedWidth > 0) {
+            bounds.requestedWidth = requestedWidth;
+        }
+        safelySendToWindow(win, 'window-geometry', bounds);
     }
 
     /**
@@ -51,6 +62,7 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
      *
      * Петли здесь нет: рендерер по этому каналу только ЗАПОМИНАЕТ границы
      * (setWindowBounds), обратно ничего не шлёт.
+     * @param {AppWindow | null} win
      */
     function bindGeometryReports(win) {
         if (!win) { return; }
@@ -70,10 +82,13 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
     // самопроизвольно увеличивается». Здесь такой рост отменяется следующим же
     // движением мыши, а размер за границами жеста по-прежнему свободен — тянуть
     // окно за край рамки можно.
+    /** @param {AppWindow | null} win @param {unknown} payload */
     function moveWindowBy(win, payload) {
         if (!isPayloadObject(payload)) { return; }
         const { deltaX, deltaY, first } = payload;
-        if (!win || win.isDestroyed() || !Number.isFinite(deltaX) || !Number.isFinite(deltaY)) { return; }
+        if (!win || win.isDestroyed()
+            || typeof deltaX !== 'number' || !Number.isFinite(deltaX)
+            || typeof deltaY !== 'number' || !Number.isFinite(deltaY)) { return; }
         // R6 (2026-09-28-psi-hardening): подделанный или испорченный payload
         // канала `*-move` может нести дельту вне разумного диапазона — игнор
         // без исключения, окно не двигаем вовсе.
@@ -110,6 +125,7 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
     //
     // Вся арифметика — в чистой fitScaledBounds() из window-geometry.js, чтобы
     // проверяться в Node без запуска Electron.
+    /** @param {AppWindow | null} win @param {unknown} payload */
     function resizeWindowClamped(win, payload) {
         if (!isPayloadObject(payload)) { return; }
         if (!win || win.isDestroyed()) { return; }
@@ -124,8 +140,9 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
         // его к краю было нечем.
         const { bounds: screenBounds } = screen.getDisplayMatching(current);
 
-        win.setBounds(fitScaledBounds(current, payload, screenBounds, { width: minWidth, height: minHeight }));
-        reportGeometry(win);
+        const { width, height } = payload;
+        win.setBounds(fitScaledBounds(current, { width, height }, screenBounds, { width: minWidth, height: minHeight }));
+        reportGeometry(win, width);
     }
 
     // Shared position restore for a frameless widget window. Reads x/y from the
@@ -138,10 +155,13 @@ function createWindowGeometry({ screen, CONFIG, safelySendToWindow }) {
     // drag it back, so the window has to keep a grabbable strip on a REAL display —
     // see fitRestoredBounds() in window-geometry.js for what that means and why
     // hanging over the edge is deliberately allowed.
+    /** @param {AppWindow | null} win @param {unknown} payload */
     function positionWindowClamped(win, payload) {
         if (!isPayloadObject(payload)) { return; }
         const { x, y } = payload;
-        if (!win || win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) { return; }
+        if (!win || win.isDestroyed()
+            || typeof x !== 'number' || !Number.isFinite(x)
+            || typeof y !== 'number' || !Number.isFinite(y)) { return; }
 
         const [width, height] = win.getSize();
         const [minWidth, minHeight] = win.getMinimumSize();

@@ -11,12 +11,15 @@
  * Stale threshold: 5 minutes. Anything older is discarded.
  */
 
-const fs = require('fs');
+const { isTimerSeconds, MAX_SECONDS } = require('./timer-engine');
 const path = require('path');
-const { writeFileAtomicSync } = require('./atomic-write');
+const { writeFileAtomicSync, readProfileJson, removeProfileFile, errorCode } = require('./atomic-write');
 
 const STATE_FILENAME = 'last-state.json';
 const MAX_AGE_MS = 5 * 60 * 1000;
+
+/** @typedef {{savedAt: number, presetSeconds: number, totalSeconds?: number, remainingSeconds?: number}} RecoverySnapshot */
+/** @typedef {Partial<Pick<import('electron-log').LogFunctions, 'error' | 'warn'>>} RecoveryLogger */
 
 function getRecoveryStatePath(userDataPath) {
     return path.join(userDataPath, STATE_FILENAME);
@@ -33,8 +36,8 @@ function getRecoveryStatePath(userDataPath) {
  * теперь тот, в котором их позвали.
  *
  * @param {string} userDataPath
- * @param {object} timerState
- * @param {object} [logger]
+ * @param {Pick<TimerState, 'totalSeconds' | 'remainingSeconds' | 'presetSeconds' | 'isRunning'>} timerState
+ * @param {RecoveryLogger} [logger]
  */
 function saveTimerStateToFileSync(userDataPath, timerState, logger) {
     try {
@@ -50,7 +53,7 @@ function saveTimerStateToFileSync(userDataPath, timerState, logger) {
         // не обрезанный JSON.
         writeFileAtomicSync(statePath, data);
     } catch (err) {
-        if (logger && logger.error) { logger.error('saveTimerStateToFileSync:', err); }
+        if (logger && logger.error) { logger.error('saveTimerStateToFileSync:', errorCode(err)); }
     }
 }
 
@@ -59,31 +62,39 @@ function saveTimerStateToFileSync(userDataPath, timerState, logger) {
  * Returns null if no file, stale, or unreadable. Deletes stale files.
  *
  * @param {string} userDataPath
- * @param {object} [logger]
- * @returns {object|null}
+ * @param {RecoveryLogger} [logger]
+ * @returns {unknown}
  */
 function loadSavedTimerState(userDataPath, logger) {
     try {
         const statePath = getRecoveryStatePath(userDataPath);
-        if (!fs.existsSync(statePath)) { return null; }
-        const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        const parsed = readProfileJson(statePath, 4096);
         const ageMs = Date.now() - (parsed.savedAt || 0);
         if (ageMs > MAX_AGE_MS) {
-            try { fs.unlinkSync(statePath); } catch { /* ignore */ }
+            clearSavedTimerState(userDataPath, logger);
             return null;
         }
         return parsed;
     } catch (err) {
-        if (logger && logger.warn) { logger.warn('loadSavedTimerState failed:', err); }
+        if (err.code !== 'ENOENT' && logger && logger.warn) { logger.warn('loadSavedTimerState failed:', errorCode(err)); }
         return null;
     }
 }
 
-function clearSavedTimerState(userDataPath) {
+/** @param {string} userDataPath @param {RecoveryLogger} [logger] */
+function clearSavedTimerState(userDataPath, logger) {
     try {
-        const statePath = getRecoveryStatePath(userDataPath);
-        if (fs.existsSync(statePath)) { fs.unlinkSync(statePath); }
-    } catch { /* ignore */ }
+        removeProfileFile(getRecoveryStatePath(userDataPath));
+        return true;
+    } catch (err) {
+        if (logger && logger.warn) { logger.warn('clearSavedTimerState failed:', errorCode(err)); }
+        // Some filesystem locks block unlink but still allow replacement.
+        // Leave an invalid snapshot if possible so the old timer cannot resume.
+        try { writeFileAtomicSync(getRecoveryStatePath(userDataPath), '{}'); } catch (writeErr) {
+            if (logger && logger.warn) { logger.warn('invalidateSavedTimerState failed:', errorCode(writeErr)); }
+        }
+        return false;
+    }
 }
 
 /**
@@ -91,14 +102,19 @@ function clearSavedTimerState(userDataPath) {
  * snapshot at time `now`. No I/O, no side effects.
  *
  * Rules: object w/ finite savedAt in [now - 5m, now], presetSeconds ≥ 0.
+ * @param {unknown} data
+ * @param {number} [now]
+ * @returns {data is RecoverySnapshot}
  */
 function isRecoveryValid(data, now) {
     if (!data || typeof data !== 'object') { return false; }
-    if (typeof data.savedAt !== 'number' || !Number.isFinite(data.savedAt)) { return false; }
-    const age = (now || Date.now()) - data.savedAt;
+    const { savedAt, presetSeconds, totalSeconds, remainingSeconds } = /** @type {Record<string, unknown>} */ (data);
+    if (typeof savedAt !== 'number' || !Number.isFinite(savedAt)) { return false; }
+    const age = (now || Date.now()) - savedAt;
     if (age < 0 || age > MAX_AGE_MS) { return false; }
-    if (typeof data.presetSeconds !== 'number' || data.presetSeconds < 0) { return false; }
-    return true;
+    return isTimerSeconds(presetSeconds)
+        && (totalSeconds === undefined || isTimerSeconds(totalSeconds))
+        && (remainingSeconds === undefined || isTimerSeconds(remainingSeconds, -MAX_SECONDS));
 }
 
 module.exports = {

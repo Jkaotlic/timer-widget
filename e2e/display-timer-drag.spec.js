@@ -67,7 +67,7 @@ const dragTimer = (display, dx, dy, opts = {}) => display.evaluate(async ([dX, d
         .find((el) => el && el.classList.contains('active'));
     const r = active.getBoundingClientRect();
     const o = (x, y) => new MouseEvent('mousemove', {
-        bubbles: true, cancelable: true, button: 0, altKey: alt,
+        buttons: 1, bubbles: true, cancelable: true, button: 0, altKey: alt,
         screenX: x, screenY: y, clientX: x, clientY: y
     });
     const down = (x, y) => new MouseEvent('mousedown', {

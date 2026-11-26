@@ -100,7 +100,7 @@ function safeTalks(raw) {
 /**
  * Собрать отчёт.
  *
- * @param {object} input
+ * @param {any} input
  * @param {Array}  input.talks — журнал докладов (недоверенный: пришёл с диска)
  * @param {number} input.overrunSeconds — ИТОГ мероприятия
  * @param {boolean} input.finished — итог заморожен

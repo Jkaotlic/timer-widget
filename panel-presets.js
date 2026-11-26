@@ -30,7 +30,7 @@ const SLOT_BUTTON_PREFIXES = [SLOT_BUTTON_PREFIX, 'miniPresetSlot'];
  * @param {object} deps
  * @param {Document} deps.doc
  * @param {Storage} deps.storage
- * @param {object} deps.presets              модуль presets.js
+ * @param {any} deps.presets              модуль presets.js
  * @param {() => void} deps.onApplied        что делать после записи ключей
  * @param {(msg: string) => void} [deps.notify]  сообщение пользователю
  * @param {string[]} [deps.prefixes]         префиксы id комплектов кнопок

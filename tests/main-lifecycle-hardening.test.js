@@ -146,3 +146,15 @@ test('R2/R4: подставка без ЛЮБОГО из пяти методов
     startApp(deps);
     return ready; // резолвится только если createControlWindow был вызван — whenReady дошёл до конца
 });
+
+test('default session cancels downloads', async () => {
+    const session = new (require('node:events').EventEmitter)();
+    session.setPermissionRequestHandler = () => {};
+    session.setPermissionCheckHandler = () => {};
+    const { deps, ready } = makeDeps(session);
+    startApp(deps);
+    await ready;
+    let canceled = false;
+    session.emit('will-download', { preventDefault: () => { canceled = true; } });
+    assert.equal(canceled, true);
+});

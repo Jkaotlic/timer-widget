@@ -121,11 +121,15 @@ test.describe('панель: четыре состояния', () => {
         await expect.poll(() => primaryLabel(control)).toBe('Пауза');
     });
 
-    test('ввод: цифры уступают место полю, кнопка называется «Поставить»', async () => {
+    test('сброс возвращает исходное время, затем клик по цифрам открывает ввод', async () => {
+        const digits = control.locator('#controlTimeDigits');
         await control.click('#pauseBtn');
         await expect(control.locator('#statusText')).toHaveText('Пауза');
+        await expect(digits).not.toHaveText('25:00');
         await control.click('#resetBtn');
-        await expect(control.locator('body')).toHaveClass(/state-idle/);
+        await expect(control.locator('body')).toHaveClass(/\bstate-idle\b/);
+        await expect(digits).toHaveText('25:00');
+        await expect(control.locator('#statusText')).toHaveText('Длительность');
 
         // Вход в ввод — КЛИКОМ по времени, как обещает подсказка в покое.
         await control.click('#controlTime');

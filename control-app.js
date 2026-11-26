@@ -78,18 +78,18 @@
 
         class TimerController {
             constructor() {
-                // Только для tsc: что приносят примеси (Object.assign ниже); строка лишь читает свойство.
-                /** @type {TimerMixins['pushDisplaySettings']} */ this.pushDisplaySettings;
-                /** @type {TimerMixins['widgetStylePayload']} */ this.widgetStylePayload;
-                /** @type {TimerMixins['pushWindowStyles']} */ this.pushWindowStyles;
-                /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows;
-                /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows;
-                /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow;
-                /** @type {TimerMixins['loadClockSettings']} */ this.loadClockSettings;
-                /** @type {TimerMixins['pushClockSettings']} */ this.pushClockSettings;
-                /** @type {TimerMixins['sendClockStyle']} */ this.sendClockStyle;
-                /** @type {TimerMixins['updateClockAnalogNumbersVisibility']} */ this.updateClockAnalogNumbersVisibility;
-                /** @type {ColorsUpdate|null} */ this.clockColors; // ставит PanelColorsMixin.loadWindowColors
+                // Явная инициализация нужна и TypeScript 7: this.foo; без неё свойство больше не объявляется.
+                /** @type {TimerMixins['pushDisplaySettings']} */ this.pushDisplaySettings = PanelDisplayMixin.pushDisplaySettings;
+                /** @type {TimerMixins['widgetStylePayload']} */ this.widgetStylePayload = PanelStateMixin.widgetStylePayload;
+                /** @type {TimerMixins['pushWindowStyles']} */ this.pushWindowStyles = PanelStateMixin.pushWindowStyles;
+                /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows = PanelStateMixin.updateStyleDependentRows;
+                /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows = PanelStateMixin.renderWindowRows;
+                /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow = PanelStateMixin.renderSoundRow;
+                /** @type {TimerMixins['loadClockSettings']} */ this.loadClockSettings = PanelClockMixin.loadClockSettings;
+                /** @type {TimerMixins['pushClockSettings']} */ this.pushClockSettings = PanelClockMixin.pushClockSettings;
+                /** @type {TimerMixins['sendClockStyle']} */ this.sendClockStyle = PanelClockMixin.sendClockStyle;
+                /** @type {TimerMixins['updateClockAnalogNumbersVisibility']} */ this.updateClockAnalogNumbersVisibility = PanelClockMixin.updateClockAnalogNumbersVisibility;
+                /** @type {ColorsUpdate|null} */ this.clockColors = null; // ставит PanelColorsMixin.loadWindowColors
                 this.totalSeconds = 0;
                 this.remainingSeconds = 0;
                 this.isRunning = false;
@@ -209,7 +209,9 @@
                 // Display-specific style/scale (Полноэкранный tab)
                 this.displayTimerStyleEl = document.getElementById('displayTimerStyle');
                 this._attachSegmented(this.displayTimerStyleEl, 'circle');
-                this.displayTimerScaleEl = document.getElementById('displayTimerScale');
+                this.displayTimerScaleEl = /** @type {HTMLInputElement} */ (document.getElementById('displayTimerScale'));
+                this.displayTimerScaleEl.min = String(CONFIG.MIN_TIMER_SCALE);
+                this.displayTimerScaleEl.max = String(CONFIG.MAX_TIMER_SCALE);
                 this.displayTimerScaleValueEl = document.getElementById('displayTimerScaleValue');
 
                 // Настройки виджета часов
@@ -732,7 +734,7 @@
                 // Scale value click-to-edit and double-click-to-reset wiring
                 setupScaleValueEdit(
                     document.getElementById('timerScaleValue'),
-                    document.getElementById('timerScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('timerScale')),
                     DEFAULT_SCALE_PCT,
                     (val) => {
                         window.ipcRenderer.send('widget-style-update', this.widgetStylePayload({ timerScale: val }));
@@ -742,7 +744,7 @@
 
                 setupScaleValueEdit(
                     document.getElementById('clockScaleValue'),
-                    document.getElementById('clockScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('clockScale')),
                     DEFAULT_SCALE_PCT,
                     (val) => {
                         const newSize = Math.round(CLOCK_BASE_PX * val / 100);
@@ -756,14 +758,14 @@
                 // которое дисплей потом откажется восстанавливать.
                 setupScaleValueEdit(
                     document.getElementById('displayTimerScaleValue'),
-                    document.getElementById('displayTimerScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('displayTimerScale')),
                     DEFAULT_SCALE_PCT,
                     () => { this.pushDisplaySettings(); }
                 );
 
                 setupScaleValueEdit(
                     document.getElementById('timeBlocksScaleValue'),
-                    document.getElementById('timeBlocksScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('timeBlocksScale')),
                     DisplayLayouts.DEFAULT_BLOCK_SCALE,
                     () => { this.pushDisplaySettings(); }
                 );
@@ -967,22 +969,6 @@
                 // остался стиль, которого на экране нет (ряд был скрыт).
                 this.syncClockStyle = applied.syncClockStyle;
                 if (this.syncClockStyle) { this.clockStyleEl.value = this.timerStyleEl.value; }
-
-                // Ползунок «Масштаб часов». Единственный источник правды здесь —
-                // clockGeometry, который пишет САМО окно часов (localStorage общий
-                // для всех окон приложения). В displayExtSettings масштаба часов
-                // нет вообще, поэтому без этого чтения ползунок при каждом запуске
-                // показывал «100%» независимо от реального размера окна.
-                const clockGeo = SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
-                const clockScaleSliderEl = document.getElementById('clockScale');
-                const clockScaleLabelEl = document.getElementById('clockScaleValue');
-                if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
-                    // Присваивание .value НЕ порождает 'input', поэтому обратной
-                    // отправки в окно часов не происходит и петля не замыкается.
-                    const pct = RendererShared.clampScale(Number(clockGeo.scalePct), 30, 600);
-                    clockScaleSliderEl.value = pct;
-                    if (clockScaleLabelEl) { clockScaleLabelEl.textContent = pct + '%'; }
-                }
 
                 // Обновляем видимость опции цифр для часов
                 this.updateClockAnalogNumbersVisibility();
@@ -1206,7 +1192,10 @@
                     });
                     // Подписи строк — отчёт о ДЕЙСТВУЮЩИХ значениях, и масштаб
                     // в них входит (см. renderWindowRows).
-                    if (applied !== null) { this.renderWindowRows(); }
+                    if (applied !== null) {
+                        this.renderWindowRows();
+                        this.refreshPresetMarks();
+                    }
                 };
                 window.ipcRenderer.on('scale-report', this._onScaleReport);
 
@@ -1272,6 +1261,10 @@
 
                 // Удаляем глобальные DOM и IPC handlers из _handlers
                 const h = this._handlers || {};
+                if (h.onSoundToggle) { window.ipcRenderer.removeListener('sound-toggle', h.onSoundToggle); }
+                h.eventOverrunState?.();
+                h.eventTimerState?.();
+                h.eventExportDone?.();
                 if (h.onDisplayWindowState) { window.ipcRenderer.removeListener('display-window-state', h.onDisplayWindowState); }
                 if (h.onWidgetWindowState) { window.ipcRenderer.removeListener('widget-window-state', h.onWidgetWindowState); }
                 if (h.onClockWindowState) { window.ipcRenderer.removeListener('clock-window-state', h.onClockWindowState); }
@@ -1752,7 +1745,6 @@
             if (e.target === resetModal) { closeModal(resetModal); }
         });
         document.getElementById('resetConfirm').addEventListener('click', () => {
-            localStorage.clear();
             window.ipcRenderer.send('reset-and-relaunch');
         });
 

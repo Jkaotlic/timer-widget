@@ -19,28 +19,33 @@
 // Приложение не ходит в сеть само: страница открывается в браузере
 // пользователя и только по явному клику.
 const RELEASES_URL = 'https://github.com/Jkaotlic/timer-widget/releases';
+const { isPayloadObject } = require('./relay-payload');
 
 /**
  * @param {object} deps
- * @param {object} deps.ipcMain — обвязка ipc-senders.guardIpcMain
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.screen
- * @param {object} deps.CONFIG
- * @param {object} deps.shell — electron.shell
- * @param {object} deps.app
- * @param {object} deps.log
- * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
+ * @param {ReturnType<typeof import('./ipc-senders.js').guardIpcMain>} deps.ipcMain — обвязка ipc-senders.guardIpcMain
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {import('electron').Screen} deps.screen
+ * @param {typeof import('./constants.js')} deps.CONFIG
+ * @param {import('electron').Dialog} deps.dialog
+ * @param {import('electron').Shell} deps.shell — electron.shell
+ * @param {import('electron').App} deps.app
+ * @param {import('electron-log').LogFunctions} deps.log
+ * @param {() => typeof import('electron').session} deps.getSession — electron.session, берётся в момент вызова
  * @param {() => void} deps.clearTimerInterval — main-timer.js
+ * @param {() => boolean} [deps.clearRecovery] - удалить снимок при сбросе
  * @param {() => void} [deps.settleMigration] - метка переноса настроек после
  *        сброса (main-storage-migration.js)
- * @param {() => void} [deps.discardRelayState] - «Сбросить всё» стирает и память
+ * @param {() => (() => void)} [deps.discardRelayState] - «Сбросить всё» стирает и память
  *        ретрансляторов в файле (relay-store.js), иначе следующий старт
  *        досылал бы окнам настройки, которых уже нет
  */
-function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log, getSession, clearTimerInterval, settleMigration, discardRelayState }) {
+function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, dialog, app, log, getSession, clearTimerInterval, clearRecovery, settleMigration, discardRelayState }) {
     // Состояние режима «полоса» (канал control-collapse ниже). Объявлено ДО
     // обработчика размера: он обязан его спрашивать.
+    /** @type {import('electron').Rectangle | null} */
     let controlBoundsBeforeCollapse = null;
+    /** @type {import('electron').BrowserWindow | null} */
     let collapsedWindow = null;
 
     // Изменение размера окна управления
@@ -49,7 +54,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // менял ТОЛЬКО ширину — иначе перезапись height=window.innerHeight округляется
     // при каждом setSize (HiDPI) и сбивает ручную высоту, которую выставил юзер.
     ipcMain.on('resize-control-window', (event, size) => {
-        if (!windows.controlWindow || !size || typeof size !== 'object') { return; }
+        if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !isPayloadObject(size)) { return; }
         // Свёрнутое окно размер по содержимому НЕ получает: его размер — полоса,
         // а размер панели вернёт разворот (границы «до»). Запрос приходит из
         // рендерера, который про полосу знать не обязан: отложенный авто-размер
@@ -67,8 +72,9 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         const screenWidth = area.width;
         const screenHeight = area.height;
         const [curW, curH] = windows.controlWindow.getSize();
-        const w = Number.isFinite(size.width) ? size.width : curW;
-        const h = Number.isFinite(size.height) ? size.height : curH;
+        const { width, height } = size;
+        const w = typeof width === 'number' && Number.isFinite(width) ? width : curW;
+        const h = typeof height === 'number' && Number.isFinite(height) ? height : curH;
         // Нижний clamp = BrowserWindow min (см. createControlWindow). Верхний —
         // ДЕЙСТВУЮЩИЙ потолок окна, а не константа: он двухуровневый и зависит от
         // того, открыт ли ящик (канал control-drawer). Без этого слагаемого запрос
@@ -111,7 +117,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // поднимал бы любой запрос, то есть потолка не было бы вовсе. Сообщает о нём
     // та единственная сторона, которая про ящик знает, — панель.
     ipcMain.on('control-drawer', (_event, payload) => {
-        if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !payload || typeof payload !== 'object') { return; }
+        if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !isPayloadObject(payload)) { return; }
         const open = payload.open === true;
         const ceilingW = open
             ? CONFIG.CONTROL_WINDOW_MAX_WIDTH_WITH_DRAWER
@@ -158,6 +164,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     // другое окно, и чужие границы ей не годятся.
     const reloadBound = new WeakSet();
 
+    /** @param {import('electron').BrowserWindow} win */
     function expandControlWindow(win) {
         // Разворот: пол возвращается ДО восстановления границ, иначе окно можно
         // оставить панелью высотой 52 — это обрезанная раскладка, которую чинила
@@ -175,6 +182,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         }
     }
 
+    /** @param {import('electron').BrowserWindow} win */
     function bindReloadExpand(win) {
         if (reloadBound.has(win) || !win.webContents || typeof win.webContents.on !== 'function') { return; }
         reloadBound.add(win);
@@ -185,7 +193,7 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
     }
 
     ipcMain.on('control-collapse', (_event, payload) => {
-        if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !payload || typeof payload !== 'object') { return; }
+        if (!windows.controlWindow || windows.controlWindow.isDestroyed() || !isPayloadObject(payload)) { return; }
         const win = windows.controlWindow;
         const collapsed = payload.collapsed === true;
         const [curW] = win.getSize();
@@ -194,7 +202,8 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
             // Высота приходит из рендерера (её знает CSS), но доверять ей нельзя:
             // это тот же непроверенный payload, что и во всех остальных
             // обработчиках размеров.
-            const raw = Number.isFinite(payload.height) ? payload.height : CONFIG.CONTROL_BAR_HEIGHT;
+            const { height } = payload;
+            const raw = typeof height === 'number' && Number.isFinite(height) ? height : CONFIG.CONTROL_BAR_HEIGHT;
             const barHeight = Math.max(36, Math.min(CONFIG.CONTROL_BAR_MAX_HEIGHT, Math.round(raw)));
 
             // Уже свёрнуто этим окном — границы «до» не перезаписываются
@@ -232,31 +241,29 @@ function registerControlIpc({ ipcMain, windows, screen, CONFIG, shell, app, log,
         app.quit();
     });
 
+    let resetInProgress = false;
     ipcMain.on('reset-and-relaunch', async () => {
-        clearTimerInterval();
-        const session = getSession();
+        if (resetInProgress) { return; }
+        resetInProgress = true;
+        let resumeRelayWrites;
         try {
-            await Promise.all([
-                session.defaultSession.clearStorageData(),
-                session.defaultSession.clearCache()
-            ]);
-        } catch (err) {
-            log.error('Storage clear failed:', err);
-        }
-        // Сброс сильнее переноса: без метки сверка следующего запуска увидела
-        // бы пустой app:// и вернула старые настройки из file://.
-        try {
+            if (clearRecovery && !clearRecovery()) {
+                throw Object.assign(new Error('Cannot remove timer snapshot'), { code: 'RECOVERY_CLEAR_FAILED' });
+            }
+            resumeRelayWrites = discardRelayState?.();
+            const session = getSession();
+            await session.defaultSession.clearStorageData();
+            await session.defaultSession.clearCache();
+            // Mark the app:// profile as settled so migration cannot restore old settings.
             if (settleMigration) { settleMigration(); }
         } catch (err) {
-            log.warn('метка переноса после сброса не записана:', err && err.message);
+            resetInProgress = false;
+            resumeRelayWrites?.();
+            log.warn('Сброс настроек не завершён:', err.code || err.name);
+            dialog.showErrorBox('Сброс настроек', 'Часть настроек осталась на диске. Проверьте права на папку профиля и повторите сброс.');
+            return;
         }
-        // Память ретрансляторов — тоже профиль: удаляется, и выход её не
-        // перезапишет (relay-store.js, discard).
-        try {
-            if (discardRelayState) { discardRelayState(); }
-        } catch (err) {
-            log.warn('память ретрансляторов после сброса не удалена:', err && err.code);
-        }
+        clearTimerInterval();
         app.quit();
     });
 }

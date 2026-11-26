@@ -69,6 +69,7 @@ function createWindowGeometry(cfg) {
     // запись и стирала восстановленное (см. saveSettled). Теперь сравнение
     // живёт внутри модуля и выполняется, когда размер устоялся.
     let scalePct;
+    let awaitingResizeBounds = false;
 
     // Отложенная запись по событию resize. См. saveSettled() ниже.
     let settleTimer = null;
@@ -127,10 +128,19 @@ function createWindowGeometry(cfg) {
             const { x, y, width, height } = bounds;
             if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) { return; }
             reported = { x, y, width, height };
+            // Ответ на явное масштабирование содержит новую позицию центра.
+            if (awaitingResizeBounds && bounds.requestedWidth === Math.round(baseSize * scalePct / 100)) {
+                awaitingResizeBounds = false;
+                const requested = scalePct;
+                const actual = Math.round(width / baseSize * 100);
+                save(actual);
+                if (actual !== requested && onScaleSettled) { onScaleSettled(actual); }
+            }
         },
 
         /** Восстанавливает размер и позицию прошлой сессии. */
         restore() {
+            awaitingResizeBounds = false;
             const geo = /** @type {{scalePct?: unknown, x?: number, y?: number} | null} */ (
                 parseJSON(storage.getItem(storageKey), null));
             if (!geo || typeof geo !== 'object') { return; }
@@ -150,7 +160,10 @@ function createWindowGeometry(cfg) {
             }
         },
 
-        save,
+        save(explicitPct) {
+            awaitingResizeBounds = Number.isFinite(explicitPct);
+            save(explicitPct);
+        },
 
         /**
          * Запись по событию `resize` — ПОСЛЕ того, как размер устоялся.
@@ -183,8 +196,10 @@ function createWindowGeometry(cfg) {
                 // и панель, получив отчёт, сохраняла ВЕСЬ свой набор настроек
                 // поверх профиля, затирая то, что туда положили мимо неё.
                 const known = Number.isFinite(scalePct) ? scalePct : 100;
-                if (pct === known) { return; }
+                if (pct === known && !awaitingResizeBounds) { return; }
+                awaitingResizeBounds = false;
                 save(pct);
+                if (pct === known) { return; }
                 // О новом масштабе узнаёт и панель. Без этого путь Ctrl+колеса
                 // был ЕДИНСТВЕННЫМ, который сообщал масштаб, — а окно можно
                 // растянуть за край рамки. Замер: окно 500 px (200 %), в
@@ -256,7 +271,7 @@ function isWindowDragTarget(target) {
  * Electron, — поэтому вся арифметика проверяется в Node без запуска приложения.
  *
  * @param {{x:number,y:number,width:number,height:number}} current — текущие границы окна
- * @param {{width:*,height:*}} requested — запрошенный размер; приходит из IPC, то есть может быть мусором
+ * @param {{width:unknown,height:unknown}} requested — запрошенный размер из IPC
  * @param {{x:number,y:number,width:number,height:number}} workArea — рабочая область ЕГО монитора
  * @param {{width:number,height:number}} min — минимальный размер окна
  * @returns {{x:number,y:number,width:number,height:number}}
@@ -265,6 +280,7 @@ function fitScaledBounds(current, requested, workArea, min) {
     // Размер по одной оси. Мусор ИГНОРИРУЕТСЯ, а не подменяется числом: раньше
     // здесь стояло `Number(width) || 220`, и нулевая или нечисловая ширина
     // молча делала окно 220 px независимо от его базового размера.
+    /** @param {unknown} asked @param {number} currentSide @param {number} minSide @param {number} areaSide */
     const sideSize = (asked, currentSide, minSide, areaSide) => {
         const value = Number(asked);
         const wanted = Number.isFinite(value) && value > 0 ? value : currentSide;
@@ -361,9 +377,9 @@ function fitRestoredBounds(target, displays, minVisible, fallbackArea, min) {
  * @param {Document} cfg.doc — сюда вешаются mousemove/mouseup: кнопку отпускают и за пределами окна
  * @param {(payload: {deltaX: number, deltaY: number, first: boolean}) => void} cfg.onMove
  * @param {() => void} cfg.onDrop — вызывается один раз в конце перетаскивания
- * @param {object} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
+ * @param {any} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
  * @param {() => boolean} [cfg.isLocked] предикат замка: true отменяет жест
- * @returns {object} тот же объект handlers
+ * @returns {any} тот же объект handlers
  */
 function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) {
     let isDragging = false;

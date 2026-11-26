@@ -39,20 +39,20 @@ const WINDOW_LEVEL_ABOVE_MENU_BAR = 'status';
 
 /**
  * @param {object} deps
- * @param {Function} deps.BrowserWindow
- * @param {object} deps.screen
- * @param {object} deps.app
- * @param {object} deps.log
- * @param {object} deps.CONFIG
+ * @param {typeof import('electron').BrowserWindow} deps.BrowserWindow
+ * @param {import('electron').Screen} deps.screen
+ * @param {import('electron').App} deps.app
+ * @param {import('electron-log').LogFunctions} deps.log
+ * @param {typeof import('./constants.js')} deps.CONFIG
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.relay — память ретрансляторов (main-state.js)
- * @param {object} deps.hooks — main-window-hooks.js
- * @param {object} deps.geometry — main-geometry.js
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {ReturnType<typeof import('./main-state.js').createRelayMemory>} deps.relay — память ретрансляторов (main-state.js)
+ * @param {ReturnType<typeof import('./main-window-hooks.js').createWindowHooks>} deps.hooks — main-window-hooks.js
+ * @param {ReturnType<typeof import('./main-geometry.js').createWindowGeometry>} deps.geometry — main-geometry.js
  * @param {boolean} deps.screenshotMode — `--screenshot`: окна скрыты и за экраном
- * @param {() => object} deps.getTimerState — зеркало состояния таймера
- * @param {() => object} deps.eventOverrunPayload — сборка payload накопителя
- * @param {(win: object) => void} deps.bindTrayBehavior — «закрытие панели = в трей»
+ * @param {() => TimerState} deps.getTimerState — зеркало состояния таймера
+ * @param {ReturnType<typeof import('./main-event-overrun.js').createEventOverrun>['eventOverrunPayload']} deps.eventOverrunPayload — сборка payload накопителя
+ * @param {ReturnType<typeof import('./main-tray.js').createTrayController>['bindTrayBehavior']} deps.bindTrayBehavior — «закрытие панели = в трей»
  */
 function createWindows(deps) {
     const {
@@ -83,6 +83,7 @@ function createWindows(deps) {
      * посылок панели), иначе узнавало бы о них только из общего localStorage.
      * Панели не шлётся: она их владелец, а замок её мост и не слушает.
      */
+    /** @param {import('./main-state.js').AppWindow} win */
     function sendUiSnapshot(win) {
         if (relay.uiTheme) {
             safelySendToWindow(win, 'ui-theme-update', { theme: relay.uiTheme });
@@ -191,8 +192,9 @@ function createWindows(deps) {
             log.info(`[perf] control window ready in ${Date.now() - __ctrlT0}ms`);
         });
 
-        windows.controlWindow.on('closed', () => {
-            windows.controlWindow = null;
+        const control = windows.controlWindow;
+        control.on('closed', () => {
+            if (windows.controlWindow === control) { windows.controlWindow = null; }
         });
     }
 
@@ -371,6 +373,7 @@ function createWindows(deps) {
         });
     }
 
+    /** @param {string | number} [displayIndex] */
     function createDisplayWindow(displayIndex) {
         const __displayT0 = Date.now();
         const displays = screen.getAllDisplays();
@@ -382,7 +385,7 @@ function createWindows(deps) {
                 || screen.getPrimaryDisplay();
         } else {
             // Выбранный монитор по индексу (с валидацией)
-            const idx = parseInt(displayIndex, 10);
+            const idx = parseInt(String(displayIndex), 10);
             targetDisplay = (!isNaN(idx) && idx >= 0 && idx < displays.length)
                 ? displays[idx]
                 : screen.getPrimaryDisplay();
@@ -478,6 +481,7 @@ function createWindows(deps) {
      * tests/window-top-edge.test.js, и оно обязано пережить выключение-включение
      * тумблера, а не только запуск.
      */
+    /** @param {unknown} on */
     function applyWidgetAlwaysOnTop(on) {
         if (!windows.widgetWindow || windows.widgetWindow.isDestroyed()) { return; }
         // undefined — это «панель ничего не сказала» (например старый payload).

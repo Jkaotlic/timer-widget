@@ -94,14 +94,16 @@ function parseManualTime(input) {
  * Откладывает выполнение функции до тех пор, пока не пройдет delay мс с последнего вызова
  * @param {Function} func - функция для debounce
  * @param {number} delay - задержка в миллисекундах
- * @returns {Function} - debounced функция
+ * @returns {((...args: any[]) => void) & {cancel: () => void}}
  */
 function debounce(func, delay = 120) {
     let timeoutId;
-    return function(...args) {
+    const debounced = function(...args) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => func.apply(this, args), delay);
     };
+    debounced.cancel = () => clearTimeout(timeoutId);
+    return debounced;
 }
 
 

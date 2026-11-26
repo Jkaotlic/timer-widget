@@ -7,7 +7,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { diffBitmaps, isRegression, isTimeDependent } = require('../visual-diff');
+const { compareWithBaseline } = require('../scripts/screenshot-runner');
+const { promoteBaseline } = require('../scripts/visual-baseline');
 
 // Буфер из n одинаковых пикселей RGBA.
 const solid = (n, [r, g, b, a = 255]) => {
@@ -15,6 +20,54 @@ const solid = (n, [r, g, b, a = 255]) => {
     for (let i = 0; i < n; i++) { buf.set([r, g, b, a], i * 4); }
     return buf;
 };
+
+test('визуальная сверка отклоняет отсутствующие эталоны и кадры прошлого прогона', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-visual-test-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const baselineDir = path.join(dir, 'baseline');
+    const outDir = path.join(dir, 'screenshots');
+    fs.mkdirSync(outDir);
+    fs.writeFileSync(path.join(outDir, 'display-idle.png'), 'старый кадр');
+    const log = { info() {}, error() {} };
+    const nativeImage = { createFromPath: () => ({ getSize: () => ({ width: 1, height: 1 }), toBitmap: () => solid(1, [10, 20, 30]) }) };
+    const compare = (...capturedNames) => compareWithBaseline({ nativeImage, outDir, baselineDir, log, capturedNames });
+
+    assert.ok(compare('control-idle.png').length > 0, 'папки с эталонами нет');
+    fs.mkdirSync(baselineDir);
+    assert.ok(compare('control-idle.png').length > 0, 'папка с эталонами пуста');
+
+    fs.writeFileSync(path.join(baselineDir, 'control-idle.png'), 'эталон');
+    fs.writeFileSync(path.join(baselineDir, 'display-idle.png'), 'эталон');
+    assert.deepEqual(compare('control-idle.png').map(({ name }) => name), ['display-idle.png']);
+    assert.deepEqual(compare('control-idle.png', 'display-idle.png', 'clock-idle.png'), []);
+    assert.deepEqual(compare('control-idle.png', 'display-idle.png', 'widget-idle.png').map(({ name }) => name), ['widget-idle.png']);
+
+    nativeImage.createFromPath = (file) => ({
+        getSize: () => path.dirname(file) === outDir ? { width: 2, height: 1 } : { width: 1, height: 2 },
+        toBitmap: () => solid(2, [10, 20, 30])
+    });
+    assert.deepEqual(compare('control-idle.png', 'display-idle.png').map(({ name }) => name),
+        ['control-idle.png', 'display-idle.png'], 'одинаковый объём растров не гарантирует совпадения размеров');
+});
+
+test('принимаются только сравнимые кадры последней завершённой съёмки', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-visual-promote-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const srcDir = path.join(dir, 'screenshots');
+    const dstDir = path.join(dir, 'baseline');
+    fs.mkdirSync(srcDir);
+    fs.mkdirSync(dstDir);
+    for (const name of ['control-idle.png', 'clock-idle.png', 'old-idle.png']) {
+        fs.writeFileSync(path.join(srcDir, name), name);
+    }
+    fs.writeFileSync(path.join(dstDir, 'old-idle.png'), 'старый эталон');
+
+    assert.throws(() => promoteBaseline(srcDir, dstDir), /завершённой съёмки/);
+    assert.deepEqual(fs.readdirSync(dstDir), ['old-idle.png']);
+    fs.writeFileSync(path.join(srcDir, 'capture-manifest.json'), JSON.stringify(['control-idle.png', 'clock-idle.png']));
+    assert.deepEqual(promoteBaseline(srcDir, dstDir), { copied: 1, skipped: 1 });
+    assert.deepEqual(fs.readdirSync(dstDir), ['control-idle.png']);
+});
 
 test('одинаковые растры дают нулевое расхождение', () => {
     const a = solid(100, [10, 20, 30]);

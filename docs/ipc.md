@@ -113,7 +113,7 @@ file:// → app:// нового канала не заводит: у его ск
 | `set-clock-style` / `clock-settings` | Clock widget settings. `set-clock-style` — строка стиля (белый список — в окне, `setClockStyle`); снимок при открытии из `relay.lastClockStyle` |
 | `display-window-state` / `widget-window-state` / `clock-window-state` | `{ isOpen }` |
 | `ui-theme-update` | `{ theme }` — applied by `UITheme.bindThemeSync()` in every window |
-| `window-geometry` | `{x, y, width, height}` — НАСТОЯЩИЕ границы окна от главного процесса. Виджет и часы пишут в `localStorage` их, а не свои `outerWidth`/`screenX`: на мониторе с масштабом ≠ 100 % это разные единицы |
+| `window-geometry` | `{x, y, width, height, requestedWidth?}` (в ответе на изменение размера указана запрошенная ширина) — НАСТОЯЩИЕ границы окна от главного процесса. Виджет и часы пишут в `localStorage` их, а не свои `outerWidth`/`screenX`: на мониторе с масштабом ≠ 100 % это разные единицы |
 | `timer-recovery-available` | The crash snapshot (`{ presetSeconds, totalSeconds, remainingSeconds, savedAt }`), sent to the control window once on `did-finish-load`. Main restores the time itself; this only tells the panel to say so (a toast) |
 
 

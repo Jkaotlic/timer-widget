@@ -1,6 +1,6 @@
 const { test, expect } = require('./fixtures');
 const { launchApp } = require('./launch');
-const { panelRoundTrip, waitForWidget } = require('./window-ready');
+const { waitForWidget, waitForWidgetGone } = require('./window-ready');
 
 let electronApp;
 let controlWindow;
@@ -16,13 +16,19 @@ test.afterAll(async () => {
 });
 
 test('app launches and control window loads', async () => {
-    const title = await controlWindow.title();
-    expect(title).toBeTruthy();
+    await expect(controlWindow).toHaveTitle('Управление Таймером');
+});
+
+test('no console errors on launch', async () => {
+    const errors = (await controlWindow.consoleMessages())
+        .filter((msg) => msg.type() === 'error')
+        .map((msg) => msg.text());
+    expect(errors).toEqual([]);
+    expect(await controlWindow.pageErrors()).toEqual([]);
 });
 
 test('control window has timer display', async () => {
-    const timerDisplay = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display, [class*="timer"]').first();
-    await expect(timerDisplay).toBeVisible({ timeout: 5000 });
+    await expect(controlWindow.locator('#controlTimeDigits')).toBeVisible();
 });
 
 test('control window has start button', async () => {
@@ -34,66 +40,30 @@ test('control window has start button', async () => {
 });
 
 test('preset buttons exist', async () => {
-    const presetBtns = await controlWindow.locator('[data-minutes]').count();
-    expect(presetBtns).toBeGreaterThan(0);
+    await expect(controlWindow.locator('button.preset[data-minutes]')).toHaveText(['5', '15', '25', '45']);
 });
 
 test('clicking preset sets timer value', async () => {
-    const preset5 = await controlWindow.locator('[data-minutes="5"]').first();
-    if (await preset5.isVisible()) {
-        await preset5.click();
-        // Timer display should show 05:00 or 5:00. Клик шлёт команду синхронно;
-        // круг панели — main её обработал и состояние панель отрисовала (было 500 мс).
-        await panelRoundTrip(controlWindow);
-        const display = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display').first();
-        const text = await display.textContent();
-        expect(text).toMatch(/5:00|05:00/);
-    }
+    const digits = controlWindow.locator('#controlTimeDigits');
+    await controlWindow.locator('.preset[data-minutes="15"]').click();
+    await expect(digits).toHaveText('15:00');
+    await controlWindow.locator('.preset[data-minutes="5"]').click();
+    await expect(digits).toHaveText('05:00');
 });
 
 test('start/pause timer cycle', async () => {
-    // Set a preset first
-    const preset5 = await controlWindow.locator('[data-minutes="5"]').first();
-    if (await preset5.isVisible()) {
-        await preset5.click();
-        await panelRoundTrip(controlWindow);
-    }
+    const digits = controlWindow.locator('#controlTimeDigits');
+    await controlWindow.locator('.preset[data-minutes="5"]').click();
+    await expect(digits).toHaveText('05:00');
+    await controlWindow.locator('#startBtn').click();
+    await expect(controlWindow.locator('body')).toHaveClass(/\bstate-running\b/);
+    await expect(digits).toHaveText(/^04:\d{2}$/, { timeout: 15000 });
 
-    // Find start button
-    const startBtn = await controlWindow.locator('#startBtn').first();
-    if (await startBtn.isVisible()) {
-        await startBtn.click();
-
-        // Ждём УСЛОВИЕ — что показанное время сдвинулось, — а не фиксированную
-        // паузу. Первый тик приходит из главного процесса, и на медленной
-        // машине (раннер Windows) он опаздывал: тест читал ещё «05:00» и падал,
-        // хотя таймер шёл. Пауза здесь мерила скорость машины — тот же дефект,
-        // что уже чинился в угле стрелки и в строке дисплея.
-        const display = await controlWindow.locator('#controlTime, #timerDisplay, .timer-display').first();
-        await expect(display).toHaveText(/4:5[0-9]|04:5[0-9]/, { timeout: 15000 });
-        const text = await display.textContent();
-        expect(text).toMatch(/4:5[0-9]|04:5[0-9]/);
-
-        // Pause
-        // Кнопка транспорта в панели ОДНА, вторая скрыта состоянием: берём ту,
-        // что видна сейчас, а не первую в DOM.
-        const pauseBtn = controlWindow.locator('.transport-main:visible').first();
-        await pauseBtn.click();
-    }
-});
-
-test('reset timer', async () => {
-    const resetBtn = await controlWindow.locator('#resetBtn, button:has-text("Сброс"), button:has-text("Reset")').first();
-    if (await resetBtn.isVisible()) {
-        await resetBtn.click();
-        await panelRoundTrip(controlWindow);
-    }
-});
-
-test('tabs are navigable', async () => {
-    // Check tab buttons exist
-    const tabs = await controlWindow.locator('.tab-btn, [data-tab]').count();
-    expect(tabs).toBeGreaterThanOrEqual(2);
+    await controlWindow.locator('#pauseBtn').click();
+    await expect(controlWindow.locator('#statusText')).toHaveText('Пауза');
+    const resume = controlWindow.locator('#startBtn');
+    await expect(resume).toBeVisible();
+    await expect(resume).toContainText('Продолжить');
 });
 
 test('widget window can be opened', async () => {
@@ -102,27 +72,12 @@ test('widget window can be opened', async () => {
     // «Виджет»; после редизайна имя окна лежит в <span> строки, а не в кнопке,
     // и локатор цеплял не тот элемент.
     const widgetToggle = controlWindow.locator('#openWidgetBtn');
-    if (await widgetToggle.isVisible()) {
-        await widgetToggle.click();
-        // Окно — опросом по пробе (было 1000 мс).
-        await waitForWidget(electronApp);
+    await expect(widgetToggle).toHaveAttribute('aria-checked', 'false');
+    await widgetToggle.click();
+    await waitForWidget(electronApp);
+    await expect(widgetToggle).toHaveAttribute('aria-checked', 'true');
 
-        const windows = electronApp.windows();
-        // Should have more than just control window
-        expect(windows.length).toBeGreaterThanOrEqual(1);
-    }
-});
-
-test('no console errors on launch', async () => {
-    const errors = [];
-    controlWindow.on('console', msg => {
-        if (msg.type() === 'error') {
-            errors.push(msg.text());
-        }
-    });
-    // пауза законна: тест утверждает ОТСУТСТВИЕ ошибок консоли за интервал наблюдения.
-    await controlWindow.waitForTimeout(1000);
-    // Filter out expected warnings
-    const realErrors = errors.filter(e => !e.includes('JSON parse error'));
-    expect(realErrors.length).toBe(0);
+    await widgetToggle.click();
+    await waitForWidgetGone(electronApp);
+    await expect(widgetToggle).toHaveAttribute('aria-checked', 'false');
 });

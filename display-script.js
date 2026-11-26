@@ -96,10 +96,6 @@ class DisplayTimer {
         this._analogMinusSpan = null;
         this._analogTextNode = null;
 
-        // F-023: Кэш flip-элементов для applyColors (избегаем querySelectorAll на каждый вызов)
-        this._cachedFlipDigits = null;
-        this._cachedFlipSeparators = null;
-
         // F-025: Кэш стрелок мини-часов по блоку (избегаем querySelector на каждый tick)
         // WeakMap<HTMLElement, { hour, minute, second }>
         this._miniClockHandsCache = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
@@ -114,7 +110,6 @@ class DisplayTimer {
             // прогресса, а не вместо него. Почему одного значения мало,
             // разобрано у самих ворот в updateDisplay().
             lastBand: null,
-            lastDigitalUpdate: null,
             lastFlipUpdate: null,
             lastAnalogUpdate: null,
             lastRunning: null  // FIX BUG-C: track running state
@@ -129,7 +124,6 @@ class DisplayTimer {
         this.endTime = '12:00';
         this.timerScale = 100;
         this.timerStyle = 'circle';
-        this.lastFlipValues = { min1: '', min2: '', sec1: '', sec2: '' };
 
         this.initElements();
         this.initProgress();
@@ -149,11 +143,17 @@ class DisplayTimer {
         this.restoreBlockPositions();
 
         // Show controls hint once (v2 = added wheel+shift info)
+        const hint = document.getElementById('controlsHint');
         if (localStorage.getItem('displayHintShown') === 'v2') {
-            const hint = document.getElementById('controlsHint');
             if (hint) { hint.style.display = 'none'; }
         } else {
             this._safeSetItem('displayHintShown', 'v2');
+            if (hint) {
+                this._hintTimeout = setTimeout(() => {
+                    hint.classList.add('faded');
+                    this._hintTimeout = setTimeout(() => { hint.style.display = 'none'; }, 500);
+                }, 5000);
+            }
         }
 
     }
@@ -161,7 +161,7 @@ class DisplayTimer {
     // localStorage.setItem с защитой от QuotaExceeded и лимитом 1MB на значение
     _safeSetItem(key, value) {
         try {
-            if (new Blob([value]).size > 1024 * 1024) { // 1 MB limit
+            if (!canSafelyStore(value)) {
                 console.warn(`localStorage skipped (too big): ${key}`);
                 return false;
             }
@@ -208,6 +208,7 @@ class DisplayTimer {
         this.movableElements = registry
             .map((row) => Object.assign({}, row, {
                 el: nodes[row.id],
+                home: nodes[row.id] && Array.from(nodes[row.id].classList).find(name => /^(top|bottom)-/.test(name)),
                 cssVar: labelVars[row.id] || null,
                 // Подпись стоит В ПОТОКЕ над таймером, и колонка держит под неё
                 // место. Ушла из потока — компенсация обязана уйти следом.
@@ -312,30 +313,33 @@ class DisplayTimer {
      * ради отката на предыдущую версию, которая доли не понимает.
      */
     saveElementPositions() {
+        this.writeElementPositions({ keepFractions: false });
+    }
+
+    saveElementPositionsKeepingFractions() {
+        this.writeElementPositions({ keepFractions: true });
+    }
+
+    writeElementPositions({ keepFractions }) {
         const positions = {};
         const viewport = { width: window.innerWidth, height: window.innerHeight };
         for (const row of (this.movableElements || [])) {
             if (!row.el.classList.contains('custom-position')) { continue; }
-            const record = {
-                left: parseInt(row.el.style.left) || 0,
-                top: parseInt(row.el.style.top) || 0
-            };
-            const rect = row.el.getBoundingClientRect();
-            const fraction = rect.width > 0
-                ? DisplayLayouts.positionToFraction(rect, viewport)
-                : null;
-            if (fraction) {
-                record.cx = Math.round(fraction.cx * 10000) / 10000;
-                record.cy = Math.round(fraction.cy * 10000) / 10000;
-                this.elementFractions[row.id] = fraction;
+            let fraction = this.elementFractions[row.id];
+            if (!keepFractions) {
+                const rect = row.el.getBoundingClientRect();
+                fraction = rect.width > 0 ? DisplayLayouts.positionToFraction(rect, viewport) : null;
+                if (fraction) { this.elementFractions[row.id] = fraction; }
             }
-            positions[row.id] = record;
+            positions[row.id] = DisplayLayouts.buildPositionRecord(row.el.style, fraction);
         }
         // Пустой набор — тоже состояние («ничего не сдвинуто»), и его
         // записывают: раскладка «Минимум», вернувшая в поток единственный
         // сдвинутый таймер, иначе оставляла в хранилище его старое место, и
         // при следующем открытии окна таймер уезжал туда снова.
-        this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
+        if (!keepFractions || Object.keys(positions).length) {
+            this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
+        }
     }
 
     /**
@@ -422,27 +426,6 @@ class DisplayTimer {
         // сдвинутой точки — окно «съедало» бы композицию шаг за шагом.
         // Поэтому в хранилище уходят прежние доли с новыми пикселями.
         if (moved) { this.saveElementPositionsKeepingFractions(); }
-    }
-
-    /** Записать позиции, оставив доли такими, какими они были. */
-    saveElementPositionsKeepingFractions() {
-        const positions = {};
-        for (const row of (this.movableElements || [])) {
-            if (!row.el.classList.contains('custom-position')) { continue; }
-            const record = {
-                left: parseInt(row.el.style.left) || 0,
-                top: parseInt(row.el.style.top) || 0
-            };
-            const fraction = this.elementFractions[row.id];
-            if (fraction) {
-                record.cx = Math.round(fraction.cx * 10000) / 10000;
-                record.cy = Math.round(fraction.cy * 10000) / 10000;
-            }
-            positions[row.id] = record;
-        }
-        if (Object.keys(positions).length > 0) {
-            this._safeSetItem('displayBlockPositions', JSON.stringify(positions));
-        }
     }
 
     /**
@@ -740,11 +723,7 @@ class DisplayTimer {
             // первый вызов выше мерил карточки ещё по прежнему окну.
             this.applyTimerScale();
         };
-        const debouncedResize = TimeUtils && TimeUtils.debounce
-            ? TimeUtils.debounce(recalc, CONFIG ? CONFIG.RESIZE_DEBOUNCE : 300)
-            : recalc;
-
-        this._handlers.windowResize = debouncedResize;
+        this._handlers.windowResize = TimeUtils.debounce(recalc, CONFIG.RESIZE_DEBOUNCE);
         window.addEventListener('resize', this._handlers.windowResize);
         // Начальный расчёт
         recalc();
@@ -1242,7 +1221,7 @@ class DisplayTimer {
                 free: { left: 0, right: window.innerWidth }
             });
             if (band.left <= 0 && band.right >= window.innerWidth) { return pct; }
-            const floorPct = (CONFIG && CONFIG.MIN_TIMER_SCALE) || 30;
+            const floorPct = CONFIG.MIN_TIMER_SCALE;
             return shared.fitBlockScale({
                 width, height, centerX, centerY,
                 // Вертикаль здесь не ограничивает — её держит fitTimerScale.
@@ -1298,6 +1277,7 @@ class DisplayTimer {
         // Flip карточки
         this.flipMinus = document.getElementById('flipMinus');
         this.flipHoursUnit = document.getElementById('flipHoursUnit');
+        this.flipSeparators = document.querySelectorAll('.flip-separator');
         this.flipHoursSep = document.getElementById('flipHoursSep');
         this.flipHr1 = document.getElementById('flipHr1');
         this.flipHr2 = document.getElementById('flipHr2');
@@ -1457,21 +1437,10 @@ class DisplayTimer {
             }
         }
 
-        if (hands.hour) {
-            // Часовая стрелка: 360/12 = 30 градусов на час + смещение от минут
-            const hourDeg = (hours % 12) * 30 + minutes * 0.5;
-            hands.hour.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
-        }
-        if (hands.minute) {
-            // Минутная стрелка: 360/60 = 6 градусов на минуту
-            const minuteDeg = minutes * 6 + seconds * 0.1;
-            hands.minute.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
-        }
-        if (hands.second) {
-            // Секундная стрелка: 6 градусов на секунду
-            const secondDeg = seconds * 6;
-            hands.second.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
-        }
+        const { hour, minute, second } = RendererShared.clockHandAngles(hours, minutes, seconds);
+        if (hands.hour) { hands.hour.style.transform = `translateX(-50%) rotate(${hour}deg)`; }
+        if (hands.minute) { hands.minute.style.transform = `translateX(-50%) rotate(${minute}deg)`; }
+        if (hands.second) { hands.second.style.transform = `translateX(-50%) rotate(${second}deg)`; }
     }
 
     updateStaticMiniClock(block, timeString) {
@@ -1592,7 +1561,6 @@ class DisplayTimer {
         // перечитывает их ТЕМ ЖЕ путём, что и при открытии: два восстановления
         // — это две копии знания о том, что такое «место карточки».
         this.ipcHandlers.displayRestoreState = () => {
-            this.restoreElementScales();
             this.restoreBlockPositions();
             this.reflowSoon();
         };
@@ -1610,10 +1578,7 @@ class DisplayTimer {
      * процесс, потому что это единственная величина, которую нельзя
      * пересчитать заново.
      *
-     * «Перелимит» прячется, пока таймер в плюсе, ДАЖЕ при включённом тумблере:
-     * висящий весь доклад ноль мозолит глаз и обесценивает момент, когда сумма
-     * пойдёт. «Итого» показывается всегда, когда включён его тумблер, — он для
-     * того и нужен, чтобы видеть накопленное.
+     * Каждый включённый блок остаётся в раскладке, даже пока сумма нулевая.
      */
     updateMoneyBlocks() {
         const Money = MoneyMeter;
@@ -1644,30 +1609,25 @@ class DisplayTimer {
             ? 0
             : Money.liveOverrun(this.remainingSeconds, this.excludedLiveSeconds || 0);
 
-        if (this.overrunCostValueEl) {
-            this.overrunCostValueEl.textContent = Money.formatMoney(Money.overrunCost(live, price, period));
-        }
-        if (this.totalCostValueEl) {
-            this.totalCostValueEl.textContent = summary.money;
-        }
-
         const unlocked = this.floor47Unlocked === true;
-        // «Перелимит» слушается ТУМБЛЕРА, как все остальные блоки.
-        //
-        // До 26.08.2026 он прятался, пока таймер в плюсе («висящий весь доклад
-        // ноль мозолит глаз»). Правило проиграло кадру: раскладка кладёт
-        // элементы по ЖИВЫМ габаритам, а у спрятанного прямоугольник нулевой —
-        // разложить его нечем, и он оставался в домашнем углу поверх соседа.
-        // Блок, впрыгивающий на место только с началом перерасхода, хуже нуля
-        // на экране.
-        if (this.overrunCostBlock) {
-            this.overrunCostBlock.classList.toggle('visible',
-                unlocked && this.showOverrunCost === true);
+        const rows = [
+            { block: this.overrunCostBlock, value: this.overrunCostValueEl, visible: unlocked && this.showOverrunCost === true,
+                text: Money.formatMoney(Money.overrunCost(live, price, period)) },
+            { block: this.totalCostBlock, value: this.totalCostValueEl, visible: unlocked && this.showTotalCost === true,
+                text: summary.money }
+        ];
+        let measure = this._moneyWidths === undefined;
+        for (const { block, value, visible, text } of rows) {
+            if (value && value.textContent !== text) {
+                value.textContent = text;
+                if (visible) { measure = true; }
+            }
+            if (block && block.classList.contains('visible') !== visible) {
+                block.classList.toggle('visible', visible);
+                measure = true;
+            }
         }
-        if (this.totalCostBlock) {
-            this.totalCostBlock.classList.toggle('visible',
-                unlocked && this.showTotalCost === true);
-        }
+        if (!measure) { return; }
 
         // Сумма переросла резерв ширины (`.money-value`) — блок вырос бы только
         // вправо, от своего `left`. Место сдвинутого элемента — доля его
@@ -1739,35 +1699,24 @@ class DisplayTimer {
         // RendererShared.migrateDisplayBlocks в панели, а расположение задаётся
         // перетаскиванием (Alt) и живёт в displayBlockPositions.
         //
-        // Место по умолчанию — прежняя «рамка»: она применяется ОДИН раз, на
-        // первой раскладке, и только к блоку, которого пользователь ещё не
-        // двигал. Раньше эти позиции переставлялись при смене пресета и тогда же
-        // стиралось сохранённое расположение; менять положение блока теперь
-        // некому, кроме самого пользователя.
+        // Домашние углы заданы классами в display.html.
         const migrated = RendererShared.migrateDisplayBlocks(settings);
-        const firstLoad = this._blocksLaidOut !== true;
-        this._blocksLaidOut = true;
-        const hasCustomPositions = (block) => block && block.classList.contains('custom-position');
-
         const BLOCKS = [
-            { el: this.currentTimeBlock, key: 'showCurrentTime', home: 'top-center' },
-            { el: this.eventTimeBlock, key: 'showEventTime', home: 'bottom-left' },
-            { el: this.endTimeBlock, key: 'showEndTime', home: 'bottom-right' },
-            { el: this.timeLeftBlock, key: 'showTimeLeft', home: 'top-left' },
+            { el: this.currentTimeBlock, key: 'showCurrentTime' },
+            { el: this.eventTimeBlock, key: 'showEventTime' },
+            { el: this.endTimeBlock, key: 'showEndTime' },
+            { el: this.timeLeftBlock, key: 'showTimeLeft' },
             // Название НЕ ставится по центру снизу, хотя на образце у
             // пользователя оно там: там же стоит плашка состояния, и на замере
             // они наложились друг на друга. Пять блоков — пять разных углов;
             // передвинуть в центр можно перетаскиванием, и это уже выбор
             // пользователя, а вид по умолчанию не должен выглядеть сломанным.
-            { el: this.eventTitleBlock, key: 'showEventTitle', home: 'top-right' }
+            { el: this.eventTitleBlock, key: 'showEventTitle' }
         ];
         for (const block of BLOCKS) {
             if (!block.el) { continue; }
             if (migrated[block.key] !== undefined) {
                 block.el.classList.toggle('visible', migrated[block.key] === true);
-            }
-            if (firstLoad && !hasCustomPositions(block.el)) {
-                this.applyPosition(block.el, block.home);
             }
         }
 
@@ -1798,8 +1747,7 @@ class DisplayTimer {
         // Скрытый режим «47-й этаж»: ставка и разблокировка.
         //
         // Видимость денежных блоков считает ОДНО место (updateMoneyBlocks), и
-        // в списке BLOCKS выше их намеренно нет: у «Перелимита» условие показа
-        // не сводится к тумблеру — он прячется, пока таймер в плюсе.
+        // в списке BLOCKS выше их нет: оба зависят от разблокировки режима.
         this.floor47Unlocked = settings.floor47Unlocked === true;
         this.showOverrunCost = settings.showOverrunCost === true;
         this.showTotalCost = settings.showTotalCost === true;
@@ -1983,11 +1931,9 @@ class DisplayTimer {
     }
 
     setTimerStyle(style) {
+        style = RendererShared.migrateTimerStyle(style);
+        if (!CONFIG.TIMER_STYLES.includes(style)) { return; }
         this.timerStyle = style;
-
-        // F-023: Инвалидируем кэши DOM-узлов на случай, если смена стиля пересоздаёт элементы
-        this._cachedFlipDigits = null;
-        this._cachedFlipSeparators = null;
 
         // Удаляем все классы стилей с body
         document.body.classList.remove('style-circle', 'style-flip', 'style-analog', 'style-digits');
@@ -2044,25 +1990,6 @@ class DisplayTimer {
         // отдельной арифметики здесь нет и быть не должно.
         this.reflowElements();
         this.reflowSoon();
-    }
-
-    applyPosition(element, position) {
-        // Clear custom positioning if present
-        element.classList.remove(
-            'top-left', 'top-center', 'top-right',
-            'bottom-left', 'bottom-center', 'bottom-right',
-            'top-left-third', 'top-right-third',
-            'bottom-left-third', 'bottom-right-third',
-            'custom-position'
-        );
-        element.style.left = '';
-        element.style.top = '';
-        element.style.right = '';
-        element.style.bottom = '';
-        element.style.marginLeft = '';
-        element.style.marginRight = '';
-        // Добавляем новый класс позиции
-        element.classList.add(position);
     }
 
     loadColors() {
@@ -2217,7 +2144,7 @@ class DisplayTimer {
             : null);
         // Было b3 (0.7): выбор темы приглушал отсчёт ВТОРОЙ раз поверх
         // токена, который и так вторичен.
-        setVar('--analog-digital-color', timerColor ? `${timerColor}e6` : null);
+        setVar('--analog-digital-color', timerColor ? `color-mix(in srgb, ${timerColor} 90%, transparent)` : null);
 
         // Охранника «применять цвет темы, только если НЕ идёт перерасход» здесь
         // больше нет, и он больше не нужен. Он существовал потому, что цвет
@@ -2498,24 +2425,7 @@ class DisplayTimer {
         // ОПТИМИЗАЦИЯ (FIX BUG-007): Проверка изменений перед обновлением
         // Если секунды не изменились, нечего обновлять
         if (this.cache.lastSeconds === secs && !this.finished) {
-            // FIX BUG-C: BUT статус проверяем ВСЕГДА (не зависит от кэша секунд)
-            const status = this.getTimerStatusValue(secs);
-            if (this.cache.lastStatus !== status
-                || this.cache.lastRunning !== this.isRunning
-                || this.cache.lastPaused !== this.isPaused
-                || this.cache.lastFinished !== this.finished) {
-                this.updateStatus(secs);
-                this.cache.lastStatus = status;
-                this.cache.lastRunning = this.isRunning;
-                this.cache.lastPaused = this.isPaused;
-                this.cache.lastFinished = this.finished;
-            }
-            // Здесь стоял вызов _enforceOvertimeColors(secs) — перекраска
-            // «на всякий случай» на КАЖДОМ тике. Она была нужна лишь потому,
-            // что applyColors писала цвет инлайном и стирала красный
-            // перерасхода. Инлайна больше нет: цвет темы приходит переменной
-            // --timer-color, а полосу держат классы .danger/.warning. Стирать
-            // друг друга им нечем, и восстанавливать нечего.
+            this.updateStatusIfChanged(secs);
             return;
         }
 
@@ -2535,11 +2445,6 @@ class DisplayTimer {
             this.timeDisplay.classList.toggle('signed-hours', secs < 0 && Math.abs(secs) >= 3600);
 
             this.cache.lastFormatted = formatted;
-        }
-
-        // Обновляем цифровой стиль (только если изменилось)
-        if (hasFormattedChanged || this.cache.lastDigitalUpdate !== secs) {
-            this.cache.lastDigitalUpdate = secs;
         }
 
         // Обновляем перекидные часы (только если изменилось)
@@ -2609,19 +2514,7 @@ class DisplayTimer {
         }
 
 
-        // Статус-пилюля зависит от нескольких флагов, а getTimerStatusValue()
-        // смотрит только на секунды — нужно инвалидировать кэш по каждому из них.
-        const status = this.getTimerStatusValue(secs);
-        if (this.cache.lastStatus !== status
-            || this.cache.lastRunning !== this.isRunning
-            || this.cache.lastPaused !== this.isPaused
-            || this.cache.lastFinished !== this.finished) {
-            this.updateStatus(secs);
-            this.cache.lastStatus = status;
-            this.cache.lastRunning = this.isRunning;
-            this.cache.lastPaused = this.isPaused;
-            this.cache.lastFinished = this.finished;
-        }
+        this.updateStatusIfChanged(secs);
 
         // Сохраняем последнее значение секунд
         this.cache.lastSeconds = secs;
@@ -2752,15 +2645,20 @@ class DisplayTimer {
         }
     }
 
-    // Вспомогательная функция для определения статуса (для кэширования)
-    getTimerStatusValue(secs) {
-        if (TimeUtils && TimeUtils.getTimerStatus) {
-            return TimeUtils.getTimerStatus(secs, this.totalSeconds);
+    updateStatusIfChanged(secs) {
+        // Статус-пилюля зависит от нескольких флагов, а getTimerStatus()
+        // смотрит только на секунды — нужно инвалидировать кэш по каждому из них.
+        const status = TimeUtils.getTimerStatus(secs, this.totalSeconds);
+        if (this.cache.lastStatus !== status
+            || this.cache.lastRunning !== this.isRunning
+            || this.cache.lastPaused !== this.isPaused
+            || this.cache.lastFinished !== this.finished) {
+            this.updateStatus(secs);
+            this.cache.lastStatus = status;
+            this.cache.lastRunning = this.isRunning;
+            this.cache.lastPaused = this.isPaused;
+            this.cache.lastFinished = this.finished;
         }
-        if (secs < 0) {return 'overtime';}
-        if (secs === 0 && this.totalSeconds > 0) {return 'danger';}
-        if (secs <= 60 && secs > 0) {return 'warning';}
-        return 'normal';
     }
 
     updateFlipDisplay(secs) {
@@ -2772,24 +2670,7 @@ class DisplayTimer {
         // Передаём геройский тотал (this._heroTotal()), чтобы правило показа
         // часов осталось «hours > 0 || total >= 3600» — но от того тотала,
         // которому принадлежит показанное число, а не от пресета доклада.
-        let cells;
-        if (RendererShared) {
-            cells = RendererShared.flipCells(secs, this._heroTotal());
-        } else {
-            const absSecs = Math.abs(secs);
-            const hours = Math.floor(absSecs / 3600);
-            const mins = Math.floor((absSecs % 3600) / 60);
-            const seconds = absSecs % 60;
-            cells = {
-                h1: String(Math.floor(hours / 10) % 10),
-                h2: String(hours % 10),
-                m1: String(Math.floor(mins / 10) % 10),
-                m2: String(mins % 10),
-                s1: String(Math.floor(seconds / 10)),
-                s2: String(seconds % 10),
-                hasHours: hours > 0 || this._heroTotal() >= 3600
-            };
-        }
+        const cells = RendererShared.flipCells(secs, this._heroTotal());
 
         // Показания часов — ВСЕГДА шесть створок, даже когда час нулевой.
         // Правило «hours > 0 || total >= 3600» верно для ДЛИТЕЛЬНОСТИ: у часов
@@ -2801,6 +2682,14 @@ class DisplayTimer {
             cells.hasHours = true;
         }
 
+        // При переходе через ноль появляется отдельная карточка минуса.
+        // Часовая группа тоже меняет ширину ряда. Место между боковыми
+        // блоками нужно проверить уже по новому составу табло.
+        const rowWidthChanged = this.timerFlip?.classList.contains('active') && (
+            (this.flipMinus && this.flipMinus.classList.contains('visible') !== isNegative)
+            || this.timerFlip.classList.contains('has-hours') !== cells.hasHours
+        );
+
         // Показываем/скрываем знак минуса
         if (this.flipMinus) {
             this.flipMinus.classList.toggle('visible', isNegative);
@@ -2811,10 +2700,11 @@ class DisplayTimer {
         // в разметке нет style="display:none", который строгая CSP не пустит.
         const showHours = cells.hasHours;
         if (this.timerFlip) { this.timerFlip.classList.toggle('has-hours', showHours); }
+        if (rowWidthChanged) { this.applyTimerScale(); }
         if (this.flipHoursUnit && this.flipHoursSep) {
             if (showHours && this.flipHr1 && this.flipHr2) {
-                this.updateFlipCard(this.flipHr1, cells.h1, 'hr1');
-                this.updateFlipCard(this.flipHr2, cells.h2, 'hr2');
+                FlipCard.flipCardTo(this.flipHr1, '.flip-digit', cells.h1);
+                FlipCard.flipCardTo(this.flipHr2, '.flip-digit', cells.h2);
             }
         }
 
@@ -2824,10 +2714,10 @@ class DisplayTimer {
         const sec2 = cells.s2;
 
         // Анимация перекидывания при изменении
-        this.updateFlipCard(this.flipMin1, min1, 'min1');
-        this.updateFlipCard(this.flipMin2, min2, 'min2');
-        this.updateFlipCard(this.flipSec1, sec1, 'sec1');
-        this.updateFlipCard(this.flipSec2, sec2, 'sec2');
+        FlipCard.flipCardTo(this.flipMin1, '.flip-digit', min1);
+        FlipCard.flipCardTo(this.flipMin2, '.flip-digit', min2);
+        FlipCard.flipCardTo(this.flipSec1, '.flip-digit', sec1);
+        FlipCard.flipCardTo(this.flipSec2, '.flip-digit', sec2);
 
         // Классы предупреждения + inline color override (applyColors sets inline style)
         const flipCards = [this.flipMin1, this.flipMin2, this.flipSec1, this.flipSec2];
@@ -2839,7 +2729,7 @@ class DisplayTimer {
         });
 
         const band = this._colorBand(secs);
-        const flipSeparators = document.querySelectorAll('.flip-separator');
+        const flipSeparators = this.flipSeparators;
         // Разделители ведут полосу тем же классом, что и карточки. Раньше их
         // красил инлайн, и правил CSS для них не существовало вовсе — то есть
         // состояние было выражено только в JS и теме не подчинялось.
@@ -2861,45 +2751,13 @@ class DisplayTimer {
         // который приходилось выбирать между темой и полосой вручную.
     }
 
-    // Перекидывание карточки. Реализация общая для всех трёх окон —
-    // flip-card.js: раньше она жила только здесь, а виджет и часы меняли цифру
-    // рывком. Незавершённые таймеры снятия класса ведёт сам модуль, cleanup()
-    // гасит их одним FlipCard.cancelPending().
-    updateFlipCard(card, value, key) {
-        const id = FlipCard.flipCardTo(card, '.flip-digit', value);
-        if (id !== null) { this.lastFlipValues[key] = value; }
-    }
-
     updateAnalogDisplay(secs) {
         if (!this.analogHandMinute || !this.analogHandSecond) {return;}
 
-        const absSecs = Math.abs(secs);
-        const totalMins = absSecs / 60;
-        const seconds = absSecs % 60;
-
-        // Часовая стрелка — полный оборот за 12 часов ОСТАТКА, плавно (дробные
-        // часы учитываются так же, как минутная учитывает дробные минуты).
-        //
-        // Раньше её не двигал никто: элемент есть в разметке (#analogHandHour),
-        // стиль .hand-hour есть, ссылка в initElements() есть — а присваивания
-        // transform не было ни одного, поэтому стрелка навсегда стояла на 12.
-        // На таймерах короче часа это выглядело «случайно правильно» (0 часов и
-        // есть 12), а на 1:30:00 минутная бежала, часовая же продолжала
-        // показывать 12 — циферблат читался как сломанный. На презентационном
-        // экране, где как раз и ставят длинные интервалы, это самый заметный случай.
-        if (this.analogHandHour) {
-            const hourDeg = ((absSecs / 3600) % 12) * 30;
-            this.analogHandHour.style.transform = `rotate(${hourDeg}deg)`;
-        }
-
-        // Минутная стрелка - полный оборот за 60 минут
-        // Плавное движение с учетом секунд
-        const minuteDeg = (totalMins / 60) * 360;
-        this.analogHandMinute.style.transform = `rotate(${minuteDeg}deg)`;
-
-        // Секундная стрелка - полный оборот за 60 секунд
-        const secondDeg = (seconds / 60) * 360;
-        this.analogHandSecond.style.transform = `rotate(${secondDeg}deg)`;
+        const { hour, minute, second } = RendererShared.timerHandAngles(secs);
+        if (this.analogHandHour) { this.analogHandHour.style.transform = `rotate(${hour}deg)`; }
+        this.analogHandMinute.style.transform = `rotate(${minute}deg)`;
+        this.analogHandSecond.style.transform = `rotate(${second}deg)`;
 
         // Обновляем цифровое время под циферблатом
         if (this.analogDigitalTime) {
@@ -2914,7 +2772,7 @@ class DisplayTimer {
             //
             // absSecs >= 0, поэтому знак форматтер не добавит — минус рисуется
             // отдельно через _setAnalogTimeContent.
-            const timeStr = this.formatTime(absSecs);
+            const timeStr = this.formatTime(Math.abs(secs));
             this._setAnalogTimeContent(timeStr, secs < 0);
         }
 
@@ -3323,6 +3181,7 @@ class DisplayTimer {
             if (e.key === 'Alt') { document.body.classList.remove('alt-active'); }
         };
         this._handlers.altBlur = () => {
+            this._handlers.endBlockDrag?.();
             document.body.classList.remove('alt-active');
         };
         document.addEventListener('keydown', this._handlers.altKeydown);
@@ -3516,10 +3375,11 @@ class DisplayTimer {
                     this.ipcRenderer.send('display-block-hidden', { block: row.toggle });
                 }
             };
-            this._handlers.blockCloses.push({ button, handler: onClose });
+            const stopPress = (e) => e.stopPropagation();
+            this._handlers.blockCloses.push({ button, onClose, stopPress });
             button.addEventListener('click', onClose);
             // Нажатие мышью на крестике не должно начинать жест перетаскивания.
-            button.addEventListener('mousedown', (e) => e.stopPropagation());
+            button.addEventListener('mousedown', stopPress);
         }
 
         // Храним ссылки на mousedown handlers блоков для cleanup
@@ -3527,7 +3387,8 @@ class DisplayTimer {
 
         BLOCK_REGISTRY.forEach(({ el: block, flowClass, anchor }) => {
             const blockMousedown = (e) => {
-                if (!e.altKey) { return; }
+                if (!e.altKey || e.button !== 0) { return; }
+                this._handlers.endBlockDrag?.();
                 if (window.UILock && window.UILock.isLocked()) { return; }
                 e.preventDefault();
                 e.stopPropagation();
@@ -3631,6 +3492,7 @@ class DisplayTimer {
                 };
 
                 const onMove = (ev) => {
+                    if ((ev.buttons & 1) === 0) { onUp(); return; }
                     ev.preventDefault();
                     pending = { x: ev.screenX, y: ev.screenY };
                     if (rafId) { cancelAnimationFrame(rafId); }
@@ -3641,6 +3503,7 @@ class DisplayTimer {
                 };
 
                 const onUp = () => {
+                    this._handlers.endBlockDrag = null;
                     block.classList.remove('dragging-block');
                     document.removeEventListener('mousemove', onMove);
                     document.removeEventListener('mouseup', onUp);
@@ -3657,6 +3520,7 @@ class DisplayTimer {
                     this.applyTimerScale();
                 };
 
+                this._handlers.endBlockDrag = onUp;
                 document.addEventListener('mousemove', onMove);
                 document.addEventListener('mouseup', onUp);
             };
@@ -3746,7 +3610,7 @@ class DisplayTimer {
             const savedTimerScale = localStorage.getItem(STORAGE_TIMER_SCALE_KEY);
             if (savedTimerScale) {
                 const pct = parseInt(savedTimerScale);
-                if (pct >= 30 && pct <= 300) {
+                if (pct >= CONFIG.MIN_TIMER_SCALE && pct <= CONFIG.MAX_TIMER_SCALE) {
                     this.timerScale = pct;
                     this.applyTimerScale();
                 }
@@ -3770,7 +3634,8 @@ class DisplayTimer {
             if (typeof saved === 'string' && saved.trim()) {
                 try { positions = JSON.parse(saved); } catch { return; }
             }
-            if (typeof positions !== 'object' || positions === null) { return; }
+            positions = validateBlockPositions(positions);
+            if (!positions) { return; }
 
             // Имена берутся из ТОГО ЖЕ реестра, что и при сохранении
             // (initMovableElements). Прежде здесь стоял его третий по счёту
@@ -3780,19 +3645,10 @@ class DisplayTimer {
                 const key = row.id;
                 const block = row.el;
                 const pos = positions[key];
-                if (!pos || typeof pos !== 'object'
-                    || !Number.isFinite(pos.left) || !Number.isFinite(pos.top)) {
-                    // Записи нет — а элемент СТОИТ сдвинутым. Так бывает после
-                    // пресета: снимок сделан до того, как элемент двигали, и
-                    // «применить вид» обязано вернуть его на место, иначе на
-                    // экране не тот вид, что записан (а ряд ячеек это сравнение
-                    // и показывает). Возвращается только тот, чьё место в
-                    // ПОТОКЕ: подпись, плашка и колонка героя. У карточки места
-                    // в потоке нет вовсе — её положение задаёт класс угла, и
-                    // снятие custom-position оставило бы её без координат.
-                    if ((row.cssVar || row.kind === 'timer')
-                        && block.classList.contains('custom-position')) {
+                if (!pos) {
+                    if (block.classList.contains('custom-position')) {
                         this.releaseToFlow(row);
+                        if (row.home) { block.classList.add(row.home); }
                     }
                     continue;
                 }
@@ -3801,9 +3657,7 @@ class DisplayTimer {
                 // мониторе или другого размера, и пиксель означал бы место в
                 // ПРОШЛОМ окне. Пиксель остаётся запасным путём для записей,
                 // сделанных версией, которая долей ещё не знала.
-                const fraction = (Number.isFinite(pos.cx) && Number.isFinite(pos.cy))
-                    ? { cx: pos.cx, cy: pos.cy }
-                    : null;
+                const fraction = pos.cx === undefined ? null : { cx: pos.cx, cy: pos.cy };
 
                 // Классы места снимает общий метод — он же снимает компенсацию
                 // потока у подписи (см. row.flowClass).
@@ -3858,6 +3712,13 @@ class DisplayTimer {
     }
 
     cleanup() {
+        clearTimeout(this._hintTimeout);
+        this._handlers.endBlockDrag?.();
+        for (const { button, onClose, stopPress } of this._handlers.blockCloses || []) {
+            button.removeEventListener('click', onClose);
+            button.removeEventListener('mousedown', stopPress);
+        }
+
         // Очищаем flashInterval если он активен
         if (this.flashInterval) {
             clearInterval(this.flashInterval);
@@ -3888,6 +3749,12 @@ class DisplayTimer {
 
         // Удаляем IPC listeners если они есть
         if (this.ipcRenderer) {
+            if (this.ipcHandlers.eventOverrunState) {
+                this.ipcRenderer.removeListener('event-overrun-state', this.ipcHandlers.eventOverrunState);
+            }
+            if (this.ipcHandlers.displayRestoreState) {
+                this.ipcRenderer.removeListener('display-restore-state', this.ipcHandlers.displayRestoreState);
+            }
             if (this.ipcHandlers.timerState) {
                 this.ipcRenderer.removeListener('timer-state', this.ipcHandlers.timerState);
             }
@@ -3910,6 +3777,7 @@ class DisplayTimer {
 
         // Удаляем document/window listeners
         if (this._handlers.windowResize) {
+            this._handlers.windowResize.cancel();
             window.removeEventListener('resize', this._handlers.windowResize);
         }
         if (this._handlers.shortcutsKeydown) {
@@ -3963,16 +3831,18 @@ class DisplayTimer {
 // Pure helpers для переиспользования и тестирования
 
 // Валидирует структуру позиций блоков после JSON.parse.
-// Возвращает очищенный объект { [key]: { left, top } } или null.
+// У старых записей только пиксели, у новых ещё и центр в долях окна.
 function validateBlockPositions(positions) {
-    if (typeof positions !== 'object' || positions === null) { return null; }
+    if (!positions || typeof positions !== 'object' || Array.isArray(positions)) { return null; }
     const result = {};
     for (const [key, pos] of Object.entries(positions)) {
         if (!pos || typeof pos !== 'object') { continue; }
         if (!Number.isFinite(pos.left) || !Number.isFinite(pos.top)) { continue; }
-        const left = Math.max(-5000, Math.min(5000, pos.left));
-        const top = Math.max(-5000, Math.min(5000, pos.top));
-        result[key] = { left, top };
+        const entry = { left: pos.left, top: pos.top };
+        if (Number.isFinite(pos.cx) && Number.isFinite(pos.cy)) {
+            Object.assign(entry, { cx: pos.cx, cy: pos.cy });
+        }
+        if (key !== '__proto__') { result[key] = entry; }
     }
     return result;
 }
@@ -3995,7 +3865,7 @@ function canSafelyStore(value, limitBytes = 1024 * 1024) {
 
 // `displayTimer` — живая привязка: display-theme-sync.js читает её import-ом
 // (null до DOMContentLoaded).
-export { validateBlockPositions, canSafelyStore, displayTimer };
+export { DisplayTimer, validateBlockPositions, canSafelyStore, displayTimer };
 
 // Инициализация
 let displayTimer;
@@ -4006,17 +3876,6 @@ if (typeof document !== 'undefined' && document.addEventListener) {
         // import. `window.displayTimer` — только крючок e2e.
         window.displayTimer = displayTimer;
 
-        // Hint-strip: показываем первые 5 секунд, затем навсегда скрываем
-        // (без возврата на mousemove/keydown — чтобы не мешала в презентации)
-        (function hintFade() {
-            const hint = document.getElementById('controlsHint');
-            if (!hint) { return; }
-            setTimeout(() => {
-                hint.classList.add('faded');
-                // После fade-анимации полностью убираем из потока, чтобы не ловить фокус/клики
-                setTimeout(() => { hint.style.display = 'none'; }, 500);
-            }, 5000);
-        })();
     });
 
     // Cleanup при закрытии окна

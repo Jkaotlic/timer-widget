@@ -30,8 +30,8 @@ const LOCK_BUTTON_IDS = ['lockToggle', 'miniBarLock'];
 /**
  * @param {object} deps
  * @param {Document} deps.doc      документ панели
- * @param {object|null} deps.ipc   ipcRenderer (в браузере без Electron — null)
- * @param {object} deps.lock       модуль замка (window.UILock)
+ * @param {any} deps.ipc   ipcRenderer (в браузере без Electron — null)
+ * @param {any} deps.lock       модуль замка (window.UILock)
  * @param {string|string[]} [deps.buttonId] id кнопки (или несколько)
  * @returns {{ set: (locked:boolean) => void, get: () => boolean }|null}
  */
@@ -94,8 +94,8 @@ function bindLockToggle({ doc, ipc, lock, buttonId = LOCK_BUTTON_IDS }) {
  *
  * @param {object} deps
  * @param {Document} deps.doc
- * @param {object|null} deps.ipc
- * @param {object} deps.theme    модуль темы (window.UITheme)
+ * @param {any} deps.ipc
+ * @param {any} deps.theme    модуль темы (window.UITheme)
  * @param {string} [deps.buttonId]
  * @returns {{ set: (theme:string) => void }|null}
  */

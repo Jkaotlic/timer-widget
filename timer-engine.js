@@ -6,27 +6,15 @@
  * Pure timer arithmetic — no Electron APIs, no side effects, no IPC.
  * Returns new state objects + a list of events for the caller to broadcast.
  *
- * State shape:
- *   {
- *     totalSeconds: number,      // Original preset duration
- *     remainingSeconds: number,  // Current remaining (negative = overrun)
- *     presetSeconds: number,     // Preset for reset (survives adjustments)
- *     isRunning: boolean,
- *     isPaused: boolean,
- *     finished: boolean
- *   }
+ * @typedef {Pick<TimerState, 'totalSeconds' | 'remainingSeconds' | 'presetSeconds' |
+ *   'isRunning' | 'isPaused' | 'finished'>} TimerEngineState
  *
- * Config shape:
- *   {
- *     allowNegative: boolean,          // Allow overrun past zero
- *     overrunLimitSeconds: number,     // Hard stop at -overrunLimitSeconds (0 = no limit)
- *     overrunIntervalMinutes: number   // Fire 'timer-overrun-minute' every N minutes
- *   }
+ * @typedef {object} TimerConfig
+ * @property {boolean} allowNegative Allow overrun past zero
+ * @property {number} overrunLimitSeconds Hard stop at this overrun (0 = no limit)
+ * @property {number} overrunIntervalMinutes Interval for overrun reminders
  *
- * Events (strings, fired by tick):
- *   'timer-reached-zero'    — emitted once when crossing 0 with allowNegative
- *   'timer-minute'          — emitted when crossing 60s threshold (one minute left)
- *   'timer-overrun-minute'  — emitted every overrunIntervalMinutes in overrun
+ * @typedef {'timer-reached-zero' | 'timer-minute' | 'timer-overrun-minute'} TimerEvent
  */
 
 /**
@@ -40,15 +28,16 @@
  * per call regardless of how many seconds the step spans (no event spam after
  * a long sleep, no missed zero crossing).
  *
- * @param {Object} state Current timer state
- * @param {Object} config Timer config
+ * @param {TimerEngineState} state Current timer state
+ * @param {Partial<TimerConfig>} [config] Timer config
  * @param {number} [stepSeconds=1] Whole seconds to advance (clamped to >= 1)
- * @returns {{state: Object, events: string[], finished: boolean}}
+ * @returns {{state: TimerEngineState, events: TimerEvent[], finished: boolean}}
  *   - state: new state after tick
  *   - events: array of event names to fire
  *   - finished: true when the timer should stop (caller clears interval)
  */
 function tick(state, config = {}, stepSeconds = 1) {
+    /** @type {TimerEvent[]} */
     const events = [];
     const prevRemaining = state.remainingSeconds;
     let step = Math.floor(Number(stepSeconds));
@@ -144,6 +133,7 @@ function toWholeSeconds(value) {
     return Math.trunc(value);
 }
 
+/** @param {number} value @param {number} min */
 function clampSeconds(value, min) {
     return Math.min(MAX_SECONDS, Math.max(min, value));
 }
@@ -152,10 +142,10 @@ function clampSeconds(value, min) {
  * Adjust remaining by delta seconds.
  * totalSeconds grows to match if new remaining exceeds it (so progress bars remain sane).
  *
- * @param {Object} state
- * @param {number} deltaSeconds
- * @param {boolean} allowNegative
- * @returns {Object} new state
+ * @param {TimerEngineState} state
+ * @param {unknown} deltaSeconds
+ * @param {boolean} [allowNegative]
+ * @returns {TimerEngineState} new state
  */
 function adjust(state, deltaSeconds, allowNegative = false) {
     const delta = toWholeSeconds(deltaSeconds) || 0;
@@ -173,8 +163,8 @@ function adjust(state, deltaSeconds, allowNegative = false) {
  * Reset to presetSeconds (falls back to totalSeconds if preset is 0/undefined).
  * Clears isRunning/isPaused/finished.
  *
- * @param {Object} state
- * @returns {Object} new state
+ * @param {TimerEngineState} state
+ * @returns {TimerEngineState} new state
  */
 function reset(state) {
     const resetTo = state.presetSeconds || state.totalSeconds || 0;
@@ -191,9 +181,9 @@ function reset(state) {
 /**
  * Set a new preset. Updates all three time fields and clears running state.
  *
- * @param {Object} state
- * @param {number} seconds
- * @returns {Object} new state
+ * @param {TimerEngineState} state
+ * @param {unknown} seconds
+ * @returns {TimerEngineState} new state
  */
 function setPreset(state, seconds) {
     const whole = toWholeSeconds(seconds);
@@ -212,8 +202,8 @@ function setPreset(state, seconds) {
 /**
  * Mark timer as running. Does NOT start an interval — caller must do that.
  *
- * @param {Object} state
- * @returns {Object} new state
+ * @param {TimerEngineState} state
+ * @returns {TimerEngineState} new state
  */
 function start(state) {
     return {
@@ -227,8 +217,8 @@ function start(state) {
 /**
  * Mark timer as paused.
  *
- * @param {Object} state
- * @returns {Object} new state
+ * @param {TimerEngineState} state
+ * @returns {TimerEngineState} new state
  */
 function pause(state) {
     return {
@@ -239,7 +229,17 @@ function pause(state) {
     };
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} [min]
+ * @returns {value is number}
+ */
+function isTimerSeconds(value, min = 0) {
+    return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= MAX_SECONDS;
+}
+
 module.exports = {
+    isTimerSeconds,
     MAX_SECONDS,
     toWholeSeconds,
     tick,

@@ -1,5 +1,10 @@
 'use strict';
 
+/** @typedef {import('./timer-engine.js').TimerEvent} TimerEvent */
+/** @typedef {import('./timer-engine.js').TimerConfig} TimerConfig */
+/** @typedef {{tick?: boolean}} StateUpdateMeta */
+/** @typedef {{presetSeconds?: unknown, totalSeconds?: unknown, remainingSeconds?: unknown}} RecoveryTimes */
+
 /**
  * timer-controller.js
  *
@@ -44,12 +49,12 @@
  * inline emitTimerState in electron-main.js.
  *
  * @param {object} [deps]
- * @param {any} [deps.engine]
+ * @param {typeof import('./timer-engine.js')} [deps.engine]
  * @param {() => number} [deps.now]
  * @param {() => number} [deps.monotonic]
- * @param {(state: TimerState, meta: { tick?: boolean }) => void} [deps.onState]
+ * @param {(state: TimerState, meta: StateUpdateMeta) => void} [deps.onState]
  *     `state` и есть payload `timer-state` (types/ipc-payloads.d.ts)
- * @param {(name: string) => void} [deps.onEvent]
+ * @param {(name: TimerEvent) => void} [deps.onEvent]
  */
 function createTimerController(deps = {}) {
     const engine = deps.engine;
@@ -77,6 +82,7 @@ function createTimerController(deps = {}) {
         updateCounter: 0   // Монотонный счетчик для надежной синхронизации
     };
 
+    /** @type {TimerConfig} */
     let timerConfig = {
         allowNegative: false,
         overrunLimitSeconds: 0,
@@ -91,7 +97,8 @@ function createTimerController(deps = {}) {
     let timerAnchorMono = 0;       // monotonic() captured when the run/anchor began
     let timerAnchorRemaining = 0;  // remainingSeconds at that anchor
     let sleepCreditMs = 0;         // сон машины с момента якоря (монотонные его не видят)
-    let suspendMark = null;        // { wall, mono } — где застал suspend()
+    /** @type {{wall: number, mono: number} | null} */
+    let suspendMark = null;
 
     // Доля секунды, натикавшая к следующему видимому шагу, — вне хода её нет.
     // Пауза забирала её с собой: каждый цикл «пауза — старт» удлинял таймер
@@ -122,7 +129,11 @@ function createTimerController(deps = {}) {
         return timerConfig;
     }
 
-    // emitTimerState equivalent: merge + stamp + bump counter + notify.
+    /**
+     * Merge + stamp + bump counter + notify.
+     * @param {Partial<TimerState>} [partial]
+     * @param {StateUpdateMeta} [meta]
+     */
     function patch(partial = {}, meta = {}) {
         // FIX BUG-012: Увеличиваем монотонный счетчик при каждом обновлении
         timerUpdateCounter++;
@@ -139,11 +150,14 @@ function createTimerController(deps = {}) {
         return timerState;
     }
 
-    // Mirror of the timer-command config-merge block. Returns true when the
-    // config actually changed (the "configChanged" semantics in electron-main).
+    /**
+     * Returns true when the config actually changed.
+     * @param {unknown} [partial] Raw timer-command payload
+     */
     function setConfig(partial = {}) {
         if (partial === null || typeof partial !== 'object') { return false; }
-        const { allowNegative, overrunLimitSeconds, overrunIntervalMinutes } = partial;
+        const { allowNegative, overrunLimitSeconds, overrunIntervalMinutes } =
+            /** @type {Record<string, unknown>} */ (partial);
         let configChanged = false;
 
         if (typeof allowNegative === 'boolean') {
@@ -157,6 +171,7 @@ function createTimerController(deps = {}) {
         // а из '' и [] — 0, то есть снятый лимит. Окна шлют числа; иное —
         // чужая посылка, и конфиг она не меняет. Сверху — потолок таймера.
         const MAX = engine.MAX_SECONDS;
+        /** @param {unknown} v @returns {v is number} */
         const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
         if (isNum(overrunLimitSeconds)) {
             const newLimit = Math.min(MAX, Math.max(0, overrunLimitSeconds));
@@ -178,6 +193,7 @@ function createTimerController(deps = {}) {
 
     // finishTimer equivalent. Does NOT touch any real interval (electron-main
     // clears its interval when start()/reconcile() report a non-running state).
+    /** @param {number} [finalRemaining] */
     function finish(finalRemaining) {
         carryMs = 0;
         const remaining = finalRemaining !== undefined
@@ -262,6 +278,7 @@ function createTimerController(deps = {}) {
     // Returns true when it emitted, false when it was a running no-op — so the
     // caller can replicate the original `emittedByCommand` bookkeeping (a config
     // change still gets its own emit when set was skipped while running).
+    /** @param {unknown} seconds */
     function setPreset(seconds) {
         if (timerState.isRunning) { return false; }
         // Не-число — не команда (BUG-12). Движок превратил бы его в 0, и
@@ -283,6 +300,7 @@ function createTimerController(deps = {}) {
     // 'adjust' command equivalent. Re-anchors while running so the next
     // reconcile continues from the new value instead of "correcting" the
     // on-the-fly adjustment away.
+    /** @param {unknown} deltaSeconds */
     function adjust(deltaSeconds) {
         // Натикавшее до поправки — сначала в состояние: иначе новый якорь
         // молча выбросил бы и его, и долю секунды (та же потеря, что BUG-05).
@@ -365,15 +383,16 @@ function createTimerController(deps = {}) {
     // directly without emitting — mirrors the inline recovery block that wrote
     // straight to the timerState globals before any window existed. No counter
     // bump, no onState (nothing is listening yet at startup).
+    /** @param {RecoveryTimes} [partial] */
     function restoreState(partial = {}) {
         if (partial === null || typeof partial !== 'object') { return; }
-        if (partial.presetSeconds !== undefined) {
+        if (engine.isTimerSeconds(partial.presetSeconds)) {
             timerState.presetSeconds = partial.presetSeconds;
         }
-        if (Number.isFinite(partial.totalSeconds)) {
+        if (engine.isTimerSeconds(partial.totalSeconds)) {
             timerState.totalSeconds = partial.totalSeconds;
         }
-        if (Number.isFinite(partial.remainingSeconds)) {
+        if (engine.isTimerSeconds(partial.remainingSeconds, -engine.MAX_SECONDS)) {
             timerState.remainingSeconds = partial.remainingSeconds;
         }
     }

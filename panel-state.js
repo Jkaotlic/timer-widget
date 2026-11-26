@@ -354,7 +354,8 @@ const PanelStateMixin = {
         // Тот же приём, что у пресетов вида (канал `preset-apply`): состояние
         // звука принадлежит панели, и второй дороги до него нет.
         if (ipcRenderer) {
-            ipcRenderer.on('sound-toggle', () => this.toggleSoundMaster());
+            this._handlers.onSoundToggle = () => this.toggleSoundMaster();
+            ipcRenderer.on('sound-toggle', this._handlers.onSoundToggle);
         }
     },
 

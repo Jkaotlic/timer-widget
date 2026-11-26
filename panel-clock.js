@@ -21,6 +21,7 @@
  */
 
 import * as SecurityUtils from './security.js';
+import * as RendererShared from './renderer-shared.js';
 import * as ClockSettingsSchema from './clock-settings-schema.js';
 import * as SettingsSchema from './settings-schema.js';
 
@@ -77,6 +78,21 @@ const PanelClockMixin = {
 
     loadClockSettings() {
         ClockSettingsSchema.applyClockSettings(this, readClockStored());
+        // Ползунок «Масштаб часов». Единственный источник правды здесь —
+        // clockGeometry, который пишет САМО окно часов (localStorage общий
+        // для всех окон приложения). В displayExtSettings масштаба часов
+        // нет вообще, поэтому без этого чтения ползунок при каждом запуске
+        // показывал «100%» независимо от реального размера окна.
+        const clockGeo = SecurityUtils.safeJSONParse(localStorage.getItem('clockGeometry'), null);
+        const clockScaleSliderEl = /** @type {HTMLInputElement} */ (document.getElementById('clockScale'));
+        const clockScaleLabelEl = document.getElementById('clockScaleValue');
+        if (clockScaleSliderEl && clockGeo && Number.isFinite(Number(clockGeo.scalePct))) {
+            // Присваивание .value НЕ порождает 'input', поэтому обратной
+            // отправки в окно часов не происходит и петля не замыкается.
+            const pct = RendererShared.clampScale(Number(clockGeo.scalePct), Number(clockScaleSliderEl.min), Number(clockScaleSliderEl.max));
+            clockScaleSliderEl.value = String(pct);
+            if (clockScaleLabelEl) { clockScaleLabelEl.textContent = pct + '%'; }
+        }
         // Деления — свой ключ вне clockWidgetSettings. Перечитываются
         // здесь же: эту раскладку зовёт и применение пресета, и без
         // строки тумблер после пресета показывал прежнее значение.

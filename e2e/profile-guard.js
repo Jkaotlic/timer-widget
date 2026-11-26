@@ -42,14 +42,12 @@
  */
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const SettingsSchema = require('../settings-schema.js');
 const ClockSettingsSchema = require('../clock-settings-schema.js');
 const UITheme = require('../ui-theme.js');
-
-const LEDGER = path.join(os.tmpdir(), 'timer-widget-e2e-profile-leaks.json');
 const { RELAY_STATE_FILE } = require('../relay-store.js');
+const { getUserDataDir } = require('./run-profile');
 
 /**
  * Ключи, которые пишет само ПРИЛОЖЕНИЕ, а не тест, — каждый с причиной.
@@ -173,9 +171,14 @@ function diffProfiles(before, after) {
     return out;
 }
 
+function ledgerPath() {
+    return path.join(getUserDataDir(), 'e2e-profile-leaks.json');
+}
+
 function readLedger() {
+    const file = ledgerPath();
     try {
-        const ledger = JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
+        const ledger = JSON.parse(fs.readFileSync(file, 'utf8'));
         ledger.leaks = ledger.leaks || {};
         ledger.restored = ledger.restored || {};
         return ledger;
@@ -185,11 +188,7 @@ function readLedger() {
 }
 
 function writeLedger(ledger) {
-    fs.writeFileSync(LEDGER, JSON.stringify(ledger, null, 2));
-}
-
-function resetLedger() {
-    fs.rmSync(LEDGER, { force: true });
+    fs.writeFileSync(ledgerPath(), JSON.stringify(ledger, null, 2));
 }
 
 /** Имя текущего теста «файл › describe › тест» или null вне теста. */
@@ -286,9 +285,7 @@ const baselines = new Map();
  */
 /** Удалить память ретрансляторов main из профиля e2e (relay-store.js). */
 function forgetRelayMemory() {
-    // Ленивый require: launch.js сам требует этот модуль.
-    const { USER_DATA_DIR } = require('./launch');
-    fs.rmSync(path.join(USER_DATA_DIR, RELAY_STATE_FILE), { force: true });
+    fs.rmSync(path.join(getUserDataDir(), RELAY_STATE_FILE), { force: true });
 }
 
 async function watch(app, opts = {}) {
@@ -355,6 +352,6 @@ async function watch(app, opts = {}) {
 }
 
 module.exports = {
-    diffProfiles, watch, readLedger, resetLedger, snapshot, forgetRelayMemory,
-    VOLATILE_KEYS, DERIVED, FIELD_DEFAULTS, KEY_DEFAULTS, LEDGER
+    diffProfiles, watch, readLedger, snapshot, forgetRelayMemory,
+    VOLATILE_KEYS, DERIVED, FIELD_DEFAULTS, KEY_DEFAULTS
 };

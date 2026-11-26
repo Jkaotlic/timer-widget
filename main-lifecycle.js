@@ -13,29 +13,29 @@
  */
 
 const path = require('path');
-const { FULLSCREEN_EXIT_TIMEOUT_MS } = require('./main-window-closing');
+const { errorCode } = require('./atomic-write');
+const { waitForFullScreenExit } = require('./main-window-closing');
 
 /**
  * @param {object} deps
- * @param {object} deps.app
- * @param {object} deps.Menu
- * @param {object} deps.powerMonitor
- * @param {object} deps.nativeImage
- * @param {object} deps.log
+ * @param {import('electron').App} deps.app
+ * @param {typeof import('electron').Menu} deps.Menu
+ * @param {import('electron').PowerMonitor} deps.powerMonitor
+ * @param {typeof import('electron').nativeImage} deps.nativeImage
+ * @param {import('electron-log').LogFunctions} deps.log
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
+ * @param {() => typeof import('electron').session} deps.getSession — берётся в момент вызова
  * @param {() => void} deps.registerProtocol — обработчик схемы app:// (SEC-12)
- * @param {() => Promise<{dispose: Function}>} deps.prepareStorage — перенос
+ * @param {() => Promise<{dispose: () => void}>} deps.prepareStorage — перенос
  *        localStorage file:// → app:// (main-storage-migration.js)
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.flags — флаги приложения (main-state.js)
- * @param {object} deps.timer — main-timer.js
- * @param {object} deps.recoverySnapshot — main-recovery.js
- * @param {object} deps.events — main-event-overrun.js
- * @param {{loadOnStart: Function, flush: Function}} deps.relayStore — память
- *        ретрансляторов в файле (relay-store.js)
- * @param {object} deps.creators — main-windows.js
- * @param {object} deps.tray — main-tray.js
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows
+ * @param {ReturnType<typeof import('./main-state.js').createAppFlags>} deps.flags
+ * @param {ReturnType<typeof import('./main-timer.js').createTimer>} deps.timer
+ * @param {ReturnType<typeof import('./main-recovery.js').createRecoverySnapshot>} deps.recoverySnapshot
+ * @param {ReturnType<typeof import('./main-event-overrun.js').createEventOverrun>} deps.events
+ * @param {ReturnType<typeof import('./relay-store.js').createRelayPersister>} deps.relayStore
+ * @param {ReturnType<typeof import('./main-windows.js').createWindows>} deps.creators
+ * @param {ReturnType<typeof import('./main-tray.js').createTrayController>} deps.tray
  * @param {boolean} deps.inTestMode
  * @param {boolean} deps.screenshotMode
  * @param {number} deps.startupT0 — метка начала процесса (perf)
@@ -66,7 +66,7 @@ function startApp(deps) {
      * `before-quit` после этого сработает второй раз — оба его действия
      * (`isQuitting`, удаление снимка восстановления) идемпотентны.
      */
-    let __leavingFullScreenToQuit = false;
+    let quitTransition = 'idle';
 
     // Идёт перенос настроек file:// → app:// (до первого окна).
     let __preparingStorage = false;
@@ -83,16 +83,14 @@ function startApp(deps) {
     app.on('before-quit', (event) => {
         if (!__singleInstance) { flags.isQuitting = true; return; }
         const win = windows.displayWindow;
-        if (!__leavingFullScreenToQuit && win && !win.isDestroyed() && win.isFullScreen()) {
-            __leavingFullScreenToQuit = true;
+        if (quitTransition === 'waiting') { event.preventDefault(); return; }
+        if (quitTransition === 'idle' && win && !win.isDestroyed() && (win._closingFullScreen || win.isFullScreen())) {
+            quitTransition = 'waiting';
             event.preventDefault();
-            const again = () => app.quit();
-            const fallback = setTimeout(again, FULLSCREEN_EXIT_TIMEOUT_MS);
-            win.once('leave-full-screen', () => {
-                clearTimeout(fallback);
-                setTimeout(again, 120);
+            waitForFullScreenExit(win, () => {
+                quitTransition = 'ready';
+                app.quit();
             });
-            win.setFullScreen(false);
             return;
         }
 
@@ -125,7 +123,7 @@ function startApp(deps) {
         // рано: окно на пустом app:// записало бы умолчания раньше, чем
         // туда придут настройки пользователя. Старт создаст её сам.
         if (__preparingStorage) { return; }
-        if (!windows.controlWindow) { createControlWindow(); return; }
+        if (!windows.controlWindow || windows.controlWindow.isDestroyed()) { createControlWindow(); return; }
         if (windows.controlWindow.isMinimized()) { windows.controlWindow.restore(); }
         if (!windows.controlWindow.isVisible()) { windows.controlWindow.show(); }
         windows.controlWindow.focus();
@@ -176,6 +174,7 @@ function startApp(deps) {
         // setPermissionRequestHandler, просто не выполнились бы.
         try {
             const session = getSession();
+            session.defaultSession.on?.('will-download', (event) => event.preventDefault());
             // Орфография тянет словарь Hunspell по сети (R2) — офлайновому
             // таймеру сеть не нужна ни для чего. Дублирует `spellcheck: false`
             // у каждого окна (main-windows.js) — тот гасит подчёркивание в
@@ -229,7 +228,7 @@ function startApp(deps) {
         try {
             storage = await prepareStorage();
         } catch (err) {
-            log.error('[migration] перенос настроек упал:', err && err.message ? err.message : err);
+            log.error('[migration] перенос настроек упал:', errorCode(err));
         } finally {
             __preparingStorage = false;
         }
@@ -282,8 +281,8 @@ function startApp(deps) {
     });
 
     app.on('window-all-closed', () => {
-        timer.clearTimerInterval(); // Очищаем интервал таймера при закрытии
         if (platform !== 'darwin') {
+            timer.clearTimerInterval();
             app.quit();
         }
     });

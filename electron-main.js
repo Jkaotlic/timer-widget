@@ -17,7 +17,8 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
     process.exit(1);
 }
 
-const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog, protocol } = require('electron');
+const electron = require('electron');
+const { app, BrowserWindow, ipcMain: rawIpcMain, screen, Menu, Tray, nativeImage, powerMonitor, shell, dialog, protocol } = electron;
 
 // Ключи, ослабляющие изоляцию СОБРАННОГО приложения, — выход до первого окна
 // (SEC-04, добивка перед повторной сдачей ПСИ, R1 в
@@ -349,7 +350,7 @@ app.on('web-contents-created', (_event, contents) => {
 // стрелками, которые читают модуль в момент ВЫЗОВА, а не сборки. До конца
 // сборки ни одна из них не зовётся: окон ещё нет, IPC не пришёл.
 const getUserDataPath = () => app.getPath('userData');
-const getSession = () => require('electron').session;
+const getSession = () => electron.session;
 
 // Память ретрансляторов в файле userData/relay-state.json (relay-store.js).
 // Стенд съёмки её не читает и не пишет: кадр не должен зависеть от того, чем
@@ -395,8 +396,9 @@ const tray = createTrayController({
 // --- Каналы IPC — все через обвязку `ipcMain` выше --------------------------
 timer.registerIpc(ipcMain);
 registerControlIpc({
-    ipcMain, windows, screen, CONFIG, shell, app, log, getSession,
+    ipcMain, windows, screen, CONFIG, shell, dialog, app, log, getSession,
     clearTimerInterval: () => timer.clearTimerInterval(),
+    clearRecovery: () => recoverySnapshot.clearSavedTimerState(),
     settleMigration: () => markSettledAfterReset(app.getPath('userData')),
     discardRelayState: () => relayStore.discard()
 });

@@ -181,7 +181,8 @@ test('ползунки масштаба совпадают по диапазон
     // Значение вне общего диапазона молча терялось при перезапуске.
     // Между id и границами диапазона могут стоять другие атрибуты (class
     // появился, когда инлайновые style= переехали в CSS) — важен сам диапазон.
-    assert.match(controlHtml, /id="displayTimerScale"[^>]*min="30"[^>]*max="300"/);
+    assert.match(controlHtml, /this\.displayTimerScaleEl\.min = String\(CONFIG\.MIN_TIMER_SCALE\)/);
+    assert.match(controlHtml, /this\.displayTimerScaleEl\.max = String\(CONFIG\.MAX_TIMER_SCALE\)/);
     assert.match(controlHtml, /id="timeBlocksScale"[^>]*min="50"[^>]*max="600"/);
 
     // У границы ОДИН владелец — атрибуты ползунка. Раньше их дублировали
@@ -630,12 +631,12 @@ test('канал report-scale открыт в мостах окон, отчёт 
 
 test('главный процесс валидирует источник и шлёт отчёт ТОЛЬКО в панель', () => {
     assert.match(mainSource, /SCALE_REPORT_SOURCES = new Set\(\['widget', 'clock', 'display', 'display-blocks'\]\)/);
-    const handler = [ipcHandlerBody(mainSource, 'report-scale')];
-    assert.match(handler[0], /if \(!SCALE_REPORT_SOURCES\.has\(source\)\) \{ return; \}/);
-    assert.match(handler[0], /Number\.isFinite\(scalePct\)/);
+    const handler = ipcHandlerBody(mainSource, 'report-scale');
+    assert.match(handler, /if \(typeof source !== 'string' \|\| !SCALE_REPORT_SOURCES\.has\(source\)\) \{ return; \}/);
+    assert.match(handler, /Number\.isFinite\(scalePct\)/);
     // Широковещание вернуло бы значение отправителю и могло закольцеваться.
-    assert.match(handler[0], /safelySendToWindow\(windows\.controlWindow, 'scale-report'/);
-    assert.doesNotMatch(handler[0], /broadcast/);
+    assert.match(handler, /safelySendToWindow\(windows\.controlWindow, 'scale-report'/);
+    assert.doesNotMatch(handler, /broadcast/);
 });
 
 test('все три окна сообщают о своём масштабе', () => {

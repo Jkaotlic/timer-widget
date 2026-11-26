@@ -12,7 +12,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 
 let raw;
 try {
-    raw = execSync('npx --yes license-checker --json --excludePrivatePackages', {
+    raw = execSync('npx --yes license-checker@25.0.1 --json --excludePrivatePackages', {
         cwd: ROOT,
         maxBuffer: 64 * 1024 * 1024,
         encoding: 'utf8'

@@ -315,3 +315,34 @@ test('каждый window.X, который читают e2e и стенд, — 
     }
     assert.match(fs.readFileSync(path.join(REPO, 'preload.js'), 'utf8'), /exposeInMainWorld\('electronAPI'/);
 });
+
+test('отписка IPC убирает одну регистрацию и работает повторно', () => {
+    const vm = require('node:vm');
+    const active = new Set();
+    const window = {
+        electronAPI: {
+            on(_channel, callback) {
+                active.add(callback);
+                return () => active.delete(callback);
+            },
+            removeAllListeners() {}
+        }
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(REPO, 'ipc-compat.js'), 'utf8'), { window });
+    const ipc = window.ipcRenderer;
+    const callback = () => {};
+    const first = ipc.on('timer-state', callback);
+    const second = ipc.on('timer-state', callback);
+    second();
+    second();
+    assert.equal(active.size, 1);
+    assert.equal(ipc._listeners.get('timer-state').length, 1);
+    ipc.removeListener('timer-state', callback);
+    first();
+    assert.equal(active.size, 0);
+    assert.equal(ipc._listeners.has('timer-state'), false);
+    ipc.on('timer-state', callback);
+    ipc.on('timer-state', callback);
+    ipc.removeAllListeners('timer-state');
+    assert.equal(active.size, 0);
+});

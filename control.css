@@ -2379,9 +2379,9 @@ select optgroup,
 
 .bg-mode-btn.active,
 .hero-mode-btn.active {
-    border-color: rgba(10, 132, 255, 0.4);
-    background: rgba(10, 132, 255, 0.12);
-    color: var(--tw-blue);
+    border-color: var(--tw-blue);
+    background: var(--tw-level-3);
+    color: var(--tw-fg);
 }
 
 /* Режим центрального времени (08.09.2026) — та же механика, что «Фон» выше:
