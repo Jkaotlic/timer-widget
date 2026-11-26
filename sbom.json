@@ -1876,6 +1876,45 @@
     },
     {
       "type": "library",
+      "name": "typescript-aix-ppc64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-aix-ppc64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-aix-ppc64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-aix-ppc64/-/typescript-aix-ppc64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "31328a91607ba7fd04f718b5775b47b59e4f88b90610c22af3ca4ad82b9b6633ac2ed6132ea8602208bacdea456bef461d9ea1d3934c0a443118a88f5ccc57b5"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-aix-ppc64"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "typescript-darwin-arm64",
       "group": "@typescript",
       "version": "7.0.2",
@@ -1889,6 +1928,19 @@
         }
       ],
       "purl": "pkg:npm/%40typescript/typescript-darwin-arm64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-darwin-arm64/-/typescript-darwin-arm64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "828c336abf4cc12fda456a7a7f76b8294ab34630198ceb2618d08ce8b713817ba6f9d05f82c05530df8082f38209b82e5f289c93a2c986906ccf131e6c9f2cc8"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
       "properties": [
         {
           "name": "cdx:npm:package:development",
@@ -1897,6 +1949,708 @@
         {
           "name": "cdx:npm:package:path",
           "value": "node_modules/@typescript/typescript-darwin-arm64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-darwin-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-darwin-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-darwin-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-darwin-x64/-/typescript-darwin-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "499f716489ea02936534673db345b5552b24b5848e7bd705a8d388aa63751acf129a48ca65816dd35ec6e15c0fc404889ce0ee01d6d35bbb1788551ff3ddd180"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-darwin-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-freebsd-arm64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-freebsd-arm64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-freebsd-arm64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-freebsd-arm64/-/typescript-freebsd-arm64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "5b9347e32fc9d29948212e5bdb1bd312453b245c72a9d3003a07fe225865d2f1d05ca3b9759a3177e0bf8c4b6ae7a738177c24ef5441e013114365dd23e6f061"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-freebsd-arm64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-freebsd-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-freebsd-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-freebsd-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-freebsd-x64/-/typescript-freebsd-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "50c183c79b13a73370dd688f79b1fb97dd0859f26080477e7a01edfeaea9eff0a6df3aa857b5719065edfb70f13c8c3c09c9af001d23dec5557db857f8ce13a7"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-freebsd-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-arm",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-arm@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-arm@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-arm/-/typescript-linux-arm-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "81f7d3df13f3f6c47b8ff6091319323e7b6b2343f610ff576cec96ced876fc6b3446cb4afbdd1105c3b49dc5e85f2fdb798965d525f0f38e8d7f6cdd9c4cf441"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-arm"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-arm64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-arm64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-arm64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "421e1e538ff2df20e39df8e3c8f62284c8f9fce0c8966b7e073bb5ece23e7e24910d6e7b4265394a237addec4f44d24f294cdc73520d6b535776b27e32a1e351"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-arm64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-loong64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-loong64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-loong64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-loong64/-/typescript-linux-loong64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "b841dc93d8bc8680335cf8984626f53bb9a23a7cf6dd2c4879597a1782d7a31faaa2fd4adf98c77045ba5472af648fa9caf97b7d910fe0c094e4b62f22ad46b9"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-loong64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-mips64el",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-mips64el@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-mips64el@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-mips64el/-/typescript-linux-mips64el-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "4782af00c9c4e375b941ea9bd0bcb9e8ede658c588020b0ccb3dfa0c26b271de676e0ffd9339b4962c3726871f46ac8963428f9b31636ecc28cd7c96d039c860"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-mips64el"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-ppc64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-ppc64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-ppc64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-ppc64/-/typescript-linux-ppc64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "0ce471e5bdec77fe12ede6b2c66e0542ff80ec2ae45081916878b023ca221d3008d5f00f5a1178274bc09640bc6e20251d2555c31310ded8d9dbf0d56e742288"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-ppc64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-riscv64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-riscv64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-riscv64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-riscv64/-/typescript-linux-riscv64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "c1fd23a840ce8eb3d19cac18472c890d1a35d4a31bbcc16b53eab8cea2b20a1383073be591b84d41f2af2f14027304e974369748765356e8742680ab28250c1d"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-riscv64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-s390x",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-s390x@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-s390x@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-s390x/-/typescript-linux-s390x-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "224c097372fbca1cad59dfdec23cb13437ce9acc029bd1963094ffb9efdd53869935bc1979801eb6ae365722e6b264a3be85fbcfbe17e996980adcc0af412e1b"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-s390x"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-linux-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-linux-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-linux-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-linux-x64/-/typescript-linux-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "11875fd9c360eeb8025899f109d27e177577f4ef2285bdfb78702ed4b2bca00162ce04d06cf38aef31c75db3edf2b5f6e023aa3835de237b087f47c25c6ec7fc"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-linux-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-netbsd-arm64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-netbsd-arm64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-netbsd-arm64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-netbsd-arm64/-/typescript-netbsd-arm64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "fa9a25605e0c174e1a3e93b9153907ada9fdc94403497ab2e468920caa6c965e63cb7977fa0f502e1a5fdfd4fe78fb5e7e15cb386acb9744088e440fe959de94"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-netbsd-arm64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-netbsd-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-netbsd-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-netbsd-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-netbsd-x64/-/typescript-netbsd-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "f18213d041ccff776ad7464e545fc0ee973f61232d6dc79c72de2b5ad7b1ae74821ce3dca42d8a4cb5df4c247abc3a674a2635da178d6f51a237fc2ef93fc5c8"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-netbsd-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-openbsd-arm64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-openbsd-arm64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-openbsd-arm64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-openbsd-arm64/-/typescript-openbsd-arm64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "00f4fcf829589ee626d6ef7e920197a0c8f65735b37329b087680d4905724877e444318e4d592858b8c298e41268ef8fa2a439ec1d1f951a7d480fbb1a79e4cd"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-openbsd-arm64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-openbsd-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-openbsd-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-openbsd-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-openbsd-x64/-/typescript-openbsd-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "c97eecf90d03967d03b7db44cd9b008d75d1ffecad04cec096095aab278c3f142ccc9d4986525d67a8cb03e23395d1ed7e55fcd5e9bb9436a8d715eef9a45192"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-openbsd-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-sunos-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-sunos-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-sunos-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-sunos-x64/-/typescript-sunos-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "74b24319a2d9d43e073d09fadaed67f26043909444c0cb00902764c1de087aac3ec774d4c93b2a634622042b44e87e8ecf38069378ae677bc55914be13cfddd6"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-sunos-x64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-win32-arm64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-win32-arm64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-win32-arm64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-win32-arm64/-/typescript-win32-arm64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "1b2975572e8eb167ac2f39aaf843f415bedbe0d89de76df602f700d9215c758ade95da4db58145a1f3e39edeb6cbd850cbb553699a7ae480898ee01045a55c21"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-win32-arm64"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "typescript-win32-x64",
+      "group": "@typescript",
+      "version": "7.0.2",
+      "bom-ref": "timer-widget@2.13.1|@typescript/typescript-win32-x64@7.0.2",
+      "scope": "optional",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40typescript/typescript-win32-x64@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/@typescript/typescript-win32-x64/-/typescript-win32-x64-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "d014371e40071e528b4a9d6a46f7f7494846a46b03ba107f8e0170ef982ecaa6f126a11a4b40b0fd514ef22da71e094953340246d30c47f20100a137113302e2"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:npm:package:development",
+          "value": "true"
+        },
+        {
+          "name": "cdx:npm:package:path",
+          "value": "node_modules/@typescript/typescript-win32-x64"
         }
       ]
     },
@@ -9578,6 +10332,19 @@
         }
       ],
       "purl": "pkg:npm/typescript@7.0.2",
+      "externalReferences": [
+        {
+          "url": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+          "type": "distribution",
+          "hashes": [
+            {
+              "alg": "SHA-512",
+              "content": "f0561abbdea8dcd28e85b8ca8bfa8dbc6fd6e63873c646dd9b9b23f406d9ff94f9b16aa7de12602df1b1dbbb11299593bf2cc23fc74b4414dfe6d05349155434"
+            }
+          ],
+          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
+        }
+      ],
       "properties": [
         {
           "name": "cdx:npm:package:development",
@@ -10553,7 +11320,64 @@
       ]
     },
     {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-aix-ppc64@7.0.2"
+    },
+    {
       "ref": "timer-widget@2.13.1|@typescript/typescript-darwin-arm64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-darwin-x64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-freebsd-arm64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-freebsd-x64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-arm@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-arm64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-loong64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-mips64el@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-ppc64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-riscv64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-s390x@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-linux-x64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-netbsd-arm64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-netbsd-x64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-openbsd-arm64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-openbsd-x64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-sunos-x64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-win32-arm64@7.0.2"
+    },
+    {
+      "ref": "timer-widget@2.13.1|@typescript/typescript-win32-x64@7.0.2"
     },
     {
       "ref": "timer-widget@2.13.1|@xmldom/xmldom@0.8.15"
@@ -12293,7 +13117,26 @@
     {
       "ref": "timer-widget@2.13.1|typescript@7.0.2",
       "dependsOn": [
-        "timer-widget@2.13.1|@typescript/typescript-darwin-arm64@7.0.2"
+        "timer-widget@2.13.1|@typescript/typescript-aix-ppc64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-darwin-arm64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-darwin-x64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-freebsd-arm64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-freebsd-x64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-arm@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-arm64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-loong64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-mips64el@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-ppc64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-riscv64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-s390x@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-linux-x64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-netbsd-arm64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-netbsd-x64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-openbsd-arm64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-openbsd-x64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-sunos-x64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-win32-arm64@7.0.2",
+        "timer-widget@2.13.1|@typescript/typescript-win32-x64@7.0.2"
       ]
     },
     {
