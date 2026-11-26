@@ -558,7 +558,7 @@ const LEGACY_COLORS_KEY = 'timerColors';
  *
  * @param {{getItem(key: string): string|null}|null|undefined} storage
  * @param {string} key
- * @returns {object|null}
+ * @returns {any}
  */
 function storedColors(storage, key) {
     if (!storage || !key) { return null; }
@@ -588,7 +588,7 @@ function storedColors(storage, key) {
  *
  * @param {{getItem(key: string): string|null}|null|undefined} storage
  * @param {string} ownKey — ключ цветов этого окна
- * @returns {object|null} объект цветов либо null (владелец умолчания — CSS)
+ * @returns {any} объект цветов либо null (владелец умолчания — CSS)
  */
 function ownColors(storage, ownKey) {
     if (!storage || !ownKey) { return null; }
@@ -985,8 +985,8 @@ function secondsUntilEventEnd(nowSeconds, startClock, endClock) {
  * старого. Иначе выключенный уже в новой версии блок возвращался бы к жизни при
  * каждом чтении, пока в профиле лежит старый `showTimeBlocks: true`.
  *
- * @param {object} settings
- * @returns {object} копия с проставленными новыми ключами
+ * @param {any} settings
+ * @returns {any} копия с проставленными новыми ключами
  */
 function migrateDisplayBlocks(settings) {
     const out = Object.assign({}, settings || {});

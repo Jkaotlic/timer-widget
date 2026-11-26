@@ -34,7 +34,7 @@ const api = (function (root) {
     /**
      * Показывает подсказку про F1 ровно один раз за профиль.
      *
-     * @param {object} deps
+     * @param {any} deps
      *   - storage : { getItem, setItem } — обычно localStorage
      *   - notify  : (text) => void — обычно Toast.show
      *   - schedule: (fn, ms) => void — обычно setTimeout
@@ -76,7 +76,7 @@ const api = (function (root) {
     /**
      * Вешает на кнопку открытие страницы релизов.
      *
-     * @param {object} deps
+     * @param {any} deps
      *   - button : элемент кнопки (может отсутствовать — тогда no-op)
      *   - send   : (channel) => void — обычно ipcRenderer.send. Имя канала
      *              подставляет МОДУЛЬ, а не вызывающий: канал — часть контракта

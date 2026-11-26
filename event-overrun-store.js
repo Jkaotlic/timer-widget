@@ -148,9 +148,9 @@ function normalizePending(raw) {
  *    бы его второй раз. Строки нет: её допишет конец доклада, с перелимитом
  *    из resumeTalk.
  *
- * @param {object} store — результат normalizeStore
+ * @param {any} store — результат normalizeStore
  * @param {{restoredRemaining: number|null}} opts — остаток поднятого таймера
- * @returns {{store: object, excludedLiveSeconds: number, resumed: boolean,
+ * @returns {{store: any, excludedLiveSeconds: number, resumed: boolean,
  *            resumeTalk: ({overrun: number}|null), changed: boolean}}
  */
 function foldPending(store, opts = {}) {

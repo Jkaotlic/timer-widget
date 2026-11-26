@@ -271,7 +271,7 @@ function isWindowDragTarget(target) {
  * Electron, — поэтому вся арифметика проверяется в Node без запуска приложения.
  *
  * @param {{x:number,y:number,width:number,height:number}} current — текущие границы окна
- * @param {{width:*,height:*}} requested — запрошенный размер; приходит из IPC, то есть может быть мусором
+ * @param {{width:unknown,height:unknown}} requested — запрошенный размер из IPC
  * @param {{x:number,y:number,width:number,height:number}} workArea — рабочая область ЕГО монитора
  * @param {{width:number,height:number}} min — минимальный размер окна
  * @returns {{x:number,y:number,width:number,height:number}}
@@ -280,6 +280,7 @@ function fitScaledBounds(current, requested, workArea, min) {
     // Размер по одной оси. Мусор ИГНОРИРУЕТСЯ, а не подменяется числом: раньше
     // здесь стояло `Number(width) || 220`, и нулевая или нечисловая ширина
     // молча делала окно 220 px независимо от его базового размера.
+    /** @param {unknown} asked @param {number} currentSide @param {number} minSide @param {number} areaSide */
     const sideSize = (asked, currentSide, minSide, areaSide) => {
         const value = Number(asked);
         const wanted = Number.isFinite(value) && value > 0 ? value : currentSide;
@@ -376,9 +377,9 @@ function fitRestoredBounds(target, displays, minVisible, fallbackArea, min) {
  * @param {Document} cfg.doc — сюда вешаются mousemove/mouseup: кнопку отпускают и за пределами окна
  * @param {(payload: {deltaX: number, deltaY: number, first: boolean}) => void} cfg.onMove
  * @param {() => void} cfg.onDrop — вызывается один раз в конце перетаскивания
- * @param {object} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
+ * @param {any} cfg.handlers — сюда складываются ссылки на обработчики для cleanup()
  * @param {() => boolean} [cfg.isLocked] предикат замка: true отменяет жест
- * @returns {object} тот же объект handlers
+ * @returns {any} тот же объект handlers
  */
 function bindWindowDrag({ container, doc, onMove, onDrop, handlers, isLocked }) {
     let isDragging = false;

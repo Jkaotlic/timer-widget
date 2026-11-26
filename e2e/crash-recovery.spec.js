@@ -2,7 +2,8 @@ const { test, expect } = require('./fixtures');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { launchApp, USER_DATA_DIR } = require('./launch');
+const { launchApp } = require('./launch');
+const { getUserDataDir } = require('./run-profile');
 const { panelRoundTrip } = require('./window-ready');
 
 /**
@@ -27,11 +28,9 @@ const { panelRoundTrip } = require('./window-ready');
 
 const PRESET = 420; // 7:00 — заметное значение, не совпадает ни с одним пресетом кнопок
 
-const SNAPSHOT_FILE = path.join(USER_DATA_DIR, 'last-state.json');
-
 /** Снимок восстановления на диске (recovery.js) или null. */
-function readSnapshot() {
-    try { return JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8')); } catch { return null; }
+function readSnapshot(file) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
 /**
@@ -74,6 +73,7 @@ test('после падения время восстанавливается, �
     // упиралась бы в потолок и падала по времени, ничего не проверив.
     // --- 1. Ставим таймер и даём ему прожить интервал сохранения ---
     const startedAt = Date.now();
+    const snapshotFile = path.join(getUserDataDir(), 'last-state.json');
     const first = await launchApp();
     await first.control.evaluate((secs) => {
         window.ipcRenderer.send('timer-command', { type: 'reset' });
@@ -86,10 +86,10 @@ test('после падения время восстанавливается, �
     // и остаток уже меньше пресета — то есть записан ТИКОМ интервала, а не
     // командой `start` (та пишет полный остаток).
     await expect.poll(() => {
-        const snap = readSnapshot();
+        const snap = readSnapshot(snapshotFile);
         return !!snap && snap.savedAt >= startedAt && snap.totalSeconds === PRESET
             && snap.isRunning === true && snap.remainingSeconds < PRESET;
-    }, { message: `снимок восстановления с идущим таймером не появился в ${SNAPSHOT_FILE}`, timeout: 25000 }).toBe(true);
+    }, { message: `снимок восстановления с идущим таймером не появился в ${snapshotFile}`, timeout: 25000 }).toBe(true);
     const before = await readTimer(first.control);
     expect(before.running, 'таймер должен идти, иначе снимок не пишется').toBe(true);
     expect(before.total).toBe(PRESET);

@@ -13,29 +13,29 @@
  */
 
 const path = require('path');
+const { errorCode } = require('./atomic-write');
 const { waitForFullScreenExit } = require('./main-window-closing');
 
 /**
  * @param {object} deps
- * @param {object} deps.app
- * @param {object} deps.Menu
- * @param {object} deps.powerMonitor
- * @param {object} deps.nativeImage
- * @param {object} deps.log
+ * @param {import('electron').App} deps.app
+ * @param {typeof import('electron').Menu} deps.Menu
+ * @param {import('electron').PowerMonitor} deps.powerMonitor
+ * @param {typeof import('electron').nativeImage} deps.nativeImage
+ * @param {import('electron-log').LogFunctions} deps.log
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {() => object} deps.getSession — electron.session, берётся в момент вызова
+ * @param {() => typeof import('electron').session} deps.getSession — берётся в момент вызова
  * @param {() => void} deps.registerProtocol — обработчик схемы app:// (SEC-12)
- * @param {() => Promise<{dispose: Function}>} deps.prepareStorage — перенос
+ * @param {() => Promise<{dispose: () => void}>} deps.prepareStorage — перенос
  *        localStorage file:// → app:// (main-storage-migration.js)
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.flags — флаги приложения (main-state.js)
- * @param {object} deps.timer — main-timer.js
- * @param {object} deps.recoverySnapshot — main-recovery.js
- * @param {object} deps.events — main-event-overrun.js
- * @param {{loadOnStart: Function, flush: Function}} deps.relayStore — память
- *        ретрансляторов в файле (relay-store.js)
- * @param {object} deps.creators — main-windows.js
- * @param {object} deps.tray — main-tray.js
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows
+ * @param {ReturnType<typeof import('./main-state.js').createAppFlags>} deps.flags
+ * @param {ReturnType<typeof import('./main-timer.js').createTimer>} deps.timer
+ * @param {ReturnType<typeof import('./main-recovery.js').createRecoverySnapshot>} deps.recoverySnapshot
+ * @param {ReturnType<typeof import('./main-event-overrun.js').createEventOverrun>} deps.events
+ * @param {ReturnType<typeof import('./relay-store.js').createRelayPersister>} deps.relayStore
+ * @param {ReturnType<typeof import('./main-windows.js').createWindows>} deps.creators
+ * @param {ReturnType<typeof import('./main-tray.js').createTrayController>} deps.tray
  * @param {boolean} deps.inTestMode
  * @param {boolean} deps.screenshotMode
  * @param {number} deps.startupT0 — метка начала процесса (perf)
@@ -228,7 +228,7 @@ function startApp(deps) {
         try {
             storage = await prepareStorage();
         } catch (err) {
-            log.error('[migration] перенос настроек упал:', err && err.message ? err.message : err);
+            log.error('[migration] перенос настроек упал:', errorCode(err));
         } finally {
             __preparingStorage = false;
         }

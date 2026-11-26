@@ -112,7 +112,7 @@ const CustomSoundsMixin = {
         // промахнувшийся пользователь теряет приложение и получает плеер.
         for (const type of ['dragover', 'drop']) {
             document.addEventListener(type, (e) => {
-                if (!zone.contains(e.target)) { e.preventDefault(); }
+                if (!(e.target instanceof Node) || !zone.contains(e.target)) { e.preventDefault(); }
             });
         }
     },

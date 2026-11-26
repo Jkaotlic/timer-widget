@@ -174,9 +174,9 @@ function defaultScale(id) {
 /**
  * Масштабы всех семи элементов из того, что нашлось в хранилище.
  *
- * @param {object|null} stored  разобранный `displayBlockScales` (id → проценты)
+ * @param {any} stored  разобранный `displayBlockScales` (id → проценты)
  * @param {number|null} legacyPct  старый ОБЩИЙ `displayBlockScale`
- * @returns {object} id → проценты, всегда все семь ключей
+ * @returns {any} id → проценты, всегда все семь ключей
  *
  * Старое значение применяется только к карточкам: подпись и плашка им никогда
  * не управлялись, и подставить его им — значит на ровном месте изменить окно
@@ -323,7 +323,7 @@ function layoutById(id) {
 /**
  * Тумблеры, которые раскладка ставит: перечисленное включено, остальное нет.
  *
- * @returns {object} ключ тумблера → boolean, всегда все семь
+ * @returns {any} ключ тумблера → boolean, всегда все семь
  */
 function layoutToggles(layout) {
     const out = {};
@@ -368,12 +368,12 @@ const CONTENT_ASPECT = 16 / 9;
 /**
  * Доли экрана → пиксели левого верхнего угла и РЕАЛЬНЫЙ масштаб.
  *
- * @param {object} layout
+ * @param {any} layout
  * @param {{width:number,height:number}} viewport
- * @param {object} naturalSizes  id → {width, height} элемента при масштабе 100 %
- * @param {object} [options]  `margin` — поле от края, `timer` — коробка таймера
+ * @param {any} naturalSizes  id → {width, height} элемента при масштабе 100 %
+ * @param {any} [options]  `margin` — поле от края, `timer` — коробка таймера
  *                            {left, top, right, bottom} в пикселях окна
- * @returns {object} id → {left, top, scale}; элементы «в потоке» и элементы без
+ * @returns {any} id → {left, top, scale}; элементы «в потоке» и элементы без
  *                   замеренного габарита в ответ не попадают
  *
  * Габарит спрашивается ПРИ МАСШТАБЕ 100 %, а не текущий: масштаб здесь и
@@ -488,6 +488,22 @@ function positionToFraction(rect, viewport) {
 }
 
 /**
+ * Запись для `displayBlockPositions`: целые пиксели из CSS для старых версий
+ * и доли центра с точностью до четырёх знаков, если они известны.
+ * @param {{left:string, top:string}} position
+ * @param {{cx:number, cy:number}|null|undefined} fraction
+ */
+function buildPositionRecord(position, fraction) {
+    const pixels = { left: parseInt(position.left) || 0, top: parseInt(position.top) || 0 };
+    if (!fraction) { return pixels; }
+    return {
+        ...pixels,
+        cx: Math.round(fraction.cx * 10000) / 10000,
+        cy: Math.round(fraction.cy * 10000) / 10000
+    };
+}
+
+/**
  * Доля окна → пиксели левого верхнего угла ВИДИМОЙ коробки.
  *
  * @param {{cx:number, cy:number}} fraction
@@ -525,5 +541,5 @@ export {
     MAX_ELEMENT_SCALE, DEFAULT_BLOCK_SCALE, DEFAULT_LABEL_SCALE, EDGE_MARGIN,
     TIMER_GAP, clampElementScale as clampScale, defaultScale, normalizeScales,
     layoutById, layoutToggles, layoutScales, placeElements, positionToFraction,
-    fractionToPosition
+    buildPositionRecord, fractionToPosition
 };

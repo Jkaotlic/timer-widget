@@ -98,11 +98,11 @@ const SENDERS = Object.freeze({
  * Проверка отправителя.
  *
  * @param {object} deps
- * @param {(webContents) => object|null} deps.windowOf — BrowserWindow.fromWebContents
- * @param {() => Record<string, object|null>} deps.windowsByRole — живые окна по ролям
+ * @param {typeof import('electron').BrowserWindow.fromWebContents} deps.windowOf
+ * @param {() => Record<string, import('electron').BrowserWindow | null>} deps.windowsByRole — живые окна по ролям
  * @param {(url: string) => boolean} deps.isAppPage — предикат navigation-guard.js
  * @param {(channel: string, reason: string) => void} [deps.onReject]
- * @returns {(channel: string, event: object) => boolean}
+ * @returns {(channel: string, event: Pick<import('electron').IpcMainEvent, 'sender' | 'senderFrame'>) => boolean}
  */
 function createSenderGate({ windowOf, windowsByRole, isAppPage, onReject = () => {} }) {
     return function isAllowedSender(channel, event) {
@@ -140,6 +140,9 @@ function createSenderGate({ windowOf, windowsByRole, isAppPage, onReject = () =>
  * зарегистрировать обработчик мимо проверки. Канал без строки в таблице падает
  * при ЗАГРУЗКЕ: забытое разрешение обнаруживается первым же запуском тестов,
  * а не отказом клавиши у пользователя.
+ *
+ * @param {Pick<import('electron').IpcMain, 'on' | 'handle'>} ipcMain
+ * @param {ReturnType<typeof createSenderGate>} isAllowedSender
  */
 function guardIpcMain(ipcMain, isAllowedSender) {
     const requireOwner = (channel) => {
@@ -148,6 +151,10 @@ function guardIpcMain(ipcMain, isAllowedSender) {
         }
     };
     return {
+        /**
+         * @param {keyof typeof SENDERS} channel
+         * @param {(event: import('electron').IpcMainEvent, ...args: unknown[]) => void} handler
+         */
         on(channel, handler) {
             requireOwner(channel);
             ipcMain.on(channel, (event, ...args) => {
@@ -155,6 +162,10 @@ function guardIpcMain(ipcMain, isAllowedSender) {
                 return handler(event, ...args);
             });
         },
+        /**
+         * @param {keyof typeof SENDERS} channel
+         * @param {(event: import('electron').IpcMainInvokeEvent, ...args: unknown[]) => unknown} handler
+         */
         handle(channel, handler) {
             requireOwner(channel);
             ipcMain.handle(channel, (event, ...args) => {
@@ -172,6 +183,7 @@ function guardIpcMain(ipcMain, isAllowedSender) {
  * десятки `move` в секунду), и запись на каждое засыпала бы журнал. В запись
  * идёт только ИМЯ канала и причина — ни payload, ни адрес (SEC-11).
  */
+/** @param {(message: string) => void} write */
 function onceLogger(write) {
     const seen = new Set();
     return (channel, reason) => {

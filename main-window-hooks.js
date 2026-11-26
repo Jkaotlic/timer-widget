@@ -13,20 +13,24 @@
 
 const NavigationGuard = require('./navigation-guard');
 
+/** @typedef {import('./main-state.js').AppWindow} AppWindow */
+/** @typedef {'widget-window-state' | 'clock-window-state' | 'display-window-state'} WindowStateChannel */
+
 /**
  * @param {object} deps
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.log — electron-log
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {import('electron-log').LogFunctions} deps.log — electron-log
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow — utils.js
- * @param {string[]} deps.appPageUrls — адреса четырёх страниц (navigation-guard.js)
- * @param {Function} deps.logBlockedNavigation — журнал отказа навигации
- * @param {Function} deps.updateTrayMenu — трей перестраивает меню по открытию окон
- * @param {object} deps.CONFIG — constants.js (CRASH_RELOAD_LIMIT, CRASH_RELOAD_WINDOW_MS)
+ * @param {Set<string>} deps.appPageUrls — адреса четырёх страниц (navigation-guard.js)
+ * @param {Parameters<typeof NavigationGuard.guardWebContents>[2]} deps.logBlockedNavigation — журнал отказа навигации
+ * @param {() => void} deps.updateTrayMenu — трей перестраивает меню по открытию окон
+ * @param {typeof import('./constants.js')} deps.CONFIG — constants.js (CRASH_RELOAD_LIMIT, CRASH_RELOAD_WINDOW_MS)
  */
 function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logBlockedNavigation, updateTrayMenu, CONFIG }) {
     const APP_PAGE_URLS = appPageUrls;
 
     // Block Ctrl+=/- keyboard zoom and Ctrl+Wheel page zoom on all windows
+    /** @param {AppWindow | null} win */
     function blockZoom(win) {
         if (!win || !win.webContents) {return;}
         win.webContents.on('before-input-event', (event, input) => {
@@ -46,6 +50,7 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
     // webContents обработчик `web-contents-created` в точке входа; здесь они
     // ставятся в том же месте, где окно родилось, и тест release-gates считает
     // эти вызовы.
+    /** @param {AppWindow} win */
     function hardenWindow(win) {
         NavigationGuard.guardWebContents(win.webContents, APP_PAGE_URLS, logBlockedNavigation);
     }
@@ -59,6 +64,7 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
     // окне (`win.__crashReloads`): старые метки, выпавшие из окна, просто
     // отфильтровываются при каждом новом крахе. При достижении лимита окно
     // остаётся как есть — не перезагружается и не закрывается, только лог.
+    /** @param {AppWindow | null} win @param {string} label */
     function bindRenderCrashHandler(win, label) {
         if (!win || !win.webContents) { return; }
         win.webContents.on('render-process-gone', (_event, details) => {
@@ -80,10 +86,12 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
 
     // Forward renderer console + preload + responsiveness events into electron-log.
     // Lets us see inline-script errors (which otherwise die silently) in the log file.
+    /** @param {AppWindow | null} win @param {string} label */
     function bindRenderConsole(win, label) {
         if (!win || !win.webContents) { return; }
         win.webContents.on('console-message', (e) => {
             try {
+                /** @type {string} */
                 const level = (e && e.level) || 'info';
                 const src = e && e.sourceId ? ` @ ${e.sourceId}:${e.lineNumber || '?'}` : '';
                 const msg = `[renderer:${label}] ${(e && e.message) || ''}${src}`;
@@ -101,6 +109,7 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
     }
 
     // Broadcast window state to all windows
+    /** @param {WindowStateChannel} channel @param {{isOpen: boolean}} data */
     function broadcastWindowState(channel, data) {
         safelySendToWindow(windows.controlWindow, channel, data);
         safelySendToWindow(windows.widgetWindow, channel, data);
@@ -124,12 +133,14 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
     // (bindRenderCrashHandler → win.reload()) и после повторного создания панели из трея.
     //
     // Слушатель именно `on`, а не `once`: перезагрузка окна обязана получить снимок заново.
+    /** @param {AppWindow} win */
     function sendWindowStatesTo(win) {
         safelySendToWindow(win, 'widget-window-state', { isOpen: !!windows.widgetWindow });
         safelySendToWindow(win, 'clock-window-state', { isOpen: !!windows.clockWidgetWindow });
         safelySendToWindow(win, 'display-window-state', { isOpen: !!windows.displayWindow });
     }
 
+    /** @param {AppWindow | null} win */
     function bindWindowStateSnapshot(win) {
         if (!win || !win.webContents) { return; }
         win.webContents.on('did-finish-load', () => sendWindowStatesTo(win));
@@ -147,6 +158,11 @@ function createWindowHooks({ windows, log, safelySendToWindow, appPageUrls, logB
     //
     // Слушатель `on`, а не `once`, по той же причине, что и у снимка: рендерер,
     // перезагруженный краш-обработчиком, обязан получить данные заново.
+    /**
+     * @param {AppWindow | null} win
+     * @param {WindowStateChannel} stateChannel
+     * @param {(win: AppWindow) => void} hydrate
+     */
     function announceWindowOpened(win, stateChannel, hydrate) {
         if (!win || !win.webContents) { return; }
         win.webContents.on('did-finish-load', () => {

@@ -29,9 +29,8 @@
  * (tests/relay-store.test.js).
  */
 
-const fs = require('fs');
 const path = require('path');
-const { writeFileAtomicSync, removeProfileFile, errorCode } = require('./atomic-write');
+const { writeFileAtomicSync, readProfileJson, removeProfileFile, errorCode } = require('./atomic-write');
 const { sanitizeRelayPayload, withoutBgImage } = require('./relay-payload');
 
 const RELAY_STATE_FILE = 'relay-state.json';
@@ -98,19 +97,16 @@ function serializeRelayState(relay) {
     return JSON.stringify({ version: RELAY_STATE_VERSION, relay: relaySnapshot(relay) });
 }
 
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
 function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
- * Разбор текста файла.
- *
- * @param {string} text
- * @returns {object|null} проверенные поля памяти или null — «формат не наш»
+ * Проверенные поля памяти или null, если формат файла неизвестен.
+ * @param {unknown} data
  */
-function parseRelayState(text) {
-    let data;
-    try { data = JSON.parse(text); } catch { return null; }
+function sanitizeRelayState(data) {
     if (!isPlainObject(data) || data.version !== RELAY_STATE_VERSION || !isPlainObject(data.relay)) {
         return null;
     }
@@ -136,20 +132,15 @@ function parseRelayState(text) {
  */
 function loadRelayState(userDataPath, relay, log) {
     const file = getRelayStatePath(userDataPath);
-    let text;
+    let data;
     try {
-        const stat = fs.statSync(file);
-        if (stat.size > MAX_FILE_BYTES) {
-            log.warn(`[relay-state] файл больше ${MAX_FILE_BYTES} байт — не читается`);
-            return;
-        }
-        text = fs.readFileSync(file, 'utf8');
+        data = readProfileJson(file, MAX_FILE_BYTES);
     } catch (err) {
         if (err && err.code === 'ENOENT') { return; }
         log.warn(`[relay-state] файл не прочитан: ${errorCode(err)}`);
         return;
     }
-    const fields = parseRelayState(text);
+    const fields = sanitizeRelayState(data);
     if (fields === null) {
         log.warn('[relay-state] формат не распознан — старт с пустой памятью');
         return;
@@ -174,12 +165,12 @@ function deleteRelayState(userDataPath) {
  *
  * @param {object} deps
  * @param {() => string} deps.getUserDataPath — app.getPath('userData')
- * @param {object} deps.relay — память ретрансляторов (main-state.js)
- * @param {object} deps.log
+ * @param {ReturnType<typeof import('./main-state.js').createRelayMemory>} deps.relay
+ * @param {Pick<import('electron-log').LogFunctions, 'info' | 'warn'>} deps.log
  * @param {number} [deps.delayMs]
- * @param {Function} [deps.setTimer] - подменяется в тестах
- * @param {Function} [deps.clearTimer]
- * @param {Function} [deps.write] - writeRelayState, подменяется в тестах
+ * @param {typeof setTimeout} [deps.setTimer] - подменяется в тестах
+ * @param {typeof clearTimeout} [deps.clearTimer]
+ * @param {typeof writeRelayState} [deps.write] - подменяется в тестах
  * @param {boolean} [deps.disabled] - стенд съёмки: не читать и не писать
  *        (кадр не зависит от прошлого прогона); сброс файл всё равно удаляет
  */
@@ -250,6 +241,6 @@ function createRelayPersister({
 
 module.exports = {
     RELAY_STATE_FILE, RELAY_STATE_VERSION, MAX_FILE_BYTES, DEFAULT_DELAY_MS,
-    getRelayStatePath, relaySnapshot, serializeRelayState, parseRelayState,
+    getRelayStatePath, relaySnapshot, serializeRelayState, sanitizeRelayState,
     loadRelayState, writeRelayState, deleteRelayState, createRelayPersister
 };

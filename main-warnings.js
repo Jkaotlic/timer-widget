@@ -48,15 +48,16 @@ function warningCode(warning, rest) {
  * @param {NodeJS.Process} [proc]
  */
 function installWarningFilter(proc = process) {
-    const current = /** @type {any} */ (proc.emitWarning);
+    const current = /** @type {NodeJS.Process['emitWarning'] & {__typelessFilter?: boolean}} */ (proc.emitWarning);
     if (current && current.__typelessFilter) { return; }
     const original = current;
+    /** @type {NodeJS.Process['emitWarning'] & {__typelessFilter?: boolean}} */
     const filtered = function emitWarning(warning, ...rest) {
         if (warningCode(warning, rest) === SILENCED_CODE) { return; }
         return original.call(this, warning, ...rest);
     };
     filtered.__typelessFilter = true;
-    proc.emitWarning = /** @type {any} */ (filtered);
+    proc.emitWarning = filtered;
 }
 
 module.exports = { installWarningFilter, warningCode, SILENCED_CODE };

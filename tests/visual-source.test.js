@@ -523,19 +523,21 @@ test('стенд съёмки отчитывается отказом, если 
     const workflow = fs.readFileSync(
         path.join(repoRoot, '.github', 'workflows', 'nodejs.yml'), 'utf8'
     );
-    const stepStart = workflow.indexOf('- name: Visual regression');
-    assert.ok(stepStart > -1, 'шаг визуальной сверки в workflow не найден');
+    const stepStart = workflow.indexOf('- name: Capture Electron windows');
+    assert.ok(stepStart > -1, 'шаг съёмки в workflow не найден');
     const nextStep = workflow.indexOf('- name:', stepStart + 10);
     const step = workflow.slice(stepStart, nextStep === -1 ? undefined : nextStep);
+    assert.match(step, /npm run screenshot/);
+    assert.match(step, /npm run visual:check/);
     assert.doesNotMatch(
         step,
         /continue-on-error:\s*true/,
-        'шаг визуальной сверки снова неблокирующий — падение съёмки опять невидимо'
+        'шаг съёмки скрывает падение Electron'
     );
 
     // Проверка себя: на образце с маскировкой утверждение обязано падать.
     assert.match(
-        '- name: Visual regression\n  run: x\n  continue-on-error: true\n',
+        '- name: Capture Electron windows\n  run: x\n  continue-on-error: true\n',
         /continue-on-error:\s*true/,
         'зонд не видит маскировку там, где она есть'
     );

@@ -1,7 +1,8 @@
 const { test, expect } = require('./fixtures');
 const fs = require('node:fs');
 const path = require('node:path');
-const { launchApp, USER_DATA_DIR, waitForStartupPush } = require('./launch');
+const { launchApp, waitForStartupPush } = require('./launch');
+const { getUserDataDir } = require('./run-profile');
 const {
     waitForDisplay, waitForDisplaySnapshot, waitForDisplaySettled, untilReceived, armReceived,
     panelRoundTrip, waitForQuiet, waitForSettledDisplay
@@ -134,7 +135,7 @@ test('масштаб дисплея применяется ко всем бло�
     // проверка снова перестала бы ловить вырезанный вызов. Сторож профиля
     // удаляет файл на каждом закрытии, но убитое приложение (crash-recovery)
     // его оставляет, поэтому условие «памяти нет» ставится здесь явно.
-    fs.rmSync(path.join(USER_DATA_DIR, 'relay-state.json'), { force: true });
+    fs.rmSync(path.join(getUserDataDir(), 'relay-state.json'), { force: true });
     const { app, control } = await launchApp({ awaitStartup: false });
     let display = null;
     try {

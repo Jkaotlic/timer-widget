@@ -386,7 +386,10 @@ test('высота полосы — одна величина с main: поло�
     // Запасная высота в main — тем же именем, а не своим литералом.
     const { codeOnly } = require('./helpers/source-scan');
     const read = (f) => codeOnly(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', f), 'utf8'));
-    const line = read('main-control-ipc.js').split('\n').find((l) => l.includes('const raw') && l.includes('payload.height'));
+    const main = read('main-control-ipc.js');
+    const handler = main.slice(main.indexOf("ipcMain.on('control-collapse'"));
+    assert.match(handler, /const \{ height \} = payload;/);
+    const line = handler.split('\n').find((l) => l.includes('const raw') && l.includes('Number.isFinite(height)'));
     assert.ok(line, 'нет запасной высоты raw в main-control-ipc.js (самопроверка)');
     assert.match(line, /CONFIG\.CONTROL_BAR_HEIGHT/);
     assert.doesNotMatch(line, /\b52\b/, 'в main снова свой литерал высоты полосы');

@@ -18,6 +18,9 @@ const { writeFileAtomicSync, readProfileJson, removeProfileFile, errorCode } = r
 const STATE_FILENAME = 'last-state.json';
 const MAX_AGE_MS = 5 * 60 * 1000;
 
+/** @typedef {{savedAt: number, presetSeconds: number, totalSeconds?: number, remainingSeconds?: number}} RecoverySnapshot */
+/** @typedef {Partial<Pick<import('electron-log').LogFunctions, 'error' | 'warn'>>} RecoveryLogger */
+
 function getRecoveryStatePath(userDataPath) {
     return path.join(userDataPath, STATE_FILENAME);
 }
@@ -33,8 +36,8 @@ function getRecoveryStatePath(userDataPath) {
  * теперь тот, в котором их позвали.
  *
  * @param {string} userDataPath
- * @param {object} timerState
- * @param {object} [logger]
+ * @param {Pick<TimerState, 'totalSeconds' | 'remainingSeconds' | 'presetSeconds' | 'isRunning'>} timerState
+ * @param {RecoveryLogger} [logger]
  */
 function saveTimerStateToFileSync(userDataPath, timerState, logger) {
     try {
@@ -59,8 +62,8 @@ function saveTimerStateToFileSync(userDataPath, timerState, logger) {
  * Returns null if no file, stale, or unreadable. Deletes stale files.
  *
  * @param {string} userDataPath
- * @param {object} [logger]
- * @returns {object|null}
+ * @param {RecoveryLogger} [logger]
+ * @returns {unknown}
  */
 function loadSavedTimerState(userDataPath, logger) {
     try {
@@ -78,6 +81,7 @@ function loadSavedTimerState(userDataPath, logger) {
     }
 }
 
+/** @param {string} userDataPath @param {RecoveryLogger} [logger] */
 function clearSavedTimerState(userDataPath, logger) {
     try {
         removeProfileFile(getRecoveryStatePath(userDataPath));
@@ -98,15 +102,19 @@ function clearSavedTimerState(userDataPath, logger) {
  * snapshot at time `now`. No I/O, no side effects.
  *
  * Rules: object w/ finite savedAt in [now - 5m, now], presetSeconds ≥ 0.
+ * @param {unknown} data
+ * @param {number} [now]
+ * @returns {data is RecoverySnapshot}
  */
 function isRecoveryValid(data, now) {
     if (!data || typeof data !== 'object') { return false; }
-    if (typeof data.savedAt !== 'number' || !Number.isFinite(data.savedAt)) { return false; }
-    const age = (now || Date.now()) - data.savedAt;
+    const { savedAt, presetSeconds, totalSeconds, remainingSeconds } = /** @type {Record<string, unknown>} */ (data);
+    if (typeof savedAt !== 'number' || !Number.isFinite(savedAt)) { return false; }
+    const age = (now || Date.now()) - savedAt;
     if (age < 0 || age > MAX_AGE_MS) { return false; }
-    return isTimerSeconds(data.presetSeconds)
-        && (data.totalSeconds === undefined || isTimerSeconds(data.totalSeconds))
-        && (data.remainingSeconds === undefined || isTimerSeconds(data.remainingSeconds, -MAX_SECONDS));
+    return isTimerSeconds(presetSeconds)
+        && (totalSeconds === undefined || isTimerSeconds(totalSeconds))
+        && (remainingSeconds === undefined || isTimerSeconds(remainingSeconds, -MAX_SECONDS));
 }
 
 module.exports = {

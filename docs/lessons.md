@@ -313,7 +313,7 @@
 
 ### Tests and screenshots run in their OWN profiles
 
-- **Tests and screenshots run in their OWN profiles**: `e2e/launch.js` passes `--user-data-dir=$TMPDIR/timer-widget-e2e-profile` (wiped by `e2e/global-setup.js` before each run), and `scripts/run-electron.js` adds `$TMPDIR/timer-widget-visual-profile` — but ONLY for `--screenshot`; `npm start` and `npm run dev` keep the live profile, because the real app must remember the user's settings. Before this, both wrote into `~/Library/Application Support/timer-widget`: running e2e wiped the user's colours, and `visual:check` inherited whatever was left, so its regression count drifted 44 → 40 → 39 → 14 across identical runs while looking deterministic. The e2e profile is ONE directory for the whole run, not one per launch: `crash-recovery.spec.js` SIGKILLs the app and expects the recovery snapshot to survive the relaunch, so a fresh directory per launch would make it green forever. The old rule "don't count the first `visual:check` after e2e" is retired.
+- **Tests and screenshots run in their OWN profiles**: `e2e/global-setup.js` creates a unique `$TMPDIR/timer-widget-e2e-*` per run and removes it at teardown. `e2e/launch.js` passes that directory to Electron as `--user-data-dir`, and `scripts/run-electron.js` adds `$TMPDIR/timer-widget-visual-profile` — but ONLY for `--screenshot`; `npm start` and `npm run dev` keep the live profile, because the real app must remember the user's settings. Before this, both wrote into `~/Library/Application Support/timer-widget`: running e2e wiped the user's colours, and `visual:check` inherited whatever was left, so its regression count drifted 44 → 40 → 39 → 14 across identical runs while looking deterministic. The e2e profile is ONE directory for the whole run, not one per launch: `crash-recovery.spec.js` SIGKILLs the app and expects the recovery snapshot to survive the relaunch, so a fresh directory per launch would make it green forever. The old rule "don't count the first `visual:check` after e2e" is retired.
 
 ---
 
@@ -1514,7 +1514,7 @@ Linux применяет правило буквально. Второе так�
 До редизайна виджет и дисплей прибивали палитру «светлое по тёмному» в обеих
 темах: окно не владеет своим фоном, и светлая тема давала почти чёрные цифры на
 тёмно-синем — на проекторе время нечитаемо вообще. Разбор
-[«Windows whose background the USER paints»](#windows-whose-background-the-user-paint)
+[«Windows whose background the USER paints»](#windows-whose-background-the-user-paints-keep-the-dark-palet)
 описывает именно это.
 
 Макет редизайна нарисовал светлый дисплей «для белой аудитории и стрима», то есть
@@ -1651,7 +1651,7 @@ if (timerColor) { root.style.setProperty('--timer-color', timerColor); }   // и
 `:root.on-light-bg` / `:root:not(.on-light-bg)` в `display.css` и светлая тема в
 `design-tokens.css`, которой пользовались часы. Копии были дословными: значения
 блока дисплея совпали со светлой темой токенов знак в знак. Разбор
-[«Windows whose background the USER paints»](#windows-whose-background-the-user-paint)
+[«Windows whose background the USER paints»](#windows-whose-background-the-user-paints-keep-the-dark-palet)
 описывает, чем такое перечисление кончилось в 2.4.1 — оно перечисляло текстовые
 токены и ни одного акцента, и затемнённый зелёный лёг на прибитый тёмный фон:
 2.66:1 на проекторе.
@@ -3595,8 +3595,8 @@ settle-loop поверх настоящего окна дисплея (тот ж
 — час суток такой же вход.
 
 **Сноска про соседа.** Разбор `'HH:MM'` для новых величин действительно живёт в
-одном месте — `RendererShared.clockToSeconds()`, из которой построены
-`signedSecondsUntilClock` и `eventClockDistances` (а из неё — `secondsUntilEventEnd`
+одном месте — `RendererShared.clockToSeconds()`, которую использует
+`eventClockDistances` (а из неё берёт значение `secondsUntilEventEnd`
 блока «До завершения»; прежняя `secondsUntilClock` по одной отметке удалена
 26.09.2026 — она не знала полуночи). Но «единственный в проекте, кто
 знает этот формат» сказать нельзя: `updateStaticMiniClock()` в

@@ -48,11 +48,11 @@ const UI_THEME_VALUES = new Set(['dark', 'light']);
 
 /**
  * @param {object} deps
- * @param {object} deps.ipcMain — обвязка ipc-senders.guardIpcMain
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.relay — память ретрансляторов (main-state.js)
+ * @param {ReturnType<typeof import('./ipc-senders.js').guardIpcMain>} deps.ipcMain — обвязка ipc-senders.guardIpcMain
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {ReturnType<typeof import('./main-state.js').createRelayMemory>} deps.relay — память ретрансляторов (main-state.js)
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {object} deps.log
+ * @param {import('electron-log').LogFunctions} deps.log
  * @param {() => void} deps.applyWidgetMinimumSize — main-windows.js
  * @param {(on: boolean) => void} deps.applyWidgetAlwaysOnTop — main-windows.js
  * @param {() => void} deps.persistRelay — память изменилась: склеенная запись
@@ -157,7 +157,7 @@ function registerRelayIpc({ ipcMain, windows, relay, safelySendToWindow, log, ap
     ipcMain.on('report-scale', (_event, payload) => {
         if (!isPayloadObject(payload)) { return; }
         const { source, scalePct } = payload;
-        if (!SCALE_REPORT_SOURCES.has(source)) { return; }
+        if (typeof source !== 'string' || !SCALE_REPORT_SOURCES.has(source)) { return; }
         if (!Number.isFinite(scalePct)) { return; }
         safelySendToWindow(windows.controlWindow, 'scale-report', { source, scalePct });
     });

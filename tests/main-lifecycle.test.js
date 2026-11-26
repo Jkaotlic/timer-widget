@@ -84,6 +84,21 @@ async function until(cond) {
     assert.ok(cond(), 'условие не наступило');
 }
 
+test('при сбое подготовки хранилища старт продолжается, в журнале остаётся код ошибки', async () => {
+    const h = makeDeps();
+    const logged = [];
+    h.deps.log.error = (...parts) => logged.push(parts.join(' '));
+    h.deps.prepareStorage = async () => {
+        throw Object.assign(new Error('open failed: /example/profile'), { code: 'EIO' });
+    };
+
+    startApp(h.deps);
+    await until(() => h.createdCount() === 1);
+    const messages = logged.join('\n');
+    assert.doesNotMatch(messages, /\/example\/profile/);
+    assert.match(messages, /перенос настроек.*EIO/);
+});
+
 test('MAIN-06: activate (клик по Dock) показывает спрятанную в трей панель', async () => {
     const h = makeDeps();
     startApp(h.deps);

@@ -23,16 +23,16 @@ const os = require('node:os');
 const path = require('node:path');
 const { _electron: electron } = require('playwright');
 const { track } = require('./failure-artifacts');
-const { launchApp, waitForControlWindow, cleanEnv, MAIN, USER_DATA_DIR } = require('./launch');
+const { launchApp, waitForControlWindow, cleanEnv, MAIN } = require('./launch');
+const { getUserDataDir } = require('./run-profile');
 const profileGuard = require('./profile-guard');
 const { waitForClock, findWindowBy } = require('./window-ready');
 const { installClockStyleProbe, clockSends } = require('./clock-style-probe');
 
-const RELAY_FILE = path.join(USER_DATA_DIR, 'relay-state.json');
 const TITLE = 'Сохранённое мероприятие';
 
-function readRelayFile() {
-    try { return JSON.parse(fs.readFileSync(RELAY_FILE, 'utf8')); } catch { return null; }
+function readRelayFile(file) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
 /**
@@ -41,7 +41,7 @@ function readRelayFile() {
  */
 async function launchBeforePanelPushes(exportTarget) {
     const app = track(await electron.launch({
-        args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`],
+        args: [MAIN, `--user-data-dir=${getUserDataDir()}`],
         env: cleanEnv()
     }));
     await app.evaluate(({ ipcMain, app: eapp, dialog }, target) => {
@@ -75,6 +75,7 @@ async function launchBeforePanelPushes(exportTarget) {
 }
 
 test('после перезапуска виджет и выгрузка CSV следуют файлу ещё до посылок панели', async () => {
+    const relayFile = path.join(getUserDataDir(), 'relay-state.json');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'timer-relay-export-'));
     const target = path.join(dir, 'отчёт.csv');
 
@@ -93,8 +94,8 @@ test('после перезапуска виджет и выгрузка CSV с�
 
     let second = null;
     try {
-        const saved = readRelayFile();
-        expect(saved, `после выхода нет ${RELAY_FILE}`).not.toBeNull();
+        const saved = readRelayFile(relayFile);
+        expect(saved, `после выхода нет ${relayFile}`).not.toBeNull();
         expect(saved.relay.lastWidgetStyle.alwaysOnTop).toBe(false);
         expect(saved.relay.lastDisplaySettings.eventTitle).toBe(TITLE);
         expect(JSON.stringify(saved), 'картинка фона в файл не пишется').not.toContain('bgLocalImage');
@@ -149,7 +150,7 @@ test('после перезапуска виджет и выгрузка CSV с�
             await fix.app.close();
         }
         // Профиль общий: следующий тест не должен стартовать с памятью этого.
-        fs.rmSync(RELAY_FILE, { force: true });
+        fs.rmSync(relayFile, { force: true });
     }
 });
 
@@ -163,6 +164,7 @@ test('после перезапуска виджет и выгрузка CSV с�
  * попасть в заглушку — иначе он встал позже неё, и замер ничего не доказывает.
  */
 test('после перезапуска часы получают стиль снимком из файла, до посылок панели', async () => {
+    const relayFile = path.join(getUserDataDir(), 'relay-state.json');
     const CLOCK_PROBE = () => !!document.getElementById('clockGradient');
     const closeClock = async (app, control) => {
         if (!(await findWindowBy(app, CLOCK_PROBE))) { return; }
@@ -182,12 +184,12 @@ test('после перезапуска часы получают стиль с�
 
     let second = null;
     try {
-        const saved = readRelayFile();
-        expect(saved, `после выхода нет ${RELAY_FILE}`).not.toBeNull();
+        const saved = readRelayFile(relayFile);
+        expect(saved, `после выхода нет ${relayFile}`).not.toBeNull();
         expect(saved.relay.lastClockStyle, 'стиль часов в файле памяти').toBe('analog');
 
         // --- 2. Вторая жизнь: панель молчит, часы открываются сразу ---
-        const app = track(await electron.launch({ args: [MAIN, `--user-data-dir=${USER_DATA_DIR}`], env: cleanEnv() }));
+        const app = track(await electron.launch({ args: [MAIN, `--user-data-dir=${getUserDataDir()}`], env: cleanEnv() }));
         await installClockStyleProbe(app, { blockPanel: true });
         const control = await waitForControlWindow(app);
         second = { app, control };
@@ -216,6 +218,6 @@ test('после перезапуска часы получают стиль с�
             const fix = await launchApp();
             await fix.app.close();
         }
-        fs.rmSync(RELAY_FILE, { force: true });
+        fs.rmSync(relayFile, { force: true });
     }
 });

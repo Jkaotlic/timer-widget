@@ -161,9 +161,9 @@ test('стиль часов переживает перезапуск: relay-sta
 
 test('стиль часов из файла проверяется тем же правилом, что живой канал', () => {
     for (const bad of [42, '', { s: 'flip' }, 'x'.repeat(10000), null]) {
-        const parsed = RelayStore.parseRelayState(JSON.stringify({
+        const parsed = RelayStore.sanitizeRelayState({
             version: RelayStore.RELAY_STATE_VERSION, relay: { lastClockStyle: bad, lastClockColors: { timer: '#111111' } }
-        }));
+        });
         assert.equal(Object.prototype.hasOwnProperty.call(parsed, 'lastClockStyle'), false, `не принимать ${JSON.stringify(bad).slice(0, 20)}`);
         assert.deepEqual(parsed.lastClockColors, { timer: '#111111' }, 'остальное читается');
     }

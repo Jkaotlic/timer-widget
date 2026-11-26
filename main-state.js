@@ -1,6 +1,16 @@
 'use strict';
 
 /**
+ * @typedef {import('electron').BrowserWindow & {
+ *   _closing?: boolean,
+ *   _closingFullScreen?: Array<() => void>,
+ *   _displayIndex?: string | number,
+ *   __crashReloads?: number[],
+ *   __dragSize?: {width: number, height: number}
+ * }} AppWindow
+ */
+
+/**
  * main-state.js — общее изменяемое состояние главного процесса. ОДИН владелец.
  *
  * До 25.09.2026 главный процесс был одним файлом, и эти величины были его
@@ -25,6 +35,8 @@
  * Четыре окна приложения. `null` — окна нет (или событие `closed` уже
  * пришло). Закрывающееся, но ещё не закрытое окно отличает
  * main-window-closing.js, а не этот объект.
+ * @returns {{controlWindow: AppWindow | null, widgetWindow: AppWindow | null,
+ *   displayWindow: AppWindow | null, clockWidgetWindow: AppWindow | null}}
  */
 function createWindowRegistry() {
     return Object.seal({
@@ -39,6 +51,18 @@ function createWindowRegistry() {
  * Что главный процесс ПОМНИТ из каналов-ретрансляторов, чтобы дослать окну,
  * открытому позже (правило «снимок при загрузке, а не только рассылка»).
  * Переживает перезапуск: файл userData/relay-state.json (relay-store.js).
+ * @returns {{
+ *   lastDisplaySettings: DisplaySettingsUpdate | null,
+ *   lastDisplayIndex: string | number,
+ *   lastWidgetColors: ColorsUpdate | null,
+ *   lastClockColors: ColorsUpdate | null,
+ *   lastDisplayColors: ColorsUpdate | null,
+ *   lastWidgetStyle: WidgetStyleUpdate | null,
+ *   lastClockStyle: ClockStyleName | null,
+ *   lastClockSettings: Record<string, string | number | boolean | null> | null,
+ *   uiTheme: string | null,
+ *   uiLocked: boolean | null
+ * }}
  */
 function createRelayMemory() {
     return Object.seal({

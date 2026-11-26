@@ -44,7 +44,7 @@ const CLOCK_SETTINGS = [
 
 /**
  * Контрол строки у владельца ссылок или undefined.
- * @param {object} els
+ * @param {any} els
  * @param {string} name
  * @returns {ClockControl|undefined}
  */
@@ -55,7 +55,7 @@ function controlOf(els, name) {
 
 /**
  * Читает состояние контролов в объект настроек.
- * @param {object} els — владелец ссылок на элементы (поля с именами из `el` таблицы)
+ * @param {any} els — владелец ссылок на элементы (поля с именами из `el` таблицы)
  * @returns {Record<string, boolean|string>}
  */
 function collectClockSettings(els) {
@@ -79,7 +79,7 @@ function collectClockSettings(els) {
  * умолчание из таблицы. Проверка именно на undefined: `false` и `''` —
  * сохранённый выбор пользователя, и подменять его умолчанием нельзя.
  *
- * @param {object} els — владелец ссылок на элементы
+ * @param {any} els — владелец ссылок на элементы
  * @param {Record<string, unknown>} stored
  */
 function applyClockSettings(els, stored) {

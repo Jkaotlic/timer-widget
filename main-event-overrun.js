@@ -21,6 +21,7 @@ const OverrunStore = require('./event-overrun-store');
 const EventReport = require('./event-report');
 
 /** Покой: остаток равен тоталу, таймер не идёт и не на паузе. Так выглядят и сброс, и новый пресет. */
+/** @param {import('./timer-engine.js').TimerEngineState | null} state */
 function isAtRest(state) {
     return !!state && !state.isRunning && !state.isPaused && !state.finished
         && Number(state.remainingSeconds) === Number(state.totalSeconds);
@@ -28,14 +29,14 @@ function isAtRest(state) {
 
 /**
  * @param {object} deps
- * @param {object} deps.windows — реестр окон (main-state.js)
- * @param {object} deps.relay — память ретрансляторов (main-state.js): ставка,
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
+ * @param {ReturnType<typeof import('./main-state.js').createRelayMemory>} deps.relay — память ретрансляторов (main-state.js): ставка,
  *        период и название мероприятия лежат в lastDisplaySettings
- * @param {() => object} deps.getTimerState — зеркало состояния таймера
+ * @param {() => TimerState} deps.getTimerState — зеркало состояния таймера
  * @param {typeof import('./utils.js').safelySendToWindow} deps.safelySendToWindow
- * @param {object} deps.log
+ * @param {import('electron-log').LogFunctions} deps.log
  * @param {() => string} deps.getUserDataPath — app.getPath('userData')
- * @param {object} deps.dialog — electron.dialog (метод зовётся на объекте:
+ * @param {import('electron').Dialog} deps.dialog — electron.dialog (метод зовётся на объекте:
  *        e2e подменяет showSaveDialog прямо на нём)
  */
 function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow, log, getUserDataPath, dialog }) {
@@ -144,6 +145,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
     }
     let currentTalk = freshTalk();
 
+    /** @param {TimerState} state */
     function trackTalk(state) {
         if (state.isRunning) { currentTalk.active = true; }
         if (currentTalk.active && Number(state.remainingSeconds) < Number(state.totalSeconds)) {
@@ -239,6 +241,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
         OverrunStore.saveStore(getUserDataPath(), Object.assign({}, eventOverrun, { pending }), log);
     }
 
+    /** @param {TimerState} state */
     function accrueOverrun(state) {
         trackTalk(state);
         // Считается перелимит ЗА ВЫЧЕТОМ отсечки: секунды, натикавшие до «Нового
@@ -319,6 +322,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
         if (folded.changed || (resume && restoredRemaining === null)) { persistEventOverrun(); }
     }
 
+    /** @param {ReturnType<typeof import('./ipc-senders.js').guardIpcMain>} ipcMain */
     function registerIpc(ipcMain) {
         // Завершить мероприятие принудительно: закрыть текущий перелимит и заморозить
         // итог. Полезной нагрузки нет — это ДЕЙСТВИЕ, а не настройка: величину знает
@@ -365,6 +369,7 @@ function createEventOverrun({ windows, relay, getTimerState, safelySendToWindow,
             };
 
             try {
+                /** @type {Partial<DisplaySettingsUpdate>} */
                 const settings = relay.lastDisplaySettings || {};
                 const report = EventReport.buildReportCSV({
                     talks: eventOverrun.talks,

@@ -333,50 +333,44 @@ test('.font-option.active (список шрифтов) проходит пор�
     console.log(`   .font-option.active светлая (расчёт): ${ratioLight.toFixed(2)}:1 (нужно ${AAA_NORMAL}:1)`);
 });
 
-test('.bg-mode-btn.active — предсуществующий дефект контраста, ЗАФИКСИРОВАН числом, не исправляется здесь', () => {
-    // Найден тем же ревью пикселем, что и .font-option.active выше (тот же
-    // паттерн: var(--tw-blue) на rgba(10,132,255,·) заливке того же тона), но
-    // это код, который эта задача не трогает — кнопки режима фона существовали
-    // до неё. Тест не проваливает сборку: он документирует масштаб дефекта
-    // числом, чтобы следующий проход (или явное решение «чиним/не чиним») не
-    // начинался с нуля. Если однажды кто-то поднимет контраст выше порога —
-    // этот тест немедленно потребует поднять и здесь заявленный порог, а не
-    // останется тихо устаревшим утверждением «менее X:1».
-    const control = readSource('control.css');
-    // Селектор с 08.09.2026 — список: `.hero-mode-btn.active` присоединён
-    // через запятую (тот же дефект, повторно заводить декларации не стали).
-    // `[^{}]*` вместо `\s*` переживает вторую строку селектора до `{`.
-    const rule = /^\.bg-mode-btn\.active[^{}]*\{([^}]*)\}/m.exec(control);
-    assert.ok(rule, 'не найдено правило .bg-mode-btn.active — если оно переименовано, замер контраста тоже надо перенести');
+const MODE_BUTTON_RULES = [
+    ...readWindowCss('control.css').matchAll(/([^{}]+)\{([^{}]*)\}/g)
+];
 
-    const bg = /background:\s*([^;]+);/.exec(rule[1]);
-    const fgTok = /color:\s*var\(--([a-z0-9-]+)\)/.exec(rule[1]);
-    assert.ok(bg && fgTok, '.bg-mode-btn.active: не разобраны background/color');
-
-    const level2Dark = composite(darkToken('tw-level-2'), SURFACE);
-    const activeDark = composite(bg[1].trim(), level2Dark);
-    const ratioDark = contrast(composite(darkToken(fgTok[1]), activeDark), activeDark);
-    // Порог здесь НЕ WCAG (4.5), а «не стало хуже измеренного»: реальный
-    // пиксель на момент ревью 2026-08-07 — 2.12:1 (скриншот → canvas →
-    // getImageData, тот же метод, что и для .font-option.active выше);
-    // упрощённая аналитическая цепочка подложки этого теста (SURFACE →
-    // --tw-level-2 → заливка) даёт 3.37:1 — выше, чем реальный пиксель,
-    // потому что настоящий фон панели в этом месте светлее, чем предполагает
-    // упрощённая модель (та же разница, что и у .font-option.active: там
-    // аналитика дала 10.31:1 при реальном пикселе 7.56:1). Оба числа — и
-    // реальное, и расчётное — ниже порога WCAG AA (4.5:1), поэтому тест как
-    // «известный дефект» отражает действительность в любом случае.
-    assert.ok(
-        ratioDark < AA_NORMAL,
-        `.bg-mode-btn.active внезапно прошёл WCAG AA (${ratioDark.toFixed(2)}:1) — обнови комментарий, `
-        + 'дефект, видимо, устранили, но не в этой задаче'
-    );
-    assert.ok(
-        ratioDark >= 2.5,
-        `.bg-mode-btn.active стал ЕЩЁ темнее: ${ratioDark.toFixed(2)}:1 — это уже регресс контраста, не только известный дефект`
-    );
-    console.log(`   [известный дефект, не чинится здесь] .bg-mode-btn.active тёмная: ${ratioDark.toFixed(2)}:1 (нужно ${AA_NORMAL}:1)`);
-});
+for (const selector of ['.bg-mode-btn.active', '.hero-mode-btn.active']) {
+    for (const [theme, token, minimum] of [
+        ['dark', darkToken, AA_NORMAL],
+        ['light', hcToken, 7]
+    ]) {
+        test(`${selector} в теме ${theme} проходит порог контраста`, () => {
+            const resolve = makeResolver(token);
+            const declarations = new Map();
+            // Тематический селектор специфичнее общего. Внутри каждой
+            // группы приоритет у последнего объявления, как в CSS.
+            for (const activeSelector of [selector, `[data-theme="${theme}"] ${selector}`]) {
+                for (const [, selectors, body] of MODE_BUTTON_RULES) {
+                    if (!selectors.split(',').some((part) => part.trim() === activeSelector)) { continue; }
+                    for (const [, property, value] of body.matchAll(/(?:^|;)\s*(color|background(?:-color)?):\s*([^;]+)/g)) {
+                        declarations.set(property === 'color' ? 'color' : 'background', value.trim());
+                    }
+                }
+            }
+            const color = (property) => {
+                const value = declarations.get(property);
+                assert.ok(value, `${selector}: не найдено объявление ${property} для темы ${theme}`);
+                return value.replace(/var\(--([a-z0-9-]+)\)/g, (_, name) => resolve(name));
+            };
+            const base = parseColor(resolve('tw-bg-dark')).rgb;
+            const surface = composite(resolve('tw-bg-surface'), base);
+            const level2 = composite(resolve('tw-level-2'), surface);
+            const bg = composite(color('background'), level2);
+            const ratio = contrast(composite(color('color'), bg), bg);
+            assert.ok(ratio >= minimum,
+                `${selector}, ${theme}: ${ratio.toFixed(2)}:1, нужно ${minimum}:1`);
+            console.log(`   ${selector}, ${theme}: ${ratio.toFixed(2)}:1`);
+        });
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Окна, не владеющие своим фоном: виджет и полноэкранный дисплей

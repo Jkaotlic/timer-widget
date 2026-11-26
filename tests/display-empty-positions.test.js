@@ -67,10 +67,18 @@ test('сдвинутый элемент по-прежнему записывае
     assert.strictEqual(writes.length, 1);
     const [key, raw] = writes[0];
     assert.strictEqual(key, 'displayBlockPositions');
-    const saved = JSON.parse(raw);
-    assert.deepStrictEqual(Object.keys(saved), ['timerBox']);
-    assert.strictEqual(saved.timerBox.left, 100);
-    assert.ok(Number.isFinite(saved.timerBox.cx));
+    assert.deepStrictEqual(JSON.parse(raw), { timerBox: { left: 100, top: 200, cx: 0.15, cy: 0.2813 } });
+    assert.deepStrictEqual(self.elementFractions.timerBox, { cx: 0.15, cy: 0.28125 });
+});
+
+test('скрытый сдвинутый элемент сохраняет пиксели без нового замера доли', () => {
+    const hidden = row('timerBox', true, 100, 200);
+    hidden.el.getBoundingClientRect = () => ({ left: 0, top: 0, width: 0, height: 0 });
+    const { self, writes } = display([hidden]);
+    self.elementFractions.timerBox = { cx: 0.9, cy: 0.7 };
+    self.saveElementPositions();
+    assert.deepStrictEqual(JSON.parse(writes[0][1]), { timerBox: { left: 100, top: 200 } });
+    assert.deepStrictEqual(self.elementFractions.timerBox, { cx: 0.9, cy: 0.7 });
 });
 
 test('перераскладка сохраняет исходную долю и пропускает пустой набор', () => {

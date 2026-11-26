@@ -3,8 +3,7 @@ const { defineConfig } = require('@playwright/test');
 module.exports = defineConfig({
     testDir: './e2e',
     forbidOnly: !!process.env.CI,
-    // Сносит и создаёт заново каталог профиля (см. e2e/global-setup.js): тесты
-    // делят один профиль внутри прогона, но не должны наследовать предыдущий.
+    // Уникальный временный профиль на весь прогон (см. e2e/global-setup.js).
     globalSetup: require.resolve('./e2e/global-setup.js'),
     /**
      * Бюджет теста — 120 с, и это НЕ запас «на всякий случай».

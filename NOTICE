@@ -10,6 +10,13 @@ see LICENSES.chromium.html shipped with the application installation.
 
 ================================================================================
 
+=== @bcoe/v8-coverage ===
+Version: 1.0.2
+License: MIT
+Repository: https://github.com/bcoe/v8-coverage
+Publisher: Charles Samborski
+Homepage: https://demurgos.net
+
 === @cacheable/memory ===
 Version: 2.2.0
 License: MIT
@@ -48,6 +55,12 @@ Repository: https://github.com/electron/asar
 
 === @electron/fuses ===
 Version: 1.8.0
+License: MIT
+Repository: https://github.com/electron/fuses
+Publisher: Electron Community
+
+=== @electron/fuses ===
+Version: 2.1.3
 License: MIT
 Repository: https://github.com/electron/fuses
 Publisher: Electron Community
@@ -106,7 +119,7 @@ Repository: https://github.com/eslint-community/regexpp
 Publisher: Toru Nagashima
 
 === @eslint/config-array ===
-Version: 0.23.5
+Version: 0.23.6
 License: Apache-2.0
 Repository: https://github.com/eslint/rewrite
 Publisher: Nicholas C. Zakas
@@ -179,6 +192,30 @@ Publisher: Isaac Z. Schlueter
 Version: 1.1.0
 License: BlueOak-1.0.0
 
+=== @istanbuljs/schema ===
+Version: 0.1.6
+License: MIT
+Repository: https://github.com/istanbuljs/schema
+Publisher: Corey Farrell
+
+=== @jridgewell/resolve-uri ===
+Version: 3.1.3
+License: MIT
+Repository: https://github.com/jridgewell/resolve-uri
+Publisher: Justin Ridgewell
+
+=== @jridgewell/sourcemap-codec ===
+Version: 1.6.0
+License: MIT
+Repository: https://github.com/jridgewell/sourcemaps
+Publisher: Justin Ridgewell
+
+=== @jridgewell/trace-mapping ===
+Version: 0.3.31
+License: MIT
+Repository: https://github.com/jridgewell/sourcemaps
+Publisher: Justin Ridgewell
+
 === @keyv/bigmap ===
 Version: 1.3.1
 License: MIT
@@ -237,7 +274,7 @@ Repository: https://github.com/PeculiarVentures/webcrypto
 Publisher: PeculiarVentures
 
 === @playwright/test ===
-Version: 1.64.1
+Version: 1.65.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
@@ -285,6 +322,11 @@ Version: 4.2.0
 License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
+=== @types/istanbul-lib-coverage ===
+Version: 2.0.6
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
 === @types/json-schema ===
 Version: 7.0.15
 License: MIT
@@ -301,7 +343,12 @@ License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
 === @types/node ===
-Version: 24.13.3
+Version: 24.19.4
+License: MIT
+Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @types/node ===
+Version: 26.6.10
 License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 
@@ -309,6 +356,12 @@ Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
 Version: 1.0.3
 License: MIT
 Repository: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== @typescript/typescript-darwin-arm64 ===
+Version: 7.0.2
+License: Apache-2.0
+Repository: https://github.com/microsoft/TypeScript
+Publisher: Microsoft Corp.
 
 === @xmldom/xmldom ===
 Version: 0.8.15
@@ -357,12 +410,26 @@ Repository: https://github.com/chalk/ansi-regex
 Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
 
+=== ansi-regex ===
+Version: 6.6.0
+License: MIT
+Repository: https://github.com/chalk/ansi-regex
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
 === ansi-styles ===
 Version: 4.3.0
 License: MIT
 Repository: https://github.com/chalk/ansi-styles
 Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
+
+=== ansi-styles ===
+Version: 6.2.3
+License: MIT
+Repository: https://github.com/chalk/ansi-styles
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
 
 === app-builder-lib ===
 Version: 26.18.0
@@ -437,7 +504,7 @@ License: MIT
 Repository: https://github.com/thenativeweb/boolean
 
 === brace-expansion ===
-Version: 5.0.12
+Version: 5.1.0
 License: MIT
 Repository: https://github.com/juliangruber/brace-expansion
 
@@ -463,6 +530,12 @@ Version: 2.0.1
 License: BSD-3-Clause
 Repository: https://github.com/PeculiarVentures/ByteStream.js
 Publisher: Yury Strozhevsky
+
+=== c8 ===
+Version: 12.0.0
+License: ISC
+Repository: https://github.com/bcoe/c8
+Publisher: Ben Coe
 
 === cacheable-lookup ===
 Version: 5.0.4
@@ -526,6 +599,12 @@ License: ISC
 Repository: https://github.com/yargs/cliui
 Publisher: Ben Coe
 
+=== cliui ===
+Version: 9.0.1
+License: ISC
+Repository: https://github.com/yargs/cliui
+Publisher: Ben Coe
+
 === clone-response ===
 Version: 1.0.3
 License: MIT
@@ -576,6 +655,13 @@ License: MIT
 Repository: https://github.com/kevva/compare-version
 Publisher: Kevin Mårtensson
 Homepage: https://github.com/kevva
+
+=== convert-source-map ===
+Version: 2.0.0
+License: MIT
+Repository: https://github.com/thlorenz/convert-source-map
+Publisher: Thorsten Lorenz
+Homepage: http://thlorenz.com
 
 === core-util-is ===
 Version: 1.0.3
@@ -744,10 +830,17 @@ License: MIT
 Repository: https://github.com/electron/windows-installer
 
 === electron ===
-Version: 44.11.4
+Version: 45.5.0
 License: MIT
 Repository: https://github.com/electron/electron
 Publisher: Electron Community
+
+=== emoji-regex ===
+Version: 10.6.0
+License: MIT
+Repository: https://github.com/mathiasbynens/emoji-regex
+Publisher: Mathias Bynens
+Homepage: https://mathiasbynens.be/
 
 === emoji-regex ===
 Version: 8.0.0
@@ -864,7 +957,7 @@ Publisher: Toru Nagashima
 Homepage: https://github.com/mysticatea
 
 === eslint ===
-Version: 10.14.0
+Version: 10.15.0
 License: MIT
 Repository: https://github.com/eslint/eslint
 Publisher: Nicholas C. Zakas
@@ -903,7 +996,7 @@ Repository: https://github.com/coveooss/exponential-backoff
 Publisher: Sami Sayegh
 
 === fast-check ===
-Version: 4.10.2
+Version: 4.11.0
 License: MIT
 Repository: https://github.com/dubzzz/fast-check
 Publisher: Nicolas DUBIEN
@@ -934,12 +1027,6 @@ License: BSD-3-Clause
 Repository: https://github.com/fastify/fast-uri
 Publisher: Vincent Le Goff
 Homepage: https://github.com/zekth
-
-=== fdir ===
-Version: 6.5.0
-License: MIT
-Repository: https://github.com/thecodrr/fdir
-Publisher: thecodrr
 
 === file-entry-cache ===
 Version: 11.1.5
@@ -972,6 +1059,13 @@ Version: 3.4.4
 License: ISC
 Repository: https://github.com/WebReflection/flatted
 Publisher: Andrea Giammarchi
+
+=== foreground-child ===
+Version: 3.3.1
+License: ISC
+Repository: https://github.com/tapjs/foreground-child
+Publisher: Isaac Z. Schlueter
+Homepage: http://blog.izs.me/
 
 === form-data ===
 Version: 4.0.6
@@ -1035,6 +1129,13 @@ License: ISC
 Repository: https://github.com/stefanpenner/get-caller-file
 Publisher: Stefan Penner
 
+=== get-east-asian-width ===
+Version: 1.7.0
+License: MIT
+Repository: https://github.com/sindresorhus/get-east-asian-width
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
 === get-intrinsic ===
 Version: 1.3.0
 License: MIT
@@ -1060,6 +1161,13 @@ License: ISC
 Repository: https://github.com/gulpjs/glob-parent
 Publisher: Gulp Team
 Homepage: https://gulpjs.com/
+
+=== glob ===
+Version: 14.0.6
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/node-glob
+Publisher: Isaac Z. Schlueter
+Homepage: https://blog.izs.me/
 
 === glob ===
 Version: 7.2.3
@@ -1167,6 +1275,12 @@ Version: 9.0.3
 License: ISC
 Repository: https://github.com/npm/hosted-git-info
 Publisher: GitHub Inc.
+
+=== html-escaper ===
+Version: 2.0.2
+License: MIT
+Repository: https://github.com/WebReflection/html-escaper
+Publisher: Andrea Giammarchi
 
 === htmlparser2 ===
 Version: 10.1.0
@@ -1284,6 +1398,24 @@ License: BlueOak-1.0.0
 Repository: https://github.com/isaacs/isexe
 Publisher: Isaac Z. Schlueter
 Homepage: http://blog.izs.me/
+
+=== istanbul-lib-coverage ===
+Version: 3.2.2
+License: BSD-3-Clause
+Repository: https://github.com/istanbuljs/istanbuljs
+Publisher: Krishnan Anantheswaran
+
+=== istanbul-lib-report ===
+Version: 3.0.1
+License: BSD-3-Clause
+Repository: https://github.com/istanbuljs/istanbuljs
+Publisher: Krishnan Anantheswaran
+
+=== istanbul-reports ===
+Version: 3.2.0
+License: BSD-3-Clause
+Repository: https://github.com/istanbuljs/istanbuljs
+Publisher: Krishnan Anantheswaran
 
 === jake ===
 Version: 10.9.4
@@ -1411,6 +1543,13 @@ Version: 6.0.0
 License: ISC
 Repository: https://github.com/isaacs/node-lru-cache
 Publisher: Isaac Z. Schlueter
+
+=== make-dir ===
+Version: 4.0.0
+License: MIT
+Repository: https://github.com/sindresorhus/make-dir
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
 
 === matcher ===
 Version: 3.0.0
@@ -1629,6 +1768,13 @@ Repository: https://github.com/sindresorhus/path-key
 Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
 
+=== path-scurry ===
+Version: 3.0.0
+License: BlueOak-1.0.0
+Repository: https://github.com/isaacs/path-scurry
+Publisher: Isaac Z. Schlueter
+Homepage: https://blog.izs.me
+
 === pe-library ===
 Version: 0.4.1
 License: MIT
@@ -1641,13 +1787,6 @@ License: ISC
 Repository: https://github.com/alexeyraspopov/picocolors
 Publisher: Alexey Raspopov
 
-=== picomatch ===
-Version: 4.0.7
-License: MIT
-Repository: https://github.com/micromatch/picomatch
-Publisher: Jon Schlinkert
-Homepage: https://github.com/jonschlinkert
-
 === pkijs ===
 Version: 3.4.3
 License: BSD-3-Clause
@@ -1655,13 +1794,13 @@ Repository: https://github.com/PeculiarVentures/PKI.js
 Publisher: Yury Strozhevsky
 
 === playwright-core ===
-Version: 1.64.1
+Version: 1.65.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
 
 === playwright ===
-Version: 1.64.1
+Version: 1.65.1
 License: Apache-2.0
 Repository: https://github.com/microsoft/playwright
 Publisher: Microsoft Corporation
@@ -1899,6 +2038,12 @@ License: ISC
 Repository: https://github.com/tapjs/signal-exit
 Publisher: Ben Coe
 
+=== signal-exit ===
+Version: 4.1.0
+License: ISC
+Repository: https://github.com/tapjs/signal-exit
+Publisher: Ben Coe
+
 === simple-update-notifier ===
 Version: 2.0.0
 License: MIT
@@ -1973,12 +2118,33 @@ Repository: https://github.com/sindresorhus/string-width
 Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
 
+=== string-width ===
+Version: 7.2.0
+License: MIT
+Repository: https://github.com/sindresorhus/string-width
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
+=== string-width ===
+Version: 8.3.0
+License: MIT
+Repository: https://github.com/sindresorhus/string-width
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
 === strip-ansi ===
 Version: 6.0.1
 License: MIT
 Repository: https://github.com/chalk/strip-ansi
 Publisher: Sindre Sorhus
 Homepage: sindresorhus.com
+
+=== strip-ansi ===
+Version: 7.2.0
+License: MIT
+Repository: https://github.com/chalk/strip-ansi
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
 
 === sumchecker ===
 Version: 3.0.1
@@ -2011,17 +2177,17 @@ License: MIT
 Repository: https://github.com/bruce/node-temp
 Publisher: Bruce Williams
 
+=== test-exclude ===
+Version: 8.0.0
+License: ISC
+Repository: https://github.com/istanbuljs/test-exclude
+Publisher: Ben Coe
+
 === tiny-async-pool ===
 Version: 1.3.0
 License: MIT
 Repository: https://github.com/rxaviers/async-pool
 Publisher: Rafael Xavier de Souza
-
-=== tinyglobby ===
-Version: 0.2.17
-License: MIT
-Repository: https://github.com/SuperchupuDev/tinyglobby
-Publisher: Superchupu
 
 === tmp-promise ===
 Version: 3.0.3
@@ -2061,13 +2227,18 @@ Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
 === typescript ===
-Version: 6.0.3
+Version: 7.0.2
 License: Apache-2.0
 Repository: https://github.com/microsoft/TypeScript
 Publisher: Microsoft Corp.
 
 === undici-types ===
-Version: 7.18.2
+Version: 7.24.6
+License: MIT
+Repository: https://github.com/nodejs/undici
+
+=== undici-types ===
+Version: 8.9.0
 License: MIT
 Repository: https://github.com/nodejs/undici
 
@@ -2118,6 +2289,12 @@ Repository: https://github.com/TooTallNate/util-deprecate
 Publisher: Nathan Rajlich
 Homepage: http://n8.io/
 
+=== v8-to-istanbul ===
+Version: 9.3.0
+License: ISC
+Repository: https://github.com/istanbuljs/v8-to-istanbul
+Publisher: Ben Coe
+
 === validate-npm-package-license ===
 Version: 3.0.4
 License: Apache-2.0
@@ -2164,6 +2341,13 @@ Repository: https://github.com/chalk/wrap-ansi
 Publisher: Sindre Sorhus
 Homepage: https://sindresorhus.com
 
+=== wrap-ansi ===
+Version: 9.0.2
+License: MIT
+Repository: https://github.com/chalk/wrap-ansi
+Publisher: Sindre Sorhus
+Homepage: https://sindresorhus.com
+
 === wrappy ===
 Version: 1.0.2
 License: ISC
@@ -2203,8 +2387,19 @@ License: ISC
 Repository: https://github.com/yargs/yargs-parser
 Publisher: Ben Coe
 
+=== yargs-parser ===
+Version: 22.0.0
+License: ISC
+Repository: https://github.com/yargs/yargs-parser
+Publisher: Ben Coe
+
 === yargs ===
 Version: 17.7.3
+License: MIT
+Repository: https://github.com/yargs/yargs
+
+=== yargs ===
+Version: 18.2.0
 License: MIT
 Repository: https://github.com/yargs/yargs
 

@@ -325,21 +325,13 @@ class DisplayTimer {
         const viewport = { width: window.innerWidth, height: window.innerHeight };
         for (const row of (this.movableElements || [])) {
             if (!row.el.classList.contains('custom-position')) { continue; }
-            const record = {
-                left: parseInt(row.el.style.left) || 0,
-                top: parseInt(row.el.style.top) || 0
-            };
             let fraction = this.elementFractions[row.id];
             if (!keepFractions) {
                 const rect = row.el.getBoundingClientRect();
                 fraction = rect.width > 0 ? DisplayLayouts.positionToFraction(rect, viewport) : null;
                 if (fraction) { this.elementFractions[row.id] = fraction; }
             }
-            if (fraction) {
-                record.cx = Math.round(fraction.cx * 10000) / 10000;
-                record.cy = Math.round(fraction.cy * 10000) / 10000;
-            }
-            positions[row.id] = record;
+            positions[row.id] = DisplayLayouts.buildPositionRecord(row.el.style, fraction);
         }
         // Пустой набор — тоже состояние («ничего не сдвинуто»), и его
         // записывают: раскладка «Минимум», вернувшая в поток единственный

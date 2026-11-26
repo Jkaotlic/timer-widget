@@ -267,6 +267,21 @@ test('сбой сброса на диск — метки нет', async () => {
     assert.equal(env.readMarker().status, 'pending');
 });
 
+test('журнал ошибки переноса сохраняет этап и код, но не путь профиля', async (t) => {
+    const env = makeEnv({ file: { a: '1' } });
+    t.after(() => fs.rmSync(env.dir, { recursive: true, force: true }));
+    env.deps.flushStorageData = async () => {
+        throw Object.assign(new Error(`open failed: ${env.dir}`), { code: 'EIO' });
+    };
+
+    const result = await M.migrateStorage(env.deps);
+    result.dispose();
+    assert.equal(result.outcome, 'retry');
+    const warning = env.logged.filter(([level]) => level === 'warn').map(([, line]) => line).join('\n');
+    assert.ok(!warning.includes(env.dir), 'журнал включил путь профиля');
+    assert.match(warning, /сброс на диск.*EIO/);
+});
+
 test('битая метка читается как «нет метки», а не роняет старт', async () => {
     const env = makeEnv({ file: { a: '1' } });
     fs.writeFileSync(path.join(env.dir, M.MARKER_FILE), '{не json');

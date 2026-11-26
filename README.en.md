@@ -6,7 +6,7 @@
 
 **Transparent timer widget for presentations and desktop**
 
-[![Version](https://img.shields.io/badge/v2.13.0-0a84ff?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/v2.13.1-0a84ff?style=flat-square)](../../releases/latest)
 [![Electron](https://img.shields.io/badge/Electron_44-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jkaotlic/timer-widget/nodejs.yml?style=flat-square&label=CI)](https://github.com/Jkaotlic/timer-widget/actions)
 [![Tests](https://img.shields.io/badge/tests-passing-30d158?style=flat-square)](tests/)
@@ -245,9 +245,9 @@ npm start
 | `npm start` | Run the app |
 | `npm run dev` | Run with DevTools |
 | `npm test` | Tests (`node --test`) |
-| `npm run lint` | ESLint 9 (flat config) |
-| `npm run ci` | Lint + tests |
-| `npm run screenshot` | 24 PNG screenshots for headless visual review |
+| `npm run lint` | ESLint 10 (flat config) |
+| `npm run ci` | Lint, type checking, and tests |
+| `npm run screenshot` | PNG screenshots for headless visual review |
 | `npm run build:win` | Build Windows (NSIS + Portable) |
 | `npm run build:mac` | Build macOS (DMG + ZIP, arm64 + x64) |
 | `npm run build` | Build for current platform |
@@ -400,7 +400,7 @@ In v2.3 the panel became compact (380 px); settings moved into a **drawer** — 
 
 1. Fork the repository
 2. Create a branch (`git checkout -b feature/my-feature`)
-3. Make sure `npm run ci` passes (lint + tests)
+3. Make sure `npm run ci` passes
 4. Open a Pull Request
 
 Bugs and feature requests — in [Issues](../../issues). Full change history — in [CHANGELOG.md](CHANGELOG.md).
@@ -409,7 +409,7 @@ Bugs and feature requests — in [Issues](../../issues). Full change history —
 
 <div align="center">
 
-**Electron 44.11.4** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
+**Electron 45.5.0** · **Vanilla JS** · **Web Audio API** · **node --test** · **GitHub Actions CI**
 
 MIT © 2024–2026 [Jkaotlic](https://github.com/Jkaotlic)
 

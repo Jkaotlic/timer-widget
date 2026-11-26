@@ -49,7 +49,7 @@ npm run notice
 Проверить отсутствие известных уязвимостей:
 
 ```bash
-npm audit --production  # у нас 0 production deps, ожидаемо "0 vulnerabilities"
+npm audit --omit=dev  # одна runtime-зависимость: electron-log
 npm audit               # все devDeps (проверяется в CI)
 ```
 

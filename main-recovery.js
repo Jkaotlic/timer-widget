@@ -16,10 +16,10 @@ const recovery = require('./recovery');
 /**
  * @param {object} deps
  * @param {() => string} deps.getUserDataPath — app.getPath('userData')
- * @param {() => object} deps.getTimerState — зеркало состояния таймера
- * @param {object} deps.flags — флаги приложения (main-state.js), читается isQuitting
- * @param {(state: object) => boolean} deps.isAtRest — покой таймера (main-event-overrun.js)
- * @param {object} deps.log
+ * @param {() => TimerState} deps.getTimerState — зеркало состояния таймера
+ * @param {ReturnType<typeof import('./main-state.js').createAppFlags>} deps.flags — флаги приложения (main-state.js), читается isQuitting
+ * @param {typeof import('./main-event-overrun.js').isAtRest} deps.isAtRest — покой таймера (main-event-overrun.js)
+ * @param {import('electron-log').LogFunctions} deps.log
  * @param {boolean} deps.inTestMode — гейтится по `!app.isPackaged`
  *        (electron-main.js, R3): у СОБРАННОГО приложения периодическая запись
  *        идёт всегда, независимо от того, что унаследовано в env — это не
@@ -46,6 +46,7 @@ function createRecoverySnapshot({ getUserDataPath, getTimerState, flags, isAtRes
      * Есть ли что восстанавливать после сбоя: таймер идёт, стоит на паузе или
      * остановлен посреди отсчёта. Покой (сброс, новый пресет) и финиш — нет.
      */
+    /** @param {TimerState | null} state */
     function worthRecovering(state) {
         return !state.finished && (state.isRunning || state.isPaused || !isAtRest(state));
     }

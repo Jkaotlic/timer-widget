@@ -29,8 +29,14 @@ const FULLSCREEN_EXIT_TIMEOUT_MS = 2000;
  */
 const WINDOW_REOPEN_TIMEOUT_MS = 3000;
 
+/** @typedef {import('./main-state.js').AppWindow} AppWindow */
+/** @typedef {'widget' | 'clock'} AuxWindowKey */
+/** @typedef {AuxWindowKey | 'display'} QueuedWindowKey */
+/** @typedef {{create: () => void, timer: ReturnType<typeof setTimeout> | null}} PendingOpen */
+
 // Closing the display and quitting the app wait on the same native transition.
 // Electron can report isFullScreen() === false before leave-full-screen fires.
+/** @param {AppWindow} win @param {() => void} afterExit */
 function waitForFullScreenExit(win, afterExit) {
     if (win._closingFullScreen) {
         win._closingFullScreen.push(afterExit);
@@ -53,7 +59,7 @@ function waitForFullScreenExit(win, afterExit) {
 
 /**
  * @param {object} deps
- * @param {object} deps.windows — реестр окон (main-state.js)
+ * @param {ReturnType<typeof import('./main-state.js').createWindowRegistry>} deps.windows — реестр окон (main-state.js)
  */
 function createWindowClosing({ windows }) {
     /**
@@ -76,15 +82,23 @@ function createWindowClosing({ windows }) {
      * дать ОДНО окно. Второе стало бы неуправляемым — ссылка (`widgetWindow` и
      * прочие) указывает только на последнее созданное.
      */
+    /** @type {Map<QueuedWindowKey, PendingOpen>} */
     const pendingOpens = new Map();
 
-    /** Пометить окно закрывающимся. Ставится ВЕЗДЕ, где зовётся close(). */
+    /**
+     * Пометить окно закрывающимся. Ставится ВЕЗДЕ, где зовётся close().
+     * @template {AppWindow | null} T
+     * @param {T} win
+     */
     function markClosing(win) {
         if (win && !win.isDestroyed()) { win._closing = true; }
         return win;
     }
 
-    /** Окно, которое можно показать: оно есть, не закрывается и не разрушено. */
+    /**
+     * Окно, которое можно показать: оно есть, не закрывается и не разрушено.
+     * @param {AppWindow | null} win
+     */
     function isUsableWindow(win) {
         return !!win && !win._closing && !win.isDestroyed();
     }
@@ -92,10 +106,10 @@ function createWindowClosing({ windows }) {
     /**
      * Запланировать открытие окна на момент, когда закрывающееся уйдёт.
      *
-     * @param {string} key — какое окно ('widget' | 'clock' | 'display')
-     * @param {object|null} closing — закрывающееся окно; null, если запрос просто
+     * @param {QueuedWindowKey} key — какое окно
+     * @param {AppWindow | null} closing — закрывающееся окно; null, если запрос просто
      *        присоединяется к уже запланированному
-     * @param {Function} create — чем создать новое окно
+     * @param {() => void} create — чем создать новое окно
      * @returns {boolean} true — запланировано, звонящий обязан выйти
      */
     function queueOpenAfterClose(key, closing, create) {
@@ -111,6 +125,7 @@ function createWindowClosing({ windows }) {
         // исполняют только СВОЮ запись: прежде run проверял лишь «есть ли что-то
         // под ключом», и неснятая страховка прошлого запроса через 3 с
         // открывала окно за СЛЕДУЮЩИЙ — раньше, чем уходило его окно.
+        /** @type {PendingOpen} */
         const entry = { create, timer: null };
         pendingOpens.set(key, entry);
         const run = () => {
@@ -126,7 +141,10 @@ function createWindowClosing({ windows }) {
         return true;
     }
 
-    /** Отменить отложенное открытие: «закрыть» отменяет «открыть». */
+    /**
+     * Отменить отложенное открытие: «закрыть» отменяет «открыть».
+     * @param {QueuedWindowKey} key
+     */
     function cancelQueuedOpen(key) {
         const entry = pendingOpens.get(key);
         if (entry) { clearTimeout(entry.timer); }
@@ -177,16 +195,19 @@ function createWindowClosing({ windows }) {
     }
 
     // Widget and clock are opened from IPC and toggled from the tray.
+    /** @param {AuxWindowKey} key @param {AppWindow | null} win @param {() => void} create */
     function openAuxWindow(key, win, create) {
         if (isUsableWindow(win)) { win.focus(); return; }
         if (!queueOpenAfterClose(key, win, create)) { create(); }
     }
 
+    /** @param {AuxWindowKey} key @param {AppWindow | null} win */
     function closeAuxWindow(key, win) {
         cancelQueuedOpen(key);
         if (isUsableWindow(win)) { markClosing(win).close(); }
     }
 
+    /** @param {AuxWindowKey} key @param {AppWindow | null} win @param {() => void} create */
     function toggleAuxWindow(key, win, create) {
         if (isUsableWindow(win) || pendingOpens.has(key)) { closeAuxWindow(key, win); }
         else { openAuxWindow(key, win, create); }

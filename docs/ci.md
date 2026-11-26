@@ -5,7 +5,7 @@
 
 | Job | Где | Что |
 |-----|-----|-----|
-| `build` | ubuntu-latest | `npm run ci`, затем `visual:check` под xvfb (блокирует промах кадра) и неблокирующий `coverage`. Визуальному шагу нужен `chmod 4755` + root на `chrome-sandbox` дев-бинаря, иначе Chromium падает с кодом 133 |
+| `build` | ubuntu-latest | Линтер, проверка типов и тесты, затем съёмка окон под xvfb и неблокирующий `coverage`. Ручной запуск с `visual_baseline_run_id` сверяет кадры с эталоном. Визуальному шагу нужен `chmod 4755` + root на `chrome-sandbox` дев-бинаря, иначе Chromium падает с кодом 133 |
 | `build` (шаг typecheck) | ubuntu-latest | `npm run typecheck` — `tsc --checkJs` по двум проектам и сравнение с `typecheck-baseline.json`; новое сообщение или его рост в файле (сравнение «код: текст» без строки), корневой `*.js` вне программ или `tsc` без диагностики — красный; уменьшение без `--write` тоже красное. Тот же шаг — в каждом job сборки `release.yml` |
 | `unit-cross-platform` | windows + macos | `npm run lint` + `npm test` — класс «ломается только не на Linux» (CRLF) |
 | `e2e` | ubuntu + windows + macos | `npx playwright test` — настоящий рантайм. Linux под `xvfb-run`; `fail-fast: false` |
@@ -22,6 +22,23 @@
 *список* в `package.json`, `verify-packed.js` открывает настоящий `app.asar`
 (так в 2.3.2 потерялся `design-tokens.css`); его парсер проверен на
 **настоящем** `default_app.asar`.
+
+## Съёмка окон и сверка с эталоном
+
+Обычный CI запускает `npm run screenshot` под xvfb и публикует артефакт
+`screenshots` на 7 дней. Он проверяет, что Electron запускается и создаёт
+полный набор кадров. Кадры неудачного прогона публикуются как `failed-screenshots`.
+Для попиксельной сверки в GitHub Actions найдите успешный Linux-прогон
+`Node.js CI`, просмотрите его артефакт и задайте числовой ID этого прогона в
+поле `visual_baseline_run_id` ручного запуска. Выбирайте эталон с теми же
+параметрами рендеринга, включая ОС, версию Electron, размер экрана и масштаб.
+Кадры с текущим временем автоматически исключаются из сверки.
+
+Для локальной сверки снимите кадры `npm run screenshot`, примите их командой
+`npm run visual:baseline` и запустите `npm run visual:check` в том же окружении.
+Принимаются кадры из списка последней завершённой съёмки (`capture-manifest.json`).
+Если набора эталонов нет или для сравнимого кадра отсутствует одна из версий,
+проверка завершается ошибкой. Растры хранятся вне Git.
 
 ## lintian: 0 error, но не 0 warning
 

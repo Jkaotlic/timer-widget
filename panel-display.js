@@ -68,7 +68,7 @@ function safeParseObject(raw) {
  * Значения полей с кастомными подписями блоков.
  *
  * @param {Document} doc
- * @returns {object} ключ настройки → введённая строка (как есть)
+ * @returns {any} ключ настройки → введённая строка (как есть)
  *
  * Обрезкой и подстановкой умолчания занимается ДИСПЛЕЙ (blockCaption): панель
  * хранит ровно то, что человек напечатал, иначе его собственный текст
@@ -87,7 +87,7 @@ function collectBlockLabels(doc) {
  * Значения всех тумблеров дисплея одним объектом.
  *
  * @param {Document} doc
- * @returns {object} ключ → boolean; отсутствующий контрол пропускается
+ * @returns {any} ключ → boolean; отсутствующий контрол пропускается
  */
 function collectDisplayToggles(doc) {
     const out = {};
@@ -107,7 +107,7 @@ function collectDisplayToggles(doc) {
  * значит «без изменений», пустая строка — «картинки нет». Главный процесс
  * помнит последнюю и досылает её окну, открытому позже; дисплей держит копию.
  *
- * @param {object} settings — собираемый payload (дополняется на месте)
+ * @param {any} settings — собираемый payload (дополняется на месте)
  * @param {string} image — картинка, которую дисплей должен показывать сейчас
  * @param {string|undefined} lastSent — последняя отправленная
  * @returns {string} новая «последняя отправленная»

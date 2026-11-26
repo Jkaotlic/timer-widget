@@ -210,6 +210,17 @@ test('доля и пиксели переводятся друг в друга �
     assert.deepEqual(DL.fractionToPosition(f, viewport, size), { left: 400, top: 200 });
 });
 
+test('запись позиции сохраняет целые пиксели и округляет доли центра', () => {
+    assert.deepEqual(
+        DL.buildPositionRecord({ left: '-23.75px', top: '17.8px' }, { cx: 0.123456, cy: 0.654343 }),
+        { left: -23, top: 17, cx: 0.1235, cy: 0.6543 }
+    );
+});
+
+test('запись без доли содержит только пиксели и заменяет нечисловой CSS нулём', () => {
+    assert.deepEqual(DL.buildPositionRecord({ left: 'auto', top: '' }, null), { left: 0, top: 0 });
+});
+
 test('доля держит КОМПОЗИЦИЮ при смене размера окна', () => {
     // Ровно та жалоба: блоки разъезжались, потому что стояли в пикселях.
     const from = { width: 1600, height: 900 };

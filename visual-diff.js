@@ -17,6 +17,8 @@
  * ложные срабатывания на ровном месте.
  */
 
+const CAPTURE_MANIFEST = 'capture-manifest.json';
+
 // Пиксель считается изменившимся, если хотя бы один канал отличается сильнее,
 // чем на channelTolerance. 8 из 255 — заметно меньше любой смысловой смены
 // цвета (жёлтый → красный это сотни единиц), но выше шума антиалиасинга.
@@ -107,6 +109,7 @@ function isTimeDependent(name) {
 }
 
 module.exports = {
+    CAPTURE_MANIFEST,
     diffBitmaps,
     isRegression,
     isTimeDependent,

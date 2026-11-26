@@ -8,9 +8,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { diffProfiles, VOLATILE_KEYS, KEY_DEFAULTS } = require('../e2e/profile-guard');
+const setup = require('../e2e/global-setup');
+const { RUN_PROFILE_ENV, getUserDataDir } = require('../e2e/run-profile');
+const { diffProfiles, readLedger, VOLATILE_KEYS, KEY_DEFAULTS } = require('../e2e/profile-guard');
 
 test('оставленное название мероприятия видно ПО ПОЛЮ, а не «ключ изменился»', () => {
     const before = { displayExtSettings: JSON.stringify({ eventTitle: '', endTime: '12:00' }) };
@@ -73,4 +76,40 @@ test('launchApp подключает сторож, а сводная спека 
     assert.match(launch, /profileGuard\.watch\(app\b/, 'launchApp не подключает сторож профиля');
     const specs = fs.readdirSync(e2e).filter((f) => f.endsWith('.spec.js')).sort();
     assert.equal(specs.at(-1), 'zz-profile-leaks.spec.js', 'сводная спека сторожа не последняя по алфавиту');
+});
+
+test('два прогона в одной временной папке получают свои профили и журналы', () => {
+    const previous = process.env[RUN_PROFILE_ENV];
+    const cleanupFirst = setup();
+    const first = getUserDataDir();
+    const firstLedger = { leaks: { example: ['тест не вернул профиль'] }, restored: {} };
+    try {
+        const firstMarker = path.join(first, 'last-state.json');
+        fs.writeFileSync(firstMarker, 'saved');
+        fs.writeFileSync(path.join(first, 'e2e-profile-leaks.json'), JSON.stringify(firstLedger));
+        assert.deepEqual(readLedger(), firstLedger);
+
+        const cleanupSecond = setup();
+        const second = getUserDataDir();
+        try {
+            assert.notEqual(first, second, 'новый прогон открыл профиль первого');
+            assert.ok(fs.existsSync(firstMarker), 'новый прогон стёр профиль первого');
+            assert.deepEqual(readLedger(), { leaks: {}, restored: {} });
+            const fromWorker = execFileSync(process.execPath, ['-e',
+                "process.stdout.write(require('./e2e/run-profile.js').getUserDataDir())"
+            ], { cwd: path.join(__dirname, '..'), encoding: 'utf8' });
+            assert.equal(fromWorker, second, 'профиль не дошёл до воркера');
+        } finally {
+            cleanupSecond();
+        }
+
+        assert.ok(!fs.existsSync(second), 'второй прогон не удалил свой профиль');
+        assert.ok(fs.existsSync(firstMarker), 'второй прогон удалил профиль первого');
+        assert.deepEqual(readLedger(), firstLedger);
+    } finally {
+        cleanupFirst();
+    }
+
+    assert.ok(!fs.existsSync(first), 'первый прогон не удалил свой профиль');
+    assert.equal(process.env[RUN_PROFILE_ENV], previous);
 });

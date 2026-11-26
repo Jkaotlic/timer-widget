@@ -63,8 +63,15 @@ function isAppPageUrl(url, allowed) {
  * `onBlocked(kind, url)` — чтобы отказ оставил след в журнале: иначе «окно
  * почему-то не переходит» не имеет ни одной зацепки. Что писать, решает
  * вызывающий (полный путь в журнал не нужен — SEC-11).
+ * @param {Pick<import('electron').WebContents, 'on' | 'setWindowOpenHandler'>} contents
+ * @param {Set<string>} allowed
+ * @param {(kind: string, url: string | null | undefined) => void} [onBlocked]
  */
 function guardWebContents(contents, allowed, onBlocked = () => {}) {
+    /**
+     * @param {string} kind
+     * @returns {(event: {url?: string, preventDefault(): void}, url?: string) => void}
+     */
     const check = (kind) => (event, url) => {
         // will-frame-navigate передаёт адрес в event.url, без второго аргумента.
         const target = url !== undefined ? url : event && event.url;

@@ -78,18 +78,18 @@
 
         class TimerController {
             constructor() {
-                // Только для tsc: что приносят примеси (Object.assign ниже); строка лишь читает свойство.
-                /** @type {TimerMixins['pushDisplaySettings']} */ this.pushDisplaySettings;
-                /** @type {TimerMixins['widgetStylePayload']} */ this.widgetStylePayload;
-                /** @type {TimerMixins['pushWindowStyles']} */ this.pushWindowStyles;
-                /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows;
-                /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows;
-                /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow;
-                /** @type {TimerMixins['loadClockSettings']} */ this.loadClockSettings;
-                /** @type {TimerMixins['pushClockSettings']} */ this.pushClockSettings;
-                /** @type {TimerMixins['sendClockStyle']} */ this.sendClockStyle;
-                /** @type {TimerMixins['updateClockAnalogNumbersVisibility']} */ this.updateClockAnalogNumbersVisibility;
-                /** @type {ColorsUpdate|null} */ this.clockColors; // ставит PanelColorsMixin.loadWindowColors
+                // Явная инициализация нужна и TypeScript 7: this.foo; без неё свойство больше не объявляется.
+                /** @type {TimerMixins['pushDisplaySettings']} */ this.pushDisplaySettings = PanelDisplayMixin.pushDisplaySettings;
+                /** @type {TimerMixins['widgetStylePayload']} */ this.widgetStylePayload = PanelStateMixin.widgetStylePayload;
+                /** @type {TimerMixins['pushWindowStyles']} */ this.pushWindowStyles = PanelStateMixin.pushWindowStyles;
+                /** @type {TimerMixins['updateStyleDependentRows']} */ this.updateStyleDependentRows = PanelStateMixin.updateStyleDependentRows;
+                /** @type {TimerMixins['renderWindowRows']} */ this.renderWindowRows = PanelStateMixin.renderWindowRows;
+                /** @type {TimerMixins['renderSoundRow']} */ this.renderSoundRow = PanelStateMixin.renderSoundRow;
+                /** @type {TimerMixins['loadClockSettings']} */ this.loadClockSettings = PanelClockMixin.loadClockSettings;
+                /** @type {TimerMixins['pushClockSettings']} */ this.pushClockSettings = PanelClockMixin.pushClockSettings;
+                /** @type {TimerMixins['sendClockStyle']} */ this.sendClockStyle = PanelClockMixin.sendClockStyle;
+                /** @type {TimerMixins['updateClockAnalogNumbersVisibility']} */ this.updateClockAnalogNumbersVisibility = PanelClockMixin.updateClockAnalogNumbersVisibility;
+                /** @type {ColorsUpdate|null} */ this.clockColors = null; // ставит PanelColorsMixin.loadWindowColors
                 this.totalSeconds = 0;
                 this.remainingSeconds = 0;
                 this.isRunning = false;
@@ -734,7 +734,7 @@
                 // Scale value click-to-edit and double-click-to-reset wiring
                 setupScaleValueEdit(
                     document.getElementById('timerScaleValue'),
-                    document.getElementById('timerScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('timerScale')),
                     DEFAULT_SCALE_PCT,
                     (val) => {
                         window.ipcRenderer.send('widget-style-update', this.widgetStylePayload({ timerScale: val }));
@@ -744,7 +744,7 @@
 
                 setupScaleValueEdit(
                     document.getElementById('clockScaleValue'),
-                    document.getElementById('clockScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('clockScale')),
                     DEFAULT_SCALE_PCT,
                     (val) => {
                         const newSize = Math.round(CLOCK_BASE_PX * val / 100);
@@ -758,14 +758,14 @@
                 // которое дисплей потом откажется восстанавливать.
                 setupScaleValueEdit(
                     document.getElementById('displayTimerScaleValue'),
-                    document.getElementById('displayTimerScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('displayTimerScale')),
                     DEFAULT_SCALE_PCT,
                     () => { this.pushDisplaySettings(); }
                 );
 
                 setupScaleValueEdit(
                     document.getElementById('timeBlocksScaleValue'),
-                    document.getElementById('timeBlocksScale'),
+                    /** @type {HTMLInputElement} */ (document.getElementById('timeBlocksScale')),
                     DisplayLayouts.DEFAULT_BLOCK_SCALE,
                     () => { this.pushDisplaySettings(); }
                 );

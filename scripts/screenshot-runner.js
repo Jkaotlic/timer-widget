@@ -6,7 +6,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
-const { diffBitmaps, isRegression, isTimeDependent } = require('../visual-diff');
+const { CAPTURE_MANIFEST, diffBitmaps, isRegression, isTimeDependent } = require('../visual-diff');
 
 /**
  * Смена стиля виджета — ЧЕРЕЗ главный процесс, а не прямой посылкой в окно.
@@ -43,6 +43,29 @@ const STATES = [
 ];
 
 const WINDOWS = ['control', 'widget', 'clock', 'display'];
+const DRAWER_TABS = ['timer', 'clock', 'display', 'sound'];
+
+function hourStyles(state, styles) {
+    return state.name === 'hmax' ? styles.filter((style) => style === 'digits' || style === 'flip') : styles;
+}
+
+function expectedCaptureNames(styles, hourStates) {
+    return [
+        ...WINDOWS.flatMap((window) => [
+            ...STATES.map((state) => `${window}-${state.name}.png`),
+            `${window}-minsize.png`, `${window}-maxsize.png`, `light-${window}.png`
+        ]),
+        ...styles.flatMap((style) => [
+            `style-${style}-display-recovered.png`, `style-${style}-widget-recovered.png`,
+            `display-blocks-${style}.png`, `display-blocks-light-${style}.png`
+        ]),
+        ...hourStates.flatMap((state) => hourStyles(state, styles).flatMap((style) => [
+            `hours-${state.name}-${style}-display.png`, `hours-${state.name}-${style}-widget.png`
+        ])),
+        ...DRAWER_TABS.map((tab) => `control-drawer-${tab}.png`),
+        'control-collapsed.png', 'control-overtime-limit.png', 'light-drawer-clock.png'
+    ];
+}
 
 // Minimum sizes advertised by BrowserWindow options — used to catch layout
 // overflow/clipping when the user resizes to the floor.
@@ -278,7 +301,7 @@ async function waitForRemaining(win, seconds, log, timeoutMs = 3000) {
  */
 const CAPTURE_FAILURES = [];
 
-async function capture(win, filePath, log) {
+async function captureWindow(win, filePath, log) {
     if (!win || win.isDestroyed()) {
         log.warn(`[screenshot] skip ${path.basename(filePath)} — window missing`);
         CAPTURE_FAILURES.push({ file: path.basename(filePath), reason: 'окна нет' });
@@ -310,9 +333,10 @@ async function capture(win, filePath, log) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             const img = await win.webContents.capturePage();
+            if (img.isEmpty()) { throw new Error('пустой кадр'); }
             fs.writeFileSync(filePath, img.toPNG());
             log.info(`[screenshot] ${path.basename(filePath)}${attempt > 1 ? ` (retry ${attempt - 1})` : ''}`);
-            return;
+            return true;
         } catch (err) {
             if (attempt === maxAttempts) {
                 log.error(`[screenshot] ${path.basename(filePath)} failed after ${maxAttempts} attempts: ${err.message}`);
@@ -324,43 +348,60 @@ async function capture(win, filePath, log) {
     }
 }
 
+function compareFrame(nativeImage, actualPath, expectedPath) {
+    const actual = nativeImage.createFromPath(actualPath);
+    const expected = nativeImage.createFromPath(expectedPath);
+    const size = actual.getSize();
+    const expectedSize = expected.getSize();
+    if (!size.width || !size.height || size.width !== expectedSize.width || size.height !== expectedSize.height) {
+        throw new Error(`размеры ${size.width}×${size.height}, ожидалось ${expectedSize.width}×${expectedSize.height}`);
+    }
+    return diffBitmaps(actual.toBitmap(), expected.toBitmap());
+}
+
 // Сверяет снятые PNG с эталонами из tests/visual-baseline/.
 // Декодирование делает Electron (nativeImage), арифметику — чистый visual-diff.js.
 // Возвращает список регрессий; пустой список = всё совпало.
-function compareWithBaseline({ nativeImage, outDir, baselineDir, log }) {
-    if (!fs.existsSync(baselineDir)) {
-        log.info('[visual] эталонов нет — пропускаю сверку (npm run visual:baseline)');
-        return null;
-    }
+function compareWithBaseline({ nativeImage, outDir, baselineDir, log, capturedNames }) {
     const regressions = [];
+    function report(name, message) {
+        regressions.push({ name });
+        log.error(`[visual] ${message}`);
+        console.error(`[visual] ${message}`);
+    }
+
+    const baselineNames = fs.existsSync(baselineDir)
+        ? fs.readdirSync(baselineDir).filter((name) => name.endsWith('.png') && !isTimeDependent(name))
+        : [];
+    if (baselineNames.length === 0) {
+        report(null, 'нет эталонов для сверки (npm run visual:baseline)');
+        return regressions;
+    }
+
+    const baseline = new Set(baselineNames);
+    const captured = new Set(capturedNames);
     let compared = 0;
     let skipped = 0;
 
-    for (const name of fs.readdirSync(outDir).filter(f => f.endsWith('.png')).sort()) {
+    for (const name of baseline) {
+        if (!captured.has(name)) { report(name, `кадр ${name} не снят в этом прогоне`); }
+    }
+
+    for (const name of [...captured].sort()) {
         if (isTimeDependent(name)) { skipped++; continue; }
-        const basePath = path.join(baselineDir, name);
-        if (!fs.existsSync(basePath)) {
-            log.warn(`[visual] нет эталона для ${name} — новый снимок`);
+        if (!baseline.has(name)) {
+            report(name, `нет эталона для ${name}`);
             continue;
         }
         try {
-            const actual = nativeImage.createFromPath(path.join(outDir, name)).toBitmap();
-            const expected = nativeImage.createFromPath(basePath).toBitmap();
-            const result = diffBitmaps(actual, expected);
+            const result = compareFrame(nativeImage, path.join(outDir, name), path.join(baselineDir, name));
             compared++;
             if (isRegression(result)) {
                 const pct = (result.ratio * 100).toFixed(2);
-                regressions.push({ name, ...result });
-                log.error(`[visual] РАСХОЖДЕНИЕ ${name}: ${result.diffPixels} px (${pct}%)`);
-                // Дублируем на консоль: результат сверки уходил ТОЛЬКО в файл
-                // лога, поэтому `npm run visual:check` со стороны выглядел
-                // молчаливым — приходилось знать, где лежит лог, чтобы узнать
-                // итог. Проверка, итог которой не видно, обесценивается: её
-                // перестают читать (см. CLAUDE.md про шаг, падавший вхолостую).
-                console.error(`[visual] РАСХОЖДЕНИЕ ${name}: ${result.diffPixels} px (${pct}%)`);
+                report(name, `РАСХОЖДЕНИЕ ${name}: ${result.diffPixels} px (${pct}%)`);
             }
         } catch (e) {
-            log.warn(`[visual] не смог сравнить ${name}: ${e.message}`);
+            report(name, `не удалось сравнить ${name}: ${e.message}`);
         }
     }
 
@@ -373,6 +414,12 @@ function compareWithBaseline({ nativeImage, outDir, baselineDir, log }) {
 async function run({ app, log, ctx, applyTimerState, openWidget, openClock, openDisplay, outDir, nativeImage }) {
     log.info('[screenshot] starting capture sequence');
     fs.mkdirSync(outDir, { recursive: true });
+    const manifest = path.join(outDir, CAPTURE_MANIFEST);
+    fs.rmSync(manifest, { force: true });
+    const capturedNames = new Set();
+    async function capture(win, filePath, logger) {
+        if (await captureWindow(win, filePath, logger)) { capturedNames.add(path.basename(filePath)); }
+    }
 
     // Hard exit guard — kill the process if the sequence hangs for any reason.
     // Это страховка от зависания, а не бюджет времени: последовательность выросла
@@ -693,7 +740,7 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
                 // время внутри фиксированного циферблата. Здесь стояло имя
                 // `digital` — его в STYLES нет со слияния LED, и кадра hmax у
                 // «Цифр» не было вовсе.
-                if (hs.name === 'hmax' && style !== 'digits' && style !== 'flip') { continue; }
+                if (!hourStyles(hs, STYLES).includes(style)) { continue; }
                 try {
                     applyTimerState({
                         totalSeconds: hs.total, presetSeconds: hs.total,
@@ -816,9 +863,8 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         // набирается выбранным шрифтом стиля. Снимать при этом только круг и
         // аналог означало бы не иметь визуального покрытия ровно у того, что и
         // менялось.
-        const blockStyles = ['circle', 'flip', 'analog', 'digits'];
         const shootBlocks = async (suffix) => {
-            for (const style of blockStyles) {
+            for (const style of STYLES) {
                 const w = ctx();
                 if (!w.display || w.display.isDestroyed()) { break; }
                 try {
@@ -892,17 +938,19 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
         // Из четырёх вкладок ящика снимались только две: «Виджет» и «Звуки»
         // не попадали ни в один кадр — а там живут самая длинная карточка
         // приложения (список звуков с селектами) и вторая сетка свотчей.
-        for (const tab of ['timer', 'clock', 'display', 'sound']) {
+        for (const tab of DRAWER_TABS) {
             const w = ctx();
             if (!w.control || w.control.isDestroyed()) { break; }
             try {
-                await w.control.webContents.executeJavaScript(`
+                const opened = await w.control.webContents.executeJavaScript(`
                     (() => {
                         const btn = document.querySelector('.tab-btn[data-tab="${tab}"]');
-                        if (btn) { btn.click(); }
-                        return !!btn;
+                        if (!btn) { return false; }
+                        btn.click();
+                        return btn.getAttribute('aria-expanded') === 'true';
                     })();
                 `);
+                if (!opened) { throw new Error('вкладка не открылась'); }
             } catch (e) {
                 log.warn(`[screenshot] drawer (${tab}) failed: ${e.message}`);
                 continue;
@@ -912,15 +960,14 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             await capture(ctx().control, path.join(outDir, `control-drawer-${tab}.png`), log);
         }
 
-        // Сверка с эталонами — только по запросу (--visual-check), чтобы обычный
-        // прогон скриншотов оставался быстрым и не падал.
-        // Неполная съёмка — отказ, а не мелочь.
-        //
-        // Сверять картинки на CI пока не с чем: эталоны (8.6 МБ PNG) в
-        // репозиторий не кладутся, а рендеринг ubuntu отличается от macOS.
-        // Но проверить, что приложение поднялось и сняло ВСЕ окна, можно и без
-        // эталонов — и это ровно то, чего шагу не хватало, когда падение
-        // Electron под xvfb прожило незамеченным.
+        // Обычная съёмка валится при промахе кадра. --visual-check вдобавок
+        // требует эталон для каждого снятого кадра, который можно сравнить.
+        const failedNames = new Set(CAPTURE_FAILURES.map(({ file }) => file));
+        for (const file of expectedCaptureNames(STYLES, HOUR_STATES)) {
+            if (!capturedNames.has(file) && !failedNames.has(file)) {
+                CAPTURE_FAILURES.push({ file, reason: 'не выполнен сценарий съёмки' });
+            }
+        }
         if (CAPTURE_FAILURES.length > 0) {
             const list = CAPTURE_FAILURES.map((f) => `${f.file} (${f.reason})`).join(', ');
             log.error(`[screenshot] кадров не снято: ${CAPTURE_FAILURES.length} — ${list}`);
@@ -929,15 +976,18 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
             app.exit(4);
             return;
         }
+        fs.writeFileSync(manifest, JSON.stringify([...capturedNames].sort()));
+        console.log(`[screenshot] кадров снято: ${capturedNames.size}`);
 
-        if (process.argv.includes('--visual-check') && nativeImage) {
+        if (process.argv.includes('--visual-check')) {
             const regressions = compareWithBaseline({
                 nativeImage,
                 outDir,
                 baselineDir: path.join(__dirname, '..', 'tests', 'visual-baseline'),
-                log
+                log,
+                capturedNames
             });
-            if (regressions && regressions.length > 0) {
+            if (regressions.length > 0) {
                 log.error(`[visual] регрессий: ${regressions.length}`);
                 clearTimeout(hardTimeout);
                 app.exit(3);
@@ -960,4 +1010,4 @@ async function run({ app, log, ctx, applyTimerState, openWidget, openClock, open
     }
 }
 
-module.exports = { run };
+module.exports = { run, compareWithBaseline };

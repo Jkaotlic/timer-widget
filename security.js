@@ -18,7 +18,7 @@ function isValidDataURL(str) {
  * Принимаются только локальные data URL — загрузка по http(s) намеренно
  * запрещена, чтобы renderer не ходил в сеть за пользовательским контентом.
  * @param {string} imageData - data URL изображения
- * @returns {Object} { valid: boolean, sanitized: string, error: string }
+ * @returns {any} { valid: boolean, sanitized: string, error: string }
  */
 function validateImageSource(imageData) {
     if (!imageData || typeof imageData !== 'string') {

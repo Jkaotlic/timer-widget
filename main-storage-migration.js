@@ -45,7 +45,7 @@
 const fs = require('fs');
 const path = require('path');
 const AppScheme = require('./app-scheme');
-const { writeFileAtomicSync, readProfileJson } = require('./atomic-write');
+const { writeFileAtomicSync, readProfileJson, errorCode } = require('./atomic-write');
 
 const MARKER_FILE = 'storage-migration.json';
 const MARKER_VERSION = 1;
@@ -132,14 +132,18 @@ function describeSize(entries) {
     return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} МБ` : `${Math.ceil(bytes / 1024)} КБ`;
 }
 
-function withTimeout(promise, ms, step) {
+/**
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ */
+function withTimeout(promise, ms) {
     let timer;
-    return Promise.race([
-        promise,
-        new Promise((_, reject) => {
-            timer = setTimeout(() => reject(new Error(`таймаут шага «${step}»`)), ms);
-        })
-    ]).finally(() => clearTimeout(timer));
+    /** @type {Promise<never>} */
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Object.assign(new Error('таймаут'), { code: 'ETIMEDOUT' })), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -147,9 +151,9 @@ function withTimeout(promise, ms, step) {
  * @param {string} deps.userDataPath
  * @param {boolean} deps.hadStorageAtStart — hasStorageDir() при загрузке точки входа
  * @param {string} deps.appDir — каталог страниц (в сборке — app.asar)
- * @param {Function} deps.BrowserWindow
- * @param {() => Promise<void>} deps.flushStorageData — session.defaultSession.flushStorageData
- * @param {{info: Function, warn: Function}} deps.log
+ * @param {typeof import('electron').BrowserWindow} deps.BrowserWindow
+ * @param {() => void | Promise<void>} deps.flushStorageData — session.defaultSession.flushStorageData
+ * @param {Pick<import('electron-log').LogFunctions, 'info' | 'warn'>} deps.log
  * @param {number} [deps.timeoutMs]
  * @returns {Promise<{outcome: string, keys?: number, written?: number, skipped?: number,
  *          failed?: number, dispose: () => void}>}
@@ -176,6 +180,7 @@ async function migrateStorage(deps) {
     const { userDataPath, appDir, BrowserWindow, flushStorageData, log } = deps;
     const timeoutMs = deps.timeoutMs || STEP_TIMEOUT_MS;
     const markerFile = path.join(userDataPath, MARKER_FILE);
+    /** @type {import('electron').BrowserWindow | null} */
     let win = null;
     const dispose = () => {
         if (win && !win.isDestroyed()) { win.destroy(); }
@@ -228,29 +233,35 @@ async function migrateStorage(deps) {
     }
 
     let entries = null;
+    let step = 'создание окна переноса';
     try {
         if (!win || win.isDestroyed()) { win = createHiddenWindow(); }
-        await withTimeout(win.loadFile(path.join(appDir, MIGRATION_PAGE)), timeoutMs, 'загрузка file://');
+        step = 'загрузка file://';
+        await withTimeout(win.loadFile(path.join(appDir, MIGRATION_PAGE)), timeoutMs);
+        step = 'чтение file://';
         entries = parseEntries(await withTimeout(
             win.webContents.executeJavaScript(`(${readAllEntries.toString()})(localStorage)`),
-            timeoutMs, 'чтение file://'
+            timeoutMs
         ));
         const keys = Object.keys(entries).length;
         if (keys === 0) {
+            step = 'запись метки';
             writeMarker(markerFile, { status: 'done', keys: 0 });
             log.info('[migration] file:// → app://: переносить нечего (ключей 0)');
             return { outcome: 'done', keys: 0, written: 0, skipped: 0, failed: 0, dispose };
         }
 
-        await withTimeout(win.loadURL(AppScheme.pageUrl(MIGRATION_PAGE)), timeoutMs, 'загрузка app://');
+        step = 'загрузка app://';
+        await withTimeout(win.loadURL(AppScheme.pageUrl(MIGRATION_PAGE)), timeoutMs);
         // Ключи — строкой JSON и JSON.parse в странице, а не литералом объекта:
         // в литерале ключ "__proto__" стал бы прототипом, а не ключом.
         const payload = JSON.stringify(JSON.stringify(entries));
+        step = 'запись app://';
         const result = await withTimeout(
             win.webContents.executeJavaScript(
                 `(${writeMissingEntries.toString()})(localStorage, JSON.parse(${payload}), ${overwrite})`
             ),
-            timeoutMs, 'запись app://'
+            timeoutMs
         );
         const written = Number(result && result.written) || 0;
         const skipped = Number(result && result.skipped) || 0;
@@ -263,24 +274,26 @@ async function migrateStorage(deps) {
         }
         // Данные — на диск ДО метки: метка без данных — это настройки,
         // потерянные при сбое в первые секунды после миграции.
-        await withTimeout(Promise.resolve(flushStorageData()), timeoutMs, 'сброс на диск');
+        step = 'сброс на диск';
+        await withTimeout(Promise.resolve(flushStorageData()), timeoutMs);
+        step = 'запись метки';
         writeMarker(markerFile, { status: 'done', keys, written, skipped });
         log.info(`[migration] file:// → app://: ${summary}`);
         return { outcome: 'done', keys, written, skipped, failed: 0, dispose };
     } catch (err) {
         const keys = entries ? Object.keys(entries).length : 0;
-        return finishFailed(`сбой: ${err && err.message ? err.message : err}`, { keys, written: 0, skipped: 0, failed: keys });
+        return finishFailed(`${step}: ${errorCode(err)}`, { keys, written: 0, skipped: 0, failed: keys });
     }
 
     // Сколько ключей в app:// — через скрытое окно; null — сверить не вышло.
     async function countAppKeys() {
         try {
             win = createHiddenWindow();
-            await withTimeout(win.loadURL(AppScheme.pageUrl(MIGRATION_PAGE)), timeoutMs, 'сверка app://');
-            const n = await withTimeout(win.webContents.executeJavaScript('localStorage.length'), timeoutMs, 'сверка app://');
+            await withTimeout(win.loadURL(AppScheme.pageUrl(MIGRATION_PAGE)), timeoutMs);
+            const n = await withTimeout(win.webContents.executeJavaScript('localStorage.length'), timeoutMs);
             return Number.isInteger(n) ? n : null;
         } catch (err) {
-            log.warn(`[migration] сверка не удалась: ${err && err.message ? err.message : err}`);
+            log.warn(`[migration] сверка app:// не удалась: ${errorCode(err)}`);
             dispose();
             return null;
         }
@@ -291,7 +304,7 @@ async function migrateStorage(deps) {
         try {
             writeMarker(markerFile, { status: gaveUp ? 'gave-up' : 'pending', attempts });
         } catch (err) {
-            log.warn('[migration] метку не записать:', err && err.message);
+            log.warn('[migration] метку не записать:', errorCode(err));
         }
         log.warn(`[migration] file:// → app://, попытка ${attempts}/${MAX_ATTEMPTS}: ${why}`
             + (gaveUp ? ' — сдаюсь, больше не повторяю' : ' — повторю при следующем запуске'));
